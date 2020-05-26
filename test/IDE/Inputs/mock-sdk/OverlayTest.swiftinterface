@@ -1,0 +1,10 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name OverlayTest
+
+@_exported import OverlayTest
+
+public extension Overlayed {
+    public func inOverlayFunc() {}
+}
+
+public func createOverlayedInOverlay() -> Overlayed

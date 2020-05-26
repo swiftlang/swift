@@ -60,7 +60,7 @@
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
 /// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
-@_fixed_layout
+@frozen
 public struct ClosedRange<Bound: Comparable> {
   /// The range's lower bound.
   public let lowerBound: Bound
@@ -126,15 +126,15 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Iterator = IndexingIterator<ClosedRange<Bound>>
 }
 
-extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
-  @_frozen // FIXME(resilience)
+extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
+  @frozen // FIXME(resilience)
   public enum Index {
     case pastEnd
     case inRange(Bound)
   }
 }
 
-extension ClosedRange.Index : Comparable {
+extension ClosedRange.Index: Comparable {
   @inlinable
   public static func == (
     lhs: ClosedRange<Bound>.Index,
@@ -158,7 +158,7 @@ extension ClosedRange.Index : Comparable {
     switch (lhs, rhs) {
     case (.inRange(let l), .inRange(let r)):
       return l < r
-    case (.inRange(_), .pastEnd):
+    case (.inRange, .pastEnd):
       return true
     default:
       return false
@@ -188,7 +188,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
 // FIXME: this should only be conformance to RandomAccessCollection but
 // the compiler balks without all 3
 extension ClosedRange: Collection, BidirectionalCollection, RandomAccessCollection
-where Bound : Strideable, Bound.Stride : SignedInteger
+where Bound: Strideable, Bound.Stride: SignedInteger
 {
   // while a ClosedRange can't be empty, a _slice_ of a ClosedRange can,
   // so ClosedRange can't be its own self-slice unlike Range
@@ -232,24 +232,24 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   }
 
   @inlinable
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
     switch i {
     case .inRange(let x):
       let d = x.distance(to: upperBound)
-      if n <= d {
-        let newPosition = x.advanced(by: numericCast(n))
+      if distance <= d {
+        let newPosition = x.advanced(by: numericCast(distance))
         _precondition(newPosition >= lowerBound,
           "Advancing past start index")
         return .inRange(newPosition)
       }
-      if d - -1 == n { return .pastEnd }
+      if d - -1 == distance { return .pastEnd }
       _preconditionFailure("Advancing past end index")
     case .pastEnd:
-      if n == 0 {
+      if distance == 0 {
         return i
       } 
-      if n < 0 {
-        return index(.inRange(upperBound), offsetBy: numericCast(n + 1))
+      if distance < 0 {
+        return index(.inRange(upperBound), offsetBy: numericCast(distance + 1))
       }
       _preconditionFailure("Advancing past end index")
     }
@@ -338,44 +338,12 @@ extension Comparable {
   }
 }
 
-extension Strideable where Stride: SignedInteger {  
-  /// Returns a countable closed range that contains both of its bounds.
-  ///
-  /// Use the closed range operator (`...`) to create a closed range of any type
-  /// that conforms to the `Strideable` protocol with an associated signed
-  /// integer `Stride` type, such as any of the standard library's integer
-  /// types. This example creates a `ClosedRange<Int>` from zero up to,
-  /// and including, nine.
-  ///
-  ///     let singleDigits = 0...9
-  ///     print(singleDigits.contains(9))
-  ///     // Prints "true"
-  ///
-  /// You can use sequence or collection methods on the `singleDigits` range.
-  ///
-  ///     print(singleDigits.count)
-  ///     // Prints "10"
-  ///     print(singleDigits.last)
-  ///     // Prints "9"
-  ///
-  /// - Parameters:)`.
-  ///   - minimum: The lower bound for the range.
-  ///   - maximum: The upper bound for the range.
-  @_transparent
-  public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
-    // FIXME: swift-3-indexing-model: tests for traps.
-    _precondition(
-      minimum <= maximum, "Can't form Range with upperBound < lowerBound")
-    return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
-  }
-}
-
 extension ClosedRange: Equatable {
   /// Returns a Boolean value indicating whether two ranges are equal.
   ///
   /// Two ranges are equal when they have the same lower and upper bounds.
   ///
-  ///     let x: ClosedRange = 5...15
+  ///     let x = 5...15
   ///     print(x == 5...15)
   ///     // Prints "true"
   ///     print(x == 10...20)
@@ -400,7 +368,7 @@ extension ClosedRange: Hashable where Bound: Hashable {
   }
 }
 
-extension ClosedRange : CustomStringConvertible {
+extension ClosedRange: CustomStringConvertible {
   /// A textual representation of the range.
   @inlinable // trivial-implementation...
   public var description: String {
@@ -408,7 +376,7 @@ extension ClosedRange : CustomStringConvertible {
   }
 }
 
-extension ClosedRange : CustomDebugStringConvertible {
+extension ClosedRange: CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
@@ -416,7 +384,7 @@ extension ClosedRange : CustomDebugStringConvertible {
   }
 }
 
-extension ClosedRange : CustomReflectable {
+extension ClosedRange: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -457,7 +425,7 @@ extension ClosedRange {
   }
 }
 
-extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {  
+extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
   /// Creates an instance equivalent to the given `Range`.
   ///
   /// - Parameter other: A `Range` to convert to a `ClosedRange` instance.
@@ -465,6 +433,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   /// An equivalent range must be representable as a closed range.
   /// For example, passing an empty range as `other` triggers a runtime error,
   /// because an empty range cannot be represented by a closed range instance.
+  @inlinable
   public init(_ other: Range<Bound>) {
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
@@ -475,7 +444,12 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
 extension ClosedRange {
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
-    return self.contains(other.lowerBound) || other.contains(lowerBound)
+    // Disjoint iff the other range is completely before or after our range.
+    // Unlike a `Range`, a `ClosedRange` can *not* be empty, so no check for
+    // that case is needed here.
+    let isDisjoint = other.upperBound < self.lowerBound
+      || self.upperBound < other.lowerBound
+    return !isDisjoint
   }
 
   @inlinable
@@ -487,4 +461,27 @@ extension ClosedRange {
 // Note: this is not for compatibility only, it is considered a useful
 // shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
-  where Bound.Stride : SignedInteger
+  where Bound.Stride: SignedInteger
+
+extension ClosedRange: Decodable where Bound: Decodable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let lowerBound = try container.decode(Bound.self)
+    let upperBound = try container.decode(Bound.self)
+    guard lowerBound <= upperBound else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
+    }
+    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+  }
+}
+
+extension ClosedRange: Encodable where Bound: Encodable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
+    try container.encode(self.upperBound)
+  }
+}

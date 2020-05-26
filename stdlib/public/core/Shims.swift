@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,9 +14,9 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 import SwiftShims
 
+#if _runtime(_ObjC)
 @inlinable
 internal func _makeSwiftNSFastEnumerationState()
    -> _SwiftNSFastEnumerationState {
@@ -27,12 +27,17 @@ internal func _makeSwiftNSFastEnumerationState()
 
 /// A dummy value to be used as the target for `mutationsPtr` in fast
 /// enumeration implementations.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 internal var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
 
 /// A dummy pointer to be used as `mutationsPtr` in fast enumeration
 /// implementations.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 internal let _fastEnumerationStorageMutationsPtr =
   UnsafeMutablePointer<CUnsignedLong>(Builtin.addressof(&_fastEnumerationStorageMutationsTarget))
 #endif
+
+@usableFromInline @_alwaysEmitIntoClient
+internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
+  return _swift_stdlib_has_malloc_size() ? _swift_stdlib_malloc_size(ptr) : nil
+}

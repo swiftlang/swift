@@ -2,6 +2,17 @@
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 // RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out
+
+// RUN: %empty-directory(%t)
+//
+// target-build-swift assumes we want -swift-version 4. Behavior in initializers
+// changed in swift 5, so we want to explicitly check it as well.
+//
+// RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
+// RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o %s -o %t/a.out -swift-version 5
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
@@ -15,6 +26,15 @@ var ThrowingInitTestSuite = TestSuite("ThrowingInitObjC")
 
 enum E : Error {
   case X
+}
+
+class Klass {}
+
+func mustThrow<T>(_ f: () throws -> T) {
+  do {
+    try f()
+    preconditionFailure("Didn't throw")
+  } catch {}
 }
 
 func unwrap(_ b: Bool) throws -> Int {
@@ -189,13 +209,6 @@ class GuineaPig<T> : Bear {
   }
 }
 
-func mustThrow<T>(_ f: () throws -> T) {
-  do {
-    try f()
-    preconditionFailure("Didn't throw")
-  } catch {}
-}
-
 ThrowingInitTestSuite.test("DesignatedInitSuccess_Root") {
   _ = try! Bear(n: 0, before: false)
   _ = try! Bear(n: 0, after: false)
@@ -320,6 +333,279 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
   mustThrow { try PolarBear(before: false, before2: true, during: false, after: false) }
   mustThrow { try PolarBear(before: false, before2: false, during: true, after: false) }
   mustThrow { try PolarBear(before: false, before2: false, during: false, after: true) }
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+// @objc tests
+
+class ObjCAnnotatedBear : NSLifetimeTracked {
+  let x: LifetimeTracked
+
+  /* Designated */
+  @objc init(n: Int) {
+    x = LifetimeTracked(0)
+  }
+
+  @objc init(n: Int, before: Bool) throws {
+    if before {
+      throw E.X
+    }
+    self.x = LifetimeTracked(0)
+  }
+
+  @objc init(n: Int, after: Bool) throws {
+    self.x = LifetimeTracked(0)
+    if after {
+      throw E.X
+    }
+  }
+
+  @objc init(n: Int, before: Bool, after: Bool) throws {
+    if before {
+      throw E.X
+    }
+    self.x = LifetimeTracked(0)
+    if after {
+      throw E.X
+    }
+  }
+
+  /* Convenience */
+  @objc convenience init(before: Bool) throws {
+    try unwrap(before)
+    self.init(n: 0)
+  }
+
+  @objc convenience init(before2: Bool) throws {
+    try self.init(n: unwrap(before2))
+  }
+
+  @objc convenience init(before: Bool, before2: Bool) throws {
+    try unwrap(before)
+    try self.init(n: unwrap(before2))
+  }
+
+  @objc convenience init(during: Bool) throws {
+    try self.init(n: 0, after: during)
+  }
+
+  @objc convenience init(before: Bool, during: Bool) throws {
+    try unwrap(before)
+    try self.init(n: 0, after: during)
+  }
+
+  @objc convenience init(after: Bool) throws {
+    self.init(n: 0)
+    try unwrap(after)
+  }
+
+  @objc convenience init(before: Bool, after: Bool) throws {
+    try unwrap(before)
+    self.init(n: 0)
+    try unwrap(after)
+  }
+
+  @objc convenience init(during: Bool, after: Bool) throws {
+    try self.init(n: 0, after: during)
+    try unwrap(after)
+  }
+
+  @objc convenience init(before: Bool, during: Bool, after: Bool) throws {
+    try unwrap(before)
+    try self.init(n: 0, after: during)
+    try unwrap(after)
+  }
+
+  @objc convenience init(before: Bool, before2: Bool, during: Bool, after: Bool) throws {
+    try unwrap(before)
+    try self.init(n: unwrap(before2), after: during)
+    try unwrap(after)
+  }
+}
+
+class ObjCAnnotatedPolarBear : ObjCAnnotatedBear {
+  let y: LifetimeTracked
+
+  /* Designated */
+  @objc override init(n: Int) {
+    self.y = LifetimeTracked(0)
+    super.init(n: n)
+  }
+
+  @objc override init(n: Int, before: Bool) throws {
+    if before {
+      throw E.X
+    }
+    self.y = LifetimeTracked(0)
+    super.init(n: n)
+  }
+
+  @objc init(n: Int, during: Bool) throws {
+    self.y = LifetimeTracked(0)
+    try super.init(n: n, before: during)
+  }
+
+  @objc init(n: Int, before: Bool, during: Bool) throws {
+    self.y = LifetimeTracked(0)
+    if before {
+      throw E.X
+    }
+    try super.init(n: n, before: during)
+  }
+
+  @objc override init(n: Int, after: Bool) throws {
+    self.y = LifetimeTracked(0)
+    super.init(n: n)
+    if after {
+      throw E.X
+    }
+  }
+
+  @objc init(n: Int, during: Bool, after: Bool) throws {
+    self.y = LifetimeTracked(0)
+    try super.init(n: n, before: during)
+    if after {
+      throw E.X
+    }
+  }
+
+  @objc override init(n: Int, before: Bool, after: Bool) throws {
+    if before {
+      throw E.X
+    }
+    self.y = LifetimeTracked(0)
+    super.init(n: n)
+    if after {
+      throw E.X
+    }
+  }
+
+  @objc init(n: Int, before: Bool, during: Bool, after: Bool) throws {
+    if before {
+      throw E.X
+    }
+    self.y = LifetimeTracked(0)
+    try super.init(n: n, before: during)
+    if after {
+      throw E.X
+    }
+  }
+}
+
+ThrowingInitTestSuite.test("ObjCAnnotatedDesignatedInitSuccess_Root") {
+  _ = try! ObjCAnnotatedBear(n: 0, before: false)
+  _ = try! ObjCAnnotatedBear(n: 0, after: false)
+  _ = try! ObjCAnnotatedBear(n: 0, before: false, after: false)
+  _ = try! ObjCAnnotatedBear(n: 0, before: false, after: false)
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("ObjCAnnotatedDesignatedInitFailure_Root") {
+  mustThrow { try ObjCAnnotatedBear(n: 0, before: true) }
+  mustThrow { try ObjCAnnotatedBear(n: 0, after: true) }
+  mustThrow { try ObjCAnnotatedBear(n: 0, before: true, after: false) }
+  mustThrow { try ObjCAnnotatedBear(n: 0, before: false, after: true) }
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("ObjCAnnotatedDesignatedInitSuccess_Derived") {
+  _ = try! ObjCAnnotatedPolarBear(n: 0, before: false)
+  _ = try! ObjCAnnotatedPolarBear(n: 0, during: false)
+  _ = try! ObjCAnnotatedPolarBear(n: 0, before: false, during: false)
+  _ = try! ObjCAnnotatedPolarBear(n: 0, after: false)
+  _ = try! ObjCAnnotatedPolarBear(n: 0, during: false, after: false)
+  _ = try! ObjCAnnotatedPolarBear(n: 0, before: false, after: false)
+  _ = try! ObjCAnnotatedPolarBear(n: 0, before: false, during: false, after: false)
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("ObjCAnnotatedDesignatedInitFailure_Derived") {
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, before: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, during: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, before: true, during: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, before: false, during: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, after: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, during: true, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, during: false, after: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, before: true, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, before: false, after: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, before: true, during: false, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, before: false, during: true, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(n: 0, before: false, during: false, after: true) }
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("ObjCAnnotatedConvenienceInitSuccess_Root") {
+  _ = try! ObjCAnnotatedBear(before: false)
+  _ = try! ObjCAnnotatedBear(before2: false)
+  _ = try! ObjCAnnotatedBear(before: false, before2: false)
+  _ = try! ObjCAnnotatedBear(during: false)
+  _ = try! ObjCAnnotatedBear(before: false, during: false)
+  _ = try! ObjCAnnotatedBear(after: false)
+  _ = try! ObjCAnnotatedBear(before: false, after: false)
+  _ = try! ObjCAnnotatedBear(during: false, after: false)
+  _ = try! ObjCAnnotatedBear(before: false, during: false, after: false)
+  _ = try! ObjCAnnotatedBear(before: false, before2: false, during: false, after: false)
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("ObjCAnnotatedConvenienceInitFailure_Root") {
+  mustThrow { try ObjCAnnotatedBear(before: true) }
+  mustThrow { try ObjCAnnotatedBear(before2: true) }
+  mustThrow { try ObjCAnnotatedBear(before: true, before2: false) }
+  mustThrow { try ObjCAnnotatedBear(before: false, before2: true) }
+  mustThrow { try ObjCAnnotatedBear(during: true) }
+  mustThrow { try ObjCAnnotatedBear(before: true, during: false) }
+  mustThrow { try ObjCAnnotatedBear(before: false, during: true) }
+  mustThrow { try ObjCAnnotatedBear(after: true) }
+  mustThrow { try ObjCAnnotatedBear(before: true, after: false) }
+  mustThrow { try ObjCAnnotatedBear(before: false, after: true) }
+  mustThrow { try ObjCAnnotatedBear(during: true, after: false) }
+  mustThrow { try ObjCAnnotatedBear(during: false, after: true) }
+  mustThrow { try ObjCAnnotatedBear(before: true, during: false, after: false) }
+  mustThrow { try ObjCAnnotatedBear(before: false, during: true, after: false) }
+  mustThrow { try ObjCAnnotatedBear(before: false, during: false, after: true) }
+  mustThrow { try ObjCAnnotatedBear(before: true, before2: false, during: false, after: false) }
+  mustThrow { try ObjCAnnotatedBear(before: false, before2: true, during: false, after: false) }
+  mustThrow { try ObjCAnnotatedBear(before: false, before2: false, during: true, after: false) }
+  mustThrow { try ObjCAnnotatedBear(before: false, before2: false, during: false, after: true) }
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("ObjCAnnotatedConvenienceInitSuccess_Derived") {
+  _ = try! ObjCAnnotatedPolarBear(before: false)
+  _ = try! ObjCAnnotatedPolarBear(before2: false)
+  _ = try! ObjCAnnotatedPolarBear(before: false, before2: false)
+  _ = try! ObjCAnnotatedPolarBear(during: false)
+  _ = try! ObjCAnnotatedPolarBear(before: false, during: false)
+  _ = try! ObjCAnnotatedPolarBear(after: false)
+  _ = try! ObjCAnnotatedPolarBear(before: false, after: false)
+  _ = try! ObjCAnnotatedPolarBear(during: false, after: false)
+  _ = try! ObjCAnnotatedPolarBear(before: false, during: false, after: false)
+  _ = try! ObjCAnnotatedPolarBear(before: false, before2: false, during: false, after: false)
+  expectEqual(NSLifetimeTracked.count(), 0)
+}
+
+ThrowingInitTestSuite.test("ObjCAnnotatedConvenienceInitFailure_Derived") {
+  mustThrow { try ObjCAnnotatedPolarBear(before: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(before2: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: true, before2: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: false, before2: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(during: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: true, during: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: false, during: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(after: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: true, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: false, after: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(during: true, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(during: false, after: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: true, during: false, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: false, during: true, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: false, during: false, after: true) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: true, before2: false, during: false, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: false, before2: true, during: false, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: false, before2: false, during: true, after: false) }
+  mustThrow { try ObjCAnnotatedPolarBear(before: false, before2: false, during: false, after: true) }
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 

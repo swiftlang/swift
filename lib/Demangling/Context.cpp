@@ -68,8 +68,24 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
   return demangling;
 }
 
+// Removes a '.<n>' suffix from \p Name. <n> is either a number or a combination of
+// '.<other-text>.<n>'.
+// Such symbols are produced in IRGen or in LLVM optimizations.
+static llvm::StringRef stripSuffix(llvm::StringRef Name) {
+  // A suffix always ends with a digit. Do this quick check to avoid scanning through the whole
+  // symbol name if the symbol has no suffix (= the common case).
+  if (isdigit(Name.back())) {
+    size_t dotPos = Name.find('.');
+    if (dotPos != StringRef::npos) {
+      Name = Name.substr(0, dotPos);
+    }
+  }
+  return Name;
+}
+
 bool Context::isThunkSymbol(llvm::StringRef MangledName) {
   if (isMangledName(MangledName)) {
+    MangledName = stripSuffix(MangledName);
     // First do a quick check
     if (MangledName.endswith("TA") ||  // partial application forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
@@ -77,7 +93,8 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         MangledName.endswith("TO") ||  // ObjC-as-swift thunk
         MangledName.endswith("TR") ||  // reabstraction thunk helper function
         MangledName.endswith("Tr") ||  // reabstraction thunk
-        MangledName.endswith("TW")) {  // protocol witness thunk
+        MangledName.endswith("TW") ||  // protocol witness thunk
+        MangledName.endswith("fC")) {  // allocating constructor
 
       // To avoid false positives, we need to fully demangle the symbol.
       NodePointer Nd = D->demangleSymbol(MangledName);
@@ -93,6 +110,7 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         case Node::Kind::ReabstractionThunkHelper:
         case Node::Kind::ReabstractionThunk:
         case Node::Kind::ProtocolWitness:
+        case Node::Kind::Allocator:
           return true;
         default:
           break;
@@ -119,11 +137,21 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
     return std::string();
 
   if (isMangledName(MangledName)) {
+    // If the symbol has a suffix we cannot derive the target.
+    if (stripSuffix(MangledName) != MangledName)
+      return std::string();
+
     // The targets of those thunks not derivable from the mangling.
     if (MangledName.endswith("TR") ||
         MangledName.endswith("Tr") ||
         MangledName.endswith("TW") )
       return std::string();
+
+    if (MangledName.endswith("fC")) {
+      std::string target = MangledName.str();
+      target[target.size() - 1] = 'c';
+      return target;
+    }
 
     return MangledName.substr(0, MangledName.size() - 2).str();
   }
@@ -154,6 +182,7 @@ bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
+    case Node::Kind::BaseWitnessTableAccessor:
     case Node::Kind::ObjCAttribute:
       return false;
     default:
@@ -161,6 +190,43 @@ bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
   }
   return true;
 }
+
+std::string Context::getModuleName(llvm::StringRef mangledName) {
+  NodePointer node = demangleSymbolAsNode(mangledName);
+  while (node) {
+    switch (node->getKind()) {
+    case Demangle::Node::Kind::Module:
+      return node->getText().str();
+    case Demangle::Node::Kind::TypeMangling:
+    case Demangle::Node::Kind::Type:
+      node = node->getFirstChild();
+      break;
+    case Demangle::Node::Kind::Global: {
+      NodePointer newNode = nullptr;
+      for (NodePointer child : *node) {
+        if (!isFunctionAttr(child->getKind())) {
+          newNode = child;
+          break;
+        }
+      }
+      node = newNode;
+      break;
+    }
+    default:
+      if (isSpecialized(node)) {
+        node = getUnspecialized(node, *D);
+        break;
+      }
+      if (isContext(node->getKind())) {
+        node = node->getFirstChild();
+        break;
+      }
+      return std::string();
+    }
+  }
+  return std::string();
+}
+
 
 //////////////////////////////////
 // Public utility functions     //

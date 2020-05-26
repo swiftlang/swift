@@ -55,6 +55,7 @@
 #ifndef SWIFT_ABI_TRAILINGOBJECTS_H
 #define SWIFT_ABI_TRAILINGOBJECTS_H
 
+#include "llvm/Support/Alignment.h"
 #include "llvm/Support/AlignOf.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
@@ -97,27 +98,20 @@ protected:
   template <typename T> struct OverloadToken {};
 };
 
-/// This helper template works-around MSVC 2013's lack of useful
-/// alignas() support. The argument to LLVM_ALIGNAS(), in MSVC, is
-/// required to be a literal integer. But, you *can* use template
-/// specialization to select between a bunch of different LLVM_ALIGNAS
-/// expressions...
 template <int Align>
 class TrailingObjectsAligner : public TrailingObjectsBase {};
 template <>
-class LLVM_ALIGNAS(1) TrailingObjectsAligner<1> : public TrailingObjectsBase {};
+class alignas(1) TrailingObjectsAligner<1> : public TrailingObjectsBase {};
 template <>
-class LLVM_ALIGNAS(2) TrailingObjectsAligner<2> : public TrailingObjectsBase {};
+class alignas(2) TrailingObjectsAligner<2> : public TrailingObjectsBase {};
 template <>
-class LLVM_ALIGNAS(4) TrailingObjectsAligner<4> : public TrailingObjectsBase {};
+class alignas(4) TrailingObjectsAligner<4> : public TrailingObjectsBase {};
 template <>
-class LLVM_ALIGNAS(8) TrailingObjectsAligner<8> : public TrailingObjectsBase {};
+class alignas(8) TrailingObjectsAligner<8> : public TrailingObjectsBase {};
 template <>
-class LLVM_ALIGNAS(16) TrailingObjectsAligner<16> : public TrailingObjectsBase {
-};
+class alignas(16) TrailingObjectsAligner<16> : public TrailingObjectsBase {};
 template <>
-class LLVM_ALIGNAS(32) TrailingObjectsAligner<32> : public TrailingObjectsBase {
-};
+class alignas(32) TrailingObjectsAligner<32> : public TrailingObjectsBase {};
 
 // Just a little helper for transforming a type pack into the same
 // number of a different type. e.g.:
@@ -182,7 +176,7 @@ protected:
 
     if (requiresRealignment())
       return reinterpret_cast<const NextTy *>(
-          llvm::alignAddr(Ptr, alignof(NextTy)));
+          llvm::alignAddr(Ptr, llvm::Align(alignof(NextTy))));
     else
       return reinterpret_cast<const NextTy *>(Ptr);
   }
@@ -196,7 +190,8 @@ protected:
                     Obj, TrailingObjectsBase::OverloadToken<PrevTy>());
 
     if (requiresRealignment())
-      return reinterpret_cast<NextTy *>(llvm::alignAddr(Ptr, alignof(NextTy)));
+      return reinterpret_cast<NextTy *>(
+          llvm::alignAddr(Ptr, llvm::Align(alignof(NextTy))));
     else
       return reinterpret_cast<NextTy *>(Ptr);
   }
@@ -259,16 +254,6 @@ class TrailingObjects : private trailing_objects_internal::TrailingObjectsImpl<
 
   using ParentType::getTrailingObjectsImpl;
 
-  // This function contains only a static_assert BaseTy is final. The
-  // static_assert must be in a function, and not at class-level
-  // because BaseTy isn't complete at class instantiation time, but
-  // will be by the time this function is instantiated.
-  static void verifyTrailingObjectsAssertions() {
-#ifdef LLVM_IS_FINAL
-    static_assert(LLVM_IS_FINAL(BaseTy), "BaseTy must be final.");
-#endif
-  }
-
   // These two methods are the base of the recursion for this method.
   static const BaseTy *
   getTrailingObjectsImpl(const BaseTy *Obj,
@@ -316,7 +301,6 @@ public:
   /// (which must be one of those specified in the class template). The
   /// array may have zero or more elements in it.
   template <typename T> const T *getTrailingObjects() const {
-    verifyTrailingObjectsAssertions();
     // Forwards to an impl function with overloads, since member
     // function templates can't be specialized.
     return this->getTrailingObjectsImpl(
@@ -328,7 +312,6 @@ public:
   /// (which must be one of those specified in the class template). The
   /// array may have zero or more elements in it.
   template <typename T> T *getTrailingObjects() {
-    verifyTrailingObjectsAssertions();
     // Forwards to an impl function with overloads, since member
     // function templates can't be specialized.
     return this->getTrailingObjectsImpl(
@@ -379,7 +362,7 @@ public:
   template <typename... Tys> struct FixedSizeStorage {
     template <size_t... Counts> struct with_counts {
       enum { Size = totalSizeToAlloc<Tys...>(Counts...) };
-      typedef llvm::AlignedCharArray<alignof(BaseTy), Size> type;
+      using type = std::aligned_storage<Size, alignof(BaseTy)>;
     };
   };
 

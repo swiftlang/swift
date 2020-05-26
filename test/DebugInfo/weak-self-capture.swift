@@ -15,5 +15,5 @@ public class ClosureMaker {
     }
 }
 
-// CHECK: define {{.*}} @"$S4main12ClosureMakerC03getB0SiycyFSiycfU_"
+// CHECK: define {{.*}} @"$s4main12ClosureMakerC03getB0SiycyFSiycfU_"
 // CHECK: call void @llvm.dbg.declare(metadata %swift.weak** %{{.*}} !DIExpression(DW_OP_deref)),

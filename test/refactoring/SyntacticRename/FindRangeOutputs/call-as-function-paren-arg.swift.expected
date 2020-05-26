@@ -1,0 +1,13 @@
+struct Adder {
+    var base: Int
+    func /*test:def*/<keywordBase>callAsFunction</keywordBase>(<arglabel index=0>_</arglabel><param index=0> x</param>: Int) -> Int {
+        return base + x
+    }
+}
+
+let add3 = Adder(base: 3)
+_ = add3/*test:call*/(<callcombo index=0></callcombo>10)
+_ = add3 . /*test:call*/<keywordBase>callAsFunction</keywordBase>(<callcombo index=0></callcombo>10)
+_ = add3 . /*test:ref*/<keywordBase>callAsFunction</keywordBase>(<sel index=0>_</sel>:)
+_ = add3 . /*test:ref*/<keywordBase>callAsFunction</keywordBase>
+

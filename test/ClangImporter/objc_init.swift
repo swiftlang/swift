@@ -121,6 +121,7 @@ func checkInitWithCoder(_ coder: NSCoder) {
   MyViewController(coder: coder) // expected-warning{{unused}}
   MyTableViewController(coder: coder) // expected-warning{{unused}}
   MyOtherTableViewController(coder: coder) // expected-error{{incorrect argument label in call (have 'coder:', expected 'int:')}}
+  // expected-error@-1 {{cannot convert value of type 'NSCoder' to expected argument type 'Int'}}
   MyThirdTableViewController(coder: coder) // expected-warning{{unused}}
 }
 
@@ -195,4 +196,17 @@ func classPropertiesAreNotInit() -> ProcessInfo {
   var procInfo = NSProcessInfo.processInfo // expected-error{{'NSProcessInfo' has been renamed to 'ProcessInfo'}}
   procInfo = ProcessInfo.processInfo // okay
   return procInfo
+}
+
+// Make sure we can still inherit a convenience initializer when we have a
+// designated initializer override in Obj-C that isn't considered a proper
+// override in Swift. In this case, both the superclass and subclass have a
+// designed init with the selector `initWithI:`, however the Swift signature for
+// the subclass' init is `init(__i:)` rather than `init(i:)`.
+extension SuperclassWithDesignatedInitInCategory {
+  convenience init(y: Int) { self.init(i: y) }
+}
+
+func testConvenienceInitInheritance() {
+  _ = SubclassWithSwiftPrivateDesignatedInit(y: 5)
 }

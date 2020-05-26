@@ -1,11 +1,12 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-object -O %s
+// RUN: %target-swift-frontend -emit-object -O %s
 
 // This is a compile-only test. It checks that the compiler does not crash for
 // a (not executed) bitcast with different sizes. This appears in the
 // specialized version fo myDictionaryBridge.
 // <rdar://problem/17821040>
 
-// A minimized version of _dictionaryBridgeToObjectiveC in the stdlib 
+// A minimized version of _dictionaryBridgeToObjectiveC that used to be in the
+// stdlib 
 public func myDictionaryBridge<
     SrcType, DestType
 >(

@@ -1,0 +1,332 @@
+// RUN: %target-sil-opt -test-constant-evaluator %s 2>&1 | %FileCheck %s
+
+/// Tests for the skip functionality of the constant evaluator which is
+/// available in the stepwise evaluation mode. The evaluator will be run on
+/// every function defined below whose name starts with `interpret` prefix and
+/// will output the constant value returned by the function or diagnostics
+/// if the evaluation fails. In addition, the evaluator will "skip" evaluating
+/// any call to a function whose name starts with `skip`. Skipping a function
+/// call will conservatively make all operands modified by the call as
+/// unknown symbolic values.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @skipNoopFunction : $@convention(thin) (Int32) -> ()
+
+// CHECK-LABEL: @interpretCallNoopFunction
+sil @interpretCallNoopFunction : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %1 = integer_literal $Builtin.Int32, 13
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %5 = function_ref @skipNoopFunction : $@convention(thin) (Int32) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (Int32) -> ()
+  %8 = struct_extract %2 : $Int32, #Int32._value
+  return %8 : $Builtin.Int32
+} // CHECK: Returns int: 13
+
+sil @skipGetInt : $@convention(thin) () -> Int32
+
+// CHECK-LABEL: @interpretSkipFunctionReturningValue
+sil hidden @interpretSkipFunctionReturningValue : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %1 = function_ref @skipGetInt : $@convention(thin) () -> Int32
+  %2 = apply %1() : $@convention(thin) () -> Int32
+  %3 = struct_extract %2 : $Int32, #Int32._value
+  return %3 : $Builtin.Int32
+} // CHECK: Returns unknown
+
+sil @skipIncrement : $@convention(thin) (@inout Int32) -> ()
+
+// CHECK-LABEL: @interpretSkipEffectfulFunction
+sil hidden @interpretSkipEffectfulFunction : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = alloc_stack $Int32, var, name "i"
+  %1 = integer_literal $Builtin.Int32, 13
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to %0 : $*Int32
+  %4 = begin_access [modify] [static] %0 : $*Int32
+  %5 = function_ref @skipIncrement : $@convention(thin) (@inout Int32) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@inout Int32) -> ()
+  end_access %4 : $*Int32
+
+  %7 = load %0 : $*Int32
+  %8 = struct_extract %7 : $Int32, #Int32._value
+  dealloc_stack %0 : $*Int32
+  return %8 : $Builtin.Int32
+} // CHECK: Returns unknown
+
+// CHECK-LABEL: @interpretSkipFunctionNotAffectingResult
+sil hidden @interpretSkipFunctionNotAffectingResult : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = alloc_stack $Int32, var, name "i"
+  %1 = integer_literal $Builtin.Int32, 32
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to %0 : $*Int32
+  %3 = load %0 : $*Int32
+  %4 = begin_access [modify] [static] %0 : $*Int32
+  %5 = function_ref @skipIncrement : $@convention(thin) (@inout Int32) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@inout Int32) -> ()
+  end_access %4 : $*Int32
+  %8 = struct_extract %3 : $Int32, #Int32._value
+  dealloc_stack %0 : $*Int32
+  return %8 : $Builtin.Int32
+} // CHECK: Returns int: 32
+
+// CHECK-LABEL: @interpretSkipFunctionInfluencingBranch
+sil hidden @interpretSkipFunctionInfluencingBranch : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = alloc_stack $Int32, var, name "i"
+  %1 = integer_literal $Builtin.Int32, 32
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  store %2 to %0 : $*Int32
+  %4 = begin_access [modify] [static] %0 : $*Int32
+  %5 = function_ref @skipIncrement : $@convention(thin) (@inout Int32) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@inout Int32) -> ()
+  end_access %4 : $*Int32
+
+  %7 = load %0 : $*Int32
+  %8 = struct_extract %7 : $Int32, #Int32._value
+  %9 = integer_literal $Builtin.Int32, 0
+  %10 = builtin "cmp_slt_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %10, bb2, bb3
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: branch depends on non-constant value produced by an unevaluated instructions
+    // CHECK: {{.*}}: note: result of an unevaluated instruction is not a constant
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %0 : $*Int32
+  return %8 : $Builtin.Int32
+}
+
+// Test skipping struct inits and methods
+
+struct S {
+  var first: Int64
+  var second: Int64
+}
+
+sil @skipInitStruct : $@convention(method) (@thin S.Type) -> S
+
+sil @skipAddToFirstProperty : $@convention(method) (Int64, @inout S) -> ()
+
+// CHECK-LABEL: @interpretMutatingMethod
+sil hidden @interpretMutatingMethod : $@convention(thin) (Int64) -> Builtin.Int64 {
+bb0(%0 : $Int64):
+  %2 = alloc_stack $S, var, name "s"
+  %3 = metatype $@thin S.Type
+  %4 = function_ref @skipInitStruct : $@convention(method) (@thin S.Type) -> S
+  %5 = apply %4(%3) : $@convention(method) (@thin S.Type) -> S
+  store %5 to %2 : $*S
+  %7 = begin_access [modify] [static] %2 : $*S
+  %8 = function_ref @skipAddToFirstProperty : $@convention(method) (Int64, @inout S) -> ()
+  %9 = apply %8(%0, %7) : $@convention(method) (Int64, @inout S) -> ()
+  end_access %7 : $*S
+  %11 = begin_access [read] [static] %2 : $*S
+  %12 = struct_element_addr %11 : $*S, #S.second
+  %13 = load %12 : $*Int64
+  end_access %11 : $*S
+  %14 = struct_extract %13 : $Int64, #Int64._value
+  dealloc_stack %2 : $*S
+  return %14 : $Builtin.Int64
+} // CHECK: Returns unknown
+
+sil hidden @initStruct : $@convention(method) (@thin S.Type) -> S {
+bb0(%0 : $@thin S.Type):
+  %1 = alloc_stack $S, var, name "self"
+  %2 = integer_literal $Builtin.Int64, 11
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = begin_access [modify] [static] %1 : $*S
+  %5 = struct_element_addr %4 : $*S, #S.first
+  store %3 to %5 : $*Int64
+  end_access %4 : $*S
+  %8 = integer_literal $Builtin.Int64, 102
+  %9 = struct $Int64 (%8 : $Builtin.Int64)
+  %10 = begin_access [modify] [static] %1 : $*S
+  %11 = struct_element_addr %10 : $*S, #S.second
+  store %9 to %11 : $*Int64
+  end_access %10 : $*S
+  %14 = struct $S (%3 : $Int64, %9 : $Int64)
+  dealloc_stack %1 : $*S
+  return %14 : $S
+}
+
+sil @skipGetInt64 : $@convention(thin) () -> Int64
+
+// CHECK-LABEL: @interpretInlinePropertyMutation
+sil hidden @interpretInlinePropertyMutation : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = alloc_stack $S, var, name "s"
+
+  // Initialize struct.
+  %1 = metatype $@thin S.Type
+  %2 = function_ref @initStruct : $@convention(method) (@thin S.Type) -> S
+  %3 = apply %2(%1) : $@convention(method) (@thin S.Type) -> S
+  store %3 to %0 : $*S
+
+  // The first property is assigned an unknown value.
+  %10 = begin_access [modify] [static] %0 : $*S
+  %11 = struct_element_addr %10 : $*S, #S.first
+  %12 = function_ref @skipGetInt64 : $@convention(thin) () -> Int64
+  %13 = apply %12() : $@convention(thin) () -> Int64
+  store %13 to %11 : $*Int64
+  end_access %10 : $*S
+
+  // Read the second property which must be a constant.
+  %23 = load %0 : $*S
+  %24 = struct_extract %23 : $S, #S.second
+  %25 = struct_extract %24 : $Int64, #Int64._value
+  dealloc_stack %0 : $*S
+  return %25 : $Builtin.Int64
+} // CHECK: Returns int: 102
+
+// Test struct initialization where some properties are unknown due to skipped
+// instructions.
+
+struct Inner {
+  var x: Int64
+}
+
+struct Outer {
+  var first: Int64
+  var second: Inner
+}
+
+sil @skipInitInner : $@convention(thin) () -> Inner
+
+// CHECK-LABEL: @interpretStructWithUnknownArgs
+sil @interpretStructWithUnknownArgs: $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 1005
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = function_ref @skipInitInner : $@convention(thin) () -> Inner
+  %4 = apply %3() : $@convention(thin) () -> Inner
+  %5 = struct $Outer (%2 : $Int64, %4 : $Inner)
+
+  %6 = struct_extract %5 : $Outer, #Outer.first
+  %7 = struct_extract %6 : $Int64, #Int64._value
+  return %7 : $Builtin.Int64
+} // CHECK: Returns int: 1005
+
+// CHECK-LABEL: @interpretPiecewiseStructConstruction
+sil @interpretPiecewiseStructConstruction: $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = alloc_stack $Outer, var, name "outer"
+  %1 = integer_literal $Builtin.Int64, 101
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct_element_addr %0 : $*Outer, #Outer.first
+  store %2 to %5 : $*Int64
+
+  %6 = function_ref @skipInitInner : $@convention(thin) () -> Inner
+  %7 = apply %6() : $@convention(thin) () -> Inner
+  %8 = struct_element_addr %0 : $*Outer, #Outer.second
+  store %7 to %8 : $*Inner
+
+  %9 = load %0 : $*Outer
+  %10 = struct_extract %9 : $Outer, #Outer.first
+  %11 = struct_extract %10 : $Int64, #Int64._value
+  dealloc_stack %0 : $*Outer
+  return %11 : $Builtin.Int64
+} // CHECK: Returns int: 101
+
+protocol InnerProto {
+  var x: Int64 { get }
+}
+
+struct OuterWithProto {
+  var first: Int64
+  var second: InnerProto
+}
+
+sil @skipConstructInnerProto : $@convention(thin) () -> @out InnerProto
+
+// CHECK-LABEL: @interpretStructConstructionWithCopyAddr
+sil @interpretStructConstructionWithCopyAddr: $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %1 = alloc_stack $OuterWithProto
+  %2 = integer_literal $Builtin.Int64, 201
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %5 = struct_element_addr %1 : $*OuterWithProto, #OuterWithProto.first
+  store %3 to %5 : $*Int64
+  %8 = alloc_stack $InnerProto
+  %9 = function_ref @skipConstructInnerProto : $@convention(thin) () -> @out InnerProto
+  %10 = apply %9(%8) : $@convention(thin) () -> @out InnerProto
+  %12 = struct_element_addr %1 : $*OuterWithProto, #OuterWithProto.second
+  copy_addr [take] %8 to [initialization] %12 : $*InnerProto
+  dealloc_stack %8 : $*InnerProto
+  %19 = struct_element_addr %1 : $*OuterWithProto, #OuterWithProto.first
+  %20 = load %19 : $*Int64
+  destroy_addr %1 : $*OuterWithProto
+  dealloc_stack %1 : $*OuterWithProto
+  %21 = struct_extract %20 : $Int64, #Int64._value
+  return %21 : $Builtin.Int64
+} // CHECK: Returns int: 201
+
+// Test the interpreter on an interleaving of skippable and interpretable
+// instructions that mimics the implementation of os log.
+
+sil @skipAppendInner : $@convention(method) (@inout Inner) -> ()
+
+sil hidden @increment : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = begin_access [modify] [static] %0 : $*Int64
+  %4 = struct_element_addr %3 : $*Int64, #Int64._value
+  %5 = load %4 : $*Builtin.Int64
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = builtin "sadd_with_overflow_Int64"(%5 : $Builtin.Int64, %2 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 0
+  %9 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %9 : $Builtin.Int1
+  %11 = struct $Int64 (%8 : $Builtin.Int64)
+  store %11 to %3 : $*Int64
+  %13 = tuple ()
+  end_access %3 : $*Int64
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: @interpretInteleavedSkipAndNonSkip
+sil @interpretInteleavedSkipAndNonSkip : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = alloc_stack $Outer, var, name "outer"
+  %1 = integer_literal $Builtin.Int64, 101
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct_element_addr %0 : $*Outer, #Outer.first
+  store %2 to %5 : $*Int64
+  %6 = function_ref @skipInitInner : $@convention(thin) () -> Inner
+  %7 = apply %6() : $@convention(thin) () -> Inner
+  %8 = struct_element_addr %0 : $*Outer, #Outer.second
+  store %7 to %8 : $*Inner
+
+  // Mutate the first component and second compoennt in an interleaved way.
+  %9 = struct_element_addr %0: $*Outer, #Outer.first
+  %10 = function_ref @increment : $@convention(thin) (@inout Int64) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@inout Int64) -> ()
+
+  %12 = struct_element_addr %0: $*Outer, #Outer.second
+  %13 = function_ref @skipAppendInner : $@convention(method) (@inout Inner) -> ()
+  %14 = apply %13(%12) : $@convention(method) (@inout Inner) -> ()
+
+  // Mutate the components once more.
+  %15 = struct_element_addr %0: $*Outer, #Outer.first
+  %16 = function_ref @increment : $@convention(thin) (@inout Int64) -> ()
+  %17 = apply %16(%15) : $@convention(thin) (@inout Int64) -> ()
+
+  %18 = struct_element_addr %0: $*Outer, #Outer.second
+  %19 = function_ref @skipAppendInner : $@convention(method) (@inout Inner) -> ()
+  %20 = apply %19(%18) : $@convention(method) (@inout Inner) -> ()
+
+  // Return the first property which should be a constant.
+  %30 = load %0 : $*Outer
+  %31 = struct_extract %30 : $Outer, #Outer.first
+  %32 = struct_extract %31 : $Int64, #Int64._value
+  dealloc_stack %0 : $*Outer
+  return %32 : $Builtin.Int64
+} // CHECK: Returns int: 103

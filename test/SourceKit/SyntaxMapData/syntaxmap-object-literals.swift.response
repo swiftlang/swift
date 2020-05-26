@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 454,
+  key.length: 280,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.syntaxmap: [
     {
@@ -11,61 +11,51 @@
     {
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 71,
-      key.length: 40
-    },
-    {
-      key.kind: source.lang.swift.syntaxtype.comment,
-      key.offset: 111,
-      key.length: 115
-    },
-    {
-      key.kind: source.lang.swift.syntaxtype.comment,
-      key.offset: 226,
-      key.length: 60
+      key.length: 41
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,
-      key.offset: 287,
+      key.offset: 113,
       key.length: 3
     },
     {
       key.kind: source.lang.swift.syntaxtype.identifier,
-      key.offset: 291,
+      key.offset: 117,
       key.length: 5
     },
     {
       key.kind: source.lang.swift.syntaxtype.objectliteral,
-      key.offset: 299,
+      key.offset: 125,
       key.length: 40
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,
-      key.offset: 340,
+      key.offset: 166,
       key.length: 3
     },
     {
       key.kind: source.lang.swift.syntaxtype.identifier,
-      key.offset: 344,
+      key.offset: 170,
       key.length: 5
     },
     {
       key.kind: source.lang.swift.syntaxtype.objectliteral,
-      key.offset: 352,
+      key.offset: 178,
       key.length: 50
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,
-      key.offset: 403,
+      key.offset: 229,
       key.length: 3
     },
     {
       key.kind: source.lang.swift.syntaxtype.identifier,
-      key.offset: 407,
+      key.offset: 233,
       key.length: 4
     },
     {
       key.kind: source.lang.swift.syntaxtype.objectliteral,
-      key.offset: 414,
+      key.offset: 240,
       key.length: 38
     }
   ]

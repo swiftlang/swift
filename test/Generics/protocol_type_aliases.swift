@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 
@@ -35,6 +35,7 @@ func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
 // CHECK-LABEL: .concreteRequirementOnConcreteNestedTypeAlias@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == τ_0_0.B.A>
 func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> == T.B.X {}
+// expected-warning@-1 {{neither type in same-type constraint ('S<T.C>' or 'T.B.X') refers to a generic parameter or associated type}}
 
 
 // Incompatible concrete typealias types are flagged as such

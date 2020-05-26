@@ -18,45 +18,47 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/Driver/DependencyGraph.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <chrono>
 #include <limits>
 
+#if LLVM_ON_UNIX
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#endif
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
 #endif
+#ifdef HAVE_PROC_PID_RUSAGE
+#include <libproc.h>
+#endif
+#ifdef HAVE_MALLOC_MALLOC_H
+#include <malloc/malloc.h>
+#endif
+#if defined(_WIN32)
+#define NOMINMAX
+#include "Windows.h"
+#include "psapi.h"
+#endif
 
 namespace swift {
 using namespace llvm;
 using namespace llvm::sys;
 
-static int64_t
-getChildrenMaxResidentSetSize() {
-#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
-  struct rusage RU;
-  ::getrusage(RUSAGE_CHILDREN, &RU);
-  int64_t M = static_cast<int64_t>(RU.ru_maxrss);
-  if (M < 0) {
-    M = std::numeric_limits<int64_t>::max();
-  } else {
-#ifndef __APPLE__
-    // Apple systems report bytes; everything else appears to report KB.
-    M <<= 10;
-#endif
-  }
-  return M;
-#else
-  return 0;
-#endif
+bool environmentVariableRequestedMaximumDeterminism() {
+  if (const char *S = ::getenv("SWIFTC_MAXIMUM_DETERMINISM"))
+    return (S[0] != '\0');
+  return false;
 }
 
 static std::string
@@ -218,7 +220,7 @@ class StatsProfiler {
       if (I != Children.end()) {
         return I->getSecond().get();
       } else {
-        auto N = llvm::make_unique<Node>(this);
+        auto N = std::make_unique<Node>(this);
         auto P = N.get();
         Children.insert(std::make_pair(K, std::move(N)));
         return P;
@@ -340,12 +342,14 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     TraceFilename(Directory),
     ProfileDirname(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
-    Timer(make_unique<NamedRegionTimer>(AuxName,
+    MainThreadID(std::this_thread::get_id()),
+    Timer(std::make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
                                         ProgramName, "Running Program")),
     SourceMgr(SM),
     ClangSourceMgr(CSM),
-    RecursiveTimers(llvm::make_unique<RecursionSafeTimers>())
+    RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
+    IsFlushingTracesAndProfiles(false)
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
@@ -357,9 +361,32 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
   if (TraceEvents)
     FrontendStatsEvents.emplace();
   if (ProfileEvents)
-    EventProfilers = make_unique<StatsProfilers>();
+    EventProfilers =std::make_unique<StatsProfilers>();
   if (ProfileEntities)
-    EntityProfilers = make_unique<StatsProfilers>();
+    EntityProfilers =std::make_unique<StatsProfilers>();
+}
+
+void UnifiedStatsReporter::recordJobMaxRSS(long rss) {
+  maxChildRSS = std::max(maxChildRSS, rss);
+}
+
+int64_t UnifiedStatsReporter::getChildrenMaxResidentSetSize() {
+#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+  struct rusage RU;
+  ::getrusage(RUSAGE_CHILDREN, &RU);
+  int64_t M = static_cast<int64_t>(RU.ru_maxrss);
+  if (M < 0) {
+    M = std::numeric_limits<int64_t>::max();
+  } else {
+#ifndef __APPLE__
+    // Apple systems report bytes; everything else appears to report KB.
+    M <<= 10;
+#endif
+  }
+  return M;
+#else
+  return maxChildRSS;
+#endif
 }
 
 UnifiedStatsReporter::AlwaysOnDriverCounters &
@@ -380,6 +407,7 @@ UnifiedStatsReporter::getFrontendCounters()
 
 void
 UnifiedStatsReporter::noteCurrentProcessExitStatus(int status) {
+  assert(MainThreadID == std::this_thread::get_id());
   assert(!currentProcessExitStatusSet);
   currentProcessExitStatusSet = true;
   currentProcessExitStatus = status;
@@ -391,7 +419,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     auto &C = getFrontendCounters();
 #define FRONTEND_STATISTIC(TY, NAME)                            \
     do {                                                        \
-      static Statistic Stat = {#TY, #NAME, #NAME, {0}, false};  \
+      static Statistic Stat = {#TY, #NAME, #NAME};              \
       Stat += (C).NAME;                                         \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -401,7 +429,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     auto &C = getDriverCounters();
 #define DRIVER_STATISTIC(NAME)                                       \
     do {                                                             \
-      static Statistic Stat = {"Driver", #NAME, #NAME, {0}, false};  \
+      static Statistic Stat = {"Driver", #NAME, #NAME};              \
       Stat += (C).NAME;                                              \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -436,6 +464,7 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   }
   // Print timers.
   TimerGroup::printAllJSONValues(OS, delim);
+  TimerGroup::clearAll();
   OS << "\n}\n";
   OS.flush();
 }
@@ -481,6 +510,33 @@ FrontendStatsTracer::~FrontendStatsTracer()
     Reporter->saveAnyFrontendStatsEvents(*this, false);
 }
 
+// Copy any interesting process-wide resource accounting stats to
+// associated fields in the provided AlwaysOnFrontendCounters.
+void updateProcessWideFrontendCounters(
+    UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
+#if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
+  struct rusage_info_v4 ru;
+  if (0 == proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru)) {
+    C.NumInstructionsExecuted = ru.ri_instructions;
+  }
+#endif
+
+#if defined(HAVE_MALLOC_ZONE_STATISTICS) && defined(HAVE_MALLOC_MALLOC_H)
+  // On Darwin we have a lifetime max that's maintained by malloc we can
+  // just directly query, even if we only make one query on shutdown.
+  malloc_statistics_t Stats;
+  malloc_zone_statistics(malloc_default_zone(), &Stats);
+  C.MaxMallocUsage = (int64_t)Stats.max_size_in_use;
+#else
+  // If we don't have a malloc-tracked max-usage counter, we have to rely
+  // on taking the max over current-usage samples while running and hoping
+  // we get called often enough. This will happen when profiling/tracing,
+  // but not while doing single-query-on-shutdown collection.
+  C.MaxMallocUsage = std::max(C.MaxMallocUsage,
+                              (int64_t)llvm::sys::Process::GetMallocUsage());
+#endif
+}
+
 static inline void
 saveEvent(StringRef StatName,
           int64_t Curr, int64_t Last,
@@ -501,6 +557,14 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
     FrontendStatsTracer const& T,
     bool IsEntry)
 {
+  assert(MainThreadID == std::this_thread::get_id());
+
+  // Don't record any new stats if we're currently flushing the ones we've
+  // already recorded. This can happen when requests get kicked off when
+  // computing source ranges.
+  if (IsFlushingTracesAndProfiles)
+    return;
+
   // First make a note in the recursion-safe timers; these
   // are active anytime UnifiedStatsReporter is active.
   if (IsEntry) {
@@ -516,6 +580,7 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   auto Now = llvm::TimeRecord::getCurrentTime();
   auto &Curr = getFrontendCounters();
   auto &Last = *LastTracedFrontendCounters;
+  updateProcessWideFrontendCounters(Curr);
   if (EventProfilers) {
     auto TimeDelta = Now;
     TimeDelta -= EventProfilers->LastUpdated;
@@ -580,6 +645,7 @@ UnifiedStatsReporter::TraceFormatter::~TraceFormatter() {}
 
 UnifiedStatsReporter::~UnifiedStatsReporter()
 {
+  assert(MainThreadID == std::this_thread::get_id());
   // If nobody's marked this process as successful yet,
   // mark it as failing.
   if (currentProcessExitStatus != EXIT_SUCCESS) {
@@ -591,6 +657,9 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
       C.NumProcessFailures++;
     }
   }
+
+  if (FrontendCounters)
+    updateProcessWideFrontendCounters(getFrontendCounters());
 
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a
@@ -641,9 +710,18 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_STATS)
   publishAlwaysOnStatsToLLVM();
   PrintStatisticsJSON(ostream);
+  TimerGroup::clearAll();
 #else
   printAlwaysOnStatsAndTimers(ostream);
 #endif
+  flushTracesAndProfiles();
+}
+
+void
+UnifiedStatsReporter::flushTracesAndProfiles() {
+  // Note that we're currently flushing statistics and shouldn't record any
+  // more until we've finished.
+  llvm::SaveAndRestore<bool> flushing(IsFlushingTracesAndProfiles, true);
 
   if (FrontendStatsEvents && SourceMgr) {
     std::error_code EC;
@@ -706,6 +784,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #undef FRONTEND_STATISTIC
     }
   }
+  LastTracedFrontendCounters.reset();
+  FrontendStatsEvents.reset();
+  EventProfilers.reset();
+  EntityProfilers.reset();
 }
 
 } // namespace swift

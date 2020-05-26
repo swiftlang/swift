@@ -56,8 +56,7 @@ void OpaqueExistentialContainer::deinit() {
 
 // *NOTE* This routine performs unused memory reads on purpose to try to catch
 // use-after-frees in conjunction with ASAN or Guard Malloc.
-template <>
-void OpaqueExistentialContainer::verify() const {
+template <> SWIFT_USED void OpaqueExistentialContainer::verify() const {
   // We do not actually care about value. We just want to see if the
   // memory is valid or not. So convert to a uint8_t and try to
   // memcpy into firstByte. We use volatile to just ensure that this
@@ -69,8 +68,7 @@ void OpaqueExistentialContainer::verify() const {
 }
 
 /// Dump information about this specific container and its contents.
-template <>
-void OpaqueExistentialContainer::dump() const {
+template <> SWIFT_USED void OpaqueExistentialContainer::dump() const {
   // Quickly verify to make sure we are well formed.
   verify();
 

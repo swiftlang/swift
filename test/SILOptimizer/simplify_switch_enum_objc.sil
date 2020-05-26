@@ -1,0 +1,457 @@
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// Just make sure that we do not infinite loop when compiling without block merging.
+//
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg -simplify-cfg-simplify-unconditional-branches=0
+
+// REQUIRES: objc_interop
+
+import Swift
+import Foundation
+
+class Test : NSObject {
+  @objc var other : Test? { get set }
+}
+
+
+// CHECK-LABEL: sil hidden @one_call : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Optional<Test>, [[ARG1:%.*]] : $Optional<Test>):
+// CHECK:   switch_enum [[ARG0]] : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb3
+// CHECK: bb1([[ARG0_PAYLOAD:%.*]] : $Test):
+// CHECK:   [[ARG1_PAYLOAD:%.*]] = unchecked_ref_cast [[ARG1]] : $Optional<Test> to $Test
+// CHECK:   [[GETTER:%.*]] = objc_method [[ARG1_PAYLOAD]] : $Test, #Test.other!getter.foreign
+// CHECK:   [[RESULT:%.*]] = apply [[GETTER]]([[ARG1_PAYLOAD]])
+// CHECK:   [[SETTER:%.*]] = objc_method [[ARG0_PAYLOAD]] : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+// CHECK:   apply [[SETTER]]([[RESULT]], [[ARG0_PAYLOAD]])
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   return
+// CHECK: bb3:
+// CHECK:   br bb2
+// CHECK: }
+
+sil hidden @one_call : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+bb0(%0 : $Optional<Test>, %1 : $Optional<Test>):
+  retain_value %0 : $Optional<Test>
+  switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
+
+bb1(%6 : $Test):
+  retain_value %1 : $Optional<Test>
+  switch_enum %1 : $Optional<Test>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%9 : $Test):
+  %10 = objc_method %9 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %11 = apply %10(%9) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  strong_release %9 : $Test
+  br bb3(%11 : $Optional<Test>)
+
+bb3(%14 : $Optional<Test>):
+  %15 = objc_method %6 : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+  %16 = apply %15(%14, %6) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+  release_value %14 : $Optional<Test>
+  strong_release %6 : $Test
+  %19 = tuple ()
+  br bb4
+
+bb4:
+  %23 = tuple ()
+  return %23 : $()
+
+bb5:
+  %25 = enum $Optional<Test>, #Optional.none!enumelt
+  br bb3(%25 : $Optional<Test>)
+
+bb6:
+  br bb4
+}
+
+// CHECK-LABEL: sil hidden @one_call2 : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Optional<Test>, [[ARG1:%.*]] : $Optional<Test>):
+// CHECK:   switch_enum [[ARG0]] : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb3
+// CHECK: bb1([[ARG0_PAYLOAD:%.*]] : $Test):
+// CHECK:   [[ARG1_PAYLOAD:%.*]] = unchecked_ref_cast [[ARG1]] : $Optional<Test> to $Test
+// CHECK:   [[GETTER:%.*]] = objc_method [[ARG1_PAYLOAD]] : $Test, #Test.other!getter.foreign
+// CHECK:   [[RESULT:%.*]] = apply [[GETTER]]([[ARG1_PAYLOAD]])
+// CHECK:   [[SETTER:%.*]] = objc_method [[ARG0_PAYLOAD]] : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+// CHECK:   apply [[SETTER]]([[RESULT]], [[ARG0_PAYLOAD]])
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   return
+// CHECK: bb3:
+// CHECK:   br bb2
+// CHECK: }
+
+sil hidden @one_call2 : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+bb0(%0 : $Optional<Test>, %1 : $Optional<Test>):
+  retain_value %0 : $Optional<Test>
+  switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
+
+bb1(%6 : $Test):
+  retain_value %1 : $Optional<Test>
+  switch_enum %1 : $Optional<Test>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2:
+  %9 = unchecked_enum_data %1 : $Optional<Test>, #Optional.some!enumelt
+  %10 = objc_method %9 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %11 = apply %10(%9) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  strong_release %9 : $Test
+  br bb3(%11 : $Optional<Test>)
+
+bb3(%14 : $Optional<Test>):
+  %15 = objc_method %6 : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+  %16 = apply %15(%14, %6) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+  release_value %14 : $Optional<Test>
+  strong_release %6 : $Test
+  %19 = tuple ()
+  br bb4
+
+bb4:
+  %23 = tuple ()
+  return %23 : $()
+
+bb5:
+  %25 = enum $Optional<Test>, #Optional.none!enumelt
+  br bb3(%25 : $Optional<Test>)
+
+bb6:
+  br bb4
+}
+sil @some_sideeffect : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil hidden @sideeffect
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK: }
+sil hidden @sideeffect : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+bb0(%0 : $Optional<Test>, %1 : $Optional<Test>):
+  retain_value %0 : $Optional<Test>
+  switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
+
+bb1(%6 : $Test):
+  retain_value %1 : $Optional<Test>
+  switch_enum %1 : $Optional<Test>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%9 : $Test):
+  %10 = objc_method %9 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %11 = apply %10(%9) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  strong_release %9 : $Test
+  %12 = function_ref @some_sideeffect : $@convention(thin) () -> ()
+  apply %12() : $@convention(thin) () -> ()
+  br bb3(%11 : $Optional<Test>)
+
+bb3(%14 : $Optional<Test>):
+  %15 = objc_method %6 : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+  %16 = apply %15(%14, %6) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+  release_value %14 : $Optional<Test>
+  strong_release %6 : $Test
+  %19 = tuple ()
+  br bb4
+
+bb4:
+  %23 = tuple ()
+  return %23 : $()
+
+bb5:
+  %25 = enum $Optional<Test>, #Optional.none!enumelt
+  br bb3(%25 : $Optional<Test>)
+
+bb6:
+  br bb4
+}
+
+// CHECK-LABEL: sil hidden @sideeffect2
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK: }
+sil hidden @sideeffect2 : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+bb0(%0 : $Optional<Test>, %1 : $Optional<Test>):
+  retain_value %0 : $Optional<Test>
+  switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
+
+bb1(%6 : $Test):
+  retain_value %1 : $Optional<Test>
+  switch_enum %1 : $Optional<Test>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%9 : $Test):
+  %10 = objc_method %9 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %11 = apply %10(%9) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  strong_release %9 : $Test
+  br bb3(%11 : $Optional<Test>)
+
+bb3(%14 : $Optional<Test>):
+  %15 = objc_method %6 : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+  %16 = apply %15(%14, %6) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+  release_value %14 : $Optional<Test>
+  strong_release %6 : $Test
+  %19 = tuple ()
+  br bb4
+
+bb4:
+  %23 = tuple ()
+  return %23 : $()
+
+bb5:
+  %12 = function_ref @some_sideeffect : $@convention(thin) () -> ()
+  apply %12() : $@convention(thin) () -> ()
+  %25 = enum $Optional<Test>, #Optional.none!enumelt
+  br bb3(%25 : $Optional<Test>)
+
+bb6:
+  br bb4
+}
+
+// CHECK-LABEL: sil hidden @not_on_optional
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK: }
+sil hidden @not_on_optional : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+bb0(%0 : $Optional<Test>, %1 : $Optional<Test>):
+  retain_value %0 : $Optional<Test>
+  switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
+
+bb1(%6 : $Test):
+  retain_value %1 : $Optional<Test>
+  switch_enum %1 : $Optional<Test>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%9 : $Test):
+  %10 = objc_method %9 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %11 = apply %10(%6) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  strong_release %9 : $Test
+  br bb3(%11 : $Optional<Test>)
+
+bb3(%14 : $Optional<Test>):
+  %15 = objc_method %6 : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+  %16 = apply %15(%14, %6) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+  release_value %14 : $Optional<Test>
+  strong_release %6 : $Test
+  %19 = tuple ()
+  br bb4
+
+bb4:
+  %23 = tuple ()
+  return %23 : $()
+
+bb5:
+  %25 = enum $Optional<Test>, #Optional.none!enumelt
+  br bb3(%25 : $Optional<Test>)
+
+bb6:
+  br bb4
+}
+
+// CHECK-LABEL: sil hidden @forwards_wrong_value
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK: }
+sil hidden @forwards_wrong_value : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+bb0(%0 : $Optional<Test>, %1 : $Optional<Test>):
+  retain_value %0 : $Optional<Test>
+  switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
+
+bb1(%6 : $Test):
+  retain_value %1 : $Optional<Test>
+  switch_enum %1 : $Optional<Test>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%9 : $Test):
+  %10 = objc_method %9 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %11 = apply %10(%9) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  strong_release %9 : $Test
+  br bb3(%0 : $Optional<Test>)
+
+bb3(%14 : $Optional<Test>):
+  %15 = objc_method %6 : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+  %16 = apply %15(%14, %6) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+  release_value %14 : $Optional<Test>
+  strong_release %6 : $Test
+  %19 = tuple ()
+  br bb4
+
+bb4:
+  %23 = tuple ()
+  return %23 : $()
+
+bb5:
+  %25 = enum $Optional<Test>, #Optional.none!enumelt
+  br bb3(%25 : $Optional<Test>)
+
+bb6:
+  br bb4
+}
+
+// CHECK-LABEL: sil hidden @forwards_wrong_value2
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK: }
+sil hidden @forwards_wrong_value2 : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+bb0(%0 : $Optional<Test>, %1 : $Optional<Test>):
+  retain_value %0 : $Optional<Test>
+  switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb6
+
+bb1(%6 : $Test):
+  retain_value %1 : $Optional<Test>
+  switch_enum %1 : $Optional<Test>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%9 : $Test):
+  %10 = objc_method %9 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %11 = apply %10(%9) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  strong_release %9 : $Test
+  br bb3(%11 : $Optional<Test>)
+
+bb3(%14 : $Optional<Test>):
+  %15 = objc_method %6 : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+  %16 = apply %15(%14, %6) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+  release_value %14 : $Optional<Test>
+  strong_release %6 : $Test
+  %19 = tuple ()
+  br bb4
+
+bb4:
+  %23 = tuple ()
+  return %23 : $()
+
+bb5:
+  br bb3(%0 : $Optional<Test>)
+
+bb6:
+  br bb4
+}
+
+// CHECK-LABEL: sil hidden @two_chained_calls
+// CHECK: bb0([[ARG0:%.*]] : $Optional<Test>, [[ARG1:%.*]] : $Optional<Test>):
+// CHECK: switch_enum [[ARG0]]
+// CHECK: bb1([[ARG0_PAYLOAD:%.*]] : $Test):
+// CHECK:   [[PAYLOAD:%.*]] = unchecked_ref_cast [[ARG1]]
+// CHECK:   [[METH:%.*]] = objc_method [[PAYLOAD]] : $Test, #Test.other!getter.foreign
+// CHECK:   [[RESULT:%.*]] = apply [[METH]]([[PAYLOAD]])
+// CHECK:   [[PAYLOAD2:%.*]] = unchecked_ref_cast [[RESULT]]
+// CHECK:   [[METH2:%.*]] = objc_method [[PAYLOAD2]] : $Test, #Test.other!getter.foreign
+// CHECK:   [[RESULT2:%.*]] = apply [[METH2]]([[PAYLOAD2]])
+// CHECK:   [[SETTER:%.*]] = objc_method [[ARG0_PAYLOAD]] : $Test, #Test.other!setter.foreign
+// CHECK:   apply [[SETTER]]([[RESULT2]], [[ARG0_PAYLOAD]]) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   return
+// CHECK: bb3:
+// CHECK:   br bb2
+// CHECK: }
+
+sil hidden @two_chained_calls : $@convention(thin) (@guaranteed Optional<Test>, @guaranteed Optional<Test>) -> () {
+bb0(%0 : $Optional<Test>, %1 : $Optional<Test>):
+  retain_value %0 : $Optional<Test>
+  switch_enum %0 : $Optional<Test>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb9
+
+bb1(%6 : $Test):
+  retain_value %1 : $Optional<Test>
+  switch_enum %1 : $Optional<Test>, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb2
+
+bb2:
+  br bb8
+
+bb3(%10 : $Test):
+  %11 = objc_method %10 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %12 = apply %11(%10) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  switch_enum %12 : $Optional<Test>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb5
+
+bb4:
+  release_value %12 : $Optional<Test>
+  strong_release %10 : $Test
+  br bb8
+
+bb5:
+  %17 = unchecked_enum_data %12 : $Optional<Test>, #Optional.some!enumelt
+  strong_retain %17 : $Test
+  release_value %12 : $Optional<Test>
+  strong_release %10 : $Test
+  %21 = objc_method %17 : $Test, #Test.other!getter.foreign : (Test) -> () -> Test?, $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  %22 = apply %21(%17) : $@convention(objc_method) (Test) -> @autoreleased Optional<Test>
+  strong_release %17 : $Test
+  br bb6(%22 : $Optional<Test>)
+
+bb6(%25 : $Optional<Test>):
+  %26 = objc_method %6 : $Test, #Test.other!setter.foreign : (Test) -> (Test?) -> (), $@convention(objc_method) (Optional<Test>, Test) -> ()
+  %27 = apply %26(%25, %6) : $@convention(objc_method) (Optional<Test>, Test) -> ()
+  release_value %25 : $Optional<Test>
+  strong_release %6 : $Test
+  br bb7
+
+bb7:
+  %31 = tuple ()
+  return %31 : $()
+
+bb8:
+  %33 = enum $Optional<Test>, #Optional.none!enumelt
+  br bb6(%33 : $Optional<Test>)
+
+bb9:
+  br bb7
+}
+
+sil @infinite_loop_get_optional_nsobject : $@convention(thin) () -> @autoreleased Optional<NSObject>
+sil @infinite_loop_get_superview : $@convention(thin) (NSObject) -> @autoreleased Optional<NSObject>
+
+// Just make sure we do not infinite loop here when looking for successors.
+// CHECK-LABEL: sil @infinite_loop_1 : $@convention(thin) () -> @owned Optional<NSObject> {
+// CHECK: } // end sil function 'infinite_loop_1'
+sil @infinite_loop_1 : $@convention(thin) () -> @owned Optional<NSObject> {
+bb0:
+  %13 = function_ref @infinite_loop_get_optional_nsobject : $@convention(thin) () -> @autoreleased Optional<NSObject>
+  %14 = apply %13() : $@convention(thin) () -> @autoreleased Optional<NSObject>
+  br bb1(%14 : $Optional<NSObject>)
+
+bb1(%16 : $Optional<NSObject>):
+  retain_value %16 : $Optional<NSObject>
+  switch_enum %16 : $Optional<NSObject>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%19 : $NSObject):
+  release_value %16 : $Optional<NSObject>
+  %21 = enum $Optional<NSObject>, #Optional.none!enumelt
+  release_value %16 : $Optional<NSObject>
+  return %21 : $Optional<NSObject>
+
+bb3:
+  %24 = unchecked_enum_data %16 : $Optional<NSObject>, #Optional.some!enumelt
+  strong_retain %24 : $NSObject
+  %26 = function_ref @infinite_loop_get_superview : $@convention(thin) (NSObject) -> @autoreleased Optional<NSObject>
+  %27 = apply %26(%24) : $@convention(thin) (NSObject) -> @autoreleased Optional<NSObject>
+  strong_release %24 : $NSObject
+  release_value %16 : $Optional<NSObject>
+  br bb1(%27 : $Optional<NSObject>)
+
+bb4:
+  release_value %16 : $Optional<NSObject>
+  br bb1(%16 : $Optional<NSObject>)
+
+bb5:
+  release_value %16 : $Optional<NSObject>
+  switch_enum %16 : $Optional<NSObject>, case #Optional.none!enumelt: bb4, default bb3
+}
+
+// Just make sure that we do not infinite loop here.
+//
+// CHECK-LABEL: sil @infinite_loop_2 : $@convention(thin) () -> @owned Optional<NSObject> {
+// CHECK: } // end sil function 'infinite_loop_2'
+sil @infinite_loop_2 : $@convention(thin) () -> @owned Optional<NSObject> {
+bb0:
+  %0 = function_ref @infinite_loop_get_optional_nsobject : $@convention(thin) () -> @autoreleased Optional<NSObject>
+  %1 = apply %0() : $@convention(thin) () -> @autoreleased Optional<NSObject>
+  br bb1(%1 : $Optional<NSObject>)
+
+bb1(%3 : $Optional<NSObject>):
+  switch_enum %3 : $Optional<NSObject>, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb2
+
+bb2:
+  br bb5(%3 : $Optional<NSObject>)
+
+bb3(%7 : $NSObject):
+  br bb4(%3 : $Optional<NSObject>)
+
+bb4(%9 : $Optional<NSObject>):
+  %11 = enum $Optional<NSObject>, #Optional.none!enumelt
+  return %11 : $Optional<NSObject>
+
+bb5(%14 : $Optional<NSObject>):
+  br bb6
+
+bb6:
+  br bb5(%14 : $Optional<NSObject>)
+}

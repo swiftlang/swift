@@ -18,20 +18,26 @@ extern "C" {
 #endif
 
 #if defined(swiftRemoteMirror_EXPORTS)
-# if defined(__ELF__)
+# if defined(__ELF__) || defined(__WASM__)
 #   define SWIFT_REMOTE_MIRROR_LINKAGE __attribute__((__visibility__("protected")))
 # elif defined(__MACH__)
 #   define SWIFT_REMOTE_MIRROR_LINKAGE __attribute__((__visibility__("default")))
 # else
-#   define SWIFT_REMOTE_MIRROR_LINKAGE __declspec(dllexport)
+#   if defined(_WINDLL)
+#     define SWIFT_REMOTE_MIRROR_LINKAGE __declspec(dllexport)
+#   else
+#     define SWIFT_REMOTE_MIRROR_LINKAGE
+#   endif
 # endif
 #else
-# if defined(__ELF__)
-#   define SWIFT_REMOTE_MIRROR_LINKAGE __attribute__((__visibility__("default")))
-# elif defined(__MACH__)
+# if defined(__ELF__) || defined(__MACH__) || defined(__WASM__)
 #   define SWIFT_REMOTE_MIRROR_LINKAGE __attribute__((__visibility__("default")))
 # else
-#   define SWIFT_REMOTE_MIRROR_LINKAGE __declspec(dllimport)
+#   if defined(_WINDLL)
+#     define SWIFT_REMOTE_MIRROR_LINKAGE __declspec(dllimport)
+#   else
+#     define SWIFT_REMOTE_MIRROR_LINKAGE
+#   endif
 # endif
 #endif
 

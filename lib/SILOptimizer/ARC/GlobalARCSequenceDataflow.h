@@ -67,7 +67,7 @@ private:
   ImmutablePointerSetFactory<SILInstruction> SetFactory;
 
   /// Stashed BB information.
-  ARCBBStateInfo *BBStateInfo;
+  std::unique_ptr<ARCBBStateInfo> BBStateInfo;
 
 public:
   ARCSequenceDataflowEvaluator(

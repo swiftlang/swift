@@ -160,6 +160,7 @@ public:
     case MetadataLayout::Kind::ForeignClass:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 };
 
@@ -239,22 +240,7 @@ public:
 
   Size getInstanceAlignMaskOffset() const;
 
-  /// Returns the start of the vtable in the class metadata.
-  Offset getVTableOffset(IRGenFunction &IGF) const;
-
-  /// Returns the size of the vtable, in words.
-  unsigned getVTableSize() const {
-    return MethodInfos.size();
-  }
-
   MethodInfo getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const;
-
-  /// Assuming that the given method is at a static offset in the metadata,
-  /// return that static offset.
-  ///
-  /// DEPRECATED: callers should be updated to handle this in a
-  /// more arbitrary fashion.
-  Size getStaticMethodOffset(SILDeclRef method) const;
 
   Offset getFieldOffset(IRGenFunction &IGF, VarDecl *field) const;
 
@@ -298,6 +284,7 @@ public:
 class EnumMetadataLayout : public NominalMetadataLayout {
   /// The offset of the payload size field, if there is one.
   StoredOffset PayloadSizeOffset;
+  StoredOffset TrailingFlagsOffset;
 
   // TODO: presumably it would be useful to store *something* here
   // for resilience.
@@ -315,6 +302,7 @@ public:
   }
 
   Offset getPayloadSizeOffset() const;
+  Offset getTrailingFlagsOffset() const;
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Enum;
@@ -324,6 +312,7 @@ public:
 /// Layout for struct type metadata.
 class StructMetadataLayout : public NominalMetadataLayout {
   llvm::DenseMap<VarDecl*, StoredOffset> FieldOffsets;
+  StoredOffset TrailingFlagsOffset;
 
   /// The start of the field-offset vector.
   StoredOffset FieldOffsetVector;
@@ -352,6 +341,7 @@ public:
   Size getStaticFieldOffset(VarDecl *field) const;
 
   Offset getFieldOffsetVectorOffset() const;
+  Offset getTrailingFlagsOffset() const;
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Struct;
@@ -406,6 +396,10 @@ llvm::Value *emitClassFieldOffset(IRGenFunction &IGF,
 /// Given a class metadata pointer, emit the address of its superclass field.  
 Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
                                                   llvm::Value *metadata);
+
+Size getStaticTupleElementOffset(IRGenModule &IGM,
+                                 SILType tupleType,
+                                 unsigned eltIdx);
 
 } // end namespace irgen
 } // end namespace swift

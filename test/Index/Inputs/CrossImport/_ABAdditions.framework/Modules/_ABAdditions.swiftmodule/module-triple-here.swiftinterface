@@ -1,0 +1,8 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -swift-version 5 -enable-library-evolution -module-name _ABAdditions
+
+@_exported import A
+import B
+
+public func from_ABAdditions()
+public struct From_ABAdditionsType {}

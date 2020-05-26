@@ -1,6 +1,10 @@
 // RUN: %target-swift-frontend -enforce-exclusivity=checked -sanitize=thread -emit-sil -primary-file %s -o /dev/null -verify
 // REQUIRES: tsan_runtime
 
+// FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
+// don't support TSan.
+// UNSUPPORTED: remote_run
+
 
 struct OtherStruct {
   mutating

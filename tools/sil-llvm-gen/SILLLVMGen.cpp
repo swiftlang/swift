@@ -18,8 +18,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
@@ -88,11 +88,6 @@ static llvm::cl::opt<std::string>
 static llvm::cl::opt<bool>
     PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
-static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
-    "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden,
-    llvm::cl::init(false),
-    llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
-
 static llvm::cl::opt<IRGenOutputKind>
     OutputKind("output-kind", llvm::cl::desc("Type of output to produce"),
                llvm::cl::values(clEnumValN(IRGenOutputKind::LLVMAssembly,
@@ -104,6 +99,10 @@ static llvm::cl::opt<IRGenOutputKind>
                                 clEnumValN(IRGenOutputKind::ObjectFile,
                                            "object", "Emit an object file")),
                llvm::cl::init(IRGenOutputKind::ObjectFile));
+
+static llvm::cl::opt<bool>
+    DisableLegacyTypeInfo("disable-legacy-type-info",
+        llvm::cl::desc("Don't try to load backward deployment layouts"));
 
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
@@ -157,14 +156,10 @@ int main(int argc, char **argv) {
   LangOpts.EnableObjCAttrRequiresFoundation = false;
   LangOpts.EnableObjCInterop = LangOpts.Target.isOSDarwin();
 
-  // Setup the SIL Options.
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
-      AssumeUnqualifiedOwnershipWhenParsing;
-
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
   Opts.OutputKind = OutputKind;
+  Opts.DisableLegacyTypeInfo = DisableLegacyTypeInfo;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -189,27 +184,28 @@ int main(int argc, char **argv) {
   if (CI.getASTContext().hadError())
     return 1;
 
-  // Load the SIL if we have a module. We have to do this after SILParse
-  // creating the unfortunate double if statement.
-  if (Invocation.hasSerializedAST()) {
-    assert(!CI.hasSILModule() &&
-           "performSema() should not create a SILModule.");
-    CI.setSILModule(SILModule::createEmptyModule(
-        CI.getMainModule(), CI.getSILOptions(), PerformWMO));
-    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
-        CI.getASTContext(), CI.getSILModule(), nullptr);
+  auto *mod = CI.getMainModule();
+  assert(mod->getFiles().size() == 1);
 
-    if (extendedInfo.isSIB())
-      SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
-    else
-      SL->getAll();
+  std::unique_ptr<SILModule> SILMod;
+  if (PerformWMO) {
+    SILMod = performSILGeneration(mod, CI.getSILTypes(), CI.getSILOptions());
+  } else {
+    SILMod = performSILGeneration(*mod->getFiles()[0], CI.getSILTypes(),
+                                  CI.getSILOptions());
+  }
+
+  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
+  // us.
+  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
+    auto SL = SerializedSILLoader::create(
+        CI.getASTContext(), SILMod.get(), nullptr);
+    SL->getAll();
   }
 
   const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
-  std::unique_ptr<llvm::Module> Mod =
-      performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
-                          CI.getMainModule()->getName().str(),
-                          PSPs,
-                          getGlobalLLVMContext(), ArrayRef<std::string>());
+  auto Mod = performIRGeneration(Opts, CI.getMainModule(), std::move(SILMod),
+                                 CI.getMainModule()->getName().str(), PSPs,
+                                 ArrayRef<std::string>());
   return CI.getASTContext().hadError();
 }

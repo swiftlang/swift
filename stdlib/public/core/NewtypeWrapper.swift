@@ -33,20 +33,20 @@ extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue: Hashable {
     hasher.combine(rawValue)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  @inlinable
+  public func _rawHashValue(seed: Int) -> Int {
     return rawValue._rawHashValue(seed: seed)
   }
 }
 
 extension _SwiftNewtypeWrapper {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return nil
   }
 }
 
 extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue: Hashable {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _NewtypeWrapperAnyHashableBox(self))
   }
 }
@@ -75,7 +75,7 @@ where Base: _SwiftNewtypeWrapper & Hashable, Base.RawValue: Hashable {
     _preconditionFailure("_hash(into:) called on non-canonical AnyHashable box")
   }
 
-  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+  func _rawHashValue(_seed: Int) -> Int {
     _preconditionFailure("_rawHashValue(_seed:) called on non-canonical AnyHashable box")
   }
 
@@ -99,17 +99,17 @@ where Base: _SwiftNewtypeWrapper & Hashable, Base.RawValue: Hashable {
 }
 
 #if _runtime(_ObjC)
-extension _SwiftNewtypeWrapper where Self.RawValue : _ObjectiveCBridgeable {
+extension _SwiftNewtypeWrapper where Self.RawValue: _ObjectiveCBridgeable {
   // Note: This is the only default typealias for _ObjectiveCType, because
   // constrained extensions aren't allowed to define types in different ways.
   // Fortunately the others don't need it.
   public typealias _ObjectiveCType = Self.RawValue._ObjectiveCType
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _bridgeToObjectiveC() -> Self.RawValue._ObjectiveCType {
     return rawValue._bridgeToObjectiveC()
   }
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func _forceBridgeFromObjectiveC(
     _ source: Self.RawValue._ObjectiveCType,
     result: inout Self?
@@ -119,7 +119,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue : _ObjectiveCBridgeable {
     result = innerResult.flatMap { Self(rawValue: $0) }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: Self.RawValue._ObjectiveCType,
     result: inout Self?
@@ -132,7 +132,8 @@ extension _SwiftNewtypeWrapper where Self.RawValue : _ObjectiveCBridgeable {
     return success
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: Self.RawValue._ObjectiveCType?
   ) -> Self {
@@ -142,12 +143,12 @@ extension _SwiftNewtypeWrapper where Self.RawValue : _ObjectiveCBridgeable {
 }
 
 extension _SwiftNewtypeWrapper where Self.RawValue: AnyObject {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _bridgeToObjectiveC() -> Self.RawValue {
     return rawValue
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func _forceBridgeFromObjectiveC(
     _ source: Self.RawValue,
     result: inout Self?
@@ -155,7 +156,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue: AnyObject {
     result = Self(rawValue: source)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: Self.RawValue,
     result: inout Self?
@@ -164,7 +165,8 @@ extension _SwiftNewtypeWrapper where Self.RawValue: AnyObject {
     return result != nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: Self.RawValue?
   ) -> Self {

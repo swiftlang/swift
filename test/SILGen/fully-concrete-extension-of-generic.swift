@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s 
+// RUN: %target-swift-emit-silgen -verify %s 
 
 class C<T> {
   init() {}
@@ -16,4 +16,18 @@ func exerciseInits(which: Bool) -> C<Int> {
   } else {
     return C(forInt: ())
   }
+}
+
+protocol P {
+  associatedtype T
+}
+
+struct S : P {
+  typealias T = Int
+}
+
+struct G<T : P> {}
+
+extension G where T == S {
+  func foo(_: T.T) {}
 }

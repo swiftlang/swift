@@ -42,3 +42,35 @@ func driver() {
 }
 
 driver()
+
+// <rdar://problem/46322928> Failure to devirtualize a protocol method
+// applied to an opened existential blocks implemention of
+// DataProtocol.
+public protocol ContiguousBytes {
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R
+}
+
+extension Array : ContiguousBytes {}
+extension ContiguousArray : ContiguousBytes {}
+
+@inline(never)
+func takesPointer(_ p: UnsafeRawBufferPointer) {}
+
+// In specialized testWithUnsafeBytes<A>(_:), the conditional case and call to withUnsafeBytes must be eliminated.
+// Normally, we expect Array.withUnsafeBytes to be inlined so we would see:
+//   [[TAKES_PTR:%.*]] = function_ref @$s30devirt_specialized_conformance12takesPointeryySWF : $@convention(thin) (UnsafeRawBufferPointer) -> ()
+//   apply [[TAKES_PTR]](%{{.*}}) : $@convention(thin) (UnsafeRawBufferPointer) -> ()
+// But the inlining isn't consistent across builds with and without debug info.
+//
+// CHECK-LABEL: sil shared [noinline] @$s30devirt_specialized_conformance19testWithUnsafeBytesyyxlFSayypG_Tg5 : $@convention(thin) (@guaranteed Array<Any>) -> () {
+// CHECK: bb0
+// CHECK-NOT: witness_method
+// CHECK-LABEL: } // end sil function '$s30devirt_specialized_conformance19testWithUnsafeBytesyyxlFSayypG_Tg5'
+@inline(never)
+func testWithUnsafeBytes<T>(_ t: T) {
+  if let cb = t as? ContiguousBytes {
+    cb.withUnsafeBytes { takesPointer($0) }
+  }
+}
+
+testWithUnsafeBytes([])

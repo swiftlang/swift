@@ -13,7 +13,6 @@
 // This test checks performance of generic binary floating-point conversion from
 // a binary integer.
 
-import Foundation
 import TestsUtils
 
 #if swift(>=4.2)
@@ -109,6 +108,10 @@ extension MockBinaryInteger : BinaryInteger {
 
   var trailingZeroBitCount: Int {
     return _value.trailingZeroBitCount
+  }
+
+  func isMultiple(of other: MockBinaryInteger<T>) -> Bool {
+    return _value.isMultiple(of: other._value)
   }
 
   static func + (
@@ -207,4 +210,3 @@ public func run_BinaryFloatingPointConversionFromBinaryInteger(_ N: Int) {
 }
 
 #endif
-

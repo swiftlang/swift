@@ -54,10 +54,12 @@ void SyntaxASTMap::dumpSyntaxMap() const {
 
     if (SemanticNode.is<Expr *>()) {
       SemanticNode.get<Expr *>()->dump(llvm::errs());
+      llvm::errs() << "\n";
     } else if (SemanticNode.is<Decl *>()) {
       SemanticNode.get<Decl *>()->dump(llvm::errs());
     } else if (SemanticNode.is<Expr *>()) {
       SemanticNode.get<Expr *>()->dump(llvm::errs());
+      llvm::errs() << "\n";
     } else {
       llvm_unreachable("ASTNode has pointer to unknown thing!");
     }

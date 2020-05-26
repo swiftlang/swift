@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -79,12 +79,12 @@
 ///   collection type, don't use `Slice` as its subsequence type. Instead,
 ///   define your own subsequence type that takes your index invalidation
 ///   requirements into account.
-@_fixed_layout // FIXME(sil-serialize-all)
+@frozen // generic-performance
 public struct Slice<Base: Collection> {
   public var _startIndex: Base.Index
   public var _endIndex: Base.Index
 
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // generic-performance
   internal var _base: Base
 
   /// Creates a view into the given collection that allows access to elements
@@ -106,7 +106,7 @@ public struct Slice<Base: Collection> {
   /// - Parameters:
   ///   - base: The collection to create a view into.
   ///   - bounds: The range of indices to allow access to in the new slice.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public init(base: Base, bounds: Range<Base.Index>) {
     self._base = base
     self._startIndex = bounds.lowerBound
@@ -127,11 +127,11 @@ public struct Slice<Base: Collection> {
   ///
   ///     print(singleNonZeroDigits.count)
   ///     // Prints "9"
-  ///     prints(singleNonZeroDigits.base.count)
+  ///     print(singleNonZeroDigits.base.count)
   ///     // Prints "10"
   ///     print(singleDigits == singleNonZeroDigits.base)
   ///     // Prints "true"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public var base: Base {
     return _base
   }
@@ -144,17 +144,17 @@ extension Slice: Collection {
   public typealias SubSequence = Slice<Base>
   public typealias Iterator = IndexingIterator<Slice<Base>>
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public var startIndex: Index {
     return _startIndex
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public var endIndex: Index {
     return _endIndex
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public subscript(index: Index) -> Base.Element {
     get {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
@@ -162,7 +162,7 @@ extension Slice: Collection {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public subscript(bounds: Range<Index>) -> Slice<Base> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
@@ -174,25 +174,25 @@ extension Slice: Collection {
     return _base.indices[_startIndex..<_endIndex]
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(after: i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func formIndex(after i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _base.formIndex(after: &i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(i, offsetBy: n)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
@@ -200,31 +200,43 @@ extension Slice: Collection {
     return _base.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func distance(from start: Index, to end: Index) -> Int {
     // FIXME: swift-3-indexing-model: range check.
     return _base.distance(from: start, to: end)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(index, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(range, bounds: bounds)
+  }
+
+  @_alwaysEmitIntoClient @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    try _base.withContiguousStorageIfAvailable { buffer in
+      let start = _base.distance(from: _base.startIndex, to: _startIndex)
+      let count = _base.distance(from: _startIndex, to: _endIndex)
+      let slice = UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
+      return try body(slice)
+    }
   }
 }
 
 extension Slice: BidirectionalCollection where Base: BidirectionalCollection {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(before: i)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func formIndex(before i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _base.formIndex(before: &i)
@@ -233,7 +245,7 @@ extension Slice: BidirectionalCollection where Base: BidirectionalCollection {
 
 
 extension Slice: MutableCollection where Base: MutableCollection {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public subscript(index: Index) -> Base.Element {
     get {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
@@ -248,7 +260,7 @@ extension Slice: MutableCollection where Base: MutableCollection {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public subscript(bounds: Range<Index>) -> Slice<Base> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
@@ -258,6 +270,34 @@ extension Slice: MutableCollection where Base: MutableCollection {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
+
+  @_alwaysEmitIntoClient @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    // We're calling `withContiguousMutableStorageIfAvailable` twice here so
+    // that we don't calculate index distances unless we know we'll use them.
+    // The expectation here is that the base collection will make itself
+    // contiguous on the first try and the second call will be relatively cheap.
+    guard _base.withContiguousMutableStorageIfAvailable({ _ in }) != nil
+    else {
+      return nil
+    }
+    let start = _base.distance(from: _base.startIndex, to: _startIndex)
+    let count = _base.distance(from: _startIndex, to: _endIndex)
+    return try _base.withContiguousMutableStorageIfAvailable { buffer in
+      var slice = UnsafeMutableBufferPointer(
+        rebasing: buffer[start ..< start + count])
+      let copy = slice
+      defer {
+        _precondition(
+          slice.baseAddress == copy.baseAddress &&
+          slice.count == copy.count,
+          "Slice.withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+      }
+      return try body(&slice)
+    }
+  }
 }
 
 
@@ -265,31 +305,31 @@ extension Slice: RandomAccessCollection where Base: RandomAccessCollection { }
 
 extension Slice: RangeReplaceableCollection
   where Base: RangeReplaceableCollection {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public init() {
     self._base = Base()
     self._startIndex = _base.startIndex
     self._endIndex = _base.endIndex
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public init(repeating repeatedValue: Base.Element, count: Int) {
     self._base = Base(repeating: repeatedValue, count: count)
     self._startIndex = _base.startIndex
     self._endIndex = _base.endIndex
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public init<S>(_ elements: S) where S: Sequence, S.Element == Base.Element {
     self._base = Base(elements)
     self._startIndex = _base.startIndex
     self._endIndex = _base.endIndex
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func replaceSubrange<C>(
     _ subRange: Range<Index>, with newElements: C
-  ) where C : Collection, C.Element == Base.Element {
+  ) where C: Collection, C.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
     let sliceOffset =
@@ -297,13 +337,13 @@ extension Slice: RangeReplaceableCollection
     let newSliceCount =
       _base.distance(from: _startIndex, to: subRange.lowerBound)
       + _base.distance(from: subRange.upperBound, to: _endIndex)
-      + (numericCast(newElements.count) as Int)
+      + newElements.count
     _base.replaceSubrange(subRange, with: newElements)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func insert(_ newElement: Base.Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
     let sliceOffset = _base.distance(from: _base.startIndex, to: _startIndex)
@@ -313,7 +353,7 @@ extension Slice: RangeReplaceableCollection
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func insert<S>(contentsOf newElements: S, at i: Index)
   where S: Collection, S.Element == Base.Element {
 
@@ -325,7 +365,7 @@ extension Slice: RangeReplaceableCollection
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func remove(at i: Index) -> Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     let sliceOffset = _base.distance(from: _base.startIndex, to: _startIndex)
@@ -336,7 +376,7 @@ extension Slice: RangeReplaceableCollection
     return result
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: range check.
     let sliceOffset = _base.distance(from: _base.startIndex, to: _startIndex)
@@ -351,16 +391,16 @@ extension Slice: RangeReplaceableCollection
 extension Slice
   where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
   
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func replaceSubrange<C>(
     _ subRange: Range<Index>, with newElements: C
-  ) where C : Collection, C.Element == Base.Element {
+  ) where C: Collection, C.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if subRange.lowerBound == _base.startIndex {
       let newSliceCount =
         _base.distance(from: _startIndex, to: subRange.lowerBound)
         + _base.distance(from: subRange.upperBound, to: _endIndex)
-        + (numericCast(newElements.count) as Int)
+        + newElements.count
       _base.replaceSubrange(subRange, with: newElements)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -369,7 +409,7 @@ extension Slice
       let lastValidIndex = _base.index(before: subRange.lowerBound)
       let newEndIndexOffset =
         _base.distance(from: subRange.upperBound, to: _endIndex)
-        + (numericCast(newElements.count) as Int) + 1
+        + newElements.count + 1
       _base.replaceSubrange(subRange, with: newElements)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -378,7 +418,7 @@ extension Slice
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func insert(_ newElement: Base.Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
@@ -398,12 +438,12 @@ extension Slice
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func insert<S>(contentsOf newElements: S, at i: Index)
-  where S : Collection, S.Element == Base.Element {
+  where S: Collection, S.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
-      let newSliceCount = count + numericCast(newElements.count)
+      let newSliceCount = count + newElements.count
       _base.insert(contentsOf: newElements, at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -412,7 +452,7 @@ extension Slice
       let lastValidIndex = _base.index(before: i)
       let newEndIndexOffset =
         _base.distance(from: i, to: _endIndex)
-        + numericCast(newElements.count) + 1
+        + newElements.count + 1
       _base.insert(contentsOf: newElements, at: i)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -421,7 +461,7 @@ extension Slice
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func remove(at i: Index) -> Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
@@ -443,7 +483,7 @@ extension Slice
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: range check.
     if bounds.lowerBound == _base.startIndex {

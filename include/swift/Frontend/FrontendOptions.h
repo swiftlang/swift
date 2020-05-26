@@ -13,6 +13,8 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Version.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -31,19 +33,19 @@ namespace swift {
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
+  /// A list of arbitrary modules to import and make implicitly visible.
+  std::vector<std::string> ImplicitImportModuleNames;
+
 public:
   FrontendInputsAndOutputs InputsAndOutputs;
 
   /// The kind of input on which the frontend should operate.
-  InputFileKind InputKind = InputFileKind::IFK_Swift;
+  InputFileKind InputKind = InputFileKind::Swift;
 
   void forAllOutputPaths(const InputFile &input,
                          llvm::function_ref<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
-
-  /// A list of arbitrary modules to import and make implicitly visible.
-  std::vector<std::string> ImplicitImportModuleNames;
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
@@ -57,7 +59,7 @@ public:
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
-  /// \brief A list of arguments to forward to LLVM's option processing; this
+  /// A list of arguments to forward to LLVM's option processing; this
   /// should only be used for debugging and experimental features.
   std::vector<std::string> LLVMArgs;
 
@@ -70,34 +72,18 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
-  /// The path to which we should emit GraphViz output for the complete
-  /// request-evaluator graph.
-  std::string RequestEvaluatorGraphVizPath;
+  /// The path to look in when loading a module interface file, to see if a
+  /// binary module has already been built for use by the compiler.
+  std::string PrebuiltModuleCachePath;
+
+  /// For these modules, we should prefer using Swift interface when importing them.
+  std::vector<std::string> PreferInterfaceForModules;
 
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
-  /// If non-zero, warn when a function body takes longer than this many
-  /// milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongFunctionBodies = 0;
-
-  /// If non-zero, warn when type-checking an expression takes longer
-  /// than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongExpressionTypeChecking = 0;
-
-  /// If non-zero, overrides the default threshold for how long we let
-  /// the expression type checker run before we consider an expression
-  /// too complex.
-  unsigned SolverExpressionTimeThreshold = 0;
-  
-  /// If non-zero, overrides the default threshold for how many times
-  /// the Space::minus function is called before we consider switch statement
-  /// exhaustiveness checking to be too complex.
-  unsigned SwitchCheckingInvocationThreshold = 0;
+  /// If indexing system modules, don't index the stdlib.
+  bool IndexIgnoreStdlib = false;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
@@ -128,6 +114,9 @@ public:
     EmitModuleOnly, ///< Emit module only
     MergeModules,   ///< Merge modules only
 
+    /// Build from a swiftinterface, as close to `import` as possible
+    CompileModuleFromInterface,
+
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL
 
@@ -138,9 +127,14 @@ public:
     EmitIR,       ///< Emit LLVM IR
     EmitBC,       ///< Emit LLVM BC
     EmitObject,   ///< Emit object file
-  };
 
-  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
+    DumpTypeInfo, ///< Dump IRGen type info
+
+    EmitPCM, ///< Emit precompiled Clang module from a module map
+    DumpPCM, ///< Dump information about a precompiled Clang module
+
+    ScanDependencies,   ///< Scan dependencies of Swift source files
+  };
 
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = ActionType::NoneAction;
@@ -148,12 +142,17 @@ public:
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
 
-  /// If set, emitted module files will always contain options for the
-  /// debugger to use.
-  bool AlwaysSerializeDebuggingOptions = false;
+  /// Ignore .swiftsourceinfo file when trying to get source locations from module imported decls.
+  bool IgnoreSwiftSourceInfo = false;
 
-  /// If set, inserts instrumentation useful for testing the debugger.
-  bool DebuggerTestingTransform = false;
+  /// When true, emitted module files will always contain options for the
+  /// debugger to use. When unset, the options will only be present if the
+  /// module appears to not be a public module.
+  Optional<bool> SerializeOptionsForDebugging;
+
+  /// When true, check if all required SwiftOnoneSupport symbols are present in
+  /// the module.
+  bool CheckOnoneSupportCompleteness = false;
 
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
@@ -180,11 +179,6 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
-  /// If true, serialization encodes an extra lookup table for use in module-
-  /// merging when emitting partial modules (the per-file modules in a non-WMO
-  /// build).
-  bool EnableSerializationNestedTypeLookupTable = true;
-
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;
@@ -194,14 +188,21 @@ public:
   /// \see ModuleDecl::isTestingEnabled
   bool EnableTesting = false;
 
+  /// Indicates whether we are compiling for private imports.
+  ///
+  /// \see ModuleDecl::arePrivateImportsEnabled
+  bool EnablePrivateImports = false;
+
+
+  /// Indicates whether we add implicit dynamic.
+  ///
+  /// \see ModuleDecl::isImplicitDynamicEnabled
+  bool EnableImplicitDynamic = false;
+
   /// Enables the "fully resilient" resilience strategy.
   ///
   /// \see ResilienceStrategy::Resilient
-  bool EnableResilience = false;
-
-  /// Indicates that the frontend should emit "verbose" SIL
-  /// (if asked to emit SIL).
-  bool EmitVerboseSIL = false;
+  bool EnableLibraryEvolution = false;
 
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
@@ -219,33 +220,43 @@ public:
   /// termination.
   bool PrintClangStats = false;
 
-  /// Indicates whether the playground transformation should be applied.
-  bool PlaygroundTransform = false;
-  
-  /// Indicates whether the AST should be instrumented to simulate a debugger's
-  /// program counter. Similar to the PlaygroundTransform, this will instrument
-  /// the AST with function calls that get called when you would see a program
-  /// counter move in a debugger. To adopt this implement the
-  /// __builtin_pc_before and __builtin_pc_after functions.
-  bool PCMacro = false;
-
-  /// Indicates whether the playground transformation should omit
-  /// instrumentation that has a high runtime performance impact.
-  bool PlaygroundHighPerformance = false;
-
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
 
   /// Indicates whether full help (including "hidden" options) should be shown.
   bool PrintHelpHidden = false;
 
-  /// Should we sort SIL functions, vtables, witness tables, and global
-  /// variables by name when we print it out. This eases diffing of SIL files.
+  /// Indicates that the frontend should print the target triple and then
+  /// exit.
+  bool PrintTargetInfo = false;
+
+  /// See the \ref SILOptions.EmitVerboseSIL flag.
+  bool EmitVerboseSIL = false;
+
+  /// See the \ref SILOptions.EmitSortedSIL flag.
   bool EmitSortedSIL = false;
 
-  /// Indices whether the dependency tracker should track system
+  /// Indicates whether the dependency tracker should track system
   /// dependencies as well.
   bool TrackSystemDeps = false;
+
+  /// Should we serialize the hashes of dependencies (vs. the modification
+  /// times) when compiling a module interface?
+  bool SerializeModuleInterfaceDependencyHashes = false;
+
+  /// Should we warn if an imported module needed to be rebuilt from a
+  /// module interface file?
+  bool RemarkOnRebuildFromModuleInterface = false;
+
+  /// Should we lock .swiftinterface while generating .swiftmodule from it?
+  bool DisableInterfaceFileLock = false;
+
+  /// Should we enable the dependency verifier for all primary files known to this frontend?
+  bool EnableIncrementalDependencyVerifier = false;
+
+  /// The directory path we should use when print #include for the bridging header.
+  /// By default, we include ImplicitObjCHeaderPath directly.
+  llvm::Optional<std::string> BridgingHeaderDirForPrint;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
@@ -257,9 +268,6 @@ public:
 
   /// Compare the symbols in the IR against the TBD file we would generate.
   TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::Default;
-
-  /// The install_name to use in the TBD file.
-  std::string TBDInstallName;
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
@@ -290,7 +298,7 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift &&
+    return InputKind == InputFileKind::Swift &&
            InputsAndOutputs.hasSingleInput();
   }
 
@@ -299,19 +307,30 @@ public:
   const PrimarySpecificPaths &
       getPrimarySpecificPathsForPrimary(StringRef) const;
 
+  /// Retrieves the list of arbitrary modules to import and make implicitly
+  /// visible.
+  ArrayRef<std::string> getImplicitImportModuleNames() const {
+    return ImplicitImportModuleNames;
+  }
+
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
+  static bool canActionEmitSwiftRanges(ActionType);
+  static bool canActionEmitCompiledSource(ActionType);
   static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitInterface(ActionType);
 
 public:
+  static bool doesActionGenerateSIL(ActionType);
+  static bool doesActionGenerateIR(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
-  static StringRef suffixForPrincipalOutputFileForAction(ActionType);
+  static file_types::ID formatForPrincipalOutputFileForAction(ActionType);
 };
 
 }

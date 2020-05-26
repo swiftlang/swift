@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -typecheck %s -dump-api-path %t.dump
-// RUN: diff -du %S/Inputs/dumped_api.swift %t.dump/dump_api.swift
+// RUN: diff -u %S/Inputs/dumped_api.swift %t.dump/dump_api.swift
 
 public class _AnyIteratorBase {}
 

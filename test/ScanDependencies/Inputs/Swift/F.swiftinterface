@@ -1,0 +1,5 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name F
+import Swift
+@_exported import F
+public func funcF() { }

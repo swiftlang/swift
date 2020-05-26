@@ -7,7 +7,7 @@ class NoInitializers { // expected-error {{class 'NoInitializers' has no initial
 
   func foo() {
     // The class should not receive a default constructor.
-    let _ = NoInitializers.init() // expected-error {{type 'NoInitializers' has no member 'init'}}
+    let _ = NoInitializers.init() // expected-error {{'NoInitializers' cannot be constructed because it has no accessible initializers}}
   }
 }
 

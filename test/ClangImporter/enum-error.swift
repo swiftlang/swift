@@ -87,11 +87,9 @@ func testError() {
 // CHECK: sil_witness_table shared [serialized] ExhaustiveError: _BridgedStoredNSError module __ObjC
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break }
-  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch covers known cases, but 'TestError.Code' may have additional unknown values
   // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: handle unknown values using "@unknown default"
 
-  // FIXME: This should still be an error because there are /known/ cases that
-  // aren't covered.
   switch (terr) { case .TENone, .TEOne: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
   // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.TETwo'

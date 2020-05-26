@@ -1,13 +1,4 @@
-set(swift_extra_sources)
-
-# When we're building with assertions, include the demangle node dumper to aid
-# in debugging.
-if (LLVM_ENABLE_ASSERTIONS)
-  list(APPEND swift_extra_sources "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
-endif(LLVM_ENABLE_ASSERTIONS)
-
-
-add_swift_library(swiftReflection STATIC TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
+set(swiftReflection_SOURCES
   MetadataSource.cpp
   TypeLowering.cpp
   TypeRef.cpp
@@ -18,10 +9,19 @@ add_swift_library(swiftReflection STATIC TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
   "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
-  ${swift_extra_sources}
-  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
-  LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
-  INSTALL_IN_COMPONENT dev)
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
+# When we're building with assertions, include the demangle node dumper to aid
+# in debugging.
+if (LLVM_ENABLE_ASSERTIONS)
+  list(APPEND swiftReflection_SOURCES
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
+endif(LLVM_ENABLE_ASSERTIONS)
+
+add_swift_target_library(swiftReflection STATIC
+  ${swiftReflection_SOURCES}
+  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftCore_EXPORTS
+  LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
+  INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport
+  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+  INSTALL_IN_COMPONENT dev)

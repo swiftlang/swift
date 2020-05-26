@@ -1,11 +1,9 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     }
   ],
@@ -21,13 +19,15 @@
           key.kind: source.lang.swift.decl.function.accessor.getter,
           key.usr: "s:16forbid_typecheck10globalPrimSivg",
           key.line: 1,
-          key.column: 5
+          key.column: 5,
+          key.is_implicit: 1
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
           key.usr: "s:16forbid_typecheck10globalPrimSivs",
           key.line: 1,
-          key.column: 5
+          key.column: 5,
+          key.is_implicit: 1
         }
       ]
     },
@@ -42,7 +42,8 @@
           key.kind: source.lang.swift.ref.function.accessor.getter,
           key.usr: "s:16forbid_typecheck9globalSecSivg",
           key.line: 1,
-          key.column: 18
+          key.column: 18,
+          key.is_implicit: 1
         }
       ]
     },
@@ -87,7 +88,8 @@
               key.line: 5,
               key.column: 20,
               key.receiver_usr: "s:16forbid_typecheck6ClsSecC",
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             }
           ]
         }

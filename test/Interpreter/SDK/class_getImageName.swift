@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/libGetImageNameHelper.dylib
 
 // RUN: %target-build-swift -g %s -I %t -o %t/main -L %t -lGetImageNameHelper
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/libGetImageNameHelper.dylib
 
 // REQUIRES: executable_test
@@ -114,7 +115,7 @@ testSuite.test("KVO/ObjC") {
 }
 
 testSuite.test("dynamic") {
-  let newClass: AnyClass = objc_allocateClassPair(/*superclass*/nil,
+  let newClass: AnyClass = objc_allocateClassPair(/*superclass*/NSObject.self,
                                                   "CompletelyDynamic",
                                                   /*extraBytes*/0)!
   objc_registerClassPair(newClass)

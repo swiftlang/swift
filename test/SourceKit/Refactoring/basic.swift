@@ -78,6 +78,44 @@ func foo7() -> String {
   foo6()
 }
 
+struct Test {
+  init(x: Int = 42) {}
+  func callAsFunction(x: Int = 42) {}
+}
+
+Test.init
+Test.init()
+Test.init(x:)
+Test.init(x: 3)
+
+let callable = Test();
+callable(x: 89)
+callable.callAsFunction
+callable.callAsFunction()
+callable.callAsFunction(x:)
+callable.callAsFunction(x: 78)
+(callable.callAsFunction)(x: 78)
+(callable.callAsFunction)()
+
+func foo(_ x: Int) -> Test { fatalError() }
+foo(39)(x: 90)
+
+struct TestDefaultedParen {
+  init(_: Int = 42) {}
+}
+
+TestDefaultedParen.init()
+
+struct HasInitWithDefaultArgs {
+  init(x: Int = 10, y: Int = 20, z: Int = 10)
+}
+
+HasInitWithDefaultArgs(z: 45)
+HasInitWithDefaultArgs(y: 45, z: 89)
+
+func `hasBackticks`(`x`: Int) {}
+`hasBackticks`(`x`:2)
+
 // RUN: %sourcekitd-test -req=cursor -pos=3:1 -end-pos=5:13 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK1
 
 // CHECK1: ACTIONS BEGIN
@@ -92,6 +130,37 @@ func foo7() -> String {
 // RUN: %sourcekitd-test -req=cursor -pos=26:20 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=27:11 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-LOCAL
 
+// RUN: %sourcekitd-test -req=cursor -pos=83:8  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=86:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
+// RUN: %sourcekitd-test -req=cursor -pos=87:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
+// RUN: %sourcekitd-test -req=cursor -pos=88:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=89:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=89:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+
+// RUN: %sourcekitd-test -req=cursor -pos=92:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=93:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
+// RUN: %sourcekitd-test -req=cursor -pos=94:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
+// RUN: %sourcekitd-test -req=cursor -pos=95:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=96:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=96:25  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=97:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=97:27  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=98:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
+
+// RUN: %sourcekitd-test -req=cursor -pos=107:20  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
+
+// RUN: %sourcekitd-test -req=cursor -pos=113:24  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=114:24  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=114:31  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=114:31  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+
+// RUN: %sourcekitd-test -req=cursor -pos=116:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=116:7  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:1  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:2  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:16  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:17  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+
 // RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
 // RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
 
@@ -105,6 +174,9 @@ func foo7() -> String {
 
 // RUN: %sourcekitd-test -req=cursor -pos=72:5 -end-pos=72:11 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
 // RUN: %sourcekitd-test -req=cursor -pos=78:3 -end-pos=78:9 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
+
+// CHECK-NORENAME-NOT: Global Rename
+// CHECK-NORENAME-NOT: Local Rename
 
 // CHECK2: ACTIONS BEGIN
 // CHECK2-NEXT: source.refactoring.kind.rename.global
@@ -152,4 +224,4 @@ func foo7() -> String {
 
 // CHECK-LOCALIZE-STRING: source.refactoring.kind.localize.string
 
-// REQUIRES-ANY: OS=macosx, OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu

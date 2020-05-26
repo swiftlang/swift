@@ -3,6 +3,7 @@
 // RUN: %target-build-swift -I %t %s -module-name typealias -emit-module-path %t/typealias.swiftmodule -o %t/typealias.o
 // RUN: llvm-bcanalyzer %t/alias.swiftmodule | %FileCheck %s
 // RUN: %target-build-swift -I %t %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck -check-prefix=OUTPUT %s
 // REQUIRES: executable_test
 

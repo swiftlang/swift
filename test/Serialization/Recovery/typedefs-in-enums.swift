@@ -14,11 +14,11 @@ import Lib
 
 func use(_: OkayEnum) {}
 // FIXME: Better to import the enum and make it unavailable.
-func use(_: BadEnum) {} // expected-error {{use of undeclared type 'BadEnum'}}
+func use(_: BadEnum) {} // expected-error {{cannot find type 'BadEnum' in scope}}
 
 func test() {
   _ = producesOkayEnum()
-  _ = producesBadEnum() // expected-error {{use of unresolved identifier 'producesBadEnum'}}
+  _ = producesBadEnum() // expected-error {{cannot find 'producesBadEnum' in scope}}
 
   // Force a lookup of the ==
   _ = Optional(OkayEnum.noPayload).map { $0 == .noPayload }
@@ -109,5 +109,32 @@ public func producesGenericBadEnum<T>() -> GenericBadEnum<T> { return .noPayload
 public func producesOkayEnum() -> OkayEnum { return .noPayload }
 // CHECK-LABEL: func producesOkayEnum() -> OkayEnum
 // CHECK-RECOVERY-LABEL: func producesOkayEnum() -> OkayEnum
+
+
+extension Int /* or any imported type, really */ {
+  public enum OkayEnumWithSelfRefs {
+    public struct Nested {}
+    indirect case selfRef(OkayEnumWithSelfRefs)
+    case nested(Nested)
+  }
+}
+// CHECK-LABEL: extension Int {
+//  CHECK-NEXT:   enum OkayEnumWithSelfRefs {
+//  CHECK-NEXT:     struct Nested {
+//  CHECK-NEXT:       init()
+//  CHECK-NEXT:     }
+//  CHECK-NEXT:     indirect case selfRef(Int.OkayEnumWithSelfRefs)
+//  CHECK-NEXT:     case nested(Int.OkayEnumWithSelfRefs.Nested)
+//  CHECK-NEXT:   }
+//  CHECK-NEXT: }
+// CHECK-RECOVERY-LABEL: extension Int {
+//  CHECK-RECOVERY-NEXT:   enum OkayEnumWithSelfRefs {
+//  CHECK-RECOVERY-NEXT:     struct Nested {
+//  CHECK-RECOVERY-NEXT:       init()
+//  CHECK-RECOVERY-NEXT:     }
+//  CHECK-RECOVERY-NEXT:     indirect case selfRef(Int.OkayEnumWithSelfRefs)
+//  CHECK-RECOVERY-NEXT:     case nested(Int.OkayEnumWithSelfRefs.Nested)
+//  CHECK-RECOVERY-NEXT:   }
+//  CHECK-RECOVERY-NEXT: }
 
 #endif // TEST

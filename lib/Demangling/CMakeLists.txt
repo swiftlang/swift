@@ -1,4 +1,4 @@
-add_swift_library(swiftDemangling STATIC
+add_swift_host_library(swiftDemangling STATIC
   Demangler.cpp
   Context.cpp
   ManglingUtils.cpp
@@ -7,7 +7,7 @@ add_swift_library(swiftDemangling STATIC
   OldDemangler.cpp
   OldRemangler.cpp
   Punycode.cpp
-  Remangler.cpp
-  TypeDecoder.cpp
-  )
+  Remangler.cpp)
+target_compile_definitions(swiftDemangling PRIVATE
+  LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
 

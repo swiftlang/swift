@@ -1,0 +1,1224 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+
+import Swift
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+struct UInt {
+  var value: Builtin.Word
+}
+struct Int {
+  var value: Builtin.Word
+}
+struct Bool {
+  var value: Builtin.Int1
+}
+struct Int64 {
+  var value: Builtin.Int64
+}
+struct UInt64 {
+  var value: Builtin.Int64
+}
+
+class Klass {}
+
+sil @klass_allocator : $@convention(method) (@thick Klass.Type) -> @owned Klass
+sil @generic_user : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+struct NativeObjectOptNativeObjectPair {
+  var lhs: Builtin.NativeObject
+  var rhs: Optional<Builtin.NativeObject>
+}
+
+///////////
+// Tests //
+///////////
+
+sil [ossa] @count_leading_zeros_corner_case : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %zero64 = integer_literal $Builtin.Int64, 0
+ %zero1 = integer_literal $Builtin.Int1, 0
+ %ctlz = builtin "int_ctlz_Int64"(%zero64 : $Builtin.Int64, %zero1 : $Builtin.Int1) : $Builtin.Int64
+ return %ctlz : $Builtin.Int64
+
+// CHECK-LABEL: sil [ossa] @count_leading_zeros_corner_case
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: integer_literal $Builtin.Int1, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 64
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+sil [ossa] @count_leading_zeros : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %zero64 = integer_literal $Builtin.Int64, 2
+ %zero1 = integer_literal $Builtin.Int1, 0
+ %ctlz = builtin "int_ctlz_Int64"(%zero64 : $Builtin.Int64, %zero1 : $Builtin.Int1) : $Builtin.Int64
+ return %ctlz : $Builtin.Int64
+
+// CHECK-LABEL: sil [ossa] @count_leading_zeros
+// CHECK-NOT: integer_literal $Builtin.Int64, 2
+// CHECK-NOT: integer_literal $Builtin.Int1, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 62
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @fold_arithmetic_with_overflow
+// CHECK-NOT: integer_literal $Builtin.Int64, 2
+// CHECK-NOT: integer_literal $Builtin.Int64, 3
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 7
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+// Compute an expression using a chain of arithmetic with overflow instructions: 2 * (2 + 3) - 3
+sil [ossa] @fold_arithmetic_with_overflow : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2
+  %110 = integer_literal $Builtin.Int64, 3
+  %18 = builtin "int_sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %110 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+  %20 = builtin "int_smul_with_overflow_Int64"(%0 : $Builtin.Int64, %19 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
+  %22 = builtin "int_ssub_with_overflow_Int64"(%21 : $Builtin.Int64, %110 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+  %23 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 0
+  return %23 : $Builtin.Int64
+}
+
+sil [ossa] @fold_arithmetic_with_overflow_destructure : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2
+  %110 = integer_literal $Builtin.Int64, 3
+  %18 = builtin "int_sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %110 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+  (%19, %19a) = destructure_tuple %18 : $(Builtin.Int64, Builtin.Int1)
+  %20 = builtin "int_smul_with_overflow_Int64"(%0 : $Builtin.Int64, %19 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+  (%21, %21a) = destructure_tuple %20 : $(Builtin.Int64, Builtin.Int1)
+  %22 = builtin "int_ssub_with_overflow_Int64"(%21 : $Builtin.Int64, %110 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+  (%23, %23a) = destructure_tuple %22 : $(Builtin.Int64, Builtin.Int1)
+  return %23 : $Builtin.Int64
+}
+
+// Fold casts. (This test assumes that DCE does not run, otherwise the unreachable blocks will get removed.)
+sil [ossa] @fold_trunc : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %0 = integer_literal $Builtin.Int128, 22
+ %2 = builtin "trunc_Int128_Int64"(%0 : $Builtin.Int128) : $Builtin.Int64
+ br bb4(%2 : $Builtin.Int64)
+
+bb1:
+ %3 = integer_literal $Builtin.Int8, 23
+ %5 = builtin "sext_Int8_Int64"(%3 : $Builtin.Int8) : $Builtin.Int64
+ br bb4(%5 : $Builtin.Int64)
+
+bb2:
+ %6 = integer_literal $Builtin.Int8, 24
+ %8 = builtin "zext_Int8_Int64"(%6 : $Builtin.Int8) : $Builtin.Int64
+ br bb4(%8 : $Builtin.Int64)
+
+bb4(%100 : $Builtin.Int64):
+ return %100 : $Builtin.Int64
+// CHECK-LABEL: sil [ossa] @fold_trunc
+// CHECK-NOT: integer_literal $Builtin.Int128, 22
+// CHECK: integer_literal $Builtin.Int64, 22
+// CHECK-NOT: integer_literal $Builtin.Int8, 23
+// CHECK: integer_literal $Builtin.Int64, 23
+// CHECK-NOT: integer_literal $Builtin.Int8, 24
+// CHECK: integer_literal $Builtin.Int64, 24
+}
+
+// CHECK-LABEL: sil [ossa] @test_tuple_extract_folding
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 5
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+sil [ossa] @test_tuple_extract_folding : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int1)
+  %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0
+  return %3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple_folding
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 5
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+sil [ossa] @test_destructure_tuple_folding : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int1)
+  (%3, %3a) = destructure_tuple %2 : $(Builtin.Int64, Builtin.Int1)
+  return %3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_struct_extract_folding_first
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+sil [ossa] @test_struct_extract_folding_first : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = struct_extract %1 : $Int64, #Int64.value
+  return %2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_struct_folding_first :
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+sil [ossa] @test_destructure_struct_folding_first : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = destructure_struct %1 : $Int64
+  return %2 : $Builtin.Int64
+}
+
+struct TwoValueStruct {
+  var a : Builtin.Int64
+  var b : Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_struct_extract_folding_second
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 20
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+sil [ossa] @test_struct_extract_folding_second : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2
+  %1 = integer_literal $Builtin.Int64, 20
+  %2 = struct $TwoValueStruct (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  %3 = struct_extract %2 : $TwoValueStruct, #TwoValueStruct.b
+  return %3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_struct_folding_second :
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 20
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+sil [ossa] @test_destructure_struct_folding_second : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2
+  %1 = integer_literal $Builtin.Int64, 20
+  %2 = struct $TwoValueStruct (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  (%3a, %3) = destructure_struct %2 : $TwoValueStruct
+  return %3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_struct_extract_folding_third
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 : $Bool
+// CHECK-NEXT: }
+sil [ossa] @test_struct_extract_folding_third : $() -> Bool {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 200
+  %a = integer_literal $Builtin.Int1, 1
+  %1 = struct $Bool (%a : $Builtin.Int1)
+  %2 = tuple (%0 : $Builtin.Int64, %1 : $Bool)
+  %3 = tuple_extract %2 : $(Builtin.Int64, Bool), 1
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_struct_folding_third :
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 : $Bool
+// CHECK-NEXT: }
+sil [ossa] @test_destructure_struct_folding_third : $() -> Bool {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 200
+  %a = integer_literal $Builtin.Int1, 1
+  %1 = struct $Bool (%a : $Builtin.Int1)
+  %2 = tuple (%0 : $Builtin.Int64, %1 : $Bool)
+  (%3a, %3) = destructure_tuple %2 : $(Builtin.Int64, Bool)
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil [ossa] @testChainingCCP :
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: return %0 : $Builtin.Int1
+// CHECK-NEXT: }
+sil [ossa] @testChainingCCP : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = struct_extract %3 : $Int64, #Int64.value
+  %5 = builtin "trunc_Int64_Int1"(%4 : $Builtin.Int64) : $Builtin.Int1
+  return %5 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [ossa] @testChainingCCPDestructure :
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: return %0 : $Builtin.Int1
+// CHECK-NEXT: }
+sil [ossa] @testChainingCCPDestructure : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = destructure_struct %3 : $Int64
+  %5 = builtin "trunc_Int64_Int1"(%4 : $Builtin.Int64) : $Builtin.Int1
+  return %5 : $Builtin.Int1
+}
+
+sil [ossa] @testDivision : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+  %1 = integer_literal $Builtin.Int8, 6
+  %2 = integer_literal $Builtin.Int8, 3
+  %3 = builtin "sdiv_Int8"(%1: $Builtin.Int8, %2: $Builtin.Int8) : $Builtin.Int8
+  return %3 : $Builtin.Int8
+
+// CHECK-LABEL: sil [ossa] @testDivision
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int8, 2
+// CHECK-NEXT: return %0 : $Builtin.Int8
+// CHECK-NEXT: }
+}
+
+sil [ossa] @testRem : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = builtin "urem_Int64"(%1 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  return %3 : $Builtin.Int64
+
+// CHECK-LABEL: sil [ossa] @testRem
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: return %0 : $Builtin.Int64
+// CHECK-NEXT: }
+}
+
+sil [ossa] @testFoldingNonNegativeSignedInt : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %zero  = integer_literal $Builtin.Int64, 0
+  %non_neg = builtin "assumeNonNegative_Int64"(%0 : $Builtin.Int64) : $Builtin.Int64
+  %compare_slt = builtin "cmp_slt_Int64"(%non_neg : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+  %compare_sgt = builtin "cmp_sgt_Int64"(%zero : $Builtin.Int64, %non_neg : $Builtin.Int64) : $Builtin.Int1
+  %compare_sge = builtin "cmp_sge_Int64"(%non_neg : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+  %compare_sle = builtin "cmp_sle_Int64"(%zero : $Builtin.Int64, %non_neg : $Builtin.Int64) : $Builtin.Int1
+  %5 = tuple ()
+  return %5 : $()
+// CHECK-LABEL: sil [ossa] @testFoldingNonNegativeSignedInt
+// CHECK: bb
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+}
+
+sil [ossa] @testFoldingIntBinaryPredicates : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = integer_literal $Builtin.Int1, 1
+  %2 = integer_literal $Builtin.Int1, 0
+  // This is Int32.Max
+  %3 = integer_literal $Builtin.Int32, 2147483647
+  %4 = builtin "cmp_eq_Int1"(%1 : $Builtin.Int1, %2 : $Builtin.Int1) : $Builtin.Int1
+  %11 = integer_literal $Builtin.Int32, 21
+  %12 = integer_literal $Builtin.Int32, 12
+  %14 = builtin "cmp_ne_Int32"(%11 : $Builtin.Int32, %12 : $Builtin.Int32) : $Builtin.Int1
+  %16 = builtin "cmp_sgt_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
+  %17 = builtin "cmp_ult_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
+  // Int32.Max < x
+  %18 = builtin "cmp_slt_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  // x > Int32.Max
+  %19 = builtin "cmp_sgt_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  // Int32.Max >= x
+  %20 = builtin "cmp_sge_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  // x <= Int32.Max
+  %21 = builtin "cmp_sle_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+
+  %5 = tuple ()
+  return %5 : $()
+// CHECK-LABEL: sil [ossa] @testFoldingIntBinaryPredicates
+// CHECK: bb
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+}
+
+sil [ossa] @testFoldingUnsignedIntComparisons : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int32, 0
+  // unsigned value is never less then 0
+  %18 = builtin "cmp_ult_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  // unsigned value is always >= 0
+  %19 = builtin "cmp_uge_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  // 0 is always <= an unsigned value
+  %20 = builtin "cmp_ule_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  // 0 is never greater than an unsigned value
+  %21 = builtin "cmp_ugt_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  %5 = tuple ()
+  return %5 : $()
+// CHECK-LABEL: sil [ossa] @testFoldingUnsignedIntComparisons
+// CHECK: bb0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+}
+
+// fold_binary_bitwise
+sil [ossa] @fold_binary_bitwise : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = integer_literal $Builtin.Int64, 0
+  %5 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %6 = builtin "or_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %7 = builtin "xor_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  return %7 : $Builtin.Int64
+
+// CHECK-LABEL: sil [ossa] @fold_binary_bitwise
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 0
+// CHECK_NEXT: %1 = integer_literal $Builtin.Int64, 1
+// CHECK_NEXT: %2 = integer_literal $Builtin.Int64, 1
+// CHECK_NEXT: return %2 : $Builtin.Int64
+}
+
+// For any x of the same size as Int.max and n>=1 , (x>>n) is always <= Int.max,
+// that is (x>>n) <= Int.max and Int.max >= (x>>n) are true.
+// At the same time (x>>n) > Int.max and Int.max < (x>>n) is always false.
+sil [ossa] @fold_cmp_lshr_with_IntMax : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 9223372036854775807
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = integer_literal $Builtin.Int64, -2
+
+  // x >> 1
+  %9 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+
+  %10 = builtin "cmp_sge_Int64"(%1 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int1
+  %11 = builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int1
+  %12 = builtin "cmp_sle_Int64"(%9 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %13 = builtin "cmp_ule_Int64"(%9 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  %20 = builtin "cmp_slt_Int64"(%1 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int1
+  %21 = builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int1
+  %22 = builtin "cmp_sgt_Int64"(%9 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %23 = builtin "cmp_ugt_Int64"(%9 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  // x >> 3
+  %29 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int64
+
+  %30 = builtin "cmp_sge_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %31 = builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %32 = builtin "cmp_sle_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %33 = builtin "cmp_ule_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  %40 = builtin "cmp_slt_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %41 = builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %42 = builtin "cmp_sgt_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %43 = builtin "cmp_ugt_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  // Check that this peephole does not happen if the shift amount is < 1
+
+  // x >> 0 (i.e. x shifted by something < 1)
+  %59 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int64
+
+  %60 = builtin "cmp_sge_Int64"(%1 : $Builtin.Int64, %59 : $Builtin.Int64) : $Builtin.Int1
+  %61 = builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %59 : $Builtin.Int64) : $Builtin.Int1
+  %62 = builtin "cmp_sle_Int64"(%59 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %63 = builtin "cmp_ule_Int64"(%59 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  %70 = builtin "cmp_slt_Int64"(%1 : $Builtin.Int64, %59 : $Builtin.Int64) : $Builtin.Int1
+  %71 = builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %59 : $Builtin.Int64) : $Builtin.Int1
+  %72 = builtin "cmp_sgt_Int64"(%59 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %73 = builtin "cmp_ugt_Int64"(%59 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  // x >> -2 (i.e. x shifted by something < 1)
+  %79 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64
+
+  %80 = builtin "cmp_sge_Int64"(%1 : $Builtin.Int64, %79 : $Builtin.Int64) : $Builtin.Int1
+  %81 = builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %79 : $Builtin.Int64) : $Builtin.Int1
+  %82 = builtin "cmp_sle_Int64"(%79 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %83 = builtin "cmp_ule_Int64"(%79 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  %90 = builtin "cmp_slt_Int64"(%1 : $Builtin.Int64, %79 : $Builtin.Int64) : $Builtin.Int1
+  %91 = builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %79 : $Builtin.Int64) : $Builtin.Int1
+  %92 = builtin "cmp_sgt_Int64"(%79 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %93 = builtin "cmp_ugt_Int64"(%79 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+
+  return %4 : $Builtin.Int64
+
+// CHECK-LABEL: sil [ossa] @fold_cmp_lshr_with_IntMax
+// CHECK: bb0
+// CHECK-NEXT: integer_literal $Builtin.Int64, 9223372036854775807
+// CHECK-NEXT: integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: integer_literal $Builtin.Int64, -2
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "lshr_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %20 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: builtin "cmp_ule_Int64"(%20 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %20 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "cmp_ugt_Int64"(%20 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: builtin "lshr_Int64"(%0 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int64
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: builtin "cmp_uge_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: builtin "cmp_ule_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "cmp_ult_Int64"(%1 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: builtin "cmp_ugt_Int64"(%29 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+// CHECK-NEXT: return %2 : $Builtin.Int64
+}
+
+// fold_shifts
+sil [ossa] @fold_shifts : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, -32
+  %1 = integer_literal $Builtin.Int64, 32
+  %2 = integer_literal $Builtin.Int64, 3
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = integer_literal $Builtin.Int64, 5
+  %8 = builtin "ashr_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  %9 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  %10 = builtin "ashr_Int64"(%1 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  %11 = builtin "lshr_Int64"(%1 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  %12 = builtin "shl_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int64
+  return %12 : $Builtin.Int64
+
+// CHECK-LABEL: sil [ossa] @fold_shifts
+// CHECK: bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int64, -4
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int64, 2305843009213693948
+// CHECK-NEXT: %2 = integer_literal $Builtin.Int64, 4
+// CHECK-NEXT: %3 = integer_literal $Builtin.Int64, 4
+// CHECK-NEXT: %4 = integer_literal $Builtin.Int64, 32
+// CHECK-NEXT: return %4 : $Builtin.Int64
+}
+
+// Fold x < 0 into false, if x is known to be a result of an unsigned
+// operation with overflow checks enabled.
+// At the same time x >= 0 is always true under the same conditions.
+//
+// CHECK-LABEL: sil [ossa] @fold_unsigned_op_with_overflow_lt_zero :
+// CHECK: builtin "uadd_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK: integer_literal $Builtin.Int1, -1
+// CHECK: builtin "usub_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK: integer_literal $Builtin.Int1, -1
+// CHECK: builtin "umul_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: return {{.*}}$Builtin.Int64
+sil [ossa] @fold_unsigned_op_with_overflow_lt_zero : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+ %zero  = integer_literal $Builtin.Int64, 0
+ %2 = integer_literal $Builtin.Int1, -1
+
+ %uadd_result = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ %uadd_with_overflow_result = tuple_extract %uadd_result : $(Builtin.Int64, Builtin.Int1), 0
+ %uadd_overflow = tuple_extract %uadd_result : $(Builtin.Int64, Builtin.Int1), 1
+ cond_fail %uadd_overflow : $Builtin.Int1
+ %compare_slt_uadd_result = builtin "cmp_slt_Int64"(%uadd_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_uadd_result = builtin "cmp_sge_Int64"(%uadd_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+
+ %usub_result = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ %usub_with_overflow_result = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 0
+ %usub_overflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1
+ cond_fail %uadd_overflow : $Builtin.Int1
+ %compare_slt_usub_result = builtin "cmp_slt_Int64"(%usub_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_usub_result = builtin "cmp_sge_Int64"(%usub_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+
+ %umul_result = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ %umul_with_overflow_result = tuple_extract %umul_result : $(Builtin.Int64, Builtin.Int1), 0
+ %umul_overflow = tuple_extract %umul_result : $(Builtin.Int64, Builtin.Int1), 1
+ cond_fail %umul_overflow : $Builtin.Int1
+ %compare_slt_umul_result = builtin "cmp_slt_Int64"(%umul_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_umul_result = builtin "cmp_sge_Int64"(%umul_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+ return %uadd_with_overflow_result : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @fold_unsigned_op_with_overflow_lt_zero_destructure :
+// CHECK: builtin "uadd_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK: integer_literal $Builtin.Int1, -1
+// CHECK: builtin "usub_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK: integer_literal $Builtin.Int1, -1
+// CHECK: builtin "umul_with_overflow_Int64"
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: return {{.*}}$Builtin.Int64
+sil [ossa] @fold_unsigned_op_with_overflow_lt_zero_destructure : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+ %zero  = integer_literal $Builtin.Int64, 0
+ %2 = integer_literal $Builtin.Int1, -1
+
+ %uadd_result = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ (%uadd_with_overflow_result, %uadd_overflow) = destructure_tuple %uadd_result : $(Builtin.Int64, Builtin.Int1)
+ cond_fail %uadd_overflow : $Builtin.Int1
+ %compare_slt_uadd_result = builtin "cmp_slt_Int64"(%uadd_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_uadd_result = builtin "cmp_sge_Int64"(%uadd_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+
+ %usub_result = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ (%usub_with_overflow_result, %usub_overflow) = destructure_tuple %usub_result : $(Builtin.Int64, Builtin.Int1)
+ cond_fail %usub_overflow : $Builtin.Int1
+ %compare_slt_usub_result = builtin "cmp_slt_Int64"(%usub_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_usub_result = builtin "cmp_sge_Int64"(%usub_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+
+ %umul_result = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2: $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+ (%umul_with_overflow_result, %umul_overflow) = destructure_tuple %umul_result : $(Builtin.Int64, Builtin.Int1)
+ cond_fail %umul_overflow : $Builtin.Int1
+ %compare_slt_umul_result = builtin "cmp_slt_Int64"(%umul_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+ %compare_sge_umul_result = builtin "cmp_sge_Int64"(%umul_with_overflow_result : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+
+ return %uadd_with_overflow_result : $Builtin.Int64
+}
+
+// fold_float_operations
+sil [ossa] @fold_float_operations : $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+  %4 = float_literal $Builtin.FPIEEE64, 0x402E4CCCCCCCCCCD // 15.15
+  %11 = float_literal $Builtin.FPIEEE64, 0x400A666666666666 // 3.2999999999999998
+  %8 = builtin "fadd_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  %9 = builtin "fdiv_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  %10 = builtin "fsub_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  %13 = builtin "fmul_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  return %13 : $Builtin.FPIEEE64
+
+// CHECK-LABEL: sil [ossa] @fold_float_operations
+// CHECK: bb0:
+// CHECK-NEXT: %0 = float_literal $Builtin.FPIEEE64, 0x4032733333333333
+// CHECK-NEXT: %1 = float_literal $Builtin.FPIEEE64, 0x40125D1745D1745D
+// CHECK-NEXT: %2 = float_literal $Builtin.FPIEEE64, 0x4027B33333333334
+// CHECK-NEXT: %3 = float_literal $Builtin.FPIEEE64, 0x4048FF5C28F5C28F
+// CHECK-NEXT: return %3 : $Builtin.FPIEEE64
+}
+
+// rdar://15729207 - Verify that constant folding doesn't leave around obviously
+// dead cond_fail instructions.
+//
+// CHECK-LABEL: sil [ossa] @fold_condfail_instructions
+// CHECK: bb0
+// CHECK-NEXT: integer_literal{{.*}}3
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+sil [ossa] @fold_condfail_instructions : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.IntLiteral, 1
+  %2 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %6 = integer_literal $Builtin.IntLiteral, 2
+  %8 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%6 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  %12 = integer_literal $Builtin.Int1, -1
+  %14 = struct_extract %4 : $Int64, #Int64.value
+  %15 = struct_extract %10 : $Int64, #Int64.value
+  %16 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %12 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %17 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 0
+  %18 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 1
+  %19 = struct $Int64 (%17 : $Builtin.Int64)
+  cond_fail %18 : $Builtin.Int1
+  return %19 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @fold_condfail_instructions_destructure :
+// CHECK: bb0
+// CHECK-NEXT: integer_literal{{.*}}3
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+sil [ossa] @fold_condfail_instructions_destructure : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.IntLiteral, 1
+  %2 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  (%3, %3a) = destructure_tuple %2 : $(Builtin.Int64, Builtin.Int1)
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %6 = integer_literal $Builtin.IntLiteral, 2
+  %8 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%6 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  (%9, %9a) = destructure_tuple %8 : $(Builtin.Int64, Builtin.Int1)
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  %12 = integer_literal $Builtin.Int1, -1
+  %14 = destructure_struct %4 : $Int64
+  %15 = destructure_struct %10 : $Int64
+  %16 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %12 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%17, %18) = destructure_tuple %16 : $(Builtin.Int64, Builtin.Int1)
+  %19 = struct $Int64 (%17 : $Builtin.Int64)
+  cond_fail %18 : $Builtin.Int1
+  return %19 : $Int64
+}
+
+// Make sure that we properly handle functions eliminated by CCP by removing
+// from the worklist. If we don't the following (reduced) test case will blow
+// up.
+//
+// CHECK-LABEL: sil [ossa] @properly_handle_eliminated_instructions_in_worklist : $@convention(method) (Bool, @inout UInt) -> () {
+sil [ossa] @properly_handle_eliminated_instructions_in_worklist : $@convention(method) (Bool, @inout UInt) -> () {
+bb0(%0 : $Bool, %1 : $*UInt):
+  %2 = load [trivial] %1 : $*UInt
+  %3 = integer_literal $Builtin.IntLiteral, 1
+  %5 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%3 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 1
+  %8 = struct $UInt (%6 : $Builtin.Word)
+  %9 = integer_literal $Builtin.IntLiteral, 0
+  %11 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%9 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 0
+  %13 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 1
+  %14 = struct $UInt (%12 : $Builtin.Word)
+  %15 = integer_literal $Builtin.IntLiteral, 1
+  %17 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%15 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 0
+  %19 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 1
+  %20 = struct $UInt (%18 : $Builtin.Word)
+  %22 = struct_extract %14 : $UInt, #UInt.value
+  %23 = struct_extract %20 : $UInt, #UInt.value
+  %25 = integer_literal $Builtin.IntLiteral, 0
+  %27 = builtin "s_to_s_checked_trunc_IntLiteral_Word"(%25 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
+  %28 = tuple_extract %27 : $(Builtin.Word, Builtin.Int1), 0
+  %29 = tuple_extract %27 : $(Builtin.Word, Builtin.Int1), 1
+  %30 = struct $Int (%28 : $Builtin.Word)
+  %31 = struct_extract %30 : $Int, #Int.value
+  %32 = builtin "trunc_Word_Int1"(%31 : $Builtin.Word) : $Builtin.Int1
+  %33 = struct $Bool (%32 : $Builtin.Int1)
+  %34 = struct_extract %33 : $Bool, #Bool.value
+  %35 = builtin "usub_with_overflow_Word"(%22 : $Builtin.Word, %23 : $Builtin.Word, %34 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %36 = tuple_extract %35 : $(Builtin.Word, Builtin.Int1), 0
+  %37 = tuple_extract %35 : $(Builtin.Word, Builtin.Int1), 1
+  %38 = struct $UInt (%36 : $Builtin.Word)
+  %39 = struct $Bool (%37 : $Builtin.Int1)
+  %40 = tuple (%38 : $UInt, %39 : $Bool)
+  %41 = tuple_extract %40 : $(UInt, Bool), 0
+  %42 = tuple_extract %40 : $(UInt, Bool), 1
+  %44 = struct_extract %8 : $UInt, #UInt.value
+  %45 = struct_extract %41 : $UInt, #UInt.value
+  %46 = builtin "xor_Word"(%44 : $Builtin.Word, %45 : $Builtin.Word) : $Builtin.Word
+  %47 = struct $UInt (%46 : $Builtin.Word)
+  %49 = struct_extract %2 : $UInt, #UInt.value
+  %50 = struct_extract %47 : $UInt, #UInt.value
+  %51 = builtin "and_Word"(%49 : $Builtin.Word, %50 : $Builtin.Word) : $Builtin.Word
+  %52 = struct $UInt (%51 : $Builtin.Word)
+  %53 = tuple ()
+  return %53 : $()
+}
+
+sil [ossa] @properly_handle_eliminated_instructions_in_worklist_destructure : $@convention(method) (Bool, @inout UInt) -> () {
+bb0(%0 : $Bool, %1 : $*UInt):
+  %2 = load [trivial] %1 : $*UInt
+  %3 = integer_literal $Builtin.IntLiteral, 1
+  %5 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%3 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
+  (%6, %7) = destructure_tuple %5 : $(Builtin.Word, Builtin.Int1)
+  %8 = struct $UInt (%6 : $Builtin.Word)
+  %9 = integer_literal $Builtin.IntLiteral, 0
+  %11 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%9 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
+  (%12, %13) = destructure_tuple %11 : $(Builtin.Word, Builtin.Int1)
+  %14 = struct $UInt (%12 : $Builtin.Word)
+  %15 = integer_literal $Builtin.IntLiteral, 1
+  %17 = builtin "s_to_u_checked_trunc_IntLiteral_Word"(%15 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
+  (%18, %19) = destructure_tuple %17 : $(Builtin.Word, Builtin.Int1)
+  %20 = struct $UInt (%18 : $Builtin.Word)
+  %22 = destructure_struct %14 : $UInt
+  %23 = destructure_struct %20 : $UInt
+  %25 = integer_literal $Builtin.IntLiteral, 0
+  %27 = builtin "s_to_s_checked_trunc_IntLiteral_Word"(%25 : $Builtin.IntLiteral) : $(Builtin.Word, Builtin.Int1)
+  (%28, %29) = destructure_tuple %27 : $(Builtin.Word, Builtin.Int1)
+  %30 = struct $Int (%28 : $Builtin.Word)
+  %31 = destructure_struct %30 : $Int
+  %32 = builtin "trunc_Word_Int1"(%31 : $Builtin.Word) : $Builtin.Int1
+  %33 = struct $Bool (%32 : $Builtin.Int1)
+  %34 = destructure_struct %33 : $Bool
+  %35 = builtin "usub_with_overflow_Word"(%22 : $Builtin.Word, %23 : $Builtin.Word, %34 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  (%36, %37) = destructure_tuple %35 : $(Builtin.Word, Builtin.Int1)
+  %38 = struct $UInt (%36 : $Builtin.Word)
+  %39 = struct $Bool (%37 : $Builtin.Int1)
+  %40 = tuple (%38 : $UInt, %39 : $Bool)
+  (%41, %42) = destructure_tuple %40 : $(UInt, Bool)
+  %44 = destructure_struct %8 : $UInt
+  %45 = destructure_struct %41 : $UInt
+  %46 = builtin "xor_Word"(%44 : $Builtin.Word, %45 : $Builtin.Word) : $Builtin.Word
+  %47 = struct $UInt (%46 : $Builtin.Word)
+  %49 = destructure_struct %2 : $UInt
+  %50 = destructure_struct %47 : $UInt
+  %51 = builtin "and_Word"(%49 : $Builtin.Word, %50 : $Builtin.Word) : $Builtin.Word
+  %52 = struct $UInt (%51 : $Builtin.Word)
+  %53 = tuple ()
+  return %53 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @constant_expect_hint
+// CHECK: bb0:
+// CHECK-NEXT: [[INT1:%[0-9]+]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: [[INT2:%[0-9]+]] = integer_literal $Builtin.Int32, 5
+// CHECK-NEXT: [[INT3:%[0-9]+]] = integer_literal $Builtin.Int64, 32
+// CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ([[INT1]] : $Builtin.Int1, [[INT2]] : $Builtin.Int32, [[INT3]] : $Builtin.Int64)
+// CHECK-NEXT: return [[TUPLE]]
+// CHECK-NEXT: }
+sil [ossa] @constant_expect_hint : $@convention(thin) () -> (Builtin.Int1, Builtin.Int32, Builtin.Int64) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  %1 = integer_literal $Builtin.Int32, 5
+  %2 = integer_literal $Builtin.Int64, 32
+
+  %3 = integer_literal $Builtin.Int1, 1
+  %4 = integer_literal $Builtin.Int32, 400
+  %5 = integer_literal $Builtin.Int64, 5000
+
+  %9 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %3 : $Builtin.Int1) : $Builtin.Int1
+  %10 = builtin "int_expect_Int32"(%1 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int32
+  %11 = builtin "int_expect_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64
+
+  %12 = tuple (%9 : $Builtin.Int1, %10 : $Builtin.Int32, %11 : $Builtin.Int64)
+  return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
+}
+
+// CHECK-LABEL: sil [ossa] @constant_fold_indexing_inst_of_0 : $@convention(thin) (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
+// CHECK: bb0
+// CHECK-NEXT: pointer_to_address
+// CHECK-NEXT: pointer_to_address
+// CHECK-NEXT: load
+// CHECK-NEXT: load
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @constant_fold_indexing_inst_of_0 : $@convention(thin) (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Builtin.Int8
+  %3 = index_addr %2 : $*Builtin.Int8, %1 : $Builtin.Word
+  %4 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Builtin.Int8
+  %6 = load [trivial] %3 : $*Builtin.Int8
+  %7 = load [trivial] %5 : $*Builtin.Int8
+  %8 = tuple(%6 : $Builtin.Int8, %7 : $Builtin.Int8)
+  return %8 : $(Builtin.Int8, Builtin.Int8)
+}
+
+// CHECK-LABEL: sil [ossa] @constant_assume_non_negative
+// CHECK: bb0:
+// CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Word, 27
+// CHECK-NEXT: return [[I]]
+// CHECK-NEXT: }
+sil [ossa] @constant_assume_non_negative : $@convention(thin) () -> Builtin.Word {
+  %0 = integer_literal $Builtin.Word, 27
+  %1 = builtin "assumeNonNegative_Word"(%0 : $Builtin.Word) : $Builtin.Word
+  return %0 : $Builtin.Word
+}
+
+// CHECK-LABEL: sil [ossa] @constant_fold_fptrunc
+// CHECK: bb0:
+// CHECK-NEXT: %0 = float_literal
+// CHECK-NEXT: %1 = tuple ()
+// CHECK-NEXT: return
+// CHECK-NEXT: }
+sil [ossa] @constant_fold_fptrunc : $@convention(thin) () -> () {
+bb0:
+  %0 = float_literal $Builtin.FPIEEE80, 0x4000C90E5604189374BC // 3.14149999999999999991
+  %1 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%0 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64
+  %3 = tuple ()
+  return %3 : $()
+}
+
+struct Value {}
+
+class AnObject {}
+class AnSubObject : AnObject {}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_failure
+// CHECK:  bb2:
+// CHECK:  alloc_stack $AnObject
+// CHECK:  store undef to [trivial] %0
+// CHECK:  dealloc_stack
+// CHECK:  builtin "int_trap"()
+// CHECK:  unreachable
+
+sil [ossa] @replace_unconditional_check_cast_failure : $@convention(thin) (Builtin.Int1, @guaranteed AnObject) -> (@out Value) {
+bb0(%2 : $*Value, %0 : $Builtin.Int1, %1 : @guaranteed $AnObject):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %3 = tuple()
+  return %3 : $()
+
+bb2:
+  %31 = alloc_stack $AnObject
+  %1a = copy_value %1 : $AnObject
+  store %1a to [init] %31 : $*AnObject
+  unconditional_checked_cast_addr AnObject in %31 : $*AnObject to Value in %2 : $*Value
+  %32 = alloc_stack $AnObject
+  dealloc_stack %32: $*AnObject
+  dealloc_stack %31 : $*AnObject
+  br bb1
+}
+
+public protocol P {
+}
+
+public protocol PP {
+}
+
+struct X : P {
+}
+
+struct Y<T>: P {
+  var x : T
+}
+
+class Z: P {
+  init()
+}
+
+// Do not optimize casts to unrelated protocols.
+// CHECK-LABEL: sil [ossa] @dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential
+// CHECK: unconditional_checked_cast_addr
+// CHECK: end sil function 'dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential'
+sil [ossa] @dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential : $@convention(thin) (@in X) -> (@out PP) {
+bb0(%0 : $*PP, %1 : $*X):
+  unconditional_checked_cast_addr X in %1 : $*X to PP in %0 : $*PP
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Do not optimize casts between existentials.
+// CHECK-LABEL: sil [ossa] @dont_replace_unconditional_check_cast_addr_for_existential_to_existential
+// CHECK: unconditional_checked_cast_addr
+// CHECK: end sil function 'dont_replace_unconditional_check_cast_addr_for_existential_to_existential'
+sil [ossa] @dont_replace_unconditional_check_cast_addr_for_existential_to_existential : $@convention(thin) (@in PP) -> (@out P) {
+bb0(%0 : $*P, %1 : $*PP):
+  unconditional_checked_cast_addr PP in %1 : $*PP to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Check that an unconditional_checked_cast_addr from a non-existential loadable type to a protocol
+// can be replaced by a more efficient code sequence if it is statitcally known that this
+// type conforms to this protocol.
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential
+// CHECK-NOT: store
+// CHECK: copy_addr
+// CHECK-NOT: destroy_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_existential : $@convention(thin) (@in X) -> (@out P) {
+bb0(%0 : $*P, %1 : $*X):
+  unconditional_checked_cast_addr X in %1 : $*X to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_class_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil [ossa] @replace_unconditional_check_cast_addr_for_class_to_existential : $@convention(thin) (@in Z) -> (@out P) {
+bb0(%0 : $*P, %1 : $*Z):
+  unconditional_checked_cast_addr Z in %1 : $*Z to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_archetype_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil [ossa] @replace_unconditional_check_cast_addr_for_archetype_to_existential : $@convention(thin) <X:P> (@in X) -> (@out P) {
+bb0(%0 : $*P, %1 : $*X):
+  unconditional_checked_cast_addr X in %1 : $*X to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_generic_type_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil [ossa] @replace_unconditional_check_cast_addr_for_generic_type_to_existential : $@convention(thin) <X:P> (@in Y<X>) -> (@out P) {
+bb0(%0 : $*P, %1 : $*Y<X>):
+  unconditional_checked_cast_addr Y<X> in %1 : $*Y<X> to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+protocol Q : class {
+}
+
+class V : Q {
+  init()
+}
+
+class W<T>: Q {
+  var x : T
+  init()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_class_existential : $@convention(thin) (@in V) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*V):
+  unconditional_checked_cast_addr V in %1 : $*V to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_archetype_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil [ossa] @replace_unconditional_check_cast_addr_for_archetype_to_class_existential : $@convention(thin) <X:Q> (@in X) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*X):
+  unconditional_checked_cast_addr X in %1 : $*X to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil [ossa] @replace_unconditional_check_cast_addr_to_class_existential : $@convention(thin) <X:Q> (@in W<X>) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*W<X>):
+  unconditional_checked_cast_addr W<X> in %1 : $*W<X> to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+public protocol MyError : Error {
+}
+
+public class E1 : MyError {
+  init()
+}
+
+public class E2<T> : MyError {
+  init()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_myerror_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_myerror_existential : $@convention(thin) (@in E1) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*E1):
+  unconditional_checked_cast_addr E1 in %1 : $*E1 to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_archetype_to_myerror_existentia
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil [ossa] @replace_unconditional_check_cast_addr_for_archetype_to_myerror_existential : $@convention(thin) <X:MyError> (@in X) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*X):
+  unconditional_checked_cast_addr X in %1 : $*X to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_to_myerror_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil [ossa] @replace_unconditional_check_cast_addr_to_myerror_existential : $@convention(thin) <X:MyError> (@in E2<X>) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*E2<X>):
+  unconditional_checked_cast_addr E2<X> in %1 : $*E2<X> to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Check casts to Error.
+// CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_error_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: [[ALLOC_BOX:%.*]] = alloc_existential_box $Error, $E1
+// CHECK: [[PROJ:%.*]] = project_existential_box $E1 in [[ALLOC_BOX]] : $Error
+// CHECK: copy_addr [take] %1 to [initialization] [[PROJ]]
+// CHECK: store [[ALLOC_BOX]] to [init] %0 : $*Error
+// CHECK: return
+sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_error_existential : $@convention(thin) (@in E1) -> (@out Error) {
+bb0(%0 : $*Error, %1 : $*E1):
+  unconditional_checked_cast_addr E1 in %1 : $*E1 to Error in %0 : $*Error
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @always_fail_protocolmeta_to_concretemeta_checkedcastbr : $@convention(thin) (@thin P.Protocol) -> Builtin.Int1 {
+// CHECK: bb0(
+// CHECK-NEXT: metatype
+// CHECK-NEXT: br bb2(
+// CHECK: } // end sil function 'always_fail_protocolmeta_to_concretemeta_checkedcastbr'
+sil [ossa] @always_fail_protocolmeta_to_concretemeta_checkedcastbr : $@convention(thin) (@thin P.Protocol) -> Builtin.Int1 {
+bb0(%0 : $@thin P.Protocol):
+  %2 = metatype $@thick P.Protocol
+  checked_cast_br %2 : $@thick P.Protocol to X.Type, bb1, bb2
+
+bb1(%4 : $@thick X.Type):
+  %5 = metatype $@thin X.Type
+  %6 = integer_literal $Builtin.Int1, -1
+  br bb3(%6 : $Builtin.Int1)
+
+bb2(%8 : $@thick P.Protocol):
+  %9 = integer_literal $Builtin.Int1, 0
+  br bb3(%9 : $Builtin.Int1)
+
+bb3(%11 : $Builtin.Int1):
+  return %11 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [ossa] @always_succeed_subtoparent : $@convention(thin) (@owned AnSubObject) -> Builtin.Int1 {
+// CHECK: bb0(
+// CHECK-NEXT: upcast
+// CHECK-NEXT: br bb1(
+// CHECK: } // end sil function 'always_succeed_subtoparent'
+sil [ossa] @always_succeed_subtoparent : $@convention(thin) (@owned AnSubObject) -> Builtin.Int1 {
+bb0(%0 : @owned $AnSubObject):
+  checked_cast_br %0 : $AnSubObject to AnObject, bb1, bb2
+
+bb1(%4 : @owned $AnObject):
+  %5 = metatype $@thin X.Type
+  %6 = integer_literal $Builtin.Int1, -1
+  destroy_value %4 : $AnObject
+  br bb3(%6 : $Builtin.Int1)
+
+bb2(%8 : @owned $AnSubObject):
+  %9 = integer_literal $Builtin.Int1, 0
+  destroy_value %8 : $AnSubObject
+  br bb3(%9 : $Builtin.Int1)
+
+bb3(%11 : $Builtin.Int1):
+  return %11 : $Builtin.Int1
+}
+
+sil [ossa] @do_not_infinite_loop : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1
+  %1 = struct $Int (%0 : $Builtin.Word)
+  %2 = metatype $@thick Klass.Type
+  %3 = function_ref @klass_allocator : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %4 = apply %3(%2) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  // We can never in constant propagation forward %5 today since we would need
+  // to know that we are eliminting all of its uses. But the pass doesn't
+  // understand that today and so destroy_value %5 in bb2 stops our ability to
+  // optimize.
+  %5 = tuple (%1 : $Int, %4 : $Klass)
+  cond_br undef, bb1, bb2
+
+bb1:
+  %6 = alloc_stack $(Int, Klass)
+  %7 = tuple_element_addr %6 : $*(Int, Klass), 0
+  %8 = tuple_element_addr %6 : $*(Int, Klass), 1
+  (%9, %10) = destructure_tuple %5 : $(Int, Klass)
+  store %1 to [trivial] %7 : $*Int
+  store %10 to [init] %8 : $*Klass
+  %13 = function_ref @generic_user : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %14 = apply %13<(Int, Klass)>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6 : $*(Int, Klass)
+  dealloc_stack %6 : $*(Int, Klass)
+  br bb3
+
+bb2:
+  destroy_value %5 : $(Int, Klass)
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_not_RAUW_owned_destructure_with_nontrivial_none_value_tuple : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: ({{%.*}}, [[DESTRUCTURE_RESULT_2:%.*]]) = destructure_tuple
+// CHECK: store [[DESTRUCTURE_RESULT_2]] to [init]
+// CHECK: } // end sil function 'do_not_RAUW_owned_destructure_with_nontrivial_none_value_tuple'
+sil [ossa] @do_not_RAUW_owned_destructure_with_nontrivial_none_value_tuple : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%arg : @owned $Builtin.NativeObject):
+  %0 = alloc_stack $Optional<Builtin.NativeObject>
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  %2 = tuple(%arg : $Builtin.NativeObject, %1 : $Optional<Builtin.NativeObject>)
+  (%3, %4) = destructure_tuple %2 : $(Builtin.NativeObject, Optional<Builtin.NativeObject>)
+  store %4 to [init] %0 : $*Optional<Builtin.NativeObject>
+  destroy_addr %0 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %0 : $*Optional<Builtin.NativeObject>
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_not_RAUW_owned_destructure_with_nontrivial_none_value_struct : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: ({{%.*}}, [[DESTRUCTURE_RESULT_2:%.*]]) = destructure_struct
+// CHECK: store [[DESTRUCTURE_RESULT_2]] to [init]
+// CHECK: } // end sil function 'do_not_RAUW_owned_destructure_with_nontrivial_none_value_struct'
+sil [ossa] @do_not_RAUW_owned_destructure_with_nontrivial_none_value_struct : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%arg : @owned $Builtin.NativeObject):
+  %0 = alloc_stack $Optional<Builtin.NativeObject>
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  %2 = struct $NativeObjectOptNativeObjectPair (%arg : $Builtin.NativeObject, %1 : $Optional<Builtin.NativeObject>)
+  (%3, %4) = destructure_struct %2 : $NativeObjectOptNativeObjectPair
+  store %4 to [init] %0 : $*Optional<Builtin.NativeObject>
+  destroy_addr %0 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %0 : $*Optional<Builtin.NativeObject>
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

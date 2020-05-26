@@ -7,5 +7,5 @@ func test<T : Proto>(obj: T) {
 }
 
 // RUN: %sourcekitd-test -req=complete -pos=6:15 %s -- %s > %t.response
-// RUN: diff -u %s.response %t.response
+// RUN: %diff -u %s.response %t.response
 // REQUIRES: objc_interop

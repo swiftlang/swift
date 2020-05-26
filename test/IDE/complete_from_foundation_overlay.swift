@@ -17,7 +17,7 @@ import Foundation
 #^PLAIN_TOP_LEVEL_1^#
 
 // PLAIN_TOP_LEVEL: Begin completions
-// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/OtherModule[Foundation.NSURL]: URLResourceKey[#URLResourceKey#]{{; name=.+}}
+// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/OtherModule[Foundation.NSURL]/IsSystem: URLResourceKey[#URLResourceKey#]{{; name=.+}}
 // PLAIN_TOP_LEVEL: End completions
 
 func privateNominalMembers(a: String) {
@@ -28,5 +28,5 @@ func privateNominalMembers(a: String) {
 
 // FIXME: we should show the qualified String.Index type.
 // rdar://problem/20788802
-// PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#String.Index#]{{; name=.+$}}
+// PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: startIndex[#String.Index#]{{; name=.+$}}
 // PRIVATE_NOMINAL_MEMBERS_1: End completions

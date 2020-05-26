@@ -29,19 +29,19 @@ struct TestHideName {
 // RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideKeywords.json -tok=HIDE_KEYWORDS_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_LET
 func testHideKeyword01() {
   #^HIDE_KEYWORDS_1^#
-// HIDE_LET-NOT: let
+// HIDE_LET-NOT: {{^}}let
 // HIDE_LET: var
-// HIDE_LET-NOT: let
+// HIDE_LET-NOT: {{^}}let
 }
 
 // RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showKeywords.json -tok=HIDE_KEYWORDS_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_FUNC
 func testHideKeyword02() {
   #^HIDE_KEYWORDS_2^#
-// SHOW_FUNC-NOT: let
+// SHOW_FUNC-NOT: {{^}}let
 // SHOW_FUNC-NOT: var
 // SHOW_FUNC: func
 // SHOW_FUNC-NOT: var
-// SHOW_FUNC-NOT: let
+// SHOW_FUNC-NOT: {{^}}let
 }
 
 // RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideLiterals.json -tok=HIDE_LITERALS_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_NIL

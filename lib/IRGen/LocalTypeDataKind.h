@@ -21,15 +21,14 @@
 
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
+#include "swift/IRGen/ValueWitness.h"
 #include <stdint.h>
 #include "llvm/ADT/DenseMapInfo.h"
 
 namespace swift {
-  class NormalProtocolConformance;
   class ProtocolDecl;
 
 namespace irgen {
-  enum class ValueWitness : unsigned;
 
 /// The kind of local type data we might want to store for a type.
 class LocalTypeDataKind {
@@ -54,6 +53,9 @@ private:
 
     // The first enumerator for an individual value witness.
     ValueWitnessBase,
+
+    // The first enumerator for an individual value witness discriminator.
+    ValueWitnessDiscriminatorBase = ValueWitnessBase + MaxNumValueWitnesses,
 
     FirstPayloadValue = 2048,
     Kind_Decl = 0,
@@ -87,6 +89,11 @@ public:
   static LocalTypeDataKind forValueWitness(ValueWitness witness) {
     return LocalTypeDataKind(ValueWitnessBase + (unsigned)witness);
   }
+
+  /// The discriminator for a specific value witness.
+  static LocalTypeDataKind forValueWitnessDiscriminator(ValueWitness witness) {
+    return LocalTypeDataKind(ValueWitnessDiscriminatorBase + (unsigned)witness);
+  }
   
   /// A reference to a protocol witness table for an archetype.
   ///
@@ -99,7 +106,7 @@ public:
     return LocalTypeDataKind(uintptr_t(protocol) | Kind_Decl);
   }
 
-  /// A reference to a protocol witness table for an archetype.
+  /// A reference to a protocol witness table for a concrete type.
   static LocalTypeDataKind
   forConcreteProtocolWitnessTable(ProtocolConformance *conformance) {
     assert(conformance && "conformance reference may not be null");
@@ -191,7 +198,8 @@ public:
 }
 }
 
-template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
+namespace llvm {
+template <> struct DenseMapInfo<swift::irgen::LocalTypeDataKey> {
   using LocalTypeDataKey = swift::irgen::LocalTypeDataKey;
   using CanTypeInfo = DenseMapInfo<swift::CanType>;
   static inline LocalTypeDataKey getEmptyKey() {
@@ -210,5 +218,6 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
     return a == b;
   }
 };
+}
 
 #endif

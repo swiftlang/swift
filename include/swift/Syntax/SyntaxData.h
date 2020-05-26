@@ -39,6 +39,7 @@
 #ifndef SWIFT_SYNTAX_SYNTAXDATA_H
 #define SWIFT_SYNTAX_SYNTAXDATA_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Syntax/AtomicCache.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/References.h"
@@ -133,15 +134,20 @@ class SyntaxData final
   }
 
 public:
-  /// Get the node immediately before this current node. Return 0 if we cannot
-  /// find such node.
+  /// Disable sized deallocation for SyntaxData, because it has tail-allocated
+  /// data.
+  void operator delete(void *p) { ::operator delete(p); }
+
+  /// Get the node immediately before this current node that does contain a
+  /// non-missing token. Return nullptr if we cannot find such node.
   RC<SyntaxData> getPreviousNode() const;
 
-  /// Get the node immediately after this current node. Return 0 if we cannot
-  /// find such node.
+  /// Get the node immediately after this current node that does contain a
+  /// non-missing token. Return nullptr if we cannot find such node.
   RC<SyntaxData> getNextNode() const;
 
-  /// Get the first token node in this tree
+  /// Get the first non-missing token node in this tree. Return nullptr if this
+  /// node does not contain non-missing tokens.
   RC<SyntaxData> getFirstToken() const;
 
   ~SyntaxData() {
@@ -177,7 +183,7 @@ public:
                              CursorIndex IndexInParent = 0);
 
   /// Returns the raw syntax node for this syntax node.
-  const RC<RawSyntax> getRaw() const {
+  const RC<RawSyntax> &getRaw() const {
     return Raw;
   }
 
@@ -283,8 +289,7 @@ public:
   /// standard error.
   void dump(llvm::raw_ostream &OS) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 } // end namespace syntax
@@ -294,7 +299,7 @@ public:
 namespace llvm {
   using SD = swift::syntax::SyntaxData;
   using RCSD = swift::RC<SD>;
-  template <> struct llvm::DenseMapInfo<RCSD> {
+  template <> struct DenseMapInfo<RCSD> {
     static inline RCSD getEmptyKey() {
       return SD::make(nullptr, nullptr, 0);
     }

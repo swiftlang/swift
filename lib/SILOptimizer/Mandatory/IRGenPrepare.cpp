@@ -16,7 +16,8 @@
 ///
 /// We perform the following canonicalizations:
 ///
-/// 1. We remove calls to Builtin.staticReport(), which are not needed post SIL.
+/// 1. We remove calls to Builtin.poundAssert() and Builtin.staticReport(),
+///    which are not needed post SIL.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -26,7 +27,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/Strings.h"
 
 using namespace swift;
@@ -41,21 +42,34 @@ static bool cleanFunction(SILFunction &fn) {
       SILInstruction *inst = &*i;
       ++i;
 
-      // Remove calls to Builtin.staticReport().
+      // Remove calls to Builtin.poundAssert() and Builtin.staticReport().
       auto *bi = dyn_cast<BuiltinInst>(inst);
       if (!bi) {
         continue;
       }
 
-      const BuiltinInfo &bInfo = bi->getBuiltinInfo();
-      if (bInfo.ID != BuiltinValueKind::StaticReport) {
-        continue;
+      switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::CondFailMessage: {
+          SILBuilderWithScope Builder(bi);
+          Builder.createCondFail(bi->getLoc(), bi->getOperand(0),
+            "unknown program error");
+          LLVM_FALLTHROUGH;
+        }
+        case BuiltinValueKind::PoundAssert:
+        case BuiltinValueKind::StaticReport: {
+          // The call to the builtin should get removed before we reach
+          // IRGen.
+          InstructionDeleter deleter;
+          deleter.forceDelete(bi);
+          // StaticReport only takes trivial operands, and therefore doesn't
+          // require fixing the lifetime of its operands.
+          deleter.cleanUpDeadInstructions();
+          madeChange = true;
+          break;
+        }
+        default:
+          break;
       }
-
-      // The call to the builtin should get removed before we reach
-      // IRGen.
-      recursivelyDeleteTriviallyDeadInstructions(bi, /* Force */ true);
-      madeChange = true;
     }
   }
 

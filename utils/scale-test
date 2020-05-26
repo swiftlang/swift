@@ -27,16 +27,12 @@ import sys
 import tempfile
 from collections import namedtuple
 from operator import attrgetter
+
+from build_swift.build_swift import shell
+
 import gyb
+
 from jobstats import load_stats_dir, merge_all_jobstats
-
-
-def find_which(p):
-    for d in os.environ["PATH"].split(os.pathsep):
-        full = os.path.join(d, p)
-        if os.path.isfile(full) and os.access(full, os.X_OK):
-            return full
-    return p
 
 
 # Evidently the debug-symbol reader in dtrace is sufficiently slow and/or buggy
@@ -45,7 +41,7 @@ def find_which(p):
 # entries, see rdar://problem/7037927 or rdar://problem/11490861 respectively),
 # so we sniff the presence of debug symbols here.
 def has_debuginfo(swiftc):
-    swiftc = find_which(swiftc)
+    swiftc = shell.which(swiftc)
     for line in subprocess.check_output(
             ["dwarfdump", "--file-stats", swiftc]).splitlines():
         if '%' not in line:
@@ -109,6 +105,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
         mode = "-c"
         if args.typecheck:
             mode = "-typecheck"
+        if args.parse:
+            mode = "-parse"
 
         focus = ["-primary-file", primary]
         if args.whole_module_optimization:
@@ -173,7 +171,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
             else:
                 r = merge_all_jobstats(load_stats_dir(d)).stats
     finally:
-        shutil.rmtree(d)
+        if not args.save_temps:
+            shutil.rmtree(d)
 
     return {k: v for (k, v) in r.items() if args.select in k}
 
@@ -717,6 +716,9 @@ def main():
         default=1.2,
         help='minimum base for exponential fit to consider "bad scaling"')
     parser.add_argument(
+        '-parse', '--parse', action='store_true',
+        default=False, help='only run compiler with -parse')
+    parser.add_argument(
         '-typecheck', '--typecheck', action='store_true',
         default=False, help='only run compiler with -typecheck')
     parser.add_argument(
@@ -746,6 +748,9 @@ def main():
     parser.add_argument(
         '--tmpdir', type=str,
         default=None, help='directory to create tempfiles in')
+    parser.add_argument(
+        '--save-temps', action='store_true',
+        default=False, help='save files in tempfiles')
     parser.add_argument(
         '--select',
         default="", help='substring of counters/symbols to limit attention to')

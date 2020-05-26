@@ -41,7 +41,7 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
 TEST(FunctionNameDemangleTests, NewManglingPrefix) {
   char OutputBuffer[128];
 
-  const char *FunctionName = "$S1a10run_MatMulyySiF";
+  const char *FunctionName = "$s1a10run_MatMulyySiF";
   const char *FunctionNameNew = "$s1a10run_MatMulyySiF";
   const char *DemangledName = "a.run_MatMul(Swift.Int) -> ()";
   const char *SimplifiedName = "run_MatMul(_:)";
@@ -85,5 +85,23 @@ TEST(FunctionNameDemangleTests, IgnoresNonMangledInputs) {
 
   EXPECT_EQ(0U, Result);
   EXPECT_STREQ("0123456789abcdef", OutputBuffer);
+}
+
+TEST(FunctionNameDemangleTests, ModuleName) {
+  const char *Sym1 = "_TtCs5Class";
+  const char *ModuleName1 = "Swift";
+  const char *Sym2 = "_TtCC3Mod7ExampleP33_211017DA67536A354F5F5EB94C7AC12E2Pv";
+  const char *ModuleName2 = "Mod";
+  char OutputBuffer[128];
+
+  size_t Result = swift_demangle_getModuleName(Sym1, OutputBuffer,
+                                               sizeof(OutputBuffer));
+  EXPECT_STREQ(ModuleName1, OutputBuffer);
+  EXPECT_EQ(Result, strlen(ModuleName1));
+
+  Result = swift_demangle_getModuleName(Sym2, OutputBuffer,
+                                        sizeof(OutputBuffer));
+  EXPECT_STREQ(ModuleName2, OutputBuffer);
+  EXPECT_EQ(Result, strlen(ModuleName2));
 }
 

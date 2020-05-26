@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-ownership-stripping-after-serialization -primary-file %s -o /dev/null -verify
 
 import Swift
 
@@ -432,18 +433,18 @@ class DelegatingCtorClass {
   }
   
   convenience init(x: EmptyStruct, y: EmptyStruct) {
-    _ = ivar       // expected-error {{'self' used in property access 'ivar' before 'self.init' call}}
-    ivar = x       // expected-error {{'self' used in property access 'ivar' before 'self.init' call}}
+    _ = ivar       // expected-error {{'self' used before 'self.init' call}}
+    ivar = x       // expected-error {{'self' used before 'self.init' call}}
     self.init()
   }
 
   convenience init(x: EmptyStruct, y: EmptyStruct, z: EmptyStruct) {
     self.init()
-    self.init()    // expected-error {{'self.init' called multiple times in initializer}}
+    self.init()
   }
 
   convenience init(x: (EmptyStruct, EmptyStruct)) {
-    method()       // expected-error {{'self' used in method call 'method' before 'self.init' call}}
+    method()       // expected-error {{'self' used before 'self.init' call}}
     self.init()
   }
 
@@ -561,10 +562,10 @@ func testNoReturn3(_ b : Bool) -> Any {
 
   switch b {
   default:
-    PerpetualMotion().start()
+    PerpetualMotion().start() // expected-note {{a call to a never-returning function}}
   }
 
-  return a
+  return a // expected-warning {{will never be executed}}
 }
 
 func testNoReturn4(_ b : Bool) -> Any {
@@ -572,10 +573,10 @@ func testNoReturn4(_ b : Bool) -> Any {
 
   switch b {
   default:
-    PerpetualMotion.stop()
+    PerpetualMotion.stop() // expected-note {{a call to a never-returning function}}
   }
 
-  return a
+  return a // expected-warning {{will never be executed}}
 }
 
 
@@ -593,10 +594,10 @@ class DerivedUsingConvenienceInits : BaseWithConvenienceInits {
   }
 }
 
-// <rdar://problem/16660680> QoI: _preconditionFailure() in init method complains about super.init being called multiple times
+// <rdar://problem/16660680> QoI: preconditionFailure() in init method complains about super.init being called multiple times
 class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
   init() {  
-    _preconditionFailure("leave me alone dude");
+    preconditionFailure("leave me alone dude");
   }
 }
 
@@ -757,12 +758,23 @@ extension Int {
   func inspect() {}
 }
 
+extension Array {
+  subscript(replacing index: Int, with newValue: Element) -> Element {
+    mutating get {
+      let oldValue = self[index]
+      self[index] = newValue
+      return oldValue
+    }
+  }
+}
+
+func throwingSwap<T>(_ a: inout T, _ b: inout T) throws {}
 
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  // expected-note @+1 5 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let arr : [Int]
-  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  // expected-note @+1 7 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let (u, v) : (Int, Int)
   // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let w : (Int, Int)
@@ -770,6 +782,9 @@ struct LetProperties {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let y : Int
   let z : Int?  // expected-note{{'self.z' not initialized}}
+
+  func methodTakesInOut(_ x: inout Int) {}
+  func throwingMethodTakesInOut(_ x: inout Int) throws {}
 
   // Let properties can be initialized naturally exactly once along any given
   // path through an initializer.
@@ -810,19 +825,24 @@ struct LetProperties {
   }  // expected-error {{return from initializer without initializing all stored properties}}
 
   // inout uses of let properties are an error.
-  init() {
+  init() throws {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
     var variable = 42
     swap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-    
+    try throwingSwap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
+
     u.inspect()  // ok, non mutating.
     u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
     
     arr = []
     arr += []      // expected-error {{mutating operator '+=' may not be used on immutable value 'self.arr'}}
     arr.append(4)  // expected-error {{mutating method 'append' may not be used on immutable value 'self.arr'}}
-    arr[12] = 17   // expected-error {{mutating subscript 'subscript' may not be used on immutable value 'self.arr'}}
+    arr[12] = 17   // expected-error {{cannot mutate subscript of immutable value 'self.arr'}}
+    let _ = arr[replacing: 12, with: 17] // expected-error {{mutating accessor for subscript may not be used on immutable value 'self.arr'}}
+
+    methodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
+    try throwingMethodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
   }
 }
 
@@ -835,7 +855,7 @@ protocol TestMutabilityProtocol {
  
 class C<T : TestMutabilityProtocol> {
   let x : T
-  let y : T
+  let y : T // expected-note {{change 'let' to 'var' to make it mutable}}
   
   init(a : T) {
     x = a; y = a
@@ -877,7 +897,7 @@ func testLocalProperties(_ b : Int) -> Int {
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(_ b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  let x : T
+  let x : T  // expected-note {{change 'let' to 'var' to make it mutable}}
   let y : T
   let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
   x = b
@@ -929,8 +949,8 @@ struct StructMutatingMethodTest {
 
  // <rdar://problem/19268443> DI should reject this call to transparent function
  class TransparentFunction {
-  let x : Int
-  let y : Int
+  let x : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let y : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
   init() {
     x = 42
     x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
@@ -983,7 +1003,7 @@ enum MyAwesomeEnum {
 
   init?() {
 
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 // <rdar://problem/20679379> DI crashes on initializers on protocol extensions
@@ -1073,7 +1093,7 @@ extension ProtocolInitTest {
 // <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value
 func bug22436880(_ x: UnsafeMutablePointer<Int>) {}
 func test22436880() {
-  let x: Int
+  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
   x = 1
   bug22436880(&x) // expected-error {{immutable value 'x' must not be passed inout}}
 }
@@ -1184,7 +1204,7 @@ enum SR1469_Enum1 {
     }
     // many lines later
     self = .A
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 enum SR1469_Enum2 {
@@ -1192,7 +1212,7 @@ enum SR1469_Enum2 {
   
   init?() {
     return
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 enum SR1469_Enum3 {
   case A, B
@@ -1202,7 +1222,7 @@ enum SR1469_Enum3 {
       self = .A
       return
     }
-  } // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 class BadFooSuper {
@@ -1228,8 +1248,8 @@ class SuperConvenienceSub : SuperConvenienceBase {
     super.init(i)
   }
   public init(_ i1: Int, _ i2: Int, _ i3: Int) {
-    self.init(i1, i1)
-  }
+    self.init(i1, i1) // expected-error{{'self' used before 'super.init' call}}
+  } // expected-error{{'super.init' isn't called}}
 }
 
 // While testing some changes I found this regression that wasn't
@@ -1407,7 +1427,7 @@ func testOptionalWriteGenerics2<T>(p: T) -> T? {
 
 enum TestOptionalEnum {
   case Cons(Int)
-  case Nil()
+  case Nil
 }
 
 func testOptionalWithEnum(p: TestOptionalEnum) -> TestOptionalEnum? {
@@ -1532,3 +1552,57 @@ func testOptionalUnwrapNoError() -> Int? {
   x = 0
   return x!
 }
+
+// <https://bugs.swift.org/browse/SR-9451>
+class StrongCycle {
+  var c: StrongCycle
+  var d: Int
+  init(first: ()) {
+    self.d = 10
+    self.c = self // expected-error {{variable 'self.c' used before being initialized}}
+  }
+
+  init(second: ()) {
+    self.c = self // expected-error {{variable 'self.c' used before being initialized}}
+    self.d = 10
+  }
+}
+
+class WeakCycle {
+  weak var c: WeakCycle?
+  var d: Int
+  init(first: ()) { // FIXME: This is inconsistent with the strong reference behavior above
+    self.d = 10
+    self.c = self
+  }
+  init(second: ()) {
+    self.c = self // expected-error {{variable 'self.d' used before being initialized}}
+    self.d = 10
+  }
+}
+
+// <rdar://51198592> DI was crashing as it wrongly detected a `type(of: self)`
+// use in a delegating initializer, when there was none.
+class DelegatingInitTest {
+  convenience init(x: Int) {
+    self // expected-warning {{expression of type 'DelegatingInitTest' is unused}}
+      // expected-error@-1 {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}
+
+class A {
+  var a: Int
+
+  init(x: Int) {
+    self.a = x
+  }
+
+  convenience init(i: Int) {
+    if i > 0 {
+      self.init(x: i)
+    }
+    if i > -100 {
+      self.init(x: i)
+    }
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+ }

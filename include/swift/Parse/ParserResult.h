@@ -21,7 +21,7 @@ namespace swift {
 
 class ParserStatus;
 
-/// \brief A wrapper for a parser AST node result (Decl, Stmt, Expr, Pattern,
+/// A wrapper for a parser AST node result (Decl, Stmt, Expr, Pattern,
 /// etc.)
 ///
 /// Contains the pointer to the AST node itself (or null) and additional bits
@@ -123,7 +123,7 @@ static inline ParserResult<T> makeParserCodeCompletionResult(T *Result =
   return PR;
 }
 
-/// \brief Same as \c ParserResult, but just the status bits without the AST
+/// Same as \c ParserResult, but just the status bits without the AST
 /// node.
 ///
 /// Useful when the AST node is returned by some other means (for example, in

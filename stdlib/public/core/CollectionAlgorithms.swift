@@ -1,8 +1,8 @@
-//===--- CollectionAlgorithms.swift.gyb -----------------------*- swift -*-===//
+//===--- CollectionAlgorithms.swift ---------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,6 +24,8 @@ extension BidirectionalCollection {
   ///         print(lastNumber)
   ///     }
   ///     // Prints "50"
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public var last: Element? {
     return isEmpty ? nil : self[index(before: endIndex)]
@@ -34,7 +36,7 @@ extension BidirectionalCollection {
 // firstIndex(of:)/firstIndex(where:)
 //===----------------------------------------------------------------------===//
 
-extension Collection where Element : Equatable {
+extension Collection where Element: Equatable {
   /// Returns the first index where the specified value appears in the
   /// collection.
   ///
@@ -53,6 +55,8 @@ extension Collection where Element : Equatable {
   /// - Parameter element: An element to search for in the collection.
   /// - Returns: The first index where `element` is found. If `element` is not
   ///   found in the collection, returns `nil`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func firstIndex(of element: Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
@@ -67,13 +71,6 @@ extension Collection where Element : Equatable {
       self.formIndex(after: &i)
     }
     return nil
-  }
-  
-  /// Returns the first index where the specified value appears in the
-  /// collection.
-  @inlinable
-  public func index(of _element: Element) -> Index? {
-    return firstIndex(of: _element)
   }
 }
 
@@ -98,6 +95,8 @@ extension Collection {
   /// - Returns: The index of the first element for which `predicate` returns
   ///   `true`. If no elements in the collection satisfy the given predicate,
   ///   returns `nil`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func firstIndex(
     where predicate: (Element) throws -> Bool
@@ -110,15 +109,6 @@ extension Collection {
       self.formIndex(after: &i)
     }
     return nil
-  }
-  
-  /// Returns the first index in which an element of the collection satisfies
-  /// the given predicate.
-  @inlinable
-  public func index(
-    where _predicate: (Element) throws -> Bool
-  ) rethrows -> Index? {
-    return try firstIndex(where: _predicate)
   }
 }
 
@@ -135,7 +125,7 @@ extension BidirectionalCollection {
   ///
   ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
   ///     if let lastNegative = numbers.last(where: { $0 < 0 }) {
-  ///         print("The last negative number is \(firstNegative).")
+  ///         print("The last negative number is \(lastNegative).")
   ///     }
   ///     // Prints "The last negative number is -6."
   ///
@@ -144,6 +134,8 @@ extension BidirectionalCollection {
   ///   element is a match.
   /// - Returns: The last element of the sequence that satisfies `predicate`,
   ///   or `nil` if there is no element that satisfies `predicate`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func last(
     where predicate: (Element) throws -> Bool
@@ -157,7 +149,7 @@ extension BidirectionalCollection {
   /// You can use the predicate to find an element of a type that doesn't
   /// conform to the `Equatable` protocol or to find an element that matches
   /// particular criteria. This example finds the index of the last name that
-  /// begins with the letter "A":
+  /// begins with the letter *A:*
   ///
   ///     let students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
   ///     if let i = students.lastIndex(where: { $0.hasPrefix("A") }) {
@@ -170,6 +162,8 @@ extension BidirectionalCollection {
   ///   represents a match.
   /// - Returns: The index of the last element in the collection that matches
   ///   `predicate`, or `nil` if no elements match.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func lastIndex(
     where predicate: (Element) throws -> Bool
@@ -185,7 +179,7 @@ extension BidirectionalCollection {
   }
 }
 
-extension BidirectionalCollection where Element : Equatable {
+extension BidirectionalCollection where Element: Equatable {
   /// Returns the last index where the specified value appears in the
   /// collection.
   ///
@@ -203,13 +197,79 @@ extension BidirectionalCollection where Element : Equatable {
   ///
   /// - Parameter element: An element to search for in the collection.
   /// - Returns: The last index where `element` is found. If `element` is not
-  ///   found in the collection, returns `nil`.
+  ///   found in the collection, this method returns `nil`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func lastIndex(of element: Element) -> Index? {
     if let result = _customLastIndexOfEquatableElement(element) {
       return result
     }
     return lastIndex(where: { $0 == element })
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// subranges(where:) / subranges(of:)
+//===----------------------------------------------------------------------===//
+
+extension Collection {
+  /// Returns the indices of all the elements that match the given predicate.
+  ///
+  /// For example, you can use this method to find all the places that a
+  /// vowel occurs in a string.
+  ///
+  ///     let str = "Fresh cheese in a breeze"
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let allTheVowels = str.subranges(where: { vowels.contains($0) })
+  ///     // str[allTheVowels].count == 9
+  ///
+  /// - Parameter predicate: A closure that takes an element as its argument
+  ///   and returns a Boolean value that indicates whether the passed element
+  ///   represents a match.
+  /// - Returns: A set of the indices of the elements for which `predicate`
+  ///   returns `true`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public func subranges(where predicate: (Element) throws -> Bool) rethrows
+    -> RangeSet<Index>
+  {
+    if isEmpty { return RangeSet() }
+
+    var result = RangeSet<Index>()
+    var i = startIndex
+    while i != endIndex {
+      let next = index(after: i)
+      if try predicate(self[i]) {
+        result._append(i..<next)
+      }
+      i = next
+    }
+
+    return result
+  }
+}
+
+extension Collection where Element: Equatable {
+  /// Returns the indices of all the elements that are equal to the given
+  /// element.
+  ///
+  /// For example, you can use this method to find all the places that a
+  /// particular letter occurs in a string.
+  ///
+  ///     let str = "Fresh cheese in a breeze"
+  ///     let allTheEs = str.subranges(of: "e")
+  ///     // str[allTheEs].count == 7
+  ///
+  /// - Parameter element: An element to look for in the collection.
+  /// - Returns: A set of the indices of the elements that are equal to
+  ///   `element`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public func subranges(of element: Element) -> RangeSet<Index> {
+    subranges(where: { $0 == element })
   }
 }
 
@@ -253,7 +313,7 @@ extension MutableCollection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*) where n is the length of the collection.
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
@@ -281,7 +341,7 @@ extension MutableCollection {
   }  
 }
 
-extension MutableCollection where Self : BidirectionalCollection {
+extension MutableCollection where Self: BidirectionalCollection {
   /// Reorders the elements of the collection such that all the elements
   /// that match the given predicate are after all the elements that don't
   /// match.
@@ -317,21 +377,28 @@ extension MutableCollection where Self : BidirectionalCollection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
     let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> Int in
-      let unsafeBufferPivot = try bufferPointer.partition(
+      let unsafeBufferPivot = try bufferPointer._partitionImpl(
         by: belongsInSecondPartition)
       return unsafeBufferPivot - bufferPointer.startIndex
     }
     if let offset = maybeOffset {
-      return index(startIndex, offsetBy: numericCast(offset))
+      return index(startIndex, offsetBy: offset)
+    } else {
+      return try _partitionImpl(by: belongsInSecondPartition)
     }
-
+  }
+  
+  @usableFromInline
+  internal mutating func _partitionImpl(
+    by belongsInSecondPartition: (Element) throws -> Bool
+  ) rethrows -> Index {
     var lo = startIndex
     var hi = endIndex
 
@@ -367,6 +434,81 @@ extension MutableCollection where Self : BidirectionalCollection {
 }
 
 //===----------------------------------------------------------------------===//
+// _indexedStablePartition / _partitioningIndex
+//===----------------------------------------------------------------------===//
+
+extension MutableCollection {
+  /// Moves all elements at the indices satisfying `belongsInSecondPartition`
+  /// into a suffix of the collection, preserving their relative order, and
+  /// returns the start of the resulting suffix.
+  ///
+  /// - Complexity: O(*n* log *n*) where *n* is the number of elements.
+  /// - Precondition:
+  ///   `n == distance(from: range.lowerBound, to: range.upperBound)`
+  internal mutating func _indexedStablePartition(
+    count n: Int,
+    range: Range<Index>,
+    by belongsInSecondPartition: (Index) throws-> Bool
+  ) rethrows -> Index {
+    if n == 0 { return range.lowerBound }
+    if n == 1 {
+      return try belongsInSecondPartition(range.lowerBound)
+        ? range.lowerBound
+        : range.upperBound
+    }
+    let h = n / 2, i = index(range.lowerBound, offsetBy: h)
+    let j = try _indexedStablePartition(
+      count: h,
+      range: range.lowerBound..<i,
+      by: belongsInSecondPartition)
+    let k = try _indexedStablePartition(
+      count: n - h,
+      range: i..<range.upperBound,
+      by: belongsInSecondPartition)
+    return _rotate(in: j..<k, shiftingToStart: i)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// _partitioningIndex(where:)
+//===----------------------------------------------------------------------===//
+
+extension Collection {
+  /// Returns the index of the first element in the collection that matches
+  /// the predicate.
+  ///
+  /// The collection must already be partitioned according to the predicate.
+  /// That is, there should be an index `i` where for every element in
+  /// `collection[..<i]` the predicate is `false`, and for every element
+  /// in `collection[i...]` the predicate is `true`.
+  ///
+  /// - Parameter predicate: A predicate that partitions the collection.
+  /// - Returns: The index of the first element in the collection for which
+  ///   `predicate` returns `true`.
+  ///
+  /// - Complexity: O(log *n*), where *n* is the length of this collection if
+  ///   the collection conforms to `RandomAccessCollection`, otherwise O(*n*).
+  internal func _partitioningIndex(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index {
+    var n = count
+    var l = startIndex
+    
+    while n > 0 {
+      let half = n / 2
+      let mid = index(l, offsetBy: half)
+      if try predicate(self[mid]) {
+        n = half
+      } else {
+        l = index(after: mid)
+        n -= half + 1
+      }
+    }
+    return l
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // shuffled()/shuffle()
 //===----------------------------------------------------------------------===//
 
@@ -374,10 +516,10 @@ extension Sequence {
   /// Returns the elements of the sequence, shuffled using the given generator
   /// as a source for randomness.
   ///
-  /// You use this method to randomize the elements of a sequence when you
-  /// are using a custom random number generator. For example, you can shuffle
-  /// the numbers between `0` and `9` by calling the `shuffled(using:)` method
-  /// on that range:
+  /// You use this method to randomize the elements of a sequence when you are
+  /// using a custom random number generator. For example, you can shuffle the
+  /// numbers between `0` and `9` by calling the `shuffled(using:)` method on
+  /// that range:
   ///
   ///     let numbers = 0...9
   ///     let shuffledNumbers = numbers.shuffled(using: &myGenerator)
@@ -387,7 +529,12 @@ extension Sequence {
   ///   the sequence.
   /// - Returns: An array of this sequence's elements in a shuffled order.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  /// - Note: The algorithm used to shuffle a sequence may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same shuffled order each time you run your program, that sequence may
+  ///   change when your program is compiled using a different version of
+  ///   Swift.
   @inlinable
   public func shuffled<T: RandomNumberGenerator>(
     using generator: inout T
@@ -406,12 +553,12 @@ extension Sequence {
   ///     let shuffledNumbers = numbers.shuffled()
   ///     // shuffledNumbers == [1, 7, 6, 2, 8, 9, 4, 3, 5, 0]
   ///
-  /// This method is equivalent to calling the version that takes a generator, 
-  /// passing in the system's default random generator.
+  /// This method is equivalent to calling `shuffled(using:)`, passing in the
+  /// system's default random generator.
   ///
   /// - Returns: A shuffled array of this sequence's elements.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
   public func shuffled() -> [Element] {
     var g = SystemRandomNumberGenerator()
@@ -419,7 +566,7 @@ extension Sequence {
   }
 }
 
-extension MutableCollection where Self : RandomAccessCollection {
+extension MutableCollection where Self: RandomAccessCollection {
   /// Shuffles the collection in place, using the given generator as a source
   /// for randomness.
   ///
@@ -434,21 +581,25 @@ extension MutableCollection where Self : RandomAccessCollection {
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the collection.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Note: The algorithm used to shuffle a collection may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same shuffled order each time you run your program, that sequence may
+  ///   change when your program is compiled using a different version of
+  ///   Swift.
   @inlinable
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: inout T
   ) {
-    let count = self.count
     guard count > 1 else { return }
     var amount = count
     var currentIndex = startIndex
     while amount > 1 {
-      let random = generator.next(upperBound: UInt(amount))
+      let random = Int.random(in: 0 ..< amount, using: &generator)
       amount -= 1
       swapAt(
         currentIndex,
-        index(currentIndex, offsetBy: numericCast(random))
+        index(currentIndex, offsetBy: random)
       )
       formIndex(after: &currentIndex)
     }
@@ -456,17 +607,16 @@ extension MutableCollection where Self : RandomAccessCollection {
   
   /// Shuffles the collection in place.
   ///
-  /// Use the `shuffle()` method to randomly reorder the elements of an
-  /// array.
+  /// Use the `shuffle()` method to randomly reorder the elements of an array.
   ///
   ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
   ///     names.shuffle(using: myGenerator)
   ///     // names == ["Luis", "Camila", "Luciana", "Sofía", "Alejandro", "Diego"]
   ///
-  /// This method is equivalent to calling the version that takes a generator, 
-  /// passing in the system's default random generator.
+  /// This method is equivalent to calling `shuffle(using:)`, passing in the
+  /// system's default random generator.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func shuffle() {
     var g = SystemRandomNumberGenerator()

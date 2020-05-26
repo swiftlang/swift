@@ -1,8 +1,0 @@
-@_exported import CoreLocation
-import Foundation
-
-%{
-from gyb_foundation_support import ObjectiveCBridgeableImplementationForNSValue
-}%
-
-${ ObjectiveCBridgeableImplementationForNSValue("CLLocationCoordinate2D") }

@@ -21,12 +21,15 @@ func /*trailing:def*/<base>withTrailingClosure</base>(<arglabel index=0>x</argla
 // valid
 /*trailing:call*/<base>withTrailingClosure</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>2, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>{ return 1})
 /*trailing:call*/<base>withTrailingClosure</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>2) { return 1}
-
-// false positives
-/*trailing:call*/<base>withTrailingClosure</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2) { return 1}
-/*trailing:call*/<base>withTrailingClosure</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2) { return 1}
 /*trailing:call*/<base>withTrailingClosure</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>2)
 { return 1}
+// invalid
+/*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}
+/*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}
+
+func /*trailing-only:def*/trailingOnly(a: () -> ()) {}
+/*trailing-only:call*/trailingOnly(a: {})
+/*trailing-only:call*/trailingOnly {}
 
 
 func /*varargs:def*/withVarargs(x: Int..., y: Int, _: Int) {}

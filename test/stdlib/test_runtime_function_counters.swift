@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/test_runtime_function_counters
+// RUN: %target-codesign %t/test_runtime_function_counters
 // RUN: %target-run %t/test_runtime_function_counters 2>&1 | %FileCheck %s
 // REQUIRES: runtime_function_counters
 // REQUIRES: executable_test
+// REQUIRES: rdar48995133
 
 /// Test functionality related to the runtime function counters.
 
@@ -98,7 +100,7 @@ func testCollectReferencesInsideObject() {
 func testRuntimeCounters() {
   print("TEST: APIs from _RuntimeFunctionCounters")
   let numRuntimeFunctionPointer =
-    _RuntimeFunctionCounters.getNumRuntimeFunctionCounters()
+    Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
 
   print("Number of runtime function pointers: \(numRuntimeFunctionPointer)")
 

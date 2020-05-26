@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
+// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
 
 // REQUIRES: executable_test
 
@@ -126,9 +126,6 @@ extension MyString {
 }
 
 extension MyString : StringProtocol {
-  typealias UTF8Index = String.UTF8Index
-  typealias UTF16Index = String.UTF16Index
-  typealias UnicodeScalarIndex = String.UnicodeScalarIndex
   var utf8: String.UTF8View { return base.utf8 }
   var utf16: String.UTF16View { return base.utf16 }
   var unicodeScalars: String.UnicodeScalarView { return base.unicodeScalars }

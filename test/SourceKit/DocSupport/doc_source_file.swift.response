@@ -2025,7 +2025,7 @@
         key.usr: "s:4main2CCC4extVSivg",
         key.offset: 748,
         key.length: 11,
-        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name></decl.function.accessor.getter>"
       }
     ]
   },
@@ -2069,14 +2069,14 @@
         key.usr: "s:4main16ComputedPropertyC5valueSivg",
         key.offset: 853,
         key.length: 51,
-        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name></decl.function.accessor.getter>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.setter,
         key.usr: "s:4main16ComputedPropertyC5valueSivs",
         key.offset: 910,
         key.length: 49,
-        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(newVal)</decl.name> {}</decl.function.accessor.setter>"
+        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(newVal)</decl.name></decl.function.accessor.setter>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -2089,7 +2089,7 @@
         key.usr: "s:4main16ComputedPropertyC8readOnlySivg",
         key.offset: 987,
         key.length: 11,
-        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name></decl.function.accessor.getter>"
       }
     ]
   },
@@ -2205,14 +2205,14 @@
         key.usr: "s:4main3CC2CyS2icig",
         key.offset: 1162,
         key.length: 25,
-        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name></decl.function.accessor.getter>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.setter,
         key.usr: "s:4main3CC2CyS2icis",
         key.offset: 1193,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(vvv)</decl.name> {}</decl.function.accessor.setter>"
+        key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(vvv)</decl.name></decl.function.accessor.setter>"
       }
     ]
   },
@@ -2269,7 +2269,7 @@
     key.usr: "s:4main12globReadOnlyAA2S2Vvg",
     key.offset: 1449,
     key.length: 25,
-    key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
+    key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name></decl.function.accessor.getter>"
   },
   {
     key.kind: source.lang.swift.decl.function.free,
@@ -2395,7 +2395,7 @@
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
         key.usr: "s:4main5Prot2P1pSivg",
-        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name></decl.function.accessor.getter>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,

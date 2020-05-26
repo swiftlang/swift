@@ -1,0 +1,19 @@
+// RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test | %FileCheck %s --check-prefix=CHECK
+
+// REQUIRES: CPU=arm64e
+// REQUIRES: OS=ios
+
+import Builtin
+
+sil @global_function : $@convention(thin) () -> ()
+
+sil @test_retain : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (@owned Builtin.NativeObject) {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  return %0 : $Builtin.NativeObject
+}
+// CHECK-LABEL: define swiftcc %swift.refcounted* @test_retain(%swift.refcounted* %0)
+// CHECK:      call %swift.refcounted* @swift_retain(
+// CHECK-NEXT: ret %swift.refcounted* %0
+
+// CHECK: declare %swift.refcounted* @swift_retain(%swift.refcounted* returned

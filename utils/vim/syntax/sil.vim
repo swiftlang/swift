@@ -1,3 +1,11 @@
+" This source file is part of the Swift.org open source project
+"
+" Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+" Licensed under Apache License v2.0 with Runtime Library Exception
+"
+" See https://swift.org/LICENSE.txt for license information
+" See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+"
 " Vim syntax file
 " Language: sil
 
@@ -23,6 +31,7 @@ syn keyword silConventions
       \ c
       \ method
       \ objc_method
+      \ sil_differentiability_witness
       \ thick
       \ thin
       \ witness_method
@@ -45,7 +54,9 @@ syn keyword silAttributes contained containedin=silAttribute
       \ exact
       \ init
       \ modify
+      \ mutating
       \ objc
+      \ open
       \ read
       \ rootself
       \ stack
@@ -59,8 +70,8 @@ syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 
-syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
-syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
+syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftTodo
+syn region swiftLineComment start="//" end="$" contains=swiftTodo
 
 syn match swiftLineComment   /^#!.*/
 syn match swiftTypeName  /\<[A-Z][a-zA-Z_0-9]*\>/
@@ -78,8 +89,8 @@ syn keyword swiftKeyword getter setter allocator initializer enumelt destroyer g
 syn keyword swiftKeyword alloc_global alloc_stack alloc_ref alloc_ref_dynamic alloc_box alloc_existential_box alloc_value_buffer dealloc_stack dealloc_box dealloc_existential_box dealloc_ref dealloc_partial_ref dealloc_value_buffer skipwhite
 syn keyword swiftKeyword debug_value debug_value_addr skipwhite
 syn keyword swiftKeyword load load_unowned store assign mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer bind_memory to skipwhite
-syn keyword swiftKeyword strong_retain strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_unowned store_weak fix_lifetime autorelease_value set_deallocating is_unique is_unique_or_pinned is_escaping_closure strong_pin strong_unpin skipwhite
-syn keyword swiftKeyword function_ref integer_literal float_literal string_literal const_string_literal global_addr skipwhite
+syn keyword swiftKeyword strong_retain strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_unowned store_weak fix_lifetime autorelease_value set_deallocating is_unique is_escaping_closure skipwhite
+syn keyword swiftKeyword function_ref integer_literal float_literal string_literal global_addr skipwhite
 syn keyword swiftKeyword class_method super_method witness_method objc_method objc_super_method skipwhite
 syn keyword swiftKeyword partial_apply builtin skipwhite
 syn keyword swiftApplyKeyword apply try_apply skipwhite

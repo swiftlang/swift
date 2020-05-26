@@ -32,4 +32,4 @@ import HasBridgingHeader // expected-error {{failed to import bridging header}} 
 // HEADER-ERROR: error: failed to import bridging header '{{.*}}/error-on-define.h'
 // HEADER-ERROR-NOT: error:
 
-let _ = x // expected-error {{use of unresolved identifier 'x'}}
+let _ = x // expected-error {{cannot find 'x' in scope}}

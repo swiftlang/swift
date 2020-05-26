@@ -83,8 +83,8 @@ The set of jobs that are run, and the way they spend their time, is itself
 highly dependent on **compilation modes**. Information concerning those modes
 that's relevant to compilation performance is recounted in the following
 section; for more details on the driver, see [the driver docs](Driver.md), as
-well as docs on [driver internals](DriverInternals.rst)
-and [driver parseable output](DriverParseableOutput.rst).
+well as docs on [driver internals](DriverInternals.md)
+and [driver parseable output](DriverParseableOutput.md).
 
 After discussing compilation modes in the following section, we'll also touch on
 large-scale variation in workload that can occur _without_ obvious hotspots, in
@@ -100,8 +100,7 @@ running in, and often to perform separate analysis for each mode. The
 significant modes are:
 
   - **Primary-file** vs. **whole-module**: this varies depending on whether the
-    driver is run with the flag `-wmo`, `-whole-module-optimization` or
-    `-force-single-frontend-invocation` (all these options are synonymous).
+    driver is run with the flag `-wmo` (a.k.a. `-whole-module-optimization`).
 
     - **Batch** vs. **single-file** primary-file mode. This distinction refines
     the behaviour of primary-file mode, with the new batch mode added in the
@@ -382,7 +381,7 @@ higher-resolution, more-detailed profile, in practice Instruments will often
 stall out and become unresponsive trying to process the additional detail.
 
 Similarly, be sure that as many applications as possible (especially those with
-debuginfo themselves!) are closed, so that Instruments has has little additional
+debuginfo themselves!) are closed, so that Instruments has little additional
 material to symbolicate as possible. It collects a _whole system profile_ at
 very high resolution, so you want to make its life easy by profiling on a quiet
 machine doing little beyond the task you're interested in.
@@ -570,7 +569,7 @@ compilers on hand while you're working.
     Total Execution Time: 0.0876 seconds (0.0877 wall clock)
 
      ---User Time---   --System Time--   --User+System--   ---Wall Time---  --- Name ---
-     0.0241 ( 53.9%)   0.0394 ( 92.0%)   0.0635 ( 72.5%)   0.0635 ( 72.5%)  Name binding
+     0.0241 ( 53.9%)   0.0394 ( 92.0%)   0.0635 ( 72.5%)   0.0635 ( 72.5%)  Import resolution
      0.0170 ( 38.0%)   0.0025 (  5.8%)   0.0195 ( 22.3%)   0.0195 ( 22.2%)  Type checking / Semantic analysis
      0.0013 (  3.0%)   0.0004 (  0.8%)   0.0017 (  1.9%)   0.0017 (  1.9%)  LLVM output
      0.0010 (  2.3%)   0.0003 (  0.7%)   0.0013 (  1.5%)   0.0013 (  1.5%)  SILGen
@@ -645,7 +644,7 @@ compilers on hand while you're working.
     ```
 
   - `-Xfrontend -print-clang-stats`: prints counters associated with the clang
-    AST reader, which is operated as a subsystem fo the swift compiler when
+    AST reader, which is operated as a subsystem of the swift compiler when
     importing definitions from C/ObjC. Its output is added to the end of
     whatever output comes from `-print-stats`, and looks like this:
 
@@ -695,7 +694,7 @@ files in `<directory>`.
 
 This option also provides _some_ high-level counters that are "always available"
 regardless of whether you're using an assert or release build, though assert
-builds still get _more_ counters (all of those available thorugh
+builds still get _more_ counters (all of those available through
 `-print-stats`). If you are using a new-enough compiler, `-stats-output-dir`
 often simplifies analysis, since its output is machine-readable and aggregates
 all the jobs in a multi-job compilation, and there's a post-processing script
@@ -717,7 +716,6 @@ $ cat /tmp/stats/*.json
   "AST.NumSourceLinesPerSecond": 3,
   "AST.NumLinkLibraries": 0,
   "AST.NumLoadedModules": 4,
-  "AST.NumImportedExternalDefinitions": 0,
   "AST.NumTotalClangImportedEntities": 0,
   ...
   "time.swift.Parsing.wall": 5.038023e-03,
@@ -754,7 +752,7 @@ Time,Live,IsEntry,EventName,CounterName,CounterDelta,CounterValue,EntityName,Ent
 40032,0,"entry","typecheck-decl","Sema.NumLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
 40032,0,"entry","typecheck-decl","Sema.NumTypesDeserialized",106,106,"foo","[test.swift:1:1 - line:1:32]"
 40032,0,"entry","typecheck-decl","Sema.NumUnloadedLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
-40135,0,"entry","typecheck-decl","Sema.NumDeclsValidated",1,1,"","[test.swift:1:13 - line:1:29]"
+40135,0,"entry","typecheck-decl","Sema.InterfaceTypeRequest",1,1,"","[test.swift:1:13 - line:1:29]"
 ...
 ```
 
@@ -794,7 +792,7 @@ performance between two compilers, say `${OLD}/swiftc` and `${NEW}/swiftc`:
 ```
 $ mkdir stats-old stats-new
 $ ${OLD}/swiftc -stats-output-dir stats-old test.swift
-$ ${OLD}/swiftc -stats-output-dir stats-new test.swift
+$ ${NEW}/swiftc -stats-output-dir stats-new test.swift
 $ utils/process-stats-dir.py --compare-stats-dirs stats-old stats-new
 old     new     delta_pct       name
 1402939 1430732 1.98    AST.NumASTBytesAllocated
@@ -1144,7 +1142,7 @@ driver. These files contain the driver's summary-view of the dependencies
 between entities defined and referenced in each source file; it is from these
 files that the driver decides when a file "needs" to be rebuilt because it
 depends on another file that needs to be rebuilt, and so on transitively. The
-file format is [documented here](DependencyAnalysis.rst).
+file format is [documented here](DependencyAnalysis.md).
 
 ### Finding areas in need of general improvement
 
@@ -1322,7 +1320,7 @@ internals of the compiler, just time and patience.
 
   - Add Open Source projects to the
     [source-compatibility testsuite](https://swift.org/source-compatibility/).
-    Apple's internal CI infastructure is now tracking selected non-assert-build
+    Apple's internal CI infrastructure is now tracking selected non-assert-build
     `UnifiedStatsReporter` counters on those projects, and the team is far
     more likely to catch a regression if it's shown by a project in the testsuite.
 

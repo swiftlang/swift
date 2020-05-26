@@ -108,6 +108,24 @@ class CallbackSubC : CallbackBase {
   override func perform(optNonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
 }
 
+//
+class MyHashableNSObject: NSObject {
+  override var hashValue: Int {
+    // expected-error@-1 {{'NSObject.hashValue' is not overridable; did you mean to override 'NSObject.hash'?}}
+    return 0
+  }
+}
+
+// rdar://problem/47557376
+// Adding an override to someone else's class in an extension like this isn't
+// really sound, but it's allowed in Objective-C too.
+extension OverrideInExtensionSub {
+  open override func method() {}
+}
+public extension OverrideInExtensionSub {
+  open override func accessWarning() {} // expected-warning {{'open' modifier conflicts with extension's default access of 'public'}}
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: overridden declaration is here
 // <unknown>:0: error: unexpected note produced: setter for 'boolProperty' declared here

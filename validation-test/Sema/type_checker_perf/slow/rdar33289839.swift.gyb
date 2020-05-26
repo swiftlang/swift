@@ -1,6 +1,6 @@
-// RUN: %scale-test --invert-result --begin 2 --end 6 --step 1 --select incrementScopeCounter %s
-// REQUIRES: OS=macosx
-// REQUIRES: asserts
+// RUN: %scale-test --invert-result --begin 2 --end 6 --step 1 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+// REQUIRES: rdar42969824,no_asan
 
 func rdar33289839(s: String) -> String {
   return "test" + String(s)

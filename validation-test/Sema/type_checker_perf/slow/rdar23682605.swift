@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
-// REQUIRES: tools-release,no_asserts
+// REQUIRES: tools-release,no_asan
 
 func memoize<T: Hashable, U>( body: @escaping ((T)->U, T)->U ) -> (T)->U {
   var memo = Dictionary<T, U>()

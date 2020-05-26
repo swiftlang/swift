@@ -38,7 +38,11 @@ PATTERN_NODES = [
     # identifier-pattern -> identifier
     Node('IdentifierPattern', kind='Pattern',
          children=[
-             Child('Identifier', kind='IdentifierToken')
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'SelfToken',
+                       'IdentifierToken',
+                   ]),
          ]),
 
     # as-pattern -> pattern 'as' type
@@ -54,7 +58,8 @@ PATTERN_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Elements', kind='TuplePatternElementList'),
+             Child('Elements', kind='TuplePatternElementList',
+                   collection_element_name='Element'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 

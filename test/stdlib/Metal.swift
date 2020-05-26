@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
+// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
@@ -117,21 +117,21 @@ if #available(OSX 10.14, iOS 12.0, tvOS 12.0, *){
       icbDesc.inheritBuffers = false
       icbDesc.maxVertexBufferBindCount = 1
       icbDesc.maxFragmentBufferBindCount = 1
-      let icb = device.makeIndirectCommandBuffer (descriptor: icbDesc, maxCommandCount: 4, options: MTLResourceOptions.storageModeShared )!
+      let icb = device.makeIndirectCommandBuffer(descriptor: icbDesc, maxCommandCount: 4, options: MTLResourceOptions.storageModeShared )!
 
       /* Call APIs */
 
       let encoder = cmdBuf.makeRenderCommandEncoder(descriptor: rpDesc)!
-      let cmd = icb.indirectRenderCommandAt (0)!
-      cmd.setVertexBuffer (buf, offset: 0, at: 0)
-      cmd.setFragmentBuffer (buf, offset: 0, at: 0)
-      cmd.drawPrimitives (MTLPrimitiveType.triangle, vertexStart: 0, vertexCount: 0, instanceCount: 0, baseInstance: 0)
-      let cmd2 = icb.indirectRenderCommandAt (1)!
+      let cmd = icb.indirectRenderCommandAt(0)
+      cmd.setVertexBuffer(buf, offset: 0, at: 0)
+      cmd.setFragmentBuffer(buf, offset: 0, at: 0)
+      cmd.drawPrimitives(MTLPrimitiveType.triangle, vertexStart: 0, vertexCount: 0, instanceCount: 0, baseInstance: 0)
+      let cmd2 = icb.indirectRenderCommandAt(1)
       cmd2.drawIndexedPrimitives(MTLPrimitiveType.triangle, indexCount: 0, indexType: MTLIndexType.uint16, indexBuffer: buf, indexBufferOffset: 0, instanceCount: 0, baseVertex: 0, baseInstance: 0)
-      let cmd3 = icb.indirectRenderCommandAt (2)!
+      let cmd3 = icb.indirectRenderCommandAt(2)
       cmd3.reset()
       icb.reset(0..<5)
-      encoder.executeCommandsInBuffer (icb, range:0..<5)
+      encoder.executeCommandsInBuffer(icb, range:0..<5)
       encoder.endEncoding()
     }
 
@@ -259,10 +259,12 @@ if #available(OSX 10.14, iOS 12.0, tvOS 12.0, *){
       let encoder = cmdBuf.makeRenderCommandEncoder(descriptor: rpDesc)!
       encoder.useResources([buf], usage: MTLResourceUsage.read)
       encoder.useHeaps([heap])
-      #if os(macOS)
+#if os(macOS) || os(iOS)
+      if #available(iOS 12.0, macOS 10.13, *) {
         encoder.setViewports([MTLViewport()])
         encoder.setScissorRects([MTLScissorRect(x:0, y:0, width:1, height:1)])
-      #endif
+      }
+#endif
       encoder.setVertexBuffers([buf], offsets: [0], range: 0..<1)
       encoder.setVertexTextures([tex], range: 0..<1)
       encoder.setVertexSamplerStates([smplr], range: 0..<1)

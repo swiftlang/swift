@@ -17,7 +17,6 @@
 #ifndef SWIFT_SIL_SILGLOBALVARIABLE_H
 #define SWIFT_SIL_SILGLOBALVARIABLE_H
 
-#include <string>
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -106,7 +105,12 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType.castTo<SILFunctionType>();
   }
-    
+  SILType getLoweredTypeInContext(TypeExpansionContext context) const;
+  CanSILFunctionType
+  getLoweredFunctionTypeInContext(TypeExpansionContext context) const {
+    return getLoweredTypeInContext(context).castTo<SILFunctionType>();
+  }
+
   StringRef getName() const { return Name; }
   
   void setDeclaration(bool isD) { IsDeclaration = isD; }
@@ -157,6 +161,11 @@ public:
   /// static initializer.
   static bool isValidStaticInitializerInst(const SILInstruction *I,
                                            SILModule &M);
+
+  /// Returns the usub_with_overflow builtin if \p TE extracts the result of
+  /// such a subtraction, which is required to have an integer_literal as right
+  /// operand.
+  static BuiltinInst *getOffsetSubtract(const TupleExtractInst *TE, SILModule &M);
 
   void dropAllReferences() {
     StaticInitializerBlock.dropAllReferences();
@@ -214,7 +223,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILGlobalVariable> :
-public ilist_default_traits<::swift::SILGlobalVariable> {
+public ilist_node_traits<::swift::SILGlobalVariable> {
   using SILGlobalVariable = ::swift::SILGlobalVariable;
 
 public:

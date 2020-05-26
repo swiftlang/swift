@@ -19,6 +19,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -35,6 +36,8 @@ public:
   typedef SmallVector<NominalTypeDecl *, 8> NominalTypeList;
   typedef llvm::DenseMap<ProtocolDecl *, NominalTypeList>
       ProtocolConformanceMap;
+  typedef llvm::DenseMap<ProtocolDecl *, NominalTypeDecl *>
+      SoleConformingTypeMap;
 
   ProtocolConformanceAnalysis(SILModule *Mod)
       : SILAnalysis(SILAnalysisKind::ProtocolConformance), M(Mod) {
@@ -71,6 +74,14 @@ public:
                                              ConformsListIt->second.end())
                : ArrayRef<NominalTypeDecl *>();
   }
+  
+  /// Traverse ProtocolConformanceMapCache recursively to determine sole
+  /// conforming concrete type. 
+  NominalTypeDecl *findSoleConformingType(ProtocolDecl *Protocol);
+
+  // Wrapper function to findSoleConformingType that checks for additional
+  // constraints for classes using ClassHierarchyAnalysis.
+  bool getSoleConformingType(ProtocolDecl *Protocol, ClassHierarchyAnalysis *CHA, CanType &ConcreteType);
 
 private:
   /// Compute inheritance properties.
@@ -79,8 +90,11 @@ private:
   /// The module.
   SILModule *M;
 
-  /// A cache that maps a protocol to its conformances
+  /// A cache that maps a protocol to its conformances.
   ProtocolConformanceMap ProtocolConformanceCache;
+
+  /// A cache that holds SoleConformingType for protocols.
+  SoleConformingTypeMap SoleConformingTypeCache;
 };
 
 } // namespace swift

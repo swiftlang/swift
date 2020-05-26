@@ -2,12 +2,21 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
+//===----------------------------------------------------------------------===//
+///
+/// An SSA-peephole analysis. Given a single-value instruction, find an existing
+/// equivalent but less costly or more canonical SIL value.
+///
+/// This analysis must handle 'raw' SIL form. It should be possible to perform
+/// the substitution discovered by the analysis without interfering with
+/// subsequent diagnostic passes.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify"
@@ -16,7 +25,7 @@
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -56,6 +65,7 @@ namespace {
     SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
     SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
     SILValue visitBeginAccessInst(BeginAccessInst *BAI);
+    SILValue visitMetatypeInst(MetatypeInst *MTI);
 
     SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
@@ -170,8 +180,8 @@ visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
 }
 
 // Simplify:
-//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt.1
-//   %2 = enum $Optional<C>, #Optional.Some!enumelt.1, %1 : $C
+//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt
+//   %2 = enum $Optional<C>, #Optional.Some!enumelt, %1 : $C
 // to %0 since we are building the same enum.
 static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
   assert(EI->hasOperand() && "Expected an enum with an operand!");
@@ -199,11 +209,11 @@ SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
   auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
   if (EI && EI->getType() == SEI->getEnumOperand()->getType()) {
     // Simplify a select_enum on an enum instruction.
-    //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
+    //   %27 = enum $Optional<Int>, #Optional.Some!enumelt, %20 : $Int
     //   %28 = integer_literal $Builtin.Int1, -1
     //   %29 = integer_literal $Builtin.Int1, 0
     //   %30 = select_enum %27 : $Optional<Int>, case #Optional.None!enumelt: %28,
-    //                                         case #Optional.Some!enumelt.1: %29
+    //                                         case #Optional.Some!enumelt: %29
     // We will return %29.
     return SEI->getCaseResult(EI->getElement());
   }
@@ -444,7 +454,38 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
   return SILValue();
 }
 
+SILValue InstSimplifier::visitMetatypeInst(MetatypeInst *MI) {
+  auto metaType = MI->getType().castTo<MetatypeType>();
+  auto instanceType = metaType.getInstanceType();
+  // Tuple, Struct, and Enum MetatypeTypes have a single value.
+  // If this metatype is already passed as an argument reuse it to enable
+  // downstream CSE/SILCombine optimizations.
+  // Note: redundant metatype instructions are already handled by CSE.
+  if (isa<TupleType>(instanceType)
+      || instanceType.getStructOrBoundGenericStruct()
+      || instanceType.getEnumOrBoundGenericEnum()) {
+    for (SILArgument *argument : MI->getFunction()->getArguments()) {
+      if (argument->getType().getASTType() == metaType)
+        return argument;
+    }
+  }
+  return SILValue();
+}
+
 static SILValue simplifyBuiltin(BuiltinInst *BI) {
+
+  switch (BI->getBuiltinInfo().ID) {
+    case BuiltinValueKind::IntToPtr:
+      if (auto *OpBI = dyn_cast<BuiltinInst>(BI->getOperand(0))) {
+        if (OpBI->getBuiltinInfo().ID == BuiltinValueKind::PtrToInt) {
+          return OpBI->getOperand(0);
+        }
+      }
+      return SILValue();
+    default:
+      break;
+  }
+
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
 
   switch (Intrinsic.ID) {
@@ -492,18 +533,6 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
         return Result;
     }
 
-    // trunc(tuple_extract(conversion(extOrBitCast(x))))) -> x
-    if (match(Op, m_TupleExtractInst(
-                   m_CheckedConversion(
-                     m_ExtOrBitCast(m_SILValue(Result))), 0))) {
-      // If the top bit of Result is known to be 0, then
-      // it is safe to replace the whole pattern by original bits of x
-      if (Result->getType() == BI->getType()) {
-        if (auto signBit = computeSignBit(Result))
-          if (!signBit.getValue())
-            return Result;
-      }
-    }
     return SILValue();
   }
 
@@ -550,7 +579,7 @@ SILValue InstSimplifier::visitBuiltinInst(BuiltinInst *BI) {
   return simplifyBuiltin(BI);
 }
 
-/// \brief Simplify arithmetic intrinsics with overflow and known identity
+/// Simplify arithmetic intrinsics with overflow and known identity
 /// constants such as 0 and 1.
 /// If this returns a value other than SILValue() then the instruction was
 /// simplified to a value which doesn't overflow.  The overflow case is handled
@@ -639,23 +668,6 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(BuiltinInst *BI) {
   switch (Builtin.ID) {
   default: break;
 
-  case BuiltinValueKind::SUCheckedConversion:
-  case BuiltinValueKind::USCheckedConversion: {
-    OperandValueArrayRef Args = BI->getArguments();
-    const SILValue &Op = Args[0];
-    if (auto signBit = computeSignBit(Op))
-      if (!signBit.getValue())
-        return Op;
-    SILValue Result;
-    // CheckedConversion(ExtOrBitCast(x)) -> x
-    if (match(BI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
-      if (Result->getType() == BI->getType().getTupleElementType(0)) {
-        assert (!computeSignBit(Result).getValue() && "Sign bit should be 0");
-        return Result;
-      }
-    }
-    break;
-
   case BuiltinValueKind::UToSCheckedTrunc:
   case BuiltinValueKind::UToUCheckedTrunc:
   case BuiltinValueKind::SToUCheckedTrunc:
@@ -682,7 +694,7 @@ case BuiltinValueKind::id:
   return SILValue();
 }
 
-/// \brief Try to simplify the specified instruction, performing local
+/// Try to simplify the specified instruction, performing local
 /// analysis of the operands of the instruction, without looking at its uses
 /// (e.g. constant folding).  If a simpler result can be found, it is
 /// returned, otherwise a null SILValue is returned.
@@ -694,12 +706,17 @@ SILValue swift::simplifyInstruction(SILInstruction *I) {
 /// Replace an instruction with a simplified result, including any debug uses,
 /// and erase the instruction. If the instruction initiates a scope, do not
 /// replace the end of its scope; it will be deleted along with its parent.
-void swift::replaceAllSimplifiedUsesAndErase(
+///
+/// This is a simple transform based on the above analysis.
+///
+/// Return an iterator to the next (nondeleted) instruction.
+SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
     SILInstruction *I, SILValue result,
-    std::function<void(SILInstruction *)> eraseNotify) {
+    std::function<void(SILInstruction *)> eraseHandler) {
 
   auto *SVI = cast<SingleValueInstruction>(I);
   assert(SVI != result && "Cannot RAUW a value with itself");
+  SILBasicBlock::iterator nextii = std::next(I->getIterator());
 
   // Only SingleValueInstructions are currently simplified.
   while (!SVI->use_empty()) {
@@ -707,16 +724,22 @@ void swift::replaceAllSimplifiedUsesAndErase(
     SILInstruction *user = use->getUser();
     // Erase the end of scope marker.
     if (isEndOfScopeMarker(user)) {
-      if (eraseNotify)
-        eraseNotify(user);
-      user->eraseFromParent();
+      if (&*nextii == user)
+        ++nextii;
+      if (eraseHandler)
+        eraseHandler(user);
+      else
+        user->eraseFromParent();
       continue;
     }
     use->set(result);
   }
-  I->eraseFromParent();
-  if (eraseNotify)
-    eraseNotify(I);
+  if (eraseHandler)
+    eraseHandler(I);
+  else
+    I->eraseFromParent();
+
+  return nextii;
 }
 
 /// Simplify invocations of builtin operations that may overflow.

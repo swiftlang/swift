@@ -481,7 +481,7 @@ Properties can be classified into three groups:
 - `static` and `class` properties on any kind of type.
 
 We propose to always treat reference-type and `static` properties
-as independent from one another other, but to treat value-type
+as independent from one another, but to treat value-type
 properties as generally non-independent outside of a specific
 (but important) special case.  That's a potentially significant
 restriction, and it's reasonable to wonder both why it's necessary
@@ -645,7 +645,7 @@ properties.
 
 In some cases, where desired, the compiler may be able to
 preserve source compatibility and avoid an error by implicitly
-inserting a copy instead.  This likely something we would only
+inserting a copy instead.  This is likely something we would only
 do in a source-compatibility mode.
 
 Static enforcement will be used for:
@@ -836,7 +836,7 @@ born from a trio of concerns:
   costs for users.  And it's still inevitably necessary
   to sometimes drop down to unsafe code to work around the
   limitations of the ownership system.  Given that a line
-  does have to drawn somewhere, it's not completely settled
+  does have to be drawn somewhere, it's not completely settled
   that lifetime-qualification systems deserve to be on the
   Swift side of the line.
 

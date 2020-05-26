@@ -73,9 +73,6 @@ private:
   // Tail-allocated expression list.
   MutableArrayRef<llvm::coverage::CounterExpression> Expressions;
 
-  // Whether the coverage mapping's name data is in the profile symbol table.
-  bool HasSymtabEntry;
-
   // Disallow copying into temporary objects.
   SILCoverageMap(const SILCoverageMap &other) = delete;
   SILCoverageMap &operator=(const SILCoverageMap &) = delete;
@@ -112,14 +109,6 @@ public:
     return Expressions;
   }
 
-  /// Check whether this coverage mapping can reference its name data within
-  /// the profile symbol table.
-  bool hasSymtabEntry() const { return HasSymtabEntry; }
-
-  /// Guarantee that this coverage mapping can reference its name data within
-  /// the profile symbol table.
-  void setSymtabEntryGuaranteed() { HasSymtabEntry = true; }
-
   void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const;
 
   /// Print the coverage map.
@@ -144,7 +133,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILCoverageMap>
-    : public ilist_default_traits<::swift::SILCoverageMap> {
+    : public ilist_node_traits<::swift::SILCoverageMap> {
   using SILCoverageMap = ::swift::SILCoverageMap;
 
 public:

@@ -28,10 +28,12 @@ import urllib
 import urllib2
 from collections import namedtuple
 from operator import attrgetter
-from jobstats import load_stats_dir, merge_all_jobstats
+
+from jobstats import (list_stats_dir_profiles,
+                      load_stats_dir, merge_all_jobstats)
 
 
-MODULE_PAT = re.compile('^(\w+)\.')
+MODULE_PAT = re.compile(r'^(\w+)\.')
 
 
 def module_name_of_stat(name):
@@ -437,7 +439,7 @@ def evaluate(args):
     vargs = vars_of_args(args)
     merged = merge_all_jobstats(load_stats_dir(d, **vargs), **vargs)
     env = {}
-    ident = re.compile('(\w+)$')
+    ident = re.compile(r'(\w+)$')
     for (k, v) in merged.stats.items():
         if k.startswith("time.") or '.time.' in k:
             continue
@@ -470,7 +472,7 @@ def evaluate_delta(args):
     new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
 
     env = {}
-    ident = re.compile('(\w+)$')
+    ident = re.compile(r'(\w+)$')
     for r in compare_stats(args, old_stats.stats, new_stats.stats):
         if r.name.startswith("time.") or '.time.' in r.name:
             continue
@@ -490,6 +492,56 @@ def evaluate_delta(args):
     except Exception as e:
         print(e)
         return 1
+
+
+def render_profiles(args):
+    flamegraph_pl = args.flamegraph_script
+    if flamegraph_pl is None:
+        import distutils.spawn
+        flamegraph_pl = distutils.spawn.find_executable("flamegraph.pl")
+    if flamegraph_pl is None:
+        print("Need flamegraph.pl in $PATH, or pass --flamegraph-script")
+
+    vargs = vars_of_args(args)
+    for statsdir in args.remainder:
+        jobprofs = list_stats_dir_profiles(statsdir, **vargs)
+        index_path = os.path.join(statsdir, "profile-index.html")
+        all_profile_types = set([k for keys in [j.profiles.keys()
+                                                for j in jobprofs
+                                                if j.profiles is not None]
+                                 for k in keys])
+        with open(index_path, "wb") as index:
+            for ptype in all_profile_types:
+                index.write("<h2>Profile type: " + ptype + "</h2>\n")
+                index.write("<ul>\n")
+                for j in jobprofs:
+                    if j.is_frontend_job():
+                        index.write("    <li>" +
+                                    ("Module %s :: %s" %
+                                     (j.module, " ".join(j.jobargs))) + "\n")
+                        index.write("    <ul>\n")
+                        profiles = sorted(j.profiles.get(ptype, {}).items())
+                        for counter, path in profiles:
+                            title = ("Module: %s, File: %s, "
+                                     "Counter: %s, Profile: %s" %
+                                     (j.module, j.input, counter, ptype))
+                            subtitle = j.triple + ", -" + j.opt
+                            svg = os.path.abspath(path + ".svg")
+                            with open(path) as p, open(svg, "wb") as g:
+                                import subprocess
+                                print("Building flamegraph " + svg)
+                                subprocess.check_call([flamegraph_pl,
+                                                       "--title", title,
+                                                       "--subtitle", subtitle],
+                                                      stdin=p, stdout=g)
+                            link = ("<tt><a href=\"file://%s\">%s</a></tt>" %
+                                    (svg, counter))
+                            index.write("        <li>" + link + "\n")
+                        index.write("    </ul>\n")
+                        index.write("    </li>\n")
+        if args.browse_profiles:
+            import webbrowser
+            webbrowser.open_new_tab("file://" + os.path.abspath(index_path))
 
 
 def main():
@@ -596,6 +648,12 @@ def main():
                        help="evaluate an expression of stat-names")
     modes.add_argument("--evaluate-delta", type=str, default=None,
                        help="evaluate an expression of stat-deltas")
+    modes.add_argument("--render-profiles", action="store_true",
+                       help="render any profiles to SVG flamegraphs")
+    parser.add_argument("--flamegraph-script", type=str, default=None,
+                        help="path to flamegraph.pl")
+    parser.add_argument("--browse-profiles", action="store_true",
+                        help="open web browser tabs with rendered profiles")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
                         help="stats-dirs to process")
 
@@ -622,6 +680,8 @@ def main():
         return evaluate(args)
     elif args.evaluate_delta:
         return evaluate_delta(args)
+    elif args.render_profiles:
+        return render_profiles(args)
     return None
 
 

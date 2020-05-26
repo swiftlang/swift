@@ -8,5 +8,5 @@ func foo(_ a: (Int) -> (Int)) -> Int {
   return 42
 }
 
-// CHECK: function_ref @$S12rdar351421213fooyS3iXEF : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> Int
+// CHECK: function_ref @$s12rdar351421213fooyS3iXEF : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> Int
 let _ = foo({ (a: Int) -> Int in a + 1 })

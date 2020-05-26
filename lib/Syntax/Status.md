@@ -31,7 +31,6 @@
   * ForcedValueExpr
   * SuperRefExpr
   * ImplicitMemberExpr
-  * InterpolatedStringLiteralExpr
   * KeyPathExpr
   * KeyPathDotExpr
   * InOutExpr
@@ -84,6 +83,7 @@
   * WhileStmt
   * ForInStmt
   * SwitchStmt
+  * YieldStmt
 
 ## Pattern
 ### Done:

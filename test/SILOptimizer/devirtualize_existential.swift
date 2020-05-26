@@ -8,7 +8,7 @@ class Foo : Pingable {
 }
 
 // Everything gets devirtualized, inlined, and promoted to the stack.
-//CHECK: @$S24devirtualize_existential17interesting_stuffyyF
+//CHECK: @$s24devirtualize_existential17interesting_stuffyyF
 //CHECK-NOT: init_existential_addr
 //CHECK-NOT: apply
 //CHECK: return

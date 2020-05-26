@@ -118,6 +118,10 @@ enum class SubclassScope : uint8_t {
   /// This class can only be subclassed in this module.
   Internal,
 
+  /// This class is resilient so even public methods cannot be directly
+  /// referenced from outside the module.
+  Resilient,
+
   /// There is no class to subclass, or it is final.
   NotApplicable,
 };
@@ -250,24 +254,15 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
       return SILLinkage::Hidden;
     break;
 
+  case SubclassScope::Resilient:
+    if (isAvailableExternally(linkage))
+      return SILLinkage::HiddenExternal;
+    return SILLinkage::Hidden;
+
   case SubclassScope::NotApplicable:
     break;
   }
   return linkage;
-}
-
-// FIXME: This should not be necessary, but it looks like visibility rules for
-// extension members are slightly bogus, and so some protocol witness thunks
-// need to be public.
-//
-// We allow a 'public' member of an extension to witness a public
-// protocol requirement, even if the extended type is not public;
-// then SILGen gives the member private linkage, ignoring the more
-// visible access level it was given in the AST.
-inline bool
-fixmeWitnessHasLinkageThatNeedsToBePublic(SILLinkage witnessLinkage) {
-  return !hasPublicVisibility(witnessLinkage) &&
-         !hasSharedVisibility(witnessLinkage);
 }
 
 } // end swift namespace

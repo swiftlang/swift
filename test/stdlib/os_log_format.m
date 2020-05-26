@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %clang %target-cc-options -g -O0 -isysroot %sdk -I %swift_src_root/stdlib/public/SDK/os -framework Foundation %swift_src_root/stdlib/public/SDK/os/format.m %swift_src_root/stdlib/public/SDK/os/os_trace_blob.c %s -o %t/os_log_format
+// RUN: %clang %target-cc-options -g -O0 -isysroot %sdk -I %swift_src_root/stdlib/public/Darwin/os -framework Foundation %swift_src_root/stdlib/public/Darwin/os/format.m %swift_src_root/stdlib/public/Darwin/os/os_trace_blob.c %s -o %t/os_log_format
 // RUN: %target-run %t/os_log_format | %FileCheck %s
-// REQUIRES: rdar41380265
 
 // REQUIRES: objc_interop
+// REQUIRES: executable_test
 
 #import <Foundation/Foundation.h>
 #import <stdint.h>
@@ -134,7 +134,9 @@ main(int argc, char **argv)
   ACCEPT("simple float %f", (float)1.5);
   ACCEPT("simple double %f", 1.5);
 #ifdef __LP64__
-  ACCEPT("simple long double %Lf", (long double)1.5);
+  // Disabled because the upstream clang output for long double changed
+  // and causes CI fallout
+  // ACCEPT("simple long double %Lf", (long double)1.5);
 #endif
 
   ACCEPT("integer with a static width %666d", 10);

@@ -16,8 +16,8 @@ struct S<A: PB> {
   }
 }
 
-// CHECK-LABEL: sil hidden @$S20specialize_anyobject6callit{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s20specialize_anyobject6callit{{[_0-9a-zA-Z]*}}F
 func callit(s: S<CB>) {
-  // CHECK: function_ref @$Ss3eeeoiySbyXlSg_ABtF : $@convention(thin) (@guaranteed Optional<AnyObject>, @guaranteed Optional<AnyObject>) -> Bool
+  // CHECK: function_ref @$ss3eeeoiySbyXlSg_ABtF : $@convention(thin) (@guaranteed Optional<AnyObject>, @guaranteed Optional<AnyObject>) -> Bool
   s.crash()
 }

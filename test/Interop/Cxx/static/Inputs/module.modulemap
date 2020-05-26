@@ -1,0 +1,19 @@
+module StaticVar {
+  header "static-var.h"
+}
+
+module StaticLocalVar {
+  header "static-local-var.h"
+}
+
+module StaticMemberVar {
+  header "static-member-var.h"
+}
+
+module InlineStaticMemberVar {
+  header "inline-static-member-var.h"
+}
+
+module StaticMemberFunc {
+  header "static-member-func.h"
+}

@@ -5,7 +5,7 @@ let ss = s[s.startIndex..<s.endIndex]
 
 // CTP_Initialization
 do {
-  let s1: String = { return ss }() // expected-error {{cannot convert value of type 'Substring' to specified type 'String'}} {{20-20=String(}} {{35-35=)}}
+  let s1: String = { return ss }() // expected-error {{cannot convert value of type 'Substring' to closure result type 'String'}} {{29-29=String(}} {{31-31=)}}
   _ = s1
 }
 
@@ -45,7 +45,7 @@ do {
 
 // CTP_ClosureResult
 do {
-  [ss].map { (x: Substring) -> String in x } // expected-error {{cannot convert value of type 'Substring' to closure result type 'String'}} {{42-42=String(}} {{43-43=)}}
+  [ss].map { (x: Substring) -> String in x } // expected-error {{declared closure result 'Substring' is incompatible with contextual type 'String'}}
 }
 
 // CTP_ArrayElement
@@ -80,12 +80,6 @@ do {
 
 // Substring-to-String via subscripting in a context expecting String
 func takesString(_ s: String) {}
-
-func apply(_ fn: (String) -> (), _ s: String) {
-  fn(s[s.startIndex..<s.endIndex]) // expected-error{{subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result}} {{6-6=String(}} {{34-34=)}}
-  let _: String = s[s.startIndex..<s.endIndex] // expected-error{{subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result}} {{19-19=String(}} {{47-47=)}}
-  _ = s[s.startIndex..<s.endIndex] as String // expected-error{{subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result}} {{7-7=String(}} {{35-35=)}}
-}
 
 // rdar://33474838
 protocol Derivable {

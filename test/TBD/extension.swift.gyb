@@ -8,28 +8,28 @@
 // RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift
 // RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -O
 // ... and resilient:
-// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience
-// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -O
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-library-evolution
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-library-evolution -O
 // The same, but with -enable-testing:
 // RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-testing
 // RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-testing -O
-// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -enable-testing
-// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -enable-testing -O
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-library-evolution -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-library-evolution -enable-testing -O
 
 // Other module is resilient:
 // RUN: %empty-directory(%t/types)
-// RUN: %target-build-swift %S/Inputs/extension_types.swift -module-name ExtensionTypes -emit-module -emit-module-path %t/types/ExtensionTypes.swiftmodule -Xfrontend -enable-resilience
+// RUN: %target-build-swift %S/Inputs/extension_types.swift -module-name ExtensionTypes -emit-module -emit-module-path %t/types/ExtensionTypes.swiftmodule -enable-library-evolution
 // This module is both not resilient:
 // RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift
 // RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -O
 // ... and resilient:
-// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience
-// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -O
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-library-evolution
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-library-evolution -O
 // The same but with -enable-testing:
 // RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-testing
 // RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-testing -O
-// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -enable-testing
-// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -enable-testing -O
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-library-evolution -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-library-evolution -enable-testing -O
 
 
 import ExtensionTypes
@@ -63,15 +63,15 @@ def conformanceBody(protocol):
 % for name in local_decl_names:
 % access = name.lower()
 
-${access} protocol ${name} {
+${access} protocol Extension${name} {
     func ${access}Method()
     var ${access}Get: Int { get }
     var ${access}GetSet: Int { get set }
 }
 
 // Defaulted methods:
-${access} protocol ${name}Inherit: Foreign {}
-extension ${name}Inherit {
+${access} protocol Extension${name}Inherit: ExtensionForeign {}
+extension Extension${name}Inherit {
     ${conformanceBody(name)}
 }
 
@@ -86,21 +86,21 @@ ${access} struct ${name}StructOneExtension {}
 
 % for pname in all_decl_names:
 // e.g. extension PublicStruct: Private { ... }
-extension ${sname}Struct: ${pname} {
+extension ${sname}Struct: Extension${pname} {
     ${conformanceBody(pname)}
 }
 
 // e.g. extension PublicStructInherit: PrivateInherit {}
-extension ${sname}StructInherit: ${pname}Inherit {}
+extension ${sname}StructInherit: Extension${pname}Inherit {}
 
 // e.g. extension PublicStructInheritNoDefault: PrivateInherit { ... }
-extension ${sname}StructInheritNoDefault: ${pname}Inherit {
+extension ${sname}StructInheritNoDefault: Extension${pname}Inherit {
     ${conformanceBody(pname)}
 }
 % end
 
-// e.g. extension PublicStructOneExtension: Foreign, Public, Internal, Private { ... }
-extension ${sname}StructOneExtension: ${", ".join(p for p in all_decl_names)} {
+// e.g. extension PublicStructOneExtension: ExtensionForeign, ExtensionPublic, ExtensionInternal, ExtensionPrivate { ... }
+extension ${sname}StructOneExtension: ${", ".join("Extension" + p for p in all_decl_names)} {
 % for pname in all_decl_names:
     ${conformanceBody(pname)}
 % end

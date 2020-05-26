@@ -111,7 +111,7 @@ func testConversion() {
 
   // Conversions among existential types.
   var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{12-53=SuperREPLPrintable & FooProtocol}}
-  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'FooProtocol & SuperREPLPrintable' in assignment}}
+  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'SuperREPLPrintable' in assignment}}
   x = x2
 
   // Subtyping
@@ -172,7 +172,7 @@ takesP1AndP2([AnyObject & P1 & P2]())
 takesP1AndP2([Swift.AnyObject & P1 & P2]())
 takesP1AndP2([AnyObject & protocol_composition.P1 & P2]())
 takesP1AndP2([AnyObject & P1 & protocol_composition.P2]())
-takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{use of unresolved identifier 'DoesNotExist'}}
+takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{cannot find 'DoesNotExist' in scope}}
 takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift' has no member named 'DoesNotExist'}}
 
 typealias T08 = P1 & inout P2 // expected-error {{'inout' may only be used on parameters}}

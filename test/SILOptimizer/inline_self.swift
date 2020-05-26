@@ -73,19 +73,19 @@ _ = Z().capturesSelf()
 
 // CHECK-LABEL: sil @main : $@convention(c)
 // CHECK: function_ref static inline_self.C.factory(Swift.Int) -> Self
-// CHECK: [[F:%[0-9]+]] = function_ref @$S11inline_self1CC7factory{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Int, @thick C.Type) -> @owned C
+// CHECK: [[F:%[0-9]+]] = function_ref @$s11inline_self1CC7factory{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Int, @thick C.Type) -> @owned C
 // CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(method) (Int, @thick C.Type) -> @owned C
 
 // CHECK: [[Z:%.*]] = alloc_ref $Z
 // CHECK: function_ref inline_self.Z.capturesSelf() -> Self
-// CHECK: [[F:%[0-9]+]] = function_ref @$S11inline_self1ZC12capturesSelfACXDyF : $@convention(method) (@guaranteed Z) -> @owned Z
+// CHECK: [[F:%[0-9]+]] = function_ref @$s11inline_self1ZC12capturesSelfACXDyF : $@convention(method) (@guaranteed Z) -> @owned Z
 // CHECK: apply [[F]]([[Z]]) : $@convention(method) (@guaranteed Z) -> @owned
 // CHECK: return
 
-// CHECK-LABEL: sil hidden @$S11inline_self1ZC16callCapturesSelfACXDyF : $@convention(method)
-// CHECK-NOT: function_ref @$S11inline_self1ZC12capturesSelfACXDyF :
+// CHECK-LABEL: sil hidden @$s11inline_self1ZC16callCapturesSelfACXDyF : $@convention(method)
+// CHECK-NOT: function_ref @$s11inline_self1ZC12capturesSelfACXDyF :
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @$S11inline_self1ZC20callBaseCapturesSelfACXDyF
-// CHECK-NOT: function_ref @$S11inline_self5BaseZC16baseCapturesSelfACXDyF :
+// CHECK-LABEL: sil hidden @$s11inline_self1ZC20callBaseCapturesSelfACXDyF
+// CHECK-NOT: function_ref @$s11inline_self5BaseZC16baseCapturesSelfACXDyF :
 // CHECK: }

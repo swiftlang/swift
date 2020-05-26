@@ -31,3 +31,74 @@ public class CustomNameClass : CustomName {
   @objc func protoMethod()
   @objc var protoProperty: Int { get }
 }
+
+@objc
+public class ObjCClass {
+  public init() {}
+}
+
+public class ImplicitlyObjCClass : ObjCClass {
+    public override init() { super.init() }
+}
+
+@objc
+public class ExplicitlyObjCClass {
+    public init() {}
+}
+
+@objc(HasSameCustomNameClass)
+public class HasSameCustomNameClass {
+    public init() {}
+}
+
+@objc(ObjCNativeTypeHasDifferentCustomNameClass)
+public class NativeTypeHasDifferentCustomNameClass {
+    public init() {}
+}
+@objc(NativeTypeHasDifferentCustomNameClass)
+public class SwiftNativeTypeHasDifferentCustomNameClass {
+    public init() {}
+}
+
+public class NativeTypeIsNonObjCClass {
+    public init() {}
+}
+@objc(NativeTypeIsNonObjCClass)
+public class SwiftNativeTypeIsNonObjCClass {
+    public init() {}
+}
+
+public class ForwardImplicitlyObjCClass : ObjCClass {
+    public override init() { super.init() }
+}
+
+@objc
+public class ForwardExplicitlyObjCClass {
+    public init() {}
+}
+
+@objc(ForwardHasSameCustomNameClass)
+public class ForwardHasSameCustomNameClass {
+    public init() {}
+}
+
+@objc(ObjCForwardNativeTypeHasDifferentCustomNameClass)
+public class ForwardNativeTypeHasDifferentCustomNameClass {
+    public init() {}
+}
+@objc(ForwardNativeTypeHasDifferentCustomNameClass)
+public class SwiftForwardNativeTypeHasDifferentCustomNameClass {
+    public init() {}
+}
+
+public class ForwardNativeTypeIsNonObjCClass {
+    public init() {}
+}
+@objc(ForwardNativeTypeIsNonObjCClass)
+public class SwiftForwardNativeTypeIsNonObjCClass {
+    public init() {}
+}
+
+public class ForwardNativeTypeIsUnambiguouslyNonObjCClass {
+    public init() {}
+}

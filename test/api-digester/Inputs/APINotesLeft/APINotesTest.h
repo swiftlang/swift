@@ -30,3 +30,7 @@ extern int ANTGlobalValue;
 extern NSString * _Null_unspecified globalAttributeName;
 
 typedef NSString * CatAttributeName;
+
+@interface Cat
+- (nonnull instancetype) initWithName:(nullable NSString*) name;
+@end

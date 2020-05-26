@@ -203,7 +203,7 @@ protected:
 
     // Deallocate the node.  The static_cast here is required
     // because LLVM's allocator API is insane.
-    this->Deallocate(static_cast<void*>(node), allocSize);
+    this->Deallocate(static_cast<void*>(node), allocSize, alignof(Node));
   }
 };
 

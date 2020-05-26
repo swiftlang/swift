@@ -1,0 +1,37 @@
+public struct Outer {
+    @propertyWrapper
+    public struct InnerWrapper<T> {
+        public var wrappedValue: T
+        public /*init:def*/init(initialValue: T) {
+            self.wrappedValue = initialValue
+        }
+        public /*body:def*/init(second: Int, head: () -> T) {
+            self.wrappedValue = body()
+        }
+    }
+}
+
+var globalInt: Int { return 17 }
+public struct HasWrappers {
+    @Outer.InnerWrapper
+    public var x: Int = globalInt
+    
+    @Outer . /*body:call*/InnerWrapper(second: 20, head: { globalInt })
+    public var y: Int
+    
+    @Outer . /*body:call*/InnerWrapper(second: 10, head: {
+        struct Inner {
+            @Outer . /*init:call*/InnerWrapper(initialValue: globalInt)
+            var x: Int
+        }
+        return Inner().x + globalInt
+    })
+    public var z: Int
+}
+
+func uses() {
+    _ = Outer . /*body:call*/InnerWrapper(second: 42, head: { 45 })
+    _ = Outer . /*init:call*/InnerWrapper(initialValue: 0)
+}
+
+

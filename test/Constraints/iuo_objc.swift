@@ -9,7 +9,9 @@ func iuo_error(prop: IUOProperty) {
   // expected-note@-2{{coalesce}}
   // expected-note@-3{{force-unwrap}}
   let _: Coat? = prop.iuo.optional()!
-  // expected-error@-1 {{cannot invoke 'optional' with no arguments}}
+  // expected-error@-1 {{value of optional type '(() -> Coat?)?' must be unwrapped to a value of type '() -> Coat?'}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
   let _: Coat? = prop.iuo.optional!()
   let _: Coat? = prop.iuo.optional!()!
   let _: Coat? = prop.iuo!.optional()
@@ -17,7 +19,9 @@ func iuo_error(prop: IUOProperty) {
   // expected-note@-2{{coalesce}}
   // expected-note@-3{{force-unwrap}}
   let _: Coat? = prop.iuo!.optional()!
-  // expected-error@-1 {{cannot invoke 'optional' with no arguments}}
+  // expected-error@-1 {{value of optional type '(() -> Coat?)?' must be unwrapped to a value of type '() -> Coat?'}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
   let _: Coat? = prop.iuo!.optional!()
   let _: Coat? = prop.iuo!.optional!()!
   let _: Coat = prop.iuo.optional()
@@ -25,7 +29,9 @@ func iuo_error(prop: IUOProperty) {
   // expected-note@-2{{coalesce}}
   // expected-note@-3{{force-unwrap}}
   let _: Coat = prop.iuo.optional()!
-  // expected-error@-1 {{cannot invoke 'optional' with no arguments}}
+  // expected-error@-1 {{value of optional type '(() -> Coat?)?' must be unwrapped to a value of type '() -> Coat?'}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
   let _: Coat = prop.iuo.optional!()
   let _: Coat = prop.iuo.optional!()!
   let _: Coat = prop.iuo!.optional()
@@ -34,7 +40,9 @@ func iuo_error(prop: IUOProperty) {
   // expected-note@-3{{force-unwrap}}
   
   let _: Coat = prop.iuo!.optional()!
-  // expected-error@-1 {{cannot invoke 'optional' with no arguments}}
+  // expected-error@-1 {{value of optional type '(() -> Coat?)?' must be unwrapped to a value of type '() -> Coat?'}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
   let _: Coat = prop.iuo!.optional!()
   let _: Coat = prop.iuo!.optional!()!
 

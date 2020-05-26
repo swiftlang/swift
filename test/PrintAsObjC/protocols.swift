@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
@@ -191,7 +191,7 @@ extension NSString : A, ZZZ {}
 @objc class Subclass : RootClass1, ZZZ {}
 
 // CHECK-LABEL: @protocol UnownedProperty
-// CHECK-NEXT: @property (nonatomic, assign) id _Nonnull unownedProp;
+// CHECK-NEXT: @property (nonatomic, unsafe_unretained) id _Nonnull unownedProp;
 @objc protocol UnownedProperty {
   unowned var unownedProp: AnyObject { get set }
 }

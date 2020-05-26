@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -generic-specializer -sil-partial-specialization=0 -sil-partial-specialization-with-generic-substitutions -debug-only=generic-specializer %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -sil-partial-specialization=0 -sil-partial-specialization-with-generic-substitutions -debug-only=generic-specializer %s -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
 

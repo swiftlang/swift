@@ -17,7 +17,7 @@ import SwiftShims
 /// When you call methods that use random data, such as creating new random
 /// values or shuffling a collection, you can pass a `RandomNumberGenerator`
 /// type to be used as the source for randomness. When you don't pass a
-/// generator, the default `Random` type is used.
+/// generator, the default `SystemRandomNumberGenerator` type is used.
 ///
 /// When providing new APIs that use randomness, provide a version that accepts
 /// a generator conforming to the `RandomNumberGenerator` protocol as well as a
@@ -32,7 +32,7 @@ import SwiftShims
 ///         }
 ///
 ///         static func random() -> Weekday {
-///             var g = SystemRandomGenerator()
+///             var g = SystemRandomNumberGenerator()
 ///             return Weekday.random(using: &g)
 ///         }
 ///     }
@@ -41,8 +41,9 @@ import SwiftShims
 /// ================================================
 ///
 /// A custom `RandomNumberGenerator` type can have different characteristics
-/// than the default `Random` type. For example, a seedable generator can be
-/// used to generate the same sequence of random values for testing purposes.
+/// than the default `SystemRandomNumberGenerator` type. For example, a
+/// seedable generator can be used to generate a repeatable sequence of random
+/// values for testing purposes.
 ///
 /// To make a custom type conform to the `RandomNumberGenerator` protocol,
 /// implement the required `next()` method. Each call to `next()` must produce
@@ -53,33 +54,22 @@ import SwiftShims
 public protocol RandomNumberGenerator {
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
+  /// Use this method when you need random binary data to generate another
+  /// value. If you need an integer value within a specific range, use the
+  /// static `random(in:using:)` method on that integer type instead of this
+  /// method.
+  ///
   /// - Returns: An unsigned 64-bit random value.
   mutating func next() -> UInt64
-
-  // FIXME: De-underscore after swift-evolution amendment
-  mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer)
-}
-
-extension RandomNumberGenerator {
-  @inlinable
-  public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
-    // FIXME: Optimize
-    var chunk: UInt64 = 0
-    var chunkBytes = 0
-    for i in 0..<buffer.count {
-      if chunkBytes == 0 {
-        chunk = next()
-        chunkBytes = UInt64.bitWidth / 8
-      }
-      buffer[i] = UInt8(truncatingIfNeeded: chunk)
-      chunk >>= UInt8.bitWidth
-      chunkBytes -= 1
-    }
-  }
 }
 
 extension RandomNumberGenerator {
   /// Returns a value from a uniform, independent distribution of binary data.
+  ///
+  /// Use this method when you need random binary data to generate another
+  /// value. If you need an integer value within a specific range, use the
+  /// static `random(in:using:)` method on that integer type instead of this
+  /// method.
   ///
   /// - Returns: A random value of `T`. Bits are randomly distributed so that
   ///   every value of `T` is equally likely to be returned.
@@ -90,6 +80,11 @@ extension RandomNumberGenerator {
 
   /// Returns a random value that is less than the given upper bound.
   ///
+  /// Use this method when you need random binary data to generate another
+  /// value. If you need an integer value within a specific range, use the
+  /// static `random(in:using:)` method on that integer type instead of this
+  /// method.
+  ///
   /// - Parameter upperBound: The upper bound for the randomly generated value.
   ///   Must be non-zero.
   /// - Returns: A random value of `T` in the range `0..<upperBound`. Every
@@ -99,6 +94,7 @@ extension RandomNumberGenerator {
     upperBound: T
   ) -> T {
     _precondition(upperBound != 0, "upperBound cannot be zero.")
+#if arch(i386) || arch(arm) // TODO(FIXME) SR-10912
     let tmp = (T.max % upperBound) + 1
     let range = tmp == upperBound ? 0 : tmp
     var random: T = 0
@@ -108,6 +104,18 @@ extension RandomNumberGenerator {
     } while random < range
 
     return random % upperBound
+#else
+    var random: T = next()
+    var m = random.multipliedFullWidth(by: upperBound)
+    if m.low < upperBound {
+      let t = (0 &- upperBound) % upperBound
+      while m.low < t {
+        random = next()
+        m = random.multipliedFullWidth(by: upperBound)
+      }
+    }
+    return m.high
+#endif
   }
 }
 
@@ -136,8 +144,10 @@ extension RandomNumberGenerator {
 /// - Apple platforms use `arc4random_buf(3)`.
 /// - Linux platforms use `getrandom(2)` when available; otherwise, they read
 ///   from `/dev/urandom`.
-@_fixed_layout
-public struct SystemRandomNumberGenerator : RandomNumberGenerator {
+/// - Windows uses `BCryptGenRandom`.
+@frozen
+public struct SystemRandomNumberGenerator: RandomNumberGenerator {
+  /// Creates a new instance of the system's default random number generator.
   @inlinable
   public init() { }
 
@@ -147,14 +157,7 @@ public struct SystemRandomNumberGenerator : RandomNumberGenerator {
   @inlinable
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
-    _stdlib_random(&random, MemoryLayout<UInt64>.size)
+    swift_stdlib_random(&random, MemoryLayout<UInt64>.size)
     return random
-  }
-
-  @inlinable
-  public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
-    if !buffer.isEmpty {
-      _stdlib_random(buffer.baseAddress!, buffer.count)
-    }
   }
 }

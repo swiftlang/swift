@@ -44,6 +44,12 @@ public:
   void print(llvm::raw_ostream &OS) const override;
 };
 
+/// A PrettyStackTraceEntry to print the version of the compiler.
+class PrettyStackTraceSwiftVersion : public llvm::PrettyStackTraceEntry {
+public:
+  void print(llvm::raw_ostream &OS) const override;
+};
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PRETTYSTACKTRACE_H

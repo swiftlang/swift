@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -simplify-unreachable-containing-blocks -assume-parsing-unqualified-ownership-sil -module-name Swift -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -simplify-unreachable-containing-blocks -module-name Swift -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 

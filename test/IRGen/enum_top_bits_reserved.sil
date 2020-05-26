@@ -1,0 +1,61 @@
+// RUN: %swift -module-name test -emit-ir -disable-legacy-type-info -target arm64-apple-ios10.0 %s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-arm64
+// RUN: %swift -module-name test -emit-ir -disable-legacy-type-info -target x86_64-apple-macosx10.12 %s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-x86_64
+
+// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=AArch64
+
+class NativeClass {}
+sil_vtable NativeClass {}
+
+// On 64-bit targets, there are 3 spare bits in the alignment bits and
+// either 4 (arm64) or 8 (everywhere else) spare bits in the high byte.
+// Consume those bits one by one.
+
+enum A {
+  case either(NativeClass)
+  case or(NativeClass)
+}
+
+enum B {
+  case either(A)
+  case or(A)
+}
+
+enum C {
+  case either(B)
+  case or(B)
+}
+
+enum D {
+  case either(C)
+  case or(C)
+}
+
+enum E {
+  case either(D)
+  case or(D)
+}
+
+enum F {
+  case either(E)
+  case or(E)
+}
+
+enum G {
+  case either(F)
+  case or(F)
+}
+
+// Okay, we've claimed 7 spare bits.  On ARM64, the eighth spare bit will
+// require an extra discriminator.
+
+// CHECK-LABEL: @"$s4test1HOWV" = internal constant %swift.enum_vwtable
+// CHECK-x86_64-SAME:     i64 8,
+// CHECK-x86_64-SAME:     i64 8,
+// CHECK-arm64-SAME:      i64 9,
+// CHECK-arm64-SAME:      i64 16,
+
+enum H {
+  case either(G)
+  case or(G)
+}

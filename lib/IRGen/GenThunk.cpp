@@ -46,7 +46,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
     return entry;
   }
 
-  auto fnType = getSILModule().Types.getConstantFunctionType(declRef);
+  auto fnType = getSILModule().Types.getConstantFunctionType(
+      getMaximalTypeExpansionContext(), declRef);
   Signature signature = getSignature(fnType);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
@@ -54,8 +55,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
   return entry;
 }
 
-static FunctionPointer lookupMethod(IRGenFunction &IGF,
-                                    SILDeclRef declRef) {
+static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
+  auto expansionContext = IGF.IGM.getMaximalTypeExpansionContext();
   auto *decl = cast<AbstractFunctionDecl>(declRef.getDecl());
 
   // Protocol case.
@@ -68,7 +69,8 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   }
 
   // Class case.
-  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(declRef);
+  auto funcTy = IGF.IGM.getSILModule().Types.getConstantFunctionType(
+      expansionContext, declRef);
 
   // Load the metadata, or use the 'self' value if we have a static method.
   llvm::Value *self;
@@ -82,7 +84,8 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   else
     self = (IGF.CurFn->arg_end() - 1);
 
-  auto selfTy = funcTy->getSelfParameter().getSILStorageType();
+  auto selfTy = funcTy->getSelfParameter().getSILStorageType(
+      IGF.IGM.getSILModule(), funcTy, IGF.IGM.getMaximalTypeExpansionContext());
 
   llvm::Value *metadata;
   if (selfTy.is<MetatypeType>()) {
@@ -95,7 +98,7 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   return emitVirtualMethodValue(IGF, metadata, declRef, funcTy);
 }
 
-llvm::Function *IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
+void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
   auto *f = getAddrOfDispatchThunk(declRef, ForDefinition);
 
   IRGenFunction IGF(*this, f);
@@ -112,6 +115,63 @@ llvm::Function *IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
     IGF.Builder.CreateRetVoid();
   else
     IGF.Builder.CreateRet(result);
+}
 
-  return f;
+llvm::GlobalValue *IRGenModule::defineMethodDescriptor(SILDeclRef declRef,
+                                                       NominalTypeDecl *nominalDecl,
+                                                       llvm::Constant *definition) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  return defineAlias(entity, definition);
+}
+
+/// Get or create a method descriptor variable.
+llvm::Constant *
+IRGenModule::getAddrOfMethodDescriptor(SILDeclRef declRef,
+                                       ForDefinition_t forDefinition) {
+  assert(forDefinition == NotForDefinition);
+  assert(declRef.getOverriddenWitnessTableEntry() == declRef &&
+         "Overriding protocol requirements do not have method descriptors");
+  LinkEntity entity = LinkEntity::forMethodDescriptor(declRef);
+  return getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo());
+}
+
+/// Fetch the method lookup function for a resilient class.
+llvm::Function *
+IRGenModule::getAddrOfMethodLookupFunction(ClassDecl *classDecl,
+                                           ForDefinition_t forDefinition) {
+  IRGen.noteUseOfTypeMetadata(classDecl);
+
+  LinkEntity entity = LinkEntity::forMethodLookupFunction(classDecl);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  llvm::Type *params[] = {
+    TypeMetadataPtrTy,
+    MethodDescriptorStructTy->getPointerTo()
+  };
+  auto fnType = llvm::FunctionType::get(Int8PtrTy, params, false);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
+  auto *f = getAddrOfMethodLookupFunction(classDecl, ForDefinition);
+
+  IRGenFunction IGF(*this, f);
+
+  auto params = IGF.collectParameters();
+  auto *metadata = params.claimNext();
+  auto *method = params.claimNext();
+
+  auto *description = getAddrOfTypeContextDescriptor(classDecl,
+                                                     RequireMetadata);
+
+  auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFn(),
+                                        {metadata, method, description});
+  IGF.Builder.CreateRet(result);
 }

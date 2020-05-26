@@ -27,7 +27,7 @@ using namespace swift;
 /// The definition of the contents of the override section.
 ///
 /// The runtime looks in the main executable (not any libraries!) for a
-/// __swift_hooks section and uses the hooks defined therein. This struct
+/// __swift53_hooks section and uses the hooks defined therein. This struct
 /// defines the layout of that section. These hooks allow extending
 /// runtime functionality when running apps built with a more recent
 /// compiler. If additional hooks are needed, they may be added at the
@@ -38,7 +38,7 @@ using namespace swift;
 struct OverrideSection {
   uintptr_t version;
   
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 #include "CompatibilityOverride.def"
 };
@@ -51,9 +51,8 @@ static OverrideSection *getOverrideSectionPtr() {
   static swift_once_t Predicate;
   swift_once(&Predicate, [](void *) {
     size_t Size;
-    OverrideSectionPtr = static_cast<OverrideSection *>(lookupSection("__DATA",
-                                                                      "__swift_hooks",
-                                                                      &Size));
+    OverrideSectionPtr = static_cast<OverrideSection *>(
+                             lookupSection("__DATA", "__swift53_hooks", &Size));
     if (Size < sizeof(OverrideSection))
       OverrideSectionPtr = nullptr;
   }, nullptr);
@@ -61,7 +60,7 @@ static OverrideSection *getOverrideSectionPtr() {
   return OverrideSectionPtr;
 }
 
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name swift::getOverride_ ## name() {                 \
     auto *Section = getOverrideSectionPtr();                        \
     if (Section == nullptr)                                         \

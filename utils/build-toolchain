@@ -41,9 +41,11 @@ BUNDLE_PREFIX=
 case $(uname -s) in
   Darwin)
     SWIFT_PACKAGE=buildbot_osx_package,no_test
+    OS_SUFFIX=osx
   ;;
   Linux)
     SWIFT_PACKAGE=buildbot_linux,no_test
+    OS_SUFFIX=linux
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
@@ -96,14 +98,15 @@ set -x
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
-TOOLCHAIN_VERSION="swift-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
-ARCHIVE="${TOOLCHAIN_VERSION}-osx.tar.gz"
-SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
+TOOLCHAIN_VERSION="5.0.${YEAR}${MONTH}${DAY}"
+TOOLCHAIN_NAME="swift-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
+DARWIN_TOOLCHAIN_VERSION="0.0.${YEAR}${MONTH}${DAY}"
+ARCHIVE="${TOOLCHAIN_NAME}-${OS_SUFFIX}.tar.gz"
+SYM_ARCHIVE="${TOOLCHAIN_NAME}-${OS_SUFFIX}-symbols.tar.gz"
 BUNDLE_PREFIX=${BUNDLE_PREFIX:?Please specify a bundle prefix}
 BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Local Swift Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
-TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
 
 SWIFT_INSTALLABLE_PACKAGE="${RESULT_DIR}/${ARCHIVE}"
 SWIFT_INSTALL_DIR="${RESULT_DIR}/swift-nightly-install"

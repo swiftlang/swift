@@ -1,0 +1,8 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -swift-version 5 -enable-library-evolution -module-name __ABAdditionsDAdditions
+
+import Swift
+@_exported import _ABAdditions
+import D
+
+public func from__ABAdditionsDAdditions()

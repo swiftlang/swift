@@ -23,9 +23,8 @@ func test8(_: ((Int, Int)) -> Int) {}
 test8 { (_, _) -> Int in 2 }
 test8 { (x, y) in x }
 
-func isEven(_ x: Int) -> Bool { return x % 2 == 0 }
 let items = Array(zip(0..<10, 0..<10))
-_ = items.filter { (_, x) in isEven(x) }
+_ = items.filter { (_, x) in x.isMultiple(of: 2) }
 _ = items.filter { _ in true }
 
 func toString(indexes: Int?...) -> String {

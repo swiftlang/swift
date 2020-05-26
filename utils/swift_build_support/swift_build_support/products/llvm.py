@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 from . import product
+from ..cmake import CMakeOptions
 
 
 class LLVM(product.Product):
@@ -20,14 +21,12 @@ class LLVM(product.Product):
                                  build_dir)
 
         # Add the cmake option for enabling or disabling assertions.
-        self.cmake_options.extend([
-            '-DLLVM_ENABLE_ASSERTIONS=%s' % str(args.llvm_assertions).upper()
-        ])
+        self.cmake_options.define(
+            'LLVM_ENABLE_ASSERTIONS:BOOL', args.llvm_assertions)
 
         # Add the cmake option for LLVM_TARGETS_TO_BUILD.
-        self.cmake_options.extend([
-            '-DLLVM_TARGETS_TO_BUILD=%s' % args.llvm_targets_to_build
-        ])
+        self.cmake_options.define(
+            'LLVM_TARGETS_TO_BUILD', args.llvm_targets_to_build)
 
         # Add the cmake options for vendors
         self.cmake_options.extend(self._compiler_vendor_flags)
@@ -44,17 +43,17 @@ class LLVM(product.Product):
             raise RuntimeError("Unknown compiler vendor?!")
 
         return [
-            "-DCLANG_VENDOR=Apple",
-            "-DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang",
+            ('CLANG_VENDOR', 'Apple'),
+            ('CLANG_VENDOR_UTI', 'com.apple.compilers.llvm.clang'),
             # This is safe since we always provide a default.
-            "-DPACKAGE_VERSION={}".format(self.args.clang_user_visible_version)
+            ('PACKAGE_VERSION', str(self.args.clang_user_visible_version))
         ]
 
     @property
     def _version_flags(self):
-        result = []
+        result = CMakeOptions()
         if self.args.clang_compiler_version is not None:
-            result.append("-DCLANG_REPOSITORY_STRING=clang-{}".format(
-                self.args.clang_compiler_version
-            ))
+            result.define(
+                'CLANG_REPOSITORY_STRING',
+                "clang-{}".format(self.args.clang_compiler_version))
         return result

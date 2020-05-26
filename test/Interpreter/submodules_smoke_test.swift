@@ -6,5 +6,5 @@ import ExplicitSubmodulesOnly.B
 _ = constantB
 
 #if !NO_ERROR
-_ = constantA // expected-error{{use of unresolved identifier 'constantA'}}
+_ = constantA // expected-error{{cannot find 'constantA' in scope}}
 #endif

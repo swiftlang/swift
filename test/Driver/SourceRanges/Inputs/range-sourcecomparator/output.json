@@ -1,0 +1,29 @@
+{
+  "./in1.swift": {
+    "object": "./in1.o",
+    "swift-dependencies": "./in1.swiftdeps"
+  },
+  "./in2.swift": {
+    "object": "./in2.o",
+    "swift-dependencies": "./in2.swiftdeps"
+  },
+  "./in3.swift": {
+    "object": "./in3.o",
+    "swift-dependencies": "./in3.swiftdeps"
+  },
+  "./in4.swift": {
+    "object": "./in4.o",
+    "swift-dependencies": "./in4.swiftdeps"
+  },
+  "./in5.swift": {
+    "object": "./in5.o",
+    "swift-dependencies": "./in5.swiftdeps"
+  },
+  "./in6.swift": {
+    "object": "./in6.o",
+    "swift-dependencies": "./in6.swiftdeps"
+  },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
+  }
+}

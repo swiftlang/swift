@@ -1,0 +1,1250 @@
+// RUN: %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+
+import Builtin
+import Swift
+
+protocol CP : class {
+  func f() -> Self
+}
+
+protocol P2 {
+  var c: Int32 { get }
+}
+
+extension P2 {
+  func s() -> Int32
+}
+
+struct L {
+  var start: Int32 { get }
+  @_hasStorage let o: P2
+  init(o: P2)
+}
+
+sil @plus : $@convention(thin) (Int64, Int64) -> Int64
+sil @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+sil @partial_apply_user : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+sil @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+sil @use_nativeobject : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+//////////////////////////////////////
+// Multiple Inline in a Block Tests //
+//////////////////////////////////////
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_add : $@convention(thin) (Int64) -> Int64 {
+sil [transparent] [ossa] @test_add : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_box ${ var Int64 }
+  %1a = project_box %1 : ${ var Int64 }, 0
+  store %0 to [trivial] %1a : $*Int64
+  %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
+  %4 = load [trivial] %1a : $*Int64
+  %5 = function_ref @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %6 = metatype $@thin Int64.Type
+  %7 = integer_literal $Builtin.Int128, 20
+  %8 = apply %5(%7, %6) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %9 = apply %3(%4, %8) : $@convention(thin) (Int64, Int64) -> Int64
+  destroy_value %1 : ${ var Int64 }
+  return %9 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @inline_test_add : $@convention(thin) (Int64) -> Int64 {
+sil [ossa] @inline_test_add : $@convention(thin) (Int64) -> Int64 {
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var Int64 }
+  // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
+  // CHECK: store [[VAL0]] to [trivial] [[PB1]]
+  // CHECK: [[VAL3:%.*]] = function_ref @plus
+  // CHECK: [[VAL4:%.*]] = function_ref @plus
+  // CHECK: [[VAL5:%.*]] = load [trivial] [[PB1]]
+  // CHECK: [[VAL6:%.*]] = function_ref @fromLiteral
+  // CHECK: [[VAL7:%.*]] = metatype $@thin Int64.Type
+  // CHECK: [[VAL8:%.*]] = integer_literal $Builtin.Int128, 10
+  // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
+  // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
+  // CHECK: [[VAL11:%.*]] = alloc_box ${ var Int64 }
+  // CHECK: [[PB11:%.*]] = project_box [[VAL11]]
+  // CHECK: store [[VAL10]] to [trivial] [[PB11]]
+  // CHECK: [[VAL13:%.*]] = function_ref @plus
+  // CHECK: [[VAL14:%.*]] = load [trivial] [[PB11]]
+  // CHECK: [[VAL15:%.*]] = function_ref @fromLiteral
+  // CHECK: [[VAL16:%.*]] = metatype $@thin Int64.Type
+  // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20
+  // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
+  // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
+  // CHECK: destroy_value [[VAL11]]
+  // CHECK: [[VAL21:%.*]] = function_ref @fromLiteral
+  // CHECK: [[VAL22:%.*]] = metatype $@thin Int64.Type
+  // CHECK: [[VAL23:%.*]] = integer_literal $Builtin.Int128, 30
+  // CHECK: [[VAL24:%.*]] = apply [[VAL21]]([[VAL23]], [[VAL22]])
+  // CHECK: [[VAL25:%.*]] = apply [[VAL3]]([[VAL19]], [[VAL24]])
+  // CHECK: destroy_value [[VAL1]]
+  // CHECK: return [[VAL25]]
+
+bb0(%0 : $Int64):
+  %1 = alloc_box ${ var Int64 }
+  %1a = project_box %1 : ${ var Int64 }, 0
+  store %0 to [trivial] %1a : $*Int64
+  %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
+  %4 = function_ref @test_add : $@convention(thin) (Int64) -> Int64
+  %5 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
+  %6 = load [trivial] %1a : $*Int64
+  %7 = function_ref @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %8 = metatype $@thin Int64.Type
+  %9 = integer_literal $Builtin.Int128, 10
+  %10 = apply %7(%9, %8) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %11 = apply %5(%6, %10) : $@convention(thin) (Int64, Int64) -> Int64
+  %12 = apply %4(%11) : $@convention(thin) (Int64) -> Int64
+  %13 = function_ref @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %14 = metatype $@thin Int64.Type
+  %15 = integer_literal $Builtin.Int128, 30
+  %16 = apply %13(%15, %14) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %17 = apply %3(%12, %16) : $@convention(thin) (Int64, Int64) -> Int64
+  destroy_value %1 : ${ var Int64 }
+  return %17 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @inline_twice_test_add : $@convention(thin) (Int64) -> Int64 {
+sil [ossa] @inline_twice_test_add : $@convention(thin) (Int64) -> Int64 {
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var Int64 }
+  // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
+  // CHECK: store [[VAL0]] to [trivial] [[PB1]]
+  // CHECK: [[VAL3:%.*]] = function_ref @plus
+  // CHECK: [[VAL4:%.*]] = function_ref @plus
+  // CHECK: [[VAL5:%.*]] = load [trivial] [[PB1]]
+  // CHECK: [[VAL6:%.*]] = function_ref @fromLiteral
+  // CHECK: [[VAL7:%.*]] = metatype $@thin Int64.Type
+  // CHECK: [[VAL8:%.*]] = integer_literal $Builtin.Int128, 10
+  // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
+  // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
+  // CHECK: [[VAL11:%.*]] = alloc_box ${ var Int64 }
+  // CHECK: [[PB11:%.*]] = project_box [[VAL11]]
+  // CHECK: store [[VAL10]] to [trivial] [[PB11]]
+  // CHECK: [[VAL13:%.*]] = function_ref @plus
+  // CHECK: [[VAL14:%.*]] = load [trivial] [[PB11]]
+  // CHECK: [[VAL15:%.*]] = function_ref @fromLiteral
+  // CHECK: [[VAL16:%.*]] = metatype $@thin Int64.Type
+  // CHECK: [[VAL17:%.*]] = integer_literal $Builtin.Int128, 20
+  // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
+  // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
+  // CHECK: destroy_value [[VAL11]]
+  // CHECK: [[VAL21:%.*]] = alloc_box ${ var Int64 }
+  // CHECK: [[PB21:%.*]] = project_box [[VAL21]]
+  // CHECK: store [[VAL19]] to [trivial] [[PB21]]
+  // CHECK: [[VAL23:%.*]] = function_ref @plus
+  // CHECK: [[VAL24:%.*]] = load [trivial] [[PB21]]
+  // CHECK: [[VAL25:%.*]] = function_ref @fromLiteral
+  // CHECK: [[VAL26:%.*]] = metatype $@thin Int64.Type
+  // CHECK: [[VAL27:%.*]] = integer_literal $Builtin.Int128, 20
+  // CHECK: [[VAL28:%.*]] = apply [[VAL25]]([[VAL27]], [[VAL26]])
+  // CHECK: [[VAL29:%.*]] = apply [[VAL23]]([[VAL24]], [[VAL28]])
+  // CHECK: destroy_value [[VAL21]]
+  // CHECK: [[VAL31:%.*]] = function_ref @fromLiteral
+  // CHECK: [[VAL32:%.*]] = metatype $@thin Int64.Type
+  // CHECK: [[VAL33:%.*]] = integer_literal $Builtin.Int128, 30
+  // CHECK: [[VAL34:%.*]] = apply [[VAL31]]([[VAL33]], [[VAL32]])
+  // CHECK: [[VAL35:%.*]] = apply [[VAL3]]([[VAL29]], [[VAL34]])
+  // CHECK: destroy_value [[VAL1]]
+  // CHECK: return [[VAL35]]
+
+bb0(%0 : $Int64):
+  %1 = alloc_box ${ var Int64 }
+  %1a = project_box %1 : ${ var Int64 }, 0
+  store %0 to [trivial] %1a : $*Int64
+  %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
+  %4 = function_ref @test_add : $@convention(thin) (Int64) -> Int64
+  %5 = function_ref @test_add : $@convention(thin) (Int64) -> Int64
+  %6 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
+  %7 = load [trivial] %1a : $*Int64
+  %8 = function_ref @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %9 = metatype $@thin Int64.Type
+  %10 = integer_literal $Builtin.Int128, 10
+  %11 = apply %8(%10, %9) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %12 = apply %6(%7, %11) : $@convention(thin) (Int64, Int64) -> Int64
+  %13 = apply %5(%12) : $@convention(thin) (Int64) -> Int64
+  %14 = apply %4(%13) : $@convention(thin) (Int64) -> Int64
+  %15 = function_ref @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %16 = metatype $@thin Int64.Type
+  %17 = integer_literal $Builtin.Int128, 30
+  %18 = apply %15(%17, %16) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
+  %19 = apply %3(%14, %18) : $@convention(thin) (Int64, Int64) -> Int64
+  destroy_value %1 : ${ var Int64 }
+  return %19 : $Int64
+}
+
+///////////////////////
+// Existential Tests //
+///////////////////////
+
+protocol SomeProtocol {
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
+sil [transparent] [ossa] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
+bb0(%0 : $*SomeProtocol):
+  %1 = alloc_box ${ var SomeProtocol }
+  %1a = project_box %1 : ${ var SomeProtocol }, 0
+  copy_addr [take] %0 to [initialization] %1a : $*SomeProtocol
+  %4 = alloc_stack $SomeProtocol
+  copy_addr %1a to [initialization] %4 : $*SomeProtocol
+  %6 = existential_metatype $@thick SomeProtocol.Type, %4 : $*SomeProtocol
+  destroy_addr %4 : $*SomeProtocol
+  dealloc_stack %4 : $*SomeProtocol
+  destroy_value %1 : ${ var SomeProtocol }
+  return %6 : $@thick SomeProtocol.Type
+}
+
+// CHECK-LABEL: sil [ossa] @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
+sil [ossa] @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $*SomeProtocol):
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var SomeProtocol }
+  // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
+  // CHECK: copy_addr [take] %0 to [initialization] [[PB1]]
+  // CHECK: [[VAL4:%.*]] = alloc_stack $SomeProtocol
+  // CHECK: copy_addr [[PB1]] to [initialization] [[VAL4]]
+  // CHECK: [[VAL6:%.*]] = existential_metatype $@thick SomeProtocol.Type, [[VAL4]]
+  // CHECK: destroy_addr [[VAL4]]
+  // CHECK: dealloc_stack [[VAL4]]
+  // CHECK: destroy_value [[VAL1]]
+  // CHECK: return [[VAL6]]
+
+bb0(%0 : $*SomeProtocol):
+  %1 = function_ref @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
+  %2 = apply %1(%0) : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
+  return %2 : $@thick SomeProtocol.Type
+}
+
+////////////////////////
+// Control Flow Tests //
+////////////////////////
+
+sil @get_logic_value : $@convention(method) (@inout Bool) -> Builtin.Int1
+sil @add_floats : $@convention(thin) (Float32, Float32) -> Float32
+sil @convertFromBuiltinFloatLiteral : $@convention(thin) (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
+sil @sub_floats : $@convention(thin) (Float32, Float32) -> Float32
+
+sil @foo : $@convention(thin) (Float32, Float32) -> Bool
+sil @bar : $@convention(thin) (Float32) -> Bool
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_control_flow : $@convention(thin) (Float, Float) -> Float
+sil [transparent] [ossa] @test_control_flow : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : $Float, %1 : $Float):
+  %2 = alloc_box ${ var Float }
+  %2a = project_box %2 : ${ var Float }, 0
+  %3 = alloc_box ${ var Float }
+  %3a = project_box %3 : ${ var Float }, 0
+  store %0 to [trivial] %2a : $*Float
+  store %1 to [trivial] %3a : $*Float
+  %6 = function_ref @get_logic_value : $@convention(method) (@inout Bool) -> Builtin.Int1
+  %7 = function_ref @foo : $@convention(thin) (Float, Float) -> Bool
+  %8 = load [trivial] %2a : $*Float
+  %9 = load [trivial] %3a : $*Float
+  %10 = apply %7(%8, %9) : $@convention(thin) (Float, Float) -> Bool
+  %11 = alloc_stack $Bool
+  store %10 to [trivial] %11 : $*Bool
+  %13 = apply %6(%11) : $@convention(method) (@inout Bool) -> Builtin.Int1
+  dealloc_stack %11 : $*Bool
+  cond_br %13, bb1, bb2
+
+bb1:
+  %16 = load [trivial] %2a : $*Float
+  unreachable
+
+bb2:
+  br bb3
+
+bb3:
+  %19 = function_ref @get_logic_value : $@convention(method) (@inout Bool) -> Builtin.Int1
+  %20 = function_ref @bar : $@convention(thin) (Float) -> Bool
+  %21 = load [trivial] %3a : $*Float
+  %22 = apply %20(%21) : $@convention(thin) (Float) -> Bool
+  %23 = alloc_stack $Bool
+  store %22 to [trivial] %23 : $*Bool
+  %25 = apply %19(%23) : $@convention(method) (@inout Bool) -> Builtin.Int1
+  dealloc_stack %23 : $*Bool
+  cond_br %25, bb4, bb5
+
+bb4:
+  %28 = function_ref @add_floats : $@convention(thin) (Float, Float) -> Float
+  %29 = load [trivial] %3a : $*Float
+  %30 = function_ref @convertFromBuiltinFloatLiteral : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %31 = metatype $@thin Float.Type
+  %32 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %33 = apply %30(%32, %31) : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %34 = apply %28(%29, %33) : $@convention(thin) (Float, Float) -> Float
+  store %34 to [trivial] %3a : $*Float
+  br bb3
+
+bb5:
+  %37 = load [trivial] %3a : $*Float
+  br bb6(%37 : $Float)
+
+bb6(%39 : $Float):
+  destroy_value %3 : ${ var Float }
+  destroy_value %2 : ${ var Float }
+  return %39 : $Float
+}
+
+// CHECK-LABEL: sil [ossa] @inline_test_control_flow : $@convention(thin) (Float) -> Float
+sil [ossa] @inline_test_control_flow : $@convention(thin) (Float) -> Float {
+
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Float):
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var Float }
+  // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
+  // CHECK: store [[VAL0]] to [trivial] [[PB1]]
+  // CHECK: [[VAL3:%.*]] = function_ref @sub_floats
+  // CHECK: [[VAL4:%.*]] = function_ref @add_floats
+  // CHECK: [[VAL5:%.*]] = load [trivial] [[PB1]]
+  // CHECK: [[VAL6:%.*]] = function_ref @convertFromBuiltinFloatLiteral
+  // CHECK: [[VAL7:%.*]] = metatype $@thin Float.Type
+  // CHECK: [[VAL8:%.*]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
+  // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
+  // CHECK: [[VAL11:%.*]] = function_ref @convertFromBuiltinFloatLiteral
+  // CHECK: [[VAL12:%.*]] = metatype $@thin Float.Type
+  // CHECK: [[VAL13:%.*]] = float_literal $Builtin.FPIEEE64, 0x4000000000000000
+  // CHECK: [[VAL14:%.*]] = apply [[VAL11]]([[VAL13]], [[VAL12]])
+  // CHECK: [[VAL15:%.*]] = alloc_box ${ var Float }
+  // CHECK: [[PB15:%.*]] = project_box [[VAL15]]
+  // CHECK: [[VAL16:%.*]] = alloc_box ${ var Float }
+  // CHECK: [[PB16:%.*]] = project_box [[VAL16]]
+  // CHECK: store [[VAL10]] to [trivial] [[PB15]]
+  // CHECK: store [[VAL14]] to [trivial] [[PB16]]
+  // CHECK: [[VAL19:%.*]] = function_ref @get_logic_value
+  // CHECK: [[VAL20:%.*]] = function_ref @foo
+  // CHECK: [[VAL21:%.*]] = load [trivial] [[PB15]]
+  // CHECK: [[VAL22:%.*]] = load [trivial] [[PB16]]
+  // CHECK: [[VAL23:%.*]] = apply [[VAL20]]([[VAL21]], [[VAL22]])
+  // CHECK: [[VAL24:%.*]] = alloc_stack $Bool
+  // CHECK: store [[VAL23]] to [trivial] [[VAL24]]
+  // CHECK: [[VAL26:%.*]] = apply [[VAL19]]([[VAL24]])
+  // CHECK: dealloc_stack [[VAL24]]
+  // CHECK: cond_br [[VAL26]], [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
+
+// CHECK: [[BB1]]:
+  // CHECK: [[VAL29:%.*]] = load [trivial] [[PB15]]
+  // CHECK: unreachable
+
+// CHECK: [[BB2]]:
+  // CHECK: br [[BB3:bb[0-9]+]]
+
+// CHECK: [[BB3]]:
+  // CHECK: [[VAL32:%.*]] = function_ref @get_logic_value
+  // CHECK: [[VAL33:%.*]] = function_ref @bar
+  // CHECK: [[VAL34:%.*]] = load [trivial] [[PB16]]
+  // CHECK: [[VAL35:%.*]] = apply [[VAL33]]([[VAL34]])
+  // CHECK: [[VAL36:%.*]] = alloc_stack $Bool
+  // CHECK: store [[VAL35]] to [trivial] [[VAL36]]
+  // CHECK: [[VAL38:%.*]] = apply [[VAL32]]([[VAL36]])
+  // CHECK: dealloc_stack [[VAL36]]
+  // CHECK: cond_br [[VAL38]], [[BB4:bb[0-9]+]], [[BB5:bb[0-9]+]]
+
+// CHECK: [[BB4]]:
+  // CHECK: [[VAL41:%.*]] = function_ref @add_floats
+  // CHECK: [[VAL42:%.*]] = load [trivial] [[PB16]]
+  // CHECK: [[VAL43:%.*]] = function_ref @convertFromBuiltinFloatLiteral
+  // CHECK: [[VAL44:%.*]] = metatype $@thin Float.Type
+  // CHECK: [[VAL45:%.*]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  // CHECK: [[VAL46:%.*]] = apply [[VAL43]]([[VAL45]], [[VAL44]])
+  // CHECK: [[VAL47:%.*]] = apply [[VAL41]]([[VAL42]], [[VAL46]])
+  // CHECK: store [[VAL47]] to [trivial] [[PB16]]
+  // CHECK: br [[BB3]]
+
+// CHECK: [[BB5]]:
+  // CHECK: [[VAL50:%.*]] = load [trivial] [[PB16]]
+  // CHECK: destroy_value [[VAL16]]
+  // CHECK: destroy_value [[VAL15]]
+  // CHECK: [[VAL57:%.*]] = function_ref @convertFromBuiltinFloatLiteral
+  // CHECK: [[VAL58:%.*]] = metatype $@thin Float.Type
+  // CHECK: [[VAL59:%.*]] = float_literal $Builtin.FPIEEE64, 0x4008000000000000
+  // CHECK: [[VAL60:%.*]] = apply [[VAL57]]([[VAL59]], [[VAL58]])
+  // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL50]], [[VAL60]])
+  // CHECK: destroy_value [[VAL1]]
+  // CHECK: return [[VAL61]]
+
+bb0(%0 : $Float):
+  %1 = alloc_box ${ var Float }
+  %1a = project_box %1 : ${ var Float }, 0
+  store %0 to [trivial] %1a : $*Float
+  %3 = function_ref @sub_floats : $@convention(thin) (Float, Float) -> Float
+  %4 = function_ref @test_control_flow : $@convention(thin) (Float, Float) -> Float
+  %5 = function_ref @add_floats : $@convention(thin) (Float, Float) -> Float
+  %6 = load [trivial] %1a : $*Float
+  %7 = function_ref @convertFromBuiltinFloatLiteral : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %8 = metatype $@thin Float.Type
+  %9 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %10 = apply %7(%9, %8) : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %11 = apply %5(%6, %10) : $@convention(thin) (Float, Float) -> Float
+  %12 = function_ref @convertFromBuiltinFloatLiteral : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %13 = metatype $@thin Float.Type
+  %14 = float_literal $Builtin.FPIEEE64, 0x4000000000000000
+  %15 = apply %12(%14, %13) : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %16 = apply %4(%11, %15) : $@convention(thin) (Float, Float) -> Float
+  %17 = function_ref @convertFromBuiltinFloatLiteral : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %18 = metatype $@thin Float.Type
+  %19 = float_literal $Builtin.FPIEEE64, 0x4008000000000000
+  %20 = apply %17(%19, %18) : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %21 = apply %3(%16, %20) : $@convention(thin) (Float, Float) -> Float
+  destroy_value %1 : ${ var Float }
+  return %21 : $Float
+}
+
+///////////////////////////////////////
+// Recursion and Partial Apply Tests //
+///////////////////////////////////////
+
+// CHECK-LABEL: [transparent] [ossa] @test_recursive_foo : $@convention(thin) (Float) -> Float
+sil [transparent] [ossa] @test_recursive_foo : $@convention(thin) (Float) -> Float {
+  // CHECK-NOT: function_ref
+  // CHECK-NOT: apply
+  // CHECK: return
+
+bb0(%0 : $Float):
+  %3 = function_ref @test_recursive_bar : $@convention(thin) (Float) -> Float
+  %5 = apply %3(%0) : $@convention(thin) (Float) -> Float
+  return %5 : $Float
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_recursive_bar : $@convention(thin) (Float) -> Float
+sil [transparent] [ossa] @test_recursive_bar : $@convention(thin) (Float) -> Float {
+  // CHECK-NOT: function_ref
+  // CHECK-NOT: apply
+  // CHECK: return
+
+bb0(%0 : $Float):
+  %3 = function_ref @test_recursive_baz : $@convention(thin) (Float) -> Float
+  %5 = apply %3(%0) : $@convention(thin) (Float) -> Float
+  return %5 : $Float
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_recursive_baz : $@convention(thin) (Float) -> Float
+sil [transparent] [ossa] @test_recursive_baz : $@convention(thin) (Float) -> Float {
+  // CHECK-NOT: function_ref
+  // CHECK-NOT: apply
+  // CHECK: return
+
+bb0(%0 : $Float):
+  return %0 : $Float
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_partial_foo : $@convention(thin) (Int64) -> Int64 {
+sil [transparent] [ossa] @test_partial_foo : $@convention(thin) (Int64) -> Int64 {
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
+  // CHECK: [[VAL1:%.*]] = function_ref @plus
+  // CHECK: [[VAL2:%.*]] = apply [[VAL1]]([[VAL0]], [[VAL0]])
+  // CHECK: return [[VAL2]]
+
+bb0(%0 : $Int64):
+  %2 = function_ref @test_partial_bar : $@convention(thin) (@owned @callee_owned (Int64) -> Int64, Int64) -> Int64
+  %3 = function_ref @test_partial_baz : $@convention(thin) (Int64, Int64) -> Int64
+  %5 = partial_apply %3(%0) : $@convention(thin) (Int64, Int64) -> Int64
+  %13 = apply %2(%5, %0) : $@convention(thin) (@owned @callee_owned (Int64) -> Int64, Int64) -> Int64
+  return %13 : $Int64
+}
+
+sil [transparent] [ossa] @test_partial_baz : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %6 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
+  %7 = apply %6(%0, %1) : $@convention(thin) (Int64, Int64) -> Int64
+  return %7 : $Int64
+}
+
+sil [transparent] [ossa] @test_partial_bar : $@convention(thin) (@owned @callee_owned (Int64) -> Int64, Int64) -> Int64 {
+bb0(%0 : @owned $@callee_owned (Int64) -> Int64, %1 : $Int64):
+  %7 = apply %0(%1) : $@callee_owned (Int64) -> Int64
+  return %7 : $Int64
+}
+
+
+// CHECK-LABEL: [transparent] [ossa] @test_recursive_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+sil [transparent] [ossa] @test_recursive_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+  // CHECK-NOT: function_ref
+  // CHECK-NOT: apply
+  // CHECK: return
+
+bb0(%0 : @owned $Builtin.NativeObject):
+  %3 = function_ref @test_recursive_nativeobject_bar : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %5 = apply %3(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %5 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_recursive_nativeobject_bar : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+sil [transparent] [ossa] @test_recursive_nativeobject_bar : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+  // CHECK-NOT: function_ref
+  // CHECK-NOT: apply
+  // CHECK: return
+
+bb0(%0 : @owned $Builtin.NativeObject):
+  %3 = function_ref @test_recursive_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %5 = apply %3(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %5 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_recursive_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'test_recursive_nativeobject_baz'
+sil [transparent] [ossa] @test_recursive_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  return %0 : $Builtin.NativeObject
+}
+
+sil [transparent] [ossa] @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %6 = function_ref @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %7 = apply %6(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
+}
+
+sil [transparent] [ossa] @test_partial_nativeobject_bar : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %7 = apply %0(%1) : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:   [[FN:%.*]] = function_ref @test_partial_nativeobject_baz :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG_COPY]])
+// CHECK:   [[ARG_COPY_3:%.*]] = copy_value [[ARG]]
+// CHECK:   [[PAI_COPY:%.*]] = copy_value [[PAI]]
+// CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
+// CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG_COPY_3]], [[ARG_COPY_2]])
+// CHECK:   destroy_value [[PAI_COPY]]
+// CHECK:   [[PAI_COPY_2:%.*]] = copy_value [[PAI]]
+// CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
+// CHECK:   apply [[OPAQUE_FN]]([[PAI_COPY_2]])
+// CHECK:   destroy_value [[PAI]]
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'test_partial_nativeobject_foo'
+sil [transparent] [ossa] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = function_ref @test_partial_nativeobject_bar : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3 = function_ref @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb1
+
+bb1:
+  %0copy1 = copy_value %0 : $Builtin.NativeObject
+  %5 = partial_apply %3(%0copy1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb2
+
+bb2:
+  %0copy2 = copy_value %0 : $Builtin.NativeObject
+  %5copy1 = copy_value %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %13 = apply %2(%5copy1, %0copy2) : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb3
+
+bb3:
+  %5copy2 = copy_value %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %15 = function_ref @partial_apply_user : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  apply %15(%5copy2) : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  destroy_value %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %13 : $Builtin.NativeObject
+}
+
+///////////////////////
+// Autoclosure Tests //
+///////////////////////
+
+sil @true_getter : $@convention(thin) () -> Bool
+
+sil [transparent] [ossa] @short_circuit_or : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool {
+bb0(%0 : $Bool, %1 : @owned $@callee_owned () -> Bool):
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var @callee_owned () -> Bool }
+  %3a = project_box %3 : ${ var @callee_owned () -> Bool }, 0
+  store %0 to [trivial] %2a : $*Bool
+  store %1 to [init] %3a : $*@callee_owned () -> Bool
+  %6 = function_ref @get_logic_value : $@convention(method) (@inout Bool) -> Builtin.Int1
+  %7 = apply %6(%2a) : $@convention(method) (@inout Bool) -> Builtin.Int1
+  cond_br %7, bb1, bb2
+
+bb1:
+
+  %9 = function_ref @true_getter : $@convention(thin) () -> Bool
+  %10 = apply %9() : $@convention(thin) () -> Bool
+  br bb3(%10 : $Bool)
+
+bb2:
+  %m2 = integer_literal $Builtin.Int32, 2 // Marker
+  %12 = load [copy] %3a : $*@callee_owned () -> Bool
+  %m3 = integer_literal $Builtin.Int32, 3 // Marker
+  %14 = apply %12() : $@callee_owned () -> Bool
+  br bb3(%14 : $Bool)
+
+bb3(%16 : $Bool):
+  destroy_value %3 : ${ var @callee_owned () -> Bool } 
+  destroy_value %2 : ${ var Bool }
+  return %16 : $Bool
+}
+
+sil private [transparent] [ossa] @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool {
+bb0(%0 : @owned ${ var Bool }):
+  %1 = project_box %0 : ${ var Bool }, 0
+  %2 = tuple ()
+  %3 = load [trivial] %1 : $*Bool
+  destroy_value %0 : ${ var Bool }
+  return %3 : $Bool
+}
+
+// CHECK-LABEL: sil [ossa] @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK: [[BOX1:%.*]] = alloc_box
+// CHECK: [[BOX2:%.*]] = alloc_box
+// CHECK: [[BOX2_COPY:%.*]] = copy_value [[BOX2]]
+// CHECK: [[BOX2_COPY_COPY:%.*]] = copy_value [[BOX2_COPY]]
+// CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
+
+// CHECK: bb1:
+// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   br [[BB3:.*]](
+
+// CHECK: bb2:
+// Separation marker
+// CHECK:   integer_literal $Builtin.Int32, 3
+// CHECK:   [[ADDR4:%.*]] = project_box [[BOX2_COPY_COPY]]
+// CHECK:   {{%.*}} = tuple ()
+// CHECK:   {{%.*}} = load [trivial] [[ADDR4]]
+// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   br [[BB3]](
+//
+// CHECK: [[BB3]](
+// CHECK:   destroy_value [[BOX2_COPY]]
+// CHECK:   destroy_value [[BOX2]]
+// CHECK:   destroy_value [[BOX1]]
+// CHECK:   return {{.*}}
+// CHECK: } // end sil function 'test_short_circuit'
+sil [ossa] @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
+bb0(%0 : $Bool, %1 : $Bool):
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var Bool }
+  %3a = project_box %3 : ${ var Bool }, 0
+  store %0 to [trivial] %2a : $*Bool
+  store %1 to [trivial] %3a : $*Bool
+  %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool
+  %7 = load [trivial] %2a : $*Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool
+  %3copy = copy_value %3 : ${ var Bool }
+  %10 = partial_apply %8(%3copy) : $@convention(thin) (@owned { var Bool }) -> Bool
+  %12 = integer_literal $Builtin.Int32, 1 // Marker
+  %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool
+  destroy_value %3 : ${ var Bool }
+  destroy_value %2 : ${ var Bool }
+  return %11 : $Bool
+}
+
+// CHECK-LABEL: sil [ossa] @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK: bb0(
+// CHECK:   [[BOX1:%.*]] = alloc_box
+// CHECK:   [[BOX2:%.*]] = alloc_box
+// CHECK:   [[BOX2_COPY:%.*]] = copy_value [[BOX2]]
+// CHECK:   [[BOX2_COPY_COPY:%.*]] = copy_value [[BOX2_COPY]]
+// CHECK:   cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
+//
+// CHECK: [[BB1]]:
+// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   br [[BB3:.*]](
+//
+// CHECK: [[BB2]]:
+// Marker -
+// CHECK:   integer_literal $Builtin.Int32, 2
+// Marker -
+// CHECK:   integer_literal $Builtin.Int32, 3
+// CHECK:   [[ADDR4:%.*]] = project_box [[BOX2_COPY_COPY]]
+// CHECK:   {{%.*}} = tuple ()
+// CHECK:   {{%.*}} = load [trivial] [[ADDR4]]
+// CHECK:   destroy_value [[BOX2_COPY_COPY]]
+// CHECK:   br [[BB3]](
+//
+// CHECK: [[BB3]](
+// CHECK:   destroy_value [[BOX2]]
+// CHECK:   destroy_value [[BOX1]]
+// CHECK:   return {{.*}}
+// CHECK: } // end sil function 'test_short_circuit2'
+sil [ossa] @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
+bb0(%0 : $Bool, %1 : $Bool):
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var Bool }
+  %3a = project_box %3 : ${ var Bool }, 0
+  store %0 to [trivial] %2a : $*Bool
+  store %1 to [trivial] %3a : $*Bool
+  %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool
+  %7 = load [trivial] %2a : $*Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool
+  %3copy = copy_value %3 : ${ var Bool }
+  %10 = partial_apply %8(%3copy) : $@convention(thin) (@owned { var Bool }) -> Bool
+  %10copy = copy_value %10 : $@callee_owned () -> Bool
+  %11 = apply %6(%7, %10copy) : $@convention(thin) (Bool, @owned @callee_owned () -> Bool) -> Bool
+  destroy_value %10 : $@callee_owned () -> Bool
+  destroy_value %3 : ${ var Bool }
+  destroy_value %2 : ${ var Bool }
+  return %11 : $Bool
+}
+
+sil [transparent] [ossa] @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.IntLiteral, @thin Int64.Type) -> Int64 {
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int64.Type):
+  %3 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  return %5 : $Int64
+}
+
+sil [ossa] @test_with_dead_argument : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %1 = alloc_box ${ var Int64 }
+  %1a = project_box %1 : ${ var Int64 }, 0
+  %2 = function_ref @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.IntLiteral, @thin Int64.Type) -> Int64
+  %3 = metatype $@thin Int64.Type
+  %4 = integer_literal $Builtin.IntLiteral, 1
+  %5 = apply %2(%4, %3) : $@convention(thin) (Builtin.IntLiteral, @thin Int64.Type) -> Int64
+  store %5 to [trivial] %1a : $*Int64
+  destroy_value %1 : ${ var Int64 }
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_with_dead_argument : $@convention(thin) () -> () {
+// CHECK-NOT: Type
+
+sil [transparent] [ossa] @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> () {
+bb0(%0 : @owned $CP):
+  %1 = copy_value %0 : $CP
+  %3 = open_existential_ref %1 : $CP to $@opened("01234567-89ab-cdef-0123-000000000000") CP
+  destroy_value %3 : $@opened("01234567-89ab-cdef-0123-000000000000") CP
+  destroy_value %0 : $CP
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ :
+// CHECK: bb0([[ARG0:%.*]] : @owned $CP, [[ARG1:%.*]] : @owned $CP):
+// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
+// CHECK:   [[ARG0_COPY_COPY:%.*]] = copy_value [[ARG0_COPY]]
+// CHECK:   open_existential_ref [[ARG0_COPY_COPY]] : $CP to $@opened([[N1:".*"]]) CP
+//
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   [[ARG1_COPY_COPY:%.*]] = copy_value [[ARG1_COPY]]
+// CHECK:   open_existential_ref [[ARG1_COPY_COPY]] : $CP to $@opened([[N1:".*"]]) CP
+// CHECK: } // end sil function '_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_'
+sil [ossa] @_TF2t222outer_open_existentialFT3cp1PS_2CP_3cp2PS0___T_ : $@convention(thin) (@owned CP, @owned CP) -> () {
+bb0(%0 : @owned $CP, %1 : @owned $CP):
+  %4 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> ()
+  %0copy = copy_value %0 : $CP
+
+  %6 = apply %4(%0copy) : $@convention(thin) (@owned CP) -> ()
+  %7 = function_ref @_TF2t222inner_open_existentialFT2cpPS_2CP__T_ : $@convention(thin) (@owned CP) -> ()
+  %1copy = copy_value %1 : $CP
+  %9 = apply %7(%1copy) : $@convention(thin) (@owned CP) -> ()
+  destroy_value %1 : $CP
+  destroy_value %0 : $CP
+  %12 = tuple ()
+  return %12 : $()
+}
+
+class C : CP {
+  func f() -> Self
+}
+
+sil [transparent] [ossa] @transparent_generic : $@convention(thin) <T where T : CP> (@owned T, @owned C) -> () {
+bb0(%0 : @owned $T, %1 : @owned $C):
+  debug_value %0 : $T
+  debug_value %1 : $C
+  destroy_value %1 : $C
+  destroy_value %0 : $T
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @fully_concrete_call : $@convention(thin) (@owned C) -> () {
+sil [ossa] @fully_concrete_call : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  debug_value %0 : $C
+  // CHECK-NOT: function_ref @transparent_generic
+  %2 = function_ref @transparent_generic : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0, @owned C) -> ()
+  %0copy1 = copy_value %0 : $C
+  %0copy2 = copy_value %0 : $C
+  // CHECK-NOT: apply
+  %5 = apply %2<C>(%0copy1, %0copy2) : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0, @owned C) -> ()
+  destroy_value %0 : $C
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @inner : $@convention(thin) <T1, T2> (@in T1, @in T2) -> @out T2 {
+sil [transparent] [ossa] @inner : $@convention(thin) <T1, T2> (@in T1, @in T2) -> @out T2 {
+bb0(%0 : $*T2, %1 : $*T1, %2 : $*T2):
+  debug_value_addr %1 : $*T1
+  debug_value_addr %2 : $*T2
+  copy_addr [take] %2 to [initialization] %0 : $*T2
+  destroy_addr %1 : $*T1
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// FIXME: We currently do not inline generics unless we have concrete types
+//        for all substitutions.
+// CHECK-LABEL: sil [transparent] [ossa] @middle : $@convention(thin) <T> (Int, @in T) -> @out T {
+sil [transparent] [ossa] @middle : $@convention(thin) <T> (Int, @in T) -> @out T {
+bb0(%0 : $*T, %1 : $Int, %2 : $*T):
+  debug_value %1 : $Int
+  debug_value_addr %2 : $*T
+  // CHECK-NOT: [[REF:%[a-zA-Z0-9]+]] = function_ref @inner
+  %5 = function_ref @inner : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> @out τ_0_1
+  %6 = alloc_stack $Int
+  store %1 to [trivial] %6 : $*Int
+  %8 = alloc_stack $T
+  copy_addr %2 to [initialization] %8 : $*T
+  // CHECK-NOT: apply
+  %10 = apply %5<Int, T>(%0, %6, %8) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> @out τ_0_1
+  dealloc_stack %8 : $*T
+  dealloc_stack %6 : $*Int
+  destroy_addr %2 : $*T
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @outer : $@convention(thin) (Int) -> Int {
+sil [transparent] [ossa] @outer : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  debug_value %0 : $Int
+  // CHECK-NOT: function_ref @middle
+  %2 = function_ref @middle : $@convention(thin) <τ_0_0> (Int, @in τ_0_0) -> @out τ_0_0
+  %7 = alloc_stack $Int
+  store %0 to [trivial] %7 : $*Int
+  %9 = alloc_stack $Int
+  // CHECK-NOT: apply
+  %10 = apply %2<Int>(%9, %0, %7) : $@convention(thin) <τ_0_0> (Int, @in τ_0_0) -> @out τ_0_0
+  %11 = load [trivial] %9 : $*Int
+  dealloc_stack %9 : $*Int
+  dealloc_stack %7 : $*Int
+  return %11 : $Int
+}
+
+@objc protocol Foo { func foo() }
+
+// CHECK-LABEL: sil hidden [transparent] [ossa] @protocolConstrained
+sil hidden [transparent] [ossa] @protocolConstrained : $@convention(thin) <T where T : Foo> (@owned T) -> () {
+bb0(%0 : @owned $T):
+  debug_value %0 : $T
+  %0copy = copy_value %0 : $T
+  %3 = objc_method %0 : $T, #Foo.foo!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  %4 = apply %3<T>(%0copy) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  destroy_value %0copy : $T
+  destroy_value %0 : $T
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @protocolTypedParam :
+// CHECK: bb0([[ARG:%.*]] : @owned $Foo):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
+// CHECK-NOT: apply
+// CHECK:   [[METHOD:%[a-zA-Z0-9]+]] = objc_method [[ARG_COPY]] : $Foo, #Foo.foo!foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+// CHECK:   apply [[METHOD]]<Foo>([[ARG_COPY_2]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+// CHECK:   destroy_value [[ARG_COPY_2]]
+// CHECK:   destroy_value [[ARG_COPY]]
+// CHECK:   destroy_value [[ARG]]
+// CHECK: } // end sil function 'protocolTypedParam'
+sil hidden [ossa] @protocolTypedParam : $@convention(thin) (@owned Foo) -> () {
+bb0(%0 : @owned $Foo):
+  debug_value %0 : $Foo
+  %2 = function_ref @protocolConstrained : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
+  %0copy = copy_value %0 : $Foo
+  %4 = apply %2<Foo>(%0copy) : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
+  destroy_value %0 : $Foo
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @identity
+sil [transparent] [ossa] @identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  debug_value_addr %1 : $*T
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %4 = tuple ()
+  // CHECK: return
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @applyIdentity
+sil [ossa] @applyIdentity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  debug_value_addr %1 : $*T
+  %3 = function_ref @identity : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %4 = alloc_stack $T
+  copy_addr %1 to [initialization] %4 : $*T
+  // CHECK-NOT: apply
+  %6 = apply %3<T>(%0, %4) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  dealloc_stack %4 : $*T
+  destroy_addr %1 : $*T
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @partial : $@convention(thin) <T, U> (@in T, @owned @callee_owned (@in T) -> @out U) -> @out U {
+// CHECK: bb0({{.*}}, {{.*}}, [[ARG2:%.*]] :
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   apply [[ARG2_COPY]](
+// CHECK: } // end sil function 'partial'
+sil [transparent] [ossa] @partial : $@convention(thin) <T, U> (@in T, @owned @callee_owned (@in T) -> @out U) -> @out U {
+bb0(%0 : $*U, %1 : $*T, %2 : @owned $@callee_owned (@in T) -> @out U):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $@callee_owned (@in T) -> @out U
+  %2copy = copy_value %2 : $@callee_owned (@in T) -> @out U
+  %6 = alloc_stack $T
+  copy_addr %1 to [initialization] %6 : $*T
+  %8 = apply %2copy(%0, %6) : $@callee_owned (@in T) -> @out U
+  dealloc_stack %6 : $*T
+  destroy_value %2 : $@callee_owned (@in T) -> @out U
+  destroy_addr %1 : $*T
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @applyPartial :
+// CHECK: bb0({{.*}}, {{.*}}, [[ARG2:%.*]] :
+// CHECK:   [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK:   [[ARG2_COPY_COPY:%.*]] = copy_value [[ARG2_COPY]]
+// CHECK-NOT: function_ref @reabstractionThunk
+// CHECK-NOT: partial_apply
+// CHECK-NOT: apply
+// CHECK:   apply [[ARG2_COPY_COPY]](
+// CHECK: } // end sil function 'applyPartial'
+sil [ossa] @applyPartial : $@convention(thin) <U> (Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out U) -> @out U {
+bb0(%0 : $*U, %1 : $Builtin.Int32, %2 : @owned $@callee_owned (Builtin.Int32) -> @out U):
+  debug_value %1 : $Builtin.Int32
+  debug_value %2 : $@callee_owned (Builtin.Int32) -> @out U
+  %5 = function_ref @partial : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out τ_0_1) -> @out τ_0_1
+  %6 = alloc_stack $Builtin.Int32
+  store %1 to [trivial] %6 : $*Builtin.Int32
+  %2copy = copy_value %2 : $@callee_owned (Builtin.Int32) -> @out U
+  %9 = function_ref @reabstractionThunk : $@convention(thin) <τ_0_0> (@in Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out τ_0_0) -> @out τ_0_0
+  %10 = partial_apply %9<U>(%2copy) : $@convention(thin) <τ_0_0> (@in Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out τ_0_0) -> @out τ_0_0
+  %11 = apply %5<Builtin.Int32, U>(%0, %6, %10) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out τ_0_1) -> @out τ_0_1
+  dealloc_stack %6 : $*Builtin.Int32
+  destroy_value %2 : $@callee_owned (Builtin.Int32) -> @out U
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @reabstractionThunk
+sil [transparent] [ossa] @reabstractionThunk : $@convention(thin) <U> (@in Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> @out U) -> @out U {
+bb0(%0 : $*U, %1 : $*Builtin.Int32, %2 : @owned $@callee_owned (Builtin.Int32) -> @out U):
+  %3 = load [trivial]  %1 : $*Builtin.Int32
+  %4 = apply %2(%0, %3) : $@callee_owned (Builtin.Int32) -> @out U
+  // CHECK: return
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @inner_transparent
+sil [transparent] [ossa] @inner_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8 {
+// CHECK: bb0
+bb0(%0 : @owned $@callee_owned () -> Builtin.Int8):
+  %0copy = copy_value %0 : $@callee_owned () -> Builtin.Int8
+  %3 = apply %0copy() : $@callee_owned () -> Builtin.Int8
+  destroy_value %0 : $@callee_owned () -> Builtin.Int8
+  // CHECK: return
+  return %3 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @outer_transparent
+sil [transparent] [ossa] @outer_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8 {
+// CHECK: bb0
+bb0(%0 : @owned $@callee_owned () -> Builtin.Int8):
+  %2 = function_ref @inner_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  %0copy = copy_value %0 : $@callee_owned () -> Builtin.Int8
+  %4 = apply %2(%0copy) : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  destroy_value %0 : $@callee_owned () -> Builtin.Int8
+  // CHECK: return
+  return %4 : $Builtin.Int8
+}
+
+// We remove everything here now.
+// CHECK-LABEL: sil [ossa] @testouter_transparent
+sil [ossa] @testouter_transparent : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
+// CHECK: bb0
+// CHECK-NEXT: return
+bb0(%0 : $Builtin.Int8):
+  %2 = function_ref @outer_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  %3 = function_ref @identity_closure : $@convention(thin) (Builtin.Int8) -> Builtin.Int8
+  %4 = partial_apply %3(%0) : $@convention(thin) (Builtin.Int8) -> Builtin.Int8
+  %5 = apply %2(%4) : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  return %5 : $Builtin.Int8
+}
+
+// We delete this now.
+//
+// CHECK-NOT: sil shared [transparent] @identity_closure
+sil shared [transparent] [ossa] @identity_closure : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
+bb0(%0 : $Builtin.Int8):
+  return %0 : $Builtin.Int8
+}
+
+sil [transparent] [ossa] @P2_s : $@convention(method) <Self where Self : P2> (@in_guaranteed Self) -> Int32 {
+bb0(%0 : $*Self):
+  %2 = alloc_stack $Self
+  copy_addr %0 to [initialization] %2 : $*Self
+  %4 = witness_method $Self, #P2.c!getter : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %5 = apply %4<Self>(%2) : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  destroy_addr %2 : $*Self
+  %7 = integer_literal $Builtin.Int32, 1
+  %8 = struct_extract %5 : $Int32, #Int32._value
+  %9 = integer_literal $Builtin.Int1, -1
+  %10 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %7 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 0
+  %12 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %12 : $Builtin.Int1
+  %14 = struct $Int32 (%11 : $Builtin.Int32)
+  dealloc_stack %2 : $*Self
+  return %14 : $Int32
+}
+
+// Check that P2_s call can be properly inlined and the resulting witness_method instruction
+// uses the opened archetype from the caller.
+// CHECK-LABEL: sil hidden [ossa] @L_start
+// CHECK: open_existential_addr immutable_access {{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+"\) P2]]
+// CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter : {{.*}}, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
+// CHECK: return
+sil hidden [ossa] @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
+bb0(%0 : $*L):
+  %2 = struct_element_addr %0 : $*L, #L.o
+  %3 = alloc_stack $P2
+  copy_addr %2 to [initialization] %3 : $*P2
+  %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2
+  %6 = function_ref @P2_s : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  destroy_addr %3 : $*P2
+  dealloc_stack %3 : $*P2
+  return %7 : $Int32
+}
+
+sil_default_witness_table hidden P2 {
+  no_default
+}
+
+// Test function_ref -> convert_function -> apply.
+sil [transparent] [ossa] @testMandatoryConvertedHelper : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  return %0 : $C
+}
+
+sil [transparent] [ossa] @testMandatoryConvertedHelper2 : $@convention(thin) (@owned Optional<C>) -> @owned C {
+bb0(%0 : @owned $Optional<C>):
+  %o = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt
+  return %o : $C
+}
+
+// CHECK-LABEL: sil [ossa] @testMandatoryConverted : $@convention(thin) (@owned C) -> @owned C {
+// CHECK: bb0([[ARG:%.*]] : @owned $C):
+// CHECK:   [[F1:%.*]] = function_ref @testMandatoryConvertedHelper : $@convention(thin) (@owned C) -> @owned C
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[CVT1:%.*]] = convert_function [[F1]] : $@convention(thin) (@owned C) -> @owned C to $@convention(thin) (@owned C) -> (@owned C, @error Error)
+// CHECK:   try_apply [[CVT1]]([[ARG_COPY]]) : $@convention(thin) (@owned C) -> (@owned C, @error Error), normal bb1, error bb2
+//
+// CHECK: bb1(%{{.*}} : @owned $C):
+// CHECK:   br bb3(%{{.*}} : $C)
+//
+// CHECK: bb2(%{{.*}} : @owned $Error):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[F2:%.*]] = function_ref @testMandatoryConvertedHelper2 : $@convention(thin) (@owned Optional<C>) -> @owned C
+// CHECK:   [[CVT2:%.*]] = convert_function [[F2]] : $@convention(thin) (@owned Optional<C>) -> @owned C to $@convention(thin) (@owned C) -> @owned C
+// CHECK:   %{{.*}} = apply [[CVT2]]([[ARG_COPY]]) : $@convention(thin) (@owned C) -> @owned C
+// CHECK:   br bb3(%{{.*}} : $C)
+//
+// CHECK: bb3(%{{.*}} : @owned $C):
+// CHECK:   return %{{.*}} : $C
+// CHECK-LABEL: } // end sil function 'testMandatoryConverted'
+sil [ossa] @testMandatoryConverted : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  // Inline this one.
+  %f = function_ref @testMandatoryConvertedHelper : $@convention(thin) (@owned C) -> @owned C
+  %0copy1 = copy_value %0 : $C
+  %cf1 = convert_function %f : $@convention(thin) (@owned C) -> @owned C to $@convention(thin) @noescape (@owned C) -> @owned C
+  %call1 = apply %cf1(%0copy1) : $@convention(thin) @noescape (@owned C) -> @owned C
+
+  // Don't (currently) inline conversion away from throws.
+  %cf2 = convert_function %f : $@convention(thin) (@owned C) -> @owned C to $@convention(thin) (@owned C) -> (@owned C, @error Error)
+  try_apply %cf2(%call1) : $@convention(thin) (@owned C) -> (@owned C, @error Error), normal bb7, error bb11
+
+bb7(%callret : @owned $C):
+  br bb12(%callret : $C)
+
+bb11(%128 : @owned $Error):
+  // Don't (currently) inline conversion away from Optional.
+  %0copy2 = copy_value %0 : $C
+  %f2 = function_ref @testMandatoryConvertedHelper2 : $@convention(thin) (@owned Optional<C>) -> @owned C
+  %cf3 = convert_function %f2 : $@convention(thin) (@owned Optional<C>) -> @owned C to $@convention(thin) (@owned C) -> @owned C
+  %call3 = apply %cf3(%0copy2) : $@convention(thin) (@owned C) -> @owned C
+  destroy_value %128 : $Error
+  br bb12(%call3 : $C)
+
+bb12(%result : @owned $C):
+  destroy_value %0 : $C
+  return %result : $C
+}
+
+sil [ossa] @use_c : $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @use_c_unowned : $@convention(thin) (C) -> ()
+
+sil [transparent] [ossa] @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %use = function_ref @use_c : $@convention(thin) (@guaranteed C) -> ()
+  apply %use(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [transparent] [ossa] @unowned_closure_func : $@convention(thin) (C) -> () {
+bb0(%0 : @unowned $C):
+  %use = function_ref @use_c_unowned : $@convention(thin) (C) -> ()
+  apply %use(%0) : $@convention(thin) (C) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_guaranteed_closure_capture
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:   [[BORROWED_ARG_COPY_COPY:%.*]] = begin_borrow [[ARG_COPY_COPY]]
+// CHECK:   [[F:%.*]] = function_ref @use_c
+// CHECK:   apply [[F]]([[BORROWED_ARG_COPY_COPY]])
+// CHECK: } // end sil function 'test_guaranteed_closure_capture'
+sil [ossa] @test_guaranteed_closure_capture : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %0copy = copy_value %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0copy) : $@convention(thin) (@guaranteed C) -> ()
+  apply %closure() : $@callee_guaranteed () -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_guaranteed_closure_capture2 :
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:   [[BORROWED_ARG_COPY_COPY:%.*]] = begin_borrow [[ARG_COPY_COPY]]
+// CHECK:   [[F:%.*]] = function_ref @use_c
+// CHECK:   apply [[F]]([[BORROWED_ARG_COPY_COPY]])
+// CHECK: } // end sil function 'test_guaranteed_closure_capture2'
+sil [ossa] @test_guaranteed_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %0copy = copy_value %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply %closure_fun(%0copy) : $@convention(thin) (@guaranteed C) -> ()
+  apply %closure() : $@callee_owned () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_unowned_closure_capture2 :
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:   [[F:%.*]] = function_ref @use_c_unowned
+// CHECK:   apply [[F]]([[ARG_COPY_COPY]]) : $@convention(thin) (C) -> ()
+// CHECK: } // end sil function 'test_unowned_closure_capture2'
+sil [ossa] @test_unowned_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %0copy = copy_value %0 : $C
+  %closure_fun = function_ref @unowned_closure_func : $@convention(thin) (C) -> ()
+  %closure = partial_apply %closure_fun(%0copy) : $@convention(thin) (C) -> ()
+  apply %closure() : $@callee_owned () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+// CHECK-LABEL: sil [ossa] @test_guaranteed_closure :
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[F:%.*]] = function_ref @guaranteed_closure_func :
+// CHECK:   [[ARG_COPY_COPY:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:   [[BORROWED_ARG_COPY_COPY:%.*]] = begin_borrow [[ARG_COPY_COPY]]
+// CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG_COPY]])
+// CHECK:   [[F:%.*]] = function_ref @use_c
+// CHECK:   apply [[F]]([[BORROWED_ARG_COPY_COPY]])
+// CHECK:   return [[C]]
+// CHECK: } // end sil function 'test_guaranteed_closure'
+sil [ossa] @test_guaranteed_closure : $@convention(thin) (@guaranteed C) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : @guaranteed $C):
+  %0copy = copy_value %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0copy) : $@convention(thin) (@guaranteed C) -> ()
+// NOTE: No ``strong_retain %closure`` is needed here because the context is
+// @callee_guaranteed.
+  apply %closure() : $@callee_guaranteed () -> ()
+  return %closure : $@callee_guaranteed () -> ()
+}
+
+sil [transparent] [ossa] @return_one : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  return %0 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @test_thin_convert_function_inline
+// CHECK-NEXT: bb0
+// CHECK-NEXT: [[RES:%.*]] = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:  return [[RES]]
+sil [ossa] @test_thin_convert_function_inline : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @return_one : $@convention(thin) () -> Builtin.Int32
+  %1 = convert_function %0 : $@convention(thin) () -> Builtin.Int32 to $@convention(thin) @noescape () -> Builtin.Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) @noescape () -> Builtin.Int32 to $@noescape () -> Builtin.Int32
+  %3 = apply %2() : $@noescape () -> Builtin.Int32
+  return %3 : $Builtin.Int32
+}
+
+sil [ossa] @test_thin_convert_function_inline_2 : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @return_one : $@convention(thin) () -> Builtin.Int32
+  %1 = convert_function %0 : $@convention(thin) () -> Builtin.Int32 to $@convention(thin) @noescape () -> Builtin.Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) @noescape () -> Builtin.Int32 to $@callee_owned () -> Builtin.Int32
+  %3 = apply %2() : $@callee_owned () -> Builtin.Int32
+  return %3 : $Builtin.Int32
+}
+
+// CHECK: sil [ossa] @test_no_copies_for_stack_pa : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-NOT: apply
+// CHECK-NOT: copy_value
+// CHECK: [[FUNC:%.*]] = function_ref @use_c :
+// CHECK-NEXT: apply [[FUNC]]
+// CHECK-NOT: apply
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'test_no_copies_for_stack_pa'
+sil [ossa] @test_no_copies_for_stack_pa : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0 : @guaranteed $C):
+  br bb1
+
+bb1:
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [on_stack] [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %closure2 = mark_dependence %closure : $@noescape @callee_guaranteed () -> () on %0 : $C
+  cond_br undef, bb2, bb3
+
+bb2:
+  apply %closure2() : $@noescape @callee_guaranteed () -> ()
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %closure : $@noescape @callee_guaranteed () -> ()
+  cond_br undef, bb1, bb5
+
+bb5:
+  %tuple = tuple()
+  return %tuple : $()
+}

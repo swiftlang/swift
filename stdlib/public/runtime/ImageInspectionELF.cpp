@@ -48,8 +48,8 @@ void swift::initializeProtocolLookup() {
     const swift::MetadataSections::Range &protocols =
         sections->swift5_protocols;
     if (protocols.length)
-      addImageProtocolsBlockCallback(reinterpret_cast<void *>(protocols.start),
-                                     protocols.length);
+      addImageProtocolsBlockCallbackUnsafe(
+          reinterpret_cast<void *>(protocols.start), protocols.length);
 
     if (sections->next == registered)
       break;
@@ -62,8 +62,8 @@ void swift::initializeProtocolConformanceLookup() {
     const swift::MetadataSections::Range &conformances =
         sections->swift5_protocol_conformances;
     if (conformances.length)
-      addImageProtocolConformanceBlockCallback(reinterpret_cast<void *>(conformances.start),
-                                               conformances.length);
+      addImageProtocolConformanceBlockCallbackUnsafe(
+          reinterpret_cast<void *>(conformances.start), conformances.length);
 
     if (sections->next == registered)
       break;
@@ -77,8 +77,8 @@ void swift::initializeTypeMetadataRecordLookup() {
     const swift::MetadataSections::Range &type_metadata =
         sections->swift5_type_metadata;
     if (type_metadata.length)
-      addImageTypeMetadataRecordBlockCallback(reinterpret_cast<void *>(type_metadata.start),
-                                              type_metadata.length);
+      addImageTypeMetadataRecordBlockCallbackUnsafe(
+          reinterpret_cast<void *>(type_metadata.start), type_metadata.length);
 
     if (sections->next == registered)
       break;
@@ -86,18 +86,7 @@ void swift::initializeTypeMetadataRecordLookup() {
   }
 }
 
-void swift::initializeTypeFieldLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSections::Range &fields = sections->swift5_fieldmd;
-    if (fields.length)
-      addImageTypeFieldDescriptorBlockCallback(
-          reinterpret_cast<void *>(fields.start), fields.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
+void swift::initializeDynamicReplacementLookup() {
 }
 
 // As ELF images are loaded, ImageInspectionInit:sectionDataInit() will call
@@ -128,6 +117,18 @@ void swift_addNewDSOImage(const void *addr) {
   const void *metadata = reinterpret_cast<void *>(type_metadata.start);
   if (type_metadata.length)
     addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+
+  const auto &dynamic_replacements = sections->swift5_replace;
+  const auto *replacements =
+      reinterpret_cast<void *>(dynamic_replacements.start);
+  if (dynamic_replacements.length) {
+    const auto &dynamic_replacements_some = sections->swift5_replac2;
+    const auto *replacements_some =
+      reinterpret_cast<void *>(dynamic_replacements_some.start);
+    addImageDynamicReplacementBlockCallback(
+        replacements, dynamic_replacements.length, replacements_some,
+        dynamic_replacements_some.length);
+  }
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
@@ -138,7 +139,7 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 
   info->fileName = dlinfo.dli_fname;
   info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName = dlinfo.dli_sname;
+  info->symbolName.reset(dlinfo.dli_sname);
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
 }

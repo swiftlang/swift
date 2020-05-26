@@ -102,7 +102,7 @@ bool ArrayAllocation::isInitializationWithKnownCount() {
       (ArrayValue = Uninitialized.getArrayValue()))
     return true;
 
-  ArraySemanticsCall Init(Alloc, "array.init");
+  ArraySemanticsCall Init(Alloc, "array.init", /*matchPartialName*/true);
   if (Init &&
       (ArrayCount = Init.getInitializationCount()) &&
       (ArrayValue = Init.getArrayValue()))
@@ -124,7 +124,6 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
     if (isa<RefCountingInst>(User) ||
-        isa<StrongPinInst>(User) ||
         isa<DebugValueInst>(User))
       continue;
 
@@ -153,7 +152,7 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
 
 bool ArrayAllocation::propagateCountToUsers() {
   bool HasChanged = false;
-  DEBUG(llvm::dbgs() << "Propagating count from " << *Alloc);
+  LLVM_DEBUG(llvm::dbgs() << "Propagating count from " << *Alloc);
   for (auto *Count : CountCalls) {
     assert(ArraySemanticsCall(Count).getKind() == ArrayCallKind::kGetCount &&
            "Expecting a call to count");
@@ -166,7 +165,7 @@ bool ArrayAllocation::propagateCountToUsers() {
     }
 
     for (auto *Use : Uses) {
-      DEBUG(llvm::dbgs() << "  to user " << *Use->getUser());
+      LLVM_DEBUG(llvm::dbgs() << "  to user " << *Use->getUser());
       Use->set(ArrayCount);
       HasChanged = true;
     }
@@ -185,6 +184,11 @@ public:
 
   void run() override {
     auto &Fn = *getFunction();
+
+    // FIXME: Add ownership support.
+    if (Fn.hasOwnership())
+      return;
+
     bool Changed = false;
     SmallVector<ApplyInst *, 16> DeadArrayCountCalls;
     // Propagate the count of array allocations to array.count users.

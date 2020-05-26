@@ -28,8 +28,12 @@ namespace migrator {
 /// If needed, run the migrator on the compiler invocation's input file and emit
 /// a "replacement map" describing the requested changes to the source file.
 /// \return true on error.
-bool updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance,
-                                    const CompilerInvocation &Invocation);
+bool updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance);
+
+/// Specify options when running syntactic migration pass.
+struct SyntacticPassOptions {
+  bool RunOptionalTryMigration = false;
+};
 
 struct Migrator {
   CompilerInstance *StartInstance;
@@ -69,7 +73,7 @@ struct Migrator {
   /// Returns true if failed:
   ///   - Setting up the Swift CompilerInstance failed.
   ///   - performSema emitted fatal errors along the way.
-  bool performSyntacticPasses();
+  bool performSyntacticPasses(SyntacticPassOptions Opts);
 
   /// Emit a replacement map from the very start state's output text to the
   /// final state's output text to the StartInvocation's output file.

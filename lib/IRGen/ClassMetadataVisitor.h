@@ -49,21 +49,22 @@ protected:
 
 public:
   void layout() {
+    static_assert(MetadataAdjustmentIndex::Class == 2,
+                  "Adjustment index must be synchronized with this layout");
+
     // HeapMetadata header.
     asImpl().addDestructorFunction();
 
     // Metadata header.
     super::layout();
 
-    // ClassMetadata header.  In ObjCInterop mode, this must be
-    // layout-compatible with an Objective-C class.  The superclass
-    // pointer is useful regardless of mode, but the rest of the data
-    // isn't necessary.
-    // FIXME: Figure out what can be removed altogether in non-objc-interop
-    // mode and remove it. rdar://problem/18801263
+    // ClassMetadata header. This must be layout-compatible with Objective-C
+    // classes when interoperability is enabled.
     asImpl().addSuperclass();
-    asImpl().addClassCacheData();
-    asImpl().addClassDataPointer();
+    if (IGM.ObjCInterop) {
+      asImpl().addClassCacheData();
+      asImpl().addClassDataPointer();
+    }
 
     asImpl().addClassFlags();
     asImpl().addInstanceAddressPoint();
@@ -76,7 +77,7 @@ public:
     asImpl().addIVarDestroyer();
 
     // Class members.
-    addClassMembers(Target, Target->getDeclaredTypeInContext());
+    addClassMembers(Target);
   }
 
   /// Notes the beginning of the field offset vector for a particular ancestor
@@ -89,11 +90,13 @@ public:
 
 private:
   /// Add fields associated with the given class and its bases.
-  void addClassMembers(ClassDecl *theClass, Type type) {
+  void addClassMembers(ClassDecl *theClass) {
     // Visit the superclass first.
-    if (Type superclass = type->getSuperclass()) {
-      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-      if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+    if (auto *superclassDecl = theClass->getSuperclassDecl()) {
+      if (superclassDecl->hasClangNode()) {
+        // Nothing to do; Objective-C classes do not add new members to
+        // Swift class metadata.
+      } else if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal)) {
         // Runtime metadata instantiation will initialize our field offset
         // vector and vtable entries.
         //
@@ -104,7 +107,7 @@ private:
         // NB: We don't apply superclass substitutions to members because we want
         // consistent metadata layout between generic superclasses and concrete
         // subclasses.
-        addClassMembers(superclassDecl, superclass);
+        addClassMembers(superclassDecl);
       }
     }
 
@@ -114,10 +117,12 @@ private:
 
     // Add space for the generic parameters, if applicable.
     // This must always be the first item in the immediate members.
-    asImpl().addGenericFields(theClass, type, theClass);
+    asImpl().addGenericFields(theClass, theClass);
 
-    // Add vtable entries.
-    asImpl().addVTableEntries(theClass);
+    // If the class has resilient storage, we cannot make any assumptions about
+    // its storage layout, so skip the rest of this method.
+    if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
+      return;
 
     // A class only really *needs* a field-offset vector in the
     // metadata if:
@@ -138,6 +143,14 @@ private:
       addFieldEntries(field);
     }
     asImpl().noteEndOfFieldOffsets(theClass);
+
+    // If the class has resilient metadata, we cannot make any assumptions
+    // about its metadata layout, so skip the rest of this method.
+    if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal))
+      return;
+
+    // Add vtable entries.
+    asImpl().addVTableEntries(theClass);
   }
   
 private:
@@ -192,10 +205,10 @@ public:
       addPointer();
     }
   }
-  void addGenericArgument(CanType argument, ClassDecl *forClass) {
+  void addGenericArgument(GenericRequirement requirement, ClassDecl *forClass) {
     addPointer();
   }
-  void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf,
+  void addGenericWitnessTable(GenericRequirement requirement,
                               ClassDecl *forClass) {
     addPointer();
   }

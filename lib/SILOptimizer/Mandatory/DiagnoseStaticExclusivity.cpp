@@ -75,9 +75,9 @@ private:
   union {
    BeginAccessInst *Inst;
     struct {
-      SILAccessKind ClosureAccessKind;
-      SILLocation ClosureAccessLoc;
-    };
+      SILAccessKind AccessKind;
+      SILLocation AccessLoc;
+    } Closure;
   };
 
   const IndexTrieNode *SubPath;
@@ -89,7 +89,7 @@ public:
   RecordedAccess(SILAccessKind ClosureAccessKind,
                  SILLocation ClosureAccessLoc, const IndexTrieNode *SubPath) :
       RecordKind(RecordedAccessKind::NoescapeClosureCapture),
-      ClosureAccessKind(ClosureAccessKind), ClosureAccessLoc(ClosureAccessLoc),
+      Closure({ClosureAccessKind, ClosureAccessLoc}),
       SubPath(SubPath) { }
 
   RecordedAccessKind getRecordKind() const {
@@ -106,8 +106,9 @@ public:
       case RecordedAccessKind::BeginInstruction:
         return Inst->getAccessKind();
       case RecordedAccessKind::NoescapeClosureCapture:
-        return ClosureAccessKind;
+        return Closure.AccessKind;
     };
+    llvm_unreachable("unhandled kind");
   }
 
   SILLocation getAccessLoc() const {
@@ -115,8 +116,9 @@ public:
       case RecordedAccessKind::BeginInstruction:
         return Inst->getLoc();
       case RecordedAccessKind::NoescapeClosureCapture:
-        return ClosureAccessLoc;
+        return Closure.AccessLoc;
     };
+    llvm_unreachable("unhandled kind");
   }
 
   const IndexTrieNode *getSubPath() const {
@@ -333,13 +335,13 @@ static StringRef extractExprText(const Expr *E, SourceManager &SM) {
 /// it is in the ifndef.
 #ifndef NDEBUG
 static bool isCallToStandardLibrarySwap(CallExpr *CE, ASTContext &Ctx) {
-  if (CE->getCalledValue() == Ctx.getSwap(nullptr))
+  if (CE->getCalledValue() == Ctx.getSwap())
     return true;
 
   // Is the call module qualified, i.e. Swift.swap(&a[i], &[j)?
   if (auto *DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(CE->getFn())) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSBIE->getRHS())) {
-      return DRE->getDecl() == Ctx.getSwap(nullptr);
+      return DRE->getDecl() == Ctx.getSwap();
     }
   }
 
@@ -431,13 +433,13 @@ canReplaceWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
   // a witness for a subscript on MutableCollection?
   bool IsSubscriptOnMutableCollection = false;
   ProtocolDecl *ProtocolForDecl =
-      Decl1->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      Decl1->getDeclContext()->getSelfProtocolDecl();
   if (ProtocolForDecl) {
     IsSubscriptOnMutableCollection = (ProtocolForDecl == MutableCollectionDecl);
   } else {
     for (ValueDecl *Req : Decl1->getSatisfiedProtocolRequirements()) {
       DeclContext *ReqDC = Req->getDeclContext();
-      ProtocolDecl *ReqProto = ReqDC->getAsProtocolOrProtocolExtensionContext();
+      ProtocolDecl *ReqProto = ReqDC->getSelfProtocolDecl();
       assert(ReqProto && "Protocol requirement not in a protocol?");
 
       if (ReqProto == MutableCollectionDecl) {
@@ -497,12 +499,14 @@ static void addSwapAtFixit(InFlightDiagnostic &Diag, CallExpr *&FoundCall,
 /// and tuple elements.
 static std::string getPathDescription(DeclName BaseName, SILType BaseType,
                                       const IndexTrieNode *SubPath,
-                                      SILModule &M) {
+                                      SILModule &M,
+                                      TypeExpansionContext context) {
   std::string sbuf;
   llvm::raw_string_ostream os(sbuf);
 
   os << "'" << BaseName;
-  os << AccessSummaryAnalysis::getSubPathDescription(BaseType, SubPath, M);
+  os << AccessSummaryAnalysis::getSubPathDescription(BaseType, SubPath, M,
+                                                     context);
   os << "'";
 
   return os.str();
@@ -520,9 +524,9 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   const RecordedAccess &SecondAccess = Violation.SecondAccess;
   SILFunction *F = FirstAccess.getInstruction()->getFunction();
 
-  DEBUG(llvm::dbgs() << "Conflict on " << *FirstAccess.getInstruction()
-                     << "\n  vs " << *SecondAccess.getInstruction()
-                     << "\n  in function " << *F);
+  LLVM_DEBUG(llvm::dbgs() << "Conflict on " << *FirstAccess.getInstruction()
+                          << "\n  vs " << *SecondAccess.getInstruction()
+                          << "\n  in function " << *F);
 
   // Can't have a conflict if both accesses are reads.
   assert(!(FirstAccess.getAccessKind() == SILAccessKind::Read &&
@@ -540,19 +544,13 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   unsigned AccessKindForMain =
       static_cast<unsigned>(MainAccess.getAccessKind());
 
-  // For now, all exclusivity violations are warning in Swift 3 mode.
-  // Also treat some violations as warnings to allow them to be staged in.
-  bool DiagnoseAsWarning = Ctx.LangOpts.isSwiftVersion3();
-
-  if (const ValueDecl *VD = Storage.getDecl(F)) {
+  if (const ValueDecl *VD = Storage.getDecl()) {
     // We have a declaration, so mention the identifier in the diagnostic.
-    auto DiagnosticID = (DiagnoseAsWarning ?
-                         diag::exclusivity_access_required_warn :
-                         diag::exclusivity_access_required);
     SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
     SILModule &M = FirstAccess.getInstruction()->getModule();
     std::string PathDescription = getPathDescription(
-        VD->getBaseName(), BaseType, MainAccess.getSubPath(), M);
+        VD->getBaseName(), BaseType, MainAccess.getSubPath(), M,
+        TypeExpansionContext(*FirstAccess.getInstruction()->getFunction()));
 
     // Determine whether we can safely suggest replacing the violation with
     // a call to MutableCollection.swapAt().
@@ -568,18 +566,16 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
     }
 
     auto D =
-        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
+        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                 diag::exclusivity_access_required,
                  PathDescription, AccessKindForMain, SuggestSwapAt);
     D.highlight(RangeForMain);
     if (SuggestSwapAt)
       addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
                      Ctx.SourceMgr);
   } else {
-    auto DiagnosticID = (DiagnoseAsWarning ?
-                         diag::exclusivity_access_required_unknown_decl_warn :
-                         diag::exclusivity_access_required_unknown_decl);
-    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
-             AccessKindForMain)
+    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+             diag::exclusivity_access_required_unknown_decl, AccessKindForMain)
         .highlight(RangeForMain);
   }
   diagnose(Ctx, NoteAccess.getAccessLoc().getSourceLoc(),
@@ -601,7 +597,7 @@ static AccessedStorage findValidAccessedStorage(SILValue Source) {
 /// Used for fix-its to suggest replacing with Collection.swapAt()
 /// on exclusivity violations.
 static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
-  SILFunction *SF = AI->getReferencedFunction();
+  SILFunction *SF = AI->getReferencedFunctionOrNull();
   if (!SF)
     return false;
 
@@ -612,7 +608,7 @@ static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   if (!FD)
     return false;
 
-  return FD == Ctx.getSwap(nullptr);
+  return FD == Ctx.getSwap();
 }
 
 static llvm::cl::opt<bool> ShouldAssertOnFailure(
@@ -679,10 +675,7 @@ findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
 // =============================================================================
 // The data flow algorithm that drives diagnostics.
 
-// Forward declare verification entry points.
-#ifndef NDEBUG
-static void checkNoEscapePartialApply(PartialApplyInst *PAI);
-#endif
+// Forward declare verification entry point.
 static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses);
 
 namespace {
@@ -705,18 +698,10 @@ struct AccessState {
 };
 } // namespace
 
-/// For each argument in the range of the callee arguments being applied at the
-/// given apply site, use the summary analysis to determine whether the
-/// arguments will be accessed in a way that conflicts with any currently in
-/// progress accesses. If so, diagnose.
-static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
-  SILFunction *Callee = Apply.getCalleeFunction();
-  if (!Callee || Callee->empty())
-    return;
-
-  const AccessSummaryAnalysis::FunctionSummary &FS =
-      State.ASA->getOrCreateSummary(Callee);
-
+// Find conflicting access on each argument using AccessSummaryAnalysis.
+static void
+checkCaptureAccess(ApplySite Apply, AccessState &State,
+                   const AccessSummaryAnalysis::FunctionSummary &FS) {
   for (unsigned ArgumentIndex : range(Apply.getNumArguments())) {
 
     unsigned CalleeIndex =
@@ -734,7 +719,7 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
     SILValue Argument = Apply.getArgument(ArgumentIndex);
     assert(Argument->getType().isAddress());
 
-    // A valid AccessedStorage should alway sbe found because Unsafe accesses
+    // A valid AccessedStorage should always be found because Unsafe accesses
     // are not tracked by AccessSummaryAnalysis.
     const AccessedStorage &Storage = findValidAccessedStorage(Argument);
     auto AccessIt = State.Accesses->find(Storage);
@@ -746,6 +731,50 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
     const AccessInfo &Info = AccessIt->getSecond();
     if (auto Conflict = findConflictingArgumentAccess(AS, Storage, Info))
       State.ConflictingAccesses.push_back(*Conflict);
+  }
+}
+
+/// For each argument in the range of the callee arguments being applied at the
+/// given apply site, use the summary analysis to determine whether the
+/// arguments will be accessed in a way that conflicts with any currently in
+/// progress accesses. If so, diagnose.
+static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
+  // A callee may be nullptr or empty for various reasons, such as being
+  // dynamically replaceable.
+  SILFunction *Callee = Apply.getCalleeFunction();
+  if (Callee && !Callee->empty()) {
+    checkCaptureAccess(Apply, State, State.ASA->getOrCreateSummary(Callee));
+    return;
+  }
+  // In the absence of AccessSummaryAnalysis, conservatively assume by-address
+  // captures are fully accessed by the callee.
+  for (Operand &argOper : Apply.getArgumentOperands()) {
+    auto convention = Apply.getArgumentConvention(argOper);
+    if (convention != SILArgumentConvention::Indirect_InoutAliasable)
+      continue;
+
+    // A valid AccessedStorage should always be found because Unsafe accesses
+    // are not tracked by AccessSummaryAnalysis.
+    const AccessedStorage &Storage = findValidAccessedStorage(argOper.get());
+
+    // Are there any accesses in progress at the time of the call?
+    auto AccessIt = State.Accesses->find(Storage);
+    if (AccessIt == State.Accesses->end())
+      continue;
+
+    // The unknown argument access is considered a modify of the root subpath.
+    auto argAccess = RecordedAccess(SILAccessKind::Modify, Apply.getLoc(),
+                                    State.ASA->getSubPathTrieRoot());
+
+    // Construct a conflicting RecordedAccess if one doesn't already exist.
+    const AccessInfo &info = AccessIt->getSecond();
+    auto inProgressAccess =
+        shouldReportAccess(info, SILAccessKind::Modify, argAccess.getSubPath());
+    if (!inProgressAccess)
+      continue;
+
+    State.ConflictingAccesses.emplace_back(Storage, *inProgressAccess,
+                                           argAccess);
   }
 }
 
@@ -791,19 +820,18 @@ static void checkForViolationAtApply(ApplySite Apply, AccessState &State) {
 
   // Next, recursively check any noescape closures passed as arguments at this
   // apply site.
+  TinyPtrVector<PartialApplyInst *> partialApplies;
   for (SILValue Argument : Apply.getArguments()) {
     auto FnType = getSILFunctionTypeForValue(Argument);
     if (!FnType || !FnType->isNoEscape())
       continue;
 
-    FindClosureResult result = findClosureForAppliedArg(Argument);
-    if (!result.PAI)
-      continue;
-
-    checkForViolationAtApply(ApplySite(result.PAI), State);
+    findClosuresForFunctionValue(Argument, partialApplies);
   }
-  // Finally, continue recursively walking up the chain of applies.
-  if (auto *PAI = dyn_cast<PartialApplyInst>(Apply.getCalleeOrigin()))
+  // Continue recursively walking up the chain of applies if necessary.
+  findClosuresForFunctionValue(Apply.getCallee(), partialApplies);
+
+  for (auto *PAI : partialApplies)
     checkForViolationAtApply(ApplySite(PAI), State);
 }
 
@@ -858,36 +886,18 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
       });
   }
 
-  if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-    // Record calls to swap() for potential Fix-Its.
-    if (isCallToStandardLibrarySwap(AI, I.getFunction()->getASTContext()))
-      State.CallsToSwap.push_back(AI);
-    else
-      checkForViolationAtApply(AI, State);
+  if (auto apply = FullApplySite::isa(&I)) {
+    if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+      // Record calls to swap() for potential Fix-Its.
+      if (isCallToStandardLibrarySwap(AI, I.getFunction()->getASTContext())) {
+        State.CallsToSwap.push_back(AI);
+        return;
+      }
+    }
+    checkForViolationAtApply(apply, State);
     return;
   }
 
-  if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
-    checkForViolationAtApply(TAI, State);
-    return;
-  }
-#ifndef NDEBUG
-  // FIXME: Once AllocBoxToStack is fixed to correctly set noescape
-  // closure types, move this PartialApply verification into the
-  // SILVerifier to better pinpoint the offending pass.
-  if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
-    ApplySite apply(PAI);
-    if (llvm::any_of(range(apply.getNumArguments()),
-                     [apply](unsigned argIdx) {
-                       unsigned calleeIdx =
-                         apply.getCalleeArgIndexOfFirstAppliedArg() + argIdx;
-                       return apply.getArgumentConvention(calleeIdx)
-                         == SILArgumentConvention::Indirect_InoutAliasable;
-                     })) {
-      checkNoEscapePartialApply(PAI);
-    }
-  }
-#endif
   // Sanity check to make sure entries are properly removed.
   assert((!isa<ReturnInst>(&I) || State.Accesses->empty())
          && "Entries were not properly removed?!");
@@ -960,96 +970,6 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
 // =============================================================================
 // Verification
 
-#ifndef NDEBUG
-// If a partial apply has @inout_aliasable arguments, it may only be used as
-// a @noescape function type in a way that is recognized by
-// DiagnoseStaticExclusivity.
-static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
-  SmallVector<Operand *, 8> uses(PAI->getUses());
-  while (!uses.empty()) {
-    Operand *oper = uses.pop_back_val();
-    SILInstruction *user = oper->getUser();
-
-    if (isIncidentalUse(user) || onlyAffectsRefCount(user))
-      continue;
-
-    if (auto *MD = dyn_cast<MarkDependenceInst>(user)) {
-      if (oper->getOperandNumber() == MarkDependenceInst::Base)
-        continue;
-      uses.append(MD->getUses().begin(), MD->getUses().end());
-      continue;
-    }
-
-    if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
-      uses.append(copy->getUses().begin(), copy->getUses().end());
-      continue;
-    }
-    if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(user)) {
-       uses.append(cvt->getUses().begin(), cvt->getUses().end());
-      continue;
-    }
-    // @noescape block storage can be passed as an Optional (Nullable).
-    if (EnumInst *EI = dyn_cast<EnumInst>(user)) {
-      uses.append(EI->getUses().begin(), EI->getUses().end());
-      continue;
-    }
-    // Recurse through partial_apply to handle special cases before handling
-    // ApplySites in general below.
-    if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(user)) {
-      // Use the same logic as checkForViolationAtApply applied to a def-use
-      // traversal.
-      //
-      // checkForViolationAtApply recurses through partial_apply chains.
-      if (oper->get() == PAI->getCallee()) {
-        uses.append(PAI->getUses().begin(), PAI->getUses().end());
-        continue;
-      }
-      // checkForViolationAtApply also uses findClosureForAppliedArg which in
-      // turn checks isPartialApplyOfReabstractionThunk.
-      //
-      // A closure with @inout_aliasable arguments may be applied to a
-      // thunk as "escaping", but as long as the thunk is only used as a
-      // '@noescape" type then it is safe.
-      if (isPartialApplyOfReabstractionThunk(PAI)) {
-        uses.append(PAI->getUses().begin(), PAI->getUses().end());
-        continue;
-      }
-    }
-    if (isa<ApplySite>(user)) {
-      SILValue arg = oper->get();
-      auto ArgumentFnType = getSILFunctionTypeForValue(arg);
-      if (ArgumentFnType && ArgumentFnType->isNoEscape()) {
-        // Verify that the inverse operation, finding a partial_apply from a
-        // @noescape argument, is consistent.
-        assert(findClosureForAppliedArg(arg).PAI &&
-               "cannot find partial_apply from @noescape function argument");
-        continue;
-      }
-      llvm::dbgs() << "Argument must be @noescape function type: " << *arg;
-      llvm_unreachable("A partial_apply with @inout_aliasable may only be "
-                       "used as a @noescape function type argument.");
-    }
-    auto *store = dyn_cast<StoreInst>(user);
-    if (store && oper->getOperandNumber() == StoreInst::Src) {
-      if (auto *PBSI = dyn_cast<ProjectBlockStorageInst>(store->getDest())) {
-        SILValue storageAddr = PBSI->getOperand();
-        // The closure is stored to block storage. Recursively visit all
-        // uses of any initialized block storage values derived from this
-        // storage address..
-        for (Operand *oper : storageAddr->getUses()) {
-          if (auto *IBS = dyn_cast<InitBlockStorageHeaderInst>(oper->getUser()))
-            uses.append(IBS->getUses().begin(), IBS->getUses().end());
-        }
-        continue;
-      }
-    }
-    llvm::dbgs() << "Unexpected partial_apply use: " << *user;
-    llvm_unreachable("A partial_apply with @inout_aliasable may only be "
-                     "used as a @noescape function type argument.");
-  }
-}
-#endif
-
 // Check that the given address-type operand is guarded by begin/end access
 // markers.
 static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
@@ -1071,8 +991,7 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
     return;
 
   if (auto apply = ApplySite::isa(memInst)) {
-    SILArgumentConvention conv =
-        apply.getArgumentConvention(apply.getCalleeArgIndex(*memOper));
+    SILArgumentConvention conv = apply.getArgumentConvention(*memOper);
     // Captured addresses currently use the @inout_aliasable convention. They
     // are considered an access at any call site that uses the closure. However,
     // those accesses are never explictly protected by access markers. Instead,

@@ -23,6 +23,7 @@
 #ifndef SWIFT_SYNTAX_SYNTAX_H
 #define SWIFT_SYNTAX_SYNTAX_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/RawSyntax.h"
@@ -82,7 +83,7 @@ public:
   SyntaxKind getKind() const;
 
   /// Get the shared raw syntax.
-  RC<RawSyntax> getRaw() const;
+  const RC<RawSyntax> &getRaw() const;
 
   /// Get an ID for this node that is stable across incremental parses
   SyntaxNodeId getId() const { return getRaw()->getId(); }
@@ -176,7 +177,7 @@ public:
   void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
   /// Print a debug representation of the syntax node to standard error.
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 
   bool hasSameIdentityAs(const Syntax &Other) const {
     return Root == Other.Root && Data == Other.Data;

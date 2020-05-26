@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -caller-analysis-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -caller-analysis-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
 
 sil_stage canonical
 
@@ -7,10 +7,12 @@ import Builtin
 // CHECK-LABEL: calleeName:      dead_func
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @dead_func : $@convention(thin) () -> () {
+sil private @dead_func : $@convention(thin) () -> () {
   %2 = tuple ()
   return %2 : $()
 }
@@ -18,10 +20,12 @@ sil hidden @dead_func : $@convention(thin) () -> () {
 // CHECK-LABEL: calleeName:      call_top
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @call_top : $@convention(thin) () -> () {
+sil private @call_top : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @call_middle : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -32,11 +36,13 @@ bb0:
 // CHECK-LABEL: calleeName:      call_middle
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - call_top
 // CHECK-NEXT:  ...
-sil hidden @call_middle : $@convention(thin) () -> () {
+sil private @call_middle : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @call_bottom : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -47,11 +53,13 @@ bb0:
 // CHECK-LABEL: calleeName:      call_bottom
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - call_middle
 // CHECK-NEXT:  ...
-sil hidden @call_bottom : $@convention(thin) () -> () {
+sil private @call_bottom : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -60,11 +68,13 @@ bb0:
 // CHECK-LABEL: calleeName:      self_recursive_func
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - self_recursive_func
 // CHECK-NEXT:  ...
-sil hidden @self_recursive_func : $@convention(thin) () -> () {
+sil private @self_recursive_func : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @self_recursive_func : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -75,11 +85,13 @@ bb0:
 // CHECK-LABEL: calleeName:      mutual_recursive_func1
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - mutual_recursive_func2
 // CHECK-NEXT:  ...
-sil hidden @mutual_recursive_func1 : $@convention(thin) () -> () {
+sil private @mutual_recursive_func1 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @mutual_recursive_func2 : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -90,11 +102,13 @@ bb0:
 // CHECK-LABEL: calleeName:      mutual_recursive_func2
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - mutual_recursive_func1
 // CHECK-NEXT:  ...
-sil hidden @mutual_recursive_func2 : $@convention(thin) () -> () {
+sil private @mutual_recursive_func2 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @mutual_recursive_func1 : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -105,11 +119,13 @@ bb0:
 // CHECK-LABEL: calleeName:      multi_called
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - multi_calles
 // CHECK-NEXT:  ...
-sil hidden @multi_called : $@convention(thin) () -> () {
+sil private @multi_called : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
   return %2 : $()
@@ -118,10 +134,12 @@ bb0:
 // CHECK-LABEL: calleeName:      multi_calles
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @multi_calles : $@convention(thin) () -> () {
+sil private @multi_calles : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @multi_called : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -140,12 +158,14 @@ bb3:
 // CHECK-LABEL: calleeName:      multi_callers
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - multi_caller1
 // CHECK-NEXT:    - multi_caller2
 // CHECK-NEXT:  ...
-sil hidden @multi_callers : $@convention(thin) () -> () {
+sil private @multi_callers : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
   return %2 : $()
@@ -154,10 +174,12 @@ bb0:
 // CHECK-LABEL: calleeName:      multi_caller1
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @multi_caller1 : $@convention(thin) () -> () {
+sil private @multi_caller1 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @multi_callers : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -168,10 +190,12 @@ bb0:
 // CHECK-LABEL: calleeName:      multi_caller2
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @multi_caller2 : $@convention(thin) () -> () {
+sil private @multi_caller2 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @multi_callers : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -185,6 +209,8 @@ bb0:
 // CHECK-LABEL: calleeName:      closure1
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 1
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_one_arg
 // CHECK-NEXT:    - partial_apply_two_args1
@@ -198,6 +224,8 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      closure2
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_two_args2
 // CHECK-NEXT:  fullAppliers:
@@ -210,10 +238,12 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      partial_apply_one_arg
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil @partial_apply_one_arg : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned (Builtin.Int32) -> Builtin.Int32 {
+sil private @partial_apply_one_arg : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned (Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = function_ref @closure1 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
   %2 = partial_apply %1(%0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
@@ -223,10 +253,12 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      partial_apply_two_args1
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil @partial_apply_two_args1 : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned () -> Builtin.Int32 {
+sil private @partial_apply_two_args1 : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned () -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = function_ref @closure1 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
   %2 = partial_apply %1(%0, %0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
@@ -236,10 +268,12 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      partial_apply_two_args2
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil @partial_apply_two_args2 : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned () -> Builtin.Int32 {
+sil private @partial_apply_two_args2 : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned () -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = function_ref @closure2 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
   %2 = partial_apply %1(%0, %0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
@@ -249,12 +283,14 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      called_closure
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  ...
-sil @called_closure : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil private @called_closure : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   return %0 : $Builtin.Int32
 }
@@ -274,12 +310,14 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      called_closure_then_destroy
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  ...
-sil @called_closure_then_destroy : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil private @called_closure_then_destroy : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   return %0 : $Builtin.Int32
 }
@@ -297,6 +335,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      called_escaping_closure
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  fullAppliers:
@@ -320,12 +360,14 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      called_closure_then_copy_destroy
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  ...
-sil @called_closure_then_copy_destroy : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil private @called_closure_then_copy_destroy : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   return %0 : $Builtin.Int32
 }
@@ -351,6 +393,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      noescape_callee
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied_and_passed_noescape
 // CHECK-NEXT:  fullAppliers:
@@ -363,12 +407,14 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      noescape_caller
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied_and_passed_noescape
 // CHECK-NEXT:    - thin_to_thick_is_applied_and_passed_noescape
 // CHECK-NEXT:  ...
-sil @noescape_caller : $@convention(thin) (@noescape @callee_owned () -> Builtin.Int32) -> () {
+sil private @noescape_caller : $@convention(thin) (@noescape @callee_owned () -> Builtin.Int32) -> () {
 bb0(%0 : $@noescape @callee_owned () -> Builtin.Int32):
   %1 = apply %0() : $@noescape @callee_owned () -> Builtin.Int32
   %9999 = tuple()
@@ -389,6 +435,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      noescape_callee2
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -424,6 +472,8 @@ class Klass {
 // CHECK-LABEL: calleeName:      called_method
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - apply_called_method
@@ -448,6 +498,8 @@ bb0(%0 : $Klass):
 // CHECK-LABEL: calleeName:      final_called_method
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - final_apply_called_method

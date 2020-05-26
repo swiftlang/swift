@@ -5,7 +5,7 @@ sil_stage raw
 
 import Swift
 
-sil @yield : $@yield_many (Int, Float) -> (@yields Int, @yields Float) {
+sil [ossa] @yield : $@yield_many (Int, Float) -> (@yields Int, @yields Float) {
 bb0(%0 : $Int, %1 : $Float):
   yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb3
 

@@ -22,7 +22,7 @@ func foo() {
 // CHECK: key.kind: source.lang.swift.codecomplete.group
 
 // RUN: cat %t.open %t.open %t.open > %t.check
-// RUN: diff -u %t.update %t.check
+// RUN: %diff -u %t.update %t.check
 
 
 struct X {

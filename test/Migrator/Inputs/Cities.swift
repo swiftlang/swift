@@ -1,5 +1,6 @@
 open class Cities {
   var x: Int
+  public var name: String = ""
   public init(x: Int) { self.x = x }
   public init!(y: Int) { self.x = y }
   open func mooloolaba(x: Cities, y: Cities?) {}
@@ -9,6 +10,7 @@ open class Cities {
   open func buderim() -> Cities? { return Cities(x: 1) }
   open func noosa() -> [[String : Cities]?] { return [] }
   open func maroochy(x: Int?, y: Int?) {}
+  open var yogurt: Int { return 1 }
   public struct CityKind {
     public static let Town = 1
     public static let Village = 1
@@ -61,6 +63,7 @@ open class ToplevelType {
   public init() {}
   public init(recordName: String) {}
   open func member(_ x: @escaping ([Any]?) -> Void) {}
+  open func trailing(_ x: @escaping ([Any]?) -> Void) {}
 }
 
 public var GlobalAttribute: String = ""

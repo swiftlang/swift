@@ -58,6 +58,22 @@ size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
                                                  Length, Opts);
 }
 
+size_t swift_demangle_getModuleName(const char *MangledName,
+                                    char *OutputBuffer,
+                                    size_t Length) {
+
+  swift::Demangle::Context DCtx;
+  std::string Result = DCtx.getModuleName(llvm::StringRef(MangledName));
+
+  // Copy the result to an output buffer and ensure '\0' termination.
+  if (OutputBuffer && Length > 0) {
+    auto Dest = strncpy(OutputBuffer, Result.c_str(), Length);
+    Dest[Length - 1] = '\0';
+  }
+  return Result.length();
+}
+
+
 int swift_demangle_hasSwiftCallingConvention(const char *MangledName) {
   swift::Demangle::Context DCtx;
   if (DCtx.hasSwiftCallingConvention(llvm::StringRef(MangledName)))

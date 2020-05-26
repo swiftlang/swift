@@ -97,7 +97,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
       .useLeftAngleBracket(LeftAngle)
       .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-      .addGenericArgument(ElementArg)
+      .addArgument(ElementArg)
       .build();
 
     auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -135,7 +135,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addGenericArgument(ElementArg)
+    .addArgument(ElementArg)
     .build();
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -181,7 +181,7 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
   auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addGenericArgument(ElementArg)
+    .addArgument(ElementArg)
     .build();
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -322,6 +322,34 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
       .print(OS);
     ASSERT_EQ(OS.str().str(), "with radius: , ");
   }
+}
+
+TEST(DeclSyntaxTests, FunctionParameterWithEllipsis) {
+    auto ExternalName = SyntaxFactory::makeIdentifier("for", {},
+                                                      Trivia::spaces(1));
+    auto LocalName = SyntaxFactory::makeIdentifier("integer", {}, {});
+    auto Colon = SyntaxFactory::makeColonToken(Trivia::spaces(1),
+                                               Trivia::spaces(1));
+    auto Int = SyntaxFactory::makeTypeIdentifier("Int", {},
+                                                 Trivia::spaces(0));
+    auto Ellipsis = SyntaxFactory::makeEllipsisToken({},
+                                                     Trivia::spaces(1));
+    auto Comma = SyntaxFactory::makeCommaToken({}, {});
+    
+    {
+        SmallString<48> Scratch;
+        llvm::raw_svector_ostream OS(Scratch);
+        getCannedFunctionParameter()
+        .withFirstName(ExternalName)
+        .withSecondName(LocalName)
+        .withColon(Colon)
+        .withType(Int)
+        .withEllipsis(Ellipsis)
+        .withDefaultArgument(llvm::None)
+        .withTrailingComma(Comma)
+        .print(OS);
+        ASSERT_EQ(OS.str().str(), "for integer : Int... ,");
+    }
 }
 
 #pragma mark - parameter-list
@@ -522,11 +550,11 @@ GenericWhereClauseSyntax getCannedWhereClause() {
   auto T = SyntaxFactory::makeTypeIdentifier("T", {}, Trivia::spaces(1));
   auto EqualEqual = SyntaxFactory::makeEqualityOperator({}, Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
-  auto SameType = SyntaxFactory::makeSameTypeRequirement(T, EqualEqual, Int,
-                                                         None);
+  auto SameType = SyntaxFactory::makeSameTypeRequirement(T, EqualEqual, Int);
+  auto Req = SyntaxFactory::makeGenericRequirement(SameType, None);
 
   auto Requirements = SyntaxFactory::makeBlankGenericRequirementList()
-    .appending(SameType);
+    .appending(Req);
 
   return SyntaxFactory::makeBlankGenericWhereClause()
     .withWhereKeyword(WhereKW)

@@ -56,6 +56,10 @@ struct LargeKey: Hashable {
     return hash
   }
 
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(self.hashValue)
+  }
+
   init(_ value: Int) {
     self.i = value
     self.j = 2 * value

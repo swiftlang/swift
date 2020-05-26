@@ -16,11 +16,31 @@
 #include <memory>
 #ifdef __APPLE__
 #include <dispatch/dispatch.h>
+#elif defined(__wasi__)
+// No pthread on wasi, see https://bugs.swift.org/browse/SR-12097 for more details.
 #else
 #include <mutex>
 #endif
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
+
+#if defined(__wasi__)
+// Temporary single-threaded stub. Should be replaced with a thread-safe version
+// as soon as the WASI SDK allows it. See https://bugs.swift.org/browse/SR-12766.
+inline void wasi_call_once(int *flag, void *context, void (*func)(void *)) {
+  switch (*flag) {
+  case 0:
+    *flag = 1;
+    func(context);
+    return;
+  case 1:
+    return;
+  default:
+    assert(false && "wasi_call_once got invalid flag");
+    abort();
+  }
+}
+#endif
 
 namespace swift {
 
@@ -36,6 +56,10 @@ namespace swift {
   using OnceToken_t = unsigned long;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
   _swift_once_f(&TOKEN, CONTEXT, FUNC)
+#elif defined(__wasi__)
+  using OnceToken_t = int;
+# define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
+  ::wasi_call_once(&TOKEN, CONTEXT, FUNC)
 #else
   using OnceToken_t = std::once_flag;
 # define SWIFT_ONCE_F(TOKEN, FUNC, CONTEXT) \
@@ -58,6 +82,9 @@ public:
   
   T &get(void (*initCallback)(void *) = defaultInitCallback);
 
+  template<typename Arg1>
+  T &getWithInit(Arg1 &&arg1);
+
   /// Get the value, assuming it must have already been initialized by this
   /// point.
   T &unsafeGetAlreadyInitialized() { return *reinterpret_cast<T *>(&Value); }
@@ -77,6 +104,22 @@ template <typename T> inline T &Lazy<T>::get(void (*initCallback)(void*)) {
                 "Lazy<T> must be a literal type");
 
   SWIFT_ONCE_F(OnceToken, initCallback, &Value);
+  return unsafeGetAlreadyInitialized();
+}
+
+template <typename T>
+template <typename Arg1> inline T &Lazy<T>::getWithInit(Arg1 &&arg1) {
+  struct Data {
+    void *address;
+    Arg1 &&arg1;
+
+    static void init(void *context) {
+      Data *data = static_cast<Data *>(context);
+      ::new (data->address) T(static_cast<Arg1&&>(data->arg1));
+    }
+  } data{&Value, static_cast<Arg1&&>(arg1)};
+
+  SWIFT_ONCE_F(OnceToken, &Data::init, &data);
   return unsafeGetAlreadyInitialized();
 }
 

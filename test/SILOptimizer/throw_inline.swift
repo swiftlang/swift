@@ -7,7 +7,7 @@ public func foo() throws -> Int32 {
   return 999
 }
 
-// CHECK-LABEL: $S12throw_inline3foos5Int32VyKF
+// CHECK-LABEL: $s12throw_inline3foos5Int32VyKF
 // CHECK: debug_value undef : $Error, var, name "$error", argno 1
 // CHECK: %1 = integer_literal $Builtin.Int32, 999
 // CHECK: %[[POS:.*]] = struct $Int32 (%1 : $Builtin.Int32)

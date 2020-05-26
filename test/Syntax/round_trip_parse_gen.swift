@@ -52,6 +52,7 @@ class C {
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
     _ = type(of: a).self
+    _ = a.`self`
     _ = A -> B.C<Int>
     _ = [(A) throws -> B]()
   }
@@ -92,7 +93,7 @@ class C {
   func implictMember() {
     _ = .foo
     _ = .foo(x: 12)
-    _ = .foo { 12 }
+    _ = .foo() { 12 }
     _ = .foo[12]
     _ = .foo.bar
   }
@@ -257,13 +258,21 @@ func postfix() {
   foo()
   foo() {}
   foo {}
+  foo { }
+    arg2: {}
+  foo {}
   foo.bar()
   foo.bar() {}
+  foo.bar() {}
+    arg2: {}
+    in: {}
   foo.bar {}
   foo[]
   foo[1]
   foo[] {}
   foo[1] {}
+  foo[1] {}
+    arg2: {}
   foo[1][2,x:3]
   foo?++.bar!(baz).self
   foo().0
@@ -330,6 +339,7 @@ func statementTests() {
   } catch (var x, let y) {
   } catch where false {
   } catch let e where e.foo == bar {
+  } catch .a(let a), .b(let b) where b == "" {
   } catch {
   }
   repeat { } while true
@@ -368,6 +378,8 @@ func statementTests() {
   }
 
   guard let a = b else {}
+
+  guard let self = self else {}
 
   for var i in foo where i.foo {}
   for case is Int in foo {}
@@ -433,11 +445,12 @@ extension ext where A == Int, B: Numeric {}
 extension ext.a.b {}
 
 func foo() {
-  var a = "abc \(foo()) def \(a + b + "a \(3)") gh"
+  var a = "abc \(foo()) def \(a + b + "a \(3)") gh \(bar, default: 1)"
   var a = """
   abc \( foo() + bar() )
   de \(3 + 3 + "abc \(foo()) def")
   fg
+  \(bar, default: 1)
   """
 }
 
@@ -532,13 +545,24 @@ struct S : Q, Equatable {
   @_implements(P, x)
   var y: String
   @_implements(P, g())
-  func h() {}
+  func h() { _ = \.self }
 
   @available(*, deprecated: 1.2, message: "ABC")
   fileprivate(set) var x: String
 }
 
-@_alignment(16) public struct float3 { public var x, y, z: Float }
+struct ReadModify {
+  var st0 = ("a", "b")
+  var rm0: (String, String) {
+    _read { yield (("a", "b")) }
+    _modify { yield &st0 }
+  }
+  var rm1: (String, String) {
+    _read { yield (st0) }
+  }
+}
+
+@custom @_alignment(16) public struct float3 { public var x, y, z: Float }
 
 #sourceLocation(file: "otherFile.swift", line: 5)
 
@@ -547,3 +571,25 @@ func foo() {}
 #sourceLocation()
 
 "abc \( } ) def"
+
+#assert(true)
+#assert(false)
+#assert(true, "hello world")
+
+public func anyFoo() -> some Foo {}
+public func qoo() -> some O & O2 {}
+func zlop() -> some C & AnyObject & P {}
+
+@custom(a, b,c)
+func foo() {}
+
+@custom_attr
+@custom(A: a, B: b, C:c)
+func foo() {}
+
+"abc"
+"abc \(foo)"
+#"abc"#
+#"abc \#(foo)"#
+##"abc"##
+##"abc \##(foo)"##

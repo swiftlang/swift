@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Config.h"
@@ -22,7 +23,6 @@
 #include "swift/Runtime/Portability.h"
 #include "Private.h"
 #include "WeakReference.h"
-#include "llvm/Support/Compiler.h"
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
@@ -88,6 +88,29 @@ using namespace swift;
 
 namespace {
 
+class FieldType {
+  const Metadata *type;
+  bool indirect;
+  TypeReferenceOwnership referenceOwnership;
+public:
+
+  constexpr FieldType() : type(nullptr), indirect(false), referenceOwnership() { }
+  constexpr FieldType(const Metadata *T) : type(T), indirect(false), referenceOwnership() { }
+
+  static constexpr FieldType untypedEnumCase(bool indirect) {
+    FieldType type{};
+    type.indirect = indirect;
+    return type;
+  }
+  const Metadata *getType() const { return type; }
+  const TypeReferenceOwnership getReferenceOwnership() const { return referenceOwnership; }
+  bool isIndirect() const { return indirect; }
+  void setIndirect(bool value) { indirect = value; }
+  void setReferenceOwnership(TypeReferenceOwnership newOwnership) {
+    referenceOwnership = newOwnership;
+  }
+};
+
 /// The layout of Any.
 using Any = OpaqueExistentialContainer;
 
@@ -122,57 +145,63 @@ unwrapExistential(const Metadata *T, OpaqueValue *Value) {
   return std::make_tuple(T, Value);
 }
 
-static bool loadSpecialReferenceStorage(OpaqueValue *fieldData,
-                                        const FieldType fieldType,
-                                        Any *outValue) {
-  // isWeak() implies a reference type via Sema.
-  if (!fieldType.isWeak())
-    return false;
-
-  auto type = fieldType.getType();
+static void copyWeakFieldContents(OpaqueValue *destContainer, const Metadata *type, OpaqueValue *fieldData) {
   assert(type->getKind() == MetadataKind::Optional);
+  auto *srcContainer = reinterpret_cast<WeakClassExistentialContainer*>(fieldData);
+  auto *destClassContainer = reinterpret_cast<ClassExistentialContainer*>(destContainer);
+  destClassContainer->Value = swift_unknownObjectWeakLoadStrong(&srcContainer->Value);
+  auto witnessTablesSize = type->vw_size() - sizeof(WeakClassExistentialContainer);
+  memcpy(destClassContainer->getWitnessTables(), srcContainer->getWitnessTables(), witnessTablesSize);
+}
 
-  auto *weakField = reinterpret_cast<WeakReference *>(fieldData);
-  auto *strongValue = swift_unknownWeakLoadStrong(weakField);
+static void copyUnownedFieldContents(OpaqueValue *destContainer, const Metadata *type, OpaqueValue *fieldData) {
+  auto *srcContainer = reinterpret_cast<UnownedClassExistentialContainer*>(fieldData);
+  auto *destClassContainer = reinterpret_cast<ClassExistentialContainer*>(destContainer);
+  destClassContainer->Value = swift_unknownObjectUnownedLoadStrong(&srcContainer->Value);
+  auto witnessTablesSize = type->vw_size() - sizeof(UnownedClassExistentialContainer);
+  memcpy(destClassContainer->getWitnessTables(), srcContainer->getWitnessTables(), witnessTablesSize);
+}
 
-  // Now that we have a strong reference, we need to create a temporary buffer
-  // from which to copy the whole value, which might be a native class-bound
-  // existential, which means we also need to copy n witness tables, for
-  // however many protocols are in the protocol composition. For example, if we
-  // are copying a:
-  // weak var myWeakProperty : (Protocol1 & Protocol2)?
-  // then we need to copy three values:
-  // - the instance
-  // - the witness table for Protocol1
-  // - the witness table for Protocol2
+static void copyUnmanagedFieldContents(OpaqueValue *destContainer, const Metadata *type, OpaqueValue *fieldData) {
+  // Also known as "unowned(unsafe)".
+  // This is simpler than the unowned/weak cases because unmanaged
+  // references are fundamentally the same as strong ones, so we
+  // can use the regular strong reference support that already
+  // knows how to handle existentials and Obj-C references.
+  type->vw_initializeWithCopy(destContainer, fieldData);
+}
 
-  auto *weakContainer =
-    reinterpret_cast<WeakClassExistentialContainer *>(fieldData);
+static AnyReturn copyFieldContents(OpaqueValue *fieldData,
+                                        const FieldType fieldType) {
+  Any outValue;
+  auto *type = fieldType.getType();
+  outValue.Type = type;
+  auto ownership = fieldType.getReferenceOwnership();
+  auto *destContainer = type->allocateBoxForExistentialIn(&outValue.Buffer);
 
-  // Create a temporary existential where we can put the strong reference.
-  // The allocateBuffer value witness requires a ValueBuffer to own the
-  // allocated storage.
-  ValueBuffer temporaryBuffer;
+  if (ownership.isStrong()) {
+    type->vw_initializeWithCopy(destContainer, fieldData);
+  }
 
-  auto *temporaryValue = reinterpret_cast<ClassExistentialContainer *>(
-      type->allocateBufferIn(&temporaryBuffer));
+  // Generate a conditional clause for every known ownership type.
+  // If this causes errors, it's because someone added a new ownership type
+  // to ReferenceStorage.def and missed some related updates.
+#define REF_STORAGE(Name, ...) \
+  else if (ownership.is##Name()) { \
+    copy##Name##FieldContents(destContainer, type, fieldData); \
+  }
+#include "swift/AST/ReferenceStorage.def"
 
-  // Now copy the entire value out of the parent, which will include the
-  // witness tables.
-  temporaryValue->Value = strongValue;
-  auto valueWitnessesSize = type->getValueWitnesses()->getSize() -
-                            sizeof(WeakClassExistentialContainer);
-  memcpy(temporaryValue->getWitnessTables(), weakContainer->getWitnessTables(),
-         valueWitnessesSize);
+  else {
+    // The field was declared with a reference type we don't understand.
+    warning(0, "Value with unrecognized reference type is reflected as ()");
+    // Clean up the buffer allocated above
+    type->deallocateBoxForExistentialIn(&outValue.Buffer);
+    // Return an existential containing Void
+    outValue.Type = &METADATA_SYM(EMPTY_TUPLE_MANGLING);
+  }
 
-  outValue->Type = type;
-  auto *opaqueValueAddr = type->allocateBoxForExistentialIn(&outValue->Buffer);
-  type->vw_initializeWithCopy(opaqueValueAddr,
-                              reinterpret_cast<OpaqueValue *>(temporaryValue));
-
-  type->deallocateBufferIn(&temporaryBuffer);
-  
-  return true;
+  return AnyReturn(outValue);
 }
 
 
@@ -253,14 +282,118 @@ struct TupleImpl : ReflectionMirrorImpl {
     return AnyReturn(result);
   }
 };
+  
+struct swift_closure {
+  void *fptr;
+  HeapObject *context;
+};
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift) swift_closure
+MANGLE_SYM(s20_playgroundPrintHookySScSgvg)();
 
+static bool _shouldReportMissingReflectionMetadataWarnings() {
+  // Missing metadata warnings noise up playground sessions and aren't really
+  // actionable in playground contexts. If we're running in a playground,
+  // suppress warnings.
+  //
+  // Guesstimate whether we're in a playground by looking at the
+  // _playgroundPrintHook variable in the standard library, which is set during
+  // playground execution.
+  auto hook = MANGLE_SYM(s20_playgroundPrintHookySScSgvg)();
+  if (hook.fptr) {
+    swift_release(hook.context);
+    return false;
+  } else {
+    return true;
+  }
+}
+
+/// Raise a warning about reflection metadata that could not be found
+/// at runtime. This is usually mostly harmless, but it's good to alert
+/// users that it happens.
+static void
+missing_reflection_metadata_warning(const char *fmt, ...) {
+  bool shouldWarn =
+    SWIFT_LAZY_CONSTANT(_shouldReportMissingReflectionMetadataWarnings());
+  
+  if (!shouldWarn)
+    return;
+  
+  va_list args;
+  va_start(args, fmt);
+  
+  warningv(0, fmt, args);
+}
+
+static std::pair<StringRef /*name*/, FieldType /*fieldInfo*/>
+getFieldAt(const Metadata *base, unsigned index) {
+  using namespace reflection;
+  
+  // If we failed to find the field descriptor metadata for the type, fall
+  // back to returning an empty tuple as a standin.
+  auto failedToFindMetadata = [&]() -> std::pair<StringRef, FieldType> {
+    auto typeName = swift_getTypeName(base, /*qualified*/ true);
+    missing_reflection_metadata_warning(
+      "warning: the Swift runtime found no field metadata for "
+      "type '%*s' that claims to be reflectable. Its fields will show up as "
+      "'unknown' in Mirrors\n",
+      (int)typeName.length, typeName.data);
+    return {"unknown", FieldType(&METADATA_SYM(EMPTY_TUPLE_MANGLING))};
+  };
+
+  auto *baseDesc = base->getTypeContextDescriptor();
+  if (!baseDesc)
+    return failedToFindMetadata();
+
+  auto *fields = baseDesc->Fields.get();
+  if (!fields)
+    return failedToFindMetadata();
+  
+  auto &field = fields->getFields()[index];
+  // Bounds are always valid as the offset is constant.
+  auto name = field.getFieldName();
+
+  // Enum cases don't always have types.
+  if (!field.hasMangledTypeName())
+    return {name, FieldType::untypedEnumCase(field.isIndirectCase())};
+
+  auto typeName = field.getMangledTypeName();
+
+  SubstGenericParametersFromMetadata substitutions(base);
+  auto typeInfo = swift_getTypeByMangledName(MetadataState::Complete,
+   typeName,
+   substitutions.getGenericArgs(),
+   [&substitutions](unsigned depth, unsigned index) {
+     return substitutions.getMetadata(depth, index);
+   },
+   [&substitutions](const Metadata *type, unsigned index) {
+     return substitutions.getWitnessTable(type, index);
+   });
+
+  // If demangling the type failed, pretend it's an empty type instead with
+  // a log message.
+  if (!typeInfo.getMetadata()) {
+    typeInfo = TypeInfo({&METADATA_SYM(EMPTY_TUPLE_MANGLING),
+                         MetadataState::Complete}, {});
+    missing_reflection_metadata_warning(
+      "warning: the Swift runtime was unable to demangle the type "
+      "of field '%*s'. the mangled type name is '%*s'. this field will "
+      "show up as an empty tuple in Mirrors\n",
+      (int)name.size(), name.data(),
+      (int)typeName.size(), typeName.data());
+  }
+
+  auto fieldType = FieldType(typeInfo.getMetadata());
+  fieldType.setIndirect(field.isIndirectCase());
+  fieldType.setReferenceOwnership(typeInfo.getReferenceOwnership());
+  return {name, fieldType};
+}
 
 // Implementation for structs.
 struct StructImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Struct = static_cast<const StructMetadata *>(type);
     const auto &Description = Struct->getDescription();
-    return Description->getTypeContextDescriptorFlags().isReflectable();
+    return Description->isReflectable();
   }
 
   char displayStyle() {
@@ -286,27 +419,18 @@ struct StructImpl : ReflectionMirrorImpl {
     // Load the offset from its respective vector.
     auto fieldOffset = Struct->getFieldOffsets()[i];
 
-    Any result;
+    StringRef name;
+    FieldType fieldInfo;
+    std::tie(name, fieldInfo) = getFieldAt(type, i);
+    assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
     
-    _swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
-      assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
-      
-      *outName = name.data();
-      *outFreeFunc = nullptr;
-      
-      auto *bytes = reinterpret_cast<char*>(value);
-      auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
-      
-      bool didLoad = loadSpecialReferenceStorage(fieldData, fieldInfo, &result);
-      if (!didLoad) {
-        result.Type = fieldInfo.getType();
-        auto *opaqueValueAddr = result.Type->allocateBoxForExistentialIn(&result.Buffer);
-        result.Type->vw_initializeWithCopy(opaqueValueAddr,
-                                           const_cast<OpaqueValue *>(fieldData));
-      }
-    });
-
-    return AnyReturn(result);
+    *outName = name.data();
+    *outFreeFunc = nullptr;
+    
+    auto *bytes = reinterpret_cast<char*>(value);
+    auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+    
+    return copyFieldContents(fieldData, fieldInfo);
   }
 };
 
@@ -316,7 +440,7 @@ struct EnumImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->getDescription();
-    return Description->getTypeContextDescriptorFlags().isReflectable();
+    return Description->isReflectable();
   }
   
   const char *getInfo(unsigned *tagPtr = nullptr,
@@ -325,15 +449,11 @@ struct EnumImpl : ReflectionMirrorImpl {
     // 'tag' is in the range [0..NumElements-1].
     unsigned tag = type->vw_getEnumTag(value);
 
-    const Metadata *payloadType = nullptr;
-    bool indirect = false;
-    
-    const char *caseName = nullptr;
-    _swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
-      caseName = name.data();
-      payloadType = info.getType();
-      indirect = info.isIndirect();
-    });
+    StringRef name;
+    FieldType info;
+    std::tie(name, info) = getFieldAt(type, tag);
+    const Metadata *payloadType = info.getType();
+    bool indirect = info.isIndirect();
 
     if (tagPtr)
       *tagPtr = tag;
@@ -342,7 +462,7 @@ struct EnumImpl : ReflectionMirrorImpl {
     if (indirectPtr)
       *indirectPtr = indirect;
     
-    return caseName;
+    return name.data();
   }
 
   char displayStyle() {
@@ -367,14 +487,21 @@ struct EnumImpl : ReflectionMirrorImpl {
 
     auto *caseName = getInfo(&tag, &payloadType, &indirect);
 
+    // Copy the enum itself so that we can project the data without destroying
+    // the original.
+    Any enumCopy;
+    auto *enumCopyContainer
+      = type->allocateBoxForExistentialIn(&enumCopy.Buffer);
+    type->vw_initializeWithCopy(enumCopyContainer,
+                                const_cast<OpaqueValue *>(value));
+
     // Copy the enum payload into a box
     const Metadata *boxType = (indirect ? &METADATA_SYM(Bo).base : payloadType);
     BoxPair pair = swift_allocBox(boxType);
-
-    type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
-    boxType->vw_initializeWithCopy(pair.buffer, const_cast<OpaqueValue *>(value));
-    type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value), tag);
-
+    type->vw_destructiveProjectEnumData(enumCopyContainer);
+    boxType->vw_initializeWithTake(pair.buffer, enumCopyContainer);
+    type->deallocateBoxForExistentialIn(&enumCopy.Buffer);
+    
     value = pair.buffer;
 
     // If the payload is indirect, we need to jump through the box to get it.
@@ -412,7 +539,7 @@ struct ClassImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Class = static_cast<const ClassMetadata *>(type);
     const auto &Description = Class->getDescription();
-    return Description->getTypeContextDescriptorFlags().isReflectable();
+    return Description->isReflectable();
   }
 
   char displayStyle() {
@@ -452,27 +579,18 @@ struct ClassImpl : ReflectionMirrorImpl {
   #endif
     }
 
-    Any result;
+    StringRef name;
+    FieldType fieldInfo;
+    std::tie(name, fieldInfo) = getFieldAt(type, i);
+    assert(!fieldInfo.isIndirect() && "class indirect properties not implemented");
     
-    _swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
-      assert(!fieldInfo.isIndirect() && "class indirect properties not implemented");
-      
-      auto *bytes = *reinterpret_cast<char * const *>(value);
-      auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+    auto *bytes = *reinterpret_cast<char * const *>(value);
+    auto *fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
-      *outName = name.data();
-      *outFreeFunc = nullptr;
-    
-      bool didLoad = loadSpecialReferenceStorage(fieldData, fieldInfo, &result);
-      if (!didLoad) {
-        result.Type = fieldInfo.getType();
-        auto *opaqueValueAddr = result.Type->allocateBoxForExistentialIn(&result.Buffer);
-        result.Type->vw_initializeWithCopy(opaqueValueAddr,
-                                           const_cast<OpaqueValue *>(fieldData));
-      }
-    });
-    
-    return AnyReturn(result);
+    *outName = name.data();
+    *outFreeFunc = nullptr;
+  
+    return copyFieldContents(fieldData, fieldInfo);
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -621,7 +739,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
     case MetadataKind::Opaque: {
 #if SWIFT_OBJC_INTEROP
-      // If this is the Builtin.UnknownObject type, use the dynamic type of the
+      // If this is the AnyObject type, use the dynamic type of the
       // object reference.
       if (type == &METADATA_SYM(BO).base) {
         return callClass();
@@ -636,7 +754,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
           return callClass();
         }
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     }
 
     /// TODO: Implement specialized mirror witnesses for all kinds.
@@ -660,7 +778,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
 
 // func _getNormalizedType<T>(_: T, type: Any.Type) -> Any.Type
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const Metadata *swift_reflectionMirror_normalizedType(OpaqueValue *value,
                                                       const Metadata *type,
                                                       const Metadata *T) {
@@ -668,7 +786,7 @@ const Metadata *swift_reflectionMirror_normalizedType(OpaqueValue *value,
 }
 
 // func _getChildCount<T>(_: T, type: Any.Type) -> Int
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 intptr_t swift_reflectionMirror_count(OpaqueValue *value,
                                       const Metadata *type,
                                       const Metadata *T) {
@@ -688,7 +806,7 @@ intptr_t swift_reflectionMirror_count(OpaqueValue *value,
 //   outName: UnsafeMutablePointer<UnsafePointer<CChar>?>,
 //   outFreeFunc: UnsafeMutablePointer<NameFreeFunc?>
 // ) -> Any
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 AnyReturn swift_reflectionMirror_subscript(OpaqueValue *value, const Metadata *type,
                                            intptr_t index,
                                            const char **outName,
@@ -701,19 +819,19 @@ AnyReturn swift_reflectionMirror_subscript(OpaqueValue *value, const Metadata *t
 #pragma clang diagnostic pop
 
 // func _getDisplayStyle<T>(_: T) -> CChar
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 char swift_reflectionMirror_displayStyle(OpaqueValue *value, const Metadata *T) {
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->displayStyle(); });
 }
 
 // func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *T) {
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->enumCaseName(); });
 }
 
 // func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const char *swift_OpaqueSummary(const Metadata *T) {
   switch (T->getKind()) {
     case MetadataKind::Class:
@@ -749,7 +867,7 @@ const char *swift_OpaqueSummary(const Metadata *T) {
 
 #if SWIFT_OBJC_INTEROP
 // func _getQuickLookObject<T>(_: T) -> AnyObject?
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 id swift_reflectionMirror_quickLookObject(OpaqueValue *value, const Metadata *T) {
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->quickLookObject(); });
 }

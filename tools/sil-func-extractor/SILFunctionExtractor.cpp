@@ -20,7 +20,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-func-extractor"
-#include "swift/Strings.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
@@ -111,11 +111,6 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
                llvm::cl::init(false),
                llvm::cl::desc("Do not dump AST."));
 
-static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
-    "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden,
-    llvm::cl::init(false),
-    llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
-
 static llvm::cl::opt<bool>
 DisableSILLinking("disable-sil-linking",
                   llvm::cl::init(true),
@@ -147,7 +142,7 @@ static void getFunctionNames(std::vector<std::string> &Names) {
       if (Token.empty()) {
         break;
       }
-      Names.push_back(Token);
+      Names.push_back(Token.str());
       Buffer = NewBuffer;
     }
   }
@@ -158,12 +153,12 @@ static bool stringInSortedArray(
     llvm::function_ref<bool(const std::string &, const std::string &)> &&cmp) {
   if (list.empty())
     return false;
-  auto iter = std::lower_bound(list.begin(), list.end(), str, cmp);
+  auto iter = std::lower_bound(list.begin(), list.end(), str.str(), cmp);
   // If we didn't find str, return false.
   if (list.end() == iter)
     return false;
 
-  return !cmp(str, *iter);
+  return !cmp(str.str(), *iter);
 }
 
 void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
@@ -178,9 +173,9 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
     std::string DemangledName =
         swift::Demangle::demangleSymbolAsString(MangledName);
     DemangledName = DemangledName.substr(0, DemangledName.find_first_of(" <("));
-    DEBUG(llvm::dbgs() << "Visiting New Func:\n"
-                       << "    Mangled: " << MangledName
-                       << "\n    Demangled: " << DemangledName << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Visiting New Func:\n"
+                            << "    Mangled: " << MangledName
+                            << "\n    Demangled: " << DemangledName << "\n");
 
     bool FoundMangledName = stringInSortedArray(MangledName, MangledNames,
                                                 std::less<std::string>());
@@ -191,11 +186,11 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
                  str2.substr(0, str2.find(' '));
         });
     if ((FoundMangledName || FoundDemangledName) ^ InvertMatch) {
-      DEBUG(llvm::dbgs() << "    Not removing!\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Not removing!\n");
       continue;
     }
 
-    DEBUG(llvm::dbgs() << "    Removing!\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Removing!\n");
 
     // If F has no body, there is nothing further to do.
     if (!F.size())
@@ -265,10 +260,6 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
-      AssumeUnqualifiedOwnershipWhenParsing;
-
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
@@ -281,17 +272,16 @@ int main(int argc, char **argv) {
   if (CI.getASTContext().hadError())
     return 1;
 
-  // Load the SIL if we have a module. We have to do this after SILParse
-  // creating the unfortunate double if statement.
-  if (Invocation.hasSerializedAST()) {
-    assert(!CI.hasSILModule() &&
-           "performSema() should not create a SILModule.");
-    CI.setSILModule(
-        SILModule::createEmptyModule(CI.getMainModule(), CI.getSILOptions()));
-    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
-        CI.getASTContext(), CI.getSILModule(), nullptr);
+  auto SILMod = performSILGeneration(CI.getMainModule(), CI.getSILTypes(),
+                                     CI.getSILOptions());
 
-    if (extendedInfo.isSIB() || DisableSILLinking)
+  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
+  // us.
+  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
+    auto SL = SerializedSILLoader::create(
+        CI.getASTContext(), SILMod.get(), nullptr);
+
+    if (DisableSILLinking)
       SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
     else
       SL->getAll();
@@ -328,18 +318,18 @@ int main(int argc, char **argv) {
   ArrayRef<std::string> DemangledNames(&*std::next(Names.begin(), NumMangled),
                                        NumNames - NumMangled);
 
-  DEBUG(llvm::errs() << "MangledNames to keep:\n";
-        std::for_each(MangledNames.begin(), MangledNames.end(),
-                      [](const std::string &str) {
-                        llvm::errs() << "    " << str << '\n';
-                      }));
-  DEBUG(llvm::errs() << "DemangledNames to keep:\n";
-        std::for_each(DemangledNames.begin(), DemangledNames.end(),
-                      [](const std::string &str) {
-                        llvm::errs() << "    " << str << '\n';
-                      }));
+  LLVM_DEBUG(llvm::errs() << "MangledNames to keep:\n";
+             std::for_each(MangledNames.begin(), MangledNames.end(),
+                           [](const std::string &str) {
+                             llvm::errs() << "    " << str << '\n';
+                           }));
+  LLVM_DEBUG(llvm::errs() << "DemangledNames to keep:\n";
+             std::for_each(DemangledNames.begin(), DemangledNames.end(),
+                           [](const std::string &str) {
+                             llvm::errs() << "    " << str << '\n';
+                           }));
 
-  removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
+  removeUnwantedFunctions(SILMod.get(), MangledNames, DemangledNames);
 
   if (EmitSIB) {
     llvm::SmallString<128> OutputFile;
@@ -347,10 +337,12 @@ int main(int argc, char **argv) {
       OutputFile = OutputFilename;
     } else if (ModuleName.size()) {
       OutputFile = ModuleName;
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+      llvm::sys::path::replace_extension(
+          OutputFile, file_types::getExtension(file_types::TY_SIB));
     } else {
       OutputFile = CI.getMainModule()->getName().str();
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+      llvm::sys::path::replace_extension(
+          OutputFile, file_types::getExtension(file_types::TY_SIB));
     }
 
     SerializationOptions serializationOpts;
@@ -358,14 +350,17 @@ int main(int argc, char **argv) {
     serializationOpts.SerializeAllSIL = true;
     serializationOpts.IsSIB = true;
 
-    serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+    serialize(CI.getMainModule(), serializationOpts, SILMod.get());
   } else {
     const StringRef OutputFile =
         OutputFilename.size() ? StringRef(OutputFilename) : "-";
 
+    auto SILOpts = SILOptions();
+    SILOpts.EmitVerboseSIL = EmitVerboseSIL;
+    SILOpts.EmitSortedSIL = EnableSILSortOutput;
+
     if (OutputFile == "-") {
-      CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
+      SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
     } else {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
@@ -374,8 +369,7 @@ int main(int argc, char **argv) {
                      << '\n';
         return 1;
       }
-      CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
+      SILMod->print(OS, CI.getMainModule(), SILOpts, !DisableASTDump);
     }
   }
 }

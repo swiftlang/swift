@@ -50,18 +50,18 @@ public:
   /// SIL diagnostic passes have not yet been applied.
   virtual void performedSILGeneration(SILModule &module);
 
-  /// The frontend has executed the SIL diagnostic passes.
-  virtual void performedSILDiagnostics(SILModule &module);
-
-  /// The frontend has executed the SIL optimization pipeline.
-  virtual void performedSILOptimization(SILModule &module);
-
-  /// The frontend is about to run the program as an immediate script.
-  virtual void aboutToRunImmediately(CompilerInstance &instance);
+  /// The frontend has executed the SIL optimization and diagnostics pipelines.
+  virtual void performedSILProcessing(SILModule &module);
 
   // TODO: maybe enhance this interface to hear about IRGen and LLVM
   // progress.
 };
+
+namespace frontend {
+namespace utils {
+StringRef escapeForMake(StringRef raw, llvm::SmallVectorImpl<char> &buffer);
+}
+}
 
 /// Perform all the operations of the frontend, exactly as if invoked
 /// with -frontend.

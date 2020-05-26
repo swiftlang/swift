@@ -1,4 +1,4 @@
-// RUN: %swift -target arm64-apple-ios7.1 %s -module-name main -emit-ir -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target arm64-apple-ios7.1 %s -module-name main -emit-ir -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=AArch64
 

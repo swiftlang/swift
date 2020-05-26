@@ -1,0 +1,179 @@
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 -o /dev/null %s 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+// This file tests that when we emit an error, it is a true negative. This is
+// done by parsing the emitted output from the ownership verifier.
+
+import Builtin
+
+
+sil [ossa] @coroutine_callee : $@yield_once (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  yield (), resume bb1, unwind bb2
+
+bb1:
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  unwind
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'destroy_value_before_end_borrow'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'destroy_value_before_end_borrow'
+sil [ossa] @destroy_value_before_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'destroy_value_before_end_borrow_coroutine'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_apply %2
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'destroy_value_before_end_borrow_coroutine'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'destroy_value_before_end_borrow_coroutine'
+sil [ossa] @destroy_value_before_end_borrow_coroutine : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%0) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  end_apply %token
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'destroy_value_before_end_borrow_coroutine_2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   abort_apply %2
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'destroy_value_before_end_borrow_coroutine_2'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'destroy_value_before_end_borrow_coroutine_2'
+sil [ossa] @destroy_value_before_end_borrow_coroutine_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%0) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  abort_apply %token
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'destroy_value_before_end_borrow_coroutine_3'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   abort_apply %2
+// CHECK: Block: bb1
+// CHECK: Error#: 0. End Error in Function: 'destroy_value_before_end_borrow_coroutine_3'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'destroy_value_before_end_borrow_coroutine_3'
+sil [ossa] @destroy_value_before_end_borrow_coroutine_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%0) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  abort_apply %token
+  br bb3
+
+bb2:
+  end_apply %token
+  destroy_value %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_apply %3
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine'
+sil [ossa] @parent_borrow_scope_end_before_end_borrow_coroutine : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %1 : $Builtin.NativeObject
+  end_apply %token
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   abort_apply %3
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_2'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_2'
+sil [ossa] @parent_borrow_scope_end_before_end_borrow_coroutine_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %1 : $Builtin.NativeObject
+  abort_apply %token
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_3'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   abort_apply %3
+// CHECK: Block: bb1
+// CHECK: Error#: 0. End Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_3'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_3'
+sil [ossa] @parent_borrow_scope_end_before_end_borrow_coroutine_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %1 : $Builtin.NativeObject
+  abort_apply %token
+  br bb3
+
+bb2:
+  end_apply %token
+  end_borrow %1 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+

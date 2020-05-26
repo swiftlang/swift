@@ -1,4 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// rdar://problem/56255858 - failing on no-asserts builds
+// XFAIL: no_asserts
 
 public struct stuffStruct {
     var a: Int64 = 6
@@ -13,7 +15,7 @@ public func f() {
 // is constructed in an alloca. The debug info for the alloca should not
 // describe a reference type as we would normally do with inout arguments.
 //
-// CHECK: define {{.*}} @"$S4self11stuffStructVACycfC"(
+// CHECK: define {{.*}} @"$s4self11stuffStructVACycfC"(
 // CHECK-NEXT: entry:
 // CHECK: %[[ALLOCA:.*]] = alloca %T4self11stuffStructV, align {{(4|8)}}
 // CHECK: call void @llvm.dbg.declare(metadata %T4self11stuffStructV* %[[ALLOCA]],

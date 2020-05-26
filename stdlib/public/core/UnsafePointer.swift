@@ -108,8 +108,8 @@
 /// `load(fromByteOffset:as:)` method to read values.
 ///
 ///     let rawPointer = UnsafeRawPointer(uint64Pointer)
-///     fullInteger = rawPointer.load(as: UInt64.self)   // OK
-///     firstByte = rawPointer.load(as: UInt8.self)      // OK
+///     let fullInteger = rawPointer.load(as: UInt64.self)   // OK
+///     let firstByte = rawPointer.load(as: UInt8.self)      // OK
 ///
 /// Performing Typed Pointer Arithmetic
 /// ===================================
@@ -204,7 +204,7 @@
 ///       var number = 5
 ///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout // unsafe-performance
+@frozen // unsafe-performance
 public struct UnsafePointer<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
@@ -215,7 +215,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
 
   /// Creates an `UnsafePointer` from a builtin raw pointer.
   @_transparent
-  public init(_ _rawValue : Builtin.RawPointer) {
+  public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
@@ -225,7 +225,11 @@ public struct UnsafePointer<Pointee>: _Pointer {
   /// block. The memory must not be initialized or `Pointee` must be a trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Accesses the instance referenced by this pointer.
@@ -244,7 +248,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   ///
   /// Use this method when you have a pointer to memory bound to one type and
   /// you need to access that memory as instances of another type. Accessing
-  /// memory as type `T` requires that the memory be bound to that type. A
+  /// memory as a type `T` requires that the memory be bound to that type. A
   /// memory location may only be bound to one type at a time, so accessing
   /// the same memory as an unrelated type without first rebinding the memory
   /// is undefined.
@@ -256,7 +260,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   /// pointer to `Int64`, then accesses a property on the signed integer.
   ///
   ///     let uint64Pointer: UnsafePointer<UInt64> = fetchValue()
-  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self) { ptr in
+  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) { ptr in
   ///         return ptr.pointee < 0
   ///     }
   ///
@@ -279,7 +283,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   ///   - type: The type to temporarily bind the memory referenced by this
   ///     pointer. The type `T` must be the same size and be layout compatible
   ///     with the pointer's `Pointee` type.
-  ///   - count: The number of instances of `T` to bind to `type`.
+  ///   - count: The number of instances of `Pointee` to bind to `type`.
   ///   - body: A closure that takes a  typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
@@ -313,7 +317,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   }
 
   @inlinable // unsafe-performance
-  internal static var _max : UnsafePointer {
+  internal static var _max: UnsafePointer {
     return UnsafePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
@@ -426,8 +430,8 @@ public struct UnsafePointer<Pointee>: _Pointer {
 /// to read and write values.
 ///
 ///     let rawPointer = UnsafeMutableRawPointer(uint64Pointer)
-///     fullInteger = rawPointer.load(as: UInt64.self)   // OK
-///     firstByte = rawPointer.load(as: UInt8.self)      // OK
+///     let fullInteger = rawPointer.load(as: UInt64.self)   // OK
+///     let firstByte = rawPointer.load(as: UInt8.self)      // OK
 ///
 /// Performing Typed Pointer Arithmetic
 /// ===================================
@@ -506,7 +510,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
 ///       var number = 5
 ///       let numberPointer = UnsafeMutablePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout // unsafe-performance
+@frozen // unsafe-performance
 public struct UnsafeMutablePointer<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
@@ -517,7 +521,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
 
   /// Creates an `UnsafeMutablePointer` from a builtin raw pointer.
   @_transparent
-  public init(_ _rawValue : Builtin.RawPointer) {
+  public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
@@ -526,7 +530,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///
   /// - Parameter other: The immutable pointer to convert.
   @_transparent
-  public init(mutating other: UnsafePointer<Pointee>) {
+  public init(@_nonEphemeral mutating other: UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
   }
 
@@ -536,10 +540,31 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
   @_transparent
-  public init?(mutating other: UnsafePointer<Pointee>?) {
+  public init?(@_nonEphemeral mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
     self.init(mutating: unwrapped)
   }
+  
+  /// Creates an immutable typed pointer referencing the same memory as the		
+  /// given mutable pointer.		
+  ///		
+  /// - Parameter other: The pointer to convert.		
+  @_transparent		
+  public init(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>) {
+   self._rawValue = other._rawValue		
+  }		
+
+  /// Creates an immutable typed pointer referencing the same memory as the		
+  /// given mutable pointer.		
+  ///		
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the		
+  ///   result is `nil`.		
+  @_transparent		
+  public init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
+   guard let unwrapped = other else { return nil }		
+   self.init(unwrapped)		
+  }		
+  
 
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Pointee`.
@@ -568,8 +593,22 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   public static func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
     let size = MemoryLayout<Pointee>.stride * count
-    let rawPtr =
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
+    // For any alignment <= _minAllocationAlignment, force alignment = 0.
+    // This forces the runtime's "aligned" allocation path so that
+    // deallocation does not require the original alignment.
+    //
+    // The runtime guarantees:
+    //
+    // align == 0 || align > _minAllocationAlignment:
+    //   Runtime uses "aligned allocation".
+    //
+    // 0 < align <= _minAllocationAlignment:
+    //   Runtime may use either malloc or "aligned allocation".
+    var align = Builtin.alignof(Pointee.self)
+    if Int(align) <= _minAllocationAlignment() {
+      align = (0)._builtinWordValue
+    }
+    let rawPtr = Builtin.allocRaw(size._builtinWordValue, align)
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return UnsafeMutablePointer(rawPtr)
   }
@@ -580,7 +619,11 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// block. The memory must not be initialized or `Pointee` must be a trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Accesses the instance referenced by this pointer.
@@ -741,7 +784,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveInitialize(from source: UnsafeMutablePointer, count: Int) {
+  public func moveInitialize(
+    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
+  ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
     if self < source || self >= source + count {
@@ -812,7 +857,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveAssign(from source: UnsafeMutablePointer, count: Int) {
+  public func moveAssign(
+    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
+  ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveAssign(from:) with negative count")
     _debugPrecondition(
@@ -852,7 +899,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///
   /// Use this method when you have a pointer to memory bound to one type and
   /// you need to access that memory as instances of another type. Accessing
-  /// memory as type `T` requires that the memory be bound to that type. A
+  /// memory as a type `T` requires that the memory be bound to that type. A
   /// memory location may only be bound to one type at a time, so accessing
   /// the same memory as an unrelated type without first rebinding the memory
   /// is undefined.
@@ -864,7 +911,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// pointer to `Int64`, then accesses a property on the signed integer.
   ///
   ///     let uint64Pointer: UnsafeMutablePointer<UInt64> = fetchValue()
-  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self) { ptr in
+  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) { ptr in
   ///         return ptr.pointee < 0
   ///     }
   ///
@@ -887,7 +934,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - type: The type to temporarily bind the memory referenced by this
   ///     pointer. The type `T` must be the same size and be layout compatible
   ///     with the pointer's `Pointee` type.
-  ///   - count: The number of instances of `T` to bind to `type`.
+  ///   - count: The number of instances of `Pointee` to bind to `type`.
   ///   - body: A closure that takes a mutable typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
@@ -931,7 +978,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   }
 
   @inlinable // unsafe-performance
-  internal static var _max : UnsafeMutablePointer {
+  internal static var _max: UnsafeMutablePointer {
     return UnsafeMutablePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked

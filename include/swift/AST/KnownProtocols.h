@@ -22,7 +22,7 @@ class StringRef;
 
 namespace swift {
 
-/// \brief The set of known protocols.
+/// The set of known protocols.
 enum class KnownProtocolKind : uint8_t {
 #define PROTOCOL_WITH_NAME(Id, Name) Id,
 #include "swift/AST/KnownProtocols.def"

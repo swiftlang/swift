@@ -6,18 +6,18 @@
 // CHECK-INCLUDE-MISSING: error: '{{.*}}this_header_does_not_exist.h' file not found
 
 func test() {
-  // CHECK-INCLUDE-ONLY: error: use of unresolved identifier 'includedConst'
-  // CHECK-INCLUDE-PLUS-BRIDGING-NOT: unresolved identifier 'includedConst'
-  // CHECK-INCLUDE-FRAMEWORK: error: use of unresolved identifier 'includedConst'
+  // CHECK-INCLUDE-ONLY: error: cannot find 'includedConst' in scope
+  // CHECK-INCLUDE-PLUS-BRIDGING-NOT: cannot find 'includedConst' in scope
+  // CHECK-INCLUDE-FRAMEWORK: error: cannot find 'includedConst' in scope
   _ = includedConst
   
-  // CHECK-INCLUDE-ONLY: error: use of unresolved identifier 'errSecSuccess'
-  // CHECK-INCLUDE-PLUS-BRIDGING: error: use of unresolved identifier 'errSecSuccess'
-  // CHECK-INCLUDE-FRAMEWORK: error: use of unresolved identifier 'errSecSuccess'
+  // CHECK-INCLUDE-ONLY: error: cannot find 'errSecSuccess' in scope
+  // CHECK-INCLUDE-PLUS-BRIDGING: error: cannot find 'errSecSuccess' in scope
+  // CHECK-INCLUDE-FRAMEWORK: error: cannot find 'errSecSuccess' in scope
   _ = errSecSuccess
 
 #if FRAMEWORK
-  // CHECK-INCLUDE-FRAMEWORK-NOT: error: unresolved identifier 'Base'
+  // CHECK-INCLUDE-FRAMEWORK-NOT: error: cannot find 'Base' in scope
   _ = Base()
 #endif
 }

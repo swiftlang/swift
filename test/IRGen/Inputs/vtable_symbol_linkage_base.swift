@@ -11,6 +11,9 @@ open class Base {
   internal var internalVar: Int = 30
 }
 
+open class Middle : Base {
+  public init(x: Int) {}
+}
 
 public struct Namespace {
   open class Nested {

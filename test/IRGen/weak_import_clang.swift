@@ -18,9 +18,6 @@ import Foundation
 // CHECK-10_50: @weak_variable = extern_weak global
 // CHECK-10_51: @weak_variable = extern_weak global
 
-// CHECK-10_50: @"OBJC_CLASS_$_NSUserNotificationAction" = extern_weak global %objc_class
-// CHECK-10_51: @"OBJC_CLASS_$_NSUserNotificationAction" = external global %objc_class
-
 func testObjCClass() {
   if #available(OSX 10.51, *) {
     let action = NSUserNotificationAction()

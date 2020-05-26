@@ -9,7 +9,6 @@
       key.name: "DefAccess",
       key.offset: 0,
       key.length: 167,
-      key.runtime_name: "_TtC6Access9DefAccess",
       key.nameoffset: 6,
       key.namelength: 9,
       key.bodyoffset: 17,
@@ -106,7 +105,6 @@
       key.name: "PubAccess",
       key.offset: 176,
       key.length: 211,
-      key.runtime_name: "_TtC6Access9PubAccess",
       key.nameoffset: 182,
       key.namelength: 9,
       key.bodyoffset: 193,
@@ -234,7 +232,6 @@
       key.name: "IntAccess",
       key.offset: 398,
       key.length: 167,
-      key.runtime_name: "_TtC6Access9IntAccess",
       key.nameoffset: 404,
       key.namelength: 9,
       key.bodyoffset: 415,
@@ -338,7 +335,6 @@
       key.name: "PrivAccess",
       key.offset: 575,
       key.length: 212,
-      key.runtime_name: "_TtC6Access10PrivAccess",
       key.nameoffset: 581,
       key.namelength: 10,
       key.bodyoffset: 593,
@@ -353,8 +349,8 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.var.instance,
-          key.accessibility: source.lang.swift.accessibility.private,
-          key.setter_accessibility: source.lang.swift.accessibility.private,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.setter_accessibility: source.lang.swift.accessibility.internal,
           key.name: "defProp",
           key.offset: 596,
           key.length: 21,
@@ -436,7 +432,7 @@
         },
         {
           key.kind: source.lang.swift.decl.class,
-          key.accessibility: source.lang.swift.accessibility.private,
+          key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "Nested",
           key.offset: 745,
           key.length: 40,
@@ -447,7 +443,7 @@
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.function.method.instance,
-              key.accessibility: source.lang.swift.accessibility.private,
+              key.accessibility: source.lang.swift.accessibility.internal,
               key.name: "defFunc()",
               key.offset: 764,
               key.length: 17,
@@ -552,7 +548,7 @@
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.enumelement,
-              key.accessibility: source.lang.swift.accessibility.internal,
+              key.accessibility: source.lang.swift.accessibility.public,
               key.name: "Some",
               key.offset: 916,
               key.length: 4,
@@ -570,7 +566,7 @@
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.enumelement,
-              key.accessibility: source.lang.swift.accessibility.internal,
+              key.accessibility: source.lang.swift.accessibility.public,
               key.name: "Else",
               key.offset: 928,
               key.length: 4,
@@ -787,7 +783,6 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "defFunc()",
           key.offset: 1423,
           key.length: 17,
@@ -810,7 +805,6 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "defFunc()",
           key.offset: 1467,
           key.length: 17,
@@ -833,7 +827,6 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "defFunc()",
           key.offset: 1511,
           key.length: 17,
@@ -856,7 +849,6 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "defFunc()",
           key.offset: 1556,
           key.length: 17,
@@ -869,7 +861,7 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.private,
+      key.accessibility: source.lang.swift.accessibility.fileprivate,
       key.name: "PubAccess",
       key.offset: 1584,
       key.length: 47,
@@ -887,7 +879,7 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.private,
+          key.accessibility: source.lang.swift.accessibility.fileprivate,
           key.name: "privExtFunc()",
           key.offset: 1608,
           key.length: 21,

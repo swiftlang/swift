@@ -152,6 +152,7 @@ public:
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
+  bool shouldTreatAsModuleInterface() const;
 
   bool areAllNonPrimariesSIB() const;
 
@@ -172,7 +173,7 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-
+  friend struct InterfaceSubContextDelegateImpl;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
@@ -230,10 +231,15 @@ public:
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
+  bool hasSwiftRangesPath() const;
+  bool hasCompiledSourcePath() const;
   bool hasObjCHeaderOutputPath() const;
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
+  bool hasModuleSourceInfoOutputPath() const;
+  bool hasModuleInterfaceOutputPath() const;
+  bool hasPrivateModuleInterfaceOutputPath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;
@@ -241,4 +247,4 @@ public:
 
 } // namespace swift
 
-#endif /* SWIFT_FRONTEND_FRONTENDINPUTS_H */
+#endif // SWIFT_FRONTEND_FRONTENDINPUTS_H

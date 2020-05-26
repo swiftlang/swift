@@ -514,7 +514,7 @@ public:
   /// Get the collected statistics for a function.
   FunctionStat &getFunctionStat(const SILFunction *F) {
     if (!Cache)
-      Cache = llvm::make_unique<AccumulatedOptimizerStats>();
+      Cache = std::make_unique<AccumulatedOptimizerStats>();
 
     return Cache->getFunctionStat(F);
   }
@@ -522,7 +522,7 @@ public:
   /// Get the collected statistics for a module.
   ModuleStat &getModuleStat() {
     if (!Cache)
-      Cache = llvm::make_unique<AccumulatedOptimizerStats>();
+      Cache = std::make_unique<AccumulatedOptimizerStats>();
 
     return Cache->getModuleStat();
   }
@@ -546,8 +546,8 @@ public:
 /// The output stream to be used for writing the collected statistics.
 /// Use the unique_ptr to ensure that the file is properly closed upon
 /// exit.
-std::unique_ptr<llvm::raw_ostream, std::function<void(llvm::raw_ostream *)>>
-    stats_output_stream;
+std::unique_ptr<llvm::raw_ostream, void(*)(llvm::raw_ostream *)>
+    stats_output_stream = {nullptr, nullptr};
 
 /// Return the output streamm to be used for logging the collected statistics.
 llvm::raw_ostream &stats_os() {
@@ -557,16 +557,15 @@ llvm::raw_ostream &stats_os() {
     if (!SILStatsOutputFile.empty()) {
       // Try to open the file.
       std::error_code EC;
-      llvm::raw_fd_ostream *fd_stream = new llvm::raw_fd_ostream(
+      auto fd_stream = std::make_unique<llvm::raw_fd_ostream>(
           SILStatsOutputFile, EC, llvm::sys::fs::OpenFlags::F_Text);
       if (!fd_stream->has_error() && !EC) {
-        stats_output_stream = {fd_stream,
+        stats_output_stream = {fd_stream.release(),
                                [](llvm::raw_ostream *d) { delete d; }};
         return *stats_output_stream.get();
       }
       fd_stream->clear_error();
       llvm::errs() << SILStatsOutputFile << " : " << EC.message() << "\n";
-      delete fd_stream;
     }
     // Otherwise use llvm::errs() as output. No need to destroy it at the end.
     stats_output_stream = {&llvm::errs(), [](llvm::raw_ostream *d) {}};
@@ -649,7 +648,7 @@ bool isMatchingFunction(SILFunction *F, bool shouldHaveNamePattern = false) {
     return FuncName.contains(StatsOnlyFunctionsNamePattern);
   }
 
-  return shouldHaveNamePattern ? true : false;
+  return shouldHaveNamePattern;
 }
 
 /// Compute the delta between the old and new values.

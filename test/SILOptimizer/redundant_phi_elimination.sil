@@ -1,0 +1,175 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-phi-elimination | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class X {}
+
+// CHECK-LABEL: sil @test_simple
+// CHECK: bb1:
+// CHECK:   br bb3(%0 : $Builtin.Int64)
+// CHECK: bb2:
+// CHECK:   br bb3(%1 : $Builtin.Int64)
+// CHECK: bb3([[ARG:%[0-9]+]] : $Builtin.Int64):
+// CHECK:   builtin "sadd_with_overflow_Int64"([[ARG]] : $Builtin.Int64, [[ARG]] : $Builtin.Int64,
+// CHECK: } // end sil function 'test_simple'
+sil @test_simple : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Builtin.Int64, %0 : $Builtin.Int64)
+  
+bb2:
+  br bb3(%1 : $Builtin.Int64, %1 : $Builtin.Int64)
+  
+
+bb3(%4 : $Builtin.Int64, %5 : $Builtin.Int64):
+  %6 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %8 : $Builtin.Int1, "arithmetic overflow"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_not_equal
+// CHECK: bb1:
+// CHECK:   br bb3(%0 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK: bb2:
+// CHECK:   br bb3(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK: bb3([[ARG1:%[0-9]+]] : $Builtin.Int64, [[ARG2:%[0-9]+]] : $Builtin.Int64):
+// CHECK:   builtin "sadd_with_overflow_Int64"([[ARG1]] : $Builtin.Int64, [[ARG2]] : $Builtin.Int64,
+// CHECK: } // end sil function 'test_not_equal'
+sil @test_not_equal : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Builtin.Int64, %0 : $Builtin.Int64)
+  
+bb2:
+  br bb3(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  
+
+bb3(%4 : $Builtin.Int64, %5 : $Builtin.Int64):
+  %6 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %8 : $Builtin.Int1, "arithmetic overflow"
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @unknown : $@convention(thin) () -> Builtin.Int64
+
+// CHECK-LABEL: sil @test_side_effects
+// CHECK:   [[A1:%[0-9]+]] = apply
+// CHECK:   [[A2:%[0-9]+]] = apply
+// CHECK:   br bb1([[A1]] : $Builtin.Int64, [[A2]] : $Builtin.Int64)
+// CHECK: bb1([[ARG1:%[0-9]+]] : $Builtin.Int64, [[ARG2:%[0-9]+]] : $Builtin.Int64):
+// CHECK:   builtin "sadd_with_overflow_Int64"([[ARG1]] : $Builtin.Int64, [[ARG2]] : $Builtin.Int64,
+// CHECK: } // end sil function 'test_side_effects'
+sil @test_side_effects : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @unknown : $@convention(thin) () -> Builtin.Int64
+  %0 = apply %f() : $@convention(thin) () -> Builtin.Int64
+  %1 = apply %f() : $@convention(thin) () -> Builtin.Int64
+  %2 = integer_literal $Builtin.Int1, -1
+  br bb1(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  
+bb1(%4 : $Builtin.Int64, %5 : $Builtin.Int64):
+  %6 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %8 : $Builtin.Int1, "arithmetic overflow"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_loop
+// CHECK:   br bb1(%0 : $Builtin.Int64)
+// CHECK: bb1([[ARG:%[0-9]+]] : $Builtin.Int64):
+// CHECK:   [[S1:%[0-9]+]] = builtin "sadd_with_overflow_Int64"([[ARG]] : $Builtin.Int64,
+// CHECK:   [[T1:%[0-9]+]] = tuple_extract [[S1]] {{.*}}, 0
+// CHECK:   [[T2:%[0-9]+]] = tuple_extract [[S1]] {{.*}}, 1
+// CHECK:   cond_fail [[T2]]
+// CHECK:   [[S2:%[0-9]+]] = builtin "sadd_with_overflow_Int64"([[ARG]] : $Builtin.Int64,
+// CHECK:   [[T3:%[0-9]+]] = tuple_extract [[S2]] {{.*}}, 1
+// CHECK:   cond_fail [[T3]]
+// CHECK: bb2:
+// CHECK:   br bb1([[T1]] : $Builtin.Int64)
+// CHECK: } // end sil function 'test_loop'
+sil @test_loop : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int1, -1
+  br bb1(%0 : $Builtin.Int64, %0 : $Builtin.Int64)
+  
+
+bb1(%4 : $Builtin.Int64, %5 : $Builtin.Int64):
+  %6 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
+  %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %8 : $Builtin.Int1, "arithmetic overflow"
+  %10 = builtin "sadd_with_overflow_Int64"(%5 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 0
+  %12 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %12 : $Builtin.Int1, "arithmetic overflow"
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%7 : $Builtin.Int64, %11 : $Builtin.Int64)
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_mismatching_arg
+// CHECK:   br bb1(%0 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK: bb1([[ARG1:%[0-9]+]] : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int64):
+// CHECK: bb2:
+// CHECK:   br bb1([[ARG1]] : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK: } // end sil function 'test_mismatching_arg'
+sil @test_mismatching_arg : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb1(%0 : $Builtin.Int64, %0 : $Builtin.Int64)
+  
+
+bb1(%4 : $Builtin.Int64, %5 : $Builtin.Int64):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%4 : $Builtin.Int64, %1 : $Builtin.Int64)
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_allocation_inst
+// CHECK:   alloc_ref
+// CHECK:   alloc_ref
+// CHECK: bb1([[ARG1:%[0-9]+]] : $X, [[ARG2:%[0-9]+]] : $X):
+// CHECK:   tuple ([[ARG1]] : $X, [[ARG2]] : $X)
+// CHECK: } // end sil function 'test_allocation_inst'
+sil @test_allocation_inst : $@convention(thin) () -> (X, X) {
+bb0:
+  %1 = alloc_ref $X
+  %2 = alloc_ref $X
+  br bb1(%1 : $X, %2 : $X)
+
+bb1(%3 : $X, %4 : $X):
+  %r = tuple (%3 : $X, %4 : $X)
+  return %r : $(X, X)
+}
+

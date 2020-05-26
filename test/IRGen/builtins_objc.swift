@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

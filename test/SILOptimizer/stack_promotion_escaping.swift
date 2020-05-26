@@ -10,7 +10,7 @@ final public class Escaper {
     myItem = items[0]
   }
 
-// CHECK-LABEL: sil [noinline] @$S4test7EscaperC15badStuffHappensyyF : $@convention(method) (@guaranteed Escaper) -> () {
+// CHECK-LABEL: sil [noinline] @$s4test7EscaperC15badStuffHappensyyF : $@convention(method) (@guaranteed Escaper) -> () {
 // CHECK: %2 = alloc_ref $Item
 // CHECK: alloc_ref [stack] [tail_elems $Item * %{{[0-9]+}} : $Builtin.Word] $_ContiguousArrayStorage<Item>
 // CHECK: return

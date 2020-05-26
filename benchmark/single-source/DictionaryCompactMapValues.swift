@@ -1,71 +1,47 @@
-// Dictionary compact map values benchmark
+//===--- DictionaryCompactMapValues.swift ---------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import TestsUtils
 
+let size = 100
+let oddNumbers = stride(from: 1, to: size, by: 2)
+let smallOddNumMap: [Int: Int?] =
+  Dictionary(uniqueKeysWithValues: zip(oddNumbers, oddNumbers))
+let compactOddNums: [Int: Int] =
+  Dictionary(uniqueKeysWithValues: zip(oddNumbers, oddNumbers))
+let oddStringMap: [Int: String] = Dictionary(uniqueKeysWithValues:
+  (1...size).lazy.map { ($0, $0 % 2 == 0 ? "dummy" : "\($0)") })
+
+let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
+
 public let DictionaryCompactMapValues = [
-  BenchmarkInfo(name: "DictionaryCompactMapValuesOfNilValue", runFunction: run_DictionaryCompactMapValuesOfNilValue, tags: [.validation, .api, .Dictionary]),
-  BenchmarkInfo(name: "DictionaryCompactMapValuesOfCastValue", runFunction: run_DictionaryCompactMapValuesOfCastValue, tags: [.validation, .api, .Dictionary]),
+  BenchmarkInfo(name: "DictionaryCompactMapValuesOfNilValue",
+    runFunction: compactMapValues, tags: t,
+    setUpFunction: { blackHole(smallOddNumMap); blackHole(compactOddNums)},
+    legacyFactor: 50),
+  BenchmarkInfo(name: "DictionaryCompactMapValuesOfCastValue",
+    runFunction: compactMapValuesInt, tags: t,
+    setUpFunction: { blackHole(oddStringMap); blackHole(compactOddNums)},
+    legacyFactor: 54),
 ]
 
-@inline(never)
-public func run_DictionaryCompactMapValuesOfNilValue(_ N: Int) {
-  let size = 100
-  var dict = [Int: Int?](minimumCapacity: size)
-
-  // Fill Dictionary
-  for i in 1...size {
-    if i % 2 == 0 {
-      dict[i] = nil
-    } else {
-      dict[i] = i
-    }
+func compactMapValues(N: Int) {
+  for _ in 1...20*N {
+    CheckResults(smallOddNumMap.compactMapValues({$0}) == compactOddNums)
   }
-  CheckResults(dict.count == size / 2)
-
-  var refDict = [Int: Int]()
-  for i in stride(from: 1, to: 100, by: 2) {
-    refDict[i] = i
-  }
-
-  var newDict = [Int: Int]()
-  for _ in 1...1000*N {
-    newDict = dict.compactMapValues({$0})
-    if newDict != refDict {
-      break
-    }
-  }
-
-  CheckResults(newDict == refDict)
 }
 
-@inline(never)
-public func run_DictionaryCompactMapValuesOfCastValue(_ N: Int) {
-  let size = 100
-  var dict = [Int: String](minimumCapacity: size)
-  
-  // Fill Dictionary
-  for i in 1...size {
-    if i % 2 == 0 {
-      dict[i] = "dummy"
-    } else {
-      dict[i] = "\(i)"
-    }
+func compactMapValuesInt(N: Int) {
+  for _ in 1...20*N {
+    CheckResults(oddStringMap.compactMapValues(Int.init) == compactOddNums)
   }
-  
-  CheckResults(dict.count == size)
-
-  var refDict = [Int: Int]()
-  for i in stride(from: 1, to: 100, by: 2) {
-    refDict[i] = i
-  }
-
-  var newDict = [Int: Int]()
-  for _ in 1...1000*N {
-    newDict = dict.compactMapValues(Int.init)
-    if newDict != refDict {
-      break
-    }
-  }
-  
-  CheckResults(newDict == refDict)
 }
-

@@ -91,6 +91,7 @@ public:
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override;
 
@@ -166,8 +167,9 @@ public:
   
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
-  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src, SILType T) const override {
+  virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                               Address src, SILType T,
+                                               bool isOutlined) const {
     return getSpareBitExtraInhabitantIndex(IGF, src);
   }
   
@@ -178,9 +180,10 @@ public:
   
   /// Store the extra inhabitant representation indexed by a 31-bit identifier
   /// to memory.
-  void storeExtraInhabitant(IRGenFunction &IGF,
-                            llvm::Value *index,
-                            Address dest, SILType T) const override {
+  virtual void storeExtraInhabitant(IRGenFunction &IGF,
+                                    llvm::Value *index,
+                                    Address dest, SILType T,
+                                    bool isOutlined) const {
     storeSpareBitExtraInhabitant(IGF, index, dest);
   }
   
@@ -210,19 +213,11 @@ public:
   ///   SpareBitVector spareBits;
   ///   for (EnumElementDecl *elt : u->getAllElements())
   ///     getFragileTypeInfo(elt->getArgumentType())
-  ///       .applyFixedSpareBitsMask(spareBits, 0);
+  ///       .applyFixedSpareBitsMask(IGM, spareBits);
   ///
   /// and end up with a spare bits mask for the entire enum.
-  void applyFixedSpareBitsMask(SpareBitVector &mask) const;
-  
-  /// Applies a fixed spare bits mask to the given BitVector,
-  /// clearing any bits used by valid representations of the type.
-  ///
-  /// If the bitvector is empty or smaller than this type, it is grown and
-  /// filled with bits direct from the spare bits mask. If the bitvector is
-  /// larger than this type, the trailing bits are untouched.
-  static void applyFixedSpareBitsMask(SpareBitVector &mask,
-                                      const SpareBitVector &spareBits);
+  void applyFixedSpareBitsMask(const IRGenModule &IGM,
+                               SpareBitVector &mask) const;
 
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
@@ -233,15 +228,50 @@ public:
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                        llvm::Value *numEmptyCases,
                                        Address enumAddr,
-                                       SILType T) const override;
+                                       SILType T,
+                                       bool isOutlined) const override;
 
   void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
                                  llvm::Value *numEmptyCases, Address enumAddr,
-                                 SILType T) const override;
+                                 SILType T, bool isOutlined) const override;
 
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
 };
+
+llvm::Value *getFixedTypeEnumTagSinglePayload(
+    IRGenFunction &IGF, llvm::Value *numEmptyCases, Address enumAddr,
+    llvm::Value *size, Size fixedSize, unsigned fixedExtraInhabitantCount,
+    llvm::function_ref<llvm::Value *(Address)> getExtraInhabitantIndex,
+    bool isOutlined);
+
+llvm::Value *getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
+                                              const FixedTypeInfo &fixedTI,
+                                              llvm::Value *numEmptyCases,
+                                              Address enumAddr,
+                                              SILType T, bool isOutlined);
+void storeFixedTypeEnumTagSinglePayload(
+    IRGenFunction &IGF, llvm::Value *whichCase, llvm::Value *numEmptyCases,
+    Address enumAddr, llvm::Value *size, Size fixedSize,
+    unsigned fixedExtraInhabitantCount,
+    llvm::function_ref<void(llvm::Value *, Address)> storeExtraInhabitant,
+    bool isOutlined);
+
+llvm::Value *emitLoad1to4Bytes(IRGenFunction &IGF, Address from,
+                               llvm::Value *size);
+void emitStore1to4Bytes(IRGenFunction &IGF, Address to, llvm::Value *val,
+                        llvm::Value *size);
+
+llvm::Value *emitGetTag(IRGenFunction &IGF, Address from, llvm::Value *size);
+void emitSetTag(IRGenFunction &IGF, Address to, llvm::Value *val,
+                llvm::Value *size);
+
+void storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
+                                        const FixedTypeInfo &fixedTI,
+                                        llvm::Value *index,
+                                        llvm::Value *numEmptyCases,
+                                        Address enumAddr,
+                                        SILType T, bool isOutlined);
 
 }
 }

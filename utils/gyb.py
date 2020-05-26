@@ -7,13 +7,16 @@ from __future__ import print_function
 import os
 import re
 import sys
+import textwrap
+import tokenize
+from bisect import bisect
+
+
 try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-import textwrap
-import tokenize
-from bisect import bisect
+
 
 try:
     basestring
@@ -99,7 +102,7 @@ tokenize_re = re.compile(
   )
 ''', re.VERBOSE | re.MULTILINE)
 
-gyb_block_close = re.compile('\}%[ \t]*\n?')
+gyb_block_close = re.compile(r'\}%[ \t]*\n?')
 
 
 def token_pos_to_index(token_pos, start, line_starts):
@@ -395,6 +398,8 @@ class ParseContext(object):
 
     def __init__(self, filename, template=None):
         self.filename = os.path.abspath(filename)
+        if sys.platform == 'win32':
+            self.filename = self.filename.replace('\\', '/')
         if template is None:
             with open(filename) as f:
                 self.template = f.read()
@@ -573,8 +578,6 @@ class ExecutionContext(object):
                 # We can only insert the line directive at a line break
                 if len(self.result_text) == 0 \
                    or self.result_text[-1].endswith('\n'):
-                    if sys.platform == 'win32':
-                        file = file.replace('\\', '/')
                     substitutions = {'file': file, 'line': line + 1}
                     format_str = self.line_directive + '\n'
                     self.result_text.append(format_str % substitutions)
@@ -751,7 +754,7 @@ class Code(ASTNode):
 
 
 def expand(filename, line_directive=_default_line_directive, **local_bindings):
-    r"""Return the contents of the givepn template file, executed with the given
+    r"""Return the contents of the given template file, executed with the given
     local bindings.
 
     >>> from tempfile import NamedTemporaryFile
@@ -779,7 +782,7 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     ...                    'line: %(line)d)',
     ...     x=2
     ... ).replace(
-    ...   '"%s"' % f.name, '"dummy.file"')
+    ...   '"%s"' % f.name.replace('\\', '/'), '"dummy.file"')
     >>> print(result, end='')
     //#sourceLocation(file: "dummy.file", line: 1)
     ---
@@ -1067,7 +1070,7 @@ def execute_template(
     Keyword arguments become local variable bindings in the execution context
 
     >>> root_directory = os.path.abspath('/')
-    >>> file_name = root_directory + 'dummy.file'
+    >>> file_name = (root_directory + 'dummy.file').replace('\\', '/')
     >>> ast = parse_template(file_name, text=
     ... '''Nothing
     ... % if x:
@@ -1133,16 +1136,6 @@ def execute_template(
 
 
 def main():
-    """
-    Lint this file.
-    >>> import sys
-    >>> gyb_path = os.path.realpath(__file__).replace('.pyc', '.py')
-    >>> sys.path.append(os.path.dirname(gyb_path))
-    >>> import python_lint
-    >>> python_lint.lint([gyb_path], verbose=False)
-    0
-    """
-
     import argparse
     import sys
 
@@ -1237,7 +1230,10 @@ def main():
              Line directive format string, which will be
              provided 2 substitutions, `%%(line)d` and `%%(file)s`.
 
-             Example: `// #sourceLocation(file: "%%(file)s", line: %%(line)d)`
+             Example: `#sourceLocation(file: "%%(file)s", line: %%(line)d)`
+
+             The default works automatically with the `line-directive` tool,
+             which see for more information.
              ''')
 
     args = parser.parse_args(sys.argv[1:])

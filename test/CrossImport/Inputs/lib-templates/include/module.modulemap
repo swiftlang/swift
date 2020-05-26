@@ -1,0 +1,14 @@
+module ClangLibrary {
+  header "clang_library.h"
+  module Submodule {
+    header "clang_library_submodule.h"
+  }
+}
+module core_mi6 {
+  header "core_mi6.h"
+  export *
+}
+module UniversalExports {
+  header "universal_exports.h"
+  export *
+}

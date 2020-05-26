@@ -16,7 +16,8 @@ public let OpaqueConsumingUsers = BenchmarkInfo(
   name: "OpaqueConsumingUsers",
   runFunction: run_OpaqueConsumingUsers,
   tags: [.regression, .abstraction, .refcount],
-  setUpFunction: setup_OpaqueConsumingUsers)
+  setUpFunction: setup_OpaqueConsumingUsers,
+  legacyFactor: 20)
 
 // This test exercises the ability of the optimizer to propagate the +1 from a
 // consuming argument of a non-inlineable through multiple non-inlinable call
@@ -80,9 +81,9 @@ func callFrame4(_ data: Klass, _ user: ConsumingUser) {
 
 @inline(never)
 public func run_OpaqueConsumingUsers(_ N: Int) {
-  let d = data._unsafelyUnwrappedUnchecked
-  let u = user._unsafelyUnwrappedUnchecked
-  for _ in 0..<N*200000 {
+  let d = data.unsafelyUnwrapped
+  let u = user.unsafelyUnwrapped
+  for _ in 0..<N*10_000 {
     callFrame4(d, u)
   }
 }

@@ -59,7 +59,8 @@ RC<SyntaxData> SyntaxData::getPreviousNode() const {
     if (hasParent()) {
       for (size_t I = N - 1; ; I--) {
         if (auto C = getParent()->getChild(I)) {
-          return C;
+          if (C->getRaw()->isPresent() && C->getFirstToken())
+            return C;
         }
         if (I == 0)
           break;
@@ -73,8 +74,10 @@ RC<SyntaxData> SyntaxData::getNextNode() const {
   if (hasParent()) {
     for (size_t I = getIndexInParent() + 1, N = Parent->getNumChildren();
          I != N; I++) {
-      if (auto C = getParent()->getChild(I))
-        return C;
+      if (auto C = getParent()->getChild(I)) {
+        if (C->getRaw()->isPresent() && C->getFirstToken())
+          return C;
+      }
     }
     return Parent->getNextNode();
   }
@@ -82,18 +85,24 @@ RC<SyntaxData> SyntaxData::getNextNode() const {
 }
 
 RC<SyntaxData> SyntaxData::getFirstToken() const {
+  if (getRaw()->isToken()) {
+    // Get a reference counted version of this
+    assert(hasParent() && "The syntax tree should not conisist only of the root");
+    return getParent()->getChild(getIndexInParent());
+  }
+
   for (size_t I = 0, E = getNumChildren(); I < E; ++I) {
     if (auto Child = getChild(I)) {
-      if (!Child->getRaw()->isMissing()) {
-        return Child->getFirstToken();
+      if (Child->getRaw()->isMissing())
+        continue;
+      if (Child->getRaw()->isToken()) {
+        return Child;
+      } else if (auto Token = Child->getFirstToken()) {
+        return Token;
       }
     }
   }
-
-  // Get a reference counted version of this
-  assert(getRaw()->isToken() && "Leaf node that is no token?");
-  assert(hasParent() && "The syntax tree should not conisist only of the root");
-  return getParent()->getChild(getIndexInParent());
+  return nullptr;
 }
 
 AbsolutePosition SyntaxData::getAbsolutePositionBeforeLeadingTrivia() const {

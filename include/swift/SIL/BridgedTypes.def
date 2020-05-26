@@ -53,6 +53,9 @@ BRIDGING_KNOWN_TYPE(Swift, Error)
 BRIDGE_TYPE(ObjectiveC, ObjCBool, Swift, Bool, false)
 BRIDGE_TYPE(Darwin, DarwinBoolean, Swift, Bool, false)
 
+BRIDGING_KNOWN_TYPE(WinSDK, WindowsBool)
+BRIDGE_TYPE(WinSDK, WindowsBool, Swift, Bool, false)
+
 #undef BRIDGING_KNOWN_TYPE
 #undef BRIDGE_TYPE
 

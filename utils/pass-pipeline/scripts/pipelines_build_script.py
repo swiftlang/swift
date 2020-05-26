@@ -24,8 +24,8 @@ def run_build_script_with_data_file(build_script, data_file, verbose=False):
     build_script_args = [
         build_script,
         DEFAULT_PRESENTS,
-        'extra_swift_args=^Swift$;-Xfrontend\;' +
-        '-external-pass-pipeline-filename\;-Xfrontend\;%s' % data_file]
+        r'extra_swift_args=^Swift$;-Xfrontend\;' +
+        r'-external-pass-pipeline-filename\;-Xfrontend\;%s' % data_file]
     sys.stdout.write("Running build script with: %s..." %
                      ' '.join(build_script_args))
     sys.stdout.flush()

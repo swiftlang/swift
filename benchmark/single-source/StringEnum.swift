@@ -15,7 +15,8 @@ import TestsUtils
 public let StringEnum = BenchmarkInfo(
   name: "StringEnumRawValueInitialization",
   runFunction: run_StringEnumRawValueInitialization,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  legacyFactor: 20)
 
 enum TestEnum : String {
   case c1 = "Swift"
@@ -216,11 +217,10 @@ public func run_StringEnumRawValueInitialization(_ N: Int) {
   let short = "To"
   let long = "(C, C++, Objective-C)."
   let last = "code."
-  for _ in 1...2000*N {
+  for _ in 1...100*N {
     convert(first)
     convert(short)
     convert(long)
     convert(last)
   }
 }
-

@@ -1,7 +1,7 @@
 
 // This file makes sure that we do not explode dead parameters.
 
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
 // REQUIRES: asserts
 
 sil_stage canonical
@@ -31,5 +31,5 @@ bb0(%0 : $S):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil shared @$S6calleeTf4dxd_n : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-LABEL: sil shared @$s6calleeTf4dxd_n : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: bb0([[KLASS:%[0-9]+]] : $Klass):

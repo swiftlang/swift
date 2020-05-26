@@ -1,0 +1,17 @@
+{
+  'version': 0,
+  'use-external-names': false,
+  'roots': [
+    {
+      'name': 'OUT_DIR', 'type': 'directory',
+      'contents': [
+        { 'name': 'YetAnotherVFSMappedModule.h', 'type': 'file',
+          'external-contents': 'INPUT_DIR/vfs/b-header'
+        },
+        { 'name': 'YetAnotherVFSMappedModule.framework/Headers/VFSMappedModule.h', 'type': 'file',
+          'external-contents': 'INPUT_DIR/vfs/b-header'
+        },
+      ]
+    },
+  ]
+}

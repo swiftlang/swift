@@ -49,7 +49,7 @@ extension MutableCollection where Self: BidirectionalCollection {
 /// * `c.reversed()` does not create new storage
 /// * `c.reversed().map(f)` maps eagerly and returns a new array
 /// * `c.lazy.reversed().map(f)` maps lazily and returns a `LazyMapCollection`
-@_fixed_layout
+@frozen
 public struct ReversedCollection<Base: BidirectionalCollection> {
   public let _base: Base
 
@@ -65,7 +65,7 @@ public struct ReversedCollection<Base: BidirectionalCollection> {
 
 extension ReversedCollection {
   // An iterator that can be much faster than the iterator of a reversed slice.
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     @usableFromInline
     internal let _base: Base
@@ -104,7 +104,7 @@ extension ReversedCollection: Sequence {
 
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base)
   }
 }
@@ -112,7 +112,7 @@ extension ReversedCollection: Sequence {
 extension ReversedCollection {
   /// An index that traverses the same positions as an underlying index,
   /// with inverted traversal direction.
-  @_fixed_layout
+  @frozen
   public struct Index {
     /// The position after this position in the underlying collection.
     ///
@@ -156,7 +156,7 @@ extension ReversedCollection {
     ///     // name[aIndex] == "a"
     ///
     ///     let reversedName = name.reversed()
-    ///     let i = ReversedIndex<String>(aIndex)
+    ///     let i = ReversedCollection<String>.Index(aIndex)
     ///     // reversedName[i] == "r"
     ///
     /// The element at the position created using `ReversedIndex<...>(aIndex)` is
@@ -257,7 +257,7 @@ extension ReversedCollection {
   /// - Complexity: O(1)
   @inlinable
   @available(swift, introduced: 4.2)
-  public func reversed() -> Base {
+  public __consuming func reversed() -> Base {
     return _base
   }
 }
@@ -289,21 +289,7 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func reversed() -> ReversedCollection<Self> {
+  public __consuming func reversed() -> ReversedCollection<Self> {
     return ReversedCollection(_base: self)
-  }
-}
-
-extension LazyCollectionProtocol
-  where
-  Self: BidirectionalCollection,
-  Elements: BidirectionalCollection {
-
-  /// Returns the elements of the collection in reverse order.
-  ///
-  /// - Complexity: O(1)
-  @inlinable
-  public func reversed() -> LazyCollection<ReversedCollection<Elements>> {
-    return ReversedCollection(_base: elements).lazy
   }
 }

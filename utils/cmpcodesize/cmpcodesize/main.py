@@ -82,6 +82,11 @@ How to specify files:
                         action='store_true',
                         dest='all_sections',
                         default=False)
+    parser.add_argument('-z', '--additional-segments',
+                        help='Show sizes of additional segments.',
+                        action='store_true',
+                        dest='all_segments',
+                        default=False)
     parser.add_argument('-c', '--category',
                         help='Show functions by category.',
                         action='store_true',
@@ -107,6 +112,18 @@ How to specify files:
                              'other programs.',
                         action='store_true',
                         default=False)
+    parser.add_argument('-o', '--old-build-directory',
+                        help='The directory containing the baseline objects ' +
+                             'against which to compare sizes.',
+                        action='store',
+                        dest='old_build_dir',
+                        default=None)
+    parser.add_argument('-n', '--new-build-directory',
+                        help='The directory containing the new objects whose' +
+                             'sizes are to be compared against the baseline.',
+                        action='store',
+                        dest='new_build_dir',
+                        default=None)
 
     # Positional arguments.
     # These can be specified in means beyond what argparse supports,
@@ -126,9 +143,10 @@ How to specify files:
         # exclusivity among options, not among groups of options, so
         # we detect this case manually.
         assert (not parsed_arguments.all_sections and
+                not parsed_arguments.all_segments and
                 not parsed_arguments.list_categories), \
             'Incorrect usage: --list cannot be specified in conjunction ' + \
-            'with --additional-sections or --category.'
+            'with --additional-sections or --additional-segments or --category.'
         # A file must be specified when using --list.
         assert parsed_arguments.files, \
             'Incorrect usage: Must specify between one and two files when ' + \
@@ -145,8 +163,12 @@ How to specify files:
     else:
         old_file_args = parsed_arguments.files
 
-        old_build_dir = os.environ.get("SWIFT_OLD_BUILDDIR")
-        new_build_dir = os.environ.get("SWIFT_NEW_BUILDDIR")
+        old_build_dir = parsed_arguments.old_build_dir
+        if not old_build_dir:
+            old_build_dir = os.environ.get("SWIFT_OLD_BUILDDIR")
+        new_build_dir = parsed_arguments.new_build_dir
+        if not new_build_dir:
+            new_build_dir = os.environ.get("SWIFT_NEW_BUILDDIR")
 
         if not parsed_arguments.files:
             assert old_build_dir and new_build_dir, \
@@ -203,7 +225,8 @@ How to specify files:
         if parsed_arguments.sum_sizes:
             compare_sizes_of_file(old_files, new_files,
                                   parsed_arguments.all_sections,
-                                  parsed_arguments.list_categories, 
+                                  parsed_arguments.all_segments,
+                                  parsed_arguments.list_categories,
                                   csv=csv_out)
         else:
             if len(old_files) != len(new_files):
@@ -215,6 +238,7 @@ How to specify files:
             for old_file, new_file in zip(old_files, new_files):
                 compare_sizes_of_file([old_file], [new_file],
                                       parsed_arguments.all_sections,
+                                      parsed_arguments.all_segments,
                                       parsed_arguments.list_categories,
                                       csv=csv_out)
 

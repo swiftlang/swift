@@ -19,9 +19,12 @@ NS_ASSUME_NONNULL_BEGIN
   NSArray<NSString *> *myArrayOfStrings;
   NSDate *myBeginDate;
   NSDate *myEndDate;
+  NSArray<NSString *> *cornucopiaOfStrings;
+  NSArray<NSString *> *bridgedStrings;
 }
 
 - (id)init;
+- (void)setUpStringTests:(NSArray<NSString *> *)bridgedStrings;
 - (void)testFromString:(NSString *) str;
 - (NSString *)testToString;
 - (void)testFromArrayOfStrings:(NSArray<NSString *> *)arr;
@@ -30,6 +33,18 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSDate *)beginDate;
 - (NSDate *)endDate;
 - (void)useDate:(NSDate *)date;
+
+- (void)testIsEqualToString;
+- (void)testIsEqualToString2;
+- (void)testIsEqualToStringAllSwift;
+- (void)testUTF8String;
+- (void)testCStringUsingEncoding;
+- (void)testGetUTF8Contents;
+- (void)testGetASCIIContents;
+- (void)testRangeOfString;
+- (void)testHash;
+- (void)testCompare;
+- (void)testCompare2;
 
 @end
 

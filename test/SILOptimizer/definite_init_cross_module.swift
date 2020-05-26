@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift
-// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 5 %s > /dev/null -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
+// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 5 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift -enable-ownership-stripping-after-serialization
+// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 5 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h -enable-ownership-stripping-after-serialization
 
 import OtherModule
 
@@ -45,6 +49,13 @@ extension Point {
     if cond { self = other }
     self.x = xx // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
     self.y = 0 // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+
+  // Test failable initializer.
+  init?(p: Point) {
+    if p.x > 0 {
+      self = p
+    }
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 

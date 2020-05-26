@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Defines version macros and version-related utility functions
+/// Defines version macros and version-related utility functions
 /// for Swift.
 ///
 //===----------------------------------------------------------------------===//
@@ -24,7 +24,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "clang/Basic/VersionTuple.h"
+#include "llvm/Support/VersionTuple.h"
 #include <string>
 
 namespace swift {
@@ -93,9 +93,9 @@ public:
     return Components.empty();
   }
 
-  /// Convert to a (maximum-4-element) clang::VersionTuple, truncating
+  /// Convert to a (maximum-4-element) llvm::VersionTuple, truncating
   /// away any 5th component that might be in this version.
-  operator clang::VersionTuple() const;
+  operator llvm::VersionTuple() const;
 
   /// Returns the concrete version to use when \e this version is provided as
   /// an argument to -swift-version.
@@ -106,9 +106,6 @@ public:
   /// result; for example "-swift-version 3" at one point instructed the
   /// compiler to act as if it is version 3.1.
   Optional<Version> getEffectiveLanguageVersion() const;
-
-  /// Whether this version is in the Swift 3 family
-  bool isVersion3() const { return !empty() && Components[0] == 3; }
 
   /// Whether this version is greater than or equal to the given major version
   /// number.
@@ -155,12 +152,13 @@ public:
 
   // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
-  static std::array<StringRef, 4> getValidEffectiveVersions() {
-    return {{"3", "4", "4.2", "5"}};
+  static std::array<StringRef, 3> getValidEffectiveVersions() {
+    return {{"4", "4.2", "5"}};
   };
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
+bool operator<(const Version &lhs, const Version &rhs);
 bool operator==(const Version &lhs, const Version &rhs);
 inline bool operator!=(const Version &lhs, const Version &rhs) {
   return !(lhs == rhs);

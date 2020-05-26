@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -27,7 +28,9 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeExpansionContext.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -36,53 +39,75 @@
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
-namespace llvm {
-  struct fltSemantics;
-}
-namespace swift {
-  enum class AllocationArena;
-  class ArchetypeType;
-  class AssociatedTypeDecl;
-  class ASTContext;
-  class ClassDecl;
-  class DependentMemberType;
-  class GenericTypeParamDecl;
-  class GenericTypeParamType;
-  class GenericParamList;
-  class GenericSignature;
-  class Identifier;
-  enum class ResilienceExpansion : unsigned;
-  class SILModule;
-  class SILType;
-  class TypeAliasDecl;
-  class TypeDecl;
-  class NominalTypeDecl;
-  class GenericTypeDecl;
-  class EnumDecl;
-  class EnumElementDecl;
-  class StructDecl;
-  class ProtocolDecl;
-  class TypeVariableType;
-  class ValueDecl;
-  class ModuleDecl;
-  class ModuleType;
-  class ProtocolConformance;
-  enum PointerTypeKind : unsigned;
-  struct ValueOwnershipKind;
+namespace clang {
+class Type;
+class FunctionType;
+} // namespace clang
 
-  enum class TypeKind : uint8_t {
+namespace llvm {
+struct fltSemantics;
+} // namespace llvm
+
+namespace swift {
+
+enum class AllocationArena;
+class ArchetypeType;
+class AssociatedTypeDecl;
+class ASTContext;
+enum BufferPointerTypeKind : unsigned;
+class ClassDecl;
+class ClangModuleLoader;
+class DependentMemberType;
+class GenericTypeParamDecl;
+class GenericTypeParamType;
+class GenericParamList;
+class GenericSignature;
+class GenericSignatureBuilder;
+class Identifier;
+class InOutType;
+class OpaqueTypeDecl;
+class OpenedArchetypeType;
+enum class ReferenceCounting : uint8_t;
+enum class ResilienceExpansion : unsigned;
+class SILModule;
+class SILType;
+class TypeAliasDecl;
+class TypeDecl;
+class NominalTypeDecl;
+class GenericTypeDecl;
+class EnumDecl;
+class EnumElementDecl;
+class SILFunctionType;
+class StructDecl;
+class ProtocolDecl;
+class TypeVariableType;
+class ValueDecl;
+class ModuleDecl;
+class ModuleType;
+class ProtocolConformance;
+enum PointerTypeKind : unsigned;
+struct ValueOwnershipKind;
+
+typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
+
+enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
 #define LAST_TYPE(id) Last_Type = id,
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
-  };
-  enum : unsigned { NumTypeKindBits =
-    countBitsUsed(static_cast<unsigned>(TypeKind::Last_Type)) };
-  
+};
+
+enum : unsigned {
+  NumTypeKindBits = countBitsUsed(static_cast<unsigned>(TypeKind::Last_Type))
+};
+
+enum class BuiltinTypeKind : std::underlying_type<TypeKind>::type;
+
 /// Various properties of types that are primarily defined recursively
 /// on structural types.
 class RecursiveTypeProperties {
@@ -95,7 +120,8 @@ public:
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
-    /// This type expression contains an ArchetypeType.
+    /// This type expression contains a context-dependent archetype, either a
+    /// PrimaryArchetypeType or OpenedArchetypeType.
     HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
@@ -122,8 +148,11 @@ public:
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
+    
+    /// This type contains an OpaqueTypeArchetype.
+    HasOpaqueArchetype   = 0x400,
 
-    Last_Property = HasDependentMember
+    Last_Property = HasOpaqueArchetype
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -142,16 +171,20 @@ public:
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
 
-  /// Does a type with these properties structurally contain an
-  /// archetype?
+  /// Does a type with these properties structurally contain a
+  /// context-dependent archetype (that is, a Primary- or OpenedArchetype)?
   bool hasArchetype() const { return Bits & HasArchetype; }
 
+  /// Does a type with these properties structurally contain an
+  /// archetype from an opaque type declaration?
+  bool hasOpaqueArchetype() const { return Bits & HasOpaqueArchetype; }
+  
   /// Does a type with these properties have a type parameter somewhere in it?
   bool hasTypeParameter() const { return Bits & HasTypeParameter; }
 
   /// Does a type with these properties have an unresolved type somewhere in it?
   bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
-  
+
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
 
@@ -244,7 +277,9 @@ enum class TypeMatchFlags {
   ///
   /// This is necessary because Objective-C allows optional function paramaters
   /// to be non-escaping, but Swift currently does not.
-  IgnoreNonEscapingForOptionalFunctionParam = 1 << 4
+  IgnoreNonEscapingForOptionalFunctionParam = 1 << 4,
+  /// Allow compatible opaque archetypes.
+  AllowCompatibleOpaqueTypeArchetypes = 1 << 5
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -274,8 +309,8 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 7 };
-  enum { NumSILExtInfoBits = 6 };
+  enum { NumAFTExtInfoBits = 8 };
+  enum { NumSILExtInfoBits = 8 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -304,11 +339,11 @@ protected:
     Flags : NumFlagBits
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    ExtInfo : NumAFTExtInfoBits,
-
+    ExtInfoBits : NumAFTExtInfoBits,
+    HasUncommonInfo : 1,
     : NumPadBits,
     NumParams : 16
   );
@@ -321,23 +356,22 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
-    /// \brief The unique number assigned to this type variable.
-    ID : 32 - NumTypeBaseBits,
-
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 5+32,
     /// Type variable options.
-    Options : 3,
-
-    ///  Index into the list of type variables, as used by the
-    ///  constraint graph.
-    GraphIndex : 29
+    Options : 5,
+    : NumPadBits,
+    /// The unique number assigned to this type variable.
+    ID : 32
   );
 
-  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
-    ExtInfo : NumSILExtInfoBits,
+  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+3+1+2+1+1,
+    ExtInfoBits : NumSILExtInfoBits,
+    HasUncommonInfo : 1,
     CalleeConvention : 3,
     HasErrorResult : 1,
-    CoroutineKind : 2
+    CoroutineKind : 2,
+    HasInvocationSubs : 1,
+    HasPatternSubs : 1
   );
 
   SWIFT_INLINE_BITFIELD(AnyMetatypeType, TypeBase, 2,
@@ -360,8 +394,9 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
-    /// Whether an element of the tuple is inout.
-    HasInOutElement : 1,
+    /// Whether an element of the tuple is inout, __shared or __owned.
+    /// Values cannot have such tuple types in the language.
+    HasElementWithOwnership : 1,
 
     : NumPadBits,
 
@@ -376,7 +411,7 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+1,
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1,
     : NumPadBits,
 
     /// Whether we have a parent type.
@@ -435,11 +470,15 @@ public:
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature *sig);
+  CanType getCanonicalType(GenericSignature sig);
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
   TypeBase *reconstituteSugar(bool Recursive);
+
+  // If this type is a syntax sugar type, desugar it. Also desugar any nested
+  // syntax sugar types.
+  TypeBase *getWithoutSyntaxSugar();
 
   /// getASTContext - Return the ASTContext that this type belongs to.
   ASTContext &getASTContext() {
@@ -501,6 +540,8 @@ public:
   /// Is this the 'Any' type?
   bool isAny();
 
+  bool isHole();
+
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 
@@ -517,27 +558,32 @@ public:
   
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool allowsOwnership();  
+  bool allowsOwnership(const GenericSignatureImpl *sig = nullptr);
 
-  /// \brief Determine whether this type involves a type variable.
+  /// Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
     return getRecursiveProperties().hasTypeVariable();
   }
 
-  /// \brief Determine where this type is a type variable or a dependent
+  /// Determine where this type is a type variable or a dependent
   /// member root in a type variable.
   bool isTypeVariableOrMember();
 
-  /// \brief Determine whether this type involves a UnresolvedType.
+  /// Determine whether this type involves a UnresolvedType.
   bool hasUnresolvedType() const {
     return getRecursiveProperties().hasUnresolvedType();
   }
-  
-  /// \brief Determine whether the type involves an archetype.
+
+  /// Determine whether this type involves a hole.
+  bool hasHole() const {
+    return getRecursiveProperties().hasUnresolvedType();
+  }
+
+  /// Determine whether the type involves a context-dependent archetype.
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
   }
-
+  
   /// Determine whether the type involves an opened existential archetype.
   bool hasOpenedExistential() const {
     return getRecursiveProperties().hasOpenedExistential();
@@ -545,7 +591,15 @@ public:
 
   /// Determine whether the type involves the given opened existential
   /// archetype.
-  bool hasOpenedExistential(ArchetypeType *opened);
+  bool hasOpenedExistential(OpenedArchetypeType *opened);
+
+  /// Determine whether the type involves an opaque type.
+  bool hasOpaqueArchetype() const {
+    return getRecursiveProperties().hasOpaqueArchetype();
+  }
+  /// Determine whether the type has any stored properties or enum cases that
+  /// involve an opaque type.
+  bool hasOpaqueArchetypePropertiesOrCases();
 
   /// Determine whether the type is an opened existential type.
   ///
@@ -558,15 +612,11 @@ public:
 
   /// Retrieve the set of opened existential archetypes that occur
   /// within this type.
-  void getOpenedExistentials(SmallVectorImpl<ArchetypeType *> &opened);
+  void getOpenedExistentials(SmallVectorImpl<OpenedArchetypeType *> &opened);
 
   /// Erase the given opened existential type by replacing it with its
   /// existential type throughout the given type.
-  Type eraseOpenedExistential(ArchetypeType *opened);
-
-  /// Erase DynamicSelfType from the given type by replacing it with its
-  /// underlying type.
-  Type eraseDynamicSelfType();
+  Type eraseOpenedExistential(OpenedArchetypeType *opened);
 
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
@@ -576,7 +626,7 @@ public:
   /// Map a contextual type to an interface type.
   Type mapTypeOutOfContext();
 
-  /// \brief Compute and return the set of type variables that occur within this
+  /// Compute and return the set of type variables that occur within this
   /// type.
   ///
   /// \param typeVariables This vector is populated with the set of
@@ -592,7 +642,7 @@ public:
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
 
-  /// \brief Determine whether this type can dynamically be an optional type.
+  /// Determine whether this type can dynamically be an optional type.
   ///
   /// \param includeExistential Whether an existential type should be considered
   /// such a type.
@@ -618,9 +668,13 @@ public:
     return getRecursiveProperties().isLValue();
   }
   
-  /// Is a type with these properties materializable: that is, is it a
-  /// first-class value type?
+  /// Is this a first-class value type, meaning it is not an InOutType or a
+  /// tuple type containing an InOutType?
   bool isMaterializable();
+
+  /// Is this a non-escaping type, that is, a non-escaping function type or a
+  /// tuple type containing a non-escaping type?
+  bool isNoEscape() const;
 
   /// Determine whether the type is dependent on DynamicSelf.
   bool hasDynamicSelfType() const {
@@ -643,11 +697,6 @@ public:
     return getRecursiveProperties().hasDependentMember();
   }
 
-  /// \brief Check if this type is a valid type for the LHS of an assignment.
-  /// This mainly means hasLValueType(), but empty tuples and tuples of empty
-  /// tuples also qualify.
-  bool isAssignableType();
-
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
   /// some set of protocols. Protocol and protocol-conformance types are
@@ -669,7 +718,7 @@ public:
   bool isClassExistentialType();
 
   /// Opens an existential instance or meta-type and returns the opened type.
-  Type openAnyExistentialType(ArchetypeType *&opened);
+  Type openAnyExistentialType(OpenedArchetypeType *&opened);
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
@@ -682,14 +731,28 @@ public:
     PointerTypeKind Ignore;
     return getAnyPointerElementType(Ignore);
   }
+
+  /// Returns a type representing a pointer to \c this.
+  ///
+  /// \p kind must not be a raw pointer kind, since that would discard the
+  /// current type.
+  Type wrapInPointer(PointerTypeKind kind);
   
-  /// \brief Determine whether the given type is "specialized", meaning that
+  /// Determines the element type of a known Unsafe[Mutable][Raw]BufferPointer
+  /// variant, or returns null if the type is not a buffer pointer.
+  Type getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK);
+  Type getAnyBufferPointerElementType() {
+    BufferPointerTypeKind Ignore;
+    return getAnyBufferPointerElementType(Ignore);
+  }
+
+  /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
   /// specialized, but the type Vector is not.
   bool isSpecialized();
 
-  /// \brief Determine whether this type is a legal, lowered SIL type.
+  /// Determine whether this type is a legal, lowered SIL type.
   ///
   /// A type is SIL-illegal if it is:
   ///   - an l-value type,
@@ -699,7 +762,7 @@ public:
   ///   - a tuple type with a SIL-illegal element type.
   bool isLegalSILType();
 
-  /// \brief Determine whether this type is a legal formal type.
+  /// Determine whether this type is a legal formal type.
   ///
   /// A type is illegal as a formal type if it is:
   ///   - an l-value type,
@@ -712,28 +775,31 @@ public:
   /// These are the types of the Swift type system.
   bool isLegalFormalType();
 
-  /// \brief Check if this type is equal to the empty tuple type.
+  /// Check if this type is equal to the empty tuple type.
   bool isVoid();
 
-  /// \brief Check if this type is equal to Swift.Bool.
+  /// Check if this type is equal to Swift.Bool.
   bool isBool();
 
-  /// \brief Check if this type is equal to Builtin.IntN.
+  /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
+  
+  /// Check if this is a nominal type defined at the top level of the Swift module
+  bool isStdlibType();
 
-  /// \brief If this is a class type or a bound generic class type, returns the
+  /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
   
-  /// \brief If this is a struct type or a bound generic struct type, returns
+  /// If this is a struct type or a bound generic struct type, returns
   /// the (possibly generic) class.
   StructDecl *getStructOrBoundGenericStruct();
   
-  /// \brief If this is an enum or a bound generic enum type, returns the
+  /// If this is an enum or a bound generic enum type, returns the
   /// (possibly generic) enum.
   EnumDecl *getEnumOrBoundGenericEnum();
   
-  /// \brief Determine whether this type may have a superclass, which holds for
+  /// Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
   /// with a class type.
   bool mayHaveSuperclass();
@@ -748,7 +814,7 @@ public:
   /// - classes
   bool satisfiesClassConstraint();
 
-  /// \brief Determine whether this type can be used as a base type for AST
+  /// Determine whether this type can be used as a base type for AST
   /// name lookup, which is the case for nominal types, protocol compositions
   /// and archetypes.
   ///
@@ -765,7 +831,20 @@ public:
             getAnyNominal());
   }
 
-  /// \brief Retrieve the superclass of this type.
+  /// Checks whether this is a type that supports being called through the
+  /// implementation of a \c callAsFunction method. Note that this does not
+  /// check access control.
+  bool isCallableNominalType(DeclContext *dc);
+
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicMemberLookup attribute on it.
+  bool hasDynamicMemberLookupAttribute();
+  
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicCallable attribute on it.
+  bool hasDynamicCallableAttribute();
+
+  /// Retrieve the superclass of this type.
   ///
   /// \param useArchetypes Whether to use context archetypes for outer generic
   /// parameters if the class is nested inside a generic function.
@@ -774,7 +853,7 @@ public:
   ///          superclass.
   Type getSuperclass(bool useArchetypes = true);
   
-  /// \brief True if this type is the exact superclass of another type.
+  /// True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.
   ///
@@ -789,7 +868,7 @@ public:
   /// a type's subclass.
   bool isExactSuperclassOf(Type ty);
 
-  /// \brief Get the substituted base class type, starting from a base class
+  /// Get the substituted base class type, starting from a base class
   /// declaration and a substituted derived class type.
   ///
   /// For example, given the following declarations:
@@ -806,24 +885,7 @@ public:
   Type getSuperclassForDecl(const ClassDecl *classDecl,
                             bool useArchetypes = true);
 
-  /// \brief Whether this type or its superclasses has some form of generic
-  /// context.
-  ///
-  /// For example, given
-  ///
-  /// class A<X> {}
-  /// class B : A<Int> {}
-  /// struct C<T> {
-  ///   struct Inner {}
-  /// }
-  /// class D {}
-  /// class E: D {}
-  ///
-  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
-  /// returns `C<T>.Inner`, but on `E` it returns null.
-  Type getGenericAncestor();
-
-  /// \brief True if this type is the superclass of another type, or a generic
+  /// True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
   ///
   /// \param ty       The potential subclass.
@@ -836,29 +898,53 @@ public:
   /// True if this type contains archetypes that could be substituted with
   /// concrete types to form the argument type.
   bool isBindableTo(Type ty);
-
-  /// \brief Determines whether this type is similar to \p other as defined by
+  
+  /// Visit this type and the argument type in parallel, invoking the callback
+  /// function with each archetype-to-substituted-type binding. The callback
+  /// may return a new type to substitute into the result type, or return
+  /// CanType() to error out of the operation. Each invocation of the callback
+  /// receives three arguments:
+  /// - The `orig` archetype from a position in `this` type.
+  /// - The `subst` type in the same structural position of `ty` that is trying to be bound
+  ///  to `orig`.
+  /// - The `upperBound` archetype, which if set, indicates the minimum set of constraints
+  ///  that any type substituted in this structural position must conform to. May be null,
+  ///  indicating an unconstrained context.
+  /// - If `upperBound` is set, then the `substConformances` array will contain the
+  ///  protocol conformances for `subst` to each of the protocol requirements
+  ///  on `upperBound` in `getConformsTo` order.
+  ///
+  /// Returns the substituted type, or a null CanType() if this type
+  /// is not bindable to the substituted type, or the callback returns
+  /// CanType().
+  CanType substituteBindingsTo(Type ty,
+         llvm::function_ref<CanType(ArchetypeType *orig,
+                CanType subst,
+                ArchetypeType *upperBound,
+                ArrayRef<ProtocolConformanceRef> substConformances)> substFn);
+  
+  /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
   bool matches(Type other, TypeMatchOptions matchOptions);
 
   bool matchesParameter(Type other, TypeMatchOptions matchMode);
 
-  /// \brief Determines whether this function type is similar to \p
+  /// Determines whether this function type is similar to \p
   /// other as defined by \p matchOptions and the callback \p
   /// paramsAndResultMatch which determines in a client-specific way
   /// whether the parameters and result of the types match.
   bool matchesFunctionType(Type other, TypeMatchOptions matchOptions,
                            llvm::function_ref<bool()> paramsAndResultMatch);
 
-  /// \brief Determines whether this type has a retainable pointer
+  /// Determines whether this type has a retainable pointer
   /// representation, i.e. whether it is representable as a single,
   /// possibly nil pointer that can be unknown-retained and
   /// unknown-released.
   bool hasRetainablePointerRepresentation();
 
-  /// \brief Given that this type is a reference type, is it known to use
-  /// Swift-native reference counting?
-  bool usesNativeReferenceCounting(ResilienceExpansion resilience);
+  /// Given that this type is a reference type, which kind of reference
+  /// counting does it use?
+  ReferenceCounting getReferenceCounting();
 
   /// Determines whether this type has a bridgeable object
   /// representation, i.e., whether it is always represented as a single
@@ -878,11 +964,11 @@ public:
   /// conceivably be bridged to an Objective-C class type.
   bool isPotentiallyBridgedValueType();
 
-  /// \brief If this is a nominal type or a bound generic nominal type,
+  /// If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();
 
-  /// \brief If this is a nominal type, bound generic nominal type, or
+  /// If this is a nominal type, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
   /// declaration.
   NominalTypeDecl *getAnyNominal();
@@ -907,30 +993,19 @@ public:
   bool isTriviallyRepresentableIn(ForeignLanguage language,
                                   const DeclContext *dc);
 
-  /// \brief Given that this is a nominal type or bound generic nominal
+  /// Given that this is a nominal type or bound generic nominal
   /// type, return its parent type; this will be a null type if the type
   /// is not a nested type.
   Type getNominalParent();
 
-  /// \brief If this is a GenericType, bound generic nominal type, or
+  /// If this is a GenericType, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
   /// declaration.
   GenericTypeDecl *getAnyGeneric();
 
-  /// getUnlabeledType - Retrieve a version of this type with all labels
-  /// removed at every level. For example, given a tuple type 
-  /// \code
-  /// (p : (x : int, y : int))
-  /// \endcode
-  /// the result would be the (parenthesized) type ((int, int)).
-  Type getUnlabeledType(ASTContext &Context);
-
-  /// Retrieve the type without any labels around it. For example, given
-  /// \code
-  /// (p : int)
-  /// \endcode
-  /// the result would be the (unparenthesized) type 'int'.
-  Type getWithoutImmediateLabel();
+  /// removeArgumentLabels -  Retrieve a version of this type with all
+  /// argument labels removed.
+  Type removeArgumentLabels(unsigned numArgumentLabels);
 
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
@@ -956,11 +1031,6 @@ public:
   /// Otherwise, returns the type itself.
   Type getRValueType();
 
-  /// getRValueType - For an @lvalue type or tuple containing a single
-  /// non-variadic element, retrieves the underlying object type.
-  /// Otherwise, returns the type itself.
-  Type getRValueObjectType();
-
   /// getInOutObjectType - For an inout type, retrieves the underlying object
   /// type.  Otherwise, returns the type itself.
   Type getInOutObjectType();
@@ -970,9 +1040,8 @@ public:
   /// Otherwise, returns the type itself.
   Type getWithoutSpecifierType();
 
-  /// Retrieves the rvalue instance type, looking through single-element
-  /// tuples, inout types, and metatypes.
-  Type getRValueInstanceType();
+  /// getMetatypeInstanceType - Looks through metatypes.
+  Type getMetatypeInstanceType();
 
   /// For a ReferenceStorageType like @unowned, this returns the referent.
   /// Otherwise, it returns the type itself.
@@ -1062,6 +1131,9 @@ public:
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();
 
+  /// Return the type T after looking through at most one optional type.
+  Type lookThroughSingleOptionalType();
+
   /// Return the type T after looking through all of the optional
   /// types.
   Type lookThroughAllOptionalTypes();
@@ -1077,13 +1149,20 @@ public:
   /// Error.
   bool isExistentialWithError();
 
-  void dump() const LLVM_ATTRIBUTE_USED;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
-  void dumpPrint() const LLVM_ATTRIBUTE_USED;
+  SWIFT_DEBUG_DUMPER(dumpPrint());
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
+
+  /// Can this type be written in source at all?
+  ///
+  /// If not, it shouldn't be shown in fix-its, for instance. The primary
+  /// example is opaque result types, which are written `some P` at the point
+  /// of definition but cannot be uttered anywhere else.
+  bool hasTypeRepr() const;
 
   /// Does this type have grammatically simple syntax?
   bool hasSimpleTypeRepr() const;
@@ -1103,6 +1182,13 @@ public:
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
   TypeTraitResult canBeClass();
+
+  Type replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const; // in SILType.cpp
+  
+  /// Return the tangent space of the given type, if it exists. Otherwise,
+  /// return `None`.
+  Optional<TangentSpace>
+  getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -1129,7 +1215,7 @@ class AnyGenericType : public TypeBase {
     NominalTypeDecl *NomDecl;
   };
 
-  /// \brief The type of the parent, in which this type is nested.
+  /// The type of the parent, in which this type is nested.
   Type Parent;
 
   template <typename... Args>
@@ -1143,10 +1229,10 @@ protected:
 
 public:
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   GenericTypeDecl *getDecl() const { return GenDecl; }
 
-  /// \brief Returns the type of the parent of this type. This will
+  /// Returns the type of the parent of this type. This will
   /// be null for top-level types or local types, and for non-generic types
   /// will simply be the same as the declared type of the declaration context
   /// of TheDecl. For types nested within generic types, however, this will
@@ -1175,7 +1261,7 @@ public:
   NominalOrBoundGenericNominalType(Args &&...args)
     : AnyGenericType(std::forward<Args>(args)...) {}
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return NomDecl; }
 
   // Implement isa/cast/dyncast/etc.
@@ -1186,10 +1272,11 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 
-/// ErrorType - This represents a type that was erroneously constructed.  This
-/// is produced when parsing types and when name binding type aliases, and is
-/// installed in declaration that use these erroneous types.  All uses of a
-/// declaration of invalid type should be ignored and not re-diagnosed.
+/// ErrorType - Represents the type of an erroneously constructed declaration,
+/// expression, or type. When creating ErrorTypes, an associated error
+/// diagnostic should always be emitted. That way when later stages of
+/// compilation encounter an ErrorType installed by earlier phases they do not
+/// have to emit further diagnostics to abort compilation.
 class ErrorType final : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
@@ -1257,6 +1344,19 @@ public:
     return T->getKind() >= TypeKind::First_BuiltinType &&
            T->getKind() <= TypeKind::Last_BuiltinType;
   }
+
+  /// Return the "canonical" name for this builtin. E.x.:
+  ///
+  ///   BuiltinRawPointerType -> BUILTIN_TYPE_NAME_RAWPOINTER ->
+  ///   Builtin.RawPointer.
+  ///
+  /// If \p prependBuiltinNamespace is set to true, "Builtin." is left as a
+  /// prefix on the name. This is the default behavior. If the user asks, we
+  /// strip off the builtin prefix.
+  StringRef getTypeName(SmallVectorImpl<char> &result,
+                        bool prependBuiltinNamespace = true) const;
+
+  BuiltinTypeKind getBuiltinTypeKind() const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
 
@@ -1301,19 +1401,6 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBridgeObjectType, BuiltinType);
 
-/// BuiltinUnknownObjectType - The builtin opaque Objective-C pointer type.
-/// Useful for pushing an Objective-C type through swift.
-class BuiltinUnknownObjectType : public BuiltinType {
-  friend class ASTContext;
-  BuiltinUnknownObjectType(const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinUnknownObject, C) {}
-public:
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BuiltinUnknownObject;
-  }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnknownObjectType, BuiltinType);
-
 /// BuiltinUnsafeValueBufferType - The builtin opaque fixed-size value
 /// buffer type, into which storage for an arbitrary value can be
 /// allocated using Builtin.allocateValueBuffer.
@@ -1333,7 +1420,7 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnsafeValueBufferType, BuiltinType);
 
-/// \brief A builtin vector type.
+/// A builtin vector type.
 class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
   Type elementType;
   unsigned numElements;
@@ -1349,10 +1436,10 @@ public:
   static BuiltinVectorType *get(const ASTContext &context, Type elementType,
                                 unsigned numElements);
 
-  /// \brief Retrieve the type of this vector's elements.
+  /// Retrieve the type of this vector's elements.
   Type getElementType() const { return elementType; }
 
-  /// \brief Retrieve the number of elements in this vector.
+  /// Retrieve the number of elements in this vector.
   unsigned getNumElements() const { return numElements; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -1377,13 +1464,17 @@ END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
 class BuiltinIntegerWidth {
   /// Tag values for abstract integer sizes.
   enum : unsigned {
-    Least_SpecialValue = ~2U,
-    /// The size of a pointer on the target system.
-    PointerWidth = ~0U,
-    
     /// Inhabitants stolen for use as DenseMap special values.
-    DenseMapEmpty = ~1U,
-    DenseMapTombstone = ~2U,
+    DenseMapEmpty = ~0U,
+    DenseMapTombstone = ~1U,
+
+    /// An arbitrary-precision integer.
+    ArbitraryWidth = ~2U,
+
+    /// The size of a pointer on the target system.
+    PointerWidth = ~3U,
+    
+    Least_SpecialValue = ~3U,
   };
   
   unsigned RawValue;
@@ -1403,6 +1494,10 @@ public:
   static BuiltinIntegerWidth pointer() {
     return BuiltinIntegerWidth(PointerWidth);
   }
+
+  static BuiltinIntegerWidth arbitrary() {
+    return BuiltinIntegerWidth(ArbitraryWidth);
+  }
   
   /// Is this a fixed width?
   bool isFixedWidth() const { return RawValue < Least_SpecialValue; }
@@ -1415,6 +1510,9 @@ public:
   
   /// Is this the abstract target pointer width?
   bool isPointerWidth() const { return RawValue == PointerWidth; }
+
+  /// Is this the abstract arbitrary-width value?
+  bool isArbitraryWidth() const { return RawValue == ArbitraryWidth; }
   
   /// Get the least supported value for the width.
   ///
@@ -1424,6 +1522,8 @@ public:
       return getFixedWidth();
     if (isPointerWidth())
       return 32;
+    if (isArbitraryWidth())
+      return 1;
     llvm_unreachable("impossible width value");
   }
   
@@ -1435,8 +1535,16 @@ public:
       return getFixedWidth();
     if (isPointerWidth())
       return 64;
+    if (isArbitraryWidth())
+      return ~0U;
     llvm_unreachable("impossible width value");
   }
+
+  /// Parse a value of this bit-width.
+  ///
+  /// If the radix is 0, it is autosensed.
+  APInt parse(StringRef text, unsigned radix, bool negate,
+              bool *hadError = nullptr) const;
   
   friend bool operator==(BuiltinIntegerWidth a, BuiltinIntegerWidth b) {
     return a.RawValue == b.RawValue;
@@ -1446,15 +1554,31 @@ public:
   }
 };
 
+/// An abstract base class for the two integer types.
+class AnyBuiltinIntegerType : public BuiltinType {
+protected:
+  AnyBuiltinIntegerType(TypeKind kind, const ASTContext &C)
+    : BuiltinType(kind, C) {}
+
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_AnyBuiltinIntegerType &&
+           T->getKind() <= TypeKind::Last_AnyBuiltinIntegerType;
+  }
+
+  BuiltinIntegerWidth getWidth() const; // defined inline below
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(AnyBuiltinIntegerType, BuiltinType)
+
 /// The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary
 /// bitwidth.
-class BuiltinIntegerType : public BuiltinType {
+class BuiltinIntegerType : public AnyBuiltinIntegerType {
   friend class ASTContext;
 private:
   BuiltinIntegerWidth Width;
   BuiltinIntegerType(BuiltinIntegerWidth BitWidth, const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinInteger, C), Width(BitWidth) {}
+    : AnyBuiltinIntegerType(TypeKind::BuiltinInteger, C), Width(BitWidth) {}
   
 public:
   /// Get a builtin integer type.
@@ -1471,7 +1595,8 @@ public:
     return get(BuiltinIntegerWidth::pointer(), C);
   }
   
-  /// Return the bit width of the integer.
+  /// Return the bit width of the integer.  Always returns a non-arbitrary
+  /// width.
   BuiltinIntegerWidth getWidth() const {
     return Width;
   }
@@ -1509,8 +1634,31 @@ public:
     return T->getKind() == TypeKind::BuiltinInteger;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, BuiltinType)
-  
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, AnyBuiltinIntegerType)
+
+/// BuiltinIntegerLiteralType - The builtin arbitrary-precision integer type.
+/// Useful for constructing integer literals.
+class BuiltinIntegerLiteralType : public AnyBuiltinIntegerType {
+  friend class ASTContext;
+  BuiltinIntegerLiteralType(const ASTContext &C)
+    : AnyBuiltinIntegerType(TypeKind::BuiltinIntegerLiteral, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinIntegerLiteral;
+  }
+
+  BuiltinIntegerWidth getWidth() const = delete;
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerLiteralType, AnyBuiltinIntegerType);
+
+inline BuiltinIntegerWidth AnyBuiltinIntegerType::getWidth() const {
+  if (auto intTy = dyn_cast<BuiltinIntegerType>(this)) {
+    return intTy->getWidth();
+  } else {
+    return BuiltinIntegerWidth::arbitrary();
+  }
+}
+
 class BuiltinFloatType : public BuiltinType {
   friend class ASTContext;
 public:
@@ -1603,37 +1751,37 @@ public:
 
 /// A reference to a type alias that is somehow generic, along with the
 /// set of substitutions to apply to make the type concrete.
-class NameAliasType final
+class TypeAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<NameAliasType, Type, SubstitutionMap>
+    llvm::TrailingObjects<TypeAliasType, Type, SubstitutionMap>
 {
   TypeAliasDecl *typealias;
 
   friend class ASTContext;
   friend TrailingObjects;
 
-  NameAliasType(TypeAliasDecl *typealias, Type parent,
+  TypeAliasType(TypeAliasDecl *typealias, Type parent,
                 SubstitutionMap substitutions, Type underlying,
                 RecursiveTypeProperties properties);
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Bits.NameAliasType.HasParent ? 1 : 0;
+    return Bits.TypeAliasType.HasParent ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
-    return Bits.NameAliasType.HasSubstitutionMap ? 1 : 0;
+    return Bits.TypeAliasType.HasSubstitutionMap ? 1 : 0;
   }
 
 public:
   /// Retrieve the generic signature used for substitutions.
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     return getSubstitutionMap().getGenericSignature();
   }
 
-  static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
+  static TypeAliasType *get(TypeAliasDecl *typealias, Type parent,
                             SubstitutionMap substitutions, Type underlying);
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   TypeAliasDecl *getDecl() const {
     // Avoid requiring the definition of TypeAliasDecl.
     return typealias;
@@ -1642,14 +1790,14 @@ public:
   /// Retrieve the parent of this type as written, e.g., the part that was
   /// written before ".", if provided.
   Type getParent() const {
-    return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
+    return Bits.TypeAliasType.HasParent ? *getTrailingObjects<Type>()
                                         : Type();
   }
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
   SubstitutionMap getSubstitutionMap() const {
-    if (!Bits.NameAliasType.HasSubstitutionMap)
+    if (!Bits.TypeAliasType.HasSubstitutionMap)
       return SubstitutionMap();
 
     return *getTrailingObjects<SubstitutionMap>();
@@ -1672,7 +1820,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::NameAlias;
+    return T->getKind() == TypeKind::TypeAlias;
   }
 };
 
@@ -1685,15 +1833,14 @@ public:
 /// escaping.
 class ParameterTypeFlags {
   enum ParameterFlags : uint8_t {
-    None        = 0,
-    Variadic    = 1 << 0,
-    AutoClosure = 1 << 1,
-    Escaping    = 1 << 2,
-    InOut       = 1 << 3,
-    Shared      = 1 << 4,
-    Owned       = 1 << 5,
-
-    NumBits = 6
+    None         = 0,
+    Variadic     = 1 << 0,
+    AutoClosure  = 1 << 1,
+    NonEphemeral = 1 << 2,
+    OwnershipShift = 3,
+    Ownership    = 7 << OwnershipShift,
+    NoDerivative = 1 << 7,
+    NumBits = 7
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1706,35 +1853,30 @@ public:
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
-  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping,
-                     ValueOwnership ownership)
+  ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
+                     ValueOwnership ownership, bool noDerivative)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
-              (escaping ? Escaping : 0) |
-              (ownership == ValueOwnership::InOut ? InOut : 0) |
-              (ownership == ValueOwnership::Shared ? Shared : 0) |
-              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
+              (nonEphemeral ? NonEphemeral : 0) |
+              uint8_t(ownership) << OwnershipShift |
+              (noDerivative ? NoDerivative : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
-  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership);
+  fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
+                    bool isNonEphemeral, ValueOwnership ownership,
+                    bool isNoDerivative);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
   bool isAutoClosure() const { return value.contains(AutoClosure); }
-  bool isEscaping() const { return value.contains(Escaping); }
-  bool isInOut() const { return value.contains(InOut); }
-  bool isShared() const { return value.contains(Shared); }
-  bool isOwned() const { return value.contains(Owned); }
+  bool isNonEphemeral() const { return value.contains(NonEphemeral); }
+  bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
+  bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
+  bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
+  bool isNoDerivative() const { return value.contains(NoDerivative); }
 
   ValueOwnership getValueOwnership() const {
-    if (isInOut())
-      return ValueOwnership::InOut;
-    else if (isShared())
-      return ValueOwnership::Shared;
-    else if (isOwned())
-      return ValueOwnership::Owned;
-
-    return ValueOwnership::Default;
+    return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
   }
 
   ParameterTypeFlags withVariadic(bool variadic) const {
@@ -1742,24 +1884,42 @@ public:
                                        : value - ParameterTypeFlags::Variadic);
   }
 
-  ParameterTypeFlags withEscaping(bool escaping) const {
-    return ParameterTypeFlags(escaping ? value | ParameterTypeFlags::Escaping
-                                       : value - ParameterTypeFlags::Escaping);
-  }
-
   ParameterTypeFlags withInOut(bool isInout) const {
-    return ParameterTypeFlags(isInout ? value | ParameterTypeFlags::InOut
-                                      : value - ParameterTypeFlags::InOut);
+    return withValueOwnership(isInout ? ValueOwnership::InOut
+                                      : ValueOwnership::Default);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
-    return ParameterTypeFlags(isShared ? value | ParameterTypeFlags::Shared
-                                       : value - ParameterTypeFlags::Shared);
+    return withValueOwnership(isShared ? ValueOwnership::Shared
+                                       : ValueOwnership::Default);
   }
 
   ParameterTypeFlags withOwned(bool isOwned) const {
-    return ParameterTypeFlags(isOwned ? value | ParameterTypeFlags::Owned
-                                      : value - ParameterTypeFlags::Owned);
+    return withValueOwnership(isOwned ? ValueOwnership::Owned
+                                      : ValueOwnership::Default);
+  }
+
+  ParameterTypeFlags withValueOwnership(ValueOwnership ownership) const {
+    return (value - ParameterTypeFlags::Ownership)
+            | ParameterFlags(uint8_t(ownership) << OwnershipShift);
+  }
+
+  ParameterTypeFlags withAutoClosure(bool isAutoClosure) const {
+    return ParameterTypeFlags(isAutoClosure
+                                  ? value | ParameterTypeFlags::AutoClosure
+                                  : value - ParameterTypeFlags::AutoClosure);
+  }
+
+  ParameterTypeFlags withNonEphemeral(bool isNonEphemeral) const {
+    return ParameterTypeFlags(isNonEphemeral
+                                  ? value | ParameterTypeFlags::NonEphemeral
+                                  : value - ParameterTypeFlags::NonEphemeral);
+  }
+
+  ParameterTypeFlags withNoDerivative(bool noDerivative) const {
+    return ParameterTypeFlags(noDerivative
+                                  ? value | ParameterTypeFlags::NoDerivative
+                                  : value - ParameterTypeFlags::NoDerivative);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -1767,6 +1927,76 @@ public:
   }
 
   bool operator!=(const ParameterTypeFlags &other) const {
+    return value.toRaw() != other.value.toRaw();
+  }
+
+  uint8_t toRaw() const { return value.toRaw(); }
+};
+
+class YieldTypeFlags {
+  enum YieldFlags : uint8_t {
+    None        = 0,
+    Ownership   = 7,
+    OwnershipShift = 0,
+
+    NumBits = 3
+  };
+  OptionSet<YieldFlags> value;
+
+  static_assert(NumBits < 8 * sizeof(OptionSet<YieldFlags>), "overflowed");
+
+  YieldTypeFlags(OptionSet<YieldFlags, uint8_t> val) : value(val) {}
+
+public:
+  YieldTypeFlags() = default;
+  static YieldTypeFlags fromRaw(uint8_t raw) {
+    return YieldTypeFlags(OptionSet<YieldFlags>(raw));
+  }
+
+  YieldTypeFlags(ValueOwnership ownership)
+      : value(uint8_t(ownership) << OwnershipShift) {}
+
+  bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
+  bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
+  bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
+
+  ValueOwnership getValueOwnership() const {
+    return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
+  }
+
+  YieldTypeFlags withInOut(bool isInout) const {
+    return withValueOwnership(isInout ? ValueOwnership::InOut
+                                      : ValueOwnership::Default);
+  }
+  
+  YieldTypeFlags withShared(bool isShared) const {
+    return withValueOwnership(isShared ? ValueOwnership::Shared
+                                       : ValueOwnership::Default);
+  }
+
+  YieldTypeFlags withOwned(bool isOwned) const {
+    return withValueOwnership(isOwned ? ValueOwnership::Owned
+                                      : ValueOwnership::Default);
+  }
+
+  YieldTypeFlags withValueOwnership(ValueOwnership ownership) const {
+    return (value - YieldTypeFlags::Ownership)
+            | YieldFlags(uint8_t(ownership) << OwnershipShift);
+  }
+
+  /// Return these flags interpreted as parameter flags.
+  ParameterTypeFlags asParamFlags() const {
+    return ParameterTypeFlags(/*variadic*/ false,
+                              /*autoclosure*/ false,
+                              /*nonEphemeral*/ false, getValueOwnership(),
+                              /*noDerivative*/ false);
+  }
+
+  bool operator ==(const YieldTypeFlags &other) const {
+    return value.toRaw() == other.value.toRaw();
+  }
+
+  bool operator!=(const YieldTypeFlags &other) const {
     return value.toRaw() != other.value.toRaw();
   }
 
@@ -1802,7 +2032,7 @@ class TupleTypeElt {
   /// An optional name for the field.
   Identifier Name;
 
-  /// \brief This is the type of the field.
+  /// This is the type of the field.
   Type ElementType;
 
   /// Flags that are specific to and relevant for parameter types
@@ -1829,9 +2059,6 @@ public:
   /// Determine whether this field is an autoclosure parameter closure.
   bool isAutoClosure() const { return Flags.isAutoClosure(); }
 
-  /// Determine whether this field is an escaping parameter closure.
-  bool isEscaping() const { return Flags.isEscaping(); }
-  
   /// Determine whether this field is marked 'inout'.
   bool isInOut() const { return Flags.isInOut(); }
   
@@ -1901,29 +2128,9 @@ public:
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
   
-  /// getElementForScalarInit - If a tuple of this type can be initialized with
-  /// a scalar, return the element number that the scalar is assigned to.  If
-  /// not, return -1.
-  int getElementForScalarInit() const;
-  
-  /// If this tuple has a varargs element to it, return the base type of the
-  /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
-  /// Otherwise, this returns Type().
-  Type getVarArgsBaseType() const;
-  
-  /// Returns true if this tuple has inout elements.
-  bool hasInOutElement() const {
-    return static_cast<bool>(Bits.TupleType.HasInOutElement);
-  }
-  
-  /// Returns true if this tuple has parenthesis semantics.
-  bool hasParenSema(bool allowName = false) const {
-    auto Fields = getElements();
-    if (Fields.size() != 1 || Fields[0].isVararg())
-     return false;
-    if (allowName)
-      return true;
-    return !Fields[0].hasName();
+  /// Returns true if this tuple has inout, __shared or __owned elements.
+  bool hasElementWithOwnership() const {
+    return static_cast<bool>(Bits.TupleType.HasElementWithOwnership);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -1940,9 +2147,9 @@ public:
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties,
-            bool hasInOut)
+            bool hasElementWithOwnership)
      : TypeBase(TypeKind::Tuple, CanCtx, properties) {
-     Bits.TupleType.HasInOutElement = hasInOut;
+     Bits.TupleType.HasElementWithOwnership = hasElementWithOwnership;
      Bits.TupleType.Count = elements.size();
      std::uninitialized_copy(elements.begin(), elements.end(),
                              getTrailingObjects<TupleTypeElt>());
@@ -2056,7 +2263,7 @@ public:
                                    parent, genericArgs));
   }
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   ClassDecl *getDecl() const {
     return reinterpret_cast<ClassDecl*>(BoundGenericType::getDecl());
   }
@@ -2090,7 +2297,7 @@ public:
                                    parent, genericArgs));
   }
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   EnumDecl *getDecl() const {
     return reinterpret_cast<EnumDecl*>(BoundGenericType::getDecl());
   }
@@ -2124,7 +2331,7 @@ public:
                                    parent, genericArgs));
   }
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   StructDecl *getDecl() const {
     return reinterpret_cast<StructDecl*>(BoundGenericType::getDecl());
   }
@@ -2158,21 +2365,16 @@ public:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalType, NominalOrBoundGenericNominalType)
 
 /// EnumType - This represents the type declared by an EnumDecl.
-class EnumType : public NominalType, public llvm::FoldingSetNode {
+class EnumType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   EnumDecl *getDecl() const {
     return reinterpret_cast<EnumDecl *>(NominalType::getDecl());
   }
 
-  /// \brief Retrieve the type when we're referencing the given enum
+  /// Retrieve the type when we're referencing the given enum
   /// declaration in the parent type \c Parent.
   static EnumType *get(EnumDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, EnumDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2186,21 +2388,16 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType : public NominalType, public llvm::FoldingSetNode {  
+class StructType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   StructDecl *getDecl() const {
     return reinterpret_cast<StructDecl *>(NominalType::getDecl());
   }
 
-  /// \brief Retrieve the type when we're referencing the given struct
+  /// Retrieve the type when we're referencing the given struct
   /// declaration in the parent type \c Parent.
   static StructType *get(StructDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2214,21 +2411,16 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
-class ClassType : public NominalType, public llvm::FoldingSetNode {  
+class ClassType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
   ClassDecl *getDecl() const {
     return reinterpret_cast<ClassDecl *>(NominalType::getDecl());
   }
 
-  /// \brief Retrieve the type when we're referencing the given class
+  /// Retrieve the type when we're referencing the given class
   /// declaration in the parent type \c Parent.
   static ClassType *get(ClassDecl *D, Type Parent, const ASTContext &C);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2264,7 +2456,9 @@ enum class MetatypeRepresentation : char {
   /// which permit dynamic behavior.
   Thick,
   /// An Objective-C metatype refers to an Objective-C class object.
-  ObjC
+  ObjC,
+
+  Last_MetatypeRepresentation = ObjC
 };
 
 /// AnyMetatypeType - A common parent class of MetatypeType and
@@ -2325,7 +2519,7 @@ class MetatypeType : public AnyMetatypeType {
                            const ASTContext &C);
 
 public:
-  /// \brief Return the MetatypeType for the specified type declaration.
+  /// Return the MetatypeType for the specified type declaration.
   ///
   /// This leaves the 'representation' property unavailable.
   static MetatypeType *get(Type T, const ASTContext &C) {
@@ -2452,7 +2646,7 @@ class DynamicSelfType : public TypeBase {
   Type SelfType;
 
 public:
-  /// \brief Return the DynamicSelf for the specified self type.
+  /// Return the DynamicSelf for the specified self type.
   static DynamicSelfType *get(Type selfType, const ASTContext &ctx);
 
   /// Retrieve the (static) self type for this dynamic self type.
@@ -2502,10 +2696,10 @@ enum class FunctionTypeRepresentation : uint8_t {
   /// A "thin" function that needs no context.
   Thin,
   
-  /// A C function pointer, which is thin and also uses the C calling
-  /// convention.
+  /// A C function pointer (or reference), which is thin and also uses the C
+  /// calling convention.
   CFunctionPointer,
-  
+
   /// The value of the greatest AST function representation.
   Last = CFunctionPointer,
 };
@@ -2591,29 +2785,30 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
-/// AnyFunctionType - A function type has a single input and result, but
-/// these types may be tuples, for example:
+/// AnyFunctionType - A function type has zero or more input parameters and a
+/// single result. The result type may be a tuple. For example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
-/// Note that the parser requires that the input to a function type be a Tuple
-/// or ParenType, but ParenType desugars to its element, so the input to a
-/// function may be an arbitrary type.
 ///
 /// There are two kinds of function types:  monomorphic (FunctionType) and
 /// polymorphic (GenericFunctionType). Both type families additionally can
 /// be 'thin', indicating that a function value has no capture context and can be
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
-  const Type Input;
   const Type Output;
   
 public:
   using Representation = FunctionTypeRepresentation;
-  
+
   class Param {
   public:
-    explicit Param(const TupleTypeElt &tte);
-    explicit Param(Type t, Identifier l, ParameterTypeFlags f);
-    
+    explicit Param(Type t,
+                   Identifier l = Identifier(),
+                   ParameterTypeFlags f = ParameterTypeFlags())
+        : Ty(t), Label(l), Flags(f) {
+      assert(t && "param type must be non-null");
+      assert(!t->is<InOutType>() && "set flags instead");
+    }
+
   private:
     /// The type of the parameter. For a variadic parameter, this is the
     /// element type.
@@ -2626,15 +2821,23 @@ public:
     ParameterTypeFlags Flags = {};
     
   public:
-    Type getType() const;
-    CanType getCanType() const {
-      assert(getType()->isCanonical());
-      return CanType(getType());
-    }
-    
-    /// FIXME(Remove InOutType): This is mostly for copying between param
-    /// types and should go away.
+    /// FIXME: Remove this. Return the formal type of the parameter in the
+    /// function type, including the InOutType if there is one.
+    ///
+    /// For example, 'inout Int' => 'inout Int', 'Int...' => 'Int'.
+    Type getOldType() const;
+
+    /// Return the formal type of the parameter.
+    ///
+    /// For example, 'inout Int' => 'Int', 'Int...' => 'Int'.
     Type getPlainType() const { return Ty; }
+
+    /// The type of the parameter when referenced inside the function body
+    /// as an rvalue.
+    ///
+    /// For example, 'inout Int' => 'Int', 'Int...' => '[Int]'.
+    Type getParameterType(bool forCanonical = false,
+                          ASTContext *ctx = nullptr) const;
 
     bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
@@ -2647,9 +2850,6 @@ public:
     /// Whether the parameter is marked '@autoclosure'
     bool isAutoClosure() const { return Flags.isAutoClosure(); }
     
-    /// Whether the parameter is marked '@escaping'
-    bool isEscaping() const { return Flags.isEscaping(); }
-    
     /// Whether the parameter is marked 'inout'
     bool isInOut() const { return Flags.isInOut(); }
     
@@ -2659,17 +2859,30 @@ public:
     /// Whether the parameter is marked 'owned'
     bool isOwned() const { return Flags.isOwned(); }
 
+    /// Whether the parameter is marked '@_nonEphemeral'
+    bool isNonEphemeral() const { return Flags.isNonEphemeral(); }
+
+    /// Whether the parameter is marked '@noDerivative'.
+    bool isNoDerivative() const { return Flags.isNoDerivative(); }
+
     ValueOwnership getValueOwnership() const {
       return Flags.getValueOwnership();
     }
 
     bool operator==(Param const &b) const {
-      return Label == b.Label && getType()->isEqual(b.getType()) &&
-             Flags == b.Flags;
+      return (Label == b.Label &&
+              getPlainType()->isEqual(b.getPlainType()) &&
+              Flags == b.Flags);
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
+
+    Param withType(Type newType) const { return Param(newType, Label, Flags); }
+
+    Param withFlags(ParameterTypeFlags flags) const {
+      return Param(Ty, Label, flags);
+    }
   };
 
   class CanParam : public Param {
@@ -2677,63 +2890,171 @@ public:
   public:
     static CanParam getFromParam(const Param &param) { return CanParam(param); }
 
-    CanType getType() const { return CanType(Param::getType()); }
+    CanType getOldType() const { return CanType(Param::getOldType()); }
+    CanType getPlainType() const { return CanType(Param::getPlainType()); }
+    CanType getParameterType() const {
+      return CanType(Param::getParameterType(/*forCanonical*/ true));
+    }
   };
 
   using CanParamArrayRef =
     ArrayRefView<Param,CanParam,CanParam::getFromParam,/*AccessOriginal*/true>;
   
-  /// \brief A class which abstracts out some details necessary for
+  class CanYield;
+  class Yield {
+    Type Ty;
+    YieldTypeFlags Flags;
+  public:
+    explicit Yield(Type type, YieldTypeFlags flags)
+      : Ty(type), Flags(flags) {}
+
+    Type getType() const { return Ty; }
+
+    YieldTypeFlags getFlags() const { return Flags; }
+    ValueOwnership getValueOwnership() const {
+      return getFlags().getValueOwnership();
+    }
+    bool isInOut() const { return getFlags().isInOut(); }
+
+    CanYield getCanonical() const;
+
+    /// There are a number of places where it's convenient to re-use
+    /// the call machinery, processing yields as if they were
+    /// parameters of a call.  Return this reinterpreted as a parameter.
+    Param asParam() const {
+      return Param(getType(), Identifier(), getFlags().asParamFlags());
+    }
+
+    Yield subst(SubstitutionMap subs, SubstOptions options=None) const {
+      return Yield(getType().subst(subs, options), getFlags());
+    }
+
+    bool operator==(const Yield &other) const {
+      return getType()->isEqual(other.getType()) &&
+             getFlags() == other.getFlags();
+    }
+    bool operator!=(const Yield &other) const {
+      return !operator==(other);
+    }
+  };
+
+  class CanYield : public Yield {
+  public:
+    explicit CanYield(CanType type, YieldTypeFlags flags)
+      : Yield(type, flags) {}
+
+    CanType getType() const { return CanType(Yield::getType()); }
+    CanParam asParam() const { return CanParam::getFromParam(Yield::asParam());}
+
+    CanYield subst(SubstitutionMap subs, SubstOptions options=None) const {
+      return CanYield(getType().subst(subs, options)->getCanonicalType(),
+                      getFlags());
+    }
+  };
+
+  /// A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
     // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
     //
-    //   |representation|isAutoClosure|noEscape|throws|
-    //   |    0 .. 3    |      4      |    5   |   6  |
+    //   |representation|noEscape|throws|differentiability|
+    //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
     //
     enum : unsigned {
-      RepresentationMask     = 0xF << 0,
-      AutoClosureMask        = 1 << 4,
-      NoEscapeMask           = 1 << 5,
-      ThrowsMask             = 1 << 6,
-      NumMaskBits            = 7
+      RepresentationMask          = 0xF << 0,
+      NoEscapeMask                = 1 << 4,
+      ThrowsMask                  = 1 << 5,
+      DifferentiabilityMaskOffset = 6,
+      DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
+      NumMaskBits                 = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
 
-    ExtInfo(unsigned Bits) : Bits(Bits) {}
+  public:
+    class Uncommon {
+      friend ExtInfo;
+      friend class AnyFunctionType;
+      friend class FunctionType;
+      // We preserve a full clang::Type *, not a clang::FunctionType * as:
+      // 1. We need to keep sugar in case we need to present an error to the user.
+      // 2. The actual type being stored is [ignoring sugar] either a
+      //    clang::PointerType, a clang::BlockPointerType, or a
+      //    clang::ReferenceType which points to a clang::FunctionType.
+      const clang::Type *ClangFunctionType;
 
-    friend class AnyFunctionType;
-    
+      bool empty() const { return !ClangFunctionType; }
+      Uncommon(const clang::Type *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Use the ClangModuleLoader to print the Clang type as a string.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os);
+    };
+
+  private:
+    Uncommon Other;
+
+    static void assertIsFunctionType(const clang::Type *);
+
+    ExtInfo(unsigned Bits, Uncommon Other) : Bits(Bits), Other(Other) {
+      // TODO: [store-sil-clang-function-type] Once we start serializing
+      // the Clang type, we should also assert that the pointer is non-null.
+      auto Rep = Representation(Bits & RepresentationMask);
+      if ((Rep == Representation::CFunctionPointer) && Other.ClangFunctionType)
+        assertIsFunctionType(Other.ClangFunctionType);
+    }
+
+    friend AnyFunctionType;
+    friend class FunctionType;
+
   public:
     // Constructor with all defaults.
-    ExtInfo() : Bits(0) {
-      assert(getRepresentation() == Representation::Swift);
+    ExtInfo()
+      : ExtInfo(Representation::Swift, false, false,
+                DifferentiabilityKind::NonDifferentiable,
+                nullptr) {
     }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation Rep, bool Throws) {
-      Bits = ((unsigned) Rep) | (Throws ? ThrowsMask : 0);
+    ExtInfo(Representation Rep, bool Throws)
+      : ExtInfo(Rep, false, Throws, DifferentiabilityKind::NonDifferentiable,
+                nullptr) {
     }
 
     // Constructor with no defaults.
-    ExtInfo(Representation Rep,
-            bool IsAutoClosure, bool IsNoEscape,
-            bool Throws)
-      : ExtInfo(Rep, Throws) {
-      Bits |= (IsAutoClosure ? AutoClosureMask : 0);
-      Bits |= (IsNoEscape ? NoEscapeMask : 0);
+    ExtInfo(Representation Rep, bool IsNoEscape, bool Throws,
+            DifferentiabilityKind DiffKind,
+            const clang::Type *type)
+      : ExtInfo(((unsigned) Rep)
+                  | (IsNoEscape ? NoEscapeMask : 0)
+                  | (Throws ? ThrowsMask : 0)
+                  | (((unsigned)DiffKind << DifferentiabilityMaskOffset)
+                     & DifferentiabilityMask),
+                Uncommon(type)) {
     }
 
-    bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
+    bool isDifferentiable() const {
+      return getDifferentiabilityKind() >
+             DifferentiabilityKind::NonDifferentiable;
+    }
+    DifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
+                                   DifferentiabilityMaskOffset);
+    }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
       assert(rawRep <= unsigned(Representation::Last)
              && "unexpected SIL representation");
       return Representation(rawRep);
+    }
+
+    /// Return the underlying Uncommon value if it is not the default value.
+    Optional<Uncommon> getUncommonInfo() const {
+      return Other.empty() ? Optional<Uncommon>() : Other;
     }
 
     bool hasSelfParam() const {
@@ -2776,32 +3097,33 @@ public:
     LLVM_NODISCARD
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
-                     | (unsigned)Rep);
-    }
-    LLVM_NODISCARD
-    ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
-      if (IsAutoClosure)
-        return ExtInfo(Bits | AutoClosureMask);
-      else
-        return ExtInfo(Bits & ~AutoClosureMask);
+                     | (unsigned)Rep, Other);
     }
     LLVM_NODISCARD
     ExtInfo withNoEscape(bool NoEscape = true) const {
-      if (NoEscape)
-        return ExtInfo(Bits | NoEscapeMask);
-      else
-        return ExtInfo(Bits & ~NoEscapeMask);
+      return ExtInfo(NoEscape ? (Bits | NoEscapeMask) : (Bits & ~NoEscapeMask),
+                     Other);
     }
     LLVM_NODISCARD
     ExtInfo withThrows(bool Throws = true) const {
-      if (Throws)
-        return ExtInfo(Bits | ThrowsMask);
-      else
-        return ExtInfo(Bits & ~ThrowsMask);
+      return ExtInfo(Throws ? (Bits | ThrowsMask) : (Bits & ~ThrowsMask),
+                     Other);
+    }
+    LLVM_NODISCARD
+    ExtInfo withClangFunctionType(const clang::Type *type) const {
+      return ExtInfo(Bits, Uncommon(type));
+    }
+    LLVM_NODISCARD
+    ExtInfo
+    withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
+      return ExtInfo(
+          (Bits & ~DifferentiabilityMask) |
+              ((unsigned)differentiability << DifferentiabilityMaskOffset),
+          Other);
     }
 
-    unsigned getFuncAttrKey() const {
-      return Bits;
+    std::pair<unsigned, const void *> getFuncAttrKey() const {
+      return std::make_pair(Bits, Other.ClangFunctionType);
     }
     
     /// Put a SIL representation in the ExtInfo.
@@ -2811,7 +3133,7 @@ public:
     /// don't need to be parsed, printed, or serialized.
     ExtInfo withSILRepresentation(SILFunctionTypeRepresentation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
-                     | (unsigned)Rep);
+                     | (unsigned)Rep, Other);
     }
     
     SILFunctionTypeRepresentation getSILRepresentation() const {
@@ -2828,25 +3150,31 @@ public:
   };
 
 protected:
+  /// Create an AnyFunctionType.
+  ///
+  /// Subclasses are responsible for storing and retrieving the
+  /// ExtInfo::Uncommon value if one is present.
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
-                  Type Input, Type Output, RecursiveTypeProperties properties,
-                  unsigned NumParams, const ExtInfo &Info)
-  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
-    Bits.AnyFunctionType.ExtInfo = Info.Bits;
+                  Type Output, RecursiveTypeProperties properties,
+                  unsigned NumParams, ExtInfo Info)
+  : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
+    Bits.AnyFunctionType.ExtInfoBits = Info.Bits;
+    Bits.AnyFunctionType.HasUncommonInfo = Info.getUncommonInfo().hasValue();
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
-    assert(Bits.AnyFunctionType.ExtInfo == Info.Bits && "Bits were dropped!");
+    assert(Bits.AnyFunctionType.ExtInfoBits == Info.Bits
+           && "Bits were dropped!");
     static_assert(ExtInfo::NumMaskBits == NumAFTExtInfoBits,
                  "ExtInfo and AnyFunctionTypeBitfields must agree on bit size");
   }
 
 public:
-  /// \brief Break an input type into an array of \c AnyFunctionType::Params.
+  /// Break an input type into an array of \c AnyFunctionType::Params.
   static void decomposeInput(Type type,
-                             SmallVectorImpl<AnyFunctionType::Param> &result);
+                             SmallVectorImpl<Param> &result);
 
-  /// \brief Take an array of parameters and turn it into an input type.
+  /// Take an array of parameters and turn it into an input type.
   ///
   /// The result type is only there as a way to extract the ASTContext when
   /// needed.
@@ -2857,33 +3185,179 @@ public:
     return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
   }
 
-  /// \brief Given two arrays of parameters determine if they are equal.
-  static bool equalParams(ArrayRef<AnyFunctionType::Param> a,
-                          ArrayRef<AnyFunctionType::Param> b);
+  /// Given two arrays of parameters determine if they are equal.
+  static bool equalParams(ArrayRef<Param> a, ArrayRef<Param> b);
 
-  Type getInput() const { return Input; }
+  /// Given two arrays of parameters determine if they are equal.
+  static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
+
+  /// Given an array of parameters and an array of labels of the
+  /// same length, update each parameter to have the corresponding label.
+  static void relabelParams(MutableArrayRef<Param> params,
+                            ArrayRef<Identifier> labels);
+
   Type getResult() const { return Output; }
-  ArrayRef<AnyFunctionType::Param> getParams() const;
+  ArrayRef<Param> getParams() const;
   unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
 
-  GenericSignature *getOptGenericSignature() const;
+  GenericSignature getOptGenericSignature() const;
   
-  ExtInfo getExtInfo() const {
-    return ExtInfo(Bits.AnyFunctionType.ExtInfo);
+  bool hasClangFunctionType() const {
+    return Bits.AnyFunctionType.HasUncommonInfo;
   }
 
-  /// \brief Get the representation of the function type.
+  const clang::Type *getClangFunctionType() const;
+  const clang::Type *getCanonicalClangFunctionType() const;
+
+  ExtInfo getExtInfo() const {
+    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangFunctionType());
+  }
+
+  /// Get the canonical ExtInfo for the function type.
+  ///
+  /// The parameter useClangFunctionType is present only for staging purposes.
+  /// In the future, we will always use the canonical clang function type.
+  ExtInfo getCanonicalExtInfo(bool useClangFunctionType) const {
+    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits,
+                   useClangFunctionType ? getCanonicalClangFunctionType()
+                                        : nullptr);
+  }
+
+  /// Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
   }
-  
-  /// \brief True if this type allows an implicit conversion from a function
-  /// argument expression of type T to a function of type () -> T.
-  bool isAutoClosure() const {
-    return getExtInfo().isAutoClosure();
-  }
 
-  /// \brief True if the parameter declaration it is attached to is guaranteed
+  /// Appends the parameters indicated by `parameterIndices` to `results`.
+  ///
+  /// For curried function types: if `reverseCurryLevels` is true, append
+  /// the `self` parameter last instead of first.
+  ///
+  /// TODO(TF-874): Simplify logic and remove the `reverseCurryLevels` flag.
+  void getSubsetParameters(IndexSubset *parameterIndices,
+                           SmallVectorImpl<AnyFunctionType::Param> &results,
+                           bool reverseCurryLevels = false);
+
+  /// Returns the derivative function type for the given parameter indices,
+  /// result index, derivative function kind, derivative function generic
+  /// signature (optional), and other auxiliary parameters.
+  ///
+  /// Preconditions:
+  /// - Parameters corresponding to parameter indices must conform to
+  ///   `Differentiable`.
+  /// - There is one semantic function result type: either the formal original
+  ///   result or an `inout` parameter. It must conform to `Differentiable`.
+  ///
+  /// Typing rules, given:
+  /// - Original function type. Three cases:
+  ///   - Top-level function: `(T0, T1, ...) -> R`
+  ///   - Static method: `(Self.Type) -> (T0, T1, ...) -> R`
+  ///   - Instance method: `(Self) -> (T0, T1, ...) -> R`
+  ///
+  /// Terminology:
+  /// - The derivative of a `Differentiable`-conforming type has the
+  ///   `TangentVector` associated type. `TangentVector` is abbreviated as `Tan`
+  ///   below.
+  /// - "wrt" parameters refers to differentiability parameters, identified by
+  ///   the parameter indices.
+  /// - "wrt" result refers to the result identified by the result index.
+  ///
+  /// JVP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original result, followed by a differential function, which
+  ///   takes "wrt" parameter derivatives and returns a "wrt" result derivative.
+  ///
+  /// \verbatim
+  ///   (T0, T1, ...) -> (R,       (T0.Tan, T1.Tan, ...) -> R.Tan)
+  ///                     ^         ^~~~~~~~~~~~~~~~~~~     ^~~~~
+  ///           original result | derivatives wrt params | derivative wrt result
+  ///
+  ///   (Self) -> (T0, ...) -> (R, (Self.Tan, T0.Tan, ...) -> R.Tan)
+  ///                           ^   ^~~~~~~~~~~~~~~~~~~~~     ^~~~~
+  ///             original result  |  deriv. wrt params  |  deriv. wrt result
+  /// \endverbatim
+  ///
+  /// VJP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original result, followed by a pullback function, which
+  ///   takes a "wrt" result derivative and returns "wrt" parameter derivatives.
+  ///
+  /// \verbatim
+  ///   (T0, T1, ...) -> (R,           (R.Tan)    ->     (T0.Tan, T1.Tan, ...))
+  ///                     ^             ^~~~~             ^~~~~~~~~~~~~~~~~~~
+  ///          original result | derivative wrt result | derivatives wrt params
+  ///
+  ///   (Self) -> (T0, ...) -> (R,     (R.Tan)    ->    (Self.Tan, T0.Tan, ...))
+  ///                           ^       ^~~~~            ^~~~~~~~~~~~~~~~~~~~~
+  ///              original result | deriv. wrt result | deriv. wrt params
+  /// \endverbatim
+  ///
+  /// The original type may have `inout` parameters. If so, the
+  /// differential/pullback typing rules are more nuanced: see documentation for
+  /// `getAutoDiffDerivativeFunctionLinearMapType` for details. Semantically,
+  /// `inout` parameters behave as both parameters and results.
+  ///
+  /// By default, if the original type has a `self` parameter list and parameter
+  /// indices include `self`, the computed derivative function type will return
+  /// a linear map taking/returning self's tangent *last* instead of first, for
+  /// consistency with SIL.
+  ///
+  /// If `makeSelfParamFirst` is true, `self`'s tangent is reordered to appear
+  /// first. `makeSelfParamFirst` should be true when working with user-facing
+  /// derivative function types, e.g. when type-checking `@differentiable` and
+  /// `@derivative` attributes.
+  AnyFunctionType *getAutoDiffDerivativeFunctionType(
+      IndexSubset *parameterIndices, AutoDiffDerivativeFunctionKind kind,
+      LookupConformanceFn lookupConformance,
+      GenericSignature derivativeGenericSignature = GenericSignature(),
+      bool makeSelfParamFirst = false);
+
+  /// Returns the corresponding linear map function type for the given parameter
+  /// indices, linear map function kind, and other auxiliary parameters.
+  ///
+  /// Preconditions:
+  /// - Parameters corresponding to parameter indices must conform to
+  ///   `Differentiable`.
+  /// - There is one semantic function result type: either the formal original
+  ///   result or an `inout` parameter. It must conform to `Differentiable`.
+  ///
+  /// Differential typing rules: takes "wrt" parameter derivatives and returns a
+  /// "wrt" result derivative.
+  ///
+  /// - Case 1: original function has no `inout` parameters.
+  ///   - Original:     `(T0, T1, ...) -> R`
+  ///   - Differential: `(T0.Tan, T1.Tan, ...) -> R.Tan`
+  /// - Case 2: original function has a non-wrt `inout` parameter.
+  ///   - Original:     `(T0, inout T1, ...) -> Void`
+  ///   - Differential: `(T0.Tan, ...) -> T1.Tan`
+  /// - Case 3: original function has a wrt `inout` parameter.
+  ///   - Original:     `(T0, inout T1, ...) -> Void`
+  ///   - Differential: `(T0.Tan, inout T1.Tan, ...) -> Void`
+  ///
+  /// Pullback typing rules: takes a "wrt" result derivative and returns "wrt"
+  /// parameter derivatives.
+  ///
+  /// - Case 1: original function has no `inout` parameters.
+  ///   - Original: `(T0, T1, ...) -> R`
+  ///   - Pullback: `R.Tan -> (T0.Tan, T1.Tan, ...)`
+  /// - Case 2: original function has a non-wrt `inout` parameter.
+  ///   - Original: `(T0, inout T1, ...) -> Void`
+  ///   - Pullback: `(T1.Tan) -> (T0.Tan, ...)`
+  /// - Case 3: original function has a wrt `inout` parameter.
+  ///   - Original: `(T0, inout T1, ...) -> Void`
+  ///   - Pullback: `(inout T1.Tan) -> (T0.Tan, ...)`
+  ///
+  /// If `makeSelfParamFirst` is true, `self`'s tangent is reordered to appear
+  /// first. `makeSelfParamFirst` should be true when working with user-facing
+  /// derivative function types, e.g. when type-checking `@differentiable` and
+  /// `@derivative` attributes.
+  llvm::Expected<AnyFunctionType *> getAutoDiffDerivativeFunctionLinearMapType(
+      IndexSubset *parameterIndices, AutoDiffLinearMapKind kind,
+      LookupConformanceFn lookupConformance, bool makeSelfParamFirst = false);
+
+  AnyFunctionType *getWithoutDifferentiability() const;
+
+  /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
     return getExtInfo().isNoEscape();
@@ -2893,17 +3367,22 @@ public:
     return getExtInfo().throws();
   }
 
-  /// Determine whether the given function input type is one of the
-  /// canonical forms.
-  static bool isCanonicalFunctionInputType(Type input);
+  bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
+  }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
 
-  void printParams(raw_ostream &OS,
-                   const PrintOptions &PO = PrintOptions()) const;
-  void printParams(ASTPrinter &Printer, const PrintOptions &PO) const;
+  static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
+                          const PrintOptions &PO = PrintOptions());
+  static void printParams(ArrayRef<Param> Params, ASTPrinter &Printer,
+                          const PrintOptions &PO);
+
+  static std::string getParamListAsString(ArrayRef<Param> Params,
+                                          const PrintOptions &PO = PrintOptions());
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2916,19 +3395,11 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
 
   static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanType input, CanType result);
-  static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanType input, CanType result,
-                                const ExtInfo &extInfo);
-  static CanAnyFunctionType get(CanGenericSignature signature,
                                 CanParamArrayRef params,
-                                CanType result, const ExtInfo &info);
+                                CanType result,
+                                ExtInfo info = ExtInfo());
 
   CanGenericSignature getOptGenericSignature() const;
-
-  CanType getInput() const {
-    return getPointer()->getInput()->getCanonicalType();
-  }
 
   CanParamArrayRef getParams() const {
     return CanParamArrayRef(getPointer()->getParams());
@@ -2941,56 +3412,67 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   }
 END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
+inline AnyFunctionType::CanYield AnyFunctionType::Yield::getCanonical() const {
+  return CanYield(getType()->getCanonicalType(), getFlags());
+}
 /// FunctionType - A monomorphic function type, specified with an arrow.
 ///
 /// For example:
 ///   let x : (Float, Int) -> Int
 class FunctionType final : public AnyFunctionType,
-    private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param> {
+    public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param,
+                                  AnyFunctionType::ExtInfo::Uncommon> {
   friend TrailingObjects;
       
+
+  size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
+    return getNumParams();
+  }
+
+  size_t numTrailingObjects(OverloadToken<ExtInfo::Uncommon>) const {
+    return hasClangFunctionType() ? 1 : 0;
+  }
+
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(Type Input, Type Result) {
-    return get(Input, Result, ExtInfo());
-  }
-
-  static FunctionType *get(Type Input, Type Result, const ExtInfo &Info);
-      
-  static FunctionType *get(ArrayRef<AnyFunctionType::Param> params,
-                           Type result, const ExtInfo &info,
-                           bool canonicalVararg = false);
+  static FunctionType *get(ArrayRef<Param> params, Type result,
+                           ExtInfo info = ExtInfo());
 
   // Retrieve the input parameters of this function type.
-  ArrayRef<AnyFunctionType::Param> getParams() const {
-    return {getTrailingObjects<AnyFunctionType::Param>(), getNumParams()};
+  ArrayRef<Param> getParams() const {
+    return {getTrailingObjects<Param>(), getNumParams()};
   }
-      
+
+  const clang::Type *getClangFunctionType() const {
+    if (!hasClangFunctionType())
+      return nullptr;
+    auto *type = getTrailingObjects<ExtInfo::Uncommon>()->ClangFunctionType;
+    assert(type && "If the pointer was null, we shouldn't have stored it.");
+    return type;
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getParams(), getResult(), getExtInfo());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ArrayRef<Param> params,
+                      Type result,
+                      ExtInfo info);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Function;
   }
       
 private:
-  FunctionType(ArrayRef<AnyFunctionType::Param> params,
-               Type Input, Type Result,
-               RecursiveTypeProperties properties,
-               const ExtInfo &Info);
+  FunctionType(ArrayRef<Param> params, Type result, ExtInfo info,
+               const ASTContext *ctx, RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  static CanFunctionType get(CanType input, CanType result) {
-    auto fnType = FunctionType::get(input, result);
-    return cast<FunctionType>(fnType->getCanonicalType());
-  }
-  static CanFunctionType get(CanType input, CanType result,
-                             const ExtInfo &info) {
-    auto fnType = FunctionType::get(input, result, info);
-    return cast<FunctionType>(fnType->getCanonicalType());
-  }
   static CanFunctionType get(CanParamArrayRef params, CanType result,
-                             const ExtInfo &info) {
-    auto fnType = FunctionType::get(params.getOriginalArray(),
-                                    result, info, /*canonicalVararg=*/true);
+                             ExtInfo info = ExtInfo()) {
+    auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
     return cast<FunctionType>(fnType->getCanonicalType());
   }
 
@@ -2998,20 +3480,29 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  
-/// Break an argument type into an array of \c AnyFunctionType::Params.
-///
-/// \param type The type to decompose.
-/// \param argumentLabels The argument labels to use.
-SmallVector<AnyFunctionType::Param, 4>
-decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
-/// Map the given parameter list onto a bitvector describing whether
-/// the argument type at each index has a default argument associated with
-/// it.
-llvm::SmallBitVector
-computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                  const ValueDecl *paramOwner, unsigned level);
+/// Provides information about the parameter list of a given declaration, including whether each parameter
+/// has a default argument.
+struct ParameterListInfo {
+  SmallBitVector defaultArguments;
+
+public:
+  ParameterListInfo() { }
+
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                    const ValueDecl *paramOwner, bool skipCurriedSelf);
+
+  /// Whether the parameter at the given index has a default argument.
+  bool hasDefaultArgument(unsigned paramIdx) const;
+
+  /// Retrieve the number of non-defaulted parameters.
+  unsigned numNonDefaultedParameters() const {
+    return defaultArguments.count();
+  }
+
+  /// Retrieve the number of parameters for which we have information.
+  unsigned size() const { return defaultArguments.size(); }
+};
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)
@@ -3029,38 +3520,30 @@ class GenericFunctionType final : public AnyFunctionType,
     private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param> {
   friend TrailingObjects;
       
-  GenericSignature *Signature;
+  GenericSignature Signature;
 
   /// Construct a new generic function type.
-  GenericFunctionType(GenericSignature *sig,
-                      ArrayRef<AnyFunctionType::Param> params,
-                      Type input,
+  GenericFunctionType(GenericSignature sig,
+                      ArrayRef<Param> params,
                       Type result,
-                      const ExtInfo &info,
+                      ExtInfo info,
                       const ASTContext *ctx,
                       RecursiveTypeProperties properties);
       
 public:
   /// Create a new generic function type.
-  static GenericFunctionType *get(GenericSignature *sig,
-                                  Type input,
-                                  Type result,
-                                  const ExtInfo &info);
-
-  /// Create a new generic function type.
-  static GenericFunctionType *get(GenericSignature *sig,
+  static GenericFunctionType *get(GenericSignature sig,
                                   ArrayRef<Param> params,
                                   Type result,
-                                  const ExtInfo &info,
-                                  bool canonicalVararg = false);
+                                  ExtInfo info = ExtInfo());
 
   // Retrieve the input parameters of this function type.
-  ArrayRef<AnyFunctionType::Param> getParams() const {
-    return {getTrailingObjects<AnyFunctionType::Param>(), getNumParams()};
+  ArrayRef<Param> getParams() const {
+    return {getTrailingObjects<Param>(), getNumParams()};
   }
       
   /// Retrieve the generic signature of this function type.
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     return Signature;
   }
   
@@ -3073,16 +3556,17 @@ public:
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
   FunctionType *substGenericArgs(SubstitutionMap subs);
+  FunctionType *substGenericArgs(llvm::function_ref<Type(Type)> substFn) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getGenericSignature(), getInput(), getResult(),
+    Profile(ID, getGenericSignature(), getParams(), getResult(),
             getExtInfo());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
-                      GenericSignature *sig,
-                      Type input,
+                      GenericSignature sig,
+                      ArrayRef<Param> params,
                       Type result,
-                      const ExtInfo &info);
+                      ExtInfo info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3091,26 +3575,19 @@ public:
 };
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-  static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanType input, CanType result,
-                                    const ExtInfo &info) {
-    // Knowing that the argument types are independently canonical is
-    // not sufficient to guarantee that the function type will be canonical.
-    auto fnType = GenericFunctionType::get(sig, input, result, info);
-    return cast<GenericFunctionType>(fnType->getCanonicalType());
-  }
-
   /// Create a new generic function type.
   static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanParamArrayRef params, CanType result,
-                                    const ExtInfo &info) {
+                                    CanParamArrayRef params,
+                                    CanType result,
+                                    ExtInfo info = ExtInfo()) {
     // Knowing that the argument types are independently canonical is
     // not sufficient to guarantee that the function type will be canonical.
     auto fnType = GenericFunctionType::get(sig, params.getOriginalArray(),
-                                           result, info,
-                                           /*canonicalVararg=*/true);
+                                           result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
+
+  CanFunctionType substGenericArgs(SubstitutionMap subs) const;
 
   CanGenericSignature getGenericSignature() const {
     return CanGenericSignature(getPointer()->getGenericSignature());
@@ -3127,24 +3604,8 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
 inline CanAnyFunctionType
-CanAnyFunctionType::get(CanGenericSignature signature,
-                        CanType input, CanType result) {
-  return get(signature, input, result, ExtInfo());
-}
-
-inline CanAnyFunctionType
-CanAnyFunctionType::get(CanGenericSignature signature,
-                        CanType input, CanType result, const ExtInfo &extInfo) {
-  if (signature) {
-    return CanGenericFunctionType::get(signature, input, result, extInfo);
-  } else {
-    return CanFunctionType::get(input, result, extInfo);
-  }
-}
-
-inline CanAnyFunctionType
 CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
-                        CanType result, const ExtInfo &extInfo) {
+                        CanType result, ExtInfo extInfo) {
   if (signature) {
     return CanGenericFunctionType::get(signature, params, result, extInfo);
   } else {
@@ -3152,7 +3613,7 @@ CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
   }
 }
 
-inline GenericSignature *AnyFunctionType::getOptGenericSignature() const {
+inline GenericSignature AnyFunctionType::getOptGenericSignature() const {
   if (auto genericFn = dyn_cast<GenericFunctionType>(this)) {
     return genericFn->getGenericSignature();
   } else {
@@ -3273,19 +3734,50 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+/// The differentiability of a SIL function type parameter.
+enum class SILParameterDifferentiability : unsigned {
+  /// Either differentiable or not applicable.
+  ///
+  /// - If the function type is not `@differentiable`, parameter
+  ///   differentiability is not applicable. This case is the default value.
+  /// - If the function type is `@differentiable`, the function is
+  ///   differentiable with respect to this parameter.
+  DifferentiableOrNotApplicable,
+
+  /// Not differentiable: a `@noDerivative` parameter.
+  ///
+  /// May be applied only to parameters of `@differentiable` function types.
+  /// The function type is not differentiable with respect to this parameter.
+  NotDifferentiable,
+};
+
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
+  SILParameterDifferentiability Differentiability : 1;
+
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
-  SILParameterInfo(CanType type, ParameterConvention conv)
-    : TypeAndConvention(type, conv) {
+  SILParameterInfo(
+      CanType type, ParameterConvention conv,
+      SILParameterDifferentiability differentiability =
+          SILParameterDifferentiability::DifferentiableOrNotApplicable)
+      : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
-  CanType getType() const {
+  /// Return the unsubstituted parameter type that describes the abstract
+  /// calling convention of the parameter.
+  ///
+  /// For most purposes, you probably want \c getArgumentType .
+  CanType getInterfaceType() const {
     return TypeAndConvention.getPointer();
   }
+  
+  /// Return the type of a call argument matching this parameter.
+  ///
+  /// \c t must refer back to the function type this is a parameter for.
+  CanType getArgumentType(SILModule &M, const SILFunctionType *t, TypeExpansionContext context) const;
   ParameterConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
@@ -3324,17 +3816,35 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
+  SILParameterDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
+
+  SILParameterInfo getWithDifferentiability(
+      SILParameterDifferentiability differentiability) const {
+    return SILParameterInfo(getInterfaceType(), getConvention(),
+                            differentiability);
+  }
+
   /// The SIL storage type determines the ABI for arguments based purely on the
   /// formal parameter conventions. The actual SIL type for the argument values
   /// may differ in canonical SIL. In particular, opaque values require indirect
   /// storage. Therefore they will be passed using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque arguments might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctionConventions.h
+  SILType getSILStorageType(
+      SILModule &M, const SILFunctionType *t,
+      TypeExpansionContext context) const; // in SILFunctionConventions.h
+  SILType getSILStorageInterfaceType() const;
 
   /// Return a version of this parameter info with the type replaced.
-  SILParameterInfo getWithType(CanType type) const {
-    return SILParameterInfo(type, getConvention());
+  SILParameterInfo getWithInterfaceType(CanType type) const {
+    return SILParameterInfo(type, getConvention(), getDifferentiability());
+  }
+
+  /// Return a version of this parameter info with the convention replaced.
+  SILParameterInfo getWithConvention(ParameterConvention c) const {
+    return SILParameterInfo(getInterfaceType(), c, getDifferentiability());
   }
 
   /// Transform this SILParameterInfo by applying the user-provided
@@ -3344,15 +3854,30 @@ public:
   /// Type::transform does.
   template<typename F>
   SILParameterInfo map(const F &fn) const {
-    return getWithType(fn(getType()));
+    return getWithInterfaceType(fn(getInterfaceType()));
+  }
+
+  SILParameterInfo mapTypeOutOfContext() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+                                                  ->getCanonicalType());
+  }
+
+  /// Treating this parameter info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILParameterInfo getUnsubstituted(SILModule &M, const SILFunctionType *fnType,
+                                    TypeExpansionContext context) const {
+    return getWithInterfaceType(getArgumentType(M, fnType, context));
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
-    id.AddPointer(getType().getPointer());
+    id.AddPointer(getInterfaceType().getPointer());
     id.AddInteger((unsigned)getConvention());
+    id.AddInteger((unsigned)getDifferentiability());
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &out,
              const PrintOptions &options = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
@@ -3363,7 +3888,9 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return getType() == rhs.getType() && getConvention() == rhs.getConvention();
+    return getInterfaceType() == rhs.getInterfaceType() &&
+           getConvention() == rhs.getConvention() &&
+           getDifferentiability() == rhs.getDifferentiability();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
@@ -3415,9 +3942,20 @@ public:
     assert(type->isLegalSILType() && "SILResultInfo has illegal SIL type");
   }
 
-  CanType getType() const {
+  /// Return the unsubstituted parameter type that describes the abstract
+  /// calling convention of the parameter.
+  ///
+  /// For most purposes, you probably want \c getReturnValueType .
+  CanType getInterfaceType() const {
     return TypeAndConvention.getPointer();
   }
+  
+  /// The type of a return value corresponding to this result.
+  ///
+  /// \c t must refer back to the function type this is a parameter for.
+  CanType getReturnValueType(SILModule &M, const SILFunctionType *t,
+                             TypeExpansionContext context) const;
+
   ResultConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
@@ -3427,11 +3965,18 @@ public:
   /// storage. Therefore they will be returned using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque results might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctionConventions.h
-
+  SILType getSILStorageType(
+      SILModule &M, const SILFunctionType *t,
+      TypeExpansionContext context) const; // in SILFunctionConventions.h
+  SILType getSILStorageInterfaceType() const;
   /// Return a version of this result info with the type replaced.
-  SILResultInfo getWithType(CanType type) const {
+  SILResultInfo getWithInterfaceType(CanType type) const {
     return SILResultInfo(type, getConvention());
+  }
+
+  /// Return a version of this result info with the convention replaced.
+  SILResultInfo getWithConvention(ResultConvention c) const {
+    return SILResultInfo(getInterfaceType(), c);
   }
 
   // Does this result convention require indirect storage? This reflects a
@@ -3451,14 +3996,28 @@ public:
   /// Type::transform does.
   template <typename F>
   SILResultInfo map(F &&fn) const {
-    return getWithType(fn(getType()));
+    return getWithInterfaceType(fn(getInterfaceType()));
+  }
+
+  SILResultInfo mapTypeOutOfContext() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+                                                  ->getCanonicalType());
+  }
+
+  /// Treating this result info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILResultInfo getUnsubstituted(SILModule &M, const SILFunctionType *fnType,
+                                 TypeExpansionContext context) const {
+    return getWithInterfaceType(getReturnValueType(M, fnType, context));
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(TypeAndConvention.getOpaqueValue());
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &out,
              const PrintOptions &options = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
@@ -3469,8 +4028,7 @@ public:
   }
 
   ValueOwnershipKind
-  getOwnershipKind(SILModule &,
-                   CanGenericSignature sig) const; // in SILType.cpp
+  getOwnershipKind(SILFunction &, CanSILFunctionType fTy) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;
@@ -3491,13 +4049,37 @@ public:
     : SILParameterInfo(type, conv) {
   }
 
-  SILYieldInfo getWithType(CanType type) const {
+  SILYieldInfo getWithInterfaceType(CanType type) const {
     return SILYieldInfo(type, getConvention());
+  }
+
+  /// Return a version of this yield info with the convention replaced.
+  SILYieldInfo getWithConvention(YieldConvention c) const {
+    return SILYieldInfo(getInterfaceType(), c);
   }
 
   template<typename F>
   SILYieldInfo map(const F &fn) const {
-    return getWithType(fn(getType()));
+    return getWithInterfaceType(fn(getInterfaceType()));
+  }
+
+  SILYieldInfo mapTypeOutOfContext() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+                                                  ->getCanonicalType());
+  }
+
+  CanType getYieldValueType(SILModule &M, const SILFunctionType *fnType,
+                            TypeExpansionContext context) const {
+    return getArgumentType(M, fnType, context);
+  }
+
+  /// Treating this yield info as a component of the given function
+  /// type, apply any substitutions from the function type to it to
+  /// get a substituted version of it, as you would get from
+  /// SILFunctionType::getUnsubstitutedType.
+  SILYieldInfo getUnsubstituted(SILModule &M, const SILFunctionType *fnType,
+                                TypeExpansionContext context) const {
+    return getWithInterfaceType(getYieldValueType(M, fnType, context));
   }
 };
 
@@ -3516,9 +4098,18 @@ enum class SILCoroutineKind : uint8_t {
   YieldMany,
 };
   
-class SILFunctionType;
-typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 class SILFunctionConventions;
+
+
+CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                            TypeExpansionContext context,
+                                            bool allowLoweredTypes = false);
+ProtocolConformanceRef
+substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
+                                    TypeExpansionContext context);
+namespace Lowering {
+  class TypeConverter;
+};
 
 /// SILFunctionType - The lowered type of a function value, suitable
 /// for use by SIL.
@@ -3528,7 +4119,8 @@ class SILFunctionConventions;
 /// function parameter and result types.
 class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
     private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
-                                  SILResultInfo> {
+                                  SILResultInfo, SILYieldInfo,
+                                  SubstitutionMap, CanType> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -3536,44 +4128,88 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
   }
 
   size_t numTrailingObjects(OverloadToken<SILResultInfo>) const {
-    return hasErrorResult() ? 1 : 0;
+    return getNumResults() + (hasErrorResult() ? 1 : 0);
+  }
+
+  size_t numTrailingObjects(OverloadToken<SILYieldInfo>) const {
+    return getNumYields();
+  }
+
+  size_t numTrailingObjects(OverloadToken<CanType>) const {
+    return hasResultCache() ? 2 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
+    return size_t(hasPatternSubstitutions())
+         + size_t(hasInvocationSubstitutions());
   }
 
 public:
   using Language = SILFunctionLanguage;
   using Representation = SILFunctionTypeRepresentation;
 
-  /// \brief A class which abstracts out some details necessary for
+  /// A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
     // If bits are added or removed, then TypeBase::SILFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
 
-    //   |representation|pseudogeneric| noescape |
-    //   |    0 .. 3    |      4      |     5    |
+    //   |representation|pseudogeneric|noescape|differentiability|
+    //   |    0 .. 3    |      4      |     5    |      6 .. 7     |
     //
     enum : unsigned {
       RepresentationMask = 0xF << 0,
       PseudogenericMask  = 1 << 4,
       NoEscapeMask       = 1 << 5,
-      NumMaskBits        = 6
+      DifferentiabilityMaskOffset = 6,
+      DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
+      NumMaskBits                 = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
 
-    ExtInfo(unsigned Bits) : Bits(Bits) {}
+    class Uncommon {
+      friend ExtInfo;
+      friend class SILFunctionType;
+
+      // Invariant: The FunctionType is canonical.
+      // We store a clang::FunctionType * instead of a clang::CanQualType to
+      // avoid depending on the Clang AST in this header.
+      const clang::FunctionType *ClangFunctionType;
+
+      bool empty() const { return !ClangFunctionType; }
+      Uncommon(const clang::FunctionType *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Analog of AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os) const;
+    };
+
+    Uncommon Other;
+
+    ExtInfo(unsigned Bits, Uncommon Other) : Bits(Bits), Other(Other) {}
 
     friend class SILFunctionType;
-    
   public:
     // Constructor with all defaults.
-    ExtInfo() : Bits(0) { }
+    ExtInfo() : Bits(0), Other(Uncommon(nullptr)) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape) {
-      Bits = ((unsigned) rep) |
-             (isPseudogeneric ? PseudogenericMask : 0) |
-             (isNoEscape ? NoEscapeMask : 0);
+    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
+            DifferentiabilityKind diffKind,
+            const clang::FunctionType *type)
+      : ExtInfo(((unsigned) rep)
+                  | (isPseudogeneric ? PseudogenericMask : 0)
+                  | (isNoEscape ? NoEscapeMask : 0)
+                  | (((unsigned)diffKind << DifferentiabilityMaskOffset)
+                     & DifferentiabilityMask),
+                Uncommon(type)) {
+    }
+
+    static ExtInfo getThin() {
+      return ExtInfo(Representation::Thin, false, false,
+                     DifferentiabilityKind::NonDifferentiable, nullptr);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3583,12 +4219,27 @@ public:
     // Is this function guaranteed to be no-escape by the type system?
     bool isNoEscape() const { return Bits & NoEscapeMask; }
 
+    bool isDifferentiable() const {
+      return getDifferentiabilityKind() !=
+             DifferentiabilityKind::NonDifferentiable;
+    }
+
+    DifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
+                                   DifferentiabilityMaskOffset);
+    }
+
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
       return Representation(Bits & RepresentationMask);
     }
     Language getLanguage() const {
       return getSILFunctionLanguage(getRepresentation());
+    }
+
+    /// Return the underlying Uncommon value if it is not the default value.
+    Optional<Uncommon> getUncommonInfo() const {
+      return Other.empty() ? Optional<Uncommon>() : Other;
     }
 
     bool hasSelfParam() const {
@@ -3600,23 +4251,6 @@ public:
       case Representation::Closure:
         return false;
       case Representation::ObjCMethod:
-      case Representation::Method:
-      case Representation::WitnessMethod:
-        return true;
-      }
-
-      llvm_unreachable("Unhandled Representation in switch.");
-    }
-
-    bool hasGuaranteedSelfParam() const {
-      switch (getRepresentation()) {
-      case Representation::Thick:
-      case Representation::Block:
-      case Representation::Thin:
-      case Representation::CFunctionPointer:
-      case Representation::ObjCMethod:
-      case Representation::Closure:
-        return false;
       case Representation::Method:
       case Representation::WitnessMethod:
         return true;
@@ -3647,23 +4281,28 @@ public:
     // the following with methods instead of mutating these objects.
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
-                     | (unsigned)Rep);
+                     | (unsigned)Rep, Other);
     }
     ExtInfo withIsPseudogeneric(bool isPseudogeneric = true) const {
-      if (isPseudogeneric)
-        return ExtInfo(Bits | PseudogenericMask);
-      else
-        return ExtInfo(Bits & ~PseudogenericMask);
+      return ExtInfo(isPseudogeneric
+                     ? (Bits | PseudogenericMask)
+                     : (Bits & ~PseudogenericMask),
+                     Other);
     }
     ExtInfo withNoEscape(bool NoEscape = true) const {
-      if (NoEscape)
-        return ExtInfo(Bits | NoEscapeMask);
-      else
-        return ExtInfo(Bits & ~NoEscapeMask);
+      return ExtInfo(NoEscape ? (Bits | NoEscapeMask) : (Bits & ~NoEscapeMask),
+                     Other);
+    }
+    ExtInfo
+    withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
+      return ExtInfo(
+          (Bits & ~DifferentiabilityMask) |
+              ((unsigned)differentiability << DifferentiabilityMaskOffset),
+          Other);
     }
 
-    unsigned getFuncAttrKey() const {
-      return Bits;
+    std::pair<unsigned, const void *> getFuncAttrKey() const {
+      return std::make_pair(Bits, Other.ClangFunctionType);
     }
 
     bool operator==(ExtInfo Other) const {
@@ -3682,51 +4321,46 @@ private:
   unsigned NumAnyResults : 16;         // Not including the ErrorResult.
   unsigned NumAnyIndirectFormalResults : 16; // Subset of NumAnyResults.
 
+  // [SILFunctionType-layout]
   // The layout of a SILFunctionType in memory is:
   //   SILFunctionType
   //   SILParameterInfo[NumParameters]
   //   SILResultInfo[isCoroutine() ? 0 : NumAnyResults]
-  //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
   //   SILResultInfo?    // if hasErrorResult()
+  //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
+  //   SubstitutionMap[HasPatternSubs + HasInvocationSubs]
   //   CanType?          // if !isCoro && NumAnyResults > 1, formal result cache
   //   CanType?          // if !isCoro && NumAnyResults > 1, all result cache
 
-  CanGenericSignature GenericSig;
-  Optional<ProtocolConformanceRef> WitnessMethodConformance;
+  CanGenericSignature InvocationGenericSig;
+  ProtocolConformanceRef WitnessMethodConformance;
 
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     return {getTrailingObjects<SILParameterInfo>(), NumParameters};
   }
 
   MutableArrayRef<SILResultInfo> getMutableResults() {
-    auto *ptr = reinterpret_cast<SILResultInfo *>(getMutableParameters().end());
-    return {ptr, getNumResults()};
+    return {getTrailingObjects<SILResultInfo>(), getNumResults()};
   }
 
   MutableArrayRef<SILYieldInfo> getMutableYields() {
-    auto *ptr = reinterpret_cast<SILYieldInfo *>(getMutableParameters().end());
-    return {ptr, getNumYields()};
-  }
-
-  /// Return a pointer past the end of the formal results, whether they
-  /// are yield-results or normal results.
-  void *getEndOfFormalResults() {
-    return isCoroutine() ? static_cast<void*>(getMutableYields().end())
-                         : static_cast<void*>(getMutableResults().end());
+    return {getTrailingObjects<SILYieldInfo>(), getNumYields()};
   }
 
   SILResultInfo &getMutableErrorResult() {
     assert(hasErrorResult());
-    return *reinterpret_cast<SILResultInfo*>(getEndOfFormalResults());
+    return *(getTrailingObjects<SILResultInfo>() + getNumResults());
   }
 
-  /// Return a pointer past the end of all of the results, including the
-  /// error result if one is present.
-  void *getEndOfAllResults() {
-    void *end = getEndOfFormalResults();
-    if (hasErrorResult())
-      end = reinterpret_cast<char*>(end) + sizeof(SILResultInfo);
-    return end;
+  SubstitutionMap &getMutablePatternSubs() {
+    assert(hasPatternSubstitutions());
+    return *getTrailingObjects<SubstitutionMap>();
+  }
+
+  SubstitutionMap &getMutableInvocationSubs() {
+    assert(hasInvocationSubstitutions());
+    return *(getTrailingObjects<SubstitutionMap>()
+               + unsigned(hasPatternSubstitutions()));
   }
 
   /// Do we have slots for caches of the normal-result tuple type?
@@ -3736,38 +4370,39 @@ private:
 
   CanType &getMutableFormalResultsCache() const {
     assert(hasResultCache());
-    auto *ptr = const_cast<SILFunctionType *>(this)->getEndOfAllResults();
-    return *reinterpret_cast<CanType*>(ptr);
+    return *const_cast<SILFunctionType *>(this)->getTrailingObjects<CanType>();
   }
 
   CanType &getMutableAllResultsCache() const {
     assert(hasResultCache());
-    auto *ptr = const_cast<SILFunctionType *>(this)->getEndOfAllResults();
-    return *(reinterpret_cast<CanType *>(ptr) + 1);
+    return *(const_cast<SILFunctionType *>(this)->getTrailingObjects<CanType>()
+             + 1);
   }
 
-  SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
+  SILFunctionType(GenericSignature genericSig, ExtInfo ext,
                   SILCoroutineKind coroutineKind,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> params,
                   ArrayRef<SILYieldInfo> yieldResults,
                   ArrayRef<SILResultInfo> normalResults,
                   Optional<SILResultInfo> errorResult,
-                  const ASTContext &ctx,
-                  RecursiveTypeProperties properties,
-                  Optional<ProtocolConformanceRef> witnessMethodConformance);
+                  SubstitutionMap patternSubs,
+                  SubstitutionMap invocationSubs,
+                  const ASTContext &ctx, RecursiveTypeProperties properties,
+                  ProtocolConformanceRef witnessMethodConformance);
 
 public:
-  static CanSILFunctionType get(GenericSignature *genericSig,
-                                ExtInfo ext,
-                                SILCoroutineKind coroutineKind,
-                                ParameterConvention calleeConvention,
-                                ArrayRef<SILParameterInfo> interfaceParams,
-                                ArrayRef<SILYieldInfo> interfaceYields,
-                                ArrayRef<SILResultInfo> interfaceResults,
-                                Optional<SILResultInfo> interfaceErrorResult,
-                                const ASTContext &ctx,
-              Optional<ProtocolConformanceRef> witnessMethodConformance = None);
+  static CanSILFunctionType
+  get(GenericSignature genericSig, ExtInfo ext, SILCoroutineKind coroutineKind,
+      ParameterConvention calleeConvention,
+      ArrayRef<SILParameterInfo> interfaceParams,
+      ArrayRef<SILYieldInfo> interfaceYields,
+      ArrayRef<SILResultInfo> interfaceResults,
+      Optional<SILResultInfo> interfaceErrorResult,
+      SubstitutionMap patternSubs, SubstitutionMap invocationSubs,
+      const ASTContext &ctx,
+      ProtocolConformanceRef witnessMethodConformance =
+          ProtocolConformanceRef());
 
   /// Return a structurally-identical function type with a slightly tweaked
   /// ExtInfo.
@@ -3786,7 +4421,7 @@ public:
   ///   - a single indirect result and no direct results.
   ///
   /// If the result is formally indirect, return the empty tuple.
-  SILType getFormalCSemanticResult();
+  SILType getFormalCSemanticResult(SILModule &M);
 
   /// Return the convention under which the callee is passed, if this
   /// is a thick non-block callee.
@@ -3869,13 +4504,11 @@ public:
   };
   using IndirectFormalResultIter =
       llvm::filter_iterator<const SILResultInfo *, IndirectFormalResultFilter>;
-  using IndirectFormalResultRange = IteratorRange<IndirectFormalResultIter>;
+  using IndirectFormalResultRange = iterator_range<IndirectFormalResultIter>;
 
   /// A range of SILResultInfo for all formally indirect results.
   IndirectFormalResultRange getIndirectFormalResults() const {
-    auto filter =
-        llvm::make_filter_range(getResults(), IndirectFormalResultFilter());
-    return makeIteratorRange(filter.begin(), filter.end());
+    return llvm::make_filter_range(getResults(), IndirectFormalResultFilter());
   }
 
   struct DirectFormalResultFilter {
@@ -3885,13 +4518,11 @@ public:
   };
   using DirectFormalResultIter =
       llvm::filter_iterator<const SILResultInfo *, DirectFormalResultFilter>;
-  using DirectFormalResultRange = IteratorRange<DirectFormalResultIter>;
+  using DirectFormalResultRange = iterator_range<DirectFormalResultIter>;
 
   /// A range of SILResultInfo for all formally direct results.
   DirectFormalResultRange getDirectFormalResults() const {
-    auto filter =
-        llvm::make_filter_range(getResults(), DirectFormalResultFilter());
-    return makeIteratorRange(filter.begin(), filter.end());
+    return llvm::make_filter_range(getResults(), DirectFormalResultFilter());
   }
 
   /// Get a single non-address SILType that represents all formal direct
@@ -3899,14 +4530,16 @@ public:
   /// this function depends on the current SIL stage and is known by
   /// SILFunctionConventions. It may be a wider tuple that includes formally
   /// indirect results.
-  SILType getDirectFormalResultsType();
+  SILType getDirectFormalResultsType(SILModule &M,
+                                     TypeExpansionContext expansion);
 
   /// Get a single non-address SILType for all SIL results regardless of whether
   /// they are formally indirect. The actual SIL result type of an apply
   /// instruction that calls this function depends on the current SIL stage and
   /// is known by SILFunctionConventions. It may be a narrower tuple that omits
   /// formally indirect results.
-  SILType getAllResultsType();
+  SILType getAllResultsSubstType(SILModule &M, TypeExpansionContext expansion);
+  SILType getAllResultsInterfaceType();
 
   /// Does this function have a blessed Swift-native error result?
   bool hasErrorResult() const {
@@ -3937,38 +4570,283 @@ public:
     return getParameters().back();
   }
 
-  bool isPolymorphic() const { return GenericSig != nullptr; }
-  CanGenericSignature getGenericSignature() const { return GenericSig; }
+  struct IndirectMutatingParameterFilter {
+    bool operator()(SILParameterInfo param) const {
+      return param.isIndirectMutating();
+    }
+  };
+  using IndirectMutatingParameterIter =
+      llvm::filter_iterator<const SILParameterInfo *,
+                            IndirectMutatingParameterFilter>;
+  using IndirectMutatingParameterRange =
+      iterator_range<IndirectMutatingParameterIter>;
 
-  CanType getSelfInstanceType() const;
+  /// A range of SILParameterInfo for all indirect mutating parameters.
+  IndirectMutatingParameterRange getIndirectMutatingParameters() const {
+    return llvm::make_filter_range(getParameters(),
+                                   IndirectMutatingParameterFilter());
+  }
 
-  /// If this is a @convention(witness_method) function with a protocol
-  /// constrained self parameter, return the protocol constraint for
-  /// the Self type.
-  ProtocolDecl *getDefaultWitnessMethodProtocol() const;
+  /// Returns the number of indirect mutating parameters.
+  unsigned getNumIndirectMutatingParameters() const {
+    return llvm::count_if(getParameters(), IndirectMutatingParameterFilter());
+  }
+
+  /// Get the generic signature that the component types are specified
+  /// in terms of, if any.
+  CanGenericSignature getSubstGenericSignature() const {
+    if (hasPatternSubstitutions())
+      return getPatternGenericSignature();
+    return getInvocationGenericSignature();
+  }
+
+  /// Return the combined substitutions that need to be applied to the
+  /// component types to render their expected types in the context.
+  SubstitutionMap getCombinedSubstitutions() const {
+    if (hasPatternSubstitutions()) {
+      auto subs = getPatternSubstitutions();
+      if (hasInvocationSubstitutions())
+        subs = subs.subst(getInvocationSubstitutions());
+      return subs;
+    }
+    return getInvocationSubstitutions();
+  }
+
+  /// Get the generic signature used by callers to invoke the function.
+  CanGenericSignature getInvocationGenericSignature() const {
+    return InvocationGenericSig;
+  }
+
+  bool hasInvocationSubstitutions() const {
+    return Bits.SILFunctionType.HasInvocationSubs;
+  }
+
+  /// Return the invocation substitutions.  The presence of invocation
+  /// substitutions means that this is an applied or contextualized generic
+  /// function type.
+  SubstitutionMap getInvocationSubstitutions() const {
+    return hasInvocationSubstitutions()
+             ? const_cast<SILFunctionType*>(this)->getMutableInvocationSubs()
+             : SubstitutionMap();
+  }
+
+  bool hasPatternSubstitutions() const {
+    return Bits.SILFunctionType.HasPatternSubs;
+  }
+
+  /// Return the generic signature which expresses the fine-grained
+  /// abstraction of this function.  See the explanation for
+  /// `getPatternSubstitutions`.
+  ///
+  /// The exact structure of this signature is an implementation detail
+  /// for many function types, and tools must be careful not to expose
+  /// it in ways that must be kept stable.  For example, ptrauth
+  /// discrimination does not distinguish between different generic
+  /// parameter types in this signature.
+  CanGenericSignature getPatternGenericSignature() const  {
+    return hasPatternSubstitutions()
+             ? CanGenericSignature(
+                 getPatternSubstitutions().getGenericSignature())
+             : CanGenericSignature();
+  }
+
+  /// Return the "pattern" substitutions.  The presence of pattern
+  /// substitutions means that the component types of this type are
+  /// abstracted in some additional way.
+  ///
+  /// For example, in the function:
+  ///
+  /// ```
+  ///   func consume<T>(producer: () -> T)
+  /// ```
+  ///
+  /// the argument function `producer` is abstracted differently from
+  /// a function of type `() -> Int`, even when `T` is concretely `Int`.
+  ///
+  /// Similarly, a protocol witness function that returns an `Int` might
+  /// return it differently if original requirement is abstract about its
+  /// return type.
+  ///
+  /// The most important abstraction differences are accounted for in
+  /// the structure and conventions of the function's component types,
+  /// but more subtle differences, like ptrauth discrimination, may
+  /// require more precise information.
+  SubstitutionMap getPatternSubstitutions() const {
+    return hasPatternSubstitutions()
+             ? const_cast<SILFunctionType*>(this)->getMutablePatternSubs()
+             : SubstitutionMap();
+  }
+
+  bool isPolymorphic() const {
+    return getInvocationGenericSignature() && !getInvocationSubstitutions();
+  }
+
+  CanType getSelfInstanceType(SILModule &M, TypeExpansionContext context) const;
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
   /// Self type.
-  ClassDecl *getWitnessMethodClass(ModuleDecl &M) const;
+  ClassDecl *getWitnessMethodClass(SILModule &M,
+                                   TypeExpansionContext context) const;
 
   /// If this is a @convention(witness_method) function, return the conformance
-  /// for which the method is a witness.
-  ProtocolConformanceRef getWitnessMethodConformance() const {
-    assert(getRepresentation() == Representation::WitnessMethod);
-    return *WitnessMethodConformance;
-  }
-
-  /// If this is a @convention(witness_method) function, return the conformance
-  /// for which the method is a witness, if it isn't that convention, return
-  /// None.
-  Optional<ProtocolConformanceRef> getWitnessMethodConformanceOrNone() const {
+  /// for which the method is a witness. If it isn't that convention, return
+  /// an invalid conformance.
+  ProtocolConformanceRef getWitnessMethodConformanceOrInvalid() const {
     return WitnessMethodConformance;
   }
 
-  ExtInfo getExtInfo() const { return ExtInfo(Bits.SILFunctionType.ExtInfo); }
+  const clang::FunctionType *getClangFunctionType() const;
 
-  /// \brief Returns the language-level calling convention of the function.
+  /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
+  /// function type, returns an `IndexSubset` corresponding to the
+  /// differentiability/linearity parameters (e.g. all parameters except the
+  /// `@noDerivative` ones).
+  IndexSubset *getDifferentiabilityParameterIndices();
+
+  /// Returns the `@differentiable` or `@differentiable(linear)` function type
+  /// for the given differentiability kind and parameter indices representing
+  /// differentiability/linearity parameters.
+  CanSILFunctionType getWithDifferentiability(DifferentiabilityKind kind,
+                                              IndexSubset *parameterIndices);
+
+  /// Returns the SIL function type stripping differentiability kind and
+  /// differentiability from all parameters.
+  CanSILFunctionType getWithoutDifferentiability();
+
+  /// Returns the type of the derivative function for the given parameter
+  /// indices, result index, derivative function kind, derivative function
+  /// generic signature (optional), and other auxiliary parameters.
+  ///
+  /// Preconditions:
+  /// - Parameters corresponding to parameter indices must conform to
+  ///   `Differentiable`.
+  /// - The result corresponding to the result index must conform to
+  ///   `Differentiable`.
+  ///
+  /// Typing rules, given:
+  /// - Original function type: $(T0, T1, ...) -> (R0, R1, ...)
+  ///
+  /// Terminology:
+  /// - The derivative of a `Differentiable`-conforming type has the
+  ///   `TangentVector` associated type. `TangentVector` is abbreviated as `Tan`
+  ///   below.
+  /// - "wrt" parameters refers to parameters indicated by the parameter
+  ///   indices.
+  /// - "wrt" result refers to the result indicated by the result index.
+  ///
+  /// JVP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original results, followed by a differential function, which
+  ///   takes "wrt" parameter derivatives and returns a "wrt" result derivative.
+  ///
+  /// \verbatim
+  ///     $(T0, ...) -> (R0, ...,  (T0.Tan, T1.Tan, ...) -> R0.Tan)
+  ///                    ^~~~~~~    ^~~~~~~~~~~~~~~~~~~     ^~~~~~
+  ///          original results | derivatives wrt params | derivative wrt result
+  /// \endverbatim
+  ///
+  /// VJP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original results, followed by a pullback function, which
+  ///   takes a "wrt" result derivative and returns "wrt" parameter derivatives.
+  ///
+  /// \verbatim
+  ///     $(T0, ...) -> (R0, ...,       (R0.Tan)  ->     (T0.Tan, T1.Tan, ...))
+  ///                    ^~~~~~~         ^~~~~~            ^~~~~~~~~~~~~~~~~~~
+  ///          original results | derivative wrt result | derivatives wrt params
+  /// \endverbatim
+  ///
+  /// The original type may have `inout` parameters. If so, the
+  /// differential/pullback typing rules are more nuanced: see documentation for
+  /// `getAutoDiffDerivativeFunctionLinearMapType` for details. Semantically,
+  /// `inout` parameters behave as both parameters and results.
+  ///
+  /// A "constrained derivative generic signature" is computed from
+  /// `derivativeFunctionGenericSignature`, if specified. Otherwise, it is
+  /// computed from the original generic signature. A "constrained derivative
+  /// generic signature" requires all "wrt" parameters to conform to
+  /// `Differentiable`; this is important for correctness.
+  ///
+  /// This "constrained derivative generic signature" is used for
+  /// parameter/result type lowering. It is used as the actual generic signature
+  /// of the derivative function type iff the original function type has a
+  /// generic signature and not all generic parameters are bound to concrete
+  /// types. Otherwise, no derivative generic signature is used.
+  ///
+  /// Other properties of the original function type are copied exactly:
+  /// `ExtInfo`, coroutine kind, callee convention, yields, optional error
+  /// result, witness method conformance, etc.
+  ///
+  /// Special cases:
+  /// - Reabstraction thunks have special derivative type calculation. The
+  ///   original function-typed last parameter is transformed into a
+  ///   `@differentiable` function-typed parameter in the derivative type. This
+  ///   is necessary for the differentiation transform to support reabstraction
+  ///   thunk differentiation because the function argument is opaque and cannot
+  ///   be differentiated. Instead, the argument is made `@differentiable` and
+  ///   reabstraction thunk JVP/VJP callers are responsible for passing a
+  ///   `@differentiable` function.
+  ///   - TODO(TF-1036): Investigate more efficient reabstraction thunk
+  ///     derivative approaches. The last argument can simply be a
+  ///     corresponding derivative function, instead of a `@differentiable`
+  ///     function - this is more direct. It may be possible to implement
+  ///     reabstraction thunk derivatives using "reabstraction thunks for
+  ///     the original function's derivative", avoiding extra code generation.
+  ///
+  /// Caveats:
+  /// - We may support multiple result indices instead of a single result index
+  ///   eventually. At the SIL level, this enables differentiating wrt multiple
+  ///   function results. At the Swift level, this enables differentiating wrt
+  ///   multiple tuple elements for tuple-returning functions.
+  CanSILFunctionType getAutoDiffDerivativeFunctionType(
+      IndexSubset *parameterIndices, unsigned resultIndex,
+      AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
+      CanGenericSignature derivativeFunctionGenericSignature = nullptr,
+      bool isReabstractionThunk = false);
+
+  /// Returns the type of the transpose function for the given parameter
+  /// indices, transpose function generic signature (optional), and other
+  /// auxiliary parameters.
+  ///
+  /// Preconditions:
+  /// - Linearity parameters corresponding to parameter indices must conform to
+  ///   `Differentiable` and satisfy `Self == Self.TangentVector`.
+  ///
+  /// Typing rules, given:
+  /// - Original function type: $(T0, T1, ...) -> (R0, R1, ...)
+  ///
+  /// Transpose function type:
+  /// - Takes non-linearity parameters, followed by original results, as
+  ///   parameters.
+  /// - Returns linearity parameters.
+  ///
+  /// A "constrained transpose generic signature" is computed from
+  /// `transposeFunctionGenericSignature`, if specified. Otherwise, it is
+  /// computed from the original generic signature. A "constrained transpose
+  /// generic signature" requires all linearity parameters to conform to
+  /// `Differentiable` and to satisfy `Self == Self.TangentVector`; this is
+  /// important for correctness.
+  ///
+  /// This "constrained transpose generic signature" is used for
+  /// parameter/result type lowering. It is used as the actual generic signature
+  /// of the transpose function type iff the original function type has a
+  /// generic signature and not all generic parameters are bound to concrete
+  /// types. Otherwise, no transpose generic signature is used.
+  ///
+  /// Other properties of the original function type are copied exactly:
+  /// `ExtInfo`, callee convention, witness method conformance, etc.
+  CanSILFunctionType getAutoDiffTransposeFunctionType(
+      IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
+      CanGenericSignature transposeFunctionGenericSignature = nullptr);
+
+  ExtInfo getExtInfo() const {
+    return ExtInfo(Bits.SILFunctionType.ExtInfoBits, getClangFunctionType());
+  }
+
+  /// Returns the language-level calling convention of the function.
   Language getLanguage() const {
     return getExtInfo().getLanguage();
   }
@@ -3977,7 +4855,7 @@ public:
     return getExtInfo().hasSelfParam();
   }
 
-  /// \brief Get the representation of the function type.
+  /// Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
   }
@@ -3996,7 +4874,37 @@ public:
            getRepresentation() == SILFunctionTypeRepresentation::Thick;
   }
 
-  bool isNoReturnFunction() const; // Defined in SILType.cpp
+  bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
+  }
+
+  bool isNoReturnFunction(SILModule &M, TypeExpansionContext context)
+      const; // Defined in SILType.cpp
+
+  /// Create a SILFunctionType with the same structure as this one,
+  /// but with a different (or new) set of invocation substitutions.
+  /// The substitutions must have the same generic signature as this.
+  CanSILFunctionType
+  withInvocationSubstitutions(SubstitutionMap subs) const;
+
+  /// Create a SILFunctionType with the same structure as this one,
+  /// but with a different set of pattern substitutions.
+  /// This type must already have pattern substitutions, and they
+  /// must have the same signature as the new substitutions.
+  CanSILFunctionType
+  withPatternSubstitutions(SubstitutionMap subs) const;
+
+  /// Create a SILFunctionType with the same structure as this one,
+  /// but replacing the invocation generic signature and pattern
+  /// substitutions.  This type must either be polymorphic or have
+  /// pattern substitutions, and the substitution signature must
+  /// match `getSubstGenericSignature()`.
+  CanSILFunctionType
+  withPatternSpecialization(CanGenericSignature sign,
+                            SubstitutionMap subs,
+                            ProtocolConformanceRef witnessConformance =
+                              ProtocolConformanceRef()) const;
 
   class ABICompatibilityCheckResult {
     friend class SILFunctionType;
@@ -4039,28 +4947,41 @@ public:
   /// std::error_code. This is only meant to be used in assertions. When
   /// assertions are disabled, this just returns true.
   ABICompatibilityCheckResult
-  isABICompatibleWith(CanSILFunctionType other) const;
+  isABICompatibleWith(CanSILFunctionType other,
+                      SILFunction &context) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      SubstitutionMap subs);
+                                      SubstitutionMap subs,
+                                      TypeExpansionContext context);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       TypeSubstitutionFn subs,
-                                      LookupConformanceFn conformances);
+                                      LookupConformanceFn conformances,
+                                      TypeExpansionContext context);
+  CanSILFunctionType substituteOpaqueArchetypes(Lowering::TypeConverter &TC,
+                                                TypeExpansionContext context);
 
+  SILType substInterfaceType(SILModule &M,
+                             SILType interfaceType,
+                             TypeExpansionContext context) const;
+
+  /// Return the unsubstituted function type equivalent to this type; that is, the type that has the same
+  /// argument and result types as `this` type after substitutions, if any.
+  CanSILFunctionType getUnsubstitutedType(SILModule &M) const;
+                                    
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getGenericSignature(), getExtInfo(), getCoroutineKind(),
-            getCalleeConvention(), getParameters(), getYields(),
-            getResults(), getOptionalErrorResult());
+    Profile(ID, getInvocationGenericSignature(),
+            getExtInfo(), getCoroutineKind(), getCalleeConvention(),
+            getParameters(), getYields(), getResults(),
+            getOptionalErrorResult(), getWitnessMethodConformanceOrInvalid(),
+            getPatternSubstitutions(), getInvocationSubstitutions());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID,
-                      GenericSignature *genericSig,
-                      ExtInfo info,
-                      SILCoroutineKind coroutineKind,
-                      ParameterConvention calleeConvention,
-                      ArrayRef<SILParameterInfo> params,
-                      ArrayRef<SILYieldInfo> yields,
-                      ArrayRef<SILResultInfo> results,
-                      Optional<SILResultInfo> errorResult);
+  static void
+  Profile(llvm::FoldingSetNodeID &ID, GenericSignature genericSig, ExtInfo info,
+          SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
+          ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
+          ArrayRef<SILResultInfo> results, Optional<SILResultInfo> errorResult,
+          ProtocolConformanceRef conformance,
+          SubstitutionMap patternSub, SubstitutionMap invocationSubs);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4092,10 +5013,6 @@ public:
   SILLayout *getLayout() const { return Layout; }
   SubstitutionMap getSubstitutions() const { return Substitutions; }
 
-  // In SILType.h:
-  CanType getFieldLoweredType(SILModule &M, unsigned index) const;
-  SILType getFieldType(SILModule &M, unsigned index) const;
-
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type
   // interface.
@@ -4111,7 +5028,7 @@ public:
                       SILLayout *Layout,
                       SubstitutionMap Args);
   
-  /// \brief Produce a profile of this box, for use in a folding set.
+  /// Produce a profile of this box, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, getLayout(), getSubstitutions());
   }
@@ -4279,9 +5196,9 @@ public:
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public NominalType, public llvm::FoldingSetNode {
+class ProtocolType : public NominalType {
 public:
-  /// \brief Retrieve the type when we're referencing the given protocol.
+  /// Retrieve the type when we're referencing the given protocol.
   /// declaration.
   static ProtocolType *get(ProtocolDecl *D, Type Parent, const ASTContext &C);
 
@@ -4311,11 +5228,6 @@ public:
   /// otherwise.
   static bool visitAllProtocols(ArrayRef<ProtocolDecl *> protocols,
                                 llvm::function_ref<bool(ProtocolDecl *)> fn);
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D, Type Parent);
 
 private:
   friend class NominalTypeDecl;
@@ -4347,12 +5259,12 @@ class ProtocolCompositionType final : public TypeBase,
   friend TrailingObjects;
   
 public:
-  /// \brief Retrieve an instance of a protocol composition type with the
+  /// Retrieve an instance of a protocol composition type with the
   /// given set of members.
   static Type get(const ASTContext &C, ArrayRef<Type> Members,
                   bool HasExplicitAnyObject);
   
-  /// \brief Retrieve the set of members composed to create this type.
+  /// Retrieve the set of members composed to create this type.
   ///
   /// For non-canonical types, this can contain classes, protocols and
   /// protocol compositions in any order. There can be at most one unique
@@ -4502,17 +5414,26 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 
+/// Common trailing objects for all ArchetypeType implementations, used to
+/// store the constraints on the archetype.
+template<typename Base, typename...AdditionalTrailingObjects>
+using ArchetypeTrailingObjects = llvm::TrailingObjects<Base,
+  ProtocolDecl *, Type, LayoutConstraint, AdditionalTrailingObjects...>;
+
+class PrimaryArchetypeType;
+class OpaqueTypeArchetypeType;
+  
 /// An archetype is a type that represents a runtime type that is
 /// known to conform to some set of requirements.
 ///
 /// Archetypes are used to represent generic type parameters and their
 /// associated types, as well as the runtime type stored within an
 /// existential container.
-class ArchetypeType final : public SubstitutableType,
-  private llvm::TrailingObjects<ArchetypeType, ProtocolDecl *,
-                                Type, LayoutConstraint, UUID> {
-  friend TrailingObjects;
-
+class ArchetypeType : public SubstitutableType,
+                private llvm::trailing_objects_internal::TrailingObjectsBase
+{
+protected:
+  // Each subclass has these same trailing objects and flags.
   size_t numTrailingObjects(OverloadToken<ProtocolDecl *>) const {
     return Bits.ArchetypeType.NumProtocols;
   }
@@ -4524,97 +5445,40 @@ class ArchetypeType final : public SubstitutableType,
   size_t numTrailingObjects(OverloadToken<LayoutConstraint>) const {
     return Bits.ArchetypeType.HasLayoutConstraint ? 1 : 0;
   }
-
-  size_t numTrailingObjects(OverloadToken<UUID>) const {
-    return getOpenedExistentialType() ? 1 : 0;
-  }
-
-  llvm::PointerUnion3<ArchetypeType *, TypeBase *,
-                      GenericEnvironment *> ParentOrOpenedOrEnvironment;
   Type InterfaceType;
   MutableArrayRef<std::pair<Identifier, Type>> NestedTypes;
 
   void populateNestedTypes() const;
   void resolveNestedType(std::pair<Identifier, Type> &nested) const;
 
+  
+  // Helper to get the trailing objects of one of the subclasses.
+  template<typename Type>
+  const Type *getSubclassTrailingObjects() const;
+  
+  template<typename Type>
+  Type *getSubclassTrailingObjects() {
+    const auto *constThis = this;
+    return const_cast<Type*>(constThis->getSubclassTrailingObjects<Type>());
+  }
+
 public:
-  /// getNew - Create a new nested archetype with the given associated type.
-  ///
-  /// The ConformsTo array will be copied into the ASTContext by this routine.
-  static CanTypeWrapper<ArchetypeType>
-                        getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               DependentMemberType *InterfaceType,
-                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                               Type Superclass, LayoutConstraint Layout);
-
-  /// getNew - Create a new primary archetype with the given name.
-  ///
-  /// The ConformsTo array will be minimized then copied into the ASTContext
-  /// by this routine.
-  static CanTypeWrapper<ArchetypeType>
-                        getNew(const ASTContext &Ctx,
-                               GenericEnvironment *GenericEnv,
-                               GenericTypeParamType *InterfaceType,
-                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                               Type Superclass, LayoutConstraint Layout);
-
-  /// Create a new archetype that represents the opened type
-  /// of an existential value.
-  ///
-  /// \param existential The existential type to open.
-  ///
-  /// \param knownID When non-empty, the known ID of the archetype. When empty,
-  /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<ArchetypeType>
-                        getOpened(Type existential, 
-                                  Optional<UUID> knownID = None);
-
-  /// Create a new archetype that represents the opened type
-  /// of an existential value.
-  ///
-  /// \param existential The existential type or existential metatype to open.
-  static CanType getAnyOpened(Type existential);
-
-  /// \brief Retrieve the name of this archetype.
+  /// Retrieve the name of this archetype.
   Identifier getName() const;
 
-  /// \brief Retrieve the fully-dotted name that should be used to display this
+  /// Retrieve the fully-dotted name that should be used to display this
   /// archetype.
   std::string getFullName() const;
-
-  /// \brief Retrieve the parent of this archetype, or null if this is a
-  /// primary archetype.
-  ArchetypeType *getParent() const { 
-    return ParentOrOpenedOrEnvironment.dyn_cast<ArchetypeType *>();
-  }
-
-  /// Retrieve the opened existential type 
-  Type getOpenedExistentialType() const {
-    return ParentOrOpenedOrEnvironment.dyn_cast<TypeBase *>();
-  }
-
-  /// Retrieve the generic environment in which this archetype resides.
-  ///
-  /// Note: opened archetypes currently don't have generic environments.
-  GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the interface type of this associated type, which will either
   /// be a GenericTypeParamType or a DependentMemberType.
   Type getInterfaceType() const { return InterfaceType; }
 
-  /// Retrieve the associated type to which this archetype (if it is a nested
-  /// archetype) corresponds.
-  ///
-  /// This associated type will have the same name as the archetype and will
-  /// be a member of one of the protocols to which the parent archetype
-  /// conforms.
-  AssociatedTypeDecl *getAssocType() const;
-
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const {
-    return { getTrailingObjects<ProtocolDecl *>(),
-             Bits.ArchetypeType.NumProtocols };
+    return { getSubclassTrailingObjects<ProtocolDecl *>(),
+             static_cast<size_t>(Bits.ArchetypeType.NumProtocols) };
   }
   
   /// requiresClass - True if the type can only be substituted with class types.
@@ -4622,38 +5486,38 @@ public:
   /// a superclass constraint.
   bool requiresClass() const;
 
-  /// \brief Retrieve the superclass of this type, if such a requirement exists.
+  /// Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const {
     if (!Bits.ArchetypeType.HasSuperclass) return Type();
 
-    return *getTrailingObjects<Type>();
+    return *getSubclassTrailingObjects<Type>();
   }
 
-  /// \brief Retrieve the layout constraint of this type, if such a requirement exists.
+  /// Retrieve the layout constraint of this type, if such a requirement exists.
   LayoutConstraint getLayoutConstraint() const {
     if (!Bits.ArchetypeType.HasLayoutConstraint) return LayoutConstraint();
 
-    return *getTrailingObjects<LayoutConstraint>();
+    return *getSubclassTrailingObjects<LayoutConstraint>();
   }
 
-  /// \brief Return true if the archetype has any requirements at all.
+  /// Return true if the archetype has any requirements at all.
   bool hasRequirements() const {
     return !getConformsTo().empty() || getSuperclass();
   }
 
-  /// \brief Retrieve the nested type with the given name.
+  /// Retrieve the nested type with the given name.
   Type getNestedType(Identifier Name) const;
 
-  /// \brief Retrieve the nested type with the given name, if it's already
+  /// Retrieve the nested type with the given name, if it's already
   /// known.
   ///
   /// This is an implementation detail used by the generic signature builder.
   Optional<Type> getNestedTypeIfKnown(Identifier Name) const;
 
-  /// \brief Check if the archetype contains a nested type with the given name.
+  /// Check if the archetype contains a nested type with the given name.
   bool hasNestedType(Identifier Name) const;
 
-  /// \brief Retrieve the known nested types of this archetype.
+  /// Retrieve the known nested types of this archetype.
   ///
   /// Useful only for debugging dumps; all other queries should attempt to
   /// find a particular nested type by name, directly, or look at the
@@ -4663,7 +5527,7 @@ public:
     return getAllNestedTypes(/*resolveTypes=*/false);
   }
 
-  /// \brief Retrieve the nested types of this archetype.
+  /// Retrieve the nested types of this archetype.
   ///
   /// \param resolveTypes Whether to eagerly resolve the nested types
   /// (defaults to \c true). Otherwise, the nested types might be
@@ -4674,7 +5538,7 @@ public:
   ArrayRef<std::pair<Identifier, Type>>
   getAllNestedTypes(bool resolveTypes = true) const;
 
-  /// \brief Set the nested types to a copy of the given array of
+  /// Set the nested types to a copy of the given array of
   /// archetypes.
   void setNestedTypes(ASTContext &Ctx,
                       ArrayRef<std::pair<Identifier, Type>> Nested);
@@ -4682,54 +5546,320 @@ public:
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, Type nested);
 
-  /// isPrimary - Determine whether this is the archetype for a 'primary'
-  /// archetype, e.g., one that is not nested within another archetype and is
-  /// not an opened existential.
-  bool isPrimary() const { 
-    return ParentOrOpenedOrEnvironment.is<GenericEnvironment *>();
-  }
-
-  /// getPrimary - Return the primary archetype parent of this archetype.
-  ArchetypeType *getPrimary() const {
-    assert(!getOpenedExistentialType() && "Check for opened existential first");
-
-    auto *archetype = this;
-    while (auto *parent = archetype->getParent())
-      archetype = parent;
-    return const_cast<ArchetypeType *>(archetype);
-  }
-
-  /// Retrieve the ID number of this opened existential.
-  UUID getOpenedExistentialID() const {
-    assert(getOpenedExistentialType() && "Not an opened existential archetype");
-    // The UUID is tail-allocated at the end of opened existential archetypes.
-    return *getTrailingObjects<UUID>();
-  }
+  /// Return the root archetype parent of this archetype.
+  ArchetypeType *getRoot() const;
+  
+  /// Get the generic environment this archetype lives in.
+  GenericEnvironment *getGenericEnvironment() const;
+  
+  /// Get the protocol/class existential type that most closely represents the
+  /// set of constraints on this archetype.
+  ///
+  /// Right now, this only considers constraints on the archetype itself, not
+  /// any of its associated types, since those are the only kind of existential
+  /// type we can represent.
+  Type getExistentialType() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Archetype;
+    return T->getKind() >= TypeKind::First_ArchetypeType
+        && T->getKind() <= TypeKind::Last_ArchetypeType;
+  }
+protected:
+  ArchetypeType(TypeKind Kind,
+                const ASTContext &C,
+                RecursiveTypeProperties properties,
+                Type InterfaceType,
+                ArrayRef<ProtocolDecl *> ConformsTo,
+                Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
+END_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
+  
+/// An archetype that represents a primary generic argument inside the generic
+/// context that binds it.
+class PrimaryArchetypeType final : public ArchetypeType,
+    private ArchetypeTrailingObjects<PrimaryArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+                                  
+  GenericEnvironment *Environment;
+
+public:
+  /// getNew - Create a new primary archetype with the given name.
+  ///
+  /// The ConformsTo array will be minimized then copied into the ASTContext
+  /// by this routine.
+  static CanTypeWrapper<PrimaryArchetypeType>
+                        getNew(const ASTContext &Ctx,
+                               GenericEnvironment *GenericEnv,
+                               GenericTypeParamType *InterfaceType,
+                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                               Type Superclass, LayoutConstraint Layout);
+
+  /// Retrieve the generic environment in which this archetype resides.
+  GenericEnvironment *getGenericEnvironment() const {
+    return Environment;
+  }
+      
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::PrimaryArchetype;
+  }
+private:
+  PrimaryArchetypeType(const ASTContext &Ctx,
+                       GenericEnvironment *GenericEnv,
+                       Type InterfaceType,
+                       ArrayRef<ProtocolDecl *> ConformsTo,
+                       Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
+
+/// An archetype that represents an opaque type.
+class OpaqueTypeArchetypeType final : public ArchetypeType,
+    public llvm::FoldingSetNode,
+    private ArchetypeTrailingObjects<OpaqueTypeArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+  friend GenericSignatureBuilder;
+
+  /// The declaration that defines the opaque type.
+  OpaqueTypeDecl *OpaqueDecl;
+  /// The substitutions into the interface signature of the opaque type.
+  SubstitutionMap Substitutions;
+  
+  /// A GenericEnvironment with this opaque archetype bound to the interface
+  /// type of the output type from the OpaqueDecl.
+  GenericEnvironment *Environment;
+  
+public:
+  /// Get 
+  
+  /// Get an opaque archetype representing the underlying type of the given
+  /// opaque type decl.
+  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl,
+                                      SubstitutionMap Substitutions);
+  
+  OpaqueTypeDecl *getDecl() const {
+    return OpaqueDecl;
+  }
+  SubstitutionMap getSubstitutions() const {
+    return Substitutions;
+  }
+  
+  /// Get the generic signature used to build out this archetype. This is
+  /// equivalent to the OpaqueTypeDecl's interface generic signature, with
+  /// all of the generic parameters aside from the opaque type's interface
+  /// type same-type-constrained to their substitutions for this type.
+  GenericSignature getBoundSignature() const;
+  
+  /// Get a generic environment that has this opaque archetype bound within it.
+  GenericEnvironment *getGenericEnvironment() const {
+    return Environment;
+  }
+  
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::OpaqueTypeArchetype;
+  }
+  
+  /// Get the ordinal of the type within the declaration's opaque signature.
+  ///
+  /// If a method declared its return type as:
+  ///
+  ///   func foo() -> (some P, some Q)
+  ///
+  /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
+  unsigned getOrdinal() const {
+    // TODO: multiple opaque types
+    return 0;
+  }
+  
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      OpaqueTypeDecl *OpaqueDecl,
+                      SubstitutionMap Substitutions);
+  
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getSubstitutions());
+  };
+  
+private:
+  OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
+                          SubstitutionMap Substitutions,
+                          RecursiveTypeProperties Props,
+                          Type InterfaceType,
+                          ArrayRef<ProtocolDecl*> ConformsTo,
+                          Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
+
+enum class OpaqueSubstitutionKind {
+  // Don't substitute the opaque type for the underlying type.
+  DontSubstitute,
+  // Substitute without looking at the type and context.
+  // Can be done because the underlying type is from a minimally resilient
+  // function (therefore must not contain private or internal types).
+  AlwaysSubstitute,
+  // Substitute in the same module into a maximal resilient context.
+  // Can be done if the underlying type is accessible from the context we
+  // substitute into. Private types cannot be accessed from a different TU.
+  SubstituteSameModuleMaximalResilience,
+  // Substitute in a different module from the opaque definining decl. Can only
+  // be done if the underlying type is public.
+  SubstituteNonResilientModule
+};
+
+/// A function object that can be used as a \c TypeSubstitutionFn and
+/// \c LookupConformanceFn for \c Type::subst style APIs to map opaque
+/// archetypes with underlying types visible at a given resilience expansion
+/// to their underlying types.
+class ReplaceOpaqueTypesWithUnderlyingTypes {
+public:
+  const DeclContext *inContext;
+  ResilienceExpansion contextExpansion;
+  bool isContextWholeModule;
+  ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
+                                        ResilienceExpansion contextExpansion,
+                                        bool isWholeModuleContext)
+      : inContext(inContext), contextExpansion(contextExpansion),
+        isContextWholeModule(isWholeModuleContext) {}
+
+  /// TypeSubstitutionFn
+  Type operator()(SubstitutableType *maybeOpaqueType) const;
+
+  /// LookupConformanceFn
+  ProtocolConformanceRef operator()(CanType maybeOpaqueType,
+                                    Type replacementType,
+                                    ProtocolDecl *protocol) const;
+
+  OpaqueSubstitutionKind
+  shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
+
+  static OpaqueSubstitutionKind
+  shouldPerformSubstitution(OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
+                            ResilienceExpansion contextExpansion);
+};
+
+/// An archetype that represents the dynamic type of an opened existential.
+class OpenedArchetypeType final : public ArchetypeType,
+    private ArchetypeTrailingObjects<OpenedArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+  
+  mutable GenericEnvironment *Environment = nullptr;
+  TypeBase *Opened;
+  UUID ID;
+public:
+  /// Create a new archetype that represents the opened type
+  /// of an existential value.
+  ///
+  /// \param existential The existential type to open.
+  ///
+  /// \param knownID When non-empty, the known ID of the archetype. When empty,
+  /// a fresh archetype with a unique ID will be opened.
+  static CanTypeWrapper<OpenedArchetypeType>
+                        get(Type existential,
+                            Optional<UUID> knownID = None);
+
+  /// Create a new archetype that represents the opened type
+  /// of an existential value.
+  ///
+  /// \param existential The existential type or existential metatype to open.
+  static CanType getAny(Type existential);
+
+  /// Retrieve the ID number of this opened existential.
+  UUID getOpenedExistentialID() const { return ID; }
+  
+  /// Retrieve the opened existential type
+  Type getOpenedExistentialType() const {
+    return Opened;
+  }
+  
+  /// Get a generic environment with this opened type bound to its generic
+  /// parameter.
+  GenericEnvironment *getGenericEnvironment() const;
+  
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::OpenedArchetype;
+  }
+  
+private:
+  OpenedArchetypeType(const ASTContext &Ctx,
+                      Type Existential,
+                      ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
+                      LayoutConstraint Layout, UUID uuid);
+};
+BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+
+/// An archetype that is a nested associated type of another archetype.
+class NestedArchetypeType final : public ArchetypeType,
+    private ArchetypeTrailingObjects<NestedArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+  
+  ArchetypeType *Parent;
+
+public:
+  /// getNew - Create a new nested archetype with the given associated type.
+  ///
+  /// The ConformsTo array will be copied into the ASTContext by this routine.
+  static CanTypeWrapper<NestedArchetypeType>
+  getNew(const ASTContext &Ctx, ArchetypeType *Parent,
+         DependentMemberType *InterfaceType,
+         SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+         Type Superclass, LayoutConstraint Layout);
+
+  /// Retrieve the parent of this archetype, or null if this is a
+  /// primary archetype.
+  ArchetypeType *getParent() const {
+    return Parent;
+  }
+  
+  AssociatedTypeDecl *getAssocType() const;
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::NestedArchetype;
+  }
+  
+  DependentMemberType *getInterfaceType() const {
+    return cast<DependentMemberType>(InterfaceType.getPointer());
   }
 
 private:
-  ArchetypeType(
-          const ASTContext &Ctx,
-          llvm::PointerUnion<ArchetypeType *, GenericEnvironment *>
-            ParentOrGenericEnv,
-          Type InterfaceType,
-          ArrayRef<ProtocolDecl *> ConformsTo,
-          Type Superclass, LayoutConstraint Layout);
-
-  ArchetypeType(const ASTContext &Ctx, Type Existential,
-                ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
-                LayoutConstraint Layout, UUID uuid);
+  NestedArchetypeType(const ASTContext &Ctx,
+                     ArchetypeType *Parent,
+                     Type InterfaceType,
+                     ArrayRef<ProtocolDecl *> ConformsTo,
+                     Type Superclass, LayoutConstraint Layout);
 };
-BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
+BEGIN_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
 CanArchetypeType getParent() const {
   return CanArchetypeType(getPointer()->getParent());
 }
-END_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
+END_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
 
+template<typename Type>
+const Type *ArchetypeType::getSubclassTrailingObjects() const {
+  if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
+    return contextTy->getTrailingObjects<Type>();
+  }
+  if (auto opaqueTy = dyn_cast<OpaqueTypeArchetypeType>(this)) {
+    return opaqueTy->getTrailingObjects<Type>();
+  }
+  if (auto openedTy = dyn_cast<OpenedArchetypeType>(this)) {
+    return openedTy->getTrailingObjects<Type>();
+  }
+  if (auto childTy = dyn_cast<NestedArchetypeType>(this)) {
+    return childTy->getTrailingObjects<Type>();
+  }
+  llvm_unreachable("unhandled ArchetypeType subclass?");
+}
+  
 /// Describes the type of a generic parameter.
 ///
 /// \sa GenericTypeParamDecl
@@ -4841,14 +5971,16 @@ public:
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
-  Type substBaseType(ModuleDecl *M,
-                     Type base,
-                     LazyResolver *resolver = nullptr);
+  Type substBaseType(ModuleDecl *M, Type base);
 
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
   Type substBaseType(Type base, LookupConformanceFn lookupConformance);
+
+  /// Substitute the root generic type, looking up the chain of associated types.
+  /// Returns null if the member could not be found in the new root.
+  Type substRootParam(Type newRoot, LookupConformanceFn lookupConformance);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4864,8 +5996,7 @@ BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBase)
 END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 
-
-/// \brief The storage type of a variable with non-strong reference
+/// The storage type of a variable with non-strong reference
 /// ownership semantics.
 ///
 /// The referent type always satisfies allowsOwnership().
@@ -4946,28 +6077,33 @@ END_CAN_TYPE_WRAPPER(Name##StorageType, ReferenceStorageType)
 #include "swift/AST/ReferenceStorage.def"
 #undef REF_STORAGE_HELPER
 
-/// \brief A type variable used during type checking.
-class TypeVariableType : public TypeBase {
+/// A type variable used during type checking.
+class alignas(1 << TypeVariableAlignInBits)
+TypeVariableType : public TypeBase {
   // Note: We can't use llvm::TrailingObjects here because the trailing object
   // type is opaque.
 
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
+    // Note: the ID may overflow (current limit is 2^20 - 1).
     Bits.TypeVariableType.ID = ID;
+    if (Bits.TypeVariableType.ID != ID) {
+      llvm::report_fatal_error("Type variable id overflow");
+    }
   }
 
   class Implementation;
   
 public:
  
-  /// \brief Create a new type variable whose implementation is constructed
+  /// Create a new type variable whose implementation is constructed
   /// with the given arguments.
   template<typename ...Args>
   static TypeVariableType *getNew(const ASTContext &C, unsigned ID,
                                   Args &&...args);
   
-  /// \brief Retrieve the implementation data corresponding to this type
+  /// Retrieve the implementation data corresponding to this type
   /// variable.
   ///
   /// The contents of the implementation data for this type are hidden in the
@@ -4976,7 +6112,7 @@ public:
     return *reinterpret_cast<Implementation *>(this + 1);
   }
 
-  /// \brief Retrieve the implementation data corresponding to this type
+  /// Retrieve the implementation data corresponding to this type
   /// variable.
   ///
   /// The contents of the implementation data for this type are hidden in the
@@ -4985,11 +6121,15 @@ public:
     return *reinterpret_cast<const Implementation *>(this + 1);
   }
 
-  /// \brief Access the implementation object for this type variable.
+  /// Access the implementation object for this type variable.
   Implementation *operator->() {
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
+  /// Type variable IDs are not globally unique and are
+  /// used in equivalence class merging (so representative
+  /// is always a type variable with smaller id), as well
+  /// as a visual aid when dumping AST.
   unsigned getID() const { return Bits.TypeVariableType.ID; }
 
   // Implement isa/cast/dyncast/etc.
@@ -5022,13 +6162,13 @@ inline bool TypeBase::isTypeParameter() {
 inline bool TypeBase::isMaterializable() {
   if (hasLValueType())
     return false;
-  
+
   if (is<InOutType>())
     return false;
-  
+
   if (auto *TTy = getAs<TupleType>())
-    return !TTy->hasInOutElement();
-  
+    return !TTy->hasElementWithOwnership();
+
   return true;
 }
 
@@ -5071,9 +6211,7 @@ inline bool TypeBase::isOpenedExistential() const {
     return false;
 
   CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<ArchetypeType>(T))
-    return !archetype->getOpenedExistentialType().isNull();
-  return false;
+  return isa<OpenedArchetypeType>(T);
 }
 
 inline bool TypeBase::isOpenedExistentialWithError() {
@@ -5081,10 +6219,9 @@ inline bool TypeBase::isOpenedExistentialWithError() {
     return false;
 
   CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<ArchetypeType>(T)) {
+  if (auto archetype = dyn_cast<OpenedArchetypeType>(T)) {
     auto openedExistentialType = archetype->getOpenedExistentialType();
-    return (!openedExistentialType.isNull() &&
-            openedExistentialType->isExistentialWithError());
+    return openedExistentialType->isExistentialWithError();
   }
   return false;
 }
@@ -5178,17 +6315,6 @@ inline Type TypeBase::getInOutObjectType() {
   return this;
 }
 
-inline Type TypeBase::getRValueObjectType() {
-  Type type = this;
-
-  // Look through lvalue type.
-  if (auto lv = type->getAs<LValueType>())
-    type = lv->getObjectType();
-
-  // Look through argument list tuples.
-  return type->getWithoutImmediateLabel();
-}
-
 /// getWithoutSpecifierType - For a non-materializable type
 /// e.g. @lvalue or inout, retrieves the underlying object type.
 /// Otherwise, returns the type itself.
@@ -5228,6 +6354,7 @@ inline CanType CanType::getNominalParent() const {
 
 inline bool CanType::isActuallyCanonicalOrNull() const {
   return getPointer() == nullptr ||
+         getPointer() == llvm::DenseMapInfo<TypeBase *>::getEmptyKey() ||
          getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey() ||
          getPointer()->isCanonical();
 }
@@ -5255,13 +6382,9 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 }
 
 /// Create one from what's present in the parameter decl and type
-inline ParameterTypeFlags
-ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
-                                      ValueOwnership ownership) {
-  bool autoclosure = paramTy->is<AnyFunctionType>() &&
-                     paramTy->castTo<AnyFunctionType>()->isAutoClosure();
-  bool escaping = paramTy->is<AnyFunctionType>() &&
-                  !paramTy->castTo<AnyFunctionType>()->isNoEscape();
+inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
+    Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
+    ValueOwnership ownership, bool isNoDerivative) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -5271,7 +6394,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, autoclosure, escaping, ownership};
+  return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isNoDerivative};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
@@ -5294,11 +6417,11 @@ inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
     llvm_unreachable("Undefined function type");
   }
 }
-  
-/// \brief If this is a method in a type or extension thereof, compute
+
+/// If this is a method in a type or extension thereof, compute
 /// and return a parameter to be used for the 'self' argument.  The type of
 /// the parameter is the empty Type() if no 'self' argument should exist. This
-/// can only be used after name binding has resolved types.
+/// can only be used after types have been resolved.
 ///
 /// \param isInitializingCtor Specifies whether we're computing the 'self'
 /// type of an initializing constructor, which accepts an instance 'self'
@@ -5339,8 +6462,12 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   case TypeKind::ExistentialMetatype:
     return !cast<const AnyMetatypeType>(this)->hasRepresentation();
 
-  case TypeKind::Archetype:
-    return !cast<const ArchetypeType>(this)->isOpenedExistential();
+  case TypeKind::NestedArchetype:
+    return cast<NestedArchetypeType>(this)->getParent()->hasSimpleTypeRepr();
+      
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::OpenedArchetype:
+    return false;
 
   case TypeKind::ProtocolComposition: {
     // 'Any', 'AnyObject' and single protocol compositions are simple
@@ -5383,5 +6510,5 @@ struct DenseMapInfo<swift::BuiltinIntegerWidth> {
 };
 
 }
-  
+
 #endif

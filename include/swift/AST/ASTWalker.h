@@ -20,11 +20,12 @@ namespace swift {
 
 class Decl;
 class Expr;
+class ClosureExpr;
 class ModuleDecl;
 class Stmt;
 class Pattern;
 class TypeRepr;
-struct TypeLoc;
+class TypeLoc;
 class ParameterList;
 enum class AccessKind: unsigned char;
 
@@ -41,11 +42,13 @@ enum class SemaReferenceKind : uint8_t {
 struct ReferenceMetaData {
   SemaReferenceKind Kind;
   llvm::Optional<AccessKind> AccKind;
-  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind) :
-    Kind(Kind), AccKind(AccKind) {}
+  bool isImplicit = false;
+  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
+                    bool isImplicit = false)
+      : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit) {}
 };
 
-/// \brief An abstract class used to traverse an AST.
+/// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
   enum class ParentKind {
@@ -92,7 +95,7 @@ public:
     }
   };
 
-  /// \brief The parent of the node we are visiting.
+  /// The parent of the node we are visiting.
   ParentTy Parent;
 
   /// This method is called when first visiting an expression
@@ -173,26 +176,26 @@ public:
   /// returns failure.
   virtual bool walkToDeclPost(Decl *D) { return true; }
 
-  /// \brief This method is called when first visiting a TypeLoc, before
+  /// This method is called when first visiting a TypeLoc, before
   /// walking into its TypeRepr children.  If it returns false, the subtree is
   /// skipped.
   ///
   /// \param TL The TypeLoc to check.
   virtual bool walkToTypeLocPre(TypeLoc &TL) { return true; }
 
-  /// \brief This method is called after visiting the children of a TypeLoc.
+  /// This method is called after visiting the children of a TypeLoc.
   /// If it returns false, the remaining traversal is terminated and returns
   /// failure.
   virtual bool walkToTypeLocPost(TypeLoc &TL) { return true; }
 
 
-  /// \brief This method is called when first visiting a TypeRepr, before
+  /// This method is called when first visiting a TypeRepr, before
   /// walking into its children.  If it returns false, the subtree is skipped.
   ///
   /// \param T The TypeRepr to check.
   virtual bool walkToTypeReprPre(TypeRepr *T) { return true; }
 
-  /// \brief This method is called after visiting the children of a TypeRepr.
+  /// This method is called after visiting the children of a TypeRepr.
   /// If it returns false, the remaining traversal is terminated and returns
   /// failure.
   virtual bool walkToTypeReprPost(TypeRepr *T) { return true; }
@@ -210,6 +213,29 @@ public:
   /// LazyInitializerExpr with the initializer as its sub-expression.
   /// However, ASTWalker does not walk into LazyInitializerExprs on its own.
   virtual bool shouldWalkIntoLazyInitializers() { return true; }
+
+  /// This method configures whether the walker should visit the body of a
+  /// non-single expression closure.
+  ///
+  /// For work that is performed for every top-level expression, this should
+  /// be overridden to return false, to avoid duplicating work or visiting
+  /// bodies of closures that have not yet been type checked.
+  virtual bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *) {
+    return true;
+  }
+
+  /// This method configures whether the walker should visit the body of a
+  /// TapExpr.
+  virtual bool shouldWalkIntoTapExpression() { return true; }
+
+  /// This method configures whether the walker should exhibit the legacy
+  /// behavior where accessors appear as peers of their storage, rather
+  /// than children nested inside of it.
+  ///
+  /// Please don't write new ASTWalker implementations that override this
+  /// method to return true; instead, refactor existing code as needed
+  /// until eventually we can remove this altogether.
+  virtual bool shouldWalkAccessorsTheOldWay() { return false; }
 
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.  If it returns false,

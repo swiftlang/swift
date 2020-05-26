@@ -1,10 +1,12 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=AFTER_POUND | %FileCheck -check-prefix=CHECK-AFTER_POUND %s
 
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CONTEXT_SELECTOR | %FileCheck -check-prefix=CHECK-CONTEXT_SELECTOR %s
+
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_ARG1 | %FileCheck -check-prefix=CHECK-CONTEXT_SELECTOR %s
+
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_ARG2 | %FileCheck -check-prefix=CHECK-CONTEXT_SELECTOR %s
+
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_BASIC | %FileCheck -check-prefix=CHECK-SELECTOR_BASIC %s
-
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_ARG1 | %FileCheck -check-prefix=CHECK-SELECTOR_ARG %s
-
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_ARG2 | %FileCheck -check-prefix=CHECK-SELECTOR_ARG %s
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR1 | %FileCheck -check-prefix=CHECK-IN_SELECTOR %s
 
@@ -22,8 +24,12 @@
 
 import Foundation
 
-{
+do {
   if ##^AFTER_POUND^#
+}
+
+do {
+  let _: Selector = #^CONTEXT_SELECTOR^#
 }
 
 func selectorArg1(obj: NSObject) {
@@ -65,23 +71,23 @@ class Subclass : NSObject {
 }
 
 
+// CHECK-AFTER_POUND-NOT: selector
 // CHECK-AFTER_POUND: Keyword/ExprSpecific:               available({#Platform...#}, *); name=available(Platform..., *)
-// CHECK-AFTER_POUND: Keyword/ExprSpecific:               selector({#@objc method#}); name=selector(@objc method)
 
-// CHECK-SELECTOR_ARG: Keyword/ExprSpecific:               #selector({#@objc method#}); name=#selector(@objc method)
+// CHECK-CONTEXT_SELECTOR: Keyword/None/TypeRelation[Identical]: #selector({#@objc method#})[#Selector#]; name=#selector(@objc method)
 
 // CHECK-SELECTOR_BASIC: Keyword/None:                       getter: {#@objc property#}; name=getter: @objc property
 // CHECK-SELECTOR_BASIC: Keyword/None:                       setter: {#@objc property#}; name=setter: @objc property
 
 // CHECK-IN_SELECTOR-NOT: getter:
-// CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal:      {{.?}}init; name=init
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}myClass; name=myClass
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}description; name=description
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}isEqual(_:); name=isEqual(_:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}isEqual(_:); name=isEqual(_:)
+// CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal/IsSystem:    {{.?}}init; name=init
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}perform(_:with:); name=perform(_:with:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}perform(_:with:); name=perform(_:with:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}myClass; name=myClass
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}description; name=description
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}isEqual(_:); name=isEqual(_:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}isEqual(_:); name=isEqual(_:)
 
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}myClass; name=myClass
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}isEqual(_:); name=isEqual(_:)
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}perform(_:with:); name=perform(_:with:)
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}myClass; name=myClass
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}isEqual(_:); name=isEqual(_:)

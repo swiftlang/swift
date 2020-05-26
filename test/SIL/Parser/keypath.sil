@@ -10,7 +10,7 @@ struct S: Hashable {
   let y: String
   var z: C
 
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
   static func ==(x: S, y: S) -> Bool
 }
 class C: Hashable {
@@ -23,7 +23,7 @@ class C: Hashable {
     get set
   }
 
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
   static func ==(x: C, y: C) -> Bool
 }
 
@@ -41,6 +41,13 @@ public struct External<T> {
   var ro: T
 
   subscript<U: Hashable>(ro _: U) -> T { get }
+}
+
+struct T {
+  var x: (Int, Int)
+  var y: (a: Int, b: Int, c: Int)
+  let z: (Int, Int)
+  let w: (Int, C)
 }
 
 // CHECK-LABEL: sil shared @stored_properties
@@ -69,13 +76,28 @@ entry:
   return undef : $()
 }
 
+// CHECK-LABEL: sil shared @tuple_elements
+sil shared @tuple_elements : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.x : $(Int, Int); tuple_element #0 : $Int)
+  %a = keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.x : $(Int, Int); tuple_element #0 : $Int)
+  // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.y : $(a: Int, b: Int, c: Int); tuple_element #2 : $Int)
+  %b = keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.y : $(a: Int, b: Int, c: Int); tuple_element #2 : $Int)
+  // CHECK: keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
+  %c = keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
+  // CHECK: keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
+  %d = keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
+
+  return undef : $()
+}
+
 sil @id_a : $@convention(thin) () -> ()
 sil @get_s_int : $@convention(thin) (@in_guaranteed S) -> @out Int
 sil @set_s_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed S) -> ()
 sil @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int
 sil @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ()
-sil @get_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed S) -> @out S) -> @out @callee_guaranteed (@in_guaranteed C) -> @out C
-sil @set_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed C) -> @out C, @in_guaranteed @callee_guaranteed (@in_guaranteed S) -> @out S) -> ()
+sil @get_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <S, S>) -> @out @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <C, C>
+sil @set_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <C, C>, @in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <S, S>) -> ()
 sil @get_s_int_subs : $@convention(thin) (@in_guaranteed S, UnsafeRawPointer) -> @out Int
 sil @set_s_int_subs : $@convention(thin) (@in_guaranteed Int, @in_guaranteed S, UnsafeRawPointer) -> ()
 sil @subs_eq : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool
@@ -93,10 +115,15 @@ entry:
   %a = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in_guaranteed S) -> @out Int)
   // CHECK: keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in_guaranteed S) -> @out Int, setter @set_s_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed S) -> ())
   %b = keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in_guaranteed S) -> @out Int, setter @set_s_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed S) -> ())
-  // CHECK: keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed S) -> @out S) -> @out @callee_guaranteed (@in_guaranteed C) -> @out C, setter @set_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed C) -> @out C, @in_guaranteed @callee_guaranteed (@in_guaranteed S) -> @out S) -> ())
-  %c = keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed S) -> @out S) -> @out @callee_guaranteed (@in_guaranteed C) -> @out C, setter @set_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed C) -> @out C, @in_guaranteed @callee_guaranteed (@in_guaranteed S) -> @out S) -> ())
-  // CHECK: keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
-  %d = keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
+  // CHECK: keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <S, S>) -> @out @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <C, C>, setter @set_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <C, C>, @in_guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <S, S>) -> ())
+  %c = keypath $WritableKeyPath<(S) -> S, (C) -> C>, (
+    root $(S) -> S;
+    settable_property $(C) -> C,
+      id @id_a : $@convention(thin) () -> (),
+      getter @get_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <S, S>) -> @out @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <C, C>,
+      setter @set_fns_fnc : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <C, C>, @in_guaranteed @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B for <S, S>) -> ())
+  // CHECK: keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
+  %d = keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @set_c_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
 
   return undef : $()
 }
@@ -109,6 +136,17 @@ sil shared @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> 
 entry:
   // CHECK: keypath $KeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; settable_property $τ_0_0, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> @out τ_0_0, setter @set_gen_a : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed τ_0_0, @in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> ()) <D, E, F>
   %a = keypath $KeyPath<Gen<D, E, F>, D>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; settable_property $G, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(thin) <X3: P, Y3: Q, Z3: R> (@in_guaranteed Gen<X3, Y3, Z3>) -> @out X3, setter @set_gen_a : $@convention(thin) <X4: P, Y4: Q, Z4: R> (@in_guaranteed X4, @in_guaranteed Gen<X4, Y4, Z4>) -> ()) <D, E, F>
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil shared @tuple_generic
+sil shared @ tuple_generic : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %a = keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %b = keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
 
   return undef : $()
 }

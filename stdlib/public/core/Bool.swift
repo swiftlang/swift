@@ -60,7 +60,7 @@
 /// bridged into Swift as `Bool`. The single `Bool` type in Swift guarantees
 /// that functions, methods, and properties imported from C and Objective-C
 /// have a consistent type interface.
-@_fixed_layout
+@frozen
 public struct Bool {
   @usableFromInline
   internal var _value: Builtin.Int1
@@ -81,7 +81,7 @@ public struct Bool {
   /// Creates an instance equal to the given Boolean value.
   ///
   /// - Parameter value: The Boolean value to copy.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(_ value: Bool) {
     self = value
   }
@@ -99,6 +99,12 @@ public struct Bool {
   ///     } else {
   ///         print("Maybe another try?")
   ///     }
+  ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same sequence of Boolean values each time you run your program, that
+  ///   sequence may change when your program is compiled using a different
+  ///   version of Swift.
   ///
   /// - Parameter generator: The random number generator to use when creating
   ///   the new random value.
@@ -122,9 +128,8 @@ public struct Bool {
   ///         print("Maybe another try?")
   ///     }
   ///
-  /// `Bool.random()` uses the default random generator,
-  /// `SystemRandomNumberGenerator`. To supply a non-default generator, call the
-  /// equivalent method that takes one as an argument.
+  /// This method is equivalent to calling `Bool.random(using:)`, passing in
+  /// the system's default random generator.
   ///
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
@@ -135,7 +140,7 @@ public struct Bool {
   }
 }
 
-extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
+extension Bool: _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
   @_transparent
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
@@ -165,27 +170,13 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   }
 }
 
-extension Bool {
-  // This is a magic entry point known to the compiler.
-  @_transparent
-  public // COMPILER_INTRINSIC
-  func _getBuiltinLogicValue() -> Builtin.Int1 {
-    return _value
-  }
-}
-
-extension Bool : CustomStringConvertible {
+extension Bool: CustomStringConvertible {
   /// A textual representation of the Boolean value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var description: String {
     return self ? "true" : "false"
   }
 }
-
-// This is a magic entry point known to the compiler.
-@_transparent
-public // COMPILER_INTRINSIC
-func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
 extension Bool: Equatable {
   @_transparent
@@ -206,14 +197,14 @@ extension Bool: Hashable {
   }
 }
 
-extension Bool : LosslessStringConvertible {
+extension Bool: LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///
   /// If the `description` value is any string other than `"true"` or
   /// `"false"`, the result is `nil`. This initializer is case sensitive.
   ///
   /// - Parameter description: A string representation of the Boolean value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init?(_ description: String) {
     if description == "true" {
       self = true
@@ -338,10 +329,10 @@ extension Bool {
   /// Use this method to toggle a Boolean value from `true` to `false` or from
   /// `false` to `true`.
   ///
-  ///    var bools = [true, false]
+  ///     var bools = [true, false]
   ///
-  ///    bools[0].toggle()
-  ///    // bools == [false, false]
+  ///     bools[0].toggle()
+  ///     // bools == [false, false]
   @inlinable
   public mutating func toggle() {
     self = !self

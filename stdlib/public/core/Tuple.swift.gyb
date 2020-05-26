@@ -108,7 +108,7 @@ public func >=(lhs: (), rhs: ()) -> Bool {
 % for arity in range(2,7):
 %   typeParams = [chr(ord("A") + i) for i in range(arity)]
 %   tupleT = "({})".format(",".join(typeParams))
-%   equatableTypeParams = ", ".join(["{} : Equatable".format(c) for c in typeParams])
+%   equatableTypeParams = ", ".join(["{}: Equatable".format(c) for c in typeParams])
 
 %   originalTuple = "(\"a\", {})".format(", ".join(map(str, range(1, arity))))
 %   greaterTuple = "(\"a\", {})".format(", ".join(map(str, range(1, arity - 1) + [arity])))
@@ -171,7 +171,7 @@ public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
   )
 }
 
-%   comparableTypeParams = ", ".join(["{} : Comparable".format(c) for c in typeParams])
+%   comparableTypeParams = ", ".join(["{}: Comparable".format(c) for c in typeParams])
 %   for op, phrase in comparableOperators:
 /// Returns a Boolean value indicating whether the first tuple is ordered
 /// ${phrase} the second in a lexicographical ordering.

@@ -32,24 +32,18 @@ class ValueDecl;
 /// Request the AccessLevel of the given ValueDecl.
 class AccessLevelRequest :
     public SimpleRequest<AccessLevelRequest,
-                         CacheKind::SeparatelyCached,
-                         AccessLevel,
-                         ValueDecl *> {
+                         AccessLevel(ValueDecl *),
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   AccessLevel evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  AccessLevel breakCycle() const { return AccessLevel::Private; }
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<AccessLevel> getCachedResult() const;
@@ -61,78 +55,61 @@ public:
 /// the accessibility of mutating accessors.
 class SetterAccessLevelRequest :
     public SimpleRequest<SetterAccessLevelRequest,
-                         CacheKind::SeparatelyCached,
-                         AccessLevel,
-                         AbstractStorageDecl *> {
+                         AccessLevel(AbstractStorageDecl *),
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   AccessLevel evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
-  // Cycle handling
-  AccessLevel breakCycle() const { return AccessLevel::Private; }
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<AccessLevel> getCachedResult() const;
   void cacheResult(AccessLevel value) const;
 };
 
+using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
+
 /// Request the Default and Max AccessLevels of the given ExtensionDecl.
 class DefaultAndMaxAccessLevelRequest :
     public SimpleRequest<DefaultAndMaxAccessLevelRequest,
-                         CacheKind::SeparatelyCached,
-                         std::pair<AccessLevel, AccessLevel>,
-                         ExtensionDecl *> {
+                         DefaultAndMax(ExtensionDecl *),
+                         RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
-  using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
-  DefaultAndMax
-  evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
+  DefaultAndMax evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
 
 public:
-  // Cycle handling
-  DefaultAndMax
-  breakCycle() const { return std::make_pair(AccessLevel::Private,
-                                             AccessLevel::Private); }
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<DefaultAndMax> getCachedResult() const;
   void cacheResult(DefaultAndMax value) const;
 };
 
-/// The zone number for access-control requests.
-#define SWIFT_ACCESS_REQUESTS_TYPEID_ZONE 11
-
-#define SWIFT_TYPEID_ZONE SWIFT_ACCESS_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE AccessControl
 #define SWIFT_TYPEID_HEADER "swift/AST/AccessTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
-}
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+  template <>                                                                  \
+  inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,              \
+                                     const RequestType &request) {             \
+    ++stats.getFrontendCounters().RequestType;                                 \
+  }
 #include "swift/AST/AccessTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

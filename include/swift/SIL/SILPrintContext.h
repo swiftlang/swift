@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_PRINTCONTEXT_H
 #define SWIFT_SIL_PRINTCONTEXT_H
 
+#include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/DenseMap.h"
@@ -72,6 +73,11 @@ public:
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose = false,
                   bool SortedSIL = false);
 
+  /// Constructor based on SILOptions.
+  ///
+  /// DebugInfo will be set according to the -sil-print-debuginfo option.
+  SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts);
+
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                   bool SortedSIL, bool DebugInfo);
 
@@ -125,4 +131,4 @@ raw_ostream &operator<<(raw_ostream &OS, SILPrintContext::ID i);
 
 } // end namespace swift
 
-#endif /* SWIFT_SIL_PRINTCONTEXT_H */
+#endif // SWIFT_SIL_PRINTCONTEXT_H

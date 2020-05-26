@@ -47,13 +47,13 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     _ x: C,
     result: inout BridgedValueType?
   ) {
-    _preconditionFailure("implement")
+    preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
     _ x: C,
     result: inout BridgedValueType?
   ) -> Bool {
-    _preconditionFailure("implement")
+    preconditionFailure("implement")
   }
 }
 

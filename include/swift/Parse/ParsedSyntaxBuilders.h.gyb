@@ -1,0 +1,77 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From ParsedSyntaxBuilders.h.gyb.
+//// Do Not Edit Directly!
+//===------------- ParsedSyntaxBuilders.h - Parsed Syntax Building --------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_PARSE_PARSEDSYNTAXBUILDERS_H
+#define SWIFT_PARSE_PARSEDSYNTAXBUILDERS_H
+
+#include "swift/Parse/ParsedRawSyntaxNode.h"
+#include "swift/Parse/ParsedSyntaxNodes.h"
+#include "swift/Parse/SyntaxParsingContext.h"
+
+namespace swift {
+
+class ParsedRawSyntaxRecorder;
+class SyntaxParsingContext;
+
+% for node in SYNTAX_NODES:
+%   if node.is_buildable():
+%     child_count = len(node.children)
+class Parsed${node.name}Builder {
+  SyntaxParsingContext &SPCtx;
+  ParsedRawSyntaxNode Layout[${child_count}];
+%     for child in node.children:
+%       child_node = NODE_MAP.get(child.syntax_kind)
+%       if child_node and child_node.is_syntax_collection():
+%         child_elt = child_node.collection_element_name
+%         child_elt_type = child_node.collection_element_type
+%         child_elt_name = child.name + 'Member'
+  SmallVector<ParsedRawSyntaxNode, 8> ${child_elt_name}s;
+%       end
+%     end
+
+public:
+  explicit Parsed${node.name}Builder(SyntaxParsingContext &SPCtx)
+    : SPCtx(SPCtx) {}
+
+%     for child in node.children:
+  Parsed${node.name}Builder &use${child.name}(Parsed${child.type_name} ${child.name});
+%       child_node = NODE_MAP.get(child.syntax_kind)
+%       if child_node and child_node.is_syntax_collection():
+%         child_elt = child_node.collection_element_name
+%         child_elt_type = child_node.collection_element_type
+%         child_elt_name = child.name + 'Member'
+  Parsed${node.name}Builder &add${child_elt_name}(Parsed${child_elt_type} ${child_elt});
+%       end
+%     end
+
+  Parsed${node.name} build();
+
+private:
+  Parsed${node.name} makeDeferred();
+  Parsed${node.name} record();
+  void finishLayout(bool deferred);
+};
+
+%   end
+% end
+
+}
+
+#endif // SWIFT_PARSE_PARSEDSYNTAXBUILDERS_H

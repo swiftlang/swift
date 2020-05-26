@@ -30,7 +30,11 @@ func debugVal<T>(_ x: inout T) -> String {
 
 // Check if @x uses the small-string or Cocoa representations.
 func hasSmallStringOrCocoaVariant(_ x: String) -> Bool {
-  return x._guts._isCocoa || x._guts._isSmall
+  switch x._classify()._form {
+    case ._small: return true
+    case ._cocoa: return true
+    default: return false
+  }
 }
 
 StringForPrintObjectTests.test("Basic") {

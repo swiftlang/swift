@@ -191,7 +191,7 @@ void swift::__swift_stdlib_ubrk_setUText(
                        ptr_cast<UErrorCode>(status));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE swift::__swift_stdlib_UText *
+SWIFT_RUNTIME_STDLIB_API swift::__swift_stdlib_UText *
 swift::__swift_stdlib_utext_openUTF8(__swift_stdlib_UText *ut,
                               const char *s, int64_t len,
                               __swift_stdlib_UErrorCode *status) {
@@ -200,7 +200,7 @@ swift::__swift_stdlib_utext_openUTF8(__swift_stdlib_UText *ut,
                    ptr_cast<UErrorCode>(status)));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE swift::__swift_stdlib_UText *
+SWIFT_RUNTIME_STDLIB_API swift::__swift_stdlib_UText *
 swift::__swift_stdlib_utext_openUChars(__swift_stdlib_UText *ut,
                                        const __swift_stdlib_UChar *s,
                                        int64_t len,

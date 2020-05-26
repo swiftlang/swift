@@ -1,0 +1,43 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From ParsedSyntaxNodes.cpp.gyb.
+//// Do Not Edit Directly!
+//===--- ParsedSyntaxNodes.cpp - Parsed Syntax Node definitions -----------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Parse/ParsedSyntaxNodes.h"
+#include "swift/Syntax/SyntaxNodes.h"
+
+using namespace swift;
+using namespace swift::syntax;
+
+% for node in SYNTAX_NODES:
+%   for child in node.children:
+%     if child.is_optional:
+Optional<Parsed${child.type_name}>
+Parsed${node.name}::getDeferred${child.name}() {
+  auto &RawChild = getRaw().getDeferredChildren()[${node.name}::Cursor::${child.name}];
+  if (RawChild.isNull())
+    return None;
+  return Parsed${child.type_name} {RawChild.copyDeferred()};
+}
+%     else:
+Parsed${child.type_name} Parsed${node.name}::getDeferred${child.name}() {
+  return Parsed${child.type_name} {getRaw().getDeferredChildren()[${node.name}::Cursor::${child.name}].copyDeferred()};
+}
+%     end
+
+%   end
+% end

@@ -8,28 +8,28 @@
 import APINotesFrameworkTest
 
 func testRenamedClassMembers(obj: AnyObject) {
-  // CHECK-DIAGS-4: [[@LINE+1]]:{{[0-9]+}}: error: 'doImportantThings()' has been renamed to 'swift4DoImportantThings()'
+  // CHECK-DIAGS-4: swift:[[@LINE+1]]:{{[0-9]+}}: error: 'doImportantThings()' has been renamed to 'swift4DoImportantThings()'
   obj.doImportantThings()
-  // CHECK-DIAGS-5: [[@LINE-1]]:{{[0-9]+}}: error: 'doImportantThings()' has been renamed to 'finalDoImportantThings()'
+  // CHECK-DIAGS-5: swift:[[@LINE-1]]:{{[0-9]+}}: error: 'doImportantThings()' has been renamed to 'finalDoImportantThings()'
 
-  // CHECK-DIAGS-4-NOT: :[[@LINE+1]]:{{[0-9]+}}:
+  // CHECK-DIAGS-4-NOT: swift:[[@LINE+1]]:{{[0-9]+}}:
   obj.swift4DoImportantThings()
-  // CHECK-DIAGS-5: [[@LINE-1]]:{{[0-9]+}}: error: 'swift4DoImportantThings()' has been renamed to 'finalDoImportantThings()'
+  // CHECK-DIAGS-5: swift:[[@LINE-1]]:{{[0-9]+}}: error: 'swift4DoImportantThings()' has been renamed to 'finalDoImportantThings()'
 
-  // CHECK-DIAGS-4: [[@LINE+1]]:{{[0-9]+}}: error: 'finalDoImportantThings()' has been renamed to 'swift4DoImportantThings()'
+  // CHECK-DIAGS-4: swift:[[@LINE+1]]:{{[0-9]+}}: error: 'finalDoImportantThings()' has been renamed to 'swift4DoImportantThings()'
   obj.finalDoImportantThings()
-  // CHECK-DIAGS-5-NOT: :[[@LINE-1]]:{{[0-9]+}}:
+  // CHECK-DIAGS-5-NOT: swift:[[@LINE-1]]:{{[0-9]+}}:
 
 
-  // CHECK-DIAGS-4: [[@LINE+1]]:{{[0-9]+}}: error: 'importantInstanceProperty' has been renamed to 'swift4InstanceProperty'
+  // CHECK-DIAGS-4: swift:[[@LINE+1]]:{{[0-9]+}}: error: 'importantInstanceProperty' has been renamed to 'swift4InstanceProperty'
   _ = obj.importantInstanceProperty
-  // CHECK-DIAGS-5: [[@LINE-1]]:{{[0-9]+}}: error: 'importantInstanceProperty' has been renamed to 'finalInstanceProperty'
+  // CHECK-DIAGS-5: swift:[[@LINE-1]]:{{[0-9]+}}: error: 'importantInstanceProperty' has been renamed to 'finalInstanceProperty'
 
-  // CHECK-DIAGS-4-NOT: :[[@LINE+1]]:{{[0-9]+}}:
+  // CHECK-DIAGS-4-NOT: swift:[[@LINE+1]]:{{[0-9]+}}:
   _ = obj.swift4InstanceProperty
-  // CHECK-DIAGS-5: [[@LINE-1]]:{{[0-9]+}}: error: 'swift4InstanceProperty' has been renamed to 'finalInstanceProperty'
+  // CHECK-DIAGS-5: swift:[[@LINE-1]]:{{[0-9]+}}: error: 'swift4InstanceProperty' has been renamed to 'finalInstanceProperty'
 
-  // CHECK-DIAGS-4: [[@LINE+1]]:{{[0-9]+}}: error: 'finalInstanceProperty' has been renamed to 'swift4InstanceProperty'
+  // CHECK-DIAGS-4: swift:[[@LINE+1]]:{{[0-9]+}}: error: 'finalInstanceProperty' has been renamed to 'swift4InstanceProperty'
   _ = obj.finalInstanceProperty
-  // CHECK-DIAGS-5-NOT: :[[@LINE-1]]:{{[0-9]+}}:
+  // CHECK-DIAGS-5-NOT: swift:[[@LINE-1]]:{{[0-9]+}}:
 }

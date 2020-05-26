@@ -16,7 +16,7 @@ func f2() -> Int {
 #elseif BAR
   let val = 3
 #endif
-  return val // expected-error {{use of unresolved identifier 'val'}}
+  return val // expected-error {{cannot find 'val' in scope}}
 }
 
 struct S1 {
@@ -36,7 +36,7 @@ struct S2 {
   let val = 2
 #endif
   var v: Int {
-    return val // expected-error {{use of unresolved identifier 'val'}}
+    return val // expected-error {{cannot find 'val' in scope}}
   }
 }
 
@@ -51,4 +51,4 @@ _ = gVal1
 #elseif BAR
 let inactive = 3
 #endif
-_ = inactive // expected-error {{use of unresolved identifier 'inactive'}}
+_ = inactive // expected-error {{cannot find 'inactive' in scope}}

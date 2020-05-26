@@ -1,0 +1,5 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name A
+@_exported import A
+public func overlayFuncA() { }
+

@@ -7,19 +7,22 @@
     "ASCII.swift",
     "CString.swift",
     "Character.swift",
-    "CharacterUnicodeScalars.swift",
+    "CharacterProperties.swift",
     "ICU.swift",
     "NormalizedCodeUnitIterator.swift",
     "SmallString.swift",
     "StaticString.swift",
     "String.swift",
+    "StringBreadcrumbs.swift",
     "StringBridge.swift",
+    "StringCharacterView.swift",
     "StringComparable.swift",
     "StringComparison.swift",
+    "StringCreate.swift",
     "StringObject.swift",
     "StringGuts.swift",
-    "StringGutsVisitor.swift",
-    "StringGraphemeBreaking.swift",  
+    "StringGutsSlice.swift",
+    "StringGraphemeBreaking.swift",
     "StringHashable.swift",
     "StringIndex.swift",
     "StringIndexConversions.swift",
@@ -28,15 +31,18 @@
     "StringNormalization.swift",
     "StringProtocol.swift",
     "StringRangeReplaceableCollection.swift",
+    "StringGutsRangeReplaceable.swift",
     "StringStorage.swift",
     "StringSwitch.swift",
-    "StringUTF16.swift",
-    "StringUTF8.swift",
+    "StringTesting.swift",
+    "StringUTF16View.swift",
+    "StringUTF8View.swift",
+    "StringUTF8Validation.swift",
     "StringUnicodeScalarView.swift",
-    "StringVariant.swift",  
     "Substring.swift",
     "Unicode.swift",
     "UnicodeEncoding.swift",
+    "UnicodeHelpers.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
     "UnicodeScalarProperties.swift",
@@ -64,8 +70,10 @@
     "Sort.swift",
     "Range.swift",
     "ClosedRange.swift",
+    "RangeSet.swift",
+    "RangeSetStorage.swift",
     "CollectionOfOne.swift",
-    "HeapBuffer.swift",
+    "BridgingBuffer.swift",
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
@@ -73,6 +81,9 @@
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
     "UIntBuffer.swift",
+    "KeyValuePairs.swift",
+    "Diffing.swift",
+    "CollectionDifference.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
@@ -87,9 +98,9 @@
         "Filter.swift",
         "Reverse.swift",
         "Slice.swift",
+        "DiscontiguousSlice.swift",
         "DropWhile.swift",
         "PrefixWhile.swift",
-        "SequenceWrapper.swift",
         "LazyCollection.swift",
         "LazySequence.swift"],
       "Array": [
@@ -104,13 +115,27 @@
         "CocoaArray.swift",
         "ContiguousArray.swift",
         "ContiguousArrayBuffer.swift",
+        "ContiguouslyStored.swift",
         "FixedArray.swift",
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
+        "HashTable.swift",
         "Dictionary.swift",
-        "HashedCollectionsAnyHashableExtensions.swift",
+        "NativeDictionary.swift",
+        "DictionaryBridging.swift",
+        "DictionaryBuilder.swift",
+        "DictionaryCasting.swift",
+        "DictionaryStorage.swift",
+        "DictionaryVariant.swift",
         "Set.swift",
+        "NativeSet.swift",
+        "SetAnyHashableExtensions.swift",
+        "SetBridging.swift",
+        "SetBuilder.swift",
+        "SetCasting.swift",
+        "SetStorage.swift",
+        "SetVariant.swift"
       ]
     }
   ],
@@ -120,7 +145,7 @@
     "Builtin.swift",
     "VarArgs.swift",
     "CTypes.swift",
-    "MemoryLayout.swift"
+    "MemoryLayout.swift",
   ],
   "KeyPaths": [
     "KeyPath.swift"
@@ -138,11 +163,15 @@
     {
     "Integers": [
       "Integers.swift",
+      "IntegerTypes.swift",
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
-      "FloatingPointTypes.swift"]}
+      "FloatingPointTypes.swift"],
+    "Vector": [
+      "SIMDVector.swift",
+      "SIMDVectorTypes.swift"]}
   ],
   "Optional": [
     "Optional.swift"
@@ -161,13 +190,18 @@
   "Playground": [
     "PlaygroundDisplay.swift"
   ],
-  "Misc": [
-    "AnyHashable.swift",
-    "Interval.swift",
-    "Hashing.swift",
-    "SipHash.swift",
+  "Hashing": [
+    "Hashable.swift",
     "Hasher.swift",
+    "SipHash.swift",
+    "AnyHashable.swift",
+    "Hashing.swift",
+    "Bitset.swift"
+  ],
+  "Misc": [
+    "AtomicInt.swift",
     "ErrorType.swift",
+    "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",
@@ -175,6 +209,7 @@
     "OptionSet.swift",
     "OutputStream.swift",
     "Policy.swift",
+    "Prespecialize.swift",
     "Print.swift",
     "REPL.swift",
     "Random.swift",
@@ -187,12 +222,15 @@
     "CommandLine.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
-    "UnsafeBitMap.swift",
     "DebuggerSupport.swift",
     "Equatable.swift",
     "Comparable.swift",
-    "Hashable.swift",
     "Codable.swift",
-    "MigrationSupport.swift"
+    "LegacyABI.swift",
+    "MigrationSupport.swift",
+    "PtrAuth.swift"
+  ],
+  "Result": [
+    "Result.swift"
   ]
 }

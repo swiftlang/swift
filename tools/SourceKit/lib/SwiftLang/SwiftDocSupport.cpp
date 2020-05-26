@@ -21,6 +21,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
@@ -40,7 +41,7 @@ using namespace swift;
 using namespace ide;
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
-  SmallVector<std::pair<Identifier, SourceLoc>, 4>
+  SmallVector<Located<Identifier>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
     StringRef SubModuleName;
@@ -51,7 +52,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule(std::make_pair(ModuleName, SourceLoc()));
+  return Ctx.getModule({ Located<Identifier>(ModuleName, SourceLoc()) });
 }
 
 namespace {
@@ -64,6 +65,7 @@ struct TextEntity {
   const Decl *Dcl = nullptr;
   TypeOrExtensionDecl SynthesizeTarget;
   const Decl *DefaultImplementationOf = nullptr;
+  ModuleDecl *DeclaringModIfFromCrossImportOverlay = nullptr;
   StringRef Argument;
   TextRange Range;
   unsigned LocOffset = 0;
@@ -114,15 +116,13 @@ class AnnotatingPrinter : public StreamPrinter {
     const auto *ED = dyn_cast<ExtensionDecl>(D);
     if (!ED)
       return;
-    if (ED->getExtendedType()) {
-      if (auto NTD = ED->getExtendedType()->getAnyNominal()) {
-        if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-          auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
-          DefaultMapToUse = &Pair.first->getSecond();
-          if (Pair.second) {
-            swift::collectDefaultImplementationForProtocolMembers(PD,
-                                                      Pair.first->getSecond());
-          }
+    if (auto NTD = ED->getExtendedNominal()) {
+      if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+        auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
+        DefaultMapToUse = &Pair.first->getSecond();
+        if (Pair.second) {
+          swift::collectDefaultImplementationForProtocolMembers(PD,
+                                                    Pair.first->getSecond());
         }
       }
     }
@@ -243,10 +243,12 @@ public:
     deinitDefaultMapToUse(D);
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     unsigned StartOffset = OS.tell();
     References.emplace_back(TD, StartOffset, Name.str().size());
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
   }
 };
 
@@ -259,27 +261,35 @@ struct SourceTextInfo {
 } // end anonymous namespace
 
 static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
-  auto *DC = dyn_cast<DeclContext>(D);
-  if (DC == nullptr || !DC->isInnermostContextGeneric())
+  auto *GC = D->getAsGenericContext();
+  if (!GC)
     return;
 
-  GenericSignature *GenericSig = DC->getGenericSignatureOfContext();
-
+  GenericSignature GenericSig = GC->getGenericSignatureOfContext();
   if (!GenericSig)
     return;
 
+  // The declaration may not be generic itself, but instead carry additional
+  // generic requirements in a contextual where clause, so checking !isGeneric()
+  // is insufficient.
+  const auto ParentSig = GC->getParent()->getGenericSignatureOfContext();
+  if (ParentSig && ParentSig->isEqual(GenericSig))
+    return;
+
   // FIXME: Not right for extensions of nested generic types
-  for (auto *GP : GenericSig->getInnermostGenericParams()) {
-    if (GP->getDecl()->isImplicit())
-      continue;
-    DocGenericParam Param;
-    Param.Name = GP->getName().str();
-    Info.GenericParams.push_back(Param);
+  if (GC->isGeneric()) {
+    for (auto *GP : GenericSig->getInnermostGenericParams()) {
+      if (GP->getDecl()->isImplicit())
+        continue;
+      DocGenericParam Param;
+      Param.Name = std::string(GP->getName());
+      Info.GenericParams.push_back(Param);
+    }
   }
 
   ProtocolDecl *proto = nullptr;
-  if (auto *typeDC = DC->getInnermostTypeContext())
-    proto = typeDC->getAsProtocolOrProtocolExtensionContext();
+  if (auto *typeDC = GC->getInnermostTypeContext())
+    proto = typeDC->getSelfProtocolDecl();
 
   for (auto &Req : GenericSig->getRequirements()) {
     // Skip protocol Self requirement.
@@ -302,7 +312,8 @@ static bool initDocEntityInfo(const Decl *D,
                               TypeOrExtensionDecl SynthesizedTarget,
                               const Decl *DefaultImplementationOf, bool IsRef,
                               bool IsSynthesizedExtension, DocEntityInfo &Info,
-                              StringRef Arg = StringRef()) {
+                              StringRef Arg = StringRef(),
+                              ModuleDecl *DeclaringModForCrossImport = nullptr){
   if (!IsRef && D->isImplicit())
     return true;
   if (!D || isa<ParamDecl>(D) ||
@@ -370,12 +381,12 @@ static bool initDocEntityInfo(const Decl *D,
       StringRef DocRef = (StringRef)DocBuffer;
       if (IsSynthesizedExtension &&
           DocRef.find("<Declaration>") != StringRef::npos) {
-        StringRef Open = "<Declaration>extension ";
+        StringRef Open = "extension ";
         assert(DocRef.find(Open) != StringRef::npos);
         auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
         auto SecondPart = DocRef.substr(FirstPart.size());
-        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedType()->
-          getAnyNominal()->getName().str();
+        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedNominal()
+            ->getName().str();
         assert(SecondPart.startswith(ExtendedName));
         SecondPart = SecondPart.substr(ExtendedName.size());
         llvm::SmallString<128> UpdatedDocBuffer;
@@ -399,6 +410,29 @@ static bool initDocEntityInfo(const Decl *D,
             VD, SynthesizedTarget, OS);
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
+    } else if (auto *E = dyn_cast<ExtensionDecl>(D)) {
+      if (auto Sig = E->getGenericSignature()) {
+        // The extension under printing is potentially part of a synthesized
+        // extension. Thus it's hard to print the fully annotated decl. We
+        // need to at least print the generic signature here.
+        llvm::raw_svector_ostream OS(Info.FullyAnnotatedGenericSig);
+        SwiftLangSupport::printFullyAnnotatedGenericReq(Sig, OS);
+      }
+    }
+
+    if (DeclaringModForCrossImport) {
+      ModuleDecl *MD = D->getModuleContext();
+      SmallVector<Identifier, 1> Bystanders;
+      if (MD->getRequiredBystandersIfCrossImportOverlay(
+          DeclaringModForCrossImport, Bystanders)) {
+        std::transform(Bystanders.begin(), Bystanders.end(),
+                       std::back_inserter(Info.RequiredBystanders),
+                       [](Identifier Bystander){
+          return Bystander.str().str();
+        });
+      } else {
+        llvm_unreachable("DeclaringModForCrossImport not correct?");
+      }
     }
   }
 
@@ -407,6 +441,7 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::EnumElementDecl:
     case DeclContextKind::Initializer:
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::ExtensionDecl:
@@ -418,21 +453,9 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::FileUnit: {
       if (auto *CD = D->getClangDecl()) {
         if (auto *M = CD->getImportedOwningModule()) {
-          const clang::Module *Root = M->getTopLevelModule();
-
-          // If Root differs from the owning module, then the owning module is
-          // a sub-module.
-          if (M != Root) {
+          if (M->isSubModule()) {
             llvm::raw_svector_ostream OS(Info.SubModuleName);
-            llvm::SmallVector<StringRef, 4> Names;
-
-            // Climb up and collect sub-module names.
-            for (auto Current = M; Current != Root; Current = Current->Parent) {
-              Names.insert(Names.begin(), Current->Name);
-            }
-            OS << Root->Name;
-            std::for_each(Names.begin(), Names.end(),
-                          [&](StringRef N) { OS << "." << N; });
+            ModuleDecl::ReverseFullNameIterator(M).printForward(OS);
           }
         }
       }
@@ -448,7 +471,8 @@ static bool initDocEntityInfo(const TextEntity &Entity,
   if (initDocEntityInfo(Entity.Dcl, Entity.SynthesizeTarget,
                         Entity.DefaultImplementationOf,
                         /*IsRef=*/false, Entity.IsSynthesizedExtension,
-                        Info, Entity.Argument))
+                        Info, Entity.Argument,
+                        Entity.DeclaringModIfFromCrossImportOverlay))
     return true;
   Info.Offset = Entity.Range.Offset;
   Info.Length = Entity.Range.Length;
@@ -456,7 +480,7 @@ static bool initDocEntityInfo(const TextEntity &Entity,
 }
 
 static const TypeDecl *getTypeDeclFromType(Type Ty) {
-  if (auto alias = dyn_cast<NameAliasType>(Ty.getPointer()))
+  if (auto alias = dyn_cast<TypeAliasType>(Ty.getPointer()))
     return alias->getDecl();
   return Ty->getAnyNominal();
 }
@@ -536,10 +560,9 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
-    if (TAD->hasInterfaceType()) {
+    if (auto Ty = TAD->getDeclaredInterfaceType()) {
       // If underlying type exists, report the inheritance and conformance of the
       // underlying type.
-      auto Ty = TAD->getDeclaredInterfaceType();
       if (auto NM = Ty->getAnyNominal()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
@@ -552,7 +575,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
     passInheritsAndConformancesForValueDecl(TAD, Consumer);
   } else if (const auto *TD = dyn_cast<TypeDecl>(D)) {
     llvm::SmallVector<TypeLoc, 4> AllInherits;
-    getInheritedForPrinting(TD, [](const Decl* d) { return true; }, AllInherits);
+    getInheritedForPrinting(TD, PrintOptions(), AllInherits);
     passInherits(AllInherits, Consumer);
     passConforms(TD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                  Consumer);
@@ -587,10 +610,12 @@ static void reportAttributes(ASTContext &Ctx,
                              DocInfoConsumer &Consumer) {
   static UIdent AvailableAttrKind("source.lang.swift.attribute.availability");
   static UIdent PlatformIOS("source.availability.platform.ios");
+  static UIdent PlatformMacCatalyst("source.availability.platform.maccatalyst");
   static UIdent PlatformOSX("source.availability.platform.osx");
   static UIdent PlatformtvOS("source.availability.platform.tvos");
   static UIdent PlatformWatchOS("source.availability.platform.watchos");
   static UIdent PlatformIOSAppExt("source.availability.platform.ios_app_extension");
+  static UIdent PlatformMacCatalystAppExt("source.availability.platform.maccatalyst_app_extension");
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
@@ -604,6 +629,8 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = UIdent(); break;
       case PlatformKind::iOS:
         PlatformUID = PlatformIOS; break;
+      case PlatformKind::macCatalyst:
+        PlatformUID = PlatformMacCatalyst; break;
       case PlatformKind::OSX:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
@@ -612,6 +639,8 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformWatchOS; break;
       case PlatformKind::iOSApplicationExtension:
         PlatformUID = PlatformIOSAppExt; break;
+      case PlatformKind::macCatalystApplicationExtension:
+        PlatformUID = PlatformMacCatalystAppExt; break;
       case PlatformKind::OSXApplicationExtension:
         PlatformUID = PlatformOSXAppExt; break;
       case PlatformKind::tvOSApplicationExtension:
@@ -778,7 +807,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
-  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.setInputKind(InputFileKind::Swift);
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
@@ -817,8 +846,8 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
       ArgNames = ArgNames.slice(1);
     }
 
-    if (auto typeRepr = param->getTypeLoc().getTypeRepr()) {
-      SourceRange TypeRange = param->getTypeLoc().getSourceRange();
+    if (auto typeRepr = param->getTypeRepr()) {
+      SourceRange TypeRange = typeRepr->getSourceRange();
       if (auto InOutTyR = dyn_cast_or_null<InOutTypeRepr>(typeRepr))
         TypeRange = InOutTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
@@ -839,19 +868,13 @@ static void addParameters(const AbstractFunctionDecl *FD,
                           TextEntity &Ent,
                           SourceManager &SM,
                           unsigned BufferID) {
-  auto params = FD->getParameterLists();
-  // Ignore 'self'.
-  if (FD->getDeclContext()->isTypeContext())
-    params = params.slice(1);
-
   ArrayRef<Identifier> ArgNames;
-  DeclName Name = FD->getFullName();
+  DeclName Name = FD->getName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
-  for (auto paramList : params) {
-    addParameters(ArgNames, paramList, Ent, SM, BufferID);
-  }
+  auto paramList = FD->getParameters();
+  addParameters(ArgNames, paramList, Ent, SM, BufferID);
 }
 
 static void addParameters(const SubscriptDecl *D,
@@ -859,7 +882,7 @@ static void addParameters(const SubscriptDecl *D,
                           SourceManager &SM,
                           unsigned BufferID) {
   ArrayRef<Identifier> ArgNames;
-  DeclName Name = D->getFullName();
+  DeclName Name = D->getName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
@@ -960,11 +983,22 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
-  printModuleInterface(M, None, TraversalOptions, Printer, Options,
-                       true);
-  Info.Text = OS.str();
+
+  printModuleInterface(M, None, TraversalOptions, Printer, Options, true);
+
+  Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);
+
+  // Add a reference to the main module on any entities from cross-import
+  // overlay modules (used to determine their bystanders later).
+  for (auto &Entity: Info.TopEntities) {
+    auto *EntityMod = Entity.Dcl->getModuleContext();
+    if (!EntityMod || EntityMod == M)
+      continue;
+    if (EntityMod->isCrossImportOverlayOf(M))
+      Entity.DeclaringModIfFromCrossImportOverlay = M;
+  }
   return false;
 }
 
@@ -980,8 +1014,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   ASTContext &Ctx = CI.getASTContext();
-  // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  registerIDERequestFunctions(Ctx.evaluator);
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1044,17 +1077,18 @@ public:
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
+    if (Data.isImplicit)
+      return true;
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
     return true;
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                               Optional<AccessKind> AccKind,
+                               ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
   }
 
   bool isLocal(Decl *D) const {
@@ -1082,7 +1116,7 @@ static bool getSourceTextInfo(CompilerInstance &CI,
   Walker.walk(*CI.getMainModule());
 
   CharSourceRange FullRange = SM.getRangeForBuffer(BufID);
-  Info.Text = SM.extractText(FullRange);
+  Info.Text = SM.extractText(FullRange).str();
   Info.TopEntities = std::move(Walker.TopEntities);
   Info.References = std::move(Walker.References);
   return false;
@@ -1107,9 +1141,6 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
   CI.performSema();
-
-  // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1138,7 +1169,7 @@ public:
     Receiver(std::move(Receiver)), OS(ErrBuffer), DiagConsumer(OS) {}
   ~Implementation() {
     if (DiagConsumer.didErrorOccur()) {
-      Receiver({}, OS.str());
+      Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(OS.str()));
       return;
     }
     assert(UIds.size() == StartEnds.size());
@@ -1149,30 +1180,34 @@ public:
                          llvm::makeArrayRef(AllEdits.data() + Pair.first,
                                              Pair.second - Pair.first)});
     }
-    Receiver(Results, "");
+    Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromResult(Results));
   }
   void accept(SourceManager &SM, RegionType RegionType,
               ArrayRef<Replacement> Replacements) {
     unsigned Start = AllEdits.size();
-    std::transform(Replacements.begin(), Replacements.end(),
-                   std::back_inserter(AllEdits),
-                   [&](const Replacement &R) -> Edit {
-      std::pair<unsigned, unsigned>
-        Start = SM.getLineAndColumn(R.Range.getStart()),
-        End = SM.getLineAndColumn(R.Range.getEnd());
-      SmallVector<NoteRegion, 4> SubRanges;
-      auto RawRanges = R.RegionsWorthNote;
-      std::transform(RawRanges.begin(), RawRanges.end(),
-                     std::back_inserter(SubRanges),
-                     [](swift::ide::NoteRegion R) -> SourceKit::NoteRegion {
-                       return {
-                         SwiftLangSupport::getUIDForRefactoringRangeKind(R.Kind),
-                         R.StartLine, R.StartColumn, R.EndLine, R.EndColumn,
-                         R.ArgIndex
-                       }; });
-      return {Start.first, Start.second, End.first, End.second, R.Text,
-        std::move(SubRanges)};
-    });
+    std::transform(
+        Replacements.begin(), Replacements.end(), std::back_inserter(AllEdits),
+        [&](const Replacement &R) -> Edit {
+          std::pair<unsigned, unsigned> Start =
+                                            SM.getPresumedLineAndColumnForLoc(
+                                                R.Range.getStart()),
+                                        End = SM.getPresumedLineAndColumnForLoc(
+                                            R.Range.getEnd());
+          SmallVector<NoteRegion, 4> SubRanges;
+          auto RawRanges = R.RegionsWorthNote;
+          std::transform(
+              RawRanges.begin(), RawRanges.end(), std::back_inserter(SubRanges),
+              [](swift::ide::NoteRegion R) -> SourceKit::NoteRegion {
+                return {SwiftLangSupport::getUIDForRefactoringRangeKind(R.Kind),
+                        R.StartLine,
+                        R.StartColumn,
+                        R.EndLine,
+                        R.EndColumn,
+                        R.ArgIndex};
+              });
+          return {Start.first, Start.second, End.first,
+                  End.second,  R.Text.str(), std::move(SubRanges)};
+        });
     unsigned End = AllEdits.size();
     StartEnds.emplace_back(Start, End);
     UIds.push_back(SwiftLangSupport::getUIDForRegionType(RegionType));
@@ -1192,13 +1227,9 @@ accept(SourceManager &SM, RegionType RegionType,
   Impl.accept(SM, RegionType, Replacements);
 }
 
-void RequestRefactoringEditConsumer::
-handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info);
+void RequestRefactoringEditConsumer::handleDiagnostic(
+    SourceManager &SM, const DiagnosticInfo &Info) {
+  Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
 class RequestRenameRangeConsumer::Implementation {
@@ -1216,10 +1247,10 @@ public:
 
   ~Implementation() {
     if (DiagConsumer.didErrorOccur()) {
-      Receiver({}, OS.str());
+      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(OS.str()));
       return;
     }
-    Receiver(CategorizedRanges, "");
+    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromResult(CategorizedRanges));
   }
 
   void accept(SourceManager &SM, RegionType RegionType,
@@ -1229,9 +1260,9 @@ public:
     for (const auto &R : Ranges) {
       SourceKit::RenameRangeDetail Result;
       std::tie(Result.StartLine, Result.StartColumn) =
-          SM.getLineAndColumn(R.Range.getStart());
+          SM.getPresumedLineAndColumnForLoc(R.Range.getStart());
       std::tie(Result.EndLine, Result.EndColumn) =
-          SM.getLineAndColumn(R.Range.getEnd());
+          SM.getPresumedLineAndColumnForLoc(R.Range.getEnd());
       Result.ArgIndex = R.Index;
       Result.Kind =
           SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);
@@ -1252,15 +1283,9 @@ void RequestRenameRangeConsumer::accept(
   Impl.accept(SM, RegionType, Ranges);
 }
 
-void RequestRenameRangeConsumer::
-handleDiagnostic(SourceManager &SM,
-                 SourceLoc Loc,
-                 DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info);
+void RequestRenameRangeConsumer::handleDiagnostic(SourceManager &SM,
+                                                  const DiagnosticInfo &Info) {
+  Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
 static NameUsage getNameUsage(RenameType Type) {
@@ -1290,7 +1315,7 @@ syntacticRename(llvm::MemoryBuffer *InputBuf,
   ParseCI.addDiagnosticConsumer(&PrintDiags);
   SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
   if (!SF) {
-    Receiver({}, Error);
+    Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(Error));
     return;
   }
 
@@ -1308,7 +1333,7 @@ void SwiftLangSupport::findRenameRanges(
   ParseCI.addDiagnosticConsumer(&PrintDiags);
   SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
   if (!SF) {
-    Receiver({}, Error);
+    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
     return;
   }
 
@@ -1323,9 +1348,8 @@ void SwiftLangSupport::findLocalRenameRanges(
   std::string Error;
   SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, Filename, Error);
   if (!Invok) {
-    // FIXME: Report it as failed request.
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver({}, Error);
+    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
     return;
   }
 
@@ -1345,9 +1369,13 @@ void SwiftLangSupport::findLocalRenameRanges(
       swift::ide::findLocalRenameRanges(&SF, Range, Consumer, Consumer);
     }
 
-    void cancelled() override { Receiver({}, "The refactoring is canceled."); }
+    void cancelled() override {
+      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::cancelled());
+    }
 
-    void failed(StringRef Error) override { Receiver({}, Error); }
+    void failed(StringRef Error) override {
+      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
+    }
   };
 
   auto ASTConsumer = std::make_shared<LocalRenameRangeASTConsumer>(
@@ -1355,7 +1383,8 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager().processASTAsync(Invok, ASTConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
+                                   llvm::vfs::getRealFileSystem());
 }
 
 SourceFile *SwiftLangSupport::getSyntacticSourceFile(
@@ -1363,13 +1392,13 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     CompilerInstance &ParseCI, std::string &Error) {
   CompilerInvocation Invocation;
 
-  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+  bool Failed = getASTManager()->initCompilerInvocationNoInputs(
       Invocation, Args, ParseCI.getDiags(), Error);
   if (Failed) {
     Error = "Compiler invocation init failed";
     return nullptr;
   }
-  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
 
@@ -1418,7 +1447,7 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
 
   CompilerInvocation Invocation;
   std::string Error;
-  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+  bool Failed = getASTManager()->initCompilerInvocationNoInputs(
       Invocation, Args, CI.getDiags(), Error, /*AllowInputs=*/false);
 
   if (Failed) {
@@ -1442,8 +1471,7 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
 
 void SwiftLangSupport::
 findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
-                 std::function<void(ArrayRef<StringRef>,
-                                    StringRef Error)> Receiver) {
+                 std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) {
   CompilerInvocation Invocation;
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
@@ -1454,33 +1482,32 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   CI.addDiagnosticConsumer(&PrintDiags);
   std::vector<StringRef> Groups;
   std::string Error;
-  if (getASTManager().initCompilerInvocationNoInputs(Invocation, Args,
+  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
                                                      CI.getDiags(), Error)) {
-    Receiver(Groups, Error);
+    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
   if (CI.setup(Invocation)) {
     Error = "Compiler invocation set up fails.";
-    Receiver(Groups, Error);
+    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
 
-  ASTContext &Ctx = CI.getASTContext();
-  // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
   // Load standard library so that Clang importer can use it.
+  ASTContext &Ctx = CI.getASTContext();
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
   if (!Stdlib) {
     Error = "Cannot load stdlib.";
-    Receiver(Groups, Error);
+    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
   auto *M = getModuleByFullName(Ctx, ModuleName);
   if (!M) {
     Error = "Cannot find the module.";
-    Receiver(Groups, Error);
+    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
   std::vector<StringRef> Scratch;
-  Receiver(collectModuleGroups(M, Scratch), Error);
+  Receiver(RequestResult<ArrayRef<StringRef>>::fromResult(
+      collectModuleGroups(M, Scratch)));
 }

@@ -62,7 +62,8 @@ public:
 
     /// Returns a description of the summary. For debugging and testing
     /// purposes.
-    std::string getDescription(SILType BaseType, SILModule &M) const;
+    std::string getDescription(SILType BaseType, SILModule &M,
+                               TypeExpansionContext context) const;
   };
 
   typedef llvm::SmallDenseMap<const IndexTrieNode *, SubAccessSummary, 8>
@@ -85,7 +86,8 @@ public:
 
     /// Returns a description of the summary. For debugging and testing
     /// purposes.
-    std::string getDescription(SILType BaseType, SILModule &M) const;
+    std::string getDescription(SILType BaseType, SILModule &M,
+                               TypeExpansionContext context) const;
 
     /// Returns the accesses that the function performs to subpaths of the
     /// argument.
@@ -173,22 +175,18 @@ private:
 
   /// A trie of integer indices that gives pointer identity to a path of
   /// projections. This is shared between all functions in the module.
-  IndexTrieNode *SubPathTrie;
+  std::unique_ptr<IndexTrieNode> SubPathTrie;
 
 public:
   AccessSummaryAnalysis() : BottomUpIPAnalysis(SILAnalysisKind::AccessSummary) {
-    SubPathTrie = new IndexTrieNode();
-  }
-
-  ~AccessSummaryAnalysis() {
-    delete SubPathTrie;
+    SubPathTrie.reset(new IndexTrieNode());
   }
 
   /// Returns a summary of the accesses performed by the given function.
   const FunctionSummary &getOrCreateSummary(SILFunction *Fn);
 
   IndexTrieNode *getSubPathTrieRoot() {
-    return SubPathTrie;
+    return SubPathTrie.get();
   }
 
   /// Returns an IndexTrieNode that represents the single subpath accessed from
@@ -212,7 +210,8 @@ public:
   /// The base type must be the type of the root of the path.
   static std::string getSubPathDescription(SILType BaseType,
                                            const IndexTrieNode *SubPath,
-                                           SILModule &M);
+                                           SILModule &M,
+                                           TypeExpansionContext context);
 
   /// Performs a lexicographic comparison of two subpaths, first by path length
   /// and then by index of the last path component. Returns true when lhs

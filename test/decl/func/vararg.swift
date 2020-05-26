@@ -23,8 +23,8 @@ func inoutVariadic(_ i: inout Int...) {  // expected-error {{'inout' must not be
 }
 
 // rdar://19722429
-func invalidVariadic(_ e: NonExistentType) { // expected-error {{use of undeclared type 'NonExistentType'}}
-  { (e: ExtraCrispy...) in }() // expected-error {{use of undeclared type 'ExtraCrispy'}}
+func invalidVariadic(_ e: NonExistentType) { // expected-error {{cannot find type 'NonExistentType' in scope}}
+  { (e: ExtraCrispy...) in }() // expected-error {{cannot find type 'ExtraCrispy' in scope}}
 }
 
 func twoVariadics(_ a: Int..., b: Int...) { } // expected-error{{only a single variadic parameter '...' is permitted}} {{38-41=}}

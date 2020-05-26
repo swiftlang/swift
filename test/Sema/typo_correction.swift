@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typo-correction-limit 20
+// RUN: %target-typecheck-verify-swift -typo-correction-limit 23
 // RUN: not %target-swift-frontend -typecheck -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -typo-correction-limit 0 %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
@@ -12,13 +12,13 @@ import NoSuchModule
 func test_short_and_close() {
   let foo = 4 // expected-note {{'foo' declared here}}
   let bab = fob + 1
-  // expected-error@-1 {{use of unresolved identifier 'fob'; did you mean 'foo'?}}
+  // expected-error@-1 {{cannot find 'fob' in scope; did you mean 'foo'?}}
 }
 
 // This is not.
 func test_too_different() {
   let moo = 4
-  let bbb = mbb + 1 // expected-error {{use of unresolved identifier}}
+  let bbb = mbb + 1 // expected-error {{cannot find 'mbb' in scope}}
 }
 
 struct Whatever {}
@@ -27,28 +27,28 @@ func *(x: Whatever, y: Whatever) {}
 // This works even for single-character identifiers.
 func test_very_short() {
   // Note that we don't suggest operators.
-  let x = 0 // expected-note {{'x' declared here}}
+  let x = 0 // expected-note {{did you mean 'x'?}}
   let longer = y
-  // expected-error@-1 {{use of unresolved identifier 'y'; did you mean 'x'?}}
+  // expected-error@-1 {{cannot find 'y' in scope}}
 }
 
 // It does not trigger in a variable's own initializer.
 func test_own_initializer() {
-  let x = y // expected-error {{use of unresolved identifier 'y'}}
+  let x = y // expected-error {{cannot find 'y' in scope}}
 }
 
 // Report candidates that are the same distance in different ways.
 func test_close_matches() {
   let match1 = 0 // expected-note {{did you mean 'match1'?}}
   let match22 = 0 // expected-note {{did you mean 'match22'?}}
-  let x = match2 // expected-error {{use of unresolved identifier 'match2'}}
+  let x = match2 // expected-error {{cannot find 'match2' in scope}}
 }
 
 // Report not-as-good matches if they're still close enough to the best.
 func test_keep_if_not_too_much_worse() {
   let longmatch1 = 0 // expected-note {{did you mean 'longmatch1'?}}
   let longmatch22 = 0 // expected-note {{did you mean 'longmatch22'?}}
-  let x = longmatch // expected-error {{use of unresolved identifier 'longmatch'}}
+  let x = longmatch // expected-error {{cannot find 'longmatch' in scope}}
 }
 
 // Report not-as-good matches if they're still close enough to the best.
@@ -56,7 +56,7 @@ func test_drop_if_too_different() {
   let longlongmatch1 = 0 // expected-note {{'longlongmatch1' declared here}}
   let longlongmatch2222 = 0
   let x = longlongmatch
-  // expected-error@-1 {{use of unresolved identifier 'longlongmatch'; did you mean 'longlongmatch1'?}}
+  // expected-error@-1 {{cannot find 'longlongmatch' in scope; did you mean 'longlongmatch1'?}}
 }
 
 // Candidates are suppressed if we have too many that are the same distance.
@@ -67,7 +67,7 @@ func test_too_many_same() {
   let match4 = 0
   let match5 = 0
   let match6 = 0
-  let x = match // expected-error {{use of unresolved identifier 'match'}}
+  let x = match // expected-error {{cannot find 'match' in scope}}
 }
 
 // But if some are better than others, just drop the worse tier.
@@ -78,7 +78,7 @@ func test_too_many_but_some_better() {
   let match4 = 0
   let match5 = 0
   let match6 = 0
-  let x = mtch // expected-error {{use of unresolved identifier 'mtch'}}
+  let x = mtch // expected-error {{cannot find 'mtch' in scope}}
 }
 
 // rdar://problem/28387684
@@ -100,26 +100,31 @@ func takesSomeClassArchetype<T : SomeClass>(_ t: T) {
 }
 
 // Typo correction of unqualified lookup from generic context.
-struct Generic<T> {
+struct Generic<T> { // expected-note {{'T' declared as parameter to type 'Generic'}}
   func match1() {}
   // expected-note@-1 {{'match1' declared here}}
 
   class Inner {
     func doStuff() {
       match0()
-      // expected-error@-1 {{use of unresolved identifier 'match0'; did you mean 'match1'?}}
+      // expected-error@-1 {{cannot find 'match0' in scope; did you mean 'match1'?}}
     }
   }
 }
 
 protocol P { // expected-note {{'P' previously declared here}}
+  // expected-note@-1 2{{did you mean 'P'?}}
+  // expected-note@-2 {{'P' declared here}}
   typealias a = Generic
 }
 
 protocol P {} // expected-error {{invalid redeclaration of 'P'}}
+// expected-note@-1 2{{did you mean 'P'?}}
+// expected-note@-2 {{'P' declared here}}
 
 func hasTypo() {
-  _ = P.a.a // expected-error {{value of type 'Generic' has no member 'a'}}
+  _ = P.a.a // expected-error {{type 'Generic<T>' has no member 'a'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
 
 // Typo correction with AnyObject.
@@ -138,7 +143,7 @@ enum Foo {
   case flashing // expected-note {{'flashing' declared here}}
 }
 
-func foo(_ a: Foo) {
+func foo(_ a: Foo) { // expected-note {{'foo' declared here}}
 }
 
 func bar() {
@@ -152,17 +157,67 @@ func overloaded(_: Int) {} // expected-note {{'overloaded' declared here}}
 func overloaded(_: Float) {} // expected-note {{'overloaded' declared here}}
 func test_overloaded() {
   overloadd(0)
-  // expected-error@-1 {{use of unresolved identifier 'overloadd'; did you mean 'overloaded'?}}{{3-12=overloaded}}
+  // expected-error@-1 {{cannot find 'overloadd' in scope; did you mean 'overloaded'?}}{{3-12=overloaded}}
 }
 
 // This is one of the backtraces from rdar://36434823 but got fixed along
 // the way.
 class CircularValidationWithTypo {
-  var cdcdcdcd = ababab { // expected-error {{use of unresolved identifier 'ababab'}}
+  var cdcdcdcd = ababab { // expected-error {{cannot find 'ababab' in scope}}
     didSet { }
   }
 
-  var abababab = cdcdcdc { // expected-error {{use of unresolved identifier 'cdcdcdc'}}
+  var abababab = cdcdcdc { // expected-error {{cannot find 'cdcdcdc' in scope}}
     didSet { }
+  }
+}
+
+// Crash with invalid extension that has not been bound -- https://bugs.swift.org/browse/SR-8984
+protocol PP {}
+
+func boo() {
+  extension PP { // expected-error {{declaration is only valid at file scope}}
+    func g() {
+      booo() // expected-error {{cannot find 'booo' in scope}}
+    }
+  }
+}
+
+// Don't show underscored names as typo corrections unless the typed name also
+// begins with an underscore.
+func test_underscored_no_match() {
+  let _ham = 0
+  _ = ham
+  // expected-error@-1 {{cannot find 'ham' in scope}}
+}
+
+func test_underscored_match() {
+  let _eggs = 4 // expected-note {{'_eggs' declared here}}
+  _ = _fggs + 1
+  // expected-error@-1 {{cannot find '_fggs' in scope; did you mean '_eggs'?}}
+}
+
+// Don't show values before declaration.
+func testFwdRef() {
+  let _ = forward_refX + 1 // expected-error {{cannot find 'forward_refX' in scope}}
+  let forward_ref1 = 4
+}
+
+// Crash with protocol members.
+protocol P1 {
+  associatedtype A1
+  associatedtype A2
+}
+
+protocol P2 {
+  associatedtype A1
+  associatedtype A2
+
+  func method<T: P1>(_: T) where T.A1 == A1, T.A2 == A2
+}
+
+extension P2 {
+  func f() { // expected-note {{did you mean 'f'?}}
+    _ = a // expected-error {{cannot find 'a' in scope}}
   }
 }

@@ -69,9 +69,9 @@ func test_static_method_value_coerce(_ a: A) {
 func test_mixed_overload(_ a: A, x: X, y: Y) {
   var x1 = a.mixed(x: x)
   x1 = x
-  var y1 = a.mixed(y: y) // expected-error{{incorrect argument label in call (have 'y:', expected 'x:')}}
+  var y1 = a.mixed(y: y) // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{12-13=A}}
   
-  A.mixed(x) // expected-error{{missing argument label 'y:' in call}}
+  A.mixed(x) // expected-error{{cannot convert value of type 'X' to expected argument type 'A'}}
   var x2 = A.mixed(a)(x: x)
   x2 = x
   var y2 = A.mixed(y: y)
@@ -89,7 +89,7 @@ func test_mixed_overload_coerce(_ a: A, x: inout X, y: Y, z: Z) {
 func test_mixed_method_value_coerce(_ a: A) {
   var _ : (X) -> X = a.mixed
   var _ : (Y) -> Y = A.mixed
-  var _ : (Y) -> Y = a.mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
+  var _ : (Y) -> Y = a.mixed; // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{22-23=A}}
   var _ : (A) -> (X) -> X = A.mixed
 }
 
@@ -130,8 +130,8 @@ extension A {
 
   func test_mixed_method_value_coerce() {
     var _ : (X) -> X = mixed
-    var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
-    var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
+    var _ : (Y) -> Y = mixed; // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{24-24=A.}}
+    var _ : (Y) -> Y = mixed; // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{24-24=A.}}
     var _ : (A) -> (X) -> X = A.mixed
   }
 
@@ -157,7 +157,7 @@ extension A {
   }
 
   class func test_mixed_overload_static(a: A, x: X, y: Y) {
-    mixed(x) // expected-error{{missing argument label 'y:' in call}}
+    mixed(x) // expected-error{{cannot convert value of type 'X' to expected argument type 'A'}}
     var x2 = mixed(a)(x: x)
     x2 = x
     var y2 = mixed(y: y)
@@ -188,6 +188,7 @@ struct WeirdIvarLookupBehavior {
   static func static_f() {
     // FIXME: These diagnostics still suck.
     var a : X = clams // expected-error{{member 'clams' cannot be used on type 'WeirdIvarLookupBehavior'}}
+    // expected-error@-1 {{cannot convert value of type 'Y' to specified type 'X'}}
     var b : Y = clams // expected-error{{member 'clams' cannot be used on type 'WeirdIvarLookupBehavior'}}
   }
 }

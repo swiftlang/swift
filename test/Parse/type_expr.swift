@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
-// RUN: %target-typecheck-verify-swift -enable-astscope-lookup -swift-version 4
+// not ready: dont_run: %target-typecheck-verify-swift -enable-astscope-lookup -swift-version 4
 
 // Types in expression contexts must be followed by a member access or
 // constructor call.
@@ -117,7 +117,7 @@ func genQualifiedType() {
 
 func typeOfShadowing() {
   // Try to shadow type(of:)
-  func type<T>(of t: T.Type, flag: Bool) -> T.Type {
+  func type<T>(of t: T.Type, flag: Bool) -> T.Type { // expected-note {{'type(of:flag:)' declared here}}
     return t
   }
 
@@ -133,9 +133,7 @@ func typeOfShadowing() {
     return t
   }
 
-  // TODO: Errors need improving here.
-  _ = type(of: Gen<Foo>.Bar) // expected-error{{argument labels '(of:)' do not match any available overloads}}
-                             // expected-note@-1{{overloads for 'type' exist with these partially matching parameter lists: (T.Type), (fo: T.Type)}}
+  _ = type(of: Gen<Foo>.Bar) // expected-error{{missing argument for parameter 'flag' in call}} {{28-28=, flag: <#Bool#>}}
   _ = type(Gen<Foo>.Bar) // expected-error{{expected member name or constructor call after type name}}
   // expected-note@-1{{add arguments after the type to construct a value of the type}}
   // expected-note@-2{{use '.self' to reference the type object}}
@@ -249,7 +247,7 @@ func testFunctionCollectionTypes() {
   _ = (Int) -> Int // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self' to reference the type object}}
 
   _ = @convention(c) () -> Int // expected-error{{expected member name or constructor call after type name}} expected-note{{use '.self' to reference the type object}}
-  _ = 1 + (@convention(c) () -> Int).self // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and '(@convention(c) () -> Int).Type'}} // expected-note {{expected an argument list of type '(Int, Int)'}}
+  _ = 1 + (@convention(c) () -> Int).self // expected-error{{cannot convert value of type '(@convention(c) () -> Int).Type' to expected argument type 'Int'}}
   _ = (@autoclosure () -> Int) -> (Int, Int).2 // expected-error {{expected type after '->'}}
   _ = ((@autoclosure () -> Int) -> (Int, Int)).1 // expected-error {{type '(@autoclosure () -> Int) -> (Int, Int)' has no member '1'}}
   _ = ((inout Int) -> Void).self
@@ -267,7 +265,7 @@ protocol P2 {}
 protocol P3 {}
 func compositionType() {
   _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{14-14=).self}}
-  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads}}
+  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}}
   _ = (P1 & P2).self // Ok.
   _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
   _ = (P1 & (P2, P3)).self // expected-error {{non-protocol, non-class type '(P2, P3)' cannot be used within a protocol-constrained type}}
@@ -299,7 +297,7 @@ func complexSequence() {
   //     (type_expr typerepr='P1 & P2 throws -> P3 & P1')))
   _ = try P1 & P2 throws -> P3 & P1
   // expected-warning @-1 {{no calls to throwing functions occur within 'try' expression}}
-  // expected-error @-2 {{single argument function types require parentheses}} {{none}} {{11-11=(}} {{18-18=)}}
+  // expected-error @-2 {{single argument function types require parentheses}} {{11-11=(}} {{18-18=)}}
   // expected-error @-3 {{expected member name or constructor call after type name}}
   // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}
 }

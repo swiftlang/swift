@@ -58,6 +58,15 @@ func escapedDollarFunc() {
 func escapedDollarAnd() {
   // FIXME: Bad diagnostics.
   `$0` = 1 // expected-error {{expected expression}}
-  `$$` = 2 // expected-error {{expected numeric value following '$'}}
-  `$abc` = 3 // expected-error {{expected numeric value following '$'}}
+  `$$` = 2
+  `$abc` = 3
+}
+
+func $declareWithDollar() { // expected-error{{cannot declare entity named '$declareWithDollar'}}
+  var $foo = 17 // expected-error{{cannot declare entity named '$foo'}}
+  // expected-warning@-1 {{initialization of variable '$foo' was never used; consider replacing with assignment to '_' or removing it}}
+  func $bar() { } // expected-error{{cannot declare entity named '$bar'}}
+  func wibble(
+    $a: Int, // expected-error{{cannot declare entity named '$a'}}
+    $b c: Int) { } // expected-error{{cannot declare entity named '$b'}}
 }

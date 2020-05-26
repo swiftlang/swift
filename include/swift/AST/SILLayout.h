@@ -29,12 +29,12 @@
 #define SWIFT_SIL_LAYOUT_H
 
 #include "llvm/ADT/PointerIntPair.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
 namespace swift {
 
-class GenericSignature;
 class SILType;
 
 /// A field of a SIL aggregate layout.
@@ -139,7 +139,7 @@ public:
                       CanGenericSignature Generics,
                       ArrayRef<SILField> Fields);
   
-  /// \brief Produce a profile of this locator, for use in a folding set.
+  /// Produce a profile of this locator, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, getGenericSignature(), getFields());
   }

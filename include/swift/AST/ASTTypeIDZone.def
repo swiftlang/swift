@@ -1,0 +1,66 @@
+//===--- ASTTypeIDZone.def - Define the AST TypeID Zone ---------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This definition file describes the types in the "AST" TypeID zone,
+//  for use with the TypeID template.
+//
+//===----------------------------------------------------------------------===//
+
+SWIFT_TYPEID(AncestryFlags)
+SWIFT_TYPEID(CtorInitializerKind)
+SWIFT_TYPEID(FunctionBuilderBodyPreCheck)
+SWIFT_TYPEID(GenericSignature)
+SWIFT_TYPEID(ImplicitImport)
+SWIFT_TYPEID(ImplicitMemberAction)
+SWIFT_TYPEID(ParamSpecifier)
+SWIFT_TYPEID(PropertyWrapperBackingPropertyInfo)
+SWIFT_TYPEID(PropertyWrapperTypeInfo)
+SWIFT_TYPEID(Requirement)
+SWIFT_TYPEID(ResilienceExpansion)
+SWIFT_TYPEID(FragileFunctionKind)
+SWIFT_TYPEID(Type)
+SWIFT_TYPEID(TypePair)
+SWIFT_TYPEID(TypeWitnessAndDecl)
+SWIFT_TYPEID(Witness)
+SWIFT_TYPEID_NAMED(AbstractFunctionDecl *, AbstractFunctionDecl)
+SWIFT_TYPEID_NAMED(ClosureExpr *, ClosureExpr)
+SWIFT_TYPEID_NAMED(CodeCompletionCallbacksFactory *,
+                   CodeCompletionCallbacksFactory)
+SWIFT_TYPEID_NAMED(ConstructorDecl *, ConstructorDecl)
+SWIFT_TYPEID_NAMED(CustomAttr *, CustomAttr)
+SWIFT_TYPEID_NAMED(Decl *, Decl)
+SWIFT_TYPEID_NAMED(EnumDecl *, EnumDecl)
+SWIFT_TYPEID_NAMED(GenericParamList *, GenericParamList)
+SWIFT_TYPEID_NAMED(GenericTypeParamType *, GenericTypeParamType)
+SWIFT_TYPEID_NAMED(InfixOperatorDecl *, InfixOperatorDecl)
+SWIFT_TYPEID_NAMED(IterableDeclContext *, IterableDeclContext)
+SWIFT_TYPEID_NAMED(ModuleDecl *, ModuleDecl)
+SWIFT_TYPEID_NAMED(NamedPattern *, NamedPattern)
+SWIFT_TYPEID_NAMED(NominalTypeDecl *, NominalTypeDecl)
+SWIFT_TYPEID_NAMED(OpaqueTypeDecl *, OpaqueTypeDecl)
+SWIFT_TYPEID_NAMED(OperatorDecl *, OperatorDecl)
+SWIFT_TYPEID_NAMED(Optional<PropertyWrapperLValueness>,
+                   PropertyWrapperLValueness)
+SWIFT_TYPEID_NAMED(Optional<PropertyWrapperMutability>,
+                   PropertyWrapperMutability)
+SWIFT_TYPEID_NAMED(ParamDecl *, ParamDecl)
+SWIFT_TYPEID_NAMED(PatternBindingEntry *, PatternBindingEntry)
+SWIFT_TYPEID_NAMED(PostfixOperatorDecl *, PostfixOperatorDecl)
+SWIFT_TYPEID_NAMED(PrecedenceGroupDecl *, PrecedenceGroupDecl)
+SWIFT_TYPEID_NAMED(PrefixOperatorDecl *, PrefixOperatorDecl)
+SWIFT_TYPEID_NAMED(ProtocolDecl *, ProtocolDecl)
+SWIFT_TYPEID_NAMED(SourceFile *, SourceFile)
+SWIFT_TYPEID_NAMED(TypeAliasDecl *, TypeAliasDecl)
+SWIFT_TYPEID_NAMED(ValueDecl *, ValueDecl)
+SWIFT_TYPEID_NAMED(VarDecl *, VarDecl)
+SWIFT_TYPEID(FingerprintAndMembers)
+SWIFT_TYPEID(Identifier)

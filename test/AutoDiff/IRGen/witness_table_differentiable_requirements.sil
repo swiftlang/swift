@@ -1,0 +1,81 @@
+// RUN: %target-swift-frontend -parse-sil %s -emit-ir | %FileCheck %s
+// REQUIRES: CPU=x86_64
+
+sil_stage canonical
+
+import _Differentiation
+import Builtin
+import Swift
+import SwiftShims
+
+protocol DifferentiableRequirement {
+  @differentiable(wrt: x)
+  func f(_ x: Float) -> Float
+}
+
+struct DifferentiableConformance : DifferentiableRequirement {
+  @differentiable(wrt: x)
+  func f(_ x: Float) -> Float
+  @derivative(of: f)
+  func df(_ x: Float) -> (value: Float, differential: (Float) -> Float)
+  @derivative(of: f)
+  func pf(_ x: Float) -> (value: Float, pullback: (Float) -> Float)
+}
+
+struct AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0 {
+}
+
+// DifferentiableConformance.f(_:)
+sil hidden @$s41witness_table_differentiable_requirements25DifferentiableConformanceV1fyS2fF : $@convention(method) (Float, DifferentiableConformance) -> Float {
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  return undef : $Float
+} // end sil function '$s41witness_table_differentiable_requirements25DifferentiableConformanceV1fyS2fF'
+
+// DifferentiableConformance.df(_:)
+sil hidden @$s41witness_table_differentiable_requirements25DifferentiableConformanceV2dfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+// DifferentiableConformance.pf(_:)
+sil hidden @$s41witness_table_differentiable_requirements25DifferentiableConformanceV2pfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+} // end sil function '$s41witness_table_differentiable_requirements25DifferentiableConformanceV2pfySf_S2fctSfF'
+
+// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+sil private [transparent] [thunk] @$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> Float {
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  return undef : $Float
+} // end sil function '$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW'
+
+// AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_jvp_SU
+sil private [transparent] [thunk] @AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_jvp_SU : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+} // end sil function 'AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_jvp_SU'
+
+// AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_vjp_SU
+sil private [transparent] [thunk] @AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_vjp_SU : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+} // end sil function 'AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_vjp_SU'
+
+// AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0
+sil hidden @AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0 : $@convention(method) (Float, AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, Float, Float, DifferentiableConformance) -> Float {
+bb0(%0 : $Float, %1 : $AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, %2 : $Float, %3 : $Float, %4 : $DifferentiableConformance):
+  return undef : $Float
+} // end sil function 'AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0'
+
+sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement module witness_tables_autodiff {
+  method #DifferentiableRequirement.f: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW	// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+  method #DifferentiableRequirement.f!jvp.SU.<Self where Self : DifferentiableRequirement>: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_jvp_SU	// AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_jvp_SU
+  method #DifferentiableRequirement.f!vjp.SU.<Self where Self : DifferentiableRequirement>: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_vjp_SU	// AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_vjp_SU
+}
+
+// CHECK: @"$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementAAWP" = hidden constant [4 x i8*] [
+// CHECK-SAME:   i8* bitcast (%swift.protocol_conformance_descriptor* @"$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementAAMc" to i8*),
+// CHECK-SAME:   i8* bitcast (float (float, %T41witness_table_differentiable_requirements25DifferentiableConformanceV*, %swift.type*, i8**)* @"$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW" to i8*),
+// CHECK-SAME:   i8* bitcast ({ float, i8*, %swift.refcounted* } (float, %T41witness_table_differentiable_requirements25DifferentiableConformanceV*, %swift.type*, i8**)* @"AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_jvp_SU" to i8*),
+// CHECK-SAME:   i8* bitcast ({ float, i8*, %swift.refcounted* } (float, %T41witness_table_differentiable_requirements25DifferentiableConformanceV*, %swift.type*, i8**)* @"AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_vjp_SU" to i8*)
+// CHECK-SAME: ]

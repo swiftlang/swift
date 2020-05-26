@@ -1,6 +1,12 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -disable-objc-attr-requires-foundation-module -enable-objc-interop -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
 
+#if os(Windows) && (arch(arm64) || arch(x86_64))
+typealias ObjCEnumType = Int32
+#else
+typealias ObjCEnumType = Int
+#endif
+
 import macros
 
 // CHECK: [[@LINE+1]]:8 s:14swift_ide_test1SV{{$}}
@@ -61,7 +67,7 @@ class GenericClass {
   }
 
   // CHECK: [[@LINE+2]]:3 s:14swift_ide_test12GenericClassCySfSicip{{$}}
-  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test12GenericClassC1iL_Sivp{{$}}
+  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test12GenericClassCySfSicip1iL_Sivp{{$}}
   subscript(i: Int) -> Float {
     // CHECK: [[@LINE+1]]:5 s:14swift_ide_test12GenericClassCySfSicig{{$}}
     get { return 0.0 }
@@ -197,7 +203,7 @@ class ObjCClass1 {
   func instanceFunc1(_ a: Int) {
 
     // CHECK: [[@LINE+1]]:16 s:14swift_ide_test10ObjCClass1C13instanceFunc1yySiF9LocalEnumL_O
-    @objc enum LocalEnum : Int {
+    @objc enum LocalEnum : ObjCEnumType {
       // CHECK: [[@LINE+1]]:12 s:14swift_ide_test10ObjCClass1C13instanceFunc1yySiF9LocalEnumL_O8someCaseyA2FmF
       case someCase
     }
@@ -206,7 +212,7 @@ class ObjCClass1 {
   class func staticFunc1(_ a: Int) {}
 
   // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1CyS2icip{{$}}
-  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_Sivp{{$}}
+  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1CyS2icip1xL_Sivp{{$}}
   public subscript(x: Int) -> Int {
 
     // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)objectAtIndexedSubscript:{{$}}
@@ -217,7 +223,7 @@ class ObjCClass1 {
   }
 
   // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1CySiACcip{{$}}
-  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_ACvp{{$}}
+  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1CySiACcip1xL_ACvp{{$}}
   public subscript(x: ObjCClass1) -> Int {
 
     // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)objectForKeyedSubscript:{{$}}
@@ -240,7 +246,7 @@ class ObjCClass1 {
 }
 
 // CHECK: [[@LINE+1]]:12 c:@M@swift_ide_test@E@ObjCEnum{{$}}
-@objc enum ObjCEnum : Int {
+@objc enum ObjCEnum : ObjCEnumType {
 
   // CHECK: [[@LINE+1]]:8 c:@M@swift_ide_test@E@ObjCEnum@ObjCEnumAmazingCase{{$}}
   case amazingCase

@@ -1,0 +1,459 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil @int_user : $@convention(thin) (Builtin.Int32) -> ()
+sil @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+
+class Klass {}
+enum FakeOptional<T> {
+case some(T)
+case none
+}
+
+///////////
+// Tests //
+///////////
+
+sil [ossa] [transparent] @load_store_borrow_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %2 = alloc_stack $Builtin.NativeObject
+  store_borrow %1 to %2 : $*Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  %f = function_ref @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %f(%2) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  dealloc_stack %2 : $*Builtin.NativeObject
+
+  %3 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %3 : $*Builtin.NativeObject
+  %4 = load_borrow %3 : $*Builtin.NativeObject
+  %f2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %f2(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %4 : $Builtin.NativeObject
+  destroy_addr %3 : $*Builtin.NativeObject
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @load_store_borrow_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   store [[ARG]] to [[STACK]]
+// CHECK:   apply {{%.*}}([[STACK]])
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   [[STACK:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   store [[ARG]] to [[STACK]]
+// CHECK:   [[LOADED_ARG:%.*]] = load [[STACK]]
+// CHECK:   apply {{%.*}}([[LOADED_ARG]])
+// CHECK:   destroy_addr [[STACK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK: } // end sil function 'load_store_borrow_ossa_caller'
+sil @load_store_borrow_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @load_store_borrow_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%0)  : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] [transparent] @load_store_ossa_nontrivial_callee : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %2 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Builtin.NativeObject
+  store %1a to [assign] %2 : $*Builtin.NativeObject
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  %4 = load [take] %2 : $*Builtin.NativeObject
+  destroy_value %4 : $Builtin.NativeObject
+  dealloc_stack %2 : $*Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @load_store_ossa_nontrivial_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG0:%.*]] : ${{.*}}, [[ARG1:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Builtin.NativeObject
+//
+// First we do a store init into the stack.
+// CHECK:   store [[ARG0]] to [[STACK]]
+//
+// Then we are performing a store assign, so we load the old value, store the
+// new value, and release the old value.
+// CHECK:   strong_retain [[ARG1]]
+// CHECK:   [[OLD_VALUE:%.*]] = load [[STACK]]
+// CHECK:   store [[ARG1]] to [[STACK]]
+// CHECK:   strong_release [[OLD_VALUE]]
+//
+// Then we are performing a load [copy] + destroy.
+//
+// CHECK:   [[COPIED_VALUE:%.*]] = load [[STACK]]
+// CHECK:   strong_retain [[COPIED_VALUE]]
+// CHECK:   release_value [[COPIED_VALUE]]
+//
+// Finally, we perform a load_take + destroy.
+//
+// CHECK:   [[NEW_VALUE:%.*]] = load [[STACK]]
+// CHECK:   release_value [[NEW_VALUE]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK:   release_value [[ARG1]]
+// CHECK: } // end sil function 'load_store_ossa_nontrivial_caller'
+sil @load_store_ossa_nontrivial_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @load_store_ossa_nontrivial_callee : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  apply %2(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] [transparent] @load_store_ossa_trivial_callee : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %1 : $*Builtin.Int32
+  %2 = load [trivial] %1 : $*Builtin.Int32
+  %f = function_ref @int_user : $@convention(thin) (Builtin.Int32) -> ()
+  apply %f(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %1 : $*Builtin.Int32
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @load_store_ossa_trivial_caller : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK:%.*]] = alloc_stack $Builtin.Int32
+// CHECK:   store [[ARG]] to [[STACK]]
+// CHECK:   [[LOADED_ARG:%.*]] = load [[STACK]]
+// CHECK:   apply {{%.*}}([[LOADED_ARG]])
+// CHECK: } // end sil function 'load_store_ossa_trivial_caller'
+sil @load_store_ossa_trivial_caller : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %f = function_ref @load_store_ossa_trivial_callee : $@convention(thin) (Builtin.Int32) -> ()
+  apply %f(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+struct NativeObjectPair {
+  var x: Builtin.NativeObject
+  var y: Builtin.NativeObject
+}
+
+sil [ossa] [transparent] @destructure_callee : $@convention(thin) (@owned (NativeObjectPair, NativeObjectPair)) -> () {
+bb0(%0 : @owned $(NativeObjectPair, NativeObjectPair)):
+  %1 = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  (%2, %3) = destructure_tuple %0 : $(NativeObjectPair, NativeObjectPair)
+  (%4, %5) = destructure_struct %2 : $NativeObjectPair
+  (%6, %7) = destructure_struct %3 : $NativeObjectPair
+  apply %1(%4): $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%5): $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%6): $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %1(%7): $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @destructure_caller : $@convention(thin) (@owned (NativeObjectPair, NativeObjectPair)) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[FUNC:%.*]] = function_ref @owned_user :
+// CHECK:   [[ARG0:%.*]] = tuple_extract [[ARG]]
+// CHECK:   [[ARG1:%.*]] = tuple_extract [[ARG]]
+// CHECK:   [[ARG00:%.*]] = struct_extract [[ARG0]]
+// CHECK:   [[ARG01:%.*]] = struct_extract [[ARG0]]
+// CHECK:   [[ARG10:%.*]] = struct_extract [[ARG1]]
+// CHECK:   [[ARG11:%.*]] = struct_extract [[ARG1]]
+// CHECK:   apply [[FUNC]]([[ARG00]])
+// CHECK:   apply [[FUNC]]([[ARG01]])
+// CHECK:   apply [[FUNC]]([[ARG10]])
+// CHECK:   apply [[FUNC]]([[ARG11]])
+// CHECK: } // end sil function 'destructure_caller'
+sil @destructure_caller : $@convention(thin) (@owned (NativeObjectPair, NativeObjectPair)) -> () {
+bb0(%0 : $(NativeObjectPair, NativeObjectPair)):
+  %1 = function_ref @destructure_callee : $@convention(thin) (@owned (NativeObjectPair, NativeObjectPair)) -> ()
+  apply %1(%0) : $@convention(thin) (@owned (NativeObjectPair, NativeObjectPair)) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test out functionality that we use to work around weird semantics of
+// destructors.
+sil [ossa] [transparent] @special_case_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  end_lifetime %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @special_case_caller : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'special_case_caller'
+sil @special_case_caller : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @special_case_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test out functionality that we use to work around weird semantics of
+// destructors.
+sil [ossa] [transparent] @unmanaged_rr_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  unmanaged_retain_value %0 : $Builtin.NativeObject
+  unmanaged_release_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @unmanaged_rr_caller : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT: retain_value [[ARG]]
+// CHECK-NEXT: release_value [[ARG]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unmanaged_rr_caller'
+sil @unmanaged_rr_caller : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @unmanaged_rr_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $FakeOptional<Klass>):
+  checked_cast_br %0 : $Builtin.NativeObject to Klass, bb1, bb2
+
+bb1(%1a : @owned $Klass):
+  destroy_value %1a : $Klass
+  br bb3
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some: bb4, default bb5
+
+bb4(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  br bb6
+
+bb5(%4 : @owned $FakeOptional<Klass>):
+  destroy_value %4 : $FakeOptional<Klass>
+  br bb6
+
+bb6:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @term_non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $FakeOptional<Klass>):
+// CHECK:   checked_cast_br [[ARG0]] : $Builtin.NativeObject to Klass, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+//
+// CHECK: [[YES]]([[SUCC:%.*]] :
+// CHECK:   release_value [[SUCC]]
+// CHECK:   br [[CONT:bb[0-9]+]]
+//
+// CHECK: [[NO]]:
+// CHECK:   release_value [[ARG0]]
+// CHECK:   br [[CONT]]
+//
+// CHECK: [[CONT]]:
+// CHECK:   switch_enum [[ARG1]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: [[SOME:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
+//
+// CHECK: [[SOME]]([[PAYLOAD:%.*]] :
+// CHECK:   release_value [[PAYLOAD]]
+//
+// CHECK: [[DEFAULT]]:
+// CHECK:   release_value [[ARG1]]
+// CHECK: } // end sil function 'term_non_ossa_caller'
+sil @term_non_ossa_caller : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $FakeOptional<Klass>):
+  %2 = function_ref @term_ossa_callee : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> ()
+  apply %2(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned FakeOptional<Klass>) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_takealways_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br take_always Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+// CHECK-LABEL: sil @term_nonossa_checked_cast_addr_br_takealways_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// ==> On success, we store the value into dest. The destroy is not from the
+// ==> optimizer, but from the code.
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
+// CHECK-NEXT:   store [[CAST_VALUE]] to [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// ==> take_always implies we destroy in failure
+// CHECK: [[FAILURE_BB]]:
+// CHECK-NEXT:   strong_release [[RELOADED_ARG]]
+// CHECK-NEXT:   br [[CONT_BB]]
+//
+// CHECK: [[CONT_BB]]:
+// CHECK:   strong_release [[ARG]]
+// CHECK: } // end sil function 'term_nonossa_checked_cast_addr_br_takealways_caller'
+sil @term_nonossa_checked_cast_addr_br_takealways_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %3 = function_ref @term_ossa_checked_cast_addr_br_takealways_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %3(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_takeonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br take_on_success Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @term_nonossa_checked_cast_addr_br_takeonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
+// ==> On success, we store into dest and destroy dest.
+// CHECK-NEXT:   store [[CAST_VALUE]] to [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// ==> Since we are doing a take on success and we failed... store the original
+// ==> value back into the memory slot.
+// CHECK: [[FAILURE_BB]]:
+// CHECK-NEXT:   store [[RELOADED_ARG]] to [[SRC_ADDR]]
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB]]
+// CHECK: } // end sil function 'term_nonossa_checked_cast_addr_br_takeonsuccess_caller'
+sil @term_nonossa_checked_cast_addr_br_takeonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %2 = function_ref @term_ossa_checked_cast_addr_br_takeonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %2(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_copyonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br copy_on_success Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @term_nonossa_checked_cast_addr_br_copyonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG]] to [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
+// CHECK-NEXT:   strong_retain [[CAST_VALUE]]
+// CHECK-NEXT:   store [[CAST_VALUE]] to [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[FAILURE_BB]]:
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB]]
+//
+// CHECK: } // end sil function 'term_nonossa_checked_cast_addr_br_copyonsuccess_caller'
+sil @term_nonossa_checked_cast_addr_br_copyonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @term_ossa_checked_cast_addr_br_copyonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

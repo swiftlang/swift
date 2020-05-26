@@ -158,10 +158,10 @@ func testRenamedUnknownEnum() {
 }
 
 func testRenamedTrueEnum() {
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumValue'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'TrueEnumValue' in scope
   _ = TrueEnumValue
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'TrueEnumValue'
+  // CHECK-DIAGS: [[@LINE+1]]:16: error: type 'TrueEnum' has no member 'TrueEnumValue'
   _ = TrueEnum.TrueEnumValue
 
   // CHECK-DIAGS: [[@LINE+1]]:16: error: 'Value' has been renamed to 'value'
@@ -169,17 +169,17 @@ func testRenamedTrueEnum() {
 
   _ = TrueEnum.value // okay
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'TrueEnumRenamed' in scope
   _ = TrueEnumRenamed
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'TrueEnumRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:16: error: type 'TrueEnum' has no member 'TrueEnumRenamed'
   _ = TrueEnum.TrueEnumRenamed
 
   // CHECK-DIAGS-5: [[@LINE+1]]:16: error: 'Renamed' has been renamed to 'renamedSwiftUnversioned'
   _ = TrueEnum.Renamed
   // CHECK-DIAGS-4: [[@LINE-1]]:16: error: 'Renamed' has been renamed to 'renamedSwift4'
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'renamed'
+  // CHECK-DIAGS: [[@LINE+1]]:16: error: type 'TrueEnum' has no member 'renamed'
   _ = TrueEnum.renamed
 
   // CHECK-DIAGS-5-NOT: :[[@LINE+1]]:16:
@@ -190,17 +190,17 @@ func testRenamedTrueEnum() {
   _ = TrueEnum.renamedSwift4
   // CHECK-DIAGS-4-NOT: :[[@LINE-1]]:16:
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumAliasRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'TrueEnumAliasRenamed' in scope
   _ = TrueEnumAliasRenamed
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'TrueEnumAliasRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:16: error: type 'TrueEnum' has no member 'TrueEnumAliasRenamed'
   _ = TrueEnum.TrueEnumAliasRenamed
 
   // CHECK-DIAGS-5: [[@LINE+1]]:16: error: 'AliasRenamed' has been renamed to 'aliasRenamedSwiftUnversioned'
   _ = TrueEnum.AliasRenamed
   // CHECK-DIAGS-4: [[@LINE-1]]:16: error: 'AliasRenamed' has been renamed to 'aliasRenamedSwift4'
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'aliasRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:16: error: type 'TrueEnum' has no member 'aliasRenamed'
   _ = TrueEnum.aliasRenamed
 
   // CHECK-DIAGS-5-NOT: :[[@LINE+1]]:16:
@@ -213,10 +213,10 @@ func testRenamedTrueEnum() {
 }
 
 func testRenamedOptionyEnum() {
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'OptionyEnumValue'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'OptionyEnumValue' in scope
   _ = OptionyEnumValue
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'OptionyEnum' has no member 'OptionyEnumValue'
+  // CHECK-DIAGS: [[@LINE+1]]:19: error: type 'OptionyEnum' has no member 'OptionyEnumValue'
   _ = OptionyEnum.OptionyEnumValue
 
   // CHECK-DIAGS: [[@LINE+1]]:19: error: 'Value' has been renamed to 'value'
@@ -224,17 +224,17 @@ func testRenamedOptionyEnum() {
 
   _ = OptionyEnum.value // okay
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'OptionyEnumRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'OptionyEnumRenamed' in scope
   _ = OptionyEnumRenamed
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'OptionyEnum' has no member 'OptionyEnumRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:19: error: type 'OptionyEnum' has no member 'OptionyEnumRenamed'
   _ = OptionyEnum.OptionyEnumRenamed
 
   // CHECK-DIAGS-5: [[@LINE+1]]:19: error: 'Renamed' has been renamed to 'renamedSwiftUnversioned'
   _ = OptionyEnum.Renamed
   // CHECK-DIAGS-4: [[@LINE-1]]:19: error: 'Renamed' has been renamed to 'renamedSwift4'
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'OptionyEnum' has no member 'renamed'
+  // CHECK-DIAGS: [[@LINE+1]]:19: error: type 'OptionyEnum' has no member 'renamed'
   _ = OptionyEnum.renamed
 
   // CHECK-DIAGS-5-NOT: :[[@LINE+1]]:19:
@@ -251,14 +251,14 @@ func testRenamedOptionyEnum() {
 #if !swift(>=5)
 
 func useSwift4Name(_: ImportantCStruct) {}
-// CHECK-SILGEN-4: sil hidden @$S9versioned13useSwift4NameyySo11SomeCStructVF
+// CHECK-SILGEN-4: sil hidden [ossa] @$s9versioned13useSwift4NameyySo11SomeCStructVF
 
 func useNewlyNested(_: InnerInSwift5) {}
-// CHECK-SILGEN-4: sil hidden @$S9versioned14useNewlyNestedyySo13InnerInSwift5VF
+// CHECK-SILGEN-4: sil hidden [ossa] @$s9versioned14useNewlyNestedyySo13InnerInSwift5VF
 #endif
 
 func useSwift5Name(_: VeryImportantCStruct) {}
-// CHECK-SILGEN: sil hidden @$S9versioned13useSwift5NameyySo11SomeCStructVF
+// CHECK-SILGEN: sil hidden [ossa] @$s9versioned13useSwift5NameyySo11SomeCStructVF
 
 
 

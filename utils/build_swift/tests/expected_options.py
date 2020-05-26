@@ -1,19 +1,20 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 import multiprocessing
 
-from swift_build_support.swift_build_support import host
-from swift_build_support.swift_build_support import targets
+from build_swift import argparse
+from build_swift import defaults
 
-from .. import argparse
-from .. import defaults
+from swift_build_support.swift_build_support import targets
 
 
 __all__ = [
@@ -45,8 +46,10 @@ EXPECTED_DEFAULTS = {
     'android_icu_i18n_include': None,
     'android_icu_uc': None,
     'android_icu_uc_include': None,
+    'android_icu_data': None,
     'android_ndk': None,
     'android_ndk_gcc_version': '4.9',
+    'android_arch': 'armv7',
     'assertions': True,
     'benchmark': False,
     'benchmark_num_o_iterations': 3,
@@ -54,6 +57,7 @@ EXPECTED_DEFAULTS = {
     'build_android': False,
     'build_args': [],
     'build_benchmarks': True,
+    'build_clang_tools_extra': True,
     'build_cygwin': True,
     'build_external_benchmarks': False,
     'build_foundation': False,
@@ -67,9 +71,11 @@ EXPECTED_DEFAULTS = {
     'build_linux': True,
     'build_llbuild': False,
     'build_lldb': False,
+    'build_libcxx': False,
     'build_ninja': False,
     'build_osx': True,
     'build_playgroundsupport': False,
+    'build_pythonkit': False,
     'build_runtime_with_host_compiler': False,
     'build_stdlib_deployment_targets': ['all'],
     'build_subdir': None,
@@ -79,6 +85,25 @@ EXPECTED_DEFAULTS = {
     'build_swift_static_stdlib': False,
     'build_swift_stdlib_unittest_extra': False,
     'build_swiftpm': False,
+    'build_swiftsyntax': False,
+    'build_tensorflow_swift_apis': False,
+    'build_libparser_only': False,
+    'build_skstresstester': False,
+    'build_swiftevolve': False,
+    'build_indexstoredb': False,
+    'test_indexstoredb_sanitize_all': False,
+    'test_sourcekitlsp_sanitize_all': False,
+    'build_sourcekitlsp': False,
+    'install_swiftpm': False,
+    'install_swiftsyntax': False,
+    'swiftsyntax_verify_generated_files': False,
+    'install_playgroundsupport': False,
+    'install_pythonkit': False,
+    'install_sourcekitlsp': False,
+    'install_skstresstester': False,
+    'install_swiftevolve': False,
+    'install_tensorflow_swift_apis': False,
+    'build_toolchainbenchmarks': False,
     'build_tvos': True,
     'build_tvos_device': False,
     'build_tvos_simulator': False,
@@ -87,6 +112,8 @@ EXPECTED_DEFAULTS = {
     'build_watchos_device': False,
     'build_watchos_simulator': False,
     'build_xctest': False,
+    'cmake_c_launcher': None,
+    'cmake_cxx_launcher': None,
     'clang_compiler_version': None,
     'clang_profile_instr_use': None,
     'clang_user_visible_version': defaults.CLANG_USER_VISIBLE_VERSION,
@@ -110,9 +137,9 @@ EXPECTED_DEFAULTS = {
     'distcc': False,
     'dry_run': False,
     'enable_asan': False,
+    'enable_experimental_differentiable_programming': True,
     'enable_lsan': False,
     'enable_sanitize_coverage': False,
-    'enable_sil_ownership': False,
     'disable_guaranteed_normal_arguments': False,
     'enable_stdlibcore_exclusivity_checking': False,
     'enable_tsan': False,
@@ -129,40 +156,51 @@ EXPECTED_DEFAULTS = {
     'host_lipo': None,
     'host_target': targets.StdlibDeploymentTarget.host_target().name,
     'host_test': False,
+    'only_executable_test': False,
+    'only_non_executable_test': False,
     'install_prefix': targets.install_prefix(),
     'install_symroot': None,
+    'install_destdir': None,
     'ios': False,
     'ios_all': False,
-    'legacy_impl': True,
+    'legacy_impl': False,
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
     'lit_args': '-sv',
     'llbuild_assertions': True,
     'lldb_assertions': True,
     'lldb_build_variant': 'Debug',
-    'lldb_build_with_xcode': '1',
+    'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
     'llvm_max_parallel_lto_link_jobs':
-        host.max_lto_link_job_counts()['llvm'],
+        defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
     'llvm_targets_to_build': 'X86;ARM;AArch64;PowerPC;SystemZ;Mips',
+    'tsan_libdispatch_test': False,
     'long_test': False,
     'lto_type': None,
+    'maccatalyst': False,
+    'maccatalyst_ios_tests': False,
+    'dump_config': False,
     'show_sdks': False,
     'skip_build': False,
+    'skip_local_build': False,
     'stdlib_deployment_targets': None,
     'stress_test': False,
     'swift_analyze_code_coverage': defaults.SWIFT_ANALYZE_CODE_COVERAGE,
     'swift_assertions': True,
     'swift_build_variant': 'Debug',
     'swift_compiler_version': None,
+    'swift_darwin_module_archs': None,
+    'swift_darwin_supported_archs': None,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_max_parallel_lto_link_jobs':
-        host.max_lto_link_job_counts()['swift'],
+        defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
     'symbols_package': None,
     'test': None,
+    'test_android': False,
     'test_android_host': False,
     'test_cygwin': False,
     'test_freebsd': False,
@@ -172,15 +210,25 @@ EXPECTED_DEFAULTS = {
     'test_ios_simulator': False,
     'test_linux': False,
     'test_optimize_for_size': None,
+    'test_optimize_none_with_implicit_dynamic': None,
     'test_optimized': None,
     'test_osx': False,
     'test_paths': [],
+    'test_pythonkit': False,
     'test_tvos': False,
     'test_tvos_host': False,
     'test_tvos_simulator': False,
     'test_watchos': False,
     'test_watchos_host': False,
     'test_watchos_simulator': False,
+    'test_playgroundsupport': True,
+    'test_swiftpm': False,
+    'test_swiftsyntax': False,
+    'test_indexstoredb': False,
+    'test_sourcekitlsp': False,
+    'test_skstresstester': False,
+    'test_swiftevolve': False,
+    'test_toolchainbenchmarks': False,
     'tvos': False,
     'tvos_all': False,
     'validation_test': None,
@@ -318,6 +366,14 @@ class IgnoreOption(_BaseOption):
     pass
 
 
+class BuildScriptImplOption(_BaseOption):
+    """Option that gets forwarded to build-script-impl by migration.py and is
+    only listed for disambiguation by argparse.
+    """
+
+    pass
+
+
 # -----------------------------------------------------------------------------
 
 EXPECTED_OPTIONS = [
@@ -366,10 +422,14 @@ EXPECTED_OPTIONS = [
     SetOption('-T', dest='validation_test', value=True),
     SetOption('-o', dest='test_optimized', value=True),
     SetOption('-s', dest='test_optimize_for_size', value=True),
+    SetOption('-y',
+              dest='test_optimize_none_with_implicit_dynamic', value=True),
     SetOption('-t', dest='test', value=True),
+    SetOption('-a', dest='assertions', value=True),
 
     # FIXME: Convert these options to set_false actions
     SetOption('--no-assertions', dest='assertions', value=False),
+    SetOption('-A', dest='assertions', value=False),
     SetOption('--no-lldb-assertions', dest='lldb_assertions', value=False),
     SetOption('--no-llvm-assertions', dest='llvm_assertions', value=False),
     SetOption('--no-llbuild-assertions',
@@ -384,16 +444,31 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),
-    SetTrueOption('--enable-sil-ownership'),
+    SetTrueOption('--dump-config'),
     SetTrueOption('--disable-guaranteed-normal-arguments'),
     SetTrueOption('--enable-stdlibcore-exclusivity-checking'),
     SetTrueOption('--force-optimized-typechecker'),
     SetTrueOption('--ios'),
     SetTrueOption('--llbuild', dest='build_llbuild'),
     SetTrueOption('--lldb', dest='build_lldb'),
+    SetTrueOption('--libcxx', dest='build_libcxx'),
+    SetTrueOption('--maccatalyst', dest='maccatalyst'),
+    SetTrueOption('--maccatalyst-ios-tests', dest='maccatalyst_ios_tests'),
     SetTrueOption('--playgroundsupport', dest='build_playgroundsupport'),
+    SetTrueOption('--pythonkit', dest='build_pythonkit'),
+    SetTrueOption('--install-playgroundsupport',
+                  dest='install_playgroundsupport'),
+    SetTrueOption('--install-pythonkit', dest='install_pythonkit'),
+    SetTrueOption('--test-pythonkit', dest='test_pythonkit'),
+    SetTrueOption('--tensorflow-swift-apis', dest='build_tensorflow_swift_apis'),
+    SetTrueOption('--install-tensorflow-swift-apis',
+                  dest='install_tensorflow_swift_apis'),
     SetTrueOption('--skip-build'),
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
+    SetTrueOption('--swiftsyntax', dest='build_swiftsyntax'),
+    SetTrueOption('--build-libparser-only', dest='build_libparser_only'),
+    SetTrueOption('--skstresstester', dest='build_skstresstester'),
+    SetTrueOption('--swiftevolve', dest='build_swiftevolve'),
     SetTrueOption('-B', dest='benchmark'),
     SetTrueOption('-S', dest='skip_build'),
     SetTrueOption('-b', dest='build_llbuild'),
@@ -403,7 +478,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('-n', dest='dry_run'),
     SetTrueOption('-p', dest='build_swiftpm'),
 
-    SetFalseOption('--no-legacy-impl', dest='legacy_impl'),
+    SetTrueOption('--legacy-impl', dest='legacy_impl'),
 
     EnableOption('--android'),
     EnableOption('--build-external-benchmarks'),
@@ -416,6 +491,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--build-swift-stdlib-unittest-extra'),
     EnableOption('--distcc'),
     EnableOption('--enable-asan'),
+    EnableOption('--enable-experimental-differentiable-programming'),
     EnableOption('--enable-lsan'),
     EnableOption('--enable-sanitize-coverage'),
     EnableOption('--enable-tsan'),
@@ -424,13 +500,32 @@ EXPECTED_OPTIONS = [
     EnableOption('--export-compile-commands'),
     EnableOption('--foundation', dest='build_foundation'),
     EnableOption('--host-test'),
+    EnableOption('--only-executable-test'),
+    EnableOption('--only-non-executable-test'),
     EnableOption('--libdispatch', dest='build_libdispatch'),
     EnableOption('--libicu', dest='build_libicu'),
+    EnableOption('--indexstore-db', dest='build_indexstoredb'),
+    EnableOption('--test-indexstore-db-sanitize-all',
+                 dest='test_indexstoredb_sanitize_all'),
+    EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
+    EnableOption('--test-sourcekit-lsp-sanitize-all',
+                 dest='test_sourcekitlsp_sanitize_all'),
+    EnableOption('--install-swiftsyntax', dest='install_swiftsyntax'),
+    EnableOption('--swiftsyntax-verify-generated-files',
+                 dest='swiftsyntax_verify_generated_files'),
+    EnableOption('--install-swiftpm', dest='install_swiftpm'),
+    EnableOption('--install-sourcekit-lsp', dest='install_sourcekitlsp'),
+    EnableOption('--install-skstresstester', dest='install_skstresstester'),
+    EnableOption('--install-swiftevolve', dest='install_swiftevolve'),
+    EnableOption('--toolchain-benchmarks', dest='build_toolchainbenchmarks'),
+    EnableOption('--tsan-libdispatch-test'),
     EnableOption('--long-test'),
     EnableOption('--show-sdks'),
+    EnableOption('--skip-local-build'),
     EnableOption('--stress-test'),
     EnableOption('--test'),
     EnableOption('--test-optimize-for-size'),
+    EnableOption('--test-optimize-none-with-implicit-dynamic'),
     EnableOption('--test-optimized'),
     EnableOption('--tvos'),
     EnableOption('--validation-test'),
@@ -457,6 +552,7 @@ EXPECTED_OPTIONS = [
                   dest='build_watchos_device'),
     DisableOption('--skip-build-watchos-simulator',
                   dest='build_watchos_simulator'),
+    DisableOption('--skip-test-android', dest='test_android'),
     DisableOption('--skip-test-android-host', dest='test_android_host'),
     DisableOption('--skip-test-cygwin', dest='test_cygwin'),
     DisableOption('--skip-test-freebsd', dest='test_freebsd'),
@@ -475,6 +571,18 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-watchos-host', dest='test_watchos_host'),
     DisableOption('--skip-test-watchos-simulator',
                   dest='test_watchos_simulator'),
+    DisableOption('--skip-test-playgroundsupport',
+                  dest='test_playgroundsupport'),
+    DisableOption('--skip-test-swiftpm', dest='test_swiftpm'),
+    DisableOption('--skip-test-swiftsyntax', dest='test_swiftsyntax'),
+    DisableOption('--skip-test-indexstore-db', dest='test_indexstoredb'),
+    DisableOption('--skip-test-sourcekit-lsp', dest='test_sourcekitlsp'),
+    DisableOption('--skip-test-skstresstester', dest='test_skstresstester'),
+    DisableOption('--skip-test-swiftevolve', dest='test_swiftevolve'),
+    DisableOption('--skip-test-toolchain-benchmarks',
+                  dest='test_toolchainbenchmarks'),
+    DisableOption('--skip-build-clang-tools-extra',
+                  dest='build_clang_tools_extra'),
 
     ChoicesOption('--android-ndk-gcc-version',
                   choices=['4.8', '4.9']),
@@ -482,6 +590,8 @@ EXPECTED_OPTIONS = [
                   choices=['none', 'apple']),
     ChoicesOption('--swift-analyze-code-coverage',
                   choices=['false', 'not-merged', 'merged']),
+    ChoicesOption('--android-arch',
+                  choices=['armv7', 'aarch64']),
 
     StrOption('--android-api-level'),
     StrOption('--build-args'),
@@ -494,12 +604,16 @@ EXPECTED_OPTIONS = [
     StrOption('--host-target'),
     StrOption('--lit-args'),
     StrOption('--llvm-targets-to-build'),
+    StrOption('--stdlib-deployment-targets'),
+    StrOption('--swift-darwin-module-archs'),
+    StrOption('--swift-darwin-supported-archs'),
 
     PathOption('--android-deploy-device-path'),
     PathOption('--android-icu-i18n'),
     PathOption('--android-icu-i18n-include'),
     PathOption('--android-icu-uc'),
     PathOption('--android-icu-uc-include'),
+    PathOption('--android-icu-data'),
     PathOption('--android-ndk'),
     PathOption('--build-subdir'),
     PathOption('--clang-profile-instr-use'),
@@ -511,7 +625,10 @@ EXPECTED_OPTIONS = [
     PathOption('--host-lipo'),
     PathOption('--install-prefix'),
     PathOption('--install-symroot'),
+    PathOption('--install-destdir'),
     PathOption('--symbols-package'),
+    PathOption('--cmake-c-launcher'),
+    PathOption('--cmake-cxx-launcher'),
 
     IntOption('--benchmark-num-o-iterations'),
     IntOption('--benchmark-num-onone-iterations'),
@@ -523,14 +640,18 @@ EXPECTED_OPTIONS = [
     AppendOption('--cross-compile-hosts'),
     AppendOption('--extra-cmake-options'),
     AppendOption('--extra-swift-args'),
-    AppendOption('--stdlib-deployment-targets'),
     AppendOption('--test-paths'),
 
     UnsupportedOption('--build-jobs'),
     UnsupportedOption('--common-cmake-options'),
     UnsupportedOption('--only-execute'),
     UnsupportedOption('--skip-test-optimize-for-size'),
+    UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
+
+    # Options forwared to build-script-impl
+    BuildScriptImplOption('--skip-test-swift', dest='impl_skip_test_swift'),
+    BuildScriptImplOption('--install-swift', dest='impl_install_swift'),
 
     # NOTE: LTO flag is a special case that acts both as an option and has
     # valid choices

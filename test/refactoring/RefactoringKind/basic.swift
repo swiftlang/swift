@@ -262,12 +262,89 @@ func testConvertToTernaryExpr() {
   }
 }
 
+func testConvertToGuardExpr(idxOpt: Int?) {
+  if let idx = idxOpt {
+    print(idx)
+  }
+}
+
+func testConvertToIfLetExpr(idxOpt: Int?) {
+  guard let idx = idxOpt else {
+    return
+  }
+  print(idx)
+}
+
+@propertyWrapper
+struct TwelveOrLess {
+    private var number = 0
+    var wrappedValue: Int {
+        get { return number }
+        set { number = min(newValue, 12) }
+    }
+}
+
+struct S {
+  var field = 2
+  let (x, y) = (2, 4)
+  @TwelveOrLess var height: Int
+  lazy var z = 42
+  var totalSteps: Int = 0 {
+      willSet(newTotalSteps) {
+          print("About to set totalSteps to \(newTotalSteps)")
+      }
+  }
+}
+
+class TestAddEquatable {
+    var property = "test"
+    private var prop = "test2"
+    let pr = "test3"
+}
+
+struct TestAddEquatableStruct {
+    var property = "test"
+    private var prop = "test2"
+    let pr = "test3"
+}
+
+enum AddEquatableEnum {
+    case first
+    case second
+}
+
+class TestAddEquatableConforming: Equatable {
+    var property = "test"
+
+    public static func ==(lhs: TestAddEquatableConforming,
+                          rhs: TestAddEquatableConforming) -> Bool {
+        return lhs.property == rhs.property
+    }
+}
+
+struct TestAddEquatableStructConforming: Equatable {
+    var property = "test"
+}
+
+extension TestAddEquatable {
+    func test() -> Bool {
+        return false
+    }
+}
+
+extension TestAddEquatableStructConforming: Equatable {
+    public static func ==(lhs: TestAddEquatableConforming,
+                          rhs: TestAddEquatableConforming) -> Bool {
+        return lhs.property == rhs.property
+    }
+}
+
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=5:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 
-// RUN: %refactor -source-filename %s -pos=2:1 -end-pos=2:18 | %FileCheck %s -check-prefix=CHECK2
+// RUN: %refactor -source-filename %s -pos=2:1 -end-pos=2:18 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=3:16 | %FileCheck %s -check-prefix=CHECK2
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=4:26 | %FileCheck %s -check-prefix=CHECK2
 
@@ -295,7 +372,7 @@ func testConvertToTernaryExpr() {
 // RUN: %refactor -source-filename %s -pos=68:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=69:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
-// RUN: %refactor -source-filename %s -pos=70:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
+// RUN: %refactor -source-filename %s -pos=70:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 // RUN: %refactor -source-filename %s -pos=74:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
 
 // RUN: %refactor -source-filename %s -pos=79:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
@@ -307,7 +384,7 @@ func testConvertToTernaryExpr() {
 // RUN: %refactor -source-filename %s -pos=91:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=95:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
-// RUN: %refactor -source-filename %s -pos=96:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
+// RUN: %refactor -source-filename %s -pos=96:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 // RUN: %refactor -source-filename %s -pos=100:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=104:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
@@ -353,7 +430,23 @@ func testConvertToTernaryExpr() {
 
 // RUN: %refactor -source-filename %s -pos=251:3 -end-pos=251:24 | %FileCheck %s -check-prefix=CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION
 
-// RUN: %refactor -source-filename %s -pos=257:3 -end-pos=262:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION
+// RUN: %refactor -source-filename %s -pos=266:3 -end-pos=268:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-GUARD-EXPRESSION
+
+// RUN: %refactor -source-filename %s -pos=272:3 -end-pos=275:13 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-IFLET-EXPRESSION
+
+// RUN: %refactor -source-filename %s -pos=288:3 -end-pos=288:16 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-COMPUTED-PROPERTY
+// RUN: %refactor -source-filename %s -pos=289:3 -end-pos=289:22 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
+// RUN: %refactor -source-filename %s -pos=290:3 -end-pos=290:32 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
+// RUN: %refactor -source-filename %s -pos=291:3 -end-pos=291:18 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
+// RUN: %refactor -source-filename %s -pos=292:3 -end-pos=296:4 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
+
+// RUN: %refactor -source-filename %s -pos=299:16 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE
+// RUN: %refactor -source-filename %s -pos=305:12 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE
+// RUN: %refactor -source-filename %s -pos=311:9 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED
+// RUN: %refactor -source-filename %s -pos=316:11 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED
+// RUN: %refactor -source-filename %s -pos=325:12 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED
+// RUN: %refactor -source-filename %s -pos=329:15 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE
+// RUN: %refactor -source-filename %s -pos=335:15 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
@@ -401,3 +494,19 @@ func testConvertToTernaryExpr() {
 // CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION: Expand Ternary Expression
 
 // CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION: Convert To Ternary Expression
+
+// CHECK-CONVERT-TO-GUARD-EXPRESSION: Convert To Guard Expression
+
+// CHECK-CONVERT-TO-IFLET-EXPRESSION: Convert To IfLet Expression
+
+// CHECK-CONVERT-TO-COMPUTED-PROPERTY: Convert To Computed Property
+
+// CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY: Action begins
+// CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY-NOT: Convert To Computed Property
+// CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY: Action ends
+
+// CHECK-ADD-EQUATABLE-CONFORMANCE: Add Equatable Conformance
+
+// CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED: Action begins
+// CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED-NOT: Add Equatable Conformance
+// CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED: Action ends

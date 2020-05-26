@@ -28,6 +28,7 @@ The protocol is documented in the following format:
 | [Module interface generation](#module-interface-generation) | source.request.editor.open.interface |
 | [Indexing](#indexing) | source.request.indexsource  |
 | [Protocol Version](#protocol-version) | source.request.protocol_version |
+| [Compiler Version](#compiler-version) | source.request.compiler_version |
 
 
 # Requests
@@ -417,6 +418,7 @@ of diagnostic entries. A diagnostic entry has this format:
     [opts] <key.fixits>:    (array) [fixit+] // one or more entries for fixits
     [opts] <key.ranges>:    (array) [range+] // one or more entries for ranges
     [opts] <key.diagnostics>: (array) [diagnostic+] // one or more sub-diagnostic entries
+    [opts] <key.educational_note_paths>: (array) [string+] // one or more absolute paths of educational notes, formatted as Markdown
 }
 ```
 
@@ -615,6 +617,45 @@ Welcome to SourceKit.  Type ':help' for assistance.
 }
 ```
 
+## Compiler Version
+
+SourceKit can provide information about the version of the compiler version that is being used.
+
+### Request
+
+```
+{
+    <key.request>: (UID) <source.request.compiler_version>
+}
+```
+
+### Response
+
+```
+{
+    <key.version_major>: (int64) // The major version number in a version string
+    <key.version_minor>: (int64) // The minor version number in a version string
+    <key.version_patch>: (int64) // The patch version number in a version string
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=compiler-version
+```
+
+or
+
+```
+$ sourcekitd-repl
+Welcome to SourceKit.  Type ':help' for assistance.
+(SourceKit) {
+    key.request: source.request.compiler_version
+}
+```
+
+
 ## Cursor Info
 
 SourceKit is capable of providing information about a specific symbol at a specific cursor, or offset, position in a document.
@@ -697,7 +738,48 @@ Welcome to SourceKit.  Type ':help' for assistance.
 }
 ```
 
+## Expression Type
+This request collects the types of all expressions in a source file after type checking.
+To fulfill this task, the client must provide the path to the Swift source file under
+type checking and the necessary compiler arguments to help resolve all dependencies.
 
+### Request
+
+```
+{
+    <key.request>:            (UID)     <source.request.expression.type>,
+    <key.sourcefile>:         (string)  // Absolute path to the file.
+    <key.compilerargs>:       [string*] // Array of zero or more strings for the compiler arguments,
+                                        // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                        // these must include the path to that file.
+    <key.expectedtypes>:      [string*] // A list of interested protocol USRs.
+                                        // When empty, we report all expressions in the file.
+                                        // When non-empty, we report expressions whose types conform to any of the give protocols.
+}
+```
+
+### Response
+```
+{
+    <key.expression_type_list>:       (array) [expr-type-info*]   // A list of expression and type
+}
+```
+
+```
+expr-type-info ::=
+{
+  <key.expression_offset>:    (int64)    // Offset of an expression in the source file
+  <key.expression_length>:    (int64)    // Length of an expression in the source file
+  <key.expression_type>:      (string)   // Printed type of this expression
+  <key.expectedtypes>:        [string*]  // A list of interested protocol USRs this expression conforms to
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=collect-type /path/to/file.swift -- /path/to/file.swift
+```
 
 # UIDs
 

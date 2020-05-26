@@ -5,7 +5,7 @@
 }
 
 class Conforms : Opt {
-  private func f(callback: () -> ()) {} // expected-note {{'f' declared here}}
+  private func f(callback: () -> ()) {} // expected-note {{'f(callback:)' declared here}}
 }
 
 func g(x: Conforms) {

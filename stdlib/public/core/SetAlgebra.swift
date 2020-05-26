@@ -52,7 +52,7 @@
 /// - `x.isStrictSuperset(of: y)` if and only if
 ///   `x.isSuperset(of: y) && x != y`
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
-public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {  
+public protocol SetAlgebra: Equatable, ExpressibleByArrayLiteral {
   /// A type for which the conforming type provides a containment test.
   associatedtype Element
   
@@ -137,7 +137,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   /// - Note: if this set and `other` contain elements that are equal but
   ///   distinguishable (e.g. via `===`), which of these elements is present
   ///   in the result is unspecified.
-  __consuming func intersection(_ other: __owned Self) -> Self
+  __consuming func intersection(_ other: Self) -> Self
 
   /// Returns a new set with the elements that are either in this set or in the
   /// given set, but not in both.
@@ -202,7 +202,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   /// - Parameter member: The element of the set to remove.
   /// - Returns: For ordinary sets, an element equal to `member` if `member` is
   ///   contained in the set; otherwise, `nil`. In some cases, a returned
-  ///   element may be distinguishable from `newMember` by identity comparison
+  ///   element may be distinguishable from `member` by identity comparison
   ///   or some other means.
   ///
   ///   For sets where the set type and element type are the same, like
@@ -273,7 +273,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///     // Prints "["Bethany", "Eric"]"
   ///
   /// - Parameter other: A set of the same type as the current set.
-  mutating func formIntersection(_ other: __owned Self)
+  mutating func formIntersection(_ other: Self)
 
   /// Removes the elements of the set that are also in the given set and adds
   /// the members of the given set that are not already in the set.
@@ -370,7 +370,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///     // Prints "[6, 0, 1, 3]"
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
-  init<S : Sequence>(_ sequence: __owned S) where S.Element == Element
+  init<S: Sequence>(_ sequence: __owned S) where S.Element == Element
 
   /// Removes the elements of the given set from this set.
   ///
@@ -406,7 +406,7 @@ extension SetAlgebra {
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
   @inlinable // protocol-only
-  public init<S : Sequence>(_ sequence: S)
+  public init<S: Sequence>(_ sequence: __owned S)
     where S.Element == Element {
     self.init()
     for e in sequence { insert(e) }
@@ -494,7 +494,7 @@ extension SetAlgebra {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     let nonNeighbors = employees.subtract(neighbors)
+  ///     let nonNeighbors = employees.subtracting(neighbors)
   ///     print(nonNeighbors)
   ///     // Prints "["Diana", "Chris", "Alicia"]"
   ///

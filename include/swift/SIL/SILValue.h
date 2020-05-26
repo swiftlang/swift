@@ -19,6 +19,7 @@
 
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -55,36 +56,48 @@ static inline llvm::hash_code hash_value(ValueKind K) {
   return llvm::hash_value(size_t(K));
 }
 
+/// What constraint does the given use of an SSA value put on the lifetime of
+/// the given SSA value.
+///
+/// There are two possible constraints: MustBeLive and
+/// MustBeInvalidated. MustBeLive means that the SSA value must be able to be
+/// used in a valid way at the given use point. MustBeInvalidated means that any
+/// use of given SSA value after this instruction on any path through this
+/// instruction.
+enum class UseLifetimeConstraint {
+  /// This use requires the SSA value to be live after the given instruction's
+  /// execution.
+  MustBeLive,
+
+  /// This use invalidates the given SSA value.
+  ///
+  /// This means that the given SSA value can not have any uses that are
+  /// reachable from this instruction. When a value has owned semantics this
+  /// means the SSA value is destroyed at this point. When a value has
+  /// guaranteed (i.e. shared borrow) semantics this means that the program
+  /// has left the scope of the borrowed SSA value and said value can not be
+  /// used.
+  MustBeInvalidated,
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              UseLifetimeConstraint constraint);
+
 /// A value representing the specific ownership semantics that a SILValue may
 /// have.
 struct ValueOwnershipKind {
   enum innerty : uint8_t {
-    /// A SILValue with Trivial ownership kind is an independent value that can
-    /// not be owned. Ownership does not place any constraints on how a SILValue
-    /// with Trivial ownership kind can be used. Other side effects (e.g. Memory
-    /// dependencies) must still be respected. A SILValue with Trivial ownership
-    /// kind must be of Trivial SILType (i.e. SILType::isTrivial(SILModule &)
-    /// must
-    /// return true).
-    ///
-    /// Some examples of SIL types with Trivial ownership are: Builtin.Int32,
-    /// Builtin.RawPointer, aggregates containing all trivial types.
-    Trivial,
-
     /// A SILValue with `Unowned` ownership kind is an independent value that
-    /// has
-    /// a lifetime that is only guaranteed to last until the next program
-    /// visible
-    /// side-effect. To maintain the lifetime of an unowned value, it must be
-    /// converted to an owned representation via a copy_value.
+    /// has a lifetime that is only guaranteed to last until the next program
+    /// visible side-effect. To maintain the lifetime of an unowned value, it
+    /// must be converted to an owned representation via a copy_value.
     ///
     /// Unowned ownership kind occurs mainly along method/function boundaries in
     /// between Swift and Objective-C code.
     Unowned,
 
     /// A SILValue with `Owned` ownership kind is an independent value that has
-    /// an
-    /// ownership independent of any other ownership imbued within it. The
+    /// an ownership independent of any other ownership imbued within it. The
     /// SILValue must be paired with a consuming operation that ends the SSA
     /// value's lifetime exactly once along all paths through the program.
     Owned,
@@ -104,14 +117,14 @@ struct ValueOwnershipKind {
     /// instruction exactly once along any path through the program.
     Guaranteed,
 
-    /// A SILValue with undefined ownership. It can pair with /Any/ ownership
-    /// kinds . This means that it could take on /any/ ownership semantics. This
-    /// is meant only to model SILUndef and to express certain situations where
-    /// we
-    /// use unqualified ownership. Expected to tighten over time.
-    Any,
+    /// A SILValue with None ownership kind is an independent value outside of
+    /// the ownership system. It is used to model trivially typed values as well
+    /// as trivial cases of non-trivial enums. Naturally None can be merged with
+    /// any ValueOwnershipKind allowing us to naturally model merge and branch
+    /// points in the SSA graph.
+    None,
 
-    LastValueOwnershipKind = Any,
+    LastValueOwnershipKind = None,
   } Value;
 
   using UnderlyingType = std::underlying_type<innerty>::type;
@@ -123,8 +136,8 @@ struct ValueOwnershipKind {
                 "ownership value?!");
 
   ValueOwnershipKind(innerty NewValue) : Value(NewValue) {}
-  ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
-  ValueOwnershipKind(SILModule &M, SILType Type,
+  explicit ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
+  ValueOwnershipKind(const SILFunction &F, SILType Type,
                      SILArgumentConvention Convention);
 
   /// Parse Value into a ValueOwnershipKind.
@@ -134,35 +147,58 @@ struct ValueOwnershipKind {
 
   operator innerty() const { return Value; }
 
-  Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
-
-  bool isTrivialOr(ValueOwnershipKind Kind) const {
-    return Value == Trivial || Value == Kind;
+  bool operator==(const swift::ValueOwnershipKind::innerty& b) {
+    return Value == b;
   }
+
+  Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
 
   /// Given that there is an aggregate value (like a struct or enum) with this
   /// ownership kind, and a subobject of type Proj is being projected from the
   /// aggregate, return Trivial if Proj has trivial type and the aggregate's
   /// ownership kind otherwise.
-  ValueOwnershipKind getProjectedOwnershipKind(SILModule &M,
+  ValueOwnershipKind getProjectedOwnershipKind(const SILFunction &F,
                                                SILType Proj) const;
+
+  /// Return the lifetime constraint semantics for this
+  /// ValueOwnershipKind when forwarding ownership.
+  ///
+  /// This is MustBeInvalidated for Owned and MustBeLive for all other ownership
+  /// kinds.
+  UseLifetimeConstraint getForwardingLifetimeConstraint() const {
+    switch (Value) {
+    case ValueOwnershipKind::None:
+    case ValueOwnershipKind::Guaranteed:
+    case ValueOwnershipKind::Unowned:
+      return UseLifetimeConstraint::MustBeLive;
+    case ValueOwnershipKind::Owned:
+      return UseLifetimeConstraint::MustBeInvalidated;
+    }
+    llvm_unreachable("covered switch");
+  }
 
   /// Returns true if \p Other can be merged successfully with this, implying
   /// that the two ownership kinds are "compatibile".
   ///
   /// The reason why we do not compare directy is to allow for
-  /// ValueOwnershipKind::Any to merge into other forms of ValueOwnershipKind.
+  /// ValueOwnershipKind::None to merge into other forms of ValueOwnershipKind.
   bool isCompatibleWith(ValueOwnershipKind other) const {
     return merge(other).hasValue();
   }
 
-  /// Returns true if \p Other is compatible with ValueOwnershipKind::Trivial or
-  /// this. See isCompatibleWith for more information on what "compatibility"
-  /// means.
-  bool isTrivialOrCompatibleWith(ValueOwnershipKind other) const {
-    return isCompatibleWith(ValueOwnershipKind::Trivial) ||
-           isCompatibleWith(other);
+  template <typename RangeTy>
+  static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
+    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::None);
+    return accumulate(
+        std::forward<RangeTy>(r), initial,
+        [](Optional<ValueOwnershipKind> acc, ValueOwnershipKind x) {
+          if (!acc)
+            return acc;
+          return acc.getValue().merge(x);
+        });
   }
+
+  StringRef asString() const;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);
@@ -204,7 +240,7 @@ public:
   /// results. To replace just one result use SILValue::replaceAllUsesWith.
   void replaceAllUsesWith(ValueBase *RHS);
 
-  /// \brief Replace all uses of this instruction with an undef value of the
+  /// Replace all uses of this instruction with an undef value of the
   /// same type as the result of this instruction.
   void replaceAllUsesWithUndef();
 
@@ -236,8 +272,42 @@ public:
   /// otherwise.
   inline Operand *getSingleUse() const;
 
+  /// Returns .some(single user) if this value is non-trivial, we are in ossa,
+  /// and it has a single consuming user. Returns .none otherwise.
+  inline Operand *getSingleConsumingUse() const;
+
   template <class T>
-  inline T *getSingleUserOfType();
+  inline T *getSingleUserOfType() const;
+
+  template <class T> inline T *getSingleConsumingUserOfType() const;
+
+  /// Returns true if this operand has exactly two.
+  ///
+  /// This is useful if one has found a predefined set of 2 unique users and
+  /// wants to check if there are any other users without iterating over the
+  /// entire use list.
+  inline bool hasTwoUses() const;
+
+  /// Helper struct for DowncastUserFilterRange
+  struct UseToUser;
+
+  template <typename Subclass>
+  using DowncastUserFilterRange =
+      DowncastFilterRange<Subclass,
+                          iterator_range<llvm::mapped_iterator<
+                              use_iterator, UseToUser, SILInstruction *>>>;
+
+  /// Iterate over the use list of this ValueBase visiting all users that are of
+  /// class T.
+  ///
+  /// Example:
+  ///
+  ///   ValueBase *v = ...;
+  ///   for (CopyValueInst *cvi : v->getUsersOfType<CopyValueInst>()) { ... }
+  ///
+  /// NOTE: Uses llvm::dyn_cast internally.
+  template <typename T>
+  inline DowncastUserFilterRange<T> getUsersOfType() const;
 
   /// Return the instruction that defines this value, or null if it is
   /// not defined by an instruction.
@@ -245,6 +315,18 @@ public:
     return const_cast<ValueBase*>(this)->getDefiningInstruction();
   }
   SILInstruction *getDefiningInstruction();
+
+  /// Return the SIL instruction that can be used to describe the first time
+  /// this value is available.
+  ///
+  /// For instruction results, this returns getDefiningInstruction(). For
+  /// arguments, this returns SILBasicBlock::begin() for the argument's parent
+  /// block. Returns nullptr for SILUndef.
+  const SILInstruction *getDefiningInsertionPoint() const {
+    return const_cast<ValueBase *>(this)->getDefiningInsertionPoint();
+  }
+
+  SILInstruction *getDefiningInsertionPoint();
 
   struct DefiningInstructionResult {
     SILInstruction *Instruction;
@@ -330,18 +412,174 @@ public:
           NumLowBitsAvailable
   };
 
+  /// If this SILValue is a result of an instruction, return its
+  /// defining instruction. Returns nullptr otherwise.
+  SILInstruction *getDefiningInstruction() {
+    return Value->getDefiningInstruction();
+  }
+
+  /// If this SILValue is a result of an instruction, return its
+  /// defining instruction. Returns nullptr otherwise.
+  const SILInstruction *getDefiningInstruction() const {
+    return Value->getDefiningInstruction();
+  }
+
   /// Returns the ValueOwnershipKind that describes this SILValue's ownership
   /// semantics if the SILValue has ownership semantics. Returns is a value
   /// without any Ownership Semantics.
   ///
   /// An example of a SILValue without ownership semantics is a
   /// struct_element_addr.
+  ///
+  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ValueOwnershipKind getOwnershipKind() const;
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  void verifyOwnership(SILModule &Mod,
-                       DeadEndBlocks *DEBlocks = nullptr) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks = nullptr) const;
 };
+
+/// A map from a ValueOwnershipKind that an operand can accept to a
+/// UseLifetimeConstraint that describes the effect that the operand's use has
+/// on the underlying value. If a ValueOwnershipKind is not in this map then
+/// matching an operand with the value results in an ill formed program.
+///
+/// So for instance, a map could specify that if a value is used as an owned
+/// parameter, then the use implies that the original value is destroyed at that
+/// point. In contrast, if the value is used as a guaranteed parameter, then the
+/// liveness constraint just requires that the value remains alive at the use
+/// point.
+struct OperandOwnershipKindMap {
+  // One bit for if a value exists and if the value exists, what the
+  // ownership constraint is. These are stored as pairs.
+  //
+  // NOTE: We are burning 1 bit per unset value. But this is without
+  // matter since we are always going to need less bits than 64, so we
+  // should always have a small case SmallBitVector, so there is no
+  // difference in size.
+  static constexpr unsigned NUM_DATA_BITS =
+      2 * (unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1);
+
+  /// A bit vector representing our "map". Given a ValueOwnershipKind k, if the
+  /// operand can accept k, the unsigned(k)*2 bit will be set to true. Assuming
+  /// that bit is set, the unsigned(k)*2+1 bit is set to the use lifetime
+  /// constraint provided by the value.
+  SmallBitVector data;
+
+  OperandOwnershipKindMap() : data(NUM_DATA_BITS) {}
+  OperandOwnershipKindMap(ValueOwnershipKind kind,
+                          UseLifetimeConstraint constraint)
+      : data(NUM_DATA_BITS) {
+    add(kind, constraint);
+  }
+
+  /// Return the OperandOwnershipKindMap that tests for compatibility with
+  /// ValueOwnershipKind kind. This means that it will accept a element whose
+  /// ownership is ValueOwnershipKind::None.
+  static OperandOwnershipKindMap
+  compatibilityMap(ValueOwnershipKind kind, UseLifetimeConstraint constraint) {
+    OperandOwnershipKindMap set;
+    set.addCompatibilityConstraint(kind, constraint);
+    return set;
+  }
+
+  /// Return a map that is compatible with any and all ValueOwnershipKinds
+  /// except for \p kind.
+  static OperandOwnershipKindMap
+  compatibleWithAllExcept(ValueOwnershipKind kind) {
+    OperandOwnershipKindMap map;
+    unsigned index = 0;
+    unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
+    for (; index != end; ++index) {
+      if (ValueOwnershipKind(index) == kind) {
+        continue;
+      }
+      map.add(ValueOwnershipKind(index), UseLifetimeConstraint::MustBeLive);
+    }
+    return map;
+  }
+
+  /// Create a map that has compatibility constraints for each of the
+  /// ValueOwnershipKind, UseLifetimeConstraints in \p args.
+  static OperandOwnershipKindMap
+  compatibilityMap(std::initializer_list<
+                   std::pair<ValueOwnershipKind, UseLifetimeConstraint>>
+                       args) {
+    OperandOwnershipKindMap map;
+    for (auto &p : args) {
+      map.addCompatibilityConstraint(p.first, p.second);
+    }
+    return map;
+  }
+
+  /// Return a map that states that an operand can take any ownership with each
+  /// ownership having a must be live constraint.
+  static OperandOwnershipKindMap allLive() {
+    OperandOwnershipKindMap map;
+    unsigned index = 0;
+    unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
+    while (index != end) {
+      map.add(ValueOwnershipKind(index), UseLifetimeConstraint::MustBeLive);
+      ++index;
+    }
+    return map;
+  }
+
+  /// Specify that the operand associated with this set can accept a value with
+  /// ValueOwnershipKind \p kind. The value provided by the operand will have a
+  /// new ownership enforced constraint defined by \p constraint.
+  void add(ValueOwnershipKind kind, UseLifetimeConstraint constraint) {
+    unsigned index = unsigned(kind);
+    unsigned kindOffset = index * 2;
+    unsigned constraintOffset = index * 2 + 1;
+
+    // If we have already put this kind into the map, we require the constraint
+    // offset to be the same, i.e. we only allow for a kind to be added twice if
+    // the constraint is idempotent. We assert otherwise.
+    assert((!data[kindOffset] || UseLifetimeConstraint(bool(
+                                     data[constraintOffset])) == constraint) &&
+           "Adding kind twice to the map with different constraints?!");
+    data[kindOffset] = true;
+    data[constraintOffset] = bool(constraint);
+  }
+
+  void addCompatibilityConstraint(ValueOwnershipKind kind,
+                                  UseLifetimeConstraint constraint) {
+    add(ValueOwnershipKind::None, UseLifetimeConstraint::MustBeLive);
+    add(kind, constraint);
+  }
+
+  bool canAcceptKind(ValueOwnershipKind kind) const {
+    unsigned index = unsigned(kind);
+    unsigned kindOffset = index * 2;
+    return data[kindOffset];
+  }
+
+  UseLifetimeConstraint getLifetimeConstraint(ValueOwnershipKind kind) const;
+
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
+};
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     OperandOwnershipKindMap map) {
+  map.print(os);
+  return os;
+}
+
+// Out of line to work around lack of forward declaration for operator <<.
+inline UseLifetimeConstraint
+OperandOwnershipKindMap::getLifetimeConstraint(ValueOwnershipKind kind) const {
+#ifndef NDEBUG
+  if (!canAcceptKind(kind)) {
+    llvm::errs() << "Can not lookup lifetime constraint: " << kind
+                 << ". Not in map!\n"
+                 << *this;
+    llvm_unreachable("standard error assertion");
+  }
+#endif
+  unsigned constraintOffset = unsigned(kind) * 2 + 1;
+  return UseLifetimeConstraint(data[constraintOffset]);
+}
 
 /// A formal SIL reference to a value, suitable for use as a stored
 /// operand.
@@ -373,6 +611,9 @@ public:
   Operand(const Operand &use) = delete;
   Operand &operator=(const Operand &use) = delete;
 
+  Operand(Operand &&) = default;
+  Operand &operator=(Operand &&) = default;
+
   /// Return the current value being used by this operand.
   SILValue get() const { return TheValue; }
 
@@ -392,7 +633,7 @@ public:
     set(OtherV);
   }
 
-  /// \brief Remove this use of the operand.
+  /// Remove this use of the operand.
   void drop() {
     removeFromCurrent();
     TheValue = SILValue();
@@ -409,9 +650,39 @@ public:
   SILInstruction *getUser() { return Owner; }
   const SILInstruction *getUser() const { return Owner; }
 
-  /// getOperandNumber - Return which operand this is in the operand list of the
-  /// using instruction.
+  /// Return true if this operand is a type dependent operand.
+  ///
+  /// Implemented in SILInstruction.h
+  bool isTypeDependent() const;
+
+  /// Return which operand this is in the operand list of the using instruction.
   unsigned getOperandNumber() const;
+
+  /// Return the static map of ValueOwnershipKinds that this operand can
+  /// potentially have to the UseLifetimeConstraint associated with that
+  /// ownership kind
+  ///
+  /// NOTE: This is implemented in OperandOwnershipKindMapClassifier.cpp.
+  ///
+  /// NOTE: The default argument isSubValue is a temporary staging flag that
+  /// will be removed once borrow scoping is checked by the normal verifier.
+  OperandOwnershipKindMap
+  getOwnershipKindMap(bool isForwardingSubValue = false) const;
+
+  /// Returns true if this operand acts as a use that consumes its associated
+  /// value.
+  bool isConsumingUse() const {
+    // Type dependent uses can never be consuming and do not have valid
+    // ownership maps since they do not participate in the ownership system.
+    if (isTypeDependent())
+      return false;
+    auto map = getOwnershipKindMap();
+    auto constraint = map.getLifetimeConstraint(get().getOwnershipKind());
+    return constraint == UseLifetimeConstraint::MustBeInvalidated;
+  }
+
+  SILBasicBlock *getParentBlock() const;
+  SILFunction *getParentFunction() const;
 
 private:
   void removeFromCurrent() {
@@ -509,17 +780,67 @@ inline Operand *ValueBase::getSingleUse() const {
   return Op;
 }
 
-template <class T>
-inline T *ValueBase::getSingleUserOfType() {
-  T *Result = nullptr;
-  for (auto *Op : getUses()) {
-    if (auto *Tmp = dyn_cast<T>(Op->getUser())) {
-      if (Result)
+inline Operand *ValueBase::getSingleConsumingUse() const {
+  Operand *result = nullptr;
+  for (auto *op : getUses()) {
+    if (op->isConsumingUse()) {
+      if (result) {
         return nullptr;
-      Result = Tmp;
+      }
+      result = op;
     }
   }
-  return Result;
+  return result;
+}
+
+inline bool ValueBase::hasTwoUses() const {
+  auto iter = use_begin(), end = use_end();
+  for (unsigned i = 0; i < 2; ++i) {
+    if (iter == end)
+      return false;
+    ++iter;
+  }
+  return iter == end;
+}
+
+template <class T>
+inline T *ValueBase::getSingleUserOfType() const {
+  T *result = nullptr;
+  for (auto *op : getUses()) {
+    if (auto *tmp = dyn_cast<T>(op->getUser())) {
+      if (result)
+        return nullptr;
+      result = tmp;
+    }
+  }
+  return result;
+}
+
+template <class T> inline T *ValueBase::getSingleConsumingUserOfType() const {
+  auto *op = getSingleConsumingUse();
+  if (!op)
+    return nullptr;
+
+  return dyn_cast<T>(op->getUser());
+}
+
+struct ValueBase::UseToUser {
+  SILInstruction *operator()(const Operand *use) const {
+    return const_cast<SILInstruction *>(use->getUser());
+  }
+  SILInstruction *operator()(const Operand &use) const {
+    return const_cast<SILInstruction *>(use.getUser());
+  }
+  SILInstruction *operator()(Operand *use) { return use->getUser(); }
+  SILInstruction *operator()(Operand &use) { return use.getUser(); }
+};
+
+template <typename T>
+inline ValueBase::DowncastUserFilterRange<T> ValueBase::getUsersOfType() const {
+  auto begin = llvm::map_iterator(use_begin(), UseToUser());
+  auto end = llvm::map_iterator(use_end(), UseToUser());
+  auto transformRange = llvm::make_range(begin, end);
+  return makeDowncastFilterRange<T>(transformRange);
 }
 
 /// A constant-size list of the operands of an instruction.

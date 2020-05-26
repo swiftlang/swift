@@ -24,12 +24,20 @@ enum class swift::DiagID : uint32_t {
 static_assert(static_cast<uint32_t>(swift::DiagID::invalid_diagnostic) == 0,
               "0 is not the invalid diagnostic ID");
 
+enum class swift::FixItID : uint32_t {
+#define DIAG(KIND, ID, Options, Text, Signature)
+#define FIXIT(ID, Text, Signature) ID,
+#include "swift/AST/DiagnosticsAll.def"
+};
+
 // Define all of the diagnostic objects and initialize them with their 
 // diagnostic IDs.
 namespace swift {
   namespace diag {
 #define DIAG(KIND,ID,Options,Text,Signature) \
     detail::DiagWithArguments<void Signature>::type ID = { DiagID::ID };
+#define FIXIT(ID, Text, Signature) \
+    detail::StructuredFixItWithArguments<void Signature>::type ID = {FixItID::ID};
 #include "swift/AST/DiagnosticsAll.def"
   } // end namespace diag
 } // end namespace swift

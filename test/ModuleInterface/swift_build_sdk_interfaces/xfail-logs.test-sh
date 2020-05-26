@@ -1,0 +1,36 @@
+RUN: %empty-directory(%t)
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %S/Inputs/xfails-sdk/ -o %t/output -log-path %t/logs | %FileCheck %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/logs/Bad-Bad-err.txt
+
+CHECK: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+
+PRINTS-ERROR: cannot find 'garbage' in scope
+
+RUN: %empty-directory(%t)
+RUN: echo '["Good"]' > %t/xfails-good.json
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %S/Inputs/xfails-sdk/ -o %t/output -log-path %t/logs -xfails %t/xfails-good.json | %FileCheck -check-prefix=CHECK-XFAIL-GOOD %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/logs/Bad-Bad-err.txt
+
+CHECK-XFAIL-GOOD-DAG: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-XFAIL-GOOD-DAG: # (UPASS) {{.+}}{{\\|/}}Good.swiftinterface
+
+RUN: %empty-directory(%t)
+RUN: echo '["Good", "Bad"]' > %t/xfails-good-and-bad.json
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -o %t/output -log-path %t/logs -xfails %t/xfails-good-and-bad.json| %FileCheck -check-prefix=CHECK-XFAIL-GOOD-AND-BAD %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/logs/Bad-Bad-err.txt
+
+CHECK-XFAIL-GOOD-AND-BAD-DAG: # (XFAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-XFAIL-GOOD-AND-BAD-DAG: # (UPASS) {{.+}}{{\\|/}}Good.swiftinterface
+
+RUN: %empty-directory(%t)
+RUN: echo '["Bad"]' > %t/xfails-bad.json
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -o %t/output -log-path %t/logs -xfails %t/xfails-bad.json | %FileCheck -check-prefix=CHECK-XFAIL-BAD %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/logs/Bad-Bad-err.txt
+
+CHECK-XFAIL-BAD: # (XFAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+
+RUN: %empty-directory(%t)
+RUN: env SWIFT_EXEC=%swiftc_driver_plain not %{python} %utils/swift_build_sdk_interfaces.py %mcp_opt -sdk %t -o %t/output -log-path %t/logs %S/Inputs/xfail-logs-framework/ | %FileCheck -check-prefix=CHECK-FRAMEWORK %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/logs/BadFMWK-x86_64-apple-macos-err.txt
+
+CHECK-FRAMEWORK: # (FAIL) {{.+}}{{\\|/}}BadFMWK.swiftmodule{{\\|/}}x86_64-apple-macos.swiftinterface

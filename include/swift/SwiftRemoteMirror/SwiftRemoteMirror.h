@@ -37,9 +37,15 @@
 extern "C" {
 #endif
 
+SWIFT_REMOTE_MIRROR_LINKAGE
+#if !defined(_WIN32)
+__attribute__((__weak_import__))
+#endif
+extern unsigned long long swift_reflection_classIsSwiftMask;
+
 /// Get the metadata version supported by the Remote Mirror library.
 SWIFT_REMOTE_MIRROR_LINKAGE
-uint16_t swift_reflection_getSupportedMetadataVersion();
+uint16_t swift_reflection_getSupportedMetadataVersion(void);
 
 /// \returns An opaque reflection context.
 SWIFT_REMOTE_MIRROR_LINKAGE
@@ -66,20 +72,20 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 void
 swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
 
-/// Add reflection sections for a loaded Swift image.
+/// DEPRECATED. Add reflection sections for a loaded Swift image.
+///
+/// You probably want to use \c swift_reflection_addImage instead.
 SWIFT_REMOTE_MIRROR_LINKAGE
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info);
 
-#if defined(__APPLE__) && defined(__MACH__)
 /// Add reflection information from a loaded Swift image.
 /// Returns true on success, false if the image's memory couldn't be read.
 SWIFT_REMOTE_MIRROR_LINKAGE
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart);
-#endif
 
 /// Returns a boolean indicating if the isa mask was successfully
 /// read, in which case it is stored in the isaMask out parameter.
@@ -110,7 +116,7 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object);
 
-/// Returns whether the given address is within an image added to this
+/// Returns whether the given address is associated with an image added to this
 /// library. Images must be added using swift_reflection_addImage, not
 /// swift_reflection_addReflectionInfo, for this function to work
 /// properly. If addReflectionInfo is used, the return value will always
@@ -142,6 +148,16 @@ swift_typeref_t
 swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledName,
                                            uint64_t Length);
+
+/// Returns the demangled name for a typeref, or NULL if the name couldn't be
+/// created.
+///
+/// The returned string is heap allocated and the caller must free() it when
+/// done.
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForTypeRef(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef);
 
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
@@ -220,6 +236,22 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *OutInstanceTypeRef,
                                         swift_addr_t *OutStartOfInstanceData);
+
+/// Projects the value of an enum.
+///
+/// Takes the address and typeref for an enum and determines the
+/// index of the currently-selected case within the enum.
+/// You can use this index with `swift_reflection_childOfTypeRef`
+/// to get detailed information about the specific case.
+///
+/// Returns true if the enum case could be successfully determined.
+/// In particular, note that this code may fail for valid in-memory data
+/// if the compiler is using a strategy we do not yet understand.
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
+                                      swift_addr_t EnumAddress,
+                                      swift_typeref_t EnumTypeRef,
+                                      int *CaseIndex);
 
 /// Dump a brief description of the typeref as a tree to stderr.
 SWIFT_REMOTE_MIRROR_LINKAGE

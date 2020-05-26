@@ -1,1 +1,1 @@
-@import ClangModuleWithAdapter;
+@import ClangModuleWithOverlay;

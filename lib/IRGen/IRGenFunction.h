@@ -20,6 +20,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/DenseMap.h"
@@ -60,7 +61,6 @@ namespace irgen {
   class Scope;
   class TypeInfo;
   enum class ValueWitness : unsigned;
-  enum class ReferenceCounting : unsigned char;
 
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
@@ -92,8 +92,9 @@ public:
 //--- Function prologue and epilogue -------------------------------------------
 public:
   Explosion collectParameters();
-  void emitScalarReturn(SILType resultTy, Explosion &scalars,
-                        bool isSwiftCCReturn, bool isOutlined);
+  void emitScalarReturn(SILType returnResultType, SILType funcResultType,
+                        Explosion &scalars, bool isSwiftCCReturn,
+                        bool isOutlined);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -280,6 +281,7 @@ public:
   const SILDebugScope *getDebugScope() const { return DbgScope; }
   llvm::Value *coerceValue(llvm::Value *value, llvm::Type *toTy,
                            const llvm::DataLayout &);
+  Explosion coerceValueTo(SILType fromTy, Explosion &from, SILType toTy);
 
   /// Mark a load as invariant.
   void setInvariantLoad(llvm::LoadInst *load);
@@ -287,7 +289,7 @@ public:
   void setDereferenceableLoad(llvm::LoadInst *load, unsigned size);
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
-  void emitTrap(bool EmitUnreachable);
+  void emitTrap(StringRef failureMessage, bool EmitUnreachable);
 
 private:
   llvm::Instruction *AllocaIP;
@@ -407,10 +409,6 @@ public:
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
 
-  //   - other operations
-  llvm::Value *emitNativeTryPin(llvm::Value *object, Atomicity atomicity);
-  void emitNativeUnpin(llvm::Value *handle, Atomicity atomicity);
-
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
@@ -435,7 +433,7 @@ public:
   void emitErrorStrongRelease(llvm::Value *value);
 
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
-                                bool isNonNull, bool checkPinned);
+                                bool isNonNull);
 
   llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc,
                                          unsigned verificationType);
@@ -648,7 +646,8 @@ public:
   };
 
   llvm::Value *getLocalSelfMetadata();
-  void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
+  void setLocalSelfMetadata(CanType selfBaseTy, bool selfIsExact,
+                            llvm::Value *value, LocalSelfKind kind);
 
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
@@ -664,7 +663,9 @@ private:
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
-  
+  /// If set, the dynamic Self type is assumed to be equivalent to this exact class.
+  CanType LocalSelfType;
+  bool LocalSelfIsExact = false;
   LocalSelfKind SelfKind;
 };
 

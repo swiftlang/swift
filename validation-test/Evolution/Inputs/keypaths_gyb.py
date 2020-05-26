@@ -4,14 +4,18 @@
 # - property kind, one of:
 #   - stored (only makes sense in structs or classes)
 #   - mutating (only makes sense in structs or enums)
-#   - struct (only makes sense in structs)
 #   - nonmutating (makes sense in classes, structs, and enums)
 # - "before" definition
 # - "after" definition
+# - whether the "after" definition adds API
 #
 # The definition strings are formatted with the following substitutions:
 # - {name}: property name
 # - {nonmutating}: nonmutating modifier spelling, if needed for context
+
+AddsAPI = True
+DoesntAddAPI = False
+
 testCases = [
     (
         "addsPrivateSetter",
@@ -25,6 +29,7 @@ testCases = [
             mutating set {{ self.sink = newValue }}
           }}
         """,
+        DoesntAddAPI,
     ),
     (
         "addsPublicSetter",
@@ -38,6 +43,7 @@ testCases = [
             mutating set {{ self.sink = newValue }}
           }}
         """,
+        AddsAPI,
     ),
     (
         "makesPrivateSetterPublic",
@@ -54,6 +60,7 @@ testCases = [
             mutating set {{ self.sink = newValue }}
           }}
         """,
+        AddsAPI,
     ),
     (
         "dropsPrivateSetter",
@@ -68,7 +75,8 @@ testCases = [
           public var {name}: Int {{
             get {{ return 0 }}
           }}
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "makesPrivateSetterNonmutating",
@@ -84,7 +92,8 @@ testCases = [
             get {{ return 0 }}
             {nonmutating} set {{ globalSink = newValue }}
           }}
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "makesPrivateSetterMutating",
@@ -100,7 +109,8 @@ testCases = [
             get {{ return 0 }}
             set {{ self.sink = newValue }}
           }}
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "addsPrivateNonmutatingSetter",
@@ -113,7 +123,8 @@ testCases = [
             get {{ return 0 }}
             {nonmutating} set {{ globalSink = newValue }}
           }}
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "addsPublicNonmutatingSetter",
@@ -126,7 +137,8 @@ testCases = [
             get {{ return 0 }}
             {nonmutating} set {{ globalSink = newValue }}
         }}
-        """
+        """,
+        AddsAPI,
     ),
     (
         "makesPrivateNonmutatingSetterPublic",
@@ -142,7 +154,8 @@ testCases = [
             get {{ return 0 }}
             {nonmutating} set {{ globalSink = newValue }}
           }}
-        """
+        """,
+        AddsAPI,
     ),
     (
         "makesPrivateNonmutatingSetterPublicMutating",
@@ -158,7 +171,8 @@ testCases = [
             get {{ return 0 }}
             set {{ self.sink = newValue }}
           }}
-        """
+        """,
+        AddsAPI,
     ),
     (
         "makesPrivateMutatingSetterPublicNonmutating",
@@ -174,7 +188,8 @@ testCases = [
             get {{ return 0 }}
             {nonmutating} set {{ globalSink = newValue }}
           }}
-        """
+        """,
+        AddsAPI,
     ),
     (
         "storedToComputed",
@@ -187,7 +202,8 @@ testCases = [
             get {{ return 0 }}
             set {{ self.sink = newValue }}
           }}
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "computedToStored",
@@ -200,7 +216,8 @@ testCases = [
         """,
         """
           public var {name}: Int = 0
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "storedToComputedPrivateSet",
@@ -213,7 +230,8 @@ testCases = [
             get {{ return 0 }}
             set {{ self.sink = newValue }}
           }}
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "storedToComputedDroppingPrivateSet",
@@ -225,7 +243,8 @@ testCases = [
           public var {name}: Int {{
             get {{ return 0 }}
           }}
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "getOnlyComputedToSettableStored",
@@ -237,7 +256,8 @@ testCases = [
         """,
         """
           public var {name}: Int = 0
-        """
+        """,
+        AddsAPI,
     ),
     (
         "getOnlyComputedToPrivateSettableStored",
@@ -249,7 +269,8 @@ testCases = [
         """,
         """
           public private(set) var {name}: Int = 0
-        """
+        """,
+        DoesntAddAPI,
     ),
     (
         "storedMakesPrivateSetPublic",
@@ -259,54 +280,61 @@ testCases = [
         """,
         """
           public var {name}: Int = 0
-        """
-    ),
-    (
-        "computedGetOnlyToLet",
-        "stored",
-        """
-          public var {name}: Int {{
-            return 0
-          }}
         """,
-        """
-          public let {name}: Int = 0
-        """
+        AddsAPI,
     ),
-    (
-        "computedPrivateSetToLet",
-        "stored",
-        """
-          public private(set) var {name}: Int {{
-            get {{ return 0 }}
-            set {{ self.sink = newValue }}
-          }}
-        """,
-        """
-          public let {name}: Int = 0
-        """
-    ),
-    (
-        "computedPrivateNonmutatingSetToLet",
-        "stored",
-        """
-          public private(set) var {name}: Int {{
-            get {{ return 0 }}
-            {nonmutating} set {{ globalSink = newValue }}
-          }}
-        """,
-        """
-          public let {name}: Int = 0
-        """
-    ),
-    (
-        "storedPrivateSetToLet",
-        "stored",
-        """
-          public private(set) var {name}: Int = 0
-        """,
-        """
-          public let {name}: Int = 0
-        """
-    ),
+    # TODO: Turning computed gets into lets without annotation drops method
+    # dispatch thunks and other ABI artifacts currently.
+    # TODO # (
+    # TODO #     "computedGetOnlyToLet",
+    # TODO #     "stored",
+    # TODO #     """
+    # TODO #       public var {name}: Int {{
+    # TODO #         return 0
+    # TODO #       }}
+    # TODO #     """,
+    # TODO #     """
+    # TODO #       public let {name}: Int = 0
+    # TODO #     """,
+    # TODO #     DoesntAddAPI,
+    # TODO # ),
+    # TODO # (
+    # TODO #     "computedPrivateSetToLet",
+    # TODO #     "stored",
+    # TODO #     """
+    # TODO #       public private(set) var {name}: Int {{
+    # TODO #         get {{ return 0 }}
+    # TODO #         set {{ self.sink = newValue }}
+    # TODO #       }}
+    # TODO #     """,
+    # TODO #     """
+    # TODO #       public let {name}: Int = 0
+    # TODO #     """,
+    # TODO #     DoesntAddAPI,
+    # TODO # ),
+    # TODO # (
+    # TODO #     "computedPrivateNonmutatingSetToLet",
+    # TODO #     "stored",
+    # TODO #     """
+    # TODO #       public private(set) var {name}: Int {{
+    # TODO #         get {{ return 0 }}
+    # TODO #         {nonmutating} set {{ globalSink = newValue }}
+    # TODO #       }}
+    # TODO #     """,
+    # TODO #     """
+    # TODO #       public let {name}: Int = 0
+    # TODO #     """,
+    # TODO #     DoesntAddAPI,
+    # TODO # ),
+    # TODO # (
+    # TODO #     "storedPrivateSetToLet",
+    # TODO #     "stored",
+    # TODO #     """
+    # TODO #       public private(set) var {name}: Int = 0
+    # TODO #     """,
+    # TODO #     """
+    # TODO #       public let {name}: Int = 0
+    # TODO #     """,
+    # TODO #     DoesntAddAPI,
+    # TODO # ),
 ]

@@ -25,7 +25,7 @@ namespace irgen {
 
 class TypeConverter;
   
-/// \brief An abstract class designed for use when implementing a type
+/// An abstract class designed for use when implementing a type
 /// that has reference semantics.
 class ReferenceTypeInfo : public LoadableTypeInfo {
 protected:
@@ -44,6 +44,10 @@ public:
   /// Strongly releases a value.
   virtual void strongRelease(IRGenFunction &IGF, Explosion &in,
                              Atomicity atomicity) const = 0;
+
+  virtual ReferenceCounting getReferenceCountingType() const {
+    llvm_unreachable("not supported");
+  }
 
 #define REF_STORAGE_HELPER(Name) \
   virtual const TypeInfo *create##Name##StorageType(TypeConverter &TC, \

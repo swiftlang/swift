@@ -1,6 +1,5 @@
 :orphan:
 
-.. @raise litre.TestsAreMissing
 .. ConcurrencyModel:
 
 *Note*: This document is **not an accepted Swift proposal**. It does not describe Swift's concurrency mechanisms as they currently exist, nor is it a roadmap for the addition of concurrency mechanisms in future versions of Swift.
@@ -49,13 +48,12 @@ multi-threaded program below.
 
     import Foundation
 
-    let priority = DISPATCH_QUEUE_PRIORITY_DEFAULT
-    let queue = dispatch_get_global_queue(priority, 0)
+    let queue = DispatchQueue.global(qos: .default)
 
     class Bird {}
     var single = Bird()
 
-    dispatch_async(queue) {
+    queue.async {
       while true { single = Bird() }
     }
     while true { single = Bird() }
@@ -172,13 +170,10 @@ with value semantics as Copyable.
 
 Value-semantic types are not the only category of types that can be copied.
 Library designers can implement thread-safe or lockless data structures and
-manually mark them as Copyable.
-
-Notice that due to rdar://17144340 we still can't mark Arrays and Optionals as
-copyable::
+manually mark them as Copyable::
 
   // Optionals are copyable if the payload type is copyable.
-  extension Optional : CopyableType where T : CopyableType  {}
+  extension Optional : Copyable where T : Copyable  {}
 
 2. Reentrant code
 ~~~~~~~~~~~~~~~~~
@@ -281,13 +276,13 @@ Implementing safe Go-lang style concurrency
 In this section, we describe how the proposed thread-safety layer can be used for
 implementing go-lang style concurrency.  Go supports concurrency using
 coroutines and channels. We are going to demonstrate how to
-implement go-style concurrency using verified code, CopyableType protocol
+implement go-style concurrency using verified code, Copyable protocol
 and gateway annotations.
 
 Let's start by implementing Streams, which are analogous to go channels.  A
 stream is simply a blocking queue with restrictions on the types that can be
 passed.  Streams are generic data structures where the queue element type is
-``CopyableType`` (and conforms to the relevant protocol, discussed above).
+``Copyable`` (and conforms to the relevant protocol, discussed above).
 Streams are the only legitimate channel of communication between threads.
 
 Streams can be shared by multiple tasks. These tasks can read from and write into the stream
@@ -305,7 +300,7 @@ created using gateways (see above) that ensure thread safety.
 Together tasks and streams create a thread-safe concurrency construct. Let's
 delve into this claim.  Tasks are created using gateways that ensure that all
 arguments being passed into the closure that will be executed are
-CopyableType. In other words, all of the arguments are either deep-copied or
+Copyable. In other words, all of the arguments are either deep-copied or
 implemented in a way that will forbid sharing of memory. The gateway also
 ensures that the closure that will be executed by the task is verified, which
 means that it will not access global variables or unsafe code, and it will not capture
@@ -314,7 +309,7 @@ ensures a hermetic separation between the newly created thread and the parent
 thread. Tasks can communicate using streams that ensure that information that
 passes between threads, just like the task's closure arguments, does not leak
 references and keeps the hermetic separation between the tasks. Notice that
-Streams themselves are CopyableTypes because they can be copied freely between
+Streams themselves are Copyable because they can be copied freely between
 tasks without violating thread safety.
 
 Stream and Tasks provide safety and allow users to develop server-like tasks
@@ -357,15 +352,19 @@ declaration of the streams in the closure.
 
 .. code-block:: swift
 
-     let comm : _Endpoint<String, Int> = createTask({var counter = 0
-                                                     while true {
-                                                       $0.pop()
-                                                       $0.push(counter++)
-                                                     }})
+     let comm : _Endpoint<String, Int> = createTask {
+       var counter = 0
+       while true {
+         $0.pop()
+         $0.push(counter)
+         counter += 1
+       }
+     }
+
      // CHECK: 0, 1, 2,
      for ss in ["","",""] {
        comm.push(ss)
-       print("\(comm.pop()), ", appendNewline: false)
+       print("\(comm.pop()), ", terminator: "")
      }
 
 Stream utilities
@@ -404,16 +403,16 @@ Example of a concurrent program using Futures in Swift.
 
 .. code-block:: swift
 
-    func merge_sort<T : Comparable>(array: ArraySlice<T>) -> [T] {
+    func mergeSort<T : Comparable>(array: ArraySlice<T>) -> [T] {
 
-      if array.count <= 16  { return Array(array).sort() }
+      if array.count <= 16  { return Array(array).sorted() }
 
       let mid = array.count / 2
       let left  = array[0..<mid]
       let right = array[mid..<array.count]
 
-      let lf = async(left,  callback: merge_sort)
-      let lr = async(right, callback: merge_sort)
+      let lf = async(left,  callback: mergeSort)
+      let lr = async(right, callback: mergeSort)
 
       return merge(lf.await(), lr.await())
     }
@@ -430,16 +429,17 @@ Here is another example of async calls using trailing closures and enums.
 .. code-block:: swift
 
      enum Shape {
-       case Circle, Oval, Square, Triangle
+       case circle, oval, square, triangle
      }
 
-     let res = async(Shape.Oval) {(c : Shape) -> (String) in
-                                  switch c {
-                                    case .Circle:   return "Circle"
-                                    case .Oval:     return "Oval"
-                                    case .Square:   return "Square"
-                                    case .Triangle: return "Triangle"
-                                  }}
+     let res = async(Shape.oval) { (c: Shape) -> String in
+       switch c {
+         case .circle:   return "Circle"
+         case .oval:     return "Oval"
+         case .square:   return "Square"
+         case .triangle: return "Triangle"
+       }
+     }
 
      //CHECK: Shape: Oval
      print("Shape: \(res.await())")
@@ -484,18 +484,16 @@ free to make unsafe calls capture locals and access globals.
   @IBAction func onClick(_ sender: AnyObject) {
 
     progress.startAnimating()
-    Label!.text = ""
+    label!.text = ""
 
-    asyncWith (1_000_000) {
-      (num: Int) -> Int in
+    asyncWith (1_000_000) { (num: Int) -> Int in
       var sum = 0
       for i in 1..<num {
         if isPrime(i) { sum += 1 }
       }
       return sum
-    }.setOnComplete {
-      (x : Int) in
-      self.Label!.text = "Found \(x) primes.\n"
+    }.setOnComplete { (x: Int) in
+      self.label!.text = "Found \(x) primes.\n"
       self.progress.stopAnimating()
     }
 
@@ -524,7 +522,7 @@ thread-safe (explained in the previous section). For example:
 
     @_semantics("swift.concurrent.async")
     // This annotation tells the compiler to verify the closure and the passed arguments at the call site.
-    public func async<RetTy, ArgsTy>(args : ArgsTy, callback : (ArgsTy) -> RetTy) -> Future<RetTy> {
+    public func async<RetTy, ArgsTy>(args: ArgsTy, callback: @escaping (ArgsTy) -> RetTy) -> Future<RetTy> {
       return unsafeAsync(args, callback: callback)
     }
 
@@ -532,7 +530,7 @@ Example of shared data structures
 ---------------------------------
 
 In the example below the class PrimesCache is explicitly marked by the user as a
-CopyableType.  The user implemented a thread-safe class that allows concurrent
+Copyable.  The user implemented a thread-safe class that allows concurrent
 access to the method ``isPrime``.  To implement a critical section the user
 inherit the class ``Sync`` that contains a lock and a method that implements a
 critical section. The user also had to annotate the shared method as safe
@@ -543,11 +541,11 @@ are not synchronized on the same lock.
 
 .. code-block:: swift
 
-  final class PrimesCache : Sync, CopyableType {
-    var cache : [Int : Bool] = [:]
+  final class PrimesCache : Sync, Copyable {
+    var cache: [Int : Bool] = [:]
 
     @_semantics("swift.concurrent.safe")
-    func isPrime(_ num : Int) -> Bool {
+    func isPrime(_ num: Int) -> Bool {
       return self.critical {
         if let r = self.cache[num] { return r }
         let b = calcIsPrime(num)
@@ -557,18 +555,18 @@ are not synchronized on the same lock.
     }
   }
 
-  func countPrimes(_ P : PrimesCache) -> Int {
+  func countPrimes(_ p: PrimesCache) -> Int {
     var sum = 0
-    for i in 2..<10_000 { if P.isPrime(i) { sum += 1} }
+    for i in 2..<10_000 where p.isPrime(i) { sum += 1 }
     return sum
   }
 
   let shared = PrimesCache()
-  let R1 = async(shared, callback: countPrimes)
-  let R2 = async(shared, callback: countPrimes)
+  let r1 = async(shared, callback: countPrimes)
+  let r2 = async(shared, callback: countPrimes)
 
   // CHECK: [1229, 1229]
-  print([R1.await(), R2.await()])
+  print([r1.await(), r2.await()])
 
 
 Example of parallel matrix multiply using Async
@@ -581,45 +579,45 @@ code runs significantly faster.
 
 .. code-block:: swift
 
-  func ParallelMatMul(_ A : Matrix,_ B : Matrix) -> Matrix {
-    assert(A.size == B.size, "size mismatch!")
+  func ParallelMatMul(_ a: Matrix, _ b: Matrix) -> Matrix {
+    assert(a.size == b.size, "size mismatch!")
 
     // Handle small matrices using the serial algorithm.
-    if A.size < 65 { return SerialMatMul(A, B) }
+    if a.size < 65 { return SerialMatMul(a, b) }
 
-    var product = Matrix(A.size)
-    // Extract 4 quarters from matrices A and B.
-    let half = A.size/2
-    let A11 = A.slice(half, 0,    0)
-    let A12 = A.slice(half, 0,    half)
-    let A21 = A.slice(half, half, 0)
-    let A22 = A.slice(half, half, half)
-    let B11 = B.slice(half, 0,    0)
-    let B12 = B.slice(half, 0,    half)
-    let B21 = B.slice(half, half, 0)
-    let B22 = B.slice(half, half, half)
+    var product = Matrix(a.size)
+    // Extract 4 quarters from matrices a and b.
+    let half = a.size/2
+    let a11 = a.slice(half, 0,    0)
+    let a12 = a.slice(half, 0,    half)
+    let a21 = a.slice(half, half, 0)
+    let a22 = a.slice(half, half, half)
+    let b11 = b.slice(half, 0,    0)
+    let b12 = b.slice(half, 0,    half)
+    let b21 = b.slice(half, half, 0)
+    let b22 = b.slice(half, half, half)
 
     // Multiply each of the sub blocks.
-    let C11_1 = async((A11, B11), callback: ParallelMatMul)
-    let C11_2 = async((A12, B21), callback: ParallelMatMul)
-    let C12_1 = async((A11, B12), callback: ParallelMatMul)
-    let C12_2 = async((A12, B22), callback: ParallelMatMul)
-    let C21_1 = async((A21, B11), callback: ParallelMatMul)
-    let C21_2 = async((A22, B21), callback: ParallelMatMul)
-    let C22_1 = async((A21, B12), callback: ParallelMatMul)
-    let C22_2 = async((A22, B22), callback: ParallelMatMul)
+    let c11_1 = async((a11, b11), callback: ParallelMatMul)
+    let c11_2 = async((a12, b21), callback: ParallelMatMul)
+    let c12_1 = async((a11, b12), callback: ParallelMatMul)
+    let c12_2 = async((a12, b22), callback: ParallelMatMul)
+    let c21_1 = async((a21, b11), callback: ParallelMatMul)
+    let c21_2 = async((a22, b21), callback: ParallelMatMul)
+    let c22_1 = async((a21, b12), callback: ParallelMatMul)
+    let c22_2 = async((a22, b22), callback: ParallelMatMul)
 
     // Add the matching blocks.
-    let C11 = C11_1.await() +  C11_2.await()
-    let C12 = C12_1.await() +  C12_2.await()
-    let C21 = C21_1.await() +  C21_2.await()
-    let C22 = C22_1.await() +  C22_2.await()
+    let c11 = c11_1.await() + c11_2.await()
+    let c12 = c12_1.await() + c12_2.await()
+    let c21 = c21_1.await() + c21_2.await()
+    let c22 = c22_1.await() + c22_2.await()
 
     // Save the matrix slices into the correct locations.
-    product.update(C11, 0,    0)
-    product.update(C12, 0,    half)
-    product.update(C21, half, 0)
-    product.update(C22, half, half)
+    product.update(c11, 0,    0)
+    product.update(c12, 0,    half)
+    product.update(c21, half, 0)
+    product.update(c22, half, half)
     return product
   }
 
@@ -636,14 +634,14 @@ not backed by a live thread or by a stack.
 
 In Swift actors could be implemented using classes that inherit from the generic
 ``Actor`` class.  The generic parameter determines the type of messages that the
-actor can accept. The message type needs to be of ``CopyableType`` to ensure the
+actor can accept. The message type needs to be of ``Copyable`` to ensure the
 safety of the model.  The actor class exposes two methods: ``send`` and
 ``accept``. Messages are sent to actors using the ``send`` method and they never
 block the sender. Actors process the message using the ``accept`` method.
 
 At this point it should be obvious to the reader of the document why
 marking the ``accept`` method as thread safe and allowing the parameter type to
-be ``CopyableType`` will ensure the safety of the system (this is discussed at
+be ``Copyable`` will ensure the safety of the system (this is discussed at
 length in the previous sections).
 
 The ``accept`` method is executed by a user-space scheduler and not by live
@@ -661,32 +659,33 @@ Finally, a collector actor saves all of the messages into an array.
 
     var numbers = ContiguousArray<Int>()
 
-    override func accept(_ x : Int) { numbers.append(x) }
+    override func accept(_ x: Int) { numbers.append(x) }
   }
 
   // Filter numbers that are divisible by an argument.
   class Sieve : Actor<Int> {
-    var div : Int
-    var next : Actor<Int>
+    var div: Int
+    var next: Actor<Int>
 
-    init(div d : Int, next n : Actor<Int>) {
-      div = d ; next = n
+    init(div d: Int, next n: Actor<Int>) {
+      div = d
+      next = n
     }
 
-    override func accept(_ x : Int) {
+    override func accept(_ x: Int) {
       if x != div && x % div == 0 { return }
       next.send(x)
     }
   }
 
   var col = Collector()
-  var head : Actor<Int> = col
+  var head: Actor<Int> = col
 
   // Construct the Sieve
   for i in 2..<limit { head = Sieve(div: i, next: head) }
 
   // Send all of the integers
-  for i in 2..<(limit*limit) { head.send(i) }
+  for i in 2..<(limit * limit) { head.send(i) }
 
   // CHECK: [1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41,
   print(col.numbers.sort())

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 enum MSV : Error {
   case Foo, Bar, Baz
 
@@ -97,6 +97,14 @@ class eight {
   }()
 }
 
+func multiPattern() {
+  do {
+    throw opaque_error()
+  } catch MSV.Foo, _ {
+    _ = e
+  }
+}
+
 protocol ThrowingProto {
   func foo() throws
   static func bar() throws
@@ -117,9 +125,9 @@ func nine() throws {
   try nine_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}}
 }
 func ten_helper(_ x: Int) {}
-func ten_helper(_ x: Int, y: Int) throws {}
+func ten_helper(_ x: Int, y: Int) throws {} // expected-note {{'ten_helper(_:y:)' declared here}}
 func ten() throws {
-  try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}} {{18-21=}}
+  try ten_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}} {{18-18=<#Int#>, }}
 }
 
 // rdar://21074857
@@ -145,7 +153,7 @@ func eleven_two() {
 enum Twelve { case Payload(Int) }
 func twelve_helper(_ fn: (Int, Int) -> ()) {}
 func twelve() {
-  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(_, _) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
+  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(Int, Int) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
       try thrower()
     } catch Twelve.Payload(a...b) {
@@ -158,10 +166,88 @@ func ==(a: Thirteen, b: Thirteen) -> Bool { return true }
 
 func thirteen_helper(_ fn: (Thirteen) -> ()) {}
 func thirteen() {
-  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(_) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
+  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(Thirteen) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
     do {
       try thrower()
     } catch a {
     }
+  }
+}
+
+// SR 6400
+
+enum SR_6400_E: Error {
+  case castError
+}
+
+struct SR_6400_S_1 {}
+struct SR_6400_S_2: Error {}
+
+protocol SR_6400_FakeApplicationDelegate: AnyObject {}
+class SR_6400_FakeViewController {}
+
+func sr_6400() throws {
+  do {
+    throw SR_6400_E.castError
+  } catch is SR_6400_S_1 { // expected-warning {{cast from 'Error' to unrelated type 'SR_6400_S_1' always fails}}
+    print("Caught error")
+  }
+  
+  do {
+    throw SR_6400_E.castError
+  } catch is SR_6400_S_2 {
+    print("Caught error") // Ok
+  }
+}
+
+func sr_6400_1<T>(error: Error, as type: T.Type) -> Bool {
+  return (error as? T) != nil // Ok
+}
+
+func sr_6400_2(error: Error) {
+  _ = error as? (SR_6400_FakeViewController & Error) // Ok
+}
+func sr_6400_3(error: Error) {
+  _ = error as? (Error & SR_6400_FakeApplicationDelegate) // Ok
+}
+
+class SR_6400_A {}
+class SR_6400_B: SR_6400_FakeApplicationDelegate & Error {}
+
+func sr_6400_4() {
+  do {
+    throw SR_6400_E.castError
+  } catch let error as SR_6400_A { // Okay
+    print(error)
+  } catch {
+    print("Bar")
+  }
+  
+  do {
+    throw SR_6400_E.castError
+  } catch let error as SR_6400_B { // Okay
+    print(error)
+  } catch {
+    print("Bar")
+  }
+}
+
+// SR-11402
+
+protocol SR_11402_P {}
+class SR_11402_Superclass {}
+class SR_11402_Subclass: SR_11402_Superclass, SR_11402_P {}
+
+func sr_11402_func1(_ x: SR_11402_P) {
+  if let y = x as? SR_11402_Superclass { // Okay
+    print(y)
+  }
+}
+
+final class SR_11402_Final {}
+
+func sr_11402_func2(_ x: SR_11402_P) {
+  if let y = x as? SR_11402_Final { // expected-warning {{cast from 'SR_11402_P' to unrelated type 'SR_11402_Final' always fails}}
+    print(y)
   }
 }

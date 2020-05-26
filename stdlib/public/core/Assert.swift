@@ -45,7 +45,7 @@ public func assert(
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _assertionFailure("Assertion failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -87,13 +87,14 @@ public func precondition(
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _assertionFailure("Precondition failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error._value)
+    Builtin.condfail_message(error._value,
+      StaticString("precondition failure").unsafeRawPointer)
   }
 }
 
@@ -122,7 +123,7 @@ public func precondition(
 ///     where `assertionFailure(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `assertionFailure(_:file:line:)` is called.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 public func assertionFailure(
   _ message: @autoclosure () -> String = String(),
@@ -171,7 +172,8 @@ public func preconditionFailure(
     _assertionFailure("Fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
-    Builtin.int_trap()
+    Builtin.condfail_message(true._value,
+      StaticString("precondition failure").unsafeRawPointer)
   }
   _conditionallyUnreachable()
 }
@@ -199,25 +201,25 @@ public func fatalError(
 /// building in fast mode they are disabled.  In release mode they don't print
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
-@_transparent
-public func _precondition(
+@usableFromInline @_transparent
+internal func _precondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
-      _fatalErrorMessage("Fatal error", message, file: file, line: line,
+    if !_fastPath(condition()) {
+      _assertionFailure("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error._value)
+    Builtin.condfail_message(error._value, message.unsafeRawPointer)
   }
 }
 
-@_transparent
-public func _preconditionFailure(
+@usableFromInline @_transparent
+internal func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
@@ -235,12 +237,13 @@ public func _overflowChecked<T>(
 ) -> T {
   let (result, error) = args
   if _isDebugAssertConfiguration() {
-    if _branchHint(error, expected: false) {
-      _fatalErrorMessage("Fatal error", "Overflow/underflow", 
+    if _slowPath(error) {
+      _fatalErrorMessage("Fatal error", "Overflow/underflow",
         file: file, line: line, flags: _fatalErrorFlags())
     }
   } else {
-    Builtin.condfail(error._value)
+    Builtin.condfail_message(error._value,
+      StaticString("_overflowChecked failure").unsafeRawPointer)
   }
   return result
 }
@@ -253,22 +256,22 @@ public func _overflowChecked<T>(
 /// and abort.
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
-@_transparent
-public func _debugPrecondition(
+@usableFromInline @_transparent
+internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
   if _slowPath(_isDebugAssertConfiguration()) {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   }
 }
 
-@_transparent
-public func _debugPreconditionFailure(
+@usableFromInline @_transparent
+internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
@@ -284,24 +287,40 @@ public func _debugPreconditionFailure(
 /// standard library. They are only enable when the standard library is built
 /// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
 /// call to this function is a noop.
-@_transparent
-public func _sanityCheck(
+@usableFromInline @_transparent
+internal func _internalInvariant(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
-  if !_branchHint(condition(), expected: true) {
+  if !_fastPath(condition()) {
     _fatalErrorMessage("Fatal error", message, file: file, line: line,
       flags: _fatalErrorFlags())
   }
 #endif
 }
 
+// Only perform the invariant check on Swift 5.1 and later
+@_alwaysEmitIntoClient // Swift 5.1
 @_transparent
-public func _sanityCheckFailure(
+internal func _internalInvariant_5_1(
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+#if INTERNAL_CHECKS_ENABLED
+  // FIXME: The below won't run the assert on 5.1 stdlib if testing on older
+  // OSes, which means that testing may not test the assertion. We need a real
+  // solution to this.
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else { return }
+  _internalInvariant(condition(), message, file: file, line: line)
+#endif
+}
+
+@usableFromInline @_transparent
+internal func _internalInvariantFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  _sanityCheck(false, message, file: file, line: line)
+  _internalInvariant(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }

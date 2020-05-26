@@ -67,7 +67,7 @@ void SwitchCaseFullExpr::unreachableExit() {
 //===----------------------------------------------------------------------===//
 
 void SwitchEnumBuilder::emit() && {
-  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule()) &&
+  bool isAddressOnly = optional.getType().isAddressOnly(builder.getFunction()) &&
                        getSGF().silConv.useLoweredAddresses();
   using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
   {
@@ -123,7 +123,7 @@ void SwitchEnumBuilder::emit() && {
     builder.emitBlock(defaultBlock);
     ManagedValue input = optional;
     if (!isAddressOnly) {
-      input = builder.createOwnedPHIArgument(optional.getType());
+      input = builder.createOwnedPhiArgument(optional.getType());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();
@@ -144,11 +144,11 @@ void SwitchEnumBuilder::emit() && {
     ManagedValue input;
     if (decl->hasAssociatedValues()) {
       // Pull the payload out if we have one.
-      SILType inputType =
-          optional.getType().getEnumElementType(decl, builder.getModule());
+      SILType inputType = optional.getType().getEnumElementType(
+          decl, builder.getModule(), builder.getFunction());
       input = optional;
       if (!isAddressOnly) {
-        input = builder.createOwnedPHIArgument(inputType);
+        input = builder.createOwnedPhiArgument(inputType);
       }
     }
     handler(input, std::move(presentScope));
@@ -169,7 +169,7 @@ void SwitchEnumBuilder::emit() && {
     builder.emitBlock(defaultBlock);
     ManagedValue input = optional;
     if (!isAddressOnly) {
-      input = builder.createOwnedPHIArgument(optional.getType());
+      input = builder.createOwnedPhiArgument(optional.getType());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();

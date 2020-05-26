@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ALIASANALYSIS_H
 
 #include "swift/Basic/ValueEnumerator.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
@@ -136,7 +137,7 @@ private:
                          SILType TBAAType2 = SILType());  
 
   /// Returns True if memory of type \p T1 and \p T2 may alias.
-  bool typesMayAlias(SILType T1, SILType T2);
+  bool typesMayAlias(SILType T1, SILType T2, const SILFunction &F);
 
   virtual void handleDeleteNotification(SILNode *node) override {
     assert(node->isRepresentativeSILNodeInObject());
@@ -193,10 +194,10 @@ public:
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MayAlias;
   }
 
-  /// \returns True if the release of the \p Ptr can access memory accessed by
-  /// \p User.
+  /// \returns True if the release of the \p releasedReference can access or
+  /// free memory accessed by \p User.
   bool mayValueReleaseInterfereWithInstruction(SILInstruction *User,
-                                               SILValue Ptr);
+                                               SILValue releasedReference);
 
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.
@@ -298,14 +299,10 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 /// Otherwise, return an empty type.
 SILType computeTBAAType(SILValue V);
 
-/// Check if \p V points to a let-member.
-/// Nobody can write into let members.
-bool isLetPointer(SILValue V);
-
 } // end namespace swift
 
 namespace llvm {
-  template <> struct llvm::DenseMapInfo<AliasKeyTy> {
+  template <> struct DenseMapInfo<AliasKeyTy> {
     static inline AliasKeyTy getEmptyKey() {
       auto Allone = std::numeric_limits<size_t>::max();
       return {0, Allone, nullptr, nullptr};
@@ -330,7 +327,7 @@ namespace llvm {
     }
   };
 
-  template <> struct llvm::DenseMapInfo<MemBehaviorKeyTy> {
+  template <> struct DenseMapInfo<MemBehaviorKeyTy> {
     static inline MemBehaviorKeyTy getEmptyKey() {
       auto Allone = std::numeric_limits<size_t>::max();
       return {0, Allone, RetainObserveKind::RetainObserveKindEnd};

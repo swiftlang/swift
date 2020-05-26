@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-comments -source-filename %S/Inputs/comment_extensions.swift -comments-xml-schema %S/../../bindings/xml/comment-xml-schema.rng | %FileCheck %s
+// REQUIRES: libxml2
 
 // Content is in separate file in ./Inputs due to the "requires" keyword getting
 // recognized by lit.

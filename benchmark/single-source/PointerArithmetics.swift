@@ -13,7 +13,10 @@
 import TestsUtils
 
 public let PointerArithmetics = [
-  BenchmarkInfo(name: "PointerArithmetics", runFunction: run_PointerArithmetics, tags: [.validation, .api]),
+  BenchmarkInfo(name: "PointerArithmetics",
+  runFunction: run_PointerArithmetics,
+  tags: [.validation, .api],
+  legacyFactor: 100),
 ]
 
 @inline(never)
@@ -23,7 +26,7 @@ public func run_PointerArithmetics(_ N: Int) {
   var c = 0
   withUnsafePointer(to: &numbers) {
     $0.withMemoryRebound(to: Int.self, capacity: 10) { ptr in
-      for _ in 1...N*10_000_000 {
+      for _ in 1...N*100_000 {
         c += (ptr + getInt(10) - getInt(5)).pointee
       }
     }

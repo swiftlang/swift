@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 func escapeByBitCast(f: () -> ()) -> () -> () {
   return unsafeBitCast(f, to: (() -> ()).self)
-  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+  // expected-error@-1 {{converting non-escaping parameter 'f' to generic parameter 'T' may allow it to escape}}
 }
 
 func changeFnRep(f: @escaping () -> ()) -> @convention(block) () -> () {

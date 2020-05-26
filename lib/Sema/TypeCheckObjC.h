@@ -25,9 +25,9 @@ namespace swift {
 class AbstractFunctionDecl;
 class ASTContext;
 class SubscriptDecl;
-class TypeChecker;
 class ValueDecl;
 class VarDecl;
+class InFlightDiagnostic;
 
 using llvm::Optional;
 
@@ -49,6 +49,8 @@ public:
     ExplicitlyIBOutlet,
     /// Has an explicit '@IBAction' attribute.
     ExplicitlyIBAction,
+    /// Has an explicit '@IBSegueAction' attribute.
+    ExplicitlyIBSegueAction,
     /// Has an explicit '@NSManaged' attribute.
     ExplicitlyNSManaged,
     /// Is a member of an @objc protocol.
@@ -65,10 +67,15 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
+
+    // These kinds do not appear in diagnostics.
+
     /// Is it a member of an @objcMembers class.
     MemberOfObjCMembersClass,
     /// A member of an Objective-C-defined class or subclass.
     MemberOfObjCSubclass,
+    /// Is a member of an @objc enum.
+    ElementOfObjCEnum,
     /// An accessor to a property.
     Accessor,
   };
@@ -127,10 +134,25 @@ bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
 /// Check whether the given declaration can be represented in Objective-C.
 bool canBeRepresentedInObjC(const ValueDecl *decl);
 
-/// Check that specific, known bridging functions are fully type-checked.
+/// Attach Fix-Its to the given diagnostic that updates the name of the
+/// given declaration to the desired target name.
 ///
-/// NOTE: This is only here to support the --enable-source-import hack.
-void checkBridgedFunctions(ASTContext &ctx);
+/// \returns false if the name could not be fixed.
+bool fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
+                        DeclName targetName);
+
+/// Fix the Objective-C name of the given declaration to match the provided
+/// Objective-C selector.
+///
+/// \param ignoreImpliedName When true, ignore the implied name of the
+/// given declaration, because it no longer applies.
+///
+/// For properties, the selector should be a zero-parameter selector of the
+/// given property's name.
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
+                            Optional<ObjCSelector> nameOpt,
+                            Optional<ObjCSelector> targetNameOpt,
+                            bool ignoreImpliedName = false);
 
 } // end namespace swift
 

@@ -83,7 +83,7 @@ UnicodeScalarPropertiesTests.test("properties.booleanProperties") {
   expectBooleanProperty(\.changesWhenNFKCCaseFolded, trueFor: "A", falseFor: "!")
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  if #available(iOS 10.2, *) {
+  if #available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *) {
     // U+2708 AIRPLANE
     expectBooleanProperty(\.isEmoji, trueFor: "\u{2708}", falseFor: "A")
     // U+231A WATCH

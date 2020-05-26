@@ -21,15 +21,12 @@ public let DictionarySubscriptDefault = [
                 tags: [.validation, .api, .Dictionary]),
   BenchmarkInfo(name: "DictionarySubscriptDefaultMutationOfObjects",
                 runFunction: run_DictionarySubscriptDefaultMutationOfObjects,
-                tags: [.validation, .api, .Dictionary]),
+                tags: [.validation, .api, .Dictionary], legacyFactor: 20),
   BenchmarkInfo(name: "DictionarySubscriptDefaultMutationArrayOfObjects",
                 runFunction:
                   run_DictionarySubscriptDefaultMutationArrayOfObjects,
-                tags: [.validation, .api, .Dictionary]),
+                tags: [.validation, .api, .Dictionary], legacyFactor: 20),
 ]
-
-let count = 10_000
-let result = count / 100
 
 @inline(never)
 public func run_DictionarySubscriptDefaultMutation(_ N: Int) {
@@ -37,12 +34,12 @@ public func run_DictionarySubscriptDefaultMutation(_ N: Int) {
 
     var dict = [Int: Int]()
 
-    for i in 0..<count {
+    for i in 0..<10_000 {
       dict[i % 100, default: 0] += 1
     }
 
     CheckResults(dict.count == 100)
-    CheckResults(dict[0]! == result)
+    CheckResults(dict[0]! == 100)
   }
 }
 
@@ -52,12 +49,12 @@ public func run_DictionarySubscriptDefaultMutationArray(_ N: Int) {
 
     var dict = [Int: [Int]]()
 
-    for i in 0..<count {
+    for i in 0..<10_000 {
       dict[i % 100, default: []].append(i)
     }
 
     CheckResults(dict.count == 100)
-    CheckResults(dict[0]!.count == result)
+    CheckResults(dict[0]!.count == 100)
   }
 }
 
@@ -99,26 +96,26 @@ public func run_DictionarySubscriptDefaultMutationOfObjects(_ N: Int) {
 
     var dict = [Box<Int>: Box<Int>]()
 
-    for i in 0..<count {
-      dict[Box(i % 100), default: Box(0)].mutateValue { $0 += 1 }
+    for i in 0..<500 {
+      dict[Box(i % 5), default: Box(0)].mutateValue { $0 += 1 }
     }
 
-    CheckResults(dict.count == 100)
-    CheckResults(dict[Box(0)]!.value == result)
+    CheckResults(dict.count == 5)
+    CheckResults(dict[Box(0)]!.value == 100)
   }
 }
 
 @inline(never)
 public func run_DictionarySubscriptDefaultMutationArrayOfObjects(_ N: Int) {
-  for _ in 1...N {
+    for _ in 1...N {
 
     var dict = [Box<Int>: [Box<Int>]]()
 
-    for i in 0..<count {
-      dict[Box(i % 100), default: []].append(Box(i))
+    for i in 0..<500 {
+      dict[Box(i % 5), default: []].append(Box(i))
     }
 
-    CheckResults(dict.count == 100)
-    CheckResults(dict[Box(0)]!.count == result)
+    CheckResults(dict.count == 5)
+    CheckResults(dict[Box(0)]!.count == 100)
   }
 }

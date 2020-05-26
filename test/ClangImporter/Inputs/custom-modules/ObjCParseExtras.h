@@ -241,3 +241,22 @@ struct NonTrivialToCopyWrapper {
 struct TrivialToCopy {
   __unsafe_unretained id field;
 };
+
+@interface OverrideInExtensionBase : NSObject
+- (void)method;
+- (void)accessWarning;
+@end
+
+@interface OverrideInExtensionSub : OverrideInExtensionBase
+@end
+
+@interface SuperclassWithDesignatedInitInCategory
+@end
+
+@interface SubclassWithSwiftPrivateDesignatedInit : SuperclassWithDesignatedInitInCategory
+-(instancetype) initWithI:(NSInteger)i __attribute__((objc_designated_initializer));
+@end
+
+@interface SuperclassWithDesignatedInitInCategory ()
+-(instancetype) initWithI:(NSInteger)i __attribute__((objc_designated_initializer));
+@end

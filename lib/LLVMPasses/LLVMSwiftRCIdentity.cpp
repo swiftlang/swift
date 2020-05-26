@@ -39,16 +39,16 @@ SwiftRCIdentity::stripReferenceForwarding(llvm::Value *Val) {
   auto Kind = classifyInstruction(*Inst);
   switch(Kind) {
   case RT_RetainN:
-  case RT_UnknownRetainN:
+  case RT_UnknownObjectRetainN:
   case RT_BridgeRetainN:
   case RT_ReleaseN:
-  case RT_UnknownReleaseN:
+  case RT_UnknownObjectReleaseN:
   case RT_BridgeReleaseN:
   case RT_FixLifetime:
   case RT_Retain:
-  case RT_UnknownRetain:
+  case RT_UnknownObjectRetain:
   case RT_Release:
-  case RT_UnknownRelease:
+  case RT_UnknownObjectRelease:
   case RT_Unknown:
   case RT_AllocObject:
   case RT_NoMemoryAccessed:

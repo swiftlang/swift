@@ -12,9 +12,9 @@ class AClass : AProtocol {
 // CHECK: ![[TYPEARG]] = !DILocalVariable(name: "$\CF\84_0_0"
 // CHECK-SAME:                            type: ![[SWIFTMETATYPE:[^,)]+]]
 // CHECK-SAME:                            flags: DIFlagArtificial
-// CHECK: ![[SWIFTMETATYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$swift.type",
+// CHECK: ![[SWIFTMETATYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "T",
 // CHECK-SAME:                                baseType: ![[VOIDPTR:[0-9]+]]
-// CHECK: ![[VOIDPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "$SBpD", baseType: null
+// CHECK: ![[VOIDPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "$sBpD", baseType: null
 func aFunction<T : AProtocol>(_ x: T) {
     print("I am in aFunction: \(x.f())")
 }

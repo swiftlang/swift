@@ -16,9 +16,21 @@
 using namespace swift;
 using namespace swift::syntax;
 
-bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
+void SyntaxParsingCache::addEdit(size_t Start, size_t End,
+                                 size_t ReplacementLength) {
+  assert((Edits.empty() || Edits.back().End <= Start) &&
+         "'Start' must be greater than or equal to 'End' of the previous edit");
+  Edits.emplace_back(Start, End, ReplacementLength);
+}
+
+bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t NodeStart,
+                                         size_t Position,
                                          SyntaxKind Kind) const {
-  auto NodeStart = Node.getAbsolutePositionBeforeLeadingTrivia().getOffset();
+  // Computing the value of NodeStart on the fly is faster than determining a
+  // node's absolute position, but make sure the values match in an assertion
+  // build
+  assert(NodeStart == Node.getAbsolutePositionBeforeLeadingTrivia().getOffset());
+
   if (NodeStart != Position)
     return false;
   if (Node.getKind() != Kind)
@@ -32,6 +44,7 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
   if (auto NextNode = Node.getData().getNextNode()) {
     auto NextLeafNode = NextNode->getFirstToken();
     auto NextRawNode = NextLeafNode->getRaw();
+    assert(NextRawNode->isPresent());
     NextLeafNodeLength += NextRawNode->getTokenText().size();
     for (auto TriviaPiece : NextRawNode->getLeadingTrivia()) {
       NextLeafNodeLength += TriviaPiece.getTextLength();
@@ -50,40 +63,55 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
 }
 
 llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
+                                                      size_t NodeStart,
                                                       size_t Position,
                                                       SyntaxKind Kind) {
-  if (nodeCanBeReused(Node, Position, Kind)) {
+  if (nodeCanBeReused(Node, NodeStart, Position, Kind)) {
     return Node;
   }
 
+  // Compute the child's position on the fly
+  size_t ChildStart = NodeStart;
   for (size_t I = 0, E = Node.getNumChildren(); I < E; ++I) {
     llvm::Optional<Syntax> Child = Node.getChild(I);
-    if (!Child.hasValue()) {
+    if (!Child.hasValue() || Child->isMissing()) {
       continue;
     }
-    auto ChildStart =
-        Child->getAbsolutePositionBeforeLeadingTrivia().getOffset();
     auto ChildEnd = ChildStart + Child->getTextLength();
     if (ChildStart <= Position && Position < ChildEnd) {
-      return lookUpFrom(Child.getValue(), Position, Kind);
+      return lookUpFrom(Child.getValue(), ChildStart, Position, Kind);
     }
+    // The next child starts where the previous child ended
+    ChildStart = ChildEnd;
   }
   return llvm::None;
 }
 
+Optional<size_t>
+SyntaxParsingCache::translateToPreEditPosition(size_t PostEditPosition,
+                                               ArrayRef<SourceEdit> Edits) {
+  size_t Position = PostEditPosition;
+  for (auto &Edit : Edits) {
+    if (Edit.Start > Position)
+      // Remaining edits doesn't affect the position. (Edits are sorted)
+      break;
+    if (Edit.Start + Edit.ReplacementLength > Position)
+      // This is a position inserted by the edit, and thus doesn't exist in the
+      // pre-edit version of the file.
+      return None;
+
+    Position = Position - Edit.ReplacementLength + Edit.originalLength();
+  }
+  return Position;
+}
+
 llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
                                                   SyntaxKind Kind) {
-  // Undo the edits in reverse order
-  size_t OldPosition = NewPosition;
-  for (auto I = Edits.rbegin(), E = Edits.rend(); I != E; ++I) {
-    auto Edit = *I;
-    if (Edit.End <= OldPosition) {
-      OldPosition =
-          OldPosition - Edit.ReplacementLength + Edit.originalLength();
-    }
-  }
+  Optional<size_t> OldPosition = translateToPreEditPosition(NewPosition, Edits);
+  if (!OldPosition.hasValue())
+    return None;
 
-  auto Node = lookUpFrom(OldSyntaxTree, OldPosition, Kind);
+  auto Node = lookUpFrom(OldSyntaxTree, /*NodeStart=*/0, *OldPosition, Kind);
   if (Node.hasValue()) {
     ReusedNodeIds.insert(Node->getId());
   }

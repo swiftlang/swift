@@ -2,6 +2,6 @@
 
 class Klass {}
 
-// CHECK-LABEL: sil hidden @$S4main3fooyyAA5KlassCF : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-LABEL: sil hidden @$s4main3fooyyAA5KlassCF : $@convention(thin) (@guaranteed Klass) -> () {
 func foo(_ k: Klass) {}
 

@@ -64,7 +64,10 @@ static bool isLeafTypeMetadata(CanType type) {
     return true;
 
   // Type parameters are statically opaque.
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     return true;
@@ -122,6 +125,14 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     if (!isLeafTypeMetadata(type)) {
       hadFulfillment |= searchTypeMetadata(IGM, type, IsInexact, metadataState,
                                            source, MetadataPath(path), keys);
+    }
+
+    // Consider its super class bound.
+    if (metadataState == MetadataState::Complete) {
+      if (auto superclassTy = keys.getSuperclassBound(type)) {
+        hadFulfillment |= searchNominalTypeMetadata(
+            IGM, superclassTy, metadataState, source, std::move(path), keys);
+      }
     }
 
     // Add the fulfillment.
@@ -209,7 +220,8 @@ bool FulfillmentMap::searchWitnessTable(
 
   bool hadFulfillment = false;
 
-  auto &pi = IGM.getProtocolInfo(protocol);
+  auto &pi = IGM.getProtocolInfo(protocol,
+                                 ProtocolInfoKind::RequirementSignature);
 
   for (auto &entry : pi.getWitnessEntries()) {
     if (!entry.isBase()) continue;
@@ -255,36 +267,35 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
   GenericTypeRequirements requirements(IGM, nominal);
   requirements.enumerateFulfillments(
       IGM, type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal),
-      [&](unsigned reqtIndex, CanType arg,
-          Optional<ProtocolConformanceRef> conf) {
-    // Skip uninteresting type arguments.
-    if (!keys.hasInterestingType(arg))
-      return;
+      [&](unsigned reqtIndex, CanType arg, ProtocolConformanceRef conf) {
+        // Skip uninteresting type arguments.
+        if (!keys.hasInterestingType(arg))
+          return;
 
-    // If the fulfilled value is type metadata, refine the path.
-    if (!conf) {
-      auto argState = getPresumedMetadataStateForTypeArgument(metadataState);
-      MetadataPath argPath = path;
-      argPath.addNominalTypeArgumentComponent(reqtIndex);
-      hadFulfillment |=
-        searchTypeMetadata(IGM, arg, IsExact, argState, source,
-                           std::move(argPath), keys);
-      return;
-    }
+        // If the fulfilled value is type metadata, refine the path.
+        if (conf.isInvalid()) {
+          auto argState =
+              getPresumedMetadataStateForTypeArgument(metadataState);
+          MetadataPath argPath = path;
+          argPath.addNominalTypeArgumentComponent(reqtIndex);
+          hadFulfillment |= searchTypeMetadata(
+              IGM, arg, IsExact, argState, source, std::move(argPath), keys);
+          return;
+        }
 
-    // Otherwise, it's a conformance.
+        // Otherwise, it's a conformance.
 
-    // Ignore it unless the type itself is interesting.
-    if (!keys.isInterestingType(arg))
-      return;
+        // Ignore it unless the type itself is interesting.
+        if (!keys.isInterestingType(arg))
+          return;
 
-    // Refine the path.
-    MetadataPath argPath = path;
-    argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
+        // Refine the path.
+        MetadataPath argPath = path;
+        argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
 
-    hadFulfillment |= searchWitnessTable(IGM, arg, conf->getRequirement(),
-                                         source, std::move(argPath), keys);
-  });
+        hadFulfillment |= searchWitnessTable(IGM, arg, conf.getRequirement(),
+                                             source, std::move(argPath), keys);
+      });
 
   return hadFulfillment;
 }
@@ -329,6 +340,7 @@ static StringRef getStateName(MetadataState state) {
   case MetadataState::LayoutComplete: return "layout-complete";
   case MetadataState::Abstract: return "abstract";
   }
+  llvm_unreachable("unhandled state");
 }
 
 void FulfillmentMap::dump() const {

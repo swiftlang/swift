@@ -44,12 +44,18 @@ def argument_parser():
         help='The path to an Android NDK. If specified, the libc++ library '
              'in that NDK will be pushed to the device.',
         default=os.getenv('ANDROID_NDK_HOME', None))
+    parser.add_argument(
+        '-a', '--destination-arch',
+        help='The architecture of the host device. Used to determine the '
+             'right library versions to send to the device.',
+        choices=['armv7', 'aarch64'],
+        default='armv7')
     return parser
 
 
-def _push(source, destination):
-    print('Pushing "{}" to device path "{}".'.format(source, destination))
-    print(adb.commands.push(source, destination))
+def _push(sources, destination):
+    print('Pushing "{}" to device path "{}".'.format(sources, destination))
+    print(adb.commands.push(sources, destination))
 
 
 def main():
@@ -64,8 +70,10 @@ def main():
 
     for path in args.paths:
         if os.path.isdir(path):
-            for basename in glob.glob(os.path.join(path, '*.so')):
-                _push(os.path.join(path, basename), args.destination)
+            full_paths = [
+                os.path.join(path, basename)
+                for basename in glob.glob(os.path.join(path, '*.so'))]
+            _push(full_paths, args.destination)
         else:
             _push(path, args.destination)
 
@@ -75,7 +83,10 @@ def main():
                               'cxx-stl',
                               'llvm-libc++',
                               'libs',
-                              'armeabi-v7a',
+                              {
+                                  'armv7': 'armeabi-v7a',
+                                  'aarch64': 'arm64-v8a',
+                              }[args.destination_arch],
                               'libc++_shared.so')
         _push(libcpp, args.destination)
 

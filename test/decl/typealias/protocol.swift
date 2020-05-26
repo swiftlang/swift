@@ -144,13 +144,13 @@ protocol P3 {
 
 // Test for not crashing on recursive aliases
 protocol Circular {
-  typealias Y = Self.Y // expected-error {{type alias 'Y' is not a member type of 'Self'}}
+  typealias Y = Self.Y // expected-error {{type alias 'Y' references itself}} expected-note {{while resolving type 'Self.Y'}}
 
-  typealias Y2 = Y2 // expected-error {{type alias 'Y2' references itself}}
-  // expected-note@-1 {{type declared here}}
+  typealias Y2 = Y2 // expected-error {{type alias 'Y2' references itself}} expected-note {{while resolving type 'Y2'}}
 
-  typealias Y3 = Y4 // expected-note {{type declared here}}
-  typealias Y4 = Y3 // expected-error {{type alias 'Y3' references itself}}
+  typealias Y3 = Y4 // expected-error {{type alias 'Y3' references itself}} expected-note {{while resolving type 'Y4'}}
+
+  typealias Y4 = Y3 // expected-note {{through reference here}} expected-note {{while resolving type 'Y3'}}
 }
 
 // Qualified and unqualified references to protocol typealiases from concrete type
@@ -272,11 +272,11 @@ extension P10 where T == Int { } // expected-warning{{neither type in same-type 
 
 extension P10 where A == X<T> { }
 
-extension P10 where A == X<U> { } // expected-error{{use of undeclared type 'U'}}
+extension P10 where A == X<U> { }
 
 extension P10 where A == X<Self.U> { }
 
-extension P10 where V == Int { } // expected-warning 3{{'V' is deprecated: just use Int, silly}}
+extension P10 where V == Int { } // expected-warning 2{{'V' is deprecated: just use Int, silly}}
 // expected-warning@-1{{neither type in same-type constraint ('Self.V' (aka 'Int') or 'Int') refers to a generic parameter or associated type}}
 
 // rdar://problem/36003312
@@ -299,3 +299,19 @@ struct SomeConformingType : UnboundGenericAliasProto {
 protocol UnboundGenericAliasProto {
   typealias G = X
 }
+
+// If pre-checking cannot resolve a member type due to ambiguity,
+// we go down the usual member access path. Make sure its correct
+// for protocol typealiases.
+protocol Amb1 {
+  typealias T = Int
+}
+
+protocol Amb2 {
+  typealias T = String
+}
+
+typealias Amb = Amb1 & Amb2
+
+let _: Int.Type = Amb.T.self
+let _: String.Type = Amb.T.self

@@ -95,12 +95,12 @@
                 (inline-close . 0)
                 (class-close . 0)
                 (namespace-close . 0)
-                (case-label . -)
+                (case-label . 0)
                 (statement-case-intro . +)
                 (cpp-define-intro . +)
                 (else-clause . 0)
                 (arglist-intro . +)
-                (arglist-cont . +)
+                (arglist-cont . 0)
                 (c . c-lineup-C-comments)
                 (inher-cont . c-lineup-multi-inher)
                 (string . -1000)
@@ -363,7 +363,7 @@ everything in the Swift project" )
 
 (defconst swift-project-single-frontend-swiftc-args
   (append swift-project-common-swiftc-args
-           (list "-force-single-frontend-invocation" "-parse-as-library"))
+           (list "-whole-module-optimization" "-parse-as-library"))
   "The arguments we'll pass to swiftc for syntax-checking
 libraries that require a single frontend invocation" )
 
@@ -395,7 +395,7 @@ of arguments that are passed to swiftc when compiling it."
   (cond ((string-match-p "^stdlib/public/core/" relative-file)
          swift-project-stdlib-swiftc-args)
         ((string-match-p
-          "^stdlib/\(public/SwiftOnoneSupport\|internal\|private/SwiftPrivate\(PthreadExtras\|LibcExtras\)?\)/"
+          "^stdlib/\(public/SwiftOnoneSupport\|internal\|private/SwiftPrivate\(ThreadExtras\|LibcExtras\)?\)/"
           relative-file)
          swift-project-stdlib-aux-swiftc-args)
         (t swift-project-single-frontend-swiftc-args)))

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -lslocation-dump -ml=only-reduction | %FileCheck %s
+// RUN: %target-sil-opt %s -lslocation-dump -ml=only-reduction | %FileCheck %s
 
 sil_stage canonical
 

@@ -8,9 +8,8 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH1 | %FileCheck %s -check-prefix=CATCH1
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW1 | %FileCheck %s -check-prefix=THROW1
 
-// FIXME: <rdar://problem/21001526> No dot code completion results in switch case or catch stmt at top-level
-// RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH2 | %FileCheck %s -check-prefix=CATCH2
-// RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW2 | %FileCheck %s -check-prefix=THROW2
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH2 | %FileCheck %s -check-prefix=CATCH2
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW2 | %FileCheck %s -check-prefix=THROW2
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH1 > %t.inside_catch1
 // RUN: %FileCheck %s -check-prefix=STMT < %t.inside_catch1
@@ -77,7 +76,7 @@ func test001() {
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
 // CATCH1-DAG:  Keyword[let]/None:                  let{{; name=.+$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
-// CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]: NSError[#NSError#]{{; name=.+$}}
+// CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]/IsSystem: NSError[#NSError#]{{; name=.+$}}
 }
 
 func test002() {
@@ -108,7 +107,7 @@ func test003() {
   do {} catch Error4.#^CATCH2^#
 // CATCH2: Begin completions
 // CATCH2: Decl[EnumElement]/CurrNominal: E1[#Error4#]{{; name=.+$}}
-// CATCH2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#(Int32) -> Error4#]{{; name=.+$}}
+// CATCH2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#Error4#]{{; name=.+$}}
 // CATCH2: End completions
 }
 
@@ -116,7 +115,7 @@ func test004() {
   throw Error4.#^THROW2^#
 // THROW2: Begin completions
 // THROW2: Decl[EnumElement]/CurrNominal: E1[#Error4#]{{; name=.+$}}
-// THROW2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#(Int32) -> Error4#]{{; name=.+$}}
+// THROW2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#Error4#]{{; name=.+$}}
 // THROW2: End completions
 }
 
@@ -211,13 +210,13 @@ func test014() {
     e.#^INSIDE_CATCH_ERR_DOT3^#
   }
 // NSERROR_DOT: Begin completions
-// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      domain[#String#]; name=domain
-// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      code[#Int#]; name=code
-// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:            hashValue[#Int#]; name=hashValue
-// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super:         myClass()[#AnyClass!#]; name=myClass()
-// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super:         isEqual({#(other): NSObject!#})[#Bool#]; name=isEqual(other: NSObject!)
-// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:            hash[#Int#]; name=hash
-// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:            description[#String#]; name=description
+// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: domain[#String#]; name=domain
+// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: code[#Int#]; name=code
+// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:                hashValue[#Int#]; name=hashValue
+// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    myClass()[#AnyClass!#]; name=myClass()
+// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    isEqual({#(other): NSObject!#})[#Bool#]; name=isEqual(other: NSObject!)
+// NSERROR_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       hash[#Int#]; name=hash
+// NSERROR_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       description[#String#]; name=description
 // NSERROR_DOT: End completions
 }
 func test015() {
@@ -228,8 +227,8 @@ func test015() {
 }
 // Check that we can complete on the bound value; Not exhaustive..
 // INT_DOT: Begin completions
-// INT_DOT-DAG: Decl[InstanceVar]/Super:            bigEndian[#(Int32)#]; name=bigEndian
-// INT_DOT-DAG: Decl[InstanceVar]/Super:            littleEndian[#(Int32)#]; name=littleEndian
+// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: bigEndian[#(Int32)#]; name=bigEndian
+// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: littleEndian[#(Int32)#]; name=littleEndian
 // INT_DOT: End completions
 
 //===--- Inside catch body top-level

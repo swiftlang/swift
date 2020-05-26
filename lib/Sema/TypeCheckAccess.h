@@ -17,90 +17,16 @@
 #ifndef TYPECHECKACCESS_H
 #define TYPECHECKACCESS_H
 
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/TypeLoc.h"
-#include "llvm/ADT/STLExtras.h"
-
 namespace swift {
 
 class Decl;
-class DeclContext;
-class GenericParamList;
-class TypeChecker;
-class ValueDecl;
-class RequirementRepr;
 
-/// A uniquely-typed boolean to reduce the chances of accidentally inverting
-/// a check.
+/// Performs access-related checks for \p D.
 ///
-/// \see checkTypeAccess
-enum class DowngradeToWarning: bool {
-  No,
-  Yes
-};
-
-/// \see checkTypeAccess
-using CheckTypeAccessCallback =
-    void(AccessScope, const TypeRepr *, DowngradeToWarning);
-
-class AccessControlCheckerBase {
-protected:
-  TypeChecker &TC;
-  bool checkUsableFromInline;
-
-  void checkTypeAccessImpl(
-      TypeLoc TL, AccessScope contextAccessScope,
-      const DeclContext *useDC,
-      llvm::function_ref<CheckTypeAccessCallback> diagnose);
-
-  void checkTypeAccess(
-      TypeLoc TL, const ValueDecl *context,
-      llvm::function_ref<CheckTypeAccessCallback> diagnose);
-
-  void checkRequirementAccess(
-      ArrayRef<RequirementRepr> requirements,
-      AccessScope accessScope,
-      const DeclContext *useDC,
-      llvm::function_ref<CheckTypeAccessCallback> diagnose);
-
-  AccessControlCheckerBase(TypeChecker &TC, bool checkUsableFromInline)
-    : TC(TC), checkUsableFromInline(checkUsableFromInline) {}
-
-public:
-  void checkGenericParamAccess(
-    const GenericParamList *params,
-    const Decl *owner,
-    AccessScope accessScope,
-    AccessLevel contextAccess);
-
-  void checkGenericParamAccess(
-    const GenericParamList *params,
-    const ValueDecl *owner);
-};
-
-class AccessControlChecker : public AccessControlCheckerBase {
-public:
-  explicit AccessControlChecker(TypeChecker &TC)
-    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/false) {}
-
-  void check(Decl *D);
-
-  static void checkAccessControl(TypeChecker &TC, Decl *D) {
-    AccessControlChecker(TC).check(D);
-  }
-};
-
-class UsableFromInlineChecker : public AccessControlCheckerBase {
-public:
-  explicit UsableFromInlineChecker(TypeChecker &TC)
-    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/true) {}
-
-  void check(Decl *D);
-
-  static void checkUsableFromInline(TypeChecker &TC, Decl *D) {
-    UsableFromInlineChecker(TC).check(D);
-  }
-};
+/// At a high level, this checks the given declaration's signature does not
+/// reference any other declarations that are less visible than the declaration
+/// itself. Related checks may also be performed.
+void checkAccessControl(Decl *D);
 
 } // end namespace swift
 

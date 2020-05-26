@@ -21,12 +21,15 @@ func /*trailing:def*/withTrailingClosure(x: Int, y: () -> Int) {}
 // valid
 /*trailing:call*/withTrailingClosure(x: 2, y: { return 1})
 /*trailing:call*/withTrailingClosure(x: 2) { return 1}
-
-// false positives
-/*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}
-/*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}
 /*trailing:call*/withTrailingClosure(x: 2)
 { return 1}
+// invalid
+/*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}
+/*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}
+
+func /*trailing-only:def*/trailingOnly(a: () -> ()) {}
+/*trailing-only:call*/trailingOnly(a: {})
+/*trailing-only:call*/trailingOnly {}
 
 
 func /*varargs:def*/betterName(a: Int..., b: Int, c: Int) {}

@@ -200,9 +200,11 @@ public:
     // We are checking for retain. If this is a self-recursion. call
     // to the function (which returns an owned value) can be treated as
     // the retain instruction.
-    if (auto *AI = dyn_cast<ApplyInst>(II))
-     if (AI->getCalleeFunction() == II->getParent()->getParent())
-       return true;
+    if (auto *AI = dyn_cast<ApplyInst>(II)) {
+      return AI->getCalleeFunction() == II->getParent()->getParent() &&
+             RCFI->getRCIdentityRoot(AI) ==
+             RCFI->getRCIdentityRoot(getArg(AI->getParent()));
+    }
     // Check whether this is a retain instruction and the argument it
     // retains.
     return isRetainInstruction(II) &&
@@ -300,8 +302,9 @@ public:
 
   virtual void initialize(SILPassManager *PM) override;
   
-  virtual EpilogueARCFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new EpilogueARCFunctionInfo(F, PO, AA, RC);
+  virtual std::unique_ptr<EpilogueARCFunctionInfo>
+  newFunctionAnalysis(SILFunction *F) override {
+    return std::make_unique<EpilogueARCFunctionInfo>(F, PO, AA, RC);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

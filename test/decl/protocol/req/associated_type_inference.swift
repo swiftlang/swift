@@ -50,8 +50,8 @@ struct X0f : P0 { // okay: Assoc1 = Int because Float doesn't conform to PSimple
 }
 
 struct X0g : P0 { // expected-error{{type 'X0g' does not conform to protocol 'P0'}}
-  func f0(_: Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
-  func g0(_: Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
+  func f0(_: Float) { } // expected-note{{candidate would match and infer 'Assoc1' = 'Float' if 'Float' conformed to 'PSimple'}}
+  func g0(_: Float) { } // expected-note{{candidate would match and infer 'Assoc1' = 'Float' if 'Float' conformed to 'PSimple'}}
 }
 
 struct X0h<T : PSimple> : P0 {
@@ -93,8 +93,8 @@ protocol P2 {
 }
 
 extension P2 where Self.P2Assoc : PSimple {
-  func f0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
-  func g0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
+  func f0(_ x: P2Assoc) { } // expected-note{{candidate would match and infer 'Assoc1' = 'Float' if 'Float' conformed to 'PSimple'}}
+  func g0(_ x: P2Assoc) { } // expected-note{{candidate would match and infer 'Assoc1' = 'Float' if 'Float' conformed to 'PSimple'}}
 }
 
 struct X0k : P0, P2 {
@@ -123,7 +123,7 @@ struct XProp0a : PropertyP0 { // okay PropType = Int
 }
 
 struct XProp0b : PropertyP0 { // expected-error{{type 'XProp0b' does not conform to protocol 'PropertyP0'}}
-  var property: Float // expected-note{{inferred type 'Float' (by matching requirement 'property') is invalid: does not conform to 'PSimple'}}
+  var property: Float // expected-note{{candidate would match and infer 'Prop' = 'Float' if 'Float' conformed to 'PSimple'}}
 }
 
 // Inference from subscripts
@@ -144,13 +144,12 @@ struct XSubP0a : SubscriptP0 {
 
 struct XSubP0b : SubscriptP0 {
 // expected-error@-1{{type 'XSubP0b' does not conform to protocol 'SubscriptP0'}}
-  subscript (i: Int) -> Float { get { return Float(i) } } // expected-note{{inferred type 'Float' (by matching requirement 'subscript') is invalid: does not conform to 'PSimple'}}
+  subscript (i: Int) -> Float { get { return Float(i) } } // expected-note{{candidate would match and infer 'Element' = 'Float' if 'Float' conformed to 'PSimple'}}
 }
 
 struct XSubP0c : SubscriptP0 {
 // expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}}
   subscript (i: Index) -> Element { get { } }
-  // expected-error@-1 {{reference to invalid associated type 'Element' of type 'XSubP0c'}}
 }
 
 struct XSubP0d : SubscriptP0 {
@@ -200,6 +199,7 @@ public class CorePromise<U> : Thenable { // expected-error{{type 'CorePromise<U>
     public func then(_ success: @escaping (_ t: U, _: CorePromise<U>) -> U) -> Self {
         return self.then() { (t: U) -> U in // expected-error{{contextual closure type '(U, CorePromise<U>) -> U' expects 2 arguments, but 1 was used in closure body}}
             return success(t: t, self)
+            // expected-error@-1 {{extraneous argument label 't:' in call}}
         }
     }
 }
@@ -501,3 +501,90 @@ protocol RefinesAssocWithDefault: HasAssoc {
 struct Foo: RefinesAssocWithDefault {
 }
 
+protocol P20 {
+  associatedtype T // expected-note{{protocol requires nested type 'T'; do you want to add it?}}
+  typealias TT = T?
+}
+struct S19 : P20 {  // expected-error{{type 'S19' does not conform to protocol 'P20'}}
+  typealias TT = Int?
+}
+
+// rdar://problem/44777661
+struct S30<T> where T : P30 {}
+
+protocol P30 {
+  static func bar()
+}
+
+protocol P31 {
+  associatedtype T : P30
+}
+
+extension S30 : P31 where T : P31 {}
+
+extension S30 {
+  func foo() {
+    T.bar()
+  }
+}
+
+protocol P32 {
+  associatedtype A
+  associatedtype B
+  associatedtype C
+
+  func foo(arg: A) -> C
+  var bar: B { get }
+}
+protocol P33 {
+  associatedtype A
+
+  var baz: A { get } // expected-note {{protocol requires property 'baz' with type 'S31<T>.A' (aka 'Never'); do you want to add a stub?}}
+}
+protocol P34 {
+  associatedtype A
+
+  func boo() -> A // expected-note {{protocol requires function 'boo()' with type '() -> S31<T>.A' (aka '() -> Never'); do you want to add a stub?}}
+}
+struct S31<T> {}
+extension S31: P32 where T == Int {} // OK
+extension S31 where T == Int {
+  func foo(arg: Never) {}
+}
+extension S31 where T: Equatable {
+  var bar: Bool { true }
+}
+extension S31: P33 where T == Never {} // expected-error {{type 'S31<T>' does not conform to protocol 'P33'}}
+extension S31 where T == String {
+  var baz: Bool { true } // expected-note {{candidate has non-matching type 'Bool' [with A = S31<T>.A]}}
+}
+extension S31: P34 {} // expected-error {{type 'S31<T>' does not conform to protocol 'P34'}}
+extension S31 where T: P32 {
+  func boo() -> Void {} // expected-note {{candidate has non-matching type '<T> () -> Void' [with A = S31<T>.A]}}
+}
+
+// SR-12707
+
+class SR_12707_C<T> {}
+
+// Inference in the adoptee
+protocol SR_12707_P1 {
+  associatedtype A
+  associatedtype B: SR_12707_C<(A, Self)>
+
+  func foo(arg: B)
+}
+struct SR_12707_Conform_P1: SR_12707_P1 {
+  typealias A = Never
+
+  func foo(arg: SR_12707_C<(A, SR_12707_Conform_P1)>) {}
+}
+
+// Inference in protocol extension
+protocol SR_12707_P2: SR_12707_P1 {}
+extension SR_12707_P2 {
+  func foo(arg: SR_12707_C<(A, Self)>) {}
+}
+struct SR_12707_Conform_P2: SR_12707_P2 {
+  typealias A = Never
+}

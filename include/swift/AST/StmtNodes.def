@@ -46,6 +46,7 @@
 
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
+STMT(Yield, Stmt)
 STMT(Defer, Stmt)
 ABSTRACT_STMT(Labeled, Stmt)
   ABSTRACT_STMT(LabeledConditional, LabeledStmt)
@@ -60,13 +61,13 @@ ABSTRACT_STMT(Labeled, Stmt)
   LABELED_STMT(Switch, LabeledStmt)
   STMT_RANGE(Labeled, If, Switch)
 STMT(Case, Stmt)
-STMT(Catch, Stmt)
 STMT(Break, Stmt)
 STMT(Continue, Stmt)
 STMT(Fallthrough, Stmt)
 STMT(Fail, Stmt)
 STMT(Throw, Stmt)
-LAST_STMT(Throw)
+STMT(PoundAssert, Stmt)
+LAST_STMT(PoundAssert)
 
 #undef STMT_RANGE
 #undef LABELED_STMT

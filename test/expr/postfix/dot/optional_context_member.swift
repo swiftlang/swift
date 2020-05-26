@@ -13,15 +13,20 @@ func nonOptContext() -> Foo {
   case ():
     return .someVar
   case (): // expected-warning {{case is already handled by previous patterns; consider removing it}}
-    // FIXME: Customize this diagnostic for the optional case.
-    return .someOptVar // expected-error 1 {{member 'someOptVar' in 'Foo' produces result of type 'Foo?', but context expects 'Foo'}}
+    return .someOptVar
+    // expected-error@-1 {{value of optional type 'Foo?' must be unwrapped to a value of type 'Foo'}}
+    // expected-note@-2 {{coalesce}}
+    // expected-note@-3 {{force-unwrap}}
   // TODO
   //case ():
   //  return .someOptVar!
   case (): // expected-warning {{case is already handled by previous patterns; consider removing it}}
     return .someFunc()
   case (): // expected-warning {{case is already handled by previous patterns; consider removing it}}
-    return .someOptFunc() // expected-error{{member 'someOptFunc' in 'Foo' produces result of type 'Foo?', but context expects 'Foo'}}
+    return .someOptFunc()
+    // expected-error@-1 {{value of optional type 'Foo?' must be unwrapped to a value of type 'Foo'}}
+    // expected-note@-2 {{coalesce}}
+    // expected-note@-3 {{force-unwrap}}
   // TODO
   //case ():
   //  return .someOptFunc()!

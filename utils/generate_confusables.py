@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# utils/update_confusables.py - Utility to update definitions of unicode 
+# utils/update_confusables.py - Utility to update definitions of unicode
 # confusables
 #
 # This source file is part of the Swift.org open source project
@@ -57,7 +57,7 @@ def main(args=sys.argv):
 
     pairs = []
     with open(confusablesFilePath, 'r') as f:
-        pattern = re.compile("(.+)\W+;\W+(.+)\W+;")
+        pattern = re.compile(r"(.+)\W+;\W+(.+)\W+;")
         for line in f:
             match = pattern.match(line)
             if match is not None:

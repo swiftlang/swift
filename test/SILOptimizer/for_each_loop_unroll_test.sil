@@ -1,0 +1,225 @@
+// RUN: %target-sil-opt -for-each-loop-unroll -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+
+// SIL tests for the ForEachLoopUnroll mandatory optimization pass that unrolls
+// Sequence.forEach calls over array literals.
+
+import Swift
+import Builtin
+
+sil [_semantics "array.uninitialized_intrinsic"] @_allocateUninitializedArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+
+sil [_semantics "sequence.forEach"] @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+
+sil @forEachBody : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error Error
+
+sil hidden [ossa] @forEachLoopUnrollTest : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 2
+  %1 = function_ref @_allocateUninitializedArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%3, %4) = destructure_tuple %2 : $(Array<Builtin.Int64>, Builtin.RawPointer)
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Builtin.Int64
+  %6 = integer_literal $Builtin.Int64, 15
+  store %6 to [trivial] %5 : $*Builtin.Int64
+  %12 = integer_literal $Builtin.Word, 1
+  %13 = index_addr %5 : $*Builtin.Int64, %12 : $Builtin.Word
+  %14 = integer_literal $Builtin.Int64, 27
+  store %14 to [trivial] %13 : $*Builtin.Int64
+  %21 = begin_borrow %3 : $Array<Builtin.Int64>
+  %22 = alloc_stack $Array<Builtin.Int64>
+  %23 = store_borrow %21 to %22 : $*Array<Builtin.Int64>
+  %24 = function_ref @forEachBody : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error Error
+  %25 = convert_function %24 : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error Error to $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error
+  %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @error Error
+  // A stub for Sequence.forEach(_:)
+  %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+  try_apply %30<[Builtin.Int64]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+
+bb1(%32 : $()):
+  dealloc_stack %22 : $*Array<Builtin.Int64>
+  end_borrow %21 : $Array<Builtin.Int64>
+  destroy_value %3 : $Array<Builtin.Int64>
+  %37 = tuple ()
+  return %37 : $()
+
+bb2(%39 : @owned $Error):
+  unreachable
+}
+// CHECK-LABEL: forEachLoopUnrollTest
+// CHECK: [[LIT1:%[0-9]+]] = integer_literal $Builtin.Int64, 15
+// CHECK: [[LIT2:%[0-9]+]] = integer_literal $Builtin.Int64, 27
+// CHECK: [[BODYCLOSURE:%[0-9]+]] = thin_to_thick_function
+// CHECK-NOT: forEach
+// CHECK: [[STACK:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK: store [[LIT1]] to [trivial] [[STACK]]
+// CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+
+// CHECK: [[ERROR]]([[ERRPARAM:%[0-9]+]] : @owned $Error):
+// CHECK: br [[ERROR3:bb[0-9]+]]([[ERRPARAM]] : $Error)
+
+// CHECK: [[NORMAL]](%{{.*}} : $()):
+// CHECK: store [[LIT2]] to [trivial] [[STACK]] : $*Builtin.Int64
+// CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @error Error, normal [[NORMAL2:bb[0-9]+]], error [[ERROR2:bb[0-9]+]]
+
+// CHECK: [[ERROR2]]([[ERRPARAM2:%[0-9]+]] : @owned $Error):
+// CHECK: br [[ERROR3:bb[0-9]+]]([[ERRPARAM2]] : $Error)
+
+// CHECK: [[NORMAL2]](%{{.*}} : $()):
+// CHECK: dealloc_stack [[STACK]]
+// Note that the temporary alloc_stack of the array created for the forEach call
+// will be cleaned up when the forEach call is removed.
+// CHECK: destroy_value
+
+// CHECK: [[ERROR3]]([[ERRPARAM3:%[0-9]+]] : @owned $Error):
+// CHECK: dealloc_stack [[STACK]]
+// CHECK: unreachable
+
+sil @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
+
+sil hidden [ossa] @nonTrivialForEachLoopUnrollTest : $@convention(thin) (@owned @callee_guaranteed @substituted <A> () -> @out A for <Int>, @owned @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> () {
+bb0(%0: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>, %1: @owned $@callee_guaranteed @substituted <A> () -> @out A for <Int>):
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = function_ref @_allocateUninitializedArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<() -> Int>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%5, %6) = destructure_tuple %4 : $(Array<()->Int>, Builtin.RawPointer)
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
+  store %0 to [init] %7 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
+  %12 = integer_literal $Builtin.Word, 1
+  %13 = index_addr %7 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>, %12 : $Builtin.Word
+  store %1 to [init] %13 : $*@callee_guaranteed @substituted <A> () -> @out A for <Int>
+  %21 = begin_borrow %5 : $Array<()->Int>
+  %22 = alloc_stack $Array<()->Int>
+  %23 = store_borrow %21 to %22 : $*Array<()->Int>
+  %24 = function_ref @forEachBody2 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
+  %25 = convert_function %24 : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error to $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
+  %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <Int>) -> @error Error
+  // A stub for Sequence.forEach(_:)
+  %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+  try_apply %30<[() -> Int]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+
+bb1(%32 : $()):
+  dealloc_stack %22 : $*Array<() -> Int>
+  end_borrow %21 : $Array<() -> Int>
+  destroy_value %5 : $Array<() -> Int>
+  %37 = tuple ()
+  return %37 : $()
+
+bb2(%39 : @owned $Error):
+  unreachable
+}
+// CHECK-LABEL: nonTrivialForEachLoopUnrollTest
+// CHECK: [[ELEM1:%[0-9]+]] = copy_value %0
+// CHECK-NEXT: store %0 to [init] %{{.*}} : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+// CHECK: [[ELEM2:%[0-9]+]] = copy_value %1
+// CHECK-NEXT: store %1 to [init] %{{.*}} : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+// CHECK: [[BODYCLOSURE:%[0-9]+]] = thin_to_thick_function
+// CHECK-NOT: forEach
+// CHECK: [[STACK:%[0-9]+]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+// CHECK: [[ELEM1BORROW:%[0-9]+]] = begin_borrow [[ELEM1]]
+// CHECK: store_borrow [[ELEM1BORROW]] to [[STACK]]
+// CHECK: end_borrow [[ELEM1BORROW]]
+// CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+
+// CHECK: [[ERROR]]([[ERRPARAM:%[0-9]+]] : @owned $Error):
+// CHECK: br [[ERROR3:bb[0-9]+]]([[ERRPARAM]] : $Error)
+
+// CHECK: [[NORMAL]](%{{.*}} : $()):
+// CHECK: [[ELEM2BORROW:%[0-9]+]] = begin_borrow [[ELEM2]]
+// CHECK: store_borrow [[ELEM2BORROW]] to [[STACK]]
+// CHECK: end_borrow [[ELEM2BORROW]]
+// CHECK: try_apply [[BODYCLOSURE]]([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>) -> @error Error, normal [[NORMAL2:bb[0-9]+]], error [[ERROR2:bb[0-9]+]]
+
+// CHECK: [[ERROR2]]([[ERRPARAM2:%[0-9]+]] : @owned $Error):
+// CHECK: br [[ERROR3:bb[0-9]+]]([[ERRPARAM2]] : $Error)
+
+// CHECK: [[NORMAL2]](%{{.*}} : $()):
+// CHECK: dealloc_stack [[STACK]]
+// Note that the temporary alloc_stack of the array created for the forEach call
+// will be cleaned up when the forEach call is removed.
+// CHECK: destroy_value
+
+// CHECK: [[ERROR3]]([[ERRPARAM3:%[0-9]+]] : @owned $Error):
+// CHECK: dealloc_stack [[STACK]]
+// CHECK: unreachable
+
+sil hidden [ossa] @checkIndirectFixLifetimeUsesAreIgnored : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 2
+  %1 = function_ref @_allocateUninitializedArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%3, %4) = destructure_tuple %2 : $(Array<Builtin.Int64>, Builtin.RawPointer)
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Builtin.Int64
+  %6 = integer_literal $Builtin.Int64, 15
+  store %6 to [trivial] %5 : $*Builtin.Int64
+  %12 = integer_literal $Builtin.Word, 1
+  %13 = index_addr %5 : $*Builtin.Int64, %12 : $Builtin.Word
+  %14 = integer_literal $Builtin.Int64, 27
+  store %14 to [trivial] %13 : $*Builtin.Int64
+  %21 = begin_borrow %3 : $Array<Builtin.Int64>
+  %22 = alloc_stack $Array<Builtin.Int64>
+  %23 = store_borrow %21 to %22 : $*Array<Builtin.Int64>
+  %24 = function_ref @forEachBody : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error Error
+  %25 = convert_function %24 : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error Error to $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error
+  %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @error Error
+  // A stub for Sequence.forEach(_:)
+  %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+  try_apply %30<[Builtin.Int64]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+
+bb1(%32 : $()):
+  // An indirect fixLifetime use
+  dealloc_stack %22 : $*Array<Builtin.Int64>
+  %33 = alloc_stack $Array<Builtin.Int64>
+  %34 = store_borrow %21 to %33 : $*Array<Builtin.Int64>
+  fix_lifetime %33 : $*Array<Builtin.Int64>
+  dealloc_stack %33 : $*Array<Builtin.Int64>
+  end_borrow %21 : $Array<Builtin.Int64>
+  destroy_value %3 : $Array<Builtin.Int64>
+  %37 = tuple ()
+  return %37 : $()
+
+bb2(%39 : @owned $Error):
+  unreachable
+}
+// CHECK-LABEL: @checkIndirectFixLifetimeUsesAreIgnored
+// CHECK-NOT: function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+// CHECK: end sil function 'checkIndirectFixLifetimeUsesAreIgnored'
+
+sil hidden [ossa] @testUnrollOfArrayWithPhiArguments : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 57
+  br bb1(%0 : $Builtin.Int64)
+
+bb1(%arg : $Builtin.Int64):
+  %10 = integer_literal $Builtin.Word, 1
+  %11 = function_ref @_allocateUninitializedArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %12 = apply %11<Builtin.Int64>(%10) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%13, %14) = destructure_tuple %12 : $(Array<Builtin.Int64>, Builtin.RawPointer)
+  %15 = pointer_to_address %14 : $Builtin.RawPointer to [strict] $*Builtin.Int64
+  store %arg to [trivial] %15 : $*Builtin.Int64
+  br bb2(%arg : $Builtin.Int64)
+
+bb2(%arg2 : $Builtin.Int64):
+  %21 = begin_borrow %13 : $Array<Builtin.Int64>
+  %22 = alloc_stack $Array<Builtin.Int64>
+  %23 = store_borrow %21 to %22 : $*Array<Builtin.Int64>
+  %24 = function_ref @forEachBody : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error Error
+  %25 = convert_function %24 : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @error Error to $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error
+  %26 = thin_to_thick_function %25 : $@convention(thin) @noescape (@in_guaranteed Builtin.Int64) -> @error Error to $@noescape @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @error Error
+  // A stub for Sequence.forEach(_:)
+  %30 = function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+  try_apply %30<[Builtin.Int64]>(%26, %22) : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb3, error bb4
+
+bb3(%32 : $()):
+  dealloc_stack %22 : $*Array<Builtin.Int64>
+  end_borrow %21 : $Array<Builtin.Int64>
+  destroy_value %13 : $Array<Builtin.Int64>
+  %37 = tuple ()
+  return %37 : $()
+
+bb4(%39 : @owned $Error):
+  unreachable
+}
+// CHECK-LABEL: @testUnrollOfArrayWithPhiArguments
+// CHECK-NOT: function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error Error, @in_guaranteed τ_0_0) -> @error Error
+// CHECK: end sil function 'testUnrollOfArrayWithPhiArguments'
+

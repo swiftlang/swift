@@ -1,0 +1,75 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/opaque_result_types.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
+// RUN: %target-sil-opt -I %t -enable-sil-verify-all %s -generic-specializer | %FileCheck %s
+
+// REQUIRES: CPU=x86_64
+
+import Builtin
+import Swift
+import SwiftShims
+import External
+
+sil_stage canonical
+
+sil @project : $@convention(thin) (@in Test) -> @out IndexingIterator<Test>
+
+sil shared @test : $@convention(thin) (@owned Test) -> () {
+bb0(%0 : $Test):
+  %3 = alloc_stack $Test
+  store %0 to %3 : $*Test
+  %5 = alloc_stack $IndexingIterator<Test>
+  %6 = function_ref @project : $@convention(thin) (@in Test) -> @out IndexingIterator<Test>
+  %7 = apply %6(%5, %3) : $@convention(thin) (@in Test) -> @out IndexingIterator<Test>
+  %44 = alloc_stack $Optional<Int64>
+  // function_ref protocol witness for IteratorProtocol.next() in conformance IndexingIterator<A>
+  %45 = function_ref @next : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
+  %46 = apply %45<Test>(%44, %5) : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
+  destroy_addr %44: $*Optional<Int64>
+  dealloc_stack %44 : $*Optional<Int64>
+  destroy_addr %5: $*IndexingIterator<Test>
+  dealloc_stack %5 : $*IndexingIterator<Test>
+  dealloc_stack %3 : $*Test
+  %41 = tuple ()
+  return %41 : $()
+}
+// CHECK-LABEL: sil shared @$s4next8External4TestV_Tg5 : $@convention(witness_method: IteratorProtocol) (@inout IndexingIterator<Test>) -> Optional<Int64>
+// CHECK: bb0(%0 : $*IndexingIterator<Test>):
+// CHECK: alloc_stack $Optional<Int64>
+// CHECK:  ([[RES:%.*]], %{{.*}}) = begin_apply {{.*}}<Test>({{.*}}) : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+// CHECK:  [[DEST:%.*]] = init_enum_data_addr %1 : $*Optional<Int64>, #Optional.some!enumelt
+// CHECK:  copy_addr [[RES]] to [initialization] {{.*}} : $*Int64
+// CHECK: } // end sil function '$s4next8External4TestV_Tg5'
+
+sil @next : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element> {
+bb0(%0 : $*Optional<τ_0_0.Element>, %1 : $*IndexingIterator<τ_0_0>):
+  %2 = metatype $@thick τ_0_0.Index.Type
+  %3 = struct_element_addr %1 : $*IndexingIterator<τ_0_0>, #IndexingIterator._position
+  %4 = alloc_stack $τ_0_0.Index
+  copy_addr %3 to [initialization] %4 : $*τ_0_0.Index
+  %6 = struct_element_addr %1 : $*IndexingIterator<τ_0_0>, #IndexingIterator._elements
+  %20 = alloc_stack $τ_0_0
+  copy_addr %6 to [initialization] %20 : $*τ_0_0
+  %22 = alloc_stack $τ_0_0.Index
+  copy_addr %3 to [initialization] %22 : $*τ_0_0.Index
+  %24 = alloc_stack $τ_0_0
+  copy_addr [take] %20 to [initialization] %24 : $*τ_0_0
+  %26 = witness_method $τ_0_0, #Collection.subscript!read : <Self where Self : Collection> (Self) -> (Self.Index) -> () : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+
+  // The specialized begin apply %26<Test> has a result type of t_0_0.Element
+  // which works out to be an opaque result type whose underlying type is Int64.
+  // Make sure that the specialized code handles this correctly.
+  (%27, %28) = begin_apply %26<τ_0_0>(%22, %24) : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+
+  %29 = init_enum_data_addr %0 : $*Optional<τ_0_0.Element>, #Optional.some!enumelt
+  copy_addr %27 to [initialization] %29 : $*τ_0_0.Element
+  end_apply %28
+  destroy_addr %22 : $*τ_0_0.Index
+  destroy_addr %24 : $*τ_0_0
+  dealloc_stack %24 : $*τ_0_0
+  dealloc_stack %22 : $*τ_0_0.Index
+  dealloc_stack %20 : $*τ_0_0
+  destroy_addr %4 : $*τ_0_0.Index
+  dealloc_stack %4 : $*τ_0_0.Index
+  %41 = tuple ()
+  return %41 : $()
+}

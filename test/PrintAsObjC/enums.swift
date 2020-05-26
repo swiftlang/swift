@@ -1,10 +1,17 @@
 // RUN: %empty-directory(%t)
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-module -emit-module-doc -o %t %s -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -typecheck -emit-objc-header-path %t/enums.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/enums.h
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.h -include ctypes.h -include CoreFoundation.h
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-module -o /dev/null -emit-module-doc-path /dev/null -module-name enums %s -emit-objc-header-path %t/enums.WMO.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck %s < %t/enums.WMO.h
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/enums.WMO.h
+// RUN: %check-in-clang %t/enums.WMO.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.WMO.h -include ctypes.h -include CoreFoundation.h
 
 // REQUIRES: objc_interop
 

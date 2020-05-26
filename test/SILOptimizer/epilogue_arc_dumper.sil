@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-epilogue-arc-dumper %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-epilogue-arc-dumper %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -180,7 +180,7 @@ bb3:
 }
 
 // CHECK-LABEL: START: epilogue_retains_in_diamond_top_and_left_split_block
-// CHECK: apply
+// CHECK-NOT: apply
 // CHECK: FINISH: epilogue_retains_in_diamond_top_and_left_split_block
 sil @epilogue_retains_in_diamond_top_and_left_split_block : $@convention(thin) (@owned foo) -> @owned foo {
 bb0(%0 : $foo):

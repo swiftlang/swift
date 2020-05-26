@@ -64,11 +64,18 @@ namespace irgen {
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
-  FunctionPointer emitWitnessMethodValue(IRGenFunction &IGF,
-                                         CanType baseTy,
+  FunctionPointer emitWitnessMethodValue(IRGenFunction &IGF, CanType baseTy,
                                          llvm::Value **baseMetadataCache,
                                          SILDeclRef member,
                                          ProtocolConformanceRef conformance);
+
+  /// Compute the index into a witness table for a resilient protocol given
+  /// a reference to a descriptor of one of the requirements in that witness
+  /// table.
+  llvm::Value *computeResilientWitnessTableIndex(
+                                            IRGenFunction &IGF,
+                                            ProtocolDecl *proto,
+                                            llvm::Constant *reqtDescriptor);
 
   /// Given a type T and an associated type X of some protocol P to
   /// which T conforms, return the type metadata for T.X.
@@ -149,7 +156,7 @@ namespace irgen {
                                 CanSILFunctionType &SubstFnType,
                                 Explosion &nativeParam, unsigned paramIndex);
 
-  /// \brief Load a reference to the protocol descriptor for the given protocol.
+  /// Load a reference to the protocol descriptor for the given protocol.
   ///
   /// For Swift protocols, this is a constant reference to the protocol
   /// descriptor symbol.
@@ -168,26 +175,6 @@ namespace irgen {
   llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
                                    CanType srcType,
                                    ProtocolConformanceRef conformance);
-
-  /// An entry in a list of known protocols.
-  class ProtocolEntry {
-    ProtocolDecl *Protocol;
-    const ProtocolInfo &Impl;
-
-  public:
-    explicit ProtocolEntry(ProtocolDecl *proto, const ProtocolInfo &impl)
-      : Protocol(proto), Impl(impl) {}
-
-    ProtocolDecl *getProtocol() const { return Protocol; }
-    const ProtocolInfo &getInfo() const { return Impl; }
-  };
-
-  using GetWitnessTableFn =
-    llvm::function_ref<llvm::Value*(unsigned originIndex)>;
-  llvm::Value *emitImpliedWitnessTableRef(IRGenFunction &IGF,
-                                          ArrayRef<ProtocolEntry> protos,
-                                          ProtocolDecl *target,
-                                    const GetWitnessTableFn &getWitnessTable);
 
   class MetadataSource {
   public:
@@ -248,9 +235,6 @@ namespace irgen {
   void enumerateGenericParamFulfillments(IRGenModule &IGM,
     CanSILFunctionType fnType,
     GenericParamFulfillmentCallback callback);
-
-  bool isDependentConformance(const NormalProtocolConformance *conformance);
-
 } // end namespace irgen
 } // end namespace swift
 

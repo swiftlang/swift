@@ -86,7 +86,7 @@ for Swift, an open-source project, is located at L<https://bugs.swift.org>.
 
 If a bug can be reproduced only within an Xcode project or a playground, or if
 the bug is associated with an Apple NDA, please file a report to Apple's
-bug reporter at L<https://bugreport.apple.com> instead.
+Feedback Assistant at L<https://feedbackassistant.apple.com> instead.
 
 =head1 SEE ALSO
 

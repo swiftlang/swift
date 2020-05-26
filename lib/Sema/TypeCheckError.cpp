@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 
 using namespace swift;
 
@@ -41,7 +42,7 @@ private:
   };
   unsigned TheKind : 2;
   unsigned IsRethrows : 1;
-  unsigned ParamCount : 28;
+  unsigned ParamCount : 2;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
@@ -54,7 +55,7 @@ public:
   explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->getNumParameterLists()) {
+      ParamCount(fn->getNumCurryLevels()) {
     TheFunction = fn;
   }
 
@@ -146,11 +147,19 @@ public:
       // Look through closure capture lists.
       } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
         fn = captureList->getClosureBody();
+        // Look through optional evaluations.
+      } else if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(fn)) {
+        fn = optionalEval->getSubExpr()->getValueProvidingExpr();
       } else {
         break;
       }
     }
     
+    // Constructor delegation.
+    if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
+      return AbstractFunction(otherCtorDeclRef->getDecl());
+    }
+
     // Normal function references.
     if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = declRef->getDecl();
@@ -207,6 +216,8 @@ public:
       recurse = asImpl().checkOptionalTry(optionalTryExpr);
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
+    } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+      recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     }
     // Error handling validation (via checkTopLevelErrorHandling) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -224,8 +235,6 @@ public:
       recurse = asImpl().checkDoCatch(doCatch);
     } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
       recurse = asImpl().checkThrow(thr);
-    } else {
-      assert(!isa<CatchStmt>(S));
     }
     return {bool(recurse), S};
   }
@@ -450,7 +459,7 @@ public:
 
       // Use the most significant result from the arguments.
       Classification result;
-      for (auto arg : reversed(args)) {
+      for (auto arg : llvm::reverse(args)) {
         auto fnType = type->getAs<AnyFunctionType>();
         if (!fnType) return Classification::forInvalidCode();
 
@@ -591,6 +600,9 @@ private:
       Result = ThrowingKind::Throws;
       return ShouldRecurse;
     }
+    ShouldRecurse_t checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
+      return ShouldRecurse;
+    }
 
     ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
       return ShouldRecurse;
@@ -615,7 +627,7 @@ private:
       return ThrowingKind::None;
     }
 
-    void checkCatch(CatchStmt *S, ThrowingKind doThrowingKind) {
+    void checkCatch(CaseStmt *S, ThrowingKind doThrowingKind) {
       if (doThrowingKind != ThrowingKind::None) {
         // This was an exhaustive do body, so bound our throwing kind by its
         // throwing kind.
@@ -665,17 +677,34 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
+    if (isa<DefaultArgumentExpr>(arg)) {
+      return classifyArgumentByType(arg->getType(),
+                                    PotentialReason::forDefaultArgument());
+    }
+
+    // If this argument is `nil` literal, it doesn't cause the call to throw.
+    if (isa<NilLiteralExpr>(arg)) {
+      if (arg->getType()->getOptionalObjectType())
+        return Classification();
+    }
+
+    // Neither does 'Optional<T>.none'.
+    if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {
+      if (auto *DE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+        auto &ctx = paramType->getASTContext();
+        if (DE->getDecl() == ctx.getOptionalNoneDecl())
+          return Classification();
+      }
+    }
+
     // If the parameter was structurally a tuple, try to look through the
     // various tuple operations.
     if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
       if (auto tuple = dyn_cast<TupleExpr>(arg)) {
         return classifyTupleRethrowsArgument(tuple, paramTupleType);
-      } else if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg)) {
-        return classifyShuffleRethrowsArgument(shuffle, paramTupleType);
       }
 
-      int scalarElt = paramTupleType->getElementForScalarInit();
-      if (scalarElt < 0) {
+      if (paramTupleType->getNumElements() != 1) {
         // Otherwise, we're passing an opaque tuple expression, and we
         // should treat it as contributing to 'rethrows' if the original
         // parameter type included a throwing function type.
@@ -684,7 +713,10 @@ private:
                                     PotentialReason::forRethrowsArgument(arg));
       }
 
-      paramType = paramTupleType->getElementType(scalarElt);
+      // FIXME: There's a case where we can end up with an ApplyExpr that
+      // has a single-element-tuple argument type, but the argument is just
+      // a ClosureExpr and not a TupleExpr.
+      paramType = paramTupleType->getElementType(0);
     }
 
     // Otherwise, if the original parameter type was not a throwing
@@ -703,7 +735,10 @@ private:
 
     // If it doesn't have function type, we must have invalid code.
     Type argType = fn.getType();
-    auto argFnType = (argType ? argType->getAs<AnyFunctionType>() : nullptr);
+    if (!argType) return Classification::forInvalidCode();
+
+    auto argFnType =
+        argType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
     if (!argFnType) return Classification::forInvalidCode();
 
     // If it doesn't throw, this argument does not cause the call to throw.
@@ -725,79 +760,6 @@ private:
                                             paramTupleType->getElementType(i)));
     }
     return result;
-  }
-
-  /// Classify an argument to a 'rethrows' function that's a tuple shuffle.
-  Classification classifyShuffleRethrowsArgument(TupleShuffleExpr *shuffle,
-                                                 TupleType *paramTupleType) {
-    auto reversedParamType =
-      reverseShuffleParamType(shuffle, paramTupleType);
-
-    // Classify the operand.
-    auto result = classifyRethrowsArgument(shuffle->getSubExpr(),
-                                           reversedParamType);
-
-    // Check for default arguments in the shuffle.
-    for (auto i : indices(shuffle->getElementMapping())) {
-      // If this element comes from the sub-expression, we've already
-      // analyzed it.  (Variadic arguments also end up here, which is
-      // correct for our purposes.)
-      auto elt = shuffle->getElementMapping()[i];
-      if (elt >= 0) {
-        // Ignore.
-
-      // Otherwise, it might come from a default argument.  It still
-      // might contribute to 'rethrows', but treat it as an opaque source.
-      } else if (elt == TupleShuffleExpr::DefaultInitialize ||
-                 elt == TupleShuffleExpr::CallerDefaultInitialize) {
-        result.merge(classifyArgumentByType(paramTupleType->getElementType(i),
-                                       PotentialReason::forDefaultArgument()));
-      }
-    }
-
-    return result;
-  }
-
-  /// Given a tuple shuffle and an original parameter type, construct
-  /// the type of the source of the tuple shuffle preserving as much
-  /// information as possible from the original parameter type.
-  Type reverseShuffleParamType(TupleShuffleExpr *shuffle,
-                               TupleType *origParamTupleType) {
-    SmallVector<TupleTypeElt, 4> origSrcElts;
-    if (shuffle->isSourceScalar()) {
-      origSrcElts.append(1, TupleTypeElt());
-    } else {
-      auto srcTupleType = shuffle->getSubExpr()->getType()->castTo<TupleType>();
-      origSrcElts.append(srcTupleType->getNumElements(), TupleTypeElt());
-    }
-
-    auto mapping = shuffle->getElementMapping();
-    for (unsigned destIndex = 0; destIndex != mapping.size(); ++destIndex) {
-      auto srcIndex = mapping[destIndex];
-      if (srcIndex >= 0) {
-        origSrcElts[srcIndex] = origParamTupleType->getElement(destIndex);
-      } else if (srcIndex == TupleShuffleExpr::DefaultInitialize ||
-                 srcIndex == TupleShuffleExpr::CallerDefaultInitialize) {
-        // Nothing interesting from the source expression.
-      } else if (srcIndex == TupleShuffleExpr::Variadic) {
-        // Variadic arguments never contribute to 'rethrows'.
-        // Assign the rest of the source elements parameter types that will
-        // cause the recursive walker to ignore them.
-        for (unsigned srcIndex : shuffle->getVariadicArgs()) {
-          assert(srcIndex >= 0 && "default-initialized variadic argument?");
-          origSrcElts[srcIndex] =
-            origParamTupleType->getASTContext().TheRawPointerType;
-        }
-      } else {
-        llvm_unreachable("bad source-element mapping!");
-      }
-    }
-
-    if (shuffle->isSourceScalar()) {
-      return origSrcElts[0].getType();
-    } else {
-      return TupleType::get(origSrcElts, origParamTupleType->getASTContext());
-    }
   }
 
   /// Given the type of an argument, try to determine if it contains
@@ -863,6 +825,9 @@ public:
 
     /// The pattern of a catch.
     CatchGuard,
+
+    /// A defer body
+    DeferBody
   };
 
 private:
@@ -889,6 +854,7 @@ private:
   Kind TheKind;
   bool DiagnoseErrorOnTry = false;
   DeclContext *RethrowsDC = nullptr;
+  InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
   explicit Context(Kind kind) : TheKind(kind) {}
 
@@ -926,7 +892,11 @@ public:
     }
 
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->getNumCurryLevels()));
+  }
+
+  static Context forDeferBody() {
+    return Context(Kind::DeferBody);
   }
 
   static Context forInitializer(Initializer *init) {
@@ -955,12 +925,22 @@ public:
     return Context(Kind::NonExhaustiveCatch);
   }
 
-  static Context forCatchPattern(CatchStmt *S) {
+  static Context forCatchPattern(CaseStmt *S) {
     return Context(Kind::CatchPattern);
   }
 
-  static Context forCatchGuard(CatchStmt *S) {
+  static Context forCatchGuard(CaseStmt *S) {
     return Context(Kind::CatchGuard);
+  }
+
+  static Context forPatternBinding(PatternBindingDecl *binding) {
+    return getContextForPatternBinding(binding);
+  }
+
+  Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
+    Context copy = *this;
+    copy.InterpolatedString = E;
+    return copy;
   }
 
   Kind getKind() const { return TheKind; }
@@ -988,20 +968,26 @@ public:
   }
 
   DeclContext *getRethrowsDC() const { return RethrowsDC; }
-
-  static void diagnoseThrowInIllegalContext(TypeChecker &TC, ASTNode node,
-                                            StringRef description) {
-    if (auto *e = node.dyn_cast<Expr*>())
-      if (isa<ApplyExpr>(e)) {
-        TC.diagnose(e->getLoc(), diag::throwing_call_in_illegal_context,
-                    description);
-        return;
-      }
-    TC.diagnose(node.getStartLoc(), diag::throw_in_illegal_context,
-                description);
+  InterpolatedStringLiteralExpr * getInterpolatedString() const {
+    return InterpolatedString;
   }
 
-  static void maybeAddRethrowsNote(TypeChecker &TC, SourceLoc loc,
+  static void diagnoseThrowInIllegalContext(DiagnosticEngine &Diags,
+                                            ASTNode node,
+                                            StringRef description) {
+    if (auto *e = node.dyn_cast<Expr*>()) {
+      if (isa<ApplyExpr>(e)) {
+        Diags.diagnose(e->getLoc(), diag::throwing_call_in_illegal_context,
+                       description);
+        return;
+      }
+    }
+
+    Diags.diagnose(node.getStartLoc(), diag::throw_in_illegal_context,
+                   description);
+  }
+
+  static void maybeAddRethrowsNote(DiagnosticEngine &Diags, SourceLoc loc,
                                    const PotentialReason &reason) {
     switch (reason.getKind()) {
     case PotentialReason::Kind::Throw:
@@ -1010,20 +996,22 @@ public:
       // Already fully diagnosed.
       return;
     case PotentialReason::Kind::CallRethrowsWithExplicitThrowingArgument:
-      TC.diagnose(reason.getThrowingArgument()->getLoc(),
-                  diag::because_rethrows_argument_throws);
+      Diags.diagnose(reason.getThrowingArgument()->getLoc(),
+                     diag::because_rethrows_argument_throws);
       return;
     case PotentialReason::Kind::CallRethrowsWithDefaultThrowingArgument:
-      TC.diagnose(loc, diag::because_rethrows_default_argument_throws);
+      Diags.diagnose(loc, diag::because_rethrows_default_argument_throws);
       return;
     }
     llvm_unreachable("bad reason kind");
   }
 
-  void diagnoseUncoveredThrowSite(TypeChecker &TC, ASTNode E,
+  void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
                                   const PotentialReason &reason) {
+    auto &Diags = ctx.Diags;
     auto message = diag::throwing_call_without_try;
     auto loc = E.getStartLoc();
+    SourceLoc insertLoc;
     SourceRange highlight;
     
     // Generate more specific messages in some cases.
@@ -1033,11 +1021,20 @@ public:
         loc = e->getFn()->getStartLoc();
         message = diag::throwing_operator_without_try;
       }
+      insertLoc = loc;
       highlight = e->getSourceRange();
+      
+      if (InterpolatedString &&
+          e->getCalledValue() &&
+          e->getCalledValue()->getBaseName() ==
+          ctx.Id_appendInterpolation) {
+        message = diag::throwing_interpolation_without_try;
+        insertLoc = InterpolatedString->getLoc();
+      }
     }
     
-    TC.diagnose(loc, message).highlight(highlight);
-    maybeAddRethrowsNote(TC, loc, reason);
+    Diags.diagnose(loc, message).highlight(highlight);
+    maybeAddRethrowsNote(Diags, loc, reason);
 
     // If this is a call without expected 'try[?|!]', like this:
     //
@@ -1049,13 +1046,15 @@ public:
     if (reason.getKind() != PotentialReason::Kind::CallThrows)
       return;
 
-    TC.diagnose(loc, diag::note_forgot_try).fixItInsert(loc, "try ");
-    TC.diagnose(loc, diag::note_error_to_optional).fixItInsert(loc, "try? ");
-    TC.diagnose(loc, diag::note_disable_error_propagation)
-        .fixItInsert(loc, "try! ");
+    Diags.diagnose(loc, diag::note_forgot_try)
+        .fixItInsert(insertLoc, "try ");
+    Diags.diagnose(loc, diag::note_error_to_optional)
+        .fixItInsert(insertLoc, "try? ");
+    Diags.diagnose(loc, diag::note_disable_error_propagation)
+        .fixItInsert(insertLoc, "try! ");
   }
 
-  void diagnoseThrowInLegalContext(TypeChecker &TC, ASTNode node,
+  void diagnoseThrowInLegalContext(DiagnosticEngine &Diags, ASTNode node,
                                    bool isTryCovered,
                                    const PotentialReason &reason,
                                    Diag<> diagForThrow,
@@ -1063,7 +1062,7 @@ public:
                                    Diag<> diagForTrylessThrowingCall) {
     auto loc = node.getStartLoc();
     if (reason.isThrow()) {
-      TC.diagnose(loc, diagForThrow);
+      Diags.diagnose(loc, diagForThrow);
       return;
     }
 
@@ -1077,14 +1076,15 @@ public:
     }
 
     if (isTryCovered) {
-      TC.diagnose(loc, diagForThrowingCall);
+      Diags.diagnose(loc, diagForThrowingCall);
     } else {
-      TC.diagnose(loc, diagForTrylessThrowingCall);
+      Diags.diagnose(loc, diagForTrylessThrowingCall);
     }
-    maybeAddRethrowsNote(TC, loc, reason);
+    maybeAddRethrowsNote(Diags, loc, reason);
   }
 
-  void diagnoseUnhandledThrowSite(TypeChecker &TC, ASTNode E, bool isTryCovered,
+  void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
+                                  bool isTryCovered,
                                   const PotentialReason &reason) {
     switch (getKind()) {
     case Kind::Handled:
@@ -1095,61 +1095,64 @@ public:
     // notes for the throw sites.
 
     case Kind::RethrowingFunction:
-      diagnoseThrowInLegalContext(TC, E, isTryCovered, reason,
+      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                   diag::throw_in_rethrows_function,
                                   diag::throwing_call_in_rethrows_function,
                           diag::tryless_throwing_call_in_rethrows_function);
       return;
 
     case Kind::NonThrowingFunction:
-      diagnoseThrowInLegalContext(TC, E, isTryCovered, reason,
+      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                   diag::throw_in_nonthrowing_function,
                                   diag::throwing_call_unhandled,
                                   diag::tryless_throwing_call_unhandled);
       return;
 
     case Kind::NonThrowingAutoClosure:
-      diagnoseThrowInLegalContext(TC, E, isTryCovered, reason,
+      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                   diag::throw_in_nonthrowing_autoclosure,
                             diag::throwing_call_in_nonthrowing_autoclosure,
                     diag::tryless_throwing_call_in_nonthrowing_autoclosure);
       return;
 
     case Kind::NonExhaustiveCatch:
-      diagnoseThrowInLegalContext(TC, E, isTryCovered, reason,
+      diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                   diag::throw_in_nonexhaustive_catch,
                                   diag::throwing_call_in_nonexhaustive_catch,
                           diag::tryless_throwing_call_in_nonexhaustive_catch);
       return;
 
     case Kind::EnumElementInitializer:
-      diagnoseThrowInIllegalContext(TC, E, "an enum case raw value");
+      diagnoseThrowInIllegalContext(Diags, E, "an enum case raw value");
       return;
 
     case Kind::GlobalVarInitializer:
-      diagnoseThrowInIllegalContext(TC, E, "a global variable initializer");
+      diagnoseThrowInIllegalContext(Diags, E, "a global variable initializer");
       return;
 
     case Kind::IVarInitializer:
-      diagnoseThrowInIllegalContext(TC, E, "a property initializer");
+      diagnoseThrowInIllegalContext(Diags, E, "a property initializer");
       return;
 
     case Kind::DefaultArgument:
-      diagnoseThrowInIllegalContext(TC, E, "a default argument");
+      diagnoseThrowInIllegalContext(Diags, E, "a default argument");
       return;
 
     case Kind::CatchPattern:
-      diagnoseThrowInIllegalContext(TC, E, "a catch pattern");
+      diagnoseThrowInIllegalContext(Diags, E, "a catch pattern");
       return;
 
     case Kind::CatchGuard:
-      diagnoseThrowInIllegalContext(TC, E, "a catch guard expression");
+      diagnoseThrowInIllegalContext(Diags, E, "a catch guard expression");
+      return;
+    case Kind::DeferBody:
+      diagnoseThrowInIllegalContext(Diags, E, "a defer body");
       return;
     }
     llvm_unreachable("bad context kind");
   }
 
-  void diagnoseUnhandledTry(TypeChecker &TC, TryExpr *E) {
+  void diagnoseUnhandledTry(DiagnosticEngine &Diags, TryExpr *E) {
     switch (getKind()) {
     case Kind::Handled:
     case Kind::RethrowingFunction:
@@ -1157,12 +1160,13 @@ public:
 
     case Kind::NonThrowingFunction:
       if (DiagnoseErrorOnTry)
-        TC.diagnose(E->getTryLoc(), diag::try_unhandled);
+        Diags.diagnose(E->getTryLoc(), diag::try_unhandled);
       return;
 
     case Kind::NonExhaustiveCatch:
       if (DiagnoseErrorOnTry)
-        TC.diagnose(E->getTryLoc(), diag::try_unhandled_in_nonexhaustive_catch);
+        Diags.diagnose(E->getTryLoc(),
+                       diag::try_unhandled_in_nonexhaustive_catch);
       return;
 
     case Kind::NonThrowingAutoClosure:
@@ -1172,6 +1176,7 @@ public:
     case Kind::DefaultArgument:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
+    case Kind::DeferBody:
       assert(!DiagnoseErrorOnTry);
       // Diagnosed at the call sites.
       return;
@@ -1185,7 +1190,7 @@ public:
 class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
   friend class ErrorHandlingWalker<CheckErrorCoverage>;
 
-  TypeChecker &TC;
+  ASTContext &Ctx;
 
   ApplyClassifier Classifier;
 
@@ -1303,6 +1308,12 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
 
+    void preserveCoverageFromInterpolatedString() {
+      OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
+      OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+    }
+    
     bool wasTopLevelDebuggerFunction() const {
       return OldFlags.has(ContextFlags::IsTopLevelDebuggerFunction);
     }
@@ -1316,8 +1327,8 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
   };
 
 public:
-  CheckErrorCoverage(TypeChecker &tc, Context initialContext)
-    : TC(tc), CurContext(initialContext),
+  CheckErrorCoverage(ASTContext &ctx, Context initialContext)
+    : Ctx(ctx), CurContext(initialContext),
       MaxThrowingKind(ThrowingKind::None) {
 
     if (auto rethrowsDC = initialContext.getRethrowsDC()) {
@@ -1395,20 +1406,22 @@ private:
     // implicit do/catch in a debugger function.
     if (!Flags.has(ContextFlags::HasAnyThrowSite) &&
         !scope.wasTopLevelDebuggerFunction()) {
-      TC.diagnose(S->getCatches().front()->getCatchLoc(),
-                  diag::no_throw_in_do_with_catch);
+      Ctx.Diags.diagnose(S->getCatches().front()->getStartLoc(),
+                         diag::no_throw_in_do_with_catch);
     }
   }
 
-  void checkCatch(CatchStmt *S, ThrowingKind doThrowingKind) {
-    // The pattern and guard aren't allowed to throw.
-    {
-      ContextScope scope(*this, Context::forCatchPattern(S));
-      S->getErrorPattern()->walk(*this);
-    }
-    if (auto guard = S->getGuardExpr()) {
-      ContextScope scope(*this, Context::forCatchGuard(S));
-      guard->walk(*this);
+  void checkCatch(CaseStmt *S, ThrowingKind doThrowingKind) {
+    for (auto &LabelItem : S->getMutableCaseLabelItems()) {
+      // The pattern and guard aren't allowed to throw.
+      {
+        ContextScope scope(*this, Context::forCatchPattern(S));
+        LabelItem.getPattern()->walk(*this);
+      }
+      if (auto guard = LabelItem.getGuardExpr()) {
+        ContextScope scope(*this, Context::forCatchGuard(S));
+        guard->walk(*this);
+      }
     }
 
     auto savedContext = CurContext;
@@ -1449,6 +1462,15 @@ private:
     // incorrect.
     auto type = E->getType();
     return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
+  }
+
+  ShouldRecurse_t
+  checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
+    ContextScope scope(*this, CurContext.withInterpolatedString(E));
+    if (E->getAppendingExpr())
+      E->getAppendingExpr()->walk(*this);
+    scope.preserveCoverageFromInterpolatedString();
+    return ShouldNotRecurse;
   }
 
   ShouldRecurse_t checkIfConfig(IfConfigDecl *ICD) {
@@ -1521,10 +1543,10 @@ private:
       bool isTryCovered =
         (!requiresTry || Flags.has(ContextFlags::IsTryCovered));
       if (!CurContext.handles(classification.getResult())) {
-        CurContext.diagnoseUnhandledThrowSite(TC, E, isTryCovered,
+        CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, E, isTryCovered,
                                               classification.getThrowsReason());
       } else if (!isTryCovered) {
-        CurContext.diagnoseUncoveredThrowSite(TC, E,
+        CurContext.diagnoseUncoveredThrowSite(Ctx, E,
                                               classification.getThrowsReason());
       }
       return;
@@ -1542,12 +1564,12 @@ private:
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
       if (!E->isImplicit())
-        TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
+        Ctx.Diags.diagnose(E->getTryLoc(), diag::no_throw_in_try);
 
     // Diagnose all the call sites within a single unhandled 'try'
     // at the same time.
     } else if (CurContext.handlesNothing()) {
-      CurContext.diagnoseUnhandledTry(TC, E);
+      CurContext.diagnoseUnhandledTry(Ctx.Diags, E);
     }
 
     scope.preserveCoverageFromTryOperand();
@@ -1563,7 +1585,7 @@ private:
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
-      TC.diagnose(E->getLoc(), diag::no_throw_in_try);
+      Ctx.Diags.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
     return ShouldNotRecurse;
   }
@@ -1577,7 +1599,7 @@ private:
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite)) {
-      TC.diagnose(E->getLoc(), diag::no_throw_in_try);
+      Ctx.Diags.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
     return ShouldNotRecurse;
   }
@@ -1586,21 +1608,26 @@ private:
 } // end anonymous namespace
 
 void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
-  CheckErrorCoverage checker(*this, Context::forTopLevelCode(code));
+  auto &ctx = code->getDeclContext()->getASTContext();
+  CheckErrorCoverage checker(ctx, Context::forTopLevelCode(code));
 
   // In some language modes, we allow top-level code to omit 'try' marking.
-  if (Context.LangOpts.EnableThrowWithoutTry)
+  if (ctx.LangOpts.EnableThrowWithoutTry)
     checker.setTopLevelThrowWithoutTry();
 
   code->getBody()->walk(checker);
 }
 
 void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
-  // In some cases, we won't have validated the signature
-  // by the time we got here.
-  if (!fn->hasInterfaceType()) return;
+#ifndef NDEBUG
+  PrettyStackTraceDecl debugStack("checking error handling for", fn);
+#endif
 
-  CheckErrorCoverage checker(*this, Context::forFunction(fn));
+  auto isDeferBody = isa<FuncDecl>(fn) && cast<FuncDecl>(fn)->isDeferBody();
+  auto context =
+      isDeferBody ? Context::forDeferBody() : Context::forFunction(fn);
+  auto &ctx = fn->getASTContext();
+  CheckErrorCoverage checker(ctx, context);
 
   // If this is a debugger function, suppress 'try' marking at the top level.
   if (fn->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
@@ -1616,7 +1643,8 @@ void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
 
 void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
                                                 Expr *init) {
-  CheckErrorCoverage checker(*this, Context::forInitializer(initCtx));
+  auto &ctx = initCtx->getASTContext();
+  CheckErrorCoverage checker(ctx, Context::forInitializer(initCtx));
   init->walk(checker);
 }
 
@@ -1628,9 +1656,15 @@ void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
 /// ensures correctness if those restrictions are ever loosened,
 /// perhaps accidentally, and (2) allows the verifier to assert that
 /// all calls have been checked.
-void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
-  if (auto init = elt->getTypeCheckedRawValueExpr()) {
-    CheckErrorCoverage checker(*this, Context::forEnumElementInitializer(elt));
-    init->walk(checker);
-  }
+void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt, Expr *E) {
+  auto &ctx = elt->getASTContext();
+  CheckErrorCoverage checker(ctx, Context::forEnumElementInitializer(elt));
+  E->walk(checker);
+}
+
+void TypeChecker::checkPropertyWrapperErrorHandling(
+    PatternBindingDecl *binding, Expr *expr) {
+  auto &ctx = binding->getASTContext();
+  CheckErrorCoverage checker(ctx, Context::forPatternBinding(binding));
+  expr->walk(checker);
 }

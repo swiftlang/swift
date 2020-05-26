@@ -78,3 +78,9 @@ func bar() -> UInt {}   // expected-note {{found this candidate}}
 foo(type(of: G.T.self)) // Ok
 let _: Any = type(of: G.T.self) // Ok
 foo(type(of: bar())) // expected-error {{ambiguous use of 'bar()'}}
+
+struct SR10696 {
+  func bar(_ s: SR10696.Type) {
+    type(of: s)() // expected-error {{type 'SR10696.Type' has no member 'init'}}
+  }
+}

@@ -33,8 +33,9 @@ namespace options {
     DoesNotAffectIncrementalBuild = (1 << 8),
     AutolinkExtractOption = (1 << 9),
     ModuleWrapOption = (1 << 10),
-    SwiftFormatOption = (1 << 11),
+    SwiftIndentOption = (1 << 11),
     ArgumentIsPath = (1 << 12),
+    ModuleInterfaceOption = (1 << 13),
   };
 
   enum ID {

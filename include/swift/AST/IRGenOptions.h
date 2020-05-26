@@ -19,12 +19,16 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "clang/Basic/PointerAuthOptions.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/VersionTuple.h"
 #include <string>
 #include <vector>
 
@@ -67,6 +71,62 @@ enum class IRGenEmbedMode : unsigned {
   EmbedBitcode
 };
 
+using clang::PointerAuthSchema;
+
+struct PointerAuthOptions : clang::PointerAuthOptions {
+  /// Native opaque function types, both thin and thick.
+  /// Never address-sensitive.
+  PointerAuthSchema SwiftFunctionPointers;
+
+  /// Swift key path helpers.
+  PointerAuthSchema KeyPaths;
+
+  /// Swift value witness functions.
+  PointerAuthSchema ValueWitnesses;
+
+  /// Swift protocol witness functions.
+  PointerAuthSchema ProtocolWitnesses;
+
+  /// Swift protocol witness table associated type metadata access functions.
+  PointerAuthSchema ProtocolAssociatedTypeAccessFunctions;
+
+  /// Swift protocol witness table associated conformance witness table
+  /// access functions.
+  PointerAuthSchema ProtocolAssociatedTypeWitnessTableAccessFunctions;
+
+  /// Swift class v-table functions.
+  PointerAuthSchema SwiftClassMethods;
+
+  /// Swift dynamic replacement implementations.
+  PointerAuthSchema SwiftDynamicReplacements;
+  PointerAuthSchema SwiftDynamicReplacementKeys;
+
+  /// Swift class v-table functions not signed with an address. This is the
+  /// return type of swift_lookUpClassMethod().
+  PointerAuthSchema SwiftClassMethodPointers;
+
+  /// Swift heap metadata destructors.
+  PointerAuthSchema HeapDestructors;
+
+  /// Non-constant function pointers captured in a partial-apply context.
+  PointerAuthSchema PartialApplyCapture;
+
+  /// Type descriptor data pointers.
+  PointerAuthSchema TypeDescriptors;
+
+  /// Type descriptor data pointers when passed as arguments.
+  PointerAuthSchema TypeDescriptorsAsArguments;
+
+  /// Resumption functions from yield-once coroutines.
+  PointerAuthSchema YieldOnceResumeFunctions;
+
+  /// Resumption functions from yield-many coroutines.
+  PointerAuthSchema YieldManyResumeFunctions;
+
+  /// Resilient class stub initializer callbacks.
+  PointerAuthSchema ResilientClassStubInitCallbacks;
+};
+
 /// The set of options supported by IR generation.
 class IRGenOptions {
 public:
@@ -103,28 +163,35 @@ public:
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
 
+  /// Which sanitizer(s) have recovery instrumentation enabled.
+  OptionSet<SanitizerKind> SanitizersWithRecoveryInstrumentation;
+
+  /// Path prefixes that should be rewritten in debug info.
+  PathRemapper DebugPrefixMap;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
   /// What type of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat : 2;
 
-  /// \brief Whether we're generating IR for the JIT.
+  /// Whether to leave DWARF breadcrumbs pointing to imported Clang modules.
+  unsigned DisableClangModuleSkeletonCUs : 1;
+
+  /// Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
   
-  /// \brief Whether we're generating code for the integrated REPL.
-  unsigned IntegratedREPL : 1;
-  
-  /// \brief Whether we should run LLVM optimizations after IRGen.
+  /// Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
   /// Whether we should run swift specific LLVM optimizations after IRGen.
   unsigned DisableSwiftSpecificLLVMOptzns : 1;
 
-  /// \brief Whether we should run LLVM SLP vectorizer.
+  /// Whether we should run LLVM SLP vectorizer.
   unsigned DisableLLVMSLPVectorizer : 1;
 
   /// Disable frame pointer elimination?
+  unsigned DisableFPElimLeaf : 1;
   unsigned DisableFPElim : 1;
   
   /// Special codegen for playgrounds.
@@ -133,6 +200,9 @@ public:
   /// Emit runtime calls to check the end of the lifetime of stack promoted
   /// objects.
   unsigned EmitStackPromotionChecks : 1;
+
+  /// Emit functions to separate sections.
+  unsigned FunctionSections : 1;
 
   /// The maximum number of bytes used on a stack frame for stack promotion
   /// (includes alloc_stack allocations).
@@ -161,11 +231,29 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
-  /// Enables resilient class layout.
-  unsigned EnableClassResilience : 1;
+  /// Emit mangled names of anonymous context descriptors.
+  unsigned EnableAnonymousContextMangledNames : 1;
 
-  /// Bypass resilience when accessing resilient frameworks.
-  unsigned EnableResilienceBypass : 1;
+  /// Force public linkage for private symbols. Used only by the LLDB
+  /// expression evaluator.
+  unsigned ForcePublicLinkage : 1;
+  
+  /// Force lazy initialization of class metadata
+  /// Used on Windows to avoid cross-module references.
+  unsigned LazyInitializeClassMetadata : 1;
+  unsigned LazyInitializeProtocolConformances : 1;
+
+  /// Normally if the -read-legacy-type-info flag is not specified, we look for
+  /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
+  /// Passing this flag completely disables this behavior.
+  unsigned DisableLegacyTypeInfo : 1;
+
+  /// Create metadata specializations for generic types at statically known type
+  /// arguments.
+  unsigned PrespecializeGenericMetadata : 1;
+
+  /// The path to load legacy type layouts from.
+  StringRef ReadLegacyTypeInfoPath;
 
   /// Should we try to build incrementally by not emitting an object file if it
   /// has the same IR hash as the module that we are preparing to emit?
@@ -177,8 +265,25 @@ public:
   /// Enable use of the swiftcall calling convention.
   unsigned UseSwiftCall : 1;
 
+  /// Enable the use of type layouts for value witness functions and use
+  /// vw functions instead of outlined copy/destroy functions.
+  unsigned UseTypeLayoutValueHandling : 1;
+
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
+
+  /// Enable chaining of dynamic replacements.
+  unsigned EnableDynamicReplacementChaining : 1;
+
+  /// Disable round-trip verification of mangled debug types.
+  unsigned DisableRoundTripDebugTypes : 1;
+
+  /// Whether to disable shadow copies for local variables on the stack. This is
+  /// only used for testing.
+  unsigned DisableDebuggerShadowCopies : 1;
+  
+  /// Whether to disable using mangled names for accessing concrete type metadata.
+  unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
 
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
@@ -189,30 +294,60 @@ public:
   /// Which sanitizer coverage is turned on.
   llvm::SanitizerCoverageOptions SanitizeCoverage;
 
+  /// Pointer authentication.
+  PointerAuthOptions PointerAuth;
+
+  /// The different modes for dumping IRGen type info.
+  enum class TypeInfoDumpFilter {
+    All,
+    Resilient,
+    Fragile
+  };
+
+  TypeInfoDumpFilter TypeInfoFilter;
+  
+  /// Pull in runtime compatibility shim libraries by autolinking.
+  Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
+  Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
+        SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
-        UseJIT(false), IntegratedREPL(false),
-        DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
-        EmitStackPromotionChecks(false), PrintInlineTree(false),
-        EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
-        ValueNames(false), EnableReflectionMetadata(true),
-        EnableReflectionNames(true), EnableClassResilience(false),
-        EnableResilienceBypass(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
-        SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
+        DisableClangModuleSkeletonCUs(false), UseJIT(false),
+        DisableLLVMOptzns(false),
+        DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
+        DisableFPElimLeaf(false),
+        DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
+        FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        HasValueNamesSetting(false), ValueNames(false),
+        EnableReflectionMetadata(true), EnableReflectionNames(true),
+        EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
+        LazyInitializeClassMetadata(false),
+        LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
+        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
+        UseSwiftCall(false), UseTypeLayoutValueHandling(true), GenerateProfile(false),
+        EnableDynamicReplacementChaining(false),
+        DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
+        DisableConcreteTypeMetadataMangledNameAccessors(false),
+        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
-  // Get a hash of all options which influence the llvm compilation but are not
-  // reflected in the llvm module itself.
-  unsigned getLLVMCodeGenOptionsHash() {
-    unsigned Hash = (unsigned)OptMode;
-    Hash = (Hash << 1) | DisableLLVMOptzns;
-    Hash = (Hash << 1) | DisableSwiftSpecificLLVMOptzns;
-    return Hash;
+  /// Appends to \p os an arbitrary string representing all options which
+  /// influence the llvm compilation but are not reflected in the llvm module
+  /// itself.
+  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) const {
+    // We put a letter between each value simply to keep them from running into
+    // one another. There might be a vague correspondence between meaning and
+    // letter, but don't sweat it.
+    os << 'O' << (unsigned)OptMode
+       << 'd' << DisableLLVMOptzns
+       << 'D' << DisableSwiftSpecificLLVMOptzns
+       << 'p' << GenerateProfile
+       << 's' << Sanitizers.toRaw();
   }
 
   /// Should LLVM IR value names be emitted and preserved?
@@ -233,6 +368,16 @@ public:
 
   bool optimizeForSize() const {
     return OptMode == OptimizationMode::ForSize;
+  }
+
+  std::string getDebugFlags(StringRef PrivateDiscriminator) const {
+    std::string Flags = DebugFlags;
+    if (!PrivateDiscriminator.empty()) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += ("-private-discriminator " + PrivateDiscriminator).str();
+    }
+    return Flags;
   }
 
   /// Return a hash code of any components from these options that should

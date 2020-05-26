@@ -29,9 +29,6 @@
 using namespace swift;
 using namespace Demangle;
 
-using llvm::Optional;
-using llvm::None;
-
 namespace {
   struct FindPtr {
     FindPtr(Node *v) : Target(v) {}
@@ -251,12 +248,12 @@ private:
     Parent->addChild(Child, Factory);
   }
   
-  Optional<Directness> demangleDirectness() {
+  llvm::Optional<Directness> demangleDirectness() {
     if (Mangled.nextIf('d'))
       return Directness::Direct;
     if (Mangled.nextIf('i'))
       return Directness::Indirect;
-    return None;
+    return llvm::None;
   }
 
   bool demangleNatural(Node::IndexType &num) {
@@ -288,13 +285,13 @@ private:
     return false;
   }
 
-  Optional<ValueWitnessKind> demangleValueWitnessKind() {
+  llvm::Optional<ValueWitnessKind> demangleValueWitnessKind() {
     char Code[2];
     if (!Mangled)
-      return None;
+      return llvm::None;
     Code[0] = Mangled.next();
     if (!Mangled)
-      return None;
+      return llvm::None;
     Code[1] = Mangled.next();
 
     StringRef CodeStr(Code, 2);
@@ -302,7 +299,7 @@ private:
   if (CodeStr == #MANGLING) return ValueWitnessKind::NAME;
 #include "swift/Demangling/ValueWitnessMangling.def"
 
-    return None;
+    return llvm::None;
   }
 
   NodePointer demangleGlobal() {
@@ -374,11 +371,14 @@ private:
 
     // Value witnesses.
     if (Mangled.nextIf('w')) {
-      Optional<ValueWitnessKind> w = demangleValueWitnessKind();
+      llvm::Optional<ValueWitnessKind> w = demangleValueWitnessKind();
       if (!w.hasValue())
         return nullptr;
       auto witness =
-        Factory.createNode(Node::Kind::ValueWitness, unsigned(w.getValue()));
+        Factory.createNode(Node::Kind::ValueWitness);
+      NodePointer Idx = Factory.createNode(Node::Kind::Index,
+                                           unsigned(w.getValue()));
+      witness->addChild(Idx, Factory);
       DEMANGLE_CHILD_OR_RETURN(witness, Type);
       return witness;
     }
@@ -608,14 +608,11 @@ private:
 
   NodePointer
   demangleFunctionSignatureSpecialization(NodePointer specialization) {
-    unsigned paramCount = 0;
-
     // Until we hit the last '_' in our specialization info...
     while (!Mangled.nextIf('_')) {
       // Create the parameter.
       NodePointer param =
-        Factory.createNode(Node::Kind::FunctionSignatureSpecializationParam,
-                            paramCount);
+        Factory.createNode(Node::Kind::FunctionSignatureSpecializationParam);
 
       // First handle options.
       if (Mangled.nextIf("n_")) {
@@ -672,7 +669,6 @@ private:
       }
 
       specialization->addChild(param, Factory);
-      paramCount++;
     }
 
     return specialization;
@@ -688,9 +684,9 @@ private:
                               Node::Kind::GenericSpecializationNotReAbstracted :
                               Node::Kind::GenericSpecialization);
 
-      // Create a node if the specialization is externally inlinable.
+      // Create a node if the specialization is serialized.
       if (Mangled.nextIf("q")) {
-        auto kind = Node::Kind::SpecializationIsFragile;
+        auto kind = Node::Kind::IsSerialized;
         spec->addChild(Factory.createNode(kind), Factory);
       }
 
@@ -705,9 +701,9 @@ private:
       auto spec =
           Factory.createNode(Node::Kind::FunctionSignatureSpecialization);
 
-      // Create a node if the specialization is externally inlinable.
+      // Create a node if the specialization is serialized.
       if (Mangled.nextIf("q")) {
-        auto kind = Node::Kind::SpecializationIsFragile;
+        auto kind = Node::Kind::IsSerialized;
         spec->addChild(Factory.createNode(kind), Factory);
       }
 
@@ -755,7 +751,7 @@ private:
     return demangleIdentifier();
   }
 
-  NodePointer demangleIdentifier(Optional<Node::Kind> kind = None) {
+  NodePointer demangleIdentifier(llvm::Optional<Node::Kind> kind = llvm::None) {
     if (!Mangled)
       return nullptr;
     
@@ -1017,6 +1013,8 @@ private:
         parentOrModule->getKind() != Node::Kind::Function &&
         parentOrModule->getKind() != Node::Kind::Extension) {
       parentOrModule = demangleBoundGenericArgs(parentOrModule);
+      if (!parentOrModule)
+        return nullptr;
 
       // Rebuild this type with the new parent type, which may have
       // had its generic arguments applied.
@@ -1259,6 +1257,16 @@ private:
       entityKind = Node::Kind::DidSet;
       name = demangleDeclName();
       if (!name) return nullptr;
+    } else if (Mangled.nextIf('r')) {
+      wrapEntity = true;
+      entityKind = Node::Kind::ReadAccessor;
+      name = demangleDeclName();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('M')) {
+      wrapEntity = true;
+      entityKind = Node::Kind::ModifyAccessor;
+      name = demangleDeclName();
+      if (!name) return nullptr;
     } else if (Mangled.nextIf('U')) {
       entityKind = Node::Kind::ExplicitClosure;
       name = demangleIndexAsNode();
@@ -1308,7 +1316,7 @@ private:
 
             auto discriminator = name->getChild(0);
 
-            // Create new PrivateDeclName with no 'subscript' identifer child
+            // Create new PrivateDeclName with no 'subscript' identifier child
             name = Factory.createNode(Node::Kind::PrivateDeclName);
             name->addChild(discriminator, Factory);
           }
@@ -1363,10 +1371,9 @@ private:
 
   NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
     DemanglerPrinter PrintName;
-    PrintName << archetypeName(index, depth);
+    PrintName << genericParameterName(depth, index);
 
-    auto paramTy = Factory.createNode(Node::Kind::DependentGenericParamType,
-                                       std::move(PrintName).str());
+    auto paramTy = Factory.createNode(Node::Kind::DependentGenericParamType);
     paramTy->addChild(Factory.createNode(Node::Kind::Index, depth), Factory);
     paramTy->addChild(Factory.createNode(Node::Kind::Index, index), Factory);
 
@@ -1415,8 +1422,11 @@ private:
       // TODO: If the protocol name was elided from the assoc type mangling,
       // we could try to fish it out of the generic signature constraints on the
       // base.
-      assocTy = demangleIdentifier(Node::Kind::DependentAssociatedTypeRef);
+      NodePointer ID = demangleIdentifier();
+      if (!ID) return nullptr;
+      assocTy = Factory.createNode(Node::Kind::DependentAssociatedTypeRef);
       if (!assocTy) return nullptr;
+      assocTy->addChild(ID, Factory);
       if (protocol)
         assocTy->addChild(protocol, Factory);
 
@@ -1798,7 +1808,7 @@ private:
         if (demangleBuiltinSize(size)) {
           return Factory.createNode(
               Node::Kind::BuiltinTypeName,
-              std::move(DemanglerPrinter() << "Builtin.Float" << size).str());
+              std::move(DemanglerPrinter() << "Builtin.FPIEEE" << size).str());
         }
       }
       if (c == 'i') {

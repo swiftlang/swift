@@ -2,12 +2,12 @@
 
 // REQUIRES: objc_interop
 
-// CHECK-DAG: ![[TY0:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "ObjCClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift,
+// CHECK-DAG: ![[TY0:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "ObjCClass",{{.*}} runtimeLang: DW_LANG_Swift,
 @objc class ObjCClass {
       @IBAction func click(_: AnyObject?) -> () {}
 }
 
-// CHECK-DAG: ![[TY1:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "SwiftClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift
+// CHECK-DAG: ![[TY1:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "SwiftClass",{{.*}} runtimeLang: DW_LANG_Swift
 class SwiftClass {
       @objc func objcmethod() -> () {}
       func swiftmethod() -> () {}
@@ -24,9 +24,9 @@ class SwiftClass {
 var strongRef0 : ObjCClass
 var strongRef1 : SwiftClass = SwiftClass()
 
-// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "$S10attributes10SwiftClassCSgXwD"
+// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "$s10attributes10SwiftClassCXSqXwD"
 weak var    weakRef1    : SwiftClass? = strongRef1
-// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "$S10attributes10SwiftClassCXoD"
+// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "$s10attributes10SwiftClassCXoD"
 unowned var unownedRef1 : SwiftClass
 
 protocol Protocol1 : class {

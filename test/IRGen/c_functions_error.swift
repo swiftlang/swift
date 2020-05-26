@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -assume-parsing-unqualified-ownership-sil -Xcc -mno-sse -import-objc-header %S/Inputs/c_functions_error.h -primary-file %s -emit-ir
+// RUN: not %target-swift-frontend -Xcc -mno-sse -import-objc-header %S/Inputs/c_functions_error.h -primary-file %s -emit-ir
 
 // This should fail, but not crash.
 

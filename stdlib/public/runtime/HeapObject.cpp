@@ -20,8 +20,6 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Once.h"
 #include "swift/ABI/System.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MathExtras.h"
 #include "MetadataCache.h"
 #include "Private.h"
 #include "RuntimeInvocationsTracking.h"
@@ -42,6 +40,8 @@
 # include <objc/message.h>
 # include <objc/objc.h>
 # include "swift/Runtime/ObjCBridge.h"
+# include "swift/Runtime/Once.h"
+# include <dlfcn.h>
 #endif
 #include "Leaks.h"
 
@@ -61,20 +61,49 @@ using namespace swift;
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 static inline bool isValidPointerForNativeRetain(const void *p) {
-#if defined(__x86_64__) || defined(__arm64__)
-  // On these platforms, the upper half of address space is reserved for the
+#if defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
+  // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
+  // On s390x it is theoretically possible to have high bit set but in practice
+  // it is unlikely.
   return (intptr_t)p > 0;
 #else
   return p != nullptr;
 #endif
 }
 
-HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
-                                     size_t requiredSize,
-                                     size_t requiredAlignmentMask) {
-  return _swift_allocObject(metadata, requiredSize, requiredAlignmentMask);
-}
+// Call the appropriate implementation of the `name` function, passing `args`
+// to the call. This checks for an override in the function pointer. If an
+// override is present, it calls that override. Otherwise it directly calls
+// the default implementation. This allows the compiler to inline the default
+// implementation and avoid the performance penalty of indirecting through
+// the function pointer in the common case.
+//
+// NOTE: the memcpy and asm("") naming shenanigans are to convince the compiler
+// not to emit a bunch of ptrauth instructions just to perform the comparison.
+// We only want to authenticate the function pointer if we actually call it. We
+// can revert to a straight comparison once rdar://problem/55267009 is fixed.
+static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
+                                       size_t requiredSize,
+                                       size_t requiredAlignmentMask)
+                                       asm("__swift_allocObject_");
+static HeapObject *_swift_retain_(HeapObject *object) asm("__swift_retain_");
+static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n)
+  asm("__swift_retain_n_");
+static void _swift_release_(HeapObject *object) asm("__swift_release_");
+static void _swift_release_n_(HeapObject *object, uint32_t n)
+  asm("__swift_release_n_");
+static HeapObject *_swift_tryRetain_(HeapObject *object)
+  asm("__swift_tryRetain_");
+#define CALL_IMPL(name, args) do { \
+    void *fptr; \
+    memcpy(&fptr, (void *)&_ ## name, sizeof(fptr)); \
+    extern char _ ## name ## _as_char asm("__" #name "_"); \
+    fptr = __ptrauth_swift_runtime_function_entry_strip(fptr); \
+    if (SWIFT_UNLIKELY(fptr != &_ ## name ## _as_char)) \
+      return _ ## name args; \
+    return _ ## name ## _ args; \
+} while(0)
 
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
@@ -82,9 +111,11 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   assert(isAlignmentMask(requiredAlignmentMask));
   auto object = reinterpret_cast<HeapObject *>(
       swift_slowAlloc(requiredSize, requiredAlignmentMask));
-  // FIXME: this should be a placement new but that adds a null check
-  object->metadata = metadata;
-  object->refCounts.init();
+
+  // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
+  // check on the placement new allocator which we have observed on Windows,
+  // Linux, and macOS.
+  new (object) HeapObject(metadata);
 
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);
@@ -94,7 +125,16 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   return object;
 }
 
-auto swift::_swift_allocObject = _swift_allocObject_;
+HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
+                                     size_t requiredSize,
+                                     size_t requiredAlignmentMask) {
+  CALL_IMPL(swift_allocObject, (metadata, requiredSize, requiredAlignmentMask));
+}
+
+SWIFT_RUNTIME_EXPORT
+HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_allocObject)(
+    HeapMetadata const *metadata, size_t requiredSize,
+    size_t requiredAlignmentMask) = _swift_allocObject_;
 
 HeapObject *
 swift::swift_initStackObject(HeapMetadata const *metadata,
@@ -115,7 +155,7 @@ struct InitStaticObjectContext {
 static void initStaticObjectWithContext(void *OpaqueCtx) {
   InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
   Ctx->object->metadata = Ctx->metadata;
-  Ctx->object->refCounts.initForNotFreeing();
+  Ctx->object->refCounts.initImmortal();
 }
 
 // TODO: We could generate inline code for the fast-path, i.e. the metadata
@@ -151,10 +191,10 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
                       "Fatal error: Weak reference to stack object\n");
 }
 
-/// \brief Allocate a reference-counted object on the heap that
+/// Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 HeapObject* swift_bufferAllocate(
   HeapMetadata const* bufferType, size_t size, size_t alignMask)
 {
@@ -285,12 +325,8 @@ HeapObject *swift::swift_allocEmptyBox() {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED 
-void _swift_release_dealloc(HeapObject *object);
-
-HeapObject *swift::swift_retain(HeapObject *object) {
-  return _swift_retain(object);
-}
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+_swift_release_dealloc(HeapObject *object);
 
 static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
@@ -299,17 +335,19 @@ static HeapObject *_swift_retain_(HeapObject *object) {
   return object;
 }
 
-auto swift::_swift_retain = _swift_retain_;
+HeapObject *swift::swift_retain(HeapObject *object) {
+  CALL_IMPL(swift_retain, (object));
+}
+
+SWIFT_RUNTIME_EXPORT
+HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain)(HeapObject *object) =
+    _swift_retain_;
 
 HeapObject *swift::swift_nonatomic_retain(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.incrementNonAtomic(1);
   return object;
-}
-
-HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
-  return _swift_retain_n(object, n);
 }
 
 static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
@@ -319,7 +357,13 @@ static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
   return object;
 }
 
-auto swift::_swift_retain_n = _swift_retain_n_;
+HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
+  CALL_IMPL(swift_retain_n, (object, n));
+}
+
+SWIFT_RUNTIME_EXPORT
+HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain_n)(
+    HeapObject *object, uint32_t n) = _swift_retain_n_;
 
 HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain_n);
@@ -328,26 +372,24 @@ HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n) {
   return object;
 }
 
-void swift::swift_release(HeapObject *object) {
-  _swift_release(object);
-}
-
 static void _swift_release_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_release);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.decrementAndMaybeDeinit(1);
 }
 
-auto swift::_swift_release = _swift_release_;
+void swift::swift_release(HeapObject *object) {
+  CALL_IMPL(swift_release, (object));
+}
+
+SWIFT_RUNTIME_EXPORT
+void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object) =
+    _swift_release_;
 
 void swift::swift_nonatomic_release(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.decrementAndMaybeDeinitNonAtomic(1);
-}
-
-void swift::swift_release_n(HeapObject *object, uint32_t n) {
-  return _swift_release_n(object, n);
 }
 
 static void _swift_release_n_(HeapObject *object, uint32_t n) {
@@ -356,7 +398,13 @@ static void _swift_release_n_(HeapObject *object, uint32_t n) {
     object->refCounts.decrementAndMaybeDeinit(n);
 }
 
-auto swift::_swift_release_n = _swift_release_n_;
+void swift::swift_release_n(HeapObject *object, uint32_t n) {
+  CALL_IMPL(swift_release_n, (object, n));
+}
+
+SWIFT_RUNTIME_EXPORT
+void (*SWIFT_RT_DECLARE_ENTRY _swift_release_n)(HeapObject *object,
+                                                uint32_t n) = _swift_release_n_;
 
 void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release_n);
@@ -365,7 +413,9 @@ void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n) {
 }
 
 size_t swift::swift_retainCount(HeapObject *object) {
-  return object->refCounts.getCount();
+  if (isValidPointerForNativeRetain(object))
+    return object->refCounts.getCount();
+  return 0;
 }
 
 size_t swift::swift_unownedRetainCount(HeapObject *object) {
@@ -478,50 +528,6 @@ void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n) {
   }
 }
 
-HeapObject *swift::swift_tryPin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_tryPin);
-  assert(isValidPointerForNativeRetain(object));
-
-  // Try to set the flag.  If this succeeds, the caller will be
-  // responsible for clearing it.
-  if (object->refCounts.tryIncrementAndPin())
-    return object;
-
-  // If setting the flag failed, it's because it was already set.
-  // Return nil so that the object will be deallocated later.
-  return nullptr;
-}
-
-void swift::swift_unpin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_unpin);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.decrementAndUnpinAndMaybeDeinit();
-}
-
-HeapObject *swift::swift_nonatomic_tryPin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_tryPin);
-  assert(object);
-
-  // Try to set the flag.  If this succeeds, the caller will be
-  // responsible for clearing it.
-  if (object->refCounts.tryIncrementAndPinNonAtomic())
-    return object;
-
-  // If setting the flag failed, it's because it was already set.
-  // Return nil so that the object will be deallocated later.
-  return nullptr;
-}
-
-void swift::swift_nonatomic_unpin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_unpin);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.decrementAndUnpinAndMaybeDeinitNonAtomic();
-}
-
-HeapObject *swift::swift_tryRetain(HeapObject *object) {
-  return _swift_tryRetain(object);
-}
-
 static HeapObject *_swift_tryRetain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_tryRetain);
   if (!isValidPointerForNativeRetain(object))
@@ -531,7 +537,13 @@ static HeapObject *_swift_tryRetain_(HeapObject *object) {
   else return nullptr;
 }
 
-auto swift::_swift_tryRetain = _swift_tryRetain_;
+HeapObject *swift::swift_tryRetain(HeapObject *object) {
+  CALL_IMPL(swift_tryRetain, (object));
+}
+
+SWIFT_RUNTIME_EXPORT
+HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_tryRetain)(HeapObject *object) =
+    _swift_tryRetain_;
 
 bool swift::swift_isDeallocating(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
@@ -625,13 +637,23 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
 }
 #endif
 
+#if SWIFT_OBJC_INTEROP
+static bool _check_fast_dealloc() {
+  return dlsym(RTLD_NEXT, "_objc_has_weak_formation_callout") != nullptr;
+}
+#endif
+
 void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
+  
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
-  objc_destructInstance((id)object);
+  const bool fastDeallocSupported = SWIFT_LAZY_CONSTANT(_check_fast_dealloc());
+  if (!fastDeallocSupported || !object->refCounts.getPureSwiftDeallocation()) {
+    objc_destructInstance((id)object);
+  }
 #endif
   swift_deallocObject(object, allocatedSize, allocatedAlignMask);
 }

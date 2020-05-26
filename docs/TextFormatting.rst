@@ -131,11 +131,11 @@ Via compiler magic, *everything* conforms to the ``CustomDebugStringConvertible`
 protocol. To change the debug representation for a type, you don't
 need to declare conformance: simply give the type a ``debugFormat()``::
 
-  /// \brief A thing that can be printed in the REPL and the Debugger
+  /// A thing that can be printed in the REPL and the Debugger
   protocol CustomDebugStringConvertible {
     typealias DebugRepresentation : TextOutputStreamable = String
 
-    /// \brief Produce a textual representation for the REPL and
+    /// Produce a textual representation for the REPL and
     /// Debugger.
     func debugFormat() -> DebugRepresentation
   }
@@ -169,11 +169,11 @@ Conformance to ``CustomStringConvertible`` is explicit, but if you want to use t
 need to do is declare conformance to ``CustomStringConvertible``; there's nothing to
 implement::
 
-  /// \brief A thing that can be print()ed and toString()ed.
+  /// A thing that can be print()ed and toString()ed.
   protocol CustomStringConvertible : CustomDebugStringConvertible {
     typealias PrintRepresentation : TextOutputStreamable = DebugRepresentation
 
-    /// \brief produce a "pretty" textual representation.
+    /// produce a "pretty" textual representation.
     ///
     /// In general you can return a String here, but if you need more
     /// control, return a custom TextOutputStreamable type
@@ -181,7 +181,7 @@ implement::
       return debugFormat()
     }
 
-    /// \brief Simply convert to String
+    /// Simply convert to String
     ///
     /// You'll never want to reimplement this
     func toString() -> String {

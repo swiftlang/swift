@@ -30,8 +30,8 @@ Enumerators:
   SwiftPrivate: true
 Functions:
 - Name: _os_log_impl
-  Availability: nonswift
-  AvailabilityMsg: 'Use os_log'
+  SwiftPrivate: true
+  NullabilityOfRet: O
 - Name: _os_log_error_impl
   Availability: nonswift
   AvailabilityMsg: 'Use os_log'

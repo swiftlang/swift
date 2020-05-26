@@ -1,13 +1,10 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out
-//
-// RUN: %target-run %t/a.out
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-
-// REQUIRES: objc_interop
+// REQUIRES: libdispatch
+// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-android
 
 import Dispatch
-import Foundation
 import StdlibUnittest
 
 
@@ -125,18 +122,6 @@ DispatchAPI.test("DispatchTime.addSubtract") {
 
 	then = DispatchTime.now() - Double.nan
 	expectEqual(DispatchTime.distantFuture, then)
-
-	then = DispatchTime.now() + Date.distantFuture.timeIntervalSinceNow
-	expectEqual(DispatchTime(uptimeNanoseconds: UInt64.max), then)
-
-	then = DispatchTime.now() + Date.distantPast.timeIntervalSinceNow
-	expectEqual(DispatchTime(uptimeNanoseconds: 1), then)
-
-	then = DispatchTime.now() - Date.distantFuture.timeIntervalSinceNow
-	expectEqual(DispatchTime(uptimeNanoseconds: 1), then)
-
-	then = DispatchTime.now() - Date.distantPast.timeIntervalSinceNow
-	expectEqual(DispatchTime(uptimeNanoseconds: UInt64.max), then)
 }
 
 DispatchAPI.test("DispatchWallTime.addSubtract") {
@@ -152,18 +137,6 @@ DispatchAPI.test("DispatchWallTime.addSubtract") {
 	expectEqual(distantPastRawValue, then.rawValue)
 
 	then = DispatchWallTime.now() - Double.nan
-	expectEqual(DispatchWallTime.distantFuture, then)
-
-	then = DispatchWallTime.now() + Date.distantFuture.timeIntervalSinceNow
-	expectEqual(DispatchWallTime.distantFuture, then)
-
-	then = DispatchWallTime.now() + Date.distantPast.timeIntervalSinceNow
-	expectEqual(distantPastRawValue, then.rawValue)
-
-	then = DispatchWallTime.now() - Date.distantFuture.timeIntervalSinceNow
-	expectEqual(distantPastRawValue, then.rawValue)
-
-	then = DispatchWallTime.now() - Date.distantPast.timeIntervalSinceNow
 	expectEqual(DispatchWallTime.distantFuture, then)
 }
 
@@ -258,3 +231,55 @@ DispatchAPI.test("DispatchTimeInterval.never.equals") {
 	expectTrue(DispatchTimeInterval.never != DispatchTimeInterval.seconds(10));
 	expectTrue(DispatchTimeInterval.seconds(10) == DispatchTimeInterval.seconds(10));
 }
+
+// Only support 64bit
+#if !(os(iOS) && (arch(i386) || arch(arm)))
+
+import Combine
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+private func clampedIntProduct(_ m1: Int, _ m2: UInt64) -> Int {
+    assert(m2 > 0, "multiplier must be positive")
+    guard m1 < Int.max, m2 < Int.max else { return Int.max }
+    let (result, overflow) = m1.multipliedReportingOverflow(by: Int(m2))
+    if overflow {
+        return m1 > 0 ? Int.max : Int.min
+    }
+    return result
+}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension DispatchTimeInterval {    
+    fileprivate var nanoseconds: Int {
+        switch self {
+        case .seconds(let s): return clampedIntProduct(s, NSEC_PER_SEC)
+        case .milliseconds(let ms): return clampedIntProduct(ms, NSEC_PER_MSEC)
+        case .microseconds(let us): return clampedIntProduct(us, NSEC_PER_USEC)
+        case .nanoseconds(let ns): return ns
+        case .never: return Int.max
+        }
+    }
+}
+
+DispatchAPI.test("DispatchTime.SchedulerTimeType.Stridable") {
+	if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+	    // Basic checks for time types
+	    for i in stride(from:1, through: 100, by: 5) {
+	        let time1 = DispatchTime(uptimeNanoseconds: UInt64(i))
+	        let time2 = DispatchTime(uptimeNanoseconds: UInt64(i + 1))
+	        let schedulerTime1 = DispatchQueue.SchedulerTimeType(time1)
+	        let schedulerTime2 = DispatchQueue.SchedulerTimeType(time2)
+	        let addedTime = time2.distance(to: time1)
+	        let addedSchedulerTime = schedulerTime2.distance(to: schedulerTime1)
+	        expectEqual(addedTime.nanoseconds, addedSchedulerTime.magnitude)
+	    }
+
+
+	    let time1 = DispatchQueue.SchedulerTimeType(.init(uptimeNanoseconds: 10000))
+	    let time2 = DispatchQueue.SchedulerTimeType(.init(uptimeNanoseconds: 10431))
+	    let addedTime = time2.distance(to: time1)
+	    expectEqual(addedTime.magnitude, (10000 - 10431))
+	}
+}
+
+#endif

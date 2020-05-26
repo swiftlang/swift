@@ -161,3 +161,12 @@ class NonObjC {}
     if outlet4 != nil {}
   }
 }
+
+// https://bugs.swift.org/browse/SR-9889
+@objc class NonOptionalWeak {
+  // expected-error@+3 {{@IBOutlet property has non-optional type 'OX'}}
+  // expected-note @+2 {{add '?' to form the optional type 'OX?'}}
+  // expected-note @+1 {{add '!' to form an implicitly unwrapped optional}}
+  @IBOutlet weak var something: OX
+  init() { }
+}

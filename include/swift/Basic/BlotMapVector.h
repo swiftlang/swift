@@ -25,7 +25,7 @@ bool compareKeyAgainstDefaultKey(const std::pair<KeyT, ValueT> &Pair) {
   return Pair.first == KeyT();
 }
 
-/// \brief An associative container with fast insertion-order (deterministic)
+/// An associative container with fast insertion-order (deterministic)
 /// iteration over its elements. Plus the special blot operation.
 template <typename KeyT, typename ValueT,
           typename MapT = llvm::DenseMap<KeyT, size_t>,
@@ -66,15 +66,40 @@ public:
     return Vector[Pair.first->second].getValue().second;
   }
 
-  std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT> &InsertPair) {
-    auto Pair = Map.insert(std::make_pair(InsertPair.first, size_t(0)));
-    if (Pair.second) {
-      size_t Num = Vector.size();
-      Pair.first->second = Num;
-      Vector.push_back(InsertPair);
-      return std::make_pair(Vector.begin() + Num, true);
+  template <typename... Ts>
+  std::pair<iterator, bool> try_emplace(KeyT &&Key, Ts &&... Args) {
+    auto Pair = Map.insert(std::make_pair(std::move(Key), size_t(0)));
+    if (!Pair.second) {
+      return std::make_pair(Vector.begin() + Pair.first->second, false);
     }
-    return std::make_pair(Vector.begin() + Pair.first->second, false);
+
+    size_t Num = Vector.size();
+    Pair.first->second = Num;
+    Vector.emplace_back(
+        std::make_pair(Pair.first->first, ValueT(std::forward<Ts>(Args)...)));
+    return std::make_pair(Vector.begin() + Num, true);
+  }
+
+  template <typename... Ts>
+  std::pair<iterator, bool> try_emplace(const KeyT &Key, Ts &&... Args) {
+    auto Pair = Map.insert(std::make_pair(std::move(Key), size_t(0)));
+    if (!Pair.second) {
+      return std::make_pair(Vector.begin() + Pair.first->second, false);
+    }
+
+    size_t Num = Vector.size();
+    Pair.first->second = Num;
+    Vector.emplace_back(
+        std::make_pair(Pair.first->first, ValueT(std::forward<Ts>(Args)...)));
+    return std::make_pair(Vector.begin() + Num, true);
+  }
+
+  std::pair<iterator, bool> insert(std::pair<KeyT, ValueT> &InsertPair) {
+    return try_emplace(InsertPair.first, InsertPair.second);
+  }
+
+  std::pair<iterator, bool> insert(const std::pair<KeyT, ValueT> &InsertPair) {
+    return try_emplace(InsertPair.first, InsertPair.second);
   }
 
   iterator find(const KeyT &Key) {

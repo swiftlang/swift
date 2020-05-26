@@ -78,7 +78,7 @@ public:
     : valueAndFlag(value, false), cleanup(cleanup) {
     assert(value && "No value specified?!");
     assert((!getType().isObject() ||
-            value.getOwnershipKind() != ValueOwnershipKind::Trivial ||
+            value.getOwnershipKind() != ValueOwnershipKind::None ||
             !hasCleanup()) &&
            "Objects with trivial ownership should never have a cleanup");
   }
@@ -98,7 +98,7 @@ public:
     assert(value && "No value specified");
     assert(value->getType().isObject() &&
            "Expected borrowed rvalues to be objects");
-    assert(value.getOwnershipKind() != ValueOwnershipKind::Trivial);
+    assert(value.getOwnershipKind() != ValueOwnershipKind::None);
     return ManagedValue(value, false, cleanup);
   }
 
@@ -109,8 +109,8 @@ public:
                                             CleanupHandle cleanup) {
     assert(value && "No value specified");
     assert(value->getType().isAddress() && "Expected value to be an address");
-    assert(value.getOwnershipKind() == ValueOwnershipKind::Trivial &&
-           "Addresses always have trivial ownership");
+    assert(value.getOwnershipKind() == ValueOwnershipKind::None &&
+           "Addresses always have any ownership");
     return ManagedValue(value, false, cleanup);
   }
 
@@ -121,13 +121,20 @@ public:
     return ManagedValue::forOwnedObjectRValue(value, cleanup);
   }
 
+  static ManagedValue
+  forExclusivelyBorrowedOwnedObjectRValue(SILValue value,
+                                          CleanupHandle cleanup) {
+    assert(value->getType().isObject());
+    return ManagedValue::forOwnedObjectRValue(value, cleanup);
+  }
+
   /// Create a managed value for a +0 borrowed non-trivial rvalue object.
   static ManagedValue
   forBorrowedObjectRValue(SILValue value) {
     assert(value && "No value specified");
     assert(value->getType().isObject() &&
            "Expected borrowed rvalues to be objects");
-    assert(value.getOwnershipKind() != ValueOwnershipKind::Trivial);
+    assert(value.getOwnershipKind() != ValueOwnershipKind::None);
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
@@ -136,7 +143,7 @@ public:
   forBorrowedAddressRValue(SILValue value) {
     assert(value && "No value specified");
     assert(value->getType().isAddress() && "Expected value to be an address");
-    assert(value.getOwnershipKind() == ValueOwnershipKind::Trivial &&
+    assert(value.getOwnershipKind() == ValueOwnershipKind::None &&
            "Addresses always have trivial ownership");
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
@@ -152,14 +159,14 @@ public:
   /// Create a managed value for a +0 trivial object rvalue.
   static ManagedValue forTrivialObjectRValue(SILValue value) {
     assert(value->getType().isObject() && "Expected an object");
-    assert(value.getOwnershipKind() == ValueOwnershipKind::Trivial);
+    assert(value.getOwnershipKind() == ValueOwnershipKind::None);
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
   /// Create a managed value for a +0 trivial address rvalue.
   static ManagedValue forTrivialAddressRValue(SILValue value) {
     assert(value->getType().isAddress() && "Expected an address");
-    assert(value.getOwnershipKind() == ValueOwnershipKind::Trivial);
+    assert(value.getOwnershipKind() == ValueOwnershipKind::None);
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
@@ -268,10 +275,6 @@ public:
   /// formal evaluation scope.
   ManagedValue formalAccessCopy(SILGenFunction &SGF, SILLocation loc);
 
-  /// Store a copy of this value with independent ownership into the given
-  /// uninitialized address.
-  void copyInto(SILGenFunction &SGF, SILValue dest, SILLocation loc);
-
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
   ManagedValue copyUnmanaged(SILGenFunction &SGF, SILLocation loc);
@@ -333,7 +336,15 @@ public:
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
   void assignInto(SILGenFunction &SGF, SILLocation loc, SILValue address);
-  
+
+  /// Store a copy of this value with independent ownership into the given
+  /// uninitialized address.
+  void copyInto(SILGenFunction &SGF, SILLocation loc, SILValue dest);
+
+  /// Store a copy of this value with independent ownership into the given
+  /// initialization \p dest.
+  void copyInto(SILGenFunction &SGF, SILLocation loc, Initialization *dest);
+
   explicit operator bool() const {
     // "InContext" is not considered false.
     return bool(getValue()) || valueAndFlag.getInt();
@@ -367,7 +378,14 @@ public:
   /// Create a CMV with a specific value and consumption rule.
   /*implicit*/ ConsumableManagedValue(ManagedValue value,
                                       CastConsumptionKind finalConsumption)
-    : Value(value), FinalConsumption(finalConsumption) {}
+      : Value(value), FinalConsumption(finalConsumption) {
+    assert((value.getType().isObject() ||
+            finalConsumption != CastConsumptionKind::BorrowAlways) &&
+           "Can not borrow always a value");
+    assert((value.getType().isAddress() ||
+            finalConsumption != CastConsumptionKind::CopyOnSuccess) &&
+           "Can not copy on success a value.");
+  }
 
   /// Create a CMV for a value of trivial type.
   static ConsumableManagedValue forUnmanaged(SILValue value) {
@@ -415,8 +433,12 @@ public:
 
   /// Return a managed value that's appropriate for borrowing this
   /// value and promising not to consume it.
-  ConsumableManagedValue asBorrowedOperand() const {
-    return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
+  ConsumableManagedValue asBorrowedOperand(SILGenFunction &SGF,
+                                           SILLocation loc) const {
+    if (getType().isAddress())
+      return {asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess};
+    return {asUnmanagedValue().borrow(SGF, loc),
+            CastConsumptionKind::BorrowAlways};
   }
 
   /// Return a managed value that's appropriate for copying this value and

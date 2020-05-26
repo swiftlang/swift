@@ -1,18 +1,19 @@
 // RUN: %empty-directory(%t)
-// RUN: %incparse-test %s --test-case REPLACE
-// RUN: %incparse-test %s --test-case REPLACE_BY_LONGER
-// RUN: %incparse-test %s --test-case REPLACE_BY_SHORTER
-// RUN: %incparse-test %s --test-case INSERT
-// RUN: %incparse-test %s --test-case REMOVE
-// RUN: %incparse-test %s --test-case ATTACH_TO_PREV_NODE
-// RUN: %incparse-test %s --test-case CLASS_SURROUNDING
-// RUN: %incparse-test %s --test-case MULTI_EDIT
-// RUN: %incparse-test %s --test-case MULTI_EDIT_SAME_LINE
-// RUN: %incparse-test %s --test-case REPLACE_WITH_MULTI_BYTE_CHAR
-// RUN: %incparse-test %s --test-case REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER
-// RUN: %incparse-test %s --test-case LAST_CHARACTER_OF_STRUCT
-// RUN: %incparse-test %s --test-case ADD_ARRAY_CLOSE_BRACKET
-// RUN: %incparse-test %s --test-case ADD_IF_OPEN_BRACE
+// RUN: %validate-incrparse %s --test-case REPLACE
+// RUN: %validate-incrparse %s --test-case REPLACE_BY_LONGER
+// RUN: %validate-incrparse %s --test-case REPLACE_BY_SHORTER
+// RUN: %validate-incrparse %s --test-case INSERT
+// RUN: %validate-incrparse %s --test-case REMOVE
+// RUN: %validate-incrparse %s --test-case ATTACH_TO_PREV_NODE
+// RUN: %validate-incrparse %s --test-case CLASS_SURROUNDING
+// RUN: %validate-incrparse %s --test-case MULTI_EDIT
+// RUN: %validate-incrparse %s --test-case MULTI_EDIT_SAME_LINE
+// RUN: %validate-incrparse %s --test-case REPLACE_WITH_MULTI_BYTE_CHAR
+// RUN: %validate-incrparse %s --test-case REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER
+// RUN: %validate-incrparse %s --test-case LAST_CHARACTER_OF_STRUCT
+// RUN: %validate-incrparse %s --test-case ADD_ARRAY_CLOSE_BRACKET
+// RUN: %validate-incrparse %s --test-case ADD_IF_OPEN_BRACE
+// RUN: %validate-incrparse %s --test-case EXTEND_IDENTIFIER
 
 func start() {}
 
@@ -20,8 +21,8 @@ func start() {}
 func foo() {
 }
 
-_ = <<REPLACE<6|||7>>></reparse REPLACE>
-_ = <<REPLACE_BY_LONGER<6|||"Hello World">>>
+_ = <<REPLACE<6|||7>>>
+_ = <<REPLACE_BY_LONGER<6|||"Hello World">>></reparse REPLACE>
 _ = <<REPLACE_BY_SHORTER<"Hello again"|||"a">>>
 <<INSERT<|||foo()>>>
 <<REMOVE<print("abc")|||>>>
@@ -52,3 +53,5 @@ var computedVar: [Int] {
 if true <<ADD_IF_OPEN_BRACE<|||{>>>
   _ = 5
 }
+
+let y<<EXTEND_IDENTIFIER<|||ou>>> = 42

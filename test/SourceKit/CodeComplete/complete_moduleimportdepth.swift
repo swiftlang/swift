@@ -5,24 +5,11 @@ func test() {
   #^A^#
 }
 
-// XFAIL: broken_std_regex
 // REQUIRES: objc_interop
 // RUN: %complete-test -hide-none -group=none -tok=A %s -raw -- -I %S/Inputs -F %S/../Inputs/libIDE-mock-sdk > %t
 // RUN: %FileCheck %s < %t
 
 // Swift == 1
-// CHECK-LABEL:  key.name: "abs(:)",
-// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedNumeric##Comparable & SignedNumeric#>)",
-// CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",
-// CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
-// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
-// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 1,
-// CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK-NOT:    key.modulename
-// CHECK:        key.modulename: "Swift"
-// CHECK-NEXT: },
-
 // CHECK-LABEL:  key.name: "abs(:)",
 // CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedNumeric##Comparable & SignedNumeric#>)",
 // CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",

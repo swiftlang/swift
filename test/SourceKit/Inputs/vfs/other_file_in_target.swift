@@ -1,0 +1,3 @@
+struct StructDefinedInSameTarget {
+  func methodDefinedInSameTarget() {}
+}

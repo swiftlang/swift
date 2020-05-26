@@ -19,7 +19,6 @@
 #define CLANG_ADAPTER_H
 
 #include "swift/Basic/StringExtras.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "clang/Basic/Specifiers.h"
@@ -47,6 +46,8 @@ class TypedefNameDecl;
 // TODO: pull more off of the ImportImpl
 
 namespace swift {
+enum OptionalTypeKind : unsigned;
+
 namespace importer {
 struct PlatformAvailability;
 
@@ -58,6 +59,34 @@ struct PlatformAvailability;
 /// definition yet.
 Optional<const clang::Decl *>
 getDefinitionForClangTypeDecl(const clang::Decl *D);
+
+/// Returns the first redeclaration of \p D outside of a function.
+///
+/// C allows redeclaring most declarations in function bodies, as so:
+///
+///     void usefulPublicFunction(void) {
+///       extern void importantInternalFunction(int code);
+///       importantInternalFunction(42);
+///     }
+///
+/// This should allow clients to call \c usefulPublicFunction without exposing
+/// \c importantInternalFunction . However, if there is another declaration of
+/// \c importantInternalFunction later, Clang still needs to treat them as the
+/// same function. This is normally fine...except that if the local declaration
+/// is the \e first declaration, it'll also get used as the "canonical"
+/// declaration that Clang (and Swift) use for uniquing purposes.
+///
+/// Every imported declaration gets assigned to a module in Swift, and for
+/// declarations without definitions that choice is somewhat arbitrary. But it
+/// would be better not to pick a local declaration like the one above, and
+/// therefore this method should be used instead of
+/// clang::Decl::getCanonicalDecl when the containing module is important.
+///
+/// If there are no non-local redeclarations, returns null.
+/// If \p D is not a kind of declaration that supports being redeclared, just
+/// returns \p D itself.
+const clang::Decl *
+getFirstNonLocalDecl(const clang::Decl *D);
 
 /// Returns the module \p D comes from, or \c None if \p D does not have
 /// a valid associated module.
@@ -83,7 +112,7 @@ clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
 
 /// Retrieve a bit vector containing the non-null argument
 /// annotations for the given declaration.
-llvm::SmallBitVector
+SmallBitVector
 getNonNullArgs(const clang::Decl *decl,
                ArrayRef<const clang::ParmVarDecl *> params);
 
@@ -109,15 +138,6 @@ bool hasNativeSwiftDecl(const clang::Decl *decl);
 
 /// Translation API nullability from an API note into an optional kind.
 OptionalTypeKind translateNullability(clang::NullabilityKind kind);
-
-/// Determine whether the given class has designated initializers,
-/// consulting
-bool hasDesignatedInitializers(const clang::ObjCInterfaceDecl *classDecl);
-
-/// Determine whether the given method is a designated initializer
-/// of the given class.
-bool isDesignatedInitializer(const clang::ObjCInterfaceDecl *classDecl,
-                             const clang::ObjCMethodDecl *method);
 
 /// Determine whether the given method is a required initializer
 /// of the given class.

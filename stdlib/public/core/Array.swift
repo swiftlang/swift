@@ -296,7 +296,7 @@
 /// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
 ///   instances of those types always have a contiguous block of memory as
 ///   their storage.
-@_fixed_layout
+@frozen
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
   @usableFromInline
@@ -315,7 +315,147 @@ public struct Array<Element>: _DestructorSafeContainer {
   internal init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
+}
 
+//===--- private helpers---------------------------------------------------===//
+extension Array {
+  /// Returns `true` if the array is native and does not need a deferred
+  /// type check.  May be hoisted by the optimizer, which means its
+  /// results may be stale by the time they are used if there is an
+  /// inout violation in user code.
+  @inlinable
+  @_semantics("array.props.isNativeTypeChecked")
+  public // @testable
+  func _hoistableIsNativeTypeChecked() -> Bool {
+   return _buffer.arrayPropertyIsNativeTypeChecked
+  }
+
+  @inlinable
+  @_semantics("array.get_count")
+  internal func _getCount() -> Int {
+    return _buffer.count
+  }
+
+  @inlinable
+  @_semantics("array.get_capacity")
+  internal func _getCapacity() -> Int {
+    return _buffer.capacity
+  }
+
+  @inlinable
+  @_semantics("array.make_mutable")
+  internal mutating func _makeMutableAndUnique() {
+    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
+      _createNewBuffer(bufferIsUnique: false, minimumCapacity: count,
+                       growForAppend: false)
+    }
+  }
+
+  /// Check that the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`.
+  @inlinable
+  @inline(__always)
+  internal func _checkSubscript_native(_ index: Int) {
+    _ = _checkSubscript(index, wasNativeTypeChecked: true)
+  }
+
+  /// Check that the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`.
+  @inlinable
+  @_semantics("array.check_subscript")
+  public // @testable
+  func _checkSubscript(
+    _ index: Int, wasNativeTypeChecked: Bool
+  ) -> _DependenceToken {
+#if _runtime(_ObjC)
+    _buffer._checkInoutAndNativeTypeCheckedBounds(
+      index, wasNativeTypeChecked: wasNativeTypeChecked)
+#else
+    _buffer._checkValidSubscript(index)
+#endif
+    return _DependenceToken()
+  }
+
+  /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
+  @inlinable
+  @_semantics("array.check_index")
+  internal func _checkIndex(_ index: Int) {
+    _precondition(index <= endIndex, "Array index is out of range")
+    _precondition(index >= startIndex, "Negative Array index is out of range")
+  }
+
+  @_semantics("array.get_element")
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
+  public // @testable
+  func _getElement(
+    _ index: Int,
+    wasNativeTypeChecked: Bool,
+    matchingSubscriptCheck: _DependenceToken
+  ) -> Element {
+#if _runtime(_ObjC)
+    return _buffer.getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
+#else
+    return _buffer.getElement(index)
+#endif
+  }
+
+  @inlinable
+  @_semantics("array.get_element_address")
+  internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
+    return _buffer.subscriptBaseAddress + index
+  }
+}
+
+extension Array: _ArrayProtocol {
+  /// The total number of elements that the array can contain without
+  /// allocating new storage.
+  ///
+  /// Every array reserves a specific amount of memory to hold its contents.
+  /// When you add elements to an array and that array begins to exceed its
+  /// reserved capacity, the array allocates a larger region of memory and
+  /// copies its elements into the new storage. The new storage is a multiple
+  /// of the old storage's size. This exponential growth strategy means that
+  /// appending an element happens in constant time, averaging the performance
+  /// of many append operations. Append operations that trigger reallocation
+  /// have a performance cost, but they occur less and less often as the array
+  /// grows larger.
+  ///
+  /// The following example creates an array of integers from an array literal,
+  /// then appends the elements of another collection. Before appending, the
+  /// array allocates new storage that is large enough store the resulting
+  /// elements.
+  ///
+  ///     var numbers = [10, 20, 30, 40, 50]
+  ///     // numbers.count == 5
+  ///     // numbers.capacity == 5
+  ///
+  ///     numbers.append(contentsOf: stride(from: 60, through: 100, by: 10))
+  ///     // numbers.count == 10
+  ///     // numbers.capacity == 10
+  @inlinable
+  public var capacity: Int {
+    return _getCapacity()
+  }
+
+  /// An object that guarantees the lifetime of this array's elements.
+  @inlinable
+  public // @testable
+  var _owner: AnyObject? {
+    @inlinable // FIXME(inline-always)
+    @inline(__always)
+    get {
+      return _buffer.owner      
+    }
+  }
+
+  /// If the elements are stored contiguously, a pointer to the first
+  /// element. Otherwise, `nil`.
+  @inlinable
+  public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    @inline(__always) // FIXME(TODO: JIRA): Hack around test failure
+    get { return _buffer.firstElementAddressIfContiguous }
+  }
 }
 
 extension Array: RandomAccessCollection, MutableCollection {
@@ -353,7 +493,7 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     // Prints "[30, 40, 50]"
   ///
   /// If the array is empty, `endIndex` is equal to `startIndex`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var endIndex: Int {
     @inlinable
     get {
@@ -429,24 +569,25 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
-  ///   - n: The distance to offset `i`.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
   @inlinable
-  public func index(_ i: Int, offsetBy n: Int) -> Int {
+  public func index(_ i: Int, offsetBy distance: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
     // capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i + n
+    return i + distance
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -475,22 +616,25 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
-  ///   - n: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, `limit` has no effect if it is less than `i`.
+  ///     Likewise, if `distance < 0`, `limit` has no effect if it is greater
+  ///     than `i`.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public func index(
-    _ i: Int, offsetBy n: Int, limitedBy limit: Int
+    _ i: Int, offsetBy distance: Int, limitedBy limit: Int
   ) -> Int? {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -498,10 +642,10 @@ extension Array: RandomAccessCollection, MutableCollection {
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
     let l = limit - i
-    if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
+    if distance > 0 ? l >= 0 && l < distance : l <= 0 && distance < l {
       return nil
     }
-    return i + n
+    return i + distance
   }
 
   /// Returns the distance between two indices.
@@ -546,10 +690,9 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///   greater than or equal to `startIndex` and less than `endIndex`.
   ///
   /// - Complexity: Reading an element from an array is O(1). Writing is O(1)
-  ///   unless the array's storage is shared with another array, in which case
-  ///   writing is O(*n*), where *n* is the length of the array.
-  ///   If the array uses a bridged `NSArray` instance as its storage, the
-  ///   efficiency is unspecified.
+  ///   unless the array's storage is shared with another array or uses a
+  ///   bridged `NSArray` instance as its storage, in which case writing is
+  ///   O(*n*), where *n* is the length of the array.
   @inlinable
   public subscript(index: Int) -> Element {
     get {
@@ -567,10 +710,11 @@ extension Array: RandomAccessCollection, MutableCollection {
         index, wasNativeTypeChecked: wasNativeTypeChecked,
         matchingSubscriptCheck: token)
     }
-    mutableAddressWithPinnedNativeOwner {
-      _makeMutableAndUniqueOrPinned() // makes the array native, too
+    _modify {
+      _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
+      let address = _buffer.subscriptBaseAddress + index
+      yield &address.pointee
     }
   }
 
@@ -616,127 +760,11 @@ extension Array: RandomAccessCollection, MutableCollection {
       }
     }
   }
-}
-
-//===--- private helpers---------------------------------------------------===//
-extension Array {
-  /// Returns `true` if the array is native and does not need a deferred
-  /// type check.  May be hoisted by the optimizer, which means its
-  /// results may be stale by the time they are used if there is an
-  /// inout violation in user code.
+  
+  /// The number of elements in the array.
   @inlinable
-  @_semantics("array.props.isNativeTypeChecked")
-  public // @testable
-  func _hoistableIsNativeTypeChecked() -> Bool {
-   return _buffer.arrayPropertyIsNativeTypeChecked
-  }
-
-  @inlinable
-  @_semantics("array.get_count")
-  internal func _getCount() -> Int {
-    return _buffer.count
-  }
-
-  @inlinable
-  @_semantics("array.get_capacity")
-  internal func _getCapacity() -> Int {
-    return _buffer.capacity
-  }
-
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @_semantics("array.owner")
-  internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
-    return Builtin.unsafeCastToNativeObject(_buffer.nativeOwner)
-  }
-
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @inline(__always)
-  internal func _getOwner_native() -> Builtin.NativeObject {
-#if _runtime(_ObjC)
-    if _isClassOrObjCExistential(Element.self) {
-      // We are hiding the access to '_buffer.owner' behind
-      // _getOwner() to help the compiler hoist uniqueness checks in
-      // the case of class or Objective-C existential typed array
-      // elements.
-      return _getOwnerWithSemanticLabel_native()
-    }
-#endif
-    // In the value typed case the extra call to
-    // _getOwnerWithSemanticLabel_native hinders optimization.
-    return Builtin.unsafeCastToNativeObject(_buffer.owner)
-  }
-
-  @inlinable
-  @_semantics("array.make_mutable")
-  internal mutating func _makeMutableAndUnique() {
-    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _buffer = _Buffer(copying: _buffer)
-    }
-  }
-
-  @inlinable
-  @_semantics("array.make_mutable")
-  internal mutating func _makeMutableAndUniqueOrPinned() {
-    if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
-      _buffer = _Buffer(copying: _buffer)
-    }
-  }
-
-
-  /// Check that the given `index` is valid for subscripting, i.e.
-  /// `0 ≤ index < count`.
-  @inlinable
-  @inline(__always)
-  internal func _checkSubscript_native(_ index: Int) {
-    _ = _checkSubscript(index, wasNativeTypeChecked: true)
-  }
-
-  /// Check that the given `index` is valid for subscripting, i.e.
-  /// `0 ≤ index < count`.
-  @inlinable
-  @_semantics("array.check_subscript")
-  public // @testable
-  func _checkSubscript(
-    _ index: Int, wasNativeTypeChecked: Bool
-  ) -> _DependenceToken {
-#if _runtime(_ObjC)
-    _buffer._checkInoutAndNativeTypeCheckedBounds(
-      index, wasNativeTypeChecked: wasNativeTypeChecked)
-#else
-    _buffer._checkValidSubscript(index)
-#endif
-    return _DependenceToken()
-  }
-
-  /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
-  @inlinable
-  @_semantics("array.check_index")
-  internal func _checkIndex(_ index: Int) {
-    _precondition(index <= endIndex, "Array index is out of range")
-    _precondition(index >= startIndex, "Negative Array index is out of range")
-  }
-
-  @_semantics("array.get_element")
-  @inline(__always)
-  public // @testable
-  func _getElement(
-    _ index: Int,
-    wasNativeTypeChecked: Bool,
-    matchingSubscriptCheck: _DependenceToken
-  ) -> Element {
-#if _runtime(_ObjC)
-    return _buffer.getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
-#else
-    return _buffer.getElement(index)
-#endif
-  }
-
-  @inlinable
-  @_semantics("array.get_element_address")
-  internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return _buffer.subscriptBaseAddress + index
+  public var count: Int {
+    return _getCount()
   }
 }
 
@@ -761,7 +789,7 @@ extension Array: ExpressibleByArrayLiteral {
   }
 }
 
-extension Array: RangeReplaceableCollection, ArrayProtocol {
+extension Array: RangeReplaceableCollection {
   /// Creates a new, empty array.
   ///
   /// This is equivalent to initializing with an empty array literal.
@@ -775,7 +803,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///     print(emptyArray.isEmpty)
   ///     // Prints "true"
   @inlinable
-  @_semantics("array.init")
+  @_semantics("array.init.empty")
   public init() {
     _buffer = _Buffer()
   }
@@ -815,9 +843,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter s: The sequence of elements to turn into an array.
   @inlinable
-  public init<S: Sequence>(_ s: S)
-    where S.Element == Element {
-
+  public init<S: Sequence>(_ s: S) where S.Element == Element {
     self = Array(
       _buffer: _Buffer(
         _buffer: s._copyToContiguousArray()._buffer,
@@ -859,7 +885,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
-  /// Construct a Array of `count` uninitialized elements.
+  /// Construct an Array of `count` uninitialized elements.
   @inlinable
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct Array with count < 0")
@@ -878,7 +904,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   }
 
   /// Entry point for `Array` literal construction; builds and returns
-  /// a Array of `count` uninitialized elements.
+  /// an Array of `count` uninitialized elements.
   @inlinable
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
@@ -911,63 +937,12 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   }
 
   /// Entry point for aborting literal construction: deallocates
-  /// a Array containing only uninitialized elements.
+  /// an Array containing only uninitialized elements.
   @inlinable
   internal mutating func _deallocateUninitialized() {
     // Set the count to zero and just release as normal.
     // Somewhat of a hack.
     _buffer.count = 0
-  }
-
-  /// The number of elements in the array.
-  @inlinable
-  public var count: Int {
-    return _getCount()
-  }
-
-  /// The total number of elements that the array can contain without
-  /// allocating new storage.
-  ///
-  /// Every array reserves a specific amount of memory to hold its contents.
-  /// When you add elements to an array and that array begins to exceed its
-  /// reserved capacity, the array allocates a larger region of memory and
-  /// copies its elements into the new storage. The new storage is a multiple
-  /// of the old storage's size. This exponential growth strategy means that
-  /// appending an element happens in constant time, averaging the performance
-  /// of many append operations. Append operations that trigger reallocation
-  /// have a performance cost, but they occur less and less often as the array
-  /// grows larger.
-  ///
-  /// The following example creates an array of integers from an array literal,
-  /// then appends the elements of another collection. Before appending, the
-  /// array allocates new storage that is large enough store the resulting
-  /// elements.
-  ///
-  ///     var numbers = [10, 20, 30, 40, 50]
-  ///     // numbers.count == 5
-  ///     // numbers.capacity == 5
-  ///
-  ///     numbers.append(contentsOf: stride(from: 60, through: 100, by: 10))
-  ///     // numbers.count == 10
-  ///     // numbers.capacity == 12
-  @inlinable
-  public var capacity: Int {
-    return _getCapacity()
-  }
-
-  /// An object that guarantees the lifetime of this array's elements.
-  @inlinable
-  public // @testable
-  var _owner: AnyObject? {
-    return _buffer.owner
-  }
-
-  /// If the elements are stored contiguously, a pointer to the first
-  /// element. Otherwise, `nil`.
-  @inlinable
-  public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
-    @inline(__always) // FIXME(TODO: JIRA): Hack around test failure
-    get { return _buffer.firstElementAddressIfContiguous }
   }
 
   //===--- basic mutations ------------------------------------------------===//
@@ -1043,19 +1018,65 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
-    if _buffer.requestUniqueMutableBackingBuffer(
-      minimumCapacity: minimumCapacity) == nil {
+    _reserveCapacityImpl(minimumCapacity: minimumCapacity,
+                         growForAppend: false)
+  }
 
-      let newBuffer = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: count, minimumCapacity: minimumCapacity)
-
-      _buffer._copyContents(
-        subRange: _buffer.indices,
-        initializing: newBuffer.firstElementAddress)
-      _buffer = _Buffer(
-        _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
+  /// Reserves enough space to store `minimumCapacity` elements.
+  /// If a new buffer needs to be allocated and `growForAppend` is true,
+  /// the new capacity is calculated using `_growArrayCapacity`, but at least
+  /// kept at `minimumCapacity`.
+  @_alwaysEmitIntoClient
+  internal mutating func _reserveCapacityImpl(
+    minimumCapacity: Int, growForAppend: Bool
+  ) {
+    let isUnique = _buffer.isUniquelyReferenced()
+    if _slowPath(!isUnique || _getCapacity() < minimumCapacity) {
+      _createNewBuffer(bufferIsUnique: isUnique,
+                       minimumCapacity: Swift.max(minimumCapacity, count),
+                       growForAppend: growForAppend)
     }
-    _sanityCheck(capacity >= minimumCapacity)
+    _internalInvariant(capacity >= minimumCapacity)
+    _internalInvariant(capacity == 0 || _buffer.isUniquelyReferenced())
+  }
+
+  /// Creates a new buffer, replacing the current buffer.
+  ///
+  /// If `bufferIsUnique` is true, the buffer is assumed to be uniquely
+  /// referenced by this array and the elements are moved - instead of copied -
+  /// to the new buffer.
+  /// The `minimumCapacity` is the lower bound for the new capacity.
+  /// If `growForAppend` is true, the new capacity is calculated using
+  /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal mutating func _createNewBuffer(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) {
+    let newCapacity = _growArrayCapacity(oldCapacity: _getCapacity(),
+                                         minimumCapacity: minimumCapacity,
+                                         growForAppend: growForAppend)
+    let count = _getCount()
+    _internalInvariant(newCapacity >= count)
+    
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: count, minimumCapacity: newCapacity)
+
+    if bufferIsUnique {
+      _internalInvariant(_buffer.isUniquelyReferenced())
+
+      // As an optimization, if the original buffer is unique, we can just move
+      // the elements instead of copying.
+      let dest = newBuffer.firstElementAddress
+      dest.moveInitialize(from: _buffer.firstElementAddress,
+                          count: count)
+      _buffer.count = 0
+    } else {
+      _buffer._copyContents(
+        subRange: 0..<count,
+        initializing: newBuffer.firstElementAddress)
+    }
+    _buffer = _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -1074,7 +1095,9 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.make_mutable")
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _copyToNewBuffer(oldCount: _buffer.count)
+      _createNewBuffer(bufferIsUnique: false,
+                       minimumCapacity: count + 1,
+                       growForAppend: true)
     }
   }
 
@@ -1082,9 +1105,9 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
-    // statement in the _sanityCheck below.
+    // statement in the _internalInvariant below.
     //
-    //   _sanityCheck(_buffer.capacity == 0 ||
+    //   _internalInvariant(_buffer.capacity == 0 ||
     //                _buffer.isMutableAndUniquelyReferenced())
     //
     // SR-6437
@@ -1099,11 +1122,13 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     // This specific case is okay because we will make the buffer unique in this
     // function because we request a capacity > 0 and therefore _copyToNewBuffer
     // will be called creating a new buffer.
-    _sanityCheck(capacity ||
+    _internalInvariant(capacity ||
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
-      _copyToNewBuffer(oldCount: oldCount)
+      _createNewBuffer(bufferIsUnique: true,
+                       minimumCapacity: oldCount + 1,
+                       growForAppend: true)
     }
   }
 
@@ -1111,10 +1136,10 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.mutate_unknown")
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
-    newElement: Element
+    newElement: __owned Element
   ) {
-    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
-    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+    _internalInvariant(_buffer.isMutableAndUniquelyReferenced())
+    _internalInvariant(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
@@ -1139,12 +1164,13 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElement: The element to append to the array.
   ///
-  /// - Complexity: Amortized O(1) over many additions. If the array uses a
-  ///   bridged `NSArray` instance as its storage, the efficiency is
-  ///   unspecified.
+  /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
+  ///   same array.
   @inlinable
   @_semantics("array.append_element")
-  public mutating func append(_ newElement: Element) {
+  public mutating func append(_ newElement: __owned Element) {
+    // Separating uniqueness check and capacity check allows hoisting the
+    // uniqueness check out of a loop.
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
     _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
@@ -1164,10 +1190,12 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElements: The elements to append to the array.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting array.
+  /// - Complexity: O(*m*) on average, where *m* is the length of
+  ///   `newElements`, over many calls to `append(contentsOf:)` on the same
+  ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
-  public mutating func append<S: Sequence>(contentsOf newElements: S)
+  public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
@@ -1179,7 +1207,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
                 start: startNewElements, 
                 count: self.capacity - oldCount)
 
-    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    var (remainder,writtenUpTo) = buf.initialize(from: newElements)
     
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
@@ -1187,35 +1215,59 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
-    _buffer.count += writtenCount
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
+    if writtenCount > 0 {
+      _buffer.count += writtenCount
+    }
 
-    if writtenUpTo == buf.endIndex {
+    if _slowPath(writtenUpTo == buf.endIndex) {
+
+      // A shortcut for appending an Array: If newElements is an Array then it's
+      // guaranteed that buf.initialize(from: newElements) already appended all
+      // elements. It reduces code size, because the following code
+      // can be removed by the optimizer by constant folding this check in a
+      // generic specialization.
+      if newElements is [Element] {
+        _internalInvariant(remainder.next() == nil)
+        return
+      }
+
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
-      _buffer._arrayAppendSequence(IteratorSequence(remainder))
+      var newCount = _getCount()
+      var nextItem = remainder.next()
+      while nextItem != nil {
+        reserveCapacityForAppend(newElementsCount: 1)
+
+        let currentCapacity = _getCapacity()
+        let base = _buffer.firstElementAddress
+
+        // fill while there is another item and spare capacity
+        while let next = nextItem, newCount < currentCapacity {
+          (base + newCount).initialize(to: next)
+          newCount += 1
+          nextItem = remainder.next()
+        }
+        _buffer.count = newCount
+      }
     }
   }
 
   @inlinable
   @_semantics("array.reserve_capacity_for_append")
   internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
-    let oldCount = self.count
-    let oldCapacity = self.capacity
-    let newCount = oldCount + newElementsCount
-
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
     // for consistency, we need unique self even if newElements is empty.
-    self.reserveCapacity(
-      newCount > oldCapacity ?
-      Swift.max(newCount, _growArrayCapacity(oldCapacity))
-      : newCount)
+    _reserveCapacityImpl(minimumCapacity: self.count + newElementsCount,
+                         growForAppend: true)
   }
 
   @inlinable
+  @_semantics("array.mutate_unknown")
   public mutating func _customRemoveLast() -> Element? {
+    _makeMutableAndUnique()
     let newCount = _getCount() - 1
     _precondition(newCount >= 0, "Can't removeLast from an empty Array")
-    _makeUniqueAndReserveCapacityIfNotUnique()
     let pointer = (_buffer.firstElementAddress + newCount)
     let element = pointer.move()
     _buffer.count = newCount
@@ -1239,11 +1291,13 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   /// - Complexity: O(*n*), where *n* is the length of the array.
   @inlinable
   @discardableResult
+  @_semantics("array.mutate_unknown")
   public mutating func remove(at index: Int) -> Element {
-    _precondition(index < endIndex, "Index out of range")
-    _precondition(index >= startIndex, "Index out of range")
-    _makeUniqueAndReserveCapacityIfNotUnique()
-    let newCount = _getCount() - 1
+    _makeMutableAndUnique()
+    let currentCount = _getCount()
+    _precondition(index < currentCount, "Index out of range")
+    _precondition(index >= 0, "Index out of range")
+    let newCount = currentCount - 1
     let pointer = (_buffer.firstElementAddress + index)
     let result = pointer.move()
     pointer.moveInitialize(from: pointer + 1, count: newCount - index)
@@ -1269,9 +1323,10 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///   `index` must be a valid index of the array or equal to its `endIndex`
   ///   property.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the array.
+  /// - Complexity: O(*n*), where *n* is the length of the array. If
+  ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
-  public mutating func insert(_ newElement: Element, at i: Int) {
+  public mutating func insert(_ newElement: __owned Element, at i: Int) {
     _checkIndex(i)
     self.replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }
@@ -1306,11 +1361,50 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   }
 
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeMutableBufferPointer {
+      (bufferPointer) -> R in
+      return try body(&bufferPointer)
+    }
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try body(bufferPointer)
+    }
+  }
+
+  @inlinable
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
-    return _copyCollectionToContiguousArray(_buffer)
+    return _copyCollectionToContiguousArray(self)
+  }
+}
+
+// Implementations of + and += for same-type arrays. This combined
+// with the operator declarations for these operators designating this
+// type as a place to prefer this operator help the expression type
+// checker speed up cases where there is a large number of uses of the
+// operator in the same expression.
+extension Array {
+  @inlinable
+  public static func + (lhs: Array, rhs: Array) -> Array {
+    var lhs = lhs
+    lhs.append(contentsOf: rhs)
+    return lhs
+  }
+
+  @inlinable
+  public static func += (lhs: inout Array, rhs: Array) {
+    lhs.append(contentsOf: rhs)
   }
 }
 
@@ -1327,14 +1421,14 @@ extension Array: CustomReflectable {
 extension Array: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
-    return _makeCollectionDescription(for: self, withTypeName: nil)
+    return _makeCollectionDescription()
   }
 
   /// A textual representation of the array and its elements, suitable for
   /// debugging.
   public var debugDescription: String {
     // Always show sugared representation for Arrays.
-    return _makeCollectionDescription(for: self, withTypeName: nil)
+    return _makeCollectionDescription()
   }
 }
 
@@ -1351,32 +1445,10 @@ extension Array {
 }
 
 extension Array {
-  /// Creates an array with the specified capacity, then calls the given
-  /// closure with a buffer covering the array's uninitialized memory.
-  ///
-  /// Inside the closure, set the `initializedCount` parameter to the number of
-  /// elements that are initialized by the closure. The memory in the range
-  /// `buffer[0..<initializedCount]` must be initialized at the end of the
-  /// closure's execution, and the memory in the range
-  /// `buffer[initializedCount...]` must be uninitialized.
-  ///
-  /// - Note: While the resulting array may have a capacity larger than the
-  ///   requested amount, the buffer passed to the closure will cover exactly
-  ///   the requested number of elements.
-  ///
-  /// - Parameters:
-  ///   - _unsafeUninitializedCapacity: The number of elements to allocate
-  ///     space for in the new array.
-  ///   - initializer: A closure that initializes elements and sets the count
-  ///     of the new array.
-  ///     - Parameters:
-  ///       - buffer: A buffer covering uninitialized memory with room for the
-  ///         specified number of of elements.
-  ///       - initializedCount: The count of initialized elements in the array,
-  ///         which begins as zero. Set `initializedCount` to the number of
-  ///         elements you initialize.
+  /// Implementation for Array(unsafeUninitializedCapacity:initializingWith:)
+  /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
   @inlinable
-  public init(
+  internal init(
     _unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
@@ -1385,21 +1457,62 @@ extension Array {
     var firstElementAddress: UnsafeMutablePointer<Element>
     (self, firstElementAddress) =
       Array._allocateUninitialized(_unsafeUninitializedCapacity)
-    
+
     var initializedCount = 0
+    var buffer = UnsafeMutableBufferPointer<Element>(
+      start: firstElementAddress, count: _unsafeUninitializedCapacity)
     defer {
       // Update self.count even if initializer throws an error.
       _precondition(
         initializedCount <= _unsafeUninitializedCapacity,
         "Initialized count set to greater than specified capacity."
       )
+      _precondition(
+        buffer.baseAddress == firstElementAddress,
+        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
+      )
       self._buffer.count = initializedCount
     }
-    var buffer = UnsafeMutableBufferPointer<Element>(
-      start: firstElementAddress, count: _unsafeUninitializedCapacity)
     try initializer(&buffer, &initializedCount)
   }
-  
+
+  /// Creates an array with the specified capacity, then calls the given
+  /// closure with a buffer covering the array's uninitialized memory.
+  ///
+  /// Inside the closure, set the `initializedCount` parameter to the number of
+  /// elements that are initialized by the closure. The memory in the range
+  /// `buffer[0..<initializedCount]` must be initialized at the end of the
+  /// closure's execution, and the memory in the range
+  /// `buffer[initializedCount...]` must be uninitialized. This postcondition
+  /// must hold even if the `initializer` closure throws an error.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the buffer passed to the closure will cover exactly
+  ///   the requested number of elements.
+  ///
+  /// - Parameters:
+  ///   - unsafeUninitializedCapacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes elements and sets the count
+  ///     of the new array.
+  ///     - Parameters:
+  ///       - buffer: A buffer covering uninitialized memory with room for the
+  ///         specified number of elements.
+  ///       - initializedCount: The count of initialized elements in the array,
+  ///         which begins as zero. Set `initializedCount` to the number of
+  ///         elements you initialize.
+  @_alwaysEmitIntoClient @inlinable
+  public init(
+    unsafeUninitializedCapacity: Int,
+    initializingWith initializer: (
+      _ buffer: inout UnsafeMutableBufferPointer<Element>,
+      _ initializedCount: inout Int) throws -> Void
+  ) rethrows {
+    self = try Array(
+      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
+      initializingWith: initializer)
+  }
+
   /// Calls a closure with a pointer to the array's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within an array
@@ -1473,6 +1586,7 @@ extension Array {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
+  @inlinable // FIXME(inline-always)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
@@ -1480,9 +1594,8 @@ extension Array {
   public mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
+    _makeMutableAndUnique()
     let count = self.count
-    // Ensure unique storage
-    _buffer._outlinedMakeUniqueBuffer(bufferCount: count)
 
     // Ensure that body can't invalidate the storage or its bounds by
     // moving self into a temporary working array.
@@ -1516,7 +1629,7 @@ extension Array {
   }
 
   @inlinable
-  public func _copyContents(
+  public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
 
@@ -1578,14 +1691,15 @@ extension Array {
   ///     a subrange must be valid indices of the array.
   ///   - newElements: The new elements to add to the array.
   ///
-  /// - Complexity: O(`subrange.count`) if you are replacing a suffix of the
-  ///   array with an empty collection; otherwise, O(*n*), where *n* is the
-  ///   length of the array.
+  /// - Complexity: O(*n* + *m*), where *n* is length of the array and
+  ///   *m* is the length of `newElements`. If the call to this method simply
+  ///   appends the contents of `newElements` to the array, this method is
+  ///   equivalent to `append(contentsOf:)`.
   @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
-    with newElements: C
+    with newElements: __owned C
   ) where C: Collection, C.Element == Element {
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "Array replace: subrange start is negative")
@@ -1593,19 +1707,12 @@ extension Array {
     _precondition(subrange.upperBound <= _buffer.endIndex,
       "Array replace: subrange extends past the end")
 
-    let oldCount = _buffer.count
     let eraseCount = subrange.count
     let insertCount = newElements.count
     let growth = insertCount - eraseCount
 
-    if _buffer.requestUniqueMutableBackingBuffer(
-      minimumCapacity: oldCount + growth) != nil {
-
-      _buffer.replaceSubrange(
-        subrange, with: insertCount, elementsOf: newElements)
-    } else {
-      _buffer._arrayOutOfPlaceReplace(subrange, with: newElements, count: insertCount)
-    }
+    reserveCapacityForAppend(newElementsCount: growth)
+    _buffer.replaceSubrange(subrange, with: insertCount, elementsOf: newElements)
   }
 }
 
@@ -1632,8 +1739,8 @@ extension Array: Equatable where Element: Equatable {
     }
 
 
-    _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
-    _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+    _internalInvariant(lhs.startIndex == 0 && rhs.startIndex == 0)
+    _internalInvariant(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
 
     // We know that lhs.count == rhs.count, compare element wise.
     for idx in 0..<lhsCount {
@@ -1643,20 +1750,6 @@ extension Array: Equatable where Element: Equatable {
     }
 
     return true
-  }
-
-  /// Returns a Boolean value indicating whether two arrays are not equal.
-  ///
-  /// Two arrays are equal if they contain the same elements in the same order.
-  /// You can use the not-equal-to operator (`!=`) to compare any two arrays
-  /// that store the same, `Equatable`-conforming element type.
-  ///
-  /// - Parameters:
-  ///   - lhs: An array to compare.
-  ///   - rhs: Another array to compare.
-  @inlinable
-  public static func !=(lhs: Array<Element>, rhs: Array<Element>) -> Bool {
-    return !(lhs == rhs)
   }
 }
 
@@ -1764,7 +1857,7 @@ extension Array {
 // to do the bridging in an ABI safe way. Even though this looks useless,
 // DO NOT DELETE!
 @usableFromInline internal
-func _bridgeCocoaArray<T>(_ _immutableCocoaArray: _NSArrayCore) -> Array<T> {
+func _bridgeCocoaArray<T>(_ _immutableCocoaArray: AnyObject) -> Array<T> {
   return Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
 }
 
@@ -1785,7 +1878,7 @@ extension Array {
     _ source: AnyObject
   ) -> Array? {
     // If source is deferred, we indirect to get its native storage
-    let maybeNative = (source as? _SwiftDeferredNSArray)?._nativeStorage ?? source
+    let maybeNative = (source as? __SwiftDeferredNSArray)?._nativeStorage ?? source
 
     return (maybeNative as? _ContiguousArrayStorage<Element>).map {
       Array(_ContiguousArrayBuffer($0))
@@ -1800,7 +1893,7 @@ extension Array {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   @inlinable
-  public init(_immutableCocoaArray: _NSArrayCore) {
+  public init(_immutableCocoaArray: AnyObject) {
     self = _bridgeCocoaArray(_immutableCocoaArray)
   }
 }
@@ -1808,7 +1901,7 @@ extension Array {
 
 extension Array: _HasCustomAnyHashableRepresentation
   where Element: Hashable {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _ArrayAnyHashableBox(self))
   }
 }
@@ -1860,13 +1953,13 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     }
   }
 
-  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+  func _rawHashValue(_seed: Int) -> Int {
     var hasher = Hasher(_seed: _seed)
     self._hash(into: &hasher)
     return hasher._finalize()
   }
 
-  internal func _unbox<T : Hashable>() -> T? {
+  internal func _unbox<T: Hashable>() -> T? {
     return _value as? T
   }
 

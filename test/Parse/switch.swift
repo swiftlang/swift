@@ -64,7 +64,7 @@ case _ where x % 2 == 0,
   x = 1
 case var y where y % 2 == 0:
   x = y + 1
-case _ where 0: // expected-error {{'Int' is not convertible to 'Bool'}}
+case _ where 0: // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   x = 0
 default:
   x = 1
@@ -307,7 +307,7 @@ Gronk: // expected-error {{switch must be exhaustive}} expected-note{{do you wan
 
 func enumElementSyntaxOnTuple() {
   switch (1, 1) {
-  case .Bar: // expected-error {{pattern cannot match values of type '(Int, Int)'}}
+  case .Bar: // expected-error {{value of tuple type '(Int, Int)' has no member 'Bar'}}
     break
   default:
     break
@@ -317,7 +317,7 @@ func enumElementSyntaxOnTuple() {
 // sr-176
 enum Whatever { case Thing }
 func f0(values: [Whatever]) { // expected-note {{'values' declared here}}
-    switch value { // expected-error {{use of unresolved identifier 'value'; did you mean 'values'?}}
+    switch value { // expected-error {{cannot find 'value' in scope; did you mean 'values'?}}
     case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
         break
     }
@@ -608,4 +608,39 @@ switch x {
   break
 @unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   break
+}
+
+func testReturnBeforeUnknownDefault() {
+  switch x { // expected-error {{switch must be exhaustive}}
+  case 1:
+    return
+  @unknown default: // expected-note {{remove '@unknown' to handle remaining values}}
+    break
+  }
+}
+
+func testReturnBeforeIncompleteUnknownDefault() {
+  switch x { // expected-error {{switch must be exhaustive}}
+  case 1:
+    return
+  @unknown default // expected-error {{expected ':' after 'default'}}
+  // expected-note@-1 {{remove '@unknown' to handle remaining values}}
+  }
+}
+
+func testReturnBeforeIncompleteUnknownDefault2() {
+  switch x { // expected-error {{switch must be exhaustive}} expected-note {{do you want to add a default clause?}}
+  case 1:
+    return
+  @unknown // expected-error {{unknown attribute 'unknown'}}
+  } // expected-error {{expected declaration}}
+}
+
+func testIncompleteArrayLiteral() {
+  switch x { // expected-error {{switch must be exhaustive}}
+  case 1:
+    _ = [1 // expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
+  @unknown default: // expected-note {{remove '@unknown' to handle remaining values}}
+    ()
+  }
 }

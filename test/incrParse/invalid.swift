@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %incparse-test %s --test-case NO_CHANGES
-// RUN: %incparse-test %s --test-case NESTED_INITIALIZERS
+// RUN: %validate-incrparse %s --test-case NO_CHANGES
+// RUN: %validate-incrparse %s --test-case NESTED_INITIALIZERS
 
 func start() {}
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -simplify-cfg %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -simplify-cfg %s | %FileCheck %s
 //
 // Make sure that we can succesfully call simplify-cfg with that name via sil-opt.
 

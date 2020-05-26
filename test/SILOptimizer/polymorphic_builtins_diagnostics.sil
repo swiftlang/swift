@@ -1,0 +1,29 @@
+// RUN: %target-sil-opt -module-name Swift -dataflow-diagnostics -verify %s
+
+sil_stage raw
+
+import Builtin
+
+struct MyInt {
+  var i : Builtin.Int32
+}
+
+sil @concrete_type_object_fail : $@convention(thin) (MyInt, MyInt) -> MyInt {
+bb0(%0 : $MyInt, %1 : $MyInt):
+  %2 = builtin "generic_add"<MyInt>(%0 : $MyInt, %1 : $MyInt) : $MyInt // expected-error {{Argument of type 'MyInt' can not be passed as an argument to a Polymorphic builtin. Polymorphic builtins can only be passed arguments that are trivial builtin typed}}
+  return %2 : $MyInt
+}
+
+sil @concrete_type_address_fail : $@convention(thin) (@in_guaranteed MyInt, @in_guaranteed MyInt) -> @out MyInt {
+bb0(%0 : $*MyInt, %1 : $*MyInt, %2 : $*MyInt):
+  %3 = builtin "generic_add"<MyInt>(%0 : $*MyInt, %1 : $*MyInt, %2 : $*MyInt) : $() // expected-error {{Argument of type 'MyInt' can not be passed as an argument to a Polymorphic builtin. Polymorphic builtins can only be passed arguments that are trivial builtin typed}}
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @concrete_type_address_fail_mismatched_trivial_type : $@convention(thin) (@in_guaranteed Builtin.FPIEEE32, @in_guaranteed Builtin.FPIEEE32) -> @out Builtin.FPIEEE32 {
+bb0(%0 : $*Builtin.FPIEEE32, %1 : $*Builtin.FPIEEE32, %2 : $*Builtin.FPIEEE32):
+  %3 = builtin "generic_add"<Builtin.FPIEEE32>(%0 : $*Builtin.FPIEEE32, %1 : $*Builtin.FPIEEE32, %2 : $*Builtin.FPIEEE32) : $() // expected-error {{Static overload 'add_FPIEEE32' does not exist for polymorphic builtin 'generic_add'. Static overload implied by passing argument of type 'Builtin.FPIEEE32'}}
+  %9999 = tuple()
+  return %9999 : $()
+}

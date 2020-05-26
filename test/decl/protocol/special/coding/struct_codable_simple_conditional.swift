@@ -16,7 +16,7 @@ struct Conditional<T> {
   }
 }
 
-extension Conditional: Codable where T: Codable {
+extension Conditional: Codable where T: Codable { // expected-note 4{{where 'T' = 'Nonconforming'}}
 }
 
 // They should receive synthesized init(from:) and an encode(to:).
@@ -25,8 +25,10 @@ let _ = Conditional<Int>.encode(to:)
 
 // but only for Codable parameters.
 struct Nonconforming {}
-let _ = Conditional<Nonconforming>.init(from:) // expected-error {{type 'Nonconforming' does not conform to protocol 'Decodable'}}
-let _ = Conditional<Nonconforming>.encode(to:) // expected-error {{type 'Nonconforming' does not conform to protocol 'Decodable'}}
+let _ = Conditional<Nonconforming>.init(from:) // expected-error {{referencing initializer 'init(from:)' on 'Conditional' requires that 'Nonconforming' conform to 'Encodable'}}
+// expected-error@-1 {{referencing initializer 'init(from:)' on 'Conditional' requires that 'Nonconforming' conform to 'Decodable'}}
+let _ = Conditional<Nonconforming>.encode(to:) // expected-error {{referencing instance method 'encode(to:)' on 'Conditional' requires that 'Nonconforming' conform to 'Encodable'}}
+// expected-error@-1 {{referencing instance method 'encode(to:)' on 'Conditional' requires that 'Nonconforming' conform to 'Decodable'}}
 
 // The synthesized CodingKeys type should not be accessible from outside the
 // struct.

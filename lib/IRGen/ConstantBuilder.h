@@ -24,8 +24,13 @@
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
 
+namespace clang {
+class PointerAuthSchema;
+}
+
 namespace swift {
 namespace irgen {
+class PointerAuthEntity;
 
 class ConstantAggregateBuilderBase;
 class ConstantStructBuilder;
@@ -72,6 +77,10 @@ public:
     addInt(IGM().Int32Ty, value);
   }
 
+  void addInt64(uint64_t value) { addInt(IGM().Int64Ty, value); }
+
+  void addSize(Size size) { addInt(IGM().SizeTy, size.getValue()); }
+
   void addRelativeAddressOrNull(llvm::Constant *target) {
     if (target) {
       addRelativeAddress(target);
@@ -81,6 +90,7 @@ public:
   }
 
   void addRelativeAddress(llvm::Constant *target) {
+    assert(!isa<llvm::ConstantPointerNull>(target));
     addRelativeOffset(IGM().RelativeAddressTy, target);
   }
 
@@ -114,6 +124,15 @@ public:
             llvm::ArrayType::get(IGM().Int8Ty,
                                  align.getValue() - misalignment.getValue())));
   }
+
+  using super::addSignedPointer;
+  void addSignedPointer(llvm::Constant *pointer,
+                        const clang::PointerAuthSchema &schema,
+                        const PointerAuthEntity &entity);
+
+  void addSignedPointer(llvm::Constant *pointer,
+                        const clang::PointerAuthSchema &schema,
+                        uint16_t otherDiscriminator);
 };
 
 class ConstantArrayBuilder

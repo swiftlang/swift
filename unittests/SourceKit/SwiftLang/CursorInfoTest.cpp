@@ -36,16 +36,17 @@ class NullEditorConsumer : public EditorConsumer {
     llvm_unreachable("unexpected error");
   }
 
-  bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
-    return false;
+  bool syntaxMapEnabled() override { return true; }
+
+  void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
   }
 
-  bool handleSemanticAnnotation(unsigned Offset, unsigned Length,
-                                UIdent Kind, bool isSystem) override {
-    return false;
-  }
+  void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
+                                bool isSystem) override {}
 
-  bool beginDocumentSubStructure(unsigned Offset, unsigned Length,
+  bool documentStructureEnabled() override { return false; }
+
+  void beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                  UIdent Kind, UIdent AccessLevel,
                                  UIdent SetterAccessLevel,
                                  unsigned NameOffset,
@@ -60,49 +61,37 @@ class NullEditorConsumer : public EditorConsumer {
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
                                  ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
-    return false;
   }
 
-  bool endDocumentSubStructure() override { return false; }
+  void endDocumentSubStructure() override {}
 
-  bool handleDocumentSubStructureElement(UIdent Kind,
-                                         unsigned Offset,
-                                         unsigned Length) override {
-    return false;
+  void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
+                                         unsigned Length) override {}
+
+  void recordAffectedRange(unsigned Offset, unsigned Length) override {}
+
+  void recordAffectedLineRange(unsigned Line, unsigned Length) override {}
+
+  void setDiagnosticStage(UIdent DiagStage) override {}
+  void handleDiagnostic(const DiagnosticEntryInfo &Info,
+                        UIdent DiagStage) override {}
+  void recordFormattedText(StringRef Text) override {}
+
+  void handleSourceText(StringRef Text) override {}
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> &ReusedNodeIds) override {}
+
+  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
+    return SyntaxTreeTransferMode::Off;
   }
 
-  bool recordAffectedRange(unsigned Offset, unsigned Length) override {
-    return false;
-  }
-  
-  bool recordAffectedLineRange(unsigned Line, unsigned Length) override {
-    return false;
-  }
-
-  bool recordFormattedText(StringRef Text) override { return false; }
-
-  bool setDiagnosticStage(UIdent DiagStage) override { return false; }
-  bool handleDiagnostic(const DiagnosticEntryInfo &Info,
-                        UIdent DiagStage) override {
-    return false;
-  }
-
-  bool handleSourceText(StringRef Text) override { return false; }
-  bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
-  bool syntaxTreeEnabled() override { return false; }
-  bool forceLibSyntaxBasedProcessing() override { return false; }
-
-  bool syntaxReuseInfoEnabled() override { return false; }
-
-  bool handleSyntaxReuseRegions(
-      std::vector<SourceFileRange> ReuseRegions) override {
-    return false;
-  }
 public:
   bool needsSema = false;
 };
 
 struct TestCursorInfo {
+  // Empty if no error.
+  std::string Error;
   std::string Name;
   std::string Typename;
   std::string Filename;
@@ -127,6 +116,7 @@ public:
 
   CursorInfoTest()
       : Ctx(*new SourceKit::Context(getRuntimeLibPath(),
+                                    /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
                                     /*dispatchOnMain=*/false)) {
     // This is avoiding destroying \p SourceKit::Context because another
@@ -135,7 +125,7 @@ public:
   }
 
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
-    Ctx.getNotificationCenter().addDocumentUpdateNotificationReceiver(Receiver);
+    Ctx.getNotificationCenter()->addDocumentUpdateNotificationReceiver(Receiver);
   }
 
   void open(const char *DocName, StringRef Text,
@@ -143,7 +133,7 @@ public:
     auto Args = CArgs.hasValue() ? makeArgs(DocName, *CArgs)
                                  : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, None);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
@@ -158,11 +148,18 @@ public:
     Semaphore sema(0);
 
     TestCursorInfo TestInfo;
-    getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
-      [&](const CursorInfoData &Info) {
-        TestInfo.Name = Info.Name;
-        TestInfo.Typename = Info.TypeName;
-        TestInfo.Filename = Info.Filename;
+    getLang().getCursorInfo(DocName, Offset, 0, false, false, Args, None,
+      [&](const RequestResult<CursorInfoData> &Result) {
+        assert(!Result.isCancelled());
+        if (Result.isError()) {
+          TestInfo.Error = Result.getError().str();
+          sema.signal();
+          return;
+        }
+        const CursorInfoData &Info = Result.value();
+        TestInfo.Name = Info.Name.str();
+        TestInfo.Typename = Info.TypeName.str();
+        TestInfo.Filename = Info.Filename.str();
         TestInfo.DeclarationLoc = Info.DeclarationLoc;
         sema.signal();
       });
@@ -193,10 +190,10 @@ private:
 } // anonymous namespace
 
 TEST_F(CursorInfoTest, FileNotExist) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let foo = 0\n";
-  const char *Args[] = { "/<not-existent-file>" };
+  const char *Args[] = { "<not-existent-file>" };
 
   open(DocName, Contents);
   auto FooOffs = findOffset("foo =", Contents);
@@ -209,7 +206,7 @@ static const char *ExpensiveInit =
     "[0:0,0:0,0:0,0:0,0:0,0:0,0:0]";
 
 TEST_F(CursorInfoTest, EditAfter) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let value = foo\n"
     "let foo = 0\n";
@@ -244,7 +241,7 @@ TEST_F(CursorInfoTest, EditAfter) {
 }
 
 TEST_F(CursorInfoTest, EditBefore) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let foo = 0\n"
     "let value = foo;\n";
@@ -281,7 +278,7 @@ TEST_F(CursorInfoTest, EditBefore) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let value = foo\n"
     "let foo = 0\n";
@@ -311,7 +308,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueOffset) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let value = foo\n"
     "let foo = 0\n";
@@ -341,7 +338,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueOffset) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "let value = foo\n"
     "let foo = 0\n";
@@ -372,7 +369,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents = "let value = foo\n"
                          "let foo = 0\n";
   const char *Args[] = {"-parse-as-library"};

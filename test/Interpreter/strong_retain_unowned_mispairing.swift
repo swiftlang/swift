@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-opt-O-swift
+// RUN: %target-run-simple-swift(-O)
 // REQUIRES: executable_test
 
 // We were crashing here due to not preserving rc identity. 

@@ -82,13 +82,16 @@ var _ : TheDevil = God()^
 var _ : God = ^TheDevil()
 var _ : Man = TheDevil() ^ God()
 var _ : Man = God()^ ^ ^TheDevil()
-let _ = God()^TheDevil() // expected-error{{cannot convert value of type 'God' to expected argument type 'TheDevil'}}
+let _ = God()^TheDevil() // expected-error{{operator argument #2 must precede operator argument #1}} {{9-9=TheDevil()}} {{14-25=}}
 
 postfix func ^ (x: Man) -> () -> God {
   return { return God() }
 }
 
-var _ : God = Man()^() // expected-error{{cannot convert value of type 'Man' to expected argument type 'TheDevil'}}
+// TODO(diagnostics): This is ambiguous operator use because if solver attempted postfix version of the operator `^`
+// it could have found a solution, with infix one nothing matches - neither argument nor contextual type. It should
+// be possible to find a way to diagnose operator use here instead of type ambiguity...
+var _ : God = Man()^() // expected-error{{type of expression is ambiguous without more context}}
 
 func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 
@@ -116,8 +119,11 @@ infix operator !!
 func !!(x: Man, y: Man) {}
 let foo = Man()
 let bar = TheDevil()
-foo!!foo // expected-error{{cannot force unwrap value of non-optional type 'Man'}} {{4-5=}} expected-error{{consecutive statements}} {{6-6=;}}
-// expected-warning @-1 {{expression of type 'Man' is unused}}
+foo!!foo
+// expected-error@-1 {{cannot force unwrap value of non-optional type 'Man'}} {{4-5=}}
+// expected-error@-2 {{cannot force unwrap value of non-optional type 'Man'}} {{5-6=}}
+// expected-error@-3 {{consecutive statements}} {{6-6=;}}
+// expected-warning@-4 {{expression of type 'Man' is unused}}
 
 foo??bar // expected-error{{broken standard library}} expected-error{{consecutive statements}} {{6-6=;}}
 // expected-warning @-1 {{expression of type 'TheDevil' is unused}}

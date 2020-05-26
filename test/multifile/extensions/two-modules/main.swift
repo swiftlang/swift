@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 
 // RUN: mkdir -p %t/onone %t/wmo
-// RUN: %target-build-swift -emit-module -emit-module-path %t/onone/library.swiftmodule -module-name=library -emit-library %S/Inputs/library.swift -o %t/onone/library.%target-dylib-extension
-// RUN: %target-build-swift %S/main.swift %t/onone/library.%target-dylib-extension -I %t/onone/ -o %t/onone/main
+// RUN: %target-build-swift -emit-module -emit-module-path %t/onone/library.swiftmodule -module-name=library -emit-library %S/Inputs/library.swift -o %t/onone/%target-library-name(rary)
+// RUN: %target-build-swift %S/main.swift -I %t/onone/ -o %t/onone/main -L%t/onone -lrary
 
-// RUN: %target-build-swift -emit-module -emit-module-path %t/wmo/library.swiftmodule -module-name=library -emit-library -O -wmo %S/Inputs/library.swift -o %t/wmo/library.%target-dylib-extension
-// RUN: %target-build-swift %S/main.swift %t/wmo/library.%target-dylib-extension -I %t/wmo/ -o %t/wmo/main
+// RUN: %target-build-swift -emit-module -emit-module-path %t/wmo/library.swiftmodule -module-name=library -emit-library -O -wmo %S/Inputs/library.swift -o %t/wmo/%target-library-name(rary)
+// RUN: %target-build-swift %S/main.swift -I %t/wmo/ -o %t/wmo/main -L%t/wmo -lrary
 
 import library
 

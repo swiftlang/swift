@@ -24,8 +24,14 @@ func testSubscript(_ instance: Members) {
 
 func testPrivateConformance(_ instance: PrivateConformance) {
   instance.publicExtensionMember()
-  // expected-error@-1 {{'publicExtensionMember' is inaccessible due to 'fileprivate' protection level}}
+  // expected-error@-1 {{'publicExtensionMember' is inaccessible due to 'private' protection level}}
 
   instance.internalExtensionMember()
-  // expected-error@-1 {{'internalExtensionMember' is inaccessible due to 'fileprivate' protection level}}
+  // expected-error@-1 {{'internalExtensionMember' is inaccessible due to 'private' protection level}}
+
+  instance.publicFPExtensionMember()
+  // expected-error@-1 {{'publicFPExtensionMember' is inaccessible due to 'fileprivate' protection level}}
+
+  instance.internalFPExtensionMember()
+  // expected-error@-1 {{'internalFPExtensionMember' is inaccessible due to 'fileprivate' protection level}}
 }

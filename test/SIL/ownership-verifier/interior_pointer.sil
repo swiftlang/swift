@@ -1,0 +1,42 @@
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+class Klass {}
+
+class KlassUser {
+  var field: Klass
+}
+
+// CHECK-LABEL: Function: 'simple_error_ref_element_addr'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $KlassUser               // users: %3, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $KlassUser                      // id: %3
+// CHECK-NEXT: Non Consuming User:   %5 = load [copy] %2 : $*Klass                   // user: %6
+// CHECK-NEXT: Block: bb0
+sil [ossa] @simple_error_ref_element_addr : $@convention(thin) (@owned KlassUser) -> @owned Klass {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0 : $KlassUser
+  %2 = ref_element_addr %1 : $KlassUser, #KlassUser.field
+  end_borrow %1 : $KlassUser
+  destroy_value %0 : $KlassUser
+  %3 = load [copy] %2 : $*Klass
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: Function: 'simple_error_ref_tail_addr'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $KlassUser               // users: %3, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $KlassUser                      // id: %3
+// CHECK-NEXT: Non Consuming User:   %5 = load [copy] %2 : $*Klass                   // user: %6
+// CHECK-NEXT: Block: bb0
+sil [ossa] @simple_error_ref_tail_addr : $@convention(thin) (@owned KlassUser) -> @owned Klass {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0 : $KlassUser
+  %2 = ref_tail_addr %1 : $KlassUser, $Klass
+  end_borrow %1 : $KlassUser
+  destroy_value %0 : $KlassUser
+  %3 = load [copy] %2 : $*Klass
+  return %3 : $Klass
+}

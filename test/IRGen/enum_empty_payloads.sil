@@ -1,45 +1,47 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -verify %s
+// RUN: %target-swift-frontend -emit-ir -verify %s
 sil_stage canonical
+
+typealias Void = ()
 
 struct Empty<T> {}
 
 enum SinglePayload<T> {
   case A(T)
-  case B()
+  case B(Void)
   case C(Empty<T>)
 }
 
 enum MultiPayload<T, U> {
   case A(T)
   case B(U)
-  case C()
-  case D()
+  case C(Void)
+  case D(Void)
   case E(Empty<T>)
   case F(Empty<U>)
 }
 
 sil @project_empty_payloads_single : $@convention(thin) <T> (@in SinglePayload<T>) -> () {
 entry(%0 : $*SinglePayload<T>):
-  %1 = init_enum_data_addr %0 : $*SinglePayload<T>, #SinglePayload.B!enumelt.1
-  %2 = init_enum_data_addr %0 : $*SinglePayload<T>, #SinglePayload.C!enumelt.1
+  %1 = init_enum_data_addr %0 : $*SinglePayload<T>, #SinglePayload.B!enumelt
+  %2 = init_enum_data_addr %0 : $*SinglePayload<T>, #SinglePayload.C!enumelt
 
-  %3 = unchecked_take_enum_data_addr %0 : $*SinglePayload<T>, #SinglePayload.B!enumelt.1
-  %4 = unchecked_take_enum_data_addr %0 : $*SinglePayload<T>, #SinglePayload.C!enumelt.1
+  %3 = unchecked_take_enum_data_addr %0 : $*SinglePayload<T>, #SinglePayload.B!enumelt
+  %4 = unchecked_take_enum_data_addr %0 : $*SinglePayload<T>, #SinglePayload.C!enumelt
 
   return undef : $()
 }
 
 sil @project_empty_payloads_multi : $@convention(thin) <T, U> (@in MultiPayload<T, U>) -> () {
 entry(%0 : $*MultiPayload<T, U>):
-  %1 = init_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.C!enumelt.1
-  %2 = init_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.D!enumelt.1
-  %3 = init_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.E!enumelt.1
-  %4 = init_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.F!enumelt.1
+  %1 = init_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.C!enumelt
+  %2 = init_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.D!enumelt
+  %3 = init_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.E!enumelt
+  %4 = init_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.F!enumelt
 
-  %5 = unchecked_take_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.C!enumelt.1
-  %6 = unchecked_take_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.D!enumelt.1
-  %7 = unchecked_take_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.E!enumelt.1
-  %8 = unchecked_take_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.F!enumelt.1
+  %5 = unchecked_take_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.C!enumelt
+  %6 = unchecked_take_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.D!enumelt
+  %7 = unchecked_take_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.E!enumelt
+  %8 = unchecked_take_enum_data_addr %0 : $*MultiPayload<T, U>, #MultiPayload.F!enumelt
 
   return undef : $()
 }

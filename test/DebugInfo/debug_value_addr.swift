@@ -4,10 +4,10 @@
 // Verify that -Onone shadow copies are emitted for debug_value_addr
 // instructions.
 
-// CHECK-SIL: sil hidden @$S16debug_value_addr4testyyxlF
+// CHECK-SIL: sil hidden @$s16debug_value_addr4testyyxlF
 // CHECK-SIL: debug_value_addr %0 : $*T, let, name "t"
 
-// CHECK: define {{.*}}$S16debug_value_addr4testyyxlF
+// CHECK: define {{.*}}$s16debug_value_addr4testyyxlF
 // CHECK: entry:
 // CHECK-NEXT: %[[TADDR:.*]] = alloca
 // CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[TADDR]]

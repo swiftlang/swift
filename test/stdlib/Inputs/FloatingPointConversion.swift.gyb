@@ -30,7 +30,11 @@ var FloatingPointConversionFailures = TestSuite("FloatingPointToFloatingPointCon
 
 %   if OtherSignificandBits <= SelfSignificandBits:
 
+%    if OtherFloat == 'Float16':
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+%    end
 FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
+
   .forEach(in: [
      ${OtherFloat}.greatestFiniteMagnitude,
     -${OtherFloat}.greatestFiniteMagnitude,
@@ -45,9 +49,15 @@ FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
   let resultConvertedBack = ${OtherFloat}(result)
   expectEqual(input, resultConvertedBack)
 }
+%    if OtherFloat == 'Float16':
+}
+%    end
 
 %   else:
 
+%    if Self == 'Float16':
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+%    end
 FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
   .forEach(in: [
     ( ${OtherFloat}.greatestFiniteMagnitude,  ${Self}.infinity),
@@ -60,9 +70,15 @@ FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
   (input, expectedResult) in
   expectEqual(expectedResult, ${Self}(input))
 }
+%    if Self == 'Float16':
+}
+%    end
 
 %   end
 
+%    if 'Float16' in [Self, OtherFloat]:
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+%    end
 FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/special") {
   expectEqual( 1.0 as ${Self},   ${Self}(exactly:  1.0 as ${OtherFloat}))
   expectEqual(-1.0 as ${Self},   ${Self}(exactly: -1.0 as ${OtherFloat}))
@@ -99,6 +115,9 @@ FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/AlwaysSuc
   expectEqual(-${Self}.infinity, ${Self}(exactly: -${OtherFloat}.infinity))
   expectNil(${Self}(exactly: ${OtherFloat}.nan))
 }
+%    if 'Float16' in [Self, OtherFloat]:
+}
+%    end
 
 %   if OtherFloat == 'Float80':
 #endif
@@ -118,6 +137,9 @@ _UnimplementedError()
 %  OtherInt = int_ty.stdlib_name
 
 extension ${OtherInt} {
+  %    if Self == 'Float16':
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  %    end
   static var _test${Self}Conversion: [(${OtherInt}, ${OtherInt}, ${OtherInt}?)] {
     if bitWidth > ${Self}.significandBitCount + 1 {
       let bitOffset = ${Self}.significandBitCount + 1
@@ -142,6 +164,9 @@ extension ${OtherInt} {
   }
 }
 
+%    if Self == 'Float16':
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+%    end
 FixedPointConversionTruncations.test("${OtherInt}to${Self}")
   .forEach(in: ${OtherInt}._test${Self}Conversion) {
     value, roundedExpectation, exactExpectation in
@@ -156,6 +181,9 @@ FixedPointConversionTruncations.test("${OtherInt}to${Self}")
     expectNil(exactResult)
   }
 }
+%    if Self == 'Float16':
+}
+%    end
 
 %  end # for in int_types
 

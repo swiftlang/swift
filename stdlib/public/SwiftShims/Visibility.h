@@ -26,6 +26,14 @@
 #define __has_attribute(x) 0
 #endif
 
+#if !defined(__has_builtin)
+#define __has_builtin(builtin) 0
+#endif
+
+#if !defined(__has_cpp_attribute)
+#define __has_cpp_attribute(attribute) 0
+#endif
+
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -62,6 +70,24 @@
 #define SWIFT_ALWAYS_INLINE
 #endif
 
+#if __has_attribute(noinline)
+#define SWIFT_NOINLINE __attribute__((__noinline__))
+#else
+#define SWIFT_NOINLINE
+#endif
+
+#if __has_attribute(noreturn)
+#define SWIFT_NORETURN __attribute__((__noreturn__))
+#else
+#define SWIFT_NORETURN
+#endif
+
+#if __has_attribute(used)
+#define SWIFT_USED __attribute__((__used__))
+#else
+#define SWIFT_USED
+#endif
+
 #if __has_attribute(unavailable)
 #define SWIFT_ATTRIBUTE_UNAVAILABLE __attribute__((__unavailable__))
 #else
@@ -72,7 +98,7 @@
 // SWIFT_RUNTIME_EXPORT on the library it's exported from.
 
 /// Attribute used to export symbols from the runtime.
-#if defined(__MACH__)
+#if defined(__MACH__) || defined(__wasi__)
 
 # define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
 
@@ -111,6 +137,26 @@
 #define SWIFT_RUNTIME_EXPORT SWIFT_EXPORT_ATTRIBUTE
 #endif
 
+#if __cplusplus > 201402l && __has_cpp_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH [[fallthrough]]
+#elif __has_cpp_attribute(gnu::fallthrough)
+#define SWIFT_FALLTHROUGH [[gnu::fallthrough]]
+#elif __has_cpp_attribute(clang::fallthrough)
+#define SWIFT_FALLTHROUGH [[clang::fallthrough]]
+#elif __has_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH __attribute__((__fallthrough__))
+#else
+#define SWIFT_FALLTHROUGH
+#endif
+
+#if __cplusplus >= 201402l && __has_cpp_attribute(nodiscard)
+#define SWIFT_NODISCARD [[nodiscard]]
+#elif __has_cpp_attribute(clang::warn_unused_result)
+#define SWIFT_NODISCARD [[clang::warn_unused_result]]
+#else
+#define SWIFT_NODISCARD
+#endif
+
 
 /// Attributes for runtime-stdlib interfaces.
 /// Use these for C implementations that are imported into Swift via SwiftShims
@@ -129,15 +175,30 @@
 ///
 /// SWIFT_RUNTIME_STDLIB_INTERNAL functions are called only by the stdlib.
 /// Such functions are internal and are not exported.
-/// FIXME(sil-serialize-all): _INTERNAL functions are also exported for now
-/// until the tide of @inlinable is rolled back.
-/// They really should be LLVM_LIBRARY_VISIBILITY, not SWIFT_RUNTIME_EXPORT.
 #define SWIFT_RUNTIME_STDLIB_API       SWIFT_RUNTIME_EXPORT
 #define SWIFT_RUNTIME_STDLIB_SPI       SWIFT_RUNTIME_EXPORT
-#define SWIFT_RUNTIME_STDLIB_INTERNAL  SWIFT_RUNTIME_EXPORT
 
-/// Old marker for runtime-stdlib interfaces. This marker will go away soon.
-#define SWIFT_RUNTIME_STDLIB_INTERFACE SWIFT_RUNTIME_STDLIB_API
+// Match the definition of LLVM_LIBRARY_VISIBILITY from LLVM's
+// Compiler.h. That header requires C++ and this needs to work in C.
+#if __has_attribute(visibility) && (defined(__ELF__) || defined(__MACH__))
+#define SWIFT_LIBRARY_VISIBILITY __attribute__ ((__visibility__("hidden")))
+#else
+#define SWIFT_LIBRARY_VISIBILITY
+#endif
+
+#if defined(__cplusplus)
+#define SWIFT_RUNTIME_STDLIB_INTERNAL extern "C" SWIFT_LIBRARY_VISIBILITY
+#else
+#define SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_LIBRARY_VISIBILITY
+#endif
+
+#if __has_builtin(__builtin_expect)
+#define SWIFT_LIKELY(expression) (__builtin_expect(!!(expression), 1))
+#define SWIFT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
+#else
+#define SWIFT_LIKELY(expression) ((expression))
+#define SWIFT_UNLIKELY(expression) ((expression))
+#endif
 
 // SWIFT_STDLIB_SHIMS_VISIBILITY_H
 #endif

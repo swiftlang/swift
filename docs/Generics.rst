@@ -783,7 +783,7 @@ protocols. A value of an existential type (say, Comparable) is a pair (value,
 vtable). 'value' stores the current value either directly (if it fits in the 3
 words allocated to the value) or as a pointer to the boxed representation (if
 the actual representation is larger than 3 words). By itself, this value cannot
-be interpreted, because it's type is not known statically, and may change due to
+be interpreted, because its type is not known statically, and may change due to
 assignment. The vtable provides the means to manipulate the value, because it
 provides a mapping between the protocols to which the existential type conforms
 (which is known statically) to the functions that implements that

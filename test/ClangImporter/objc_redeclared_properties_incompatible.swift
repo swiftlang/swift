@@ -24,7 +24,7 @@ func testWithInitializer() {
   // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
 
   obj.readwriteChange = Base() // CHECK-PRIVATE-NOT: [[@LINE]]:{{.+}}: error
-  // CHECK-PUBLIC: [[@LINE-1]]:23: error: cannot assign to property: 'readwriteChange' is a get-only property
+  // CHECK-PUBLIC: [[@LINE-1]]:7: error: cannot assign to property: 'readwriteChange' is a get-only property
 }
 
 func testWithoutInitializer(obj: PropertiesNoInit) {
@@ -38,7 +38,7 @@ func testWithoutInitializer(obj: PropertiesNoInit) {
   // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
 
   obj.readwriteChange = Base() // CHECK-PRIVATE-NOT: [[@LINE]]:{{.+}}: error
-  // CHECK-PUBLIC: [[@LINE-1]]:23: error: cannot assign to property: 'readwriteChange' is a get-only property
+  // CHECK-PUBLIC: [[@LINE-1]]:7: error: cannot assign to property: 'readwriteChange' is a get-only property
 }
 
 func testGenericWithInitializer() {
@@ -54,7 +54,7 @@ func testGenericWithInitializer() {
   // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
 
   obj.readwriteChange = Base() // CHECK-PRIVATE-NOT: [[@LINE]]:{{.+}}: error
-  // CHECK-PUBLIC: [[@LINE-1]]:23: error: cannot assign to property: 'readwriteChange' is a get-only property
+  // CHECK-PUBLIC: [[@LINE-1]]:7: error: cannot assign to property: 'readwriteChange' is a get-only property
 }
 
 func testGenericWithoutInitializer(obj: PropertiesNoInitGeneric<Base>) {
@@ -68,35 +68,41 @@ func testGenericWithoutInitializer(obj: PropertiesNoInitGeneric<Base>) {
   // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
 
   obj.readwriteChange = Base() // CHECK-PRIVATE-NOT: [[@LINE]]:{{.+}}: error
-  // CHECK-PUBLIC: [[@LINE-1]]:23: error: cannot assign to property: 'readwriteChange' is a get-only property
+  // CHECK-PUBLIC: [[@LINE-1]]:7: error: cannot assign to property: 'readwriteChange' is a get-only property
 }
 
 func testCategoryWithInitializer() {
   let obj = PropertiesInitCategory()
 
   let _: Int = obj.nullabilityChange
-  // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
+  // CHECK-PUBLIC: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
+  // CHECK-PRIVATE: [[@LINE-2]]:20: error: cannot convert value of type 'Base?' to specified type 'Int'
 
   let _: Int = obj.missingGenerics
-  // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'GenericClass<Base>' to specified type 'Int'
+  // CHECK-PUBLIC: [[@LINE-1]]:20: error: cannot convert value of type 'GenericClass<Base>' to specified type 'Int'
+  // CHECK-PRIVATE: [[@LINE-2]]:20: error: cannot convert value of type 'GenericClass<AnyObject>' to specified type 'Int'
 
   let _: Int = obj.typeChange
-  // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
+  // CHECK-PUBLIC: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
+  // CHECK-PRIVATE: [[@LINE-2]]:20: error: cannot convert value of type 'PrivateSubclass' to specified type 'Int'
 
   obj.readwriteChange = Base() // CHECK-PRIVATE-NOT: [[@LINE]]:{{.+}}: error
-  // CHECK-PUBLIC: [[@LINE-1]]:23: error: cannot assign to property: 'readwriteChange' is a get-only property
+  // CHECK-PUBLIC: [[@LINE-1]]:7: error: cannot assign to property: 'readwriteChange' is a get-only property
 }
 
 func testCategoryWithoutInitializer(obj: PropertiesNoInitCategory) {
   let _: Int = obj.nullabilityChange
-  // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
+  // CHECK-PUBLIC: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
+  // CHECK-PRIVATE: [[@LINE-2]]:20: error: cannot convert value of type 'Base?' to specified type 'Int'
 
   let _: Int = obj.missingGenerics
-  // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'GenericClass<Base>' to specified type 'Int'
+  // CHECK-PUBLIC: [[@LINE-1]]:20: error: cannot convert value of type 'GenericClass<Base>' to specified type 'Int'
+  // CHECK-PRIVATE: [[@LINE-2]]:20: error: cannot convert value of type 'GenericClass<AnyObject>' to specified type 'Int'
 
   let _: Int = obj.typeChange
-  // CHECK: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
+  // CHECK-PUBLIC: [[@LINE-1]]:20: error: cannot convert value of type 'Base' to specified type 'Int'
+  // CHECK-PRIVATE: [[@LINE-2]]:20: error: cannot convert value of type 'PrivateSubclass' to specified type 'Int'
 
   obj.readwriteChange = Base() // CHECK-PRIVATE-NOT: [[@LINE]]:{{.+}}: error
-  // CHECK-PUBLIC: [[@LINE-1]]:23: error: cannot assign to property: 'readwriteChange' is a get-only property
+  // CHECK-PUBLIC: [[@LINE-1]]:7: error: cannot assign to property: 'readwriteChange' is a get-only property
 }

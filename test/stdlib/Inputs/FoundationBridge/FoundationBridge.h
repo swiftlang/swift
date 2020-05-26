@@ -75,4 +75,23 @@ BOOL identityOfData(NSData *data);
 - (BOOL)verifyKeysInRange:(NSRange)range existInDictionary:(NSDictionary *)dictionary;
 @end
 
+#pragma mark - NSString bridging
+
+static inline NSString *getNSStringEqualTestString() {
+  return [NSString stringWithUTF8String:"2166002315@874404110.1042078977"];
+}
+
+static inline BOOL NSStringBridgeTestEqual(NSString * _Nonnull a, NSString * _Nonnull b) {
+  return [a isEqual:b];
+}
+
+static inline NSString *getNSStringWithUnpairedSurrogate() {
+  unichar chars[16] = {
+    0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
+    0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
+    0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
+    0xD800 };
+  return [NSString stringWithCharacters:chars length:1];
+}
+
 NS_ASSUME_NONNULL_END

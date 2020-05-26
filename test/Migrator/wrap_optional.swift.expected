@@ -7,7 +7,7 @@
 import Cities
 
 class MyCities : Cities {
-  override init?(x: Int?) { super.init(x: x) }
+  override init?(x: Int?) { super.init(x: x)! }
   override init?(y: Int) { super.init(y: y) }
   override func newMooloolaba(newX x: Cities?, newY y: Cities) {}
   override func toowoomba(x: [Cities?], y: [Cities?]) {}

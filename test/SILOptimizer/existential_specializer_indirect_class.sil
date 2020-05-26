@@ -1,0 +1,72 @@
+// RUN: %target-sil-opt -O -wmo -enable-sil-verify-all -sil-disable-pass=DeadFunctionElimination %s | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+protocol ClassProtocol: AnyObject { func method() }
+
+class C: ClassProtocol { func method() {} }
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> ()
+sil @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> () {
+// CHECK-NEXT: //
+// CHECK-NEXT: bb0(%0 : $*ClassProtocol):
+bb0(%0 : $*ClassProtocol):
+  // CHECK-NEXT: %1 = load %0
+  // CHECK-NEXT: strong_release %1
+  destroy_addr %0 : $*ClassProtocol
+  // CHECK-NEXT: return undef
+  return undef : $()
+}
+
+// Check that all the opened types are optimized away in the specialization of test_indirect_class_protocol_guaranteed
+// CHECK-LABEL: sil shared @$s39test_indirect_class_protocol_guaranteedTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : ClassProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: //
+// CHECK-NEXT: bb0(%0 : $*τ_0_0):
+  // CHECK-NEXT: [[INPUT:%1]] = load %0
+  // CHECK-NEXT: [[METHOD:%.*]] = witness_method $C, #ClassProtocol.method
+  // CHECK-NEXT: [[ARG:%.*]] = unchecked_ref_cast [[INPUT]]
+  // CHECK-NEXT: apply [[METHOD]]<C>([[ARG]])
+  // CHECK-NEXT: return undef
+  
+sil @test_indirect_class_protocol_guaranteed : $@convention(thin) (@in_guaranteed ClassProtocol) -> () {
+bb0(%0 : $*ClassProtocol):
+  %1 = load %0 : $*ClassProtocol
+  %2 = open_existential_ref %1 : $ClassProtocol to $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol
+  %f = witness_method $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol, #ClassProtocol.method : <Self: ClassProtocol> (Self) -> () -> (), %2 : $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
+  apply %f<@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol>(%2) : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
+  return undef : $()
+}
+
+// Check that a specialization of test_indirect_class_protocol is created.
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5 : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT: //
+// CHECK-NEXT: bb0(%0 : $C):
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return undef
+// CHECK-LABEL: end sil function '$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5'
+
+// Check the generated specialization of test_indirect_class_protocol
+// CHECK-LABEL: sil shared @$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5Tf4d_n : $@convention(thin) () -> ()
+// Make sure *everything* was inlined / optimized away
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: return undef
+
+sil @invoke_indirect_class_protocol : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %1 = init_existential_ref %0 : $C : $C, $ClassProtocol
+
+  %z = alloc_stack $ClassProtocol
+  retain_value %1 : $ClassProtocol
+  store %1 to %z : $*ClassProtocol
+
+  %f = function_ref @test_indirect_class_protocol_guaranteed : $@convention(thin) (@in_guaranteed ClassProtocol) -> ()
+  apply %f(%z) : $@convention(thin) (@in_guaranteed ClassProtocol) -> ()
+
+  %g = function_ref @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> ()
+  apply %g(%z) : $@convention(thin) (@in ClassProtocol) -> ()
+
+  dealloc_stack %z : $*ClassProtocol
+  return undef : $()
+}

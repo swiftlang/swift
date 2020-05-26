@@ -1,6 +1,6 @@
 // RxUN: %target-build-swift -g %s -o %t/ViewControllerAdditions.out
-// RxUN: %target-run %t/ViewControllerAdditions.out %S/Inputs/UIViewControllerAdditions | %FileCheck %s
-// RUN: %target-run-simple-swift %S/Inputs/UIViewControllerAdditions | %FileCheck %s
+// RxUN: %target-run %t/ViewControllerAdditions.out %S/Inputs/UIViewControllerAdditions/* | %FileCheck %s
+// RUN: %target-run-simple-swift %S/Inputs/UIViewControllerAdditions/* | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: OS=ios
@@ -28,7 +28,9 @@ class View6Controller : UIViewController { }
 // no nib
 class MissingViewController : UIViewController { }
 
-let bundle = Bundle(path: CommandLine.arguments[1])
+let nsarg1 = CommandLine.arguments[1] as NSString
+let bundlePath = nsarg1.deletingLastPathComponent
+let bundle = Bundle(path: bundlePath)
 
 let v1 = View1Controller(nibName:nil, bundle:bundle)
 print("tag 1 0=\(v1.view.tag) you're it")

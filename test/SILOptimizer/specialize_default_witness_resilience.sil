@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-resilience -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-library-evolution -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -15,10 +15,14 @@ public struct ConformingStruct : ResilientProtocol {
   public func defaultB()
 }
 
-// CHECK-LABEL: sil shared @$S8defaultA4main16ConformingStructV_Tg5
-// CHECK:       bb0(%0 : $*ConformingStruct):
-// CHECK:         [[FN:%.*]] = function_ref @$S8defaultB4main16ConformingStructV_Tg5
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]](%0)
+// CHECK-LABEL: sil shared @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK:       bb0(%0 : $ConformingStruct):
+// CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingStruct
+// CHECK-NEXT:    store %0 to [[TMP]] : $*ConformingStruct
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main16ConformingStructV_Tg5
+// CHECK-NEXT:    [[LOAD:%.*]] = load [[TMP]] : $*ConformingStruct
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
+// CHECK-NEXT:    dealloc_stack [[TMP]] : $*ConformingStruct
 // CHECK-NEXT:    return [[RESULT]]
 
 sil @defaultA : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
@@ -28,9 +32,12 @@ bb0(%0 : $*Self):
   return %result : $()
 }
 
-// CHECK-LABEL: sil shared @$S8defaultB4main16ConformingStructV_Tg5
-// CHECK:       bb0(%0 : $*ConformingStruct):
+// CHECK-LABEL: sil shared @$s8defaultB4main16ConformingStructV_Tg5
+// CHECK:       bb0(%0 : $ConformingStruct):
+// CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingStruct
+// CHECK-NEXT:    store %0 to [[TMP]] : $*ConformingStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[TMP]] : $*ConformingStruct
 // CHECK-NEXT:    return [[RESULT]]
 
 sil @defaultB : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
@@ -41,8 +48,9 @@ bb0(%0 : $*Self):
 
 // CHECK-LABEL: sil hidden @test_specialize_default_witness_method
 // CHECK:       bb0(%0 : $*ConformingStruct):
-// CHECK:         [[FN:%.*]] = function_ref @$S8defaultA4main16ConformingStructV_Tg5
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]](%0)
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK-NEXT:    [[VALUE:%.*]] = load %0 : $*ConformingStruct
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[VALUE]])
 // CHECK-NEXT:    return [[RESULT]]
 
 sil hidden @test_specialize_default_witness_method : $@convention(thin) (@in_guaranteed ConformingStruct) -> () {

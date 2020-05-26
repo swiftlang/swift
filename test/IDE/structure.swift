@@ -245,6 +245,12 @@ protocol FooProtocol {
   // CHECK:  <associatedtype>associatedtype <name>Baz</name>: Equatable</associatedtype>
   associatedtype Qux where Qux: Equatable
   // CHECK:  <associatedtype>associatedtype <name>Qux</name> where Qux: Equatable</associatedtype>
+  associatedtype Bar2 = Int
+  // CHECK:  <associatedtype>associatedtype <name>Bar2</name> = Int</associatedtype>
+  associatedtype Baz2: Equatable = Int
+  // CHECK:  <associatedtype>associatedtype <name>Baz2</name>: Equatable = Int</associatedtype>
+  associatedtype Qux2 = Int where Qux2: Equatable
+  // CHECK:  <associatedtype>associatedtype <name>Qux2</name> = Int where Qux2: Equatable</associatedtype>
 }
 
 // CHECK: <struct>struct <name>Generic</name><<generic-param><name>T</name>: <inherited><elem-typeref>Comparable</elem-typeref></inherited></generic-param>, <generic-param><name>X</name></generic-param>> {
@@ -276,9 +282,53 @@ struct Tuples {
   }
 }
 
-completion(a: 1) { (x: Int, y: Int) -> Int in
-  return x + y
+completion(a: 1) { (x: Any, y: Int) -> Int in
+  return x as! Int + y
 }
-// CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure>{ (<param>x: <type>Int</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
-// CHECK:    return x + y
+// CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure>{ (<param>x: <type>Any</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
+// CHECK:    return x as! Int + y
 // CHECK: }</closure></arg></call>
+
+myFunc(foo: 0,
+       bar: baz == 0)
+// CHECK: <call><name>myFunc</name>(<arg><name>foo</name>: 0</arg>,
+// CHECK:        <arg><name>bar</name>: baz == 0</arg>)</call>
+
+
+enum FooEnum {
+// CHECK: <enum>enum <name>FooEnum</name> {
+  case blah(x: () -> () = {
+  // CHECK: <enum-case>case <enum-elem><name>blah(<param><name>x</name>: <type>() -> ()</type> = <closure><brace>{
+    @Tuples func foo(x: MyStruc) {}
+    // CHECK: @Tuples <ffunc>func <name>foo(<param><name>x</name>: <type>MyStruc</type></param>)</name> {}</ffunc>
+  })
+  // CHECK: }</brace></closure></param>)</name></enum-elem></enum-case>
+}
+// CHECK: }</enum>
+
+firstCall("\(1)", 1)
+// CHECK: <call><name>firstCall</name>(<arg>"\(1)"</arg>, <arg>1</arg>)</call>
+
+secondCall("\(a: {struct Foo {let x = 10}; return Foo().x}())", 1)
+// CHECK: <call><name>secondCall</name>(<arg>"\(a: <call><name><closure><brace>{<struct>struct <name>Foo</name> {<property>let <name>x</name> = 10</property>}</struct>; return <call><name>Foo</name>()</call>.x}</brace></closure></name>()</call>)"</arg>, <arg>1</arg>)</call>
+
+thirdCall("""
+\("""
+  \({
+  return a()
+  }())
+  """)
+""")
+// CHECK: <call><name>thirdCall</name>("""
+// CHECK-NEXT: \("""
+// CHECK-NEXT:   \(<call><name><closure>{
+// CHECK-NEXT:   return <call><name>a</name>()</call>
+// CHECK-NEXT:   }</closure></name>()</call>)
+// CHECK-NEXT:   """)
+// CHECK-NEXT: """)</call>
+
+fourthCall(a: @escaping () -> Int)
+// CHECK: <call><name>fourthCall</name>(<arg><name>a</name>: @escaping () -> Int</arg>)</call>
+
+// CHECK: <call><name>foo</name> <closure>{ [unowned <lvar><name>self</name></lvar>, <lvar><name>x</name></lvar>] in _ }</closure></call>
+foo { [unowned self, x] in _ }

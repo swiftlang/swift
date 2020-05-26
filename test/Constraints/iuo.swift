@@ -210,9 +210,9 @@ func conditionalDowncastToOptional(b: B?) -> D? {
 }
 
 func conditionalDowncastToObject(b: B?) -> D {
-  return b as? D! // expected-error {{value of optional type 'D?' must be unwrapped}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
+  return b as? D! // expected-error {{value of optional type 'D?' must be unwrapped to a value of type 'D'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   // expected-warning@-3 {{using '!' here is deprecated and will be removed in a future release}}
 }
 
@@ -225,3 +225,7 @@ var y: Int = 2
 
 let r = sr6988(x: x, y: y)
 let _: Int = r
+
+// SR-11998 / rdar://problem/58455441
+class C<T> {}
+var sub: C! = C<Int>()

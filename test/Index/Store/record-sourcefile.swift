@@ -4,14 +4,12 @@
 // RUN: c-index-test core -print-record %t/idx1 | %FileCheck %s
 // RUN: c-index-test core -print-record %t/idx2 | %FileCheck %s
 
-// XFAIL: linux
-
 // CHECK: record-sourcefile.swift
 // CHECK: ------------
 // CHECK: struct/Swift | S1 | s:4file2S1V | <no-cgname> | Def,Ref,RelCont -
 // CHECK: instance-method/acc-get/Swift | getter:property | s:4file2S1V8propertySivg | <no-cgname> | Def,Ref,Call,Impl,RelChild,RelRec,RelCall,RelAcc,RelCont - 
 // CHECK: instance-property/Swift | property | [[property_USR:s:4file2S1V8propertySivp]] | <no-cgname> | Def,Ref,Read,RelChild,RelCont -
-// CHECK: static-method/acc-get/Swift | getter:staticProperty | s:4file2S1V14staticPropertySivg | <no-cgname> | Def,Ref,Call,Impl,RelChild,RelRec,RelCall,RelAcc,RelCont -
+// CHECK: static-method/acc-get/Swift | getter:staticProperty | s:4file2S1V14staticPropertySivgZ | <no-cgname> | Def,Ref,Call,Impl,RelChild,RelRec,RelCall,RelAcc,RelCont -
 // CHECK: static-property/Swift | staticProperty | s:{{.*}} | <no-cgname> | Def,Ref,Read,RelChild,RelCont -
 // CHECK: instance-property/Swift | computedPropertyGetSet | s:{{.*}} | <no-cgname> | Def,RelChild -
 // CHECK: struct/Swift | Int | s:Si | <no-cgname> | Ref -

@@ -58,8 +58,7 @@ class NotInherited1 : D {
 
 func testNotInherited1() {
   var n1 = NotInherited1(int: 5)
-  var n2 = NotInherited1(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'NotInherited1' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
+  var n2 = NotInherited1(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}}
 }
 
 class NotInherited1Sub : NotInherited1 {
@@ -71,8 +70,7 @@ class NotInherited1Sub : NotInherited1 {
 func testNotInherited1Sub() {
   var n1 = NotInherited1Sub(int: 5)
   var n2 = NotInherited1Sub(float: 3.14159)
-  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'NotInherited1Sub' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
+  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}}
 }
 
 // Having a stored property without an initial value prevents
@@ -92,16 +90,16 @@ func testNotInherited2() {
   var n2 = NotInherited2(double: 2.72828) // expected-error{{'NotInherited2' cannot be constructed because it has no accessible initializers}}
 }
 
-// FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers
+// <rdar://problem/16331406> Implement inheritance of variadic designated initializers
 class SuperVariadic {
-  init(ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
-  init(_ : Double...) { } // expected-note{{variadic superclass initializer defined here}}
+  init(ints: Int...) { }
+  init(_ : Double...) { }
 
-  init(s: String, ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
-  init(s: String, _ : Double...) { } // expected-note{{variadic superclass initializer defined here}}
+  init(s: String, ints: Int...) { }
+  init(s: String, _ : Double...) { }
 }
 
-class SubVariadic : SuperVariadic { } // expected-warning 4{{synthesizing a variadic inherited initializer for subclass 'SubVariadic' is unsupported}}
+class SubVariadic : SuperVariadic { }
 
 // Don't crash with invalid nesting of class in generic function
 
@@ -112,3 +110,22 @@ func testClassInGenericFunc<T>(t: T) {
   _ = B(t: t)
 }
 
+
+// <https://bugs.swift.org/browse/SR-5056> Required convenience init inhibits inheritance
+
+class SR5056A {
+    required init(a: Int) {}
+}
+
+class SR5056B : SR5056A {
+    required convenience init(b: Int) {
+        self.init(a: b)
+    }
+}
+
+class SR5056C : SR5056B {}
+
+func useSR5056C() {
+  _ = SR5056C(a: 0)
+  _ = SR5056C(b: 0)
+}

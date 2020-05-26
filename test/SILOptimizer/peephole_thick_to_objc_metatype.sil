@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -7,6 +7,8 @@ sil_stage canonical
 import Builtin
 import Swift
 import SwiftShims
+
+import Foundation
 
 @objc(XX) protocol X {
 }
@@ -115,3 +117,48 @@ bb0(%0 : $T):
   strong_release %0 : $T
   return %3 : $@thick T.Type
 }
+
+// CHECK-LABEL: sil @$test_peephole_objc_to_thick_to_objc :
+// CHECK: [[T:%.*]] = apply
+// CHECK-NOT: objc_to_thick_metatype
+// CHECK-NOT: thick_to_objc_metatype
+// CHECK: enum $Optional<@objc_metatype AnyObject.Type>, #Optional.some!enumelt, [[T]] : $@objc_metatype AnyObject.Type
+// CHECK: } // end sil function '$test_peephole_objc_to_thick_to_objc'
+
+sil @$test_peephole_objc_to_thick_to_objc : $@convention(thin) (@guaranteed NSObject) -> Optional<UnsafeMutablePointer<OpaquePointer>> {
+// %0 "obj"                                       // users: %3, %2, %1
+bb0(%0 : $NSObject):
+  debug_value %0 : $NSObject, let, name "obj", argno 1 // id: %1
+  %2 = objc_method %0 : $NSObject, #NSObject.classForCoder!getter.foreign : (NSObject) -> () -> AnyObject.Type, $@convention(objc_method) (NSObject) -> @objc_metatype AnyObject.Type // user: %3
+  %3 = apply %2(%0) : $@convention(objc_method) (NSObject) -> @objc_metatype AnyObject.Type // user: %4
+  %4 = objc_to_thick_metatype %3 : $@objc_metatype AnyObject.Type to $@thick AnyObject.Type // users: %6, %5
+  debug_value %4 : $@thick AnyObject.Type, let, name "c" // id: %5
+  %6 = thick_to_objc_metatype %4 : $@thick AnyObject.Type to $@objc_metatype AnyObject.Type // user: %7
+  %7 = enum $Optional<@objc_metatype AnyObject.Type>, #Optional.some!enumelt, %6 : $@objc_metatype AnyObject.Type // user: %10
+  %8 = enum $Optional<UnsafeMutablePointer<UInt32>>, #Optional.none!enumelt // user: %10
+  // function_ref class_copyMethodList
+  %9 = function_ref @class_copyMethodList : $@convention(c) (Optional<@objc_metatype AnyObject.Type>, Optional<UnsafeMutablePointer<UInt32>>) -> Optional<UnsafeMutablePointer<OpaquePointer>> // user: %10
+  %10 = apply %9(%7, %8) : $@convention(c) (Optional<@objc_metatype AnyObject.Type>, Optional<UnsafeMutablePointer<UInt32>>) -> Optional<UnsafeMutablePointer<OpaquePointer>> // users: %12, %11
+  debug_value %10 : $Optional<UnsafeMutablePointer<OpaquePointer>>, let, name "l" // id: %11
+  return %10 : $Optional<UnsafeMutablePointer<OpaquePointer>> // id: %12
+}
+
+// CHECK-LABEL: sil @$test_peephole_thick_to_objc_to_thick :
+// CHECK: [[T:%.*]] = apply
+// CHECK-NOT: thick_to_objc_metatype
+// CHECK-NOT: objc_to_thick_metatype
+// CHECK: return [[T]]
+// CHECK: } // end sil function '$test_peephole_thick_to_objc_to_thick'
+
+sil @$test_peephole_thick_to_objc_to_thick : $@convention(thin) (@guaranteed AnyObject) -> @thick AnyObject.Type {
+bb0(%0 : $AnyObject):
+  %func = function_ref @foo : $@convention(thin) (@guaranteed AnyObject) -> @thick AnyObject.Type
+  %res = apply %func(%0) : $@convention(thin) (@guaranteed AnyObject) -> @thick AnyObject.Type
+  %objctype = thick_to_objc_metatype %res : $@thick AnyObject.Type to $@objc_metatype AnyObject.Type
+  %thicktype = objc_to_thick_metatype %objctype : $@objc_metatype AnyObject.Type to $@thick AnyObject.Type
+  return %thicktype :  $@thick AnyObject.Type
+}
+
+// class_copyMethodList
+sil [serializable] [clang class_copyMethodList] @class_copyMethodList : $@convention(c) (Optional<@objc_metatype AnyObject.Type>, Optional<UnsafeMutablePointer<UInt32>>) -> Optional<UnsafeMutablePointer<OpaquePointer>>
+sil [serializable] @foo : $@convention(thin) (@guaranteed AnyObject) -> @thick AnyObject.Type

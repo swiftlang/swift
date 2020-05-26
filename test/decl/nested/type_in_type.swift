@@ -192,7 +192,7 @@ class X6<T> {
 // ---------------------------------------------
 // Unbound name references within a generic type
 // ---------------------------------------------
-struct GS<T> {
+struct GS<T> { //expected-note {{arguments to generic parameter 'T' ('T' and 'Int') are expected to be equal}}
   func f() -> GS {
     let gs = GS()
     return gs
@@ -224,11 +224,12 @@ extension GS {
   }
 
   func h() {
-    _ = GS() as GS<Int> // expected-error{{'GS<T>' is not convertible to 'GS<Int>'; did you mean to use 'as!' to force downcast?}}
+    _ = GS() as GS<Int> // expected-error{{cannot convert value of type 'GS<T>' to type 'GS<Int>' in coercion}}
   }
 }
 
-struct HasNested<T> {
+struct HasNested<T> { // expected-note {{arguments to generic parameter 'T' ('Int' and 'Float') are expected to be equal}}
+// expected-note@-1 {{arguments to generic parameter 'T' ('Float' and 'Int') are expected to be equal}}
   init<U>(_ t: T, _ u: U) {}
   func f<U>(_ t: T, u: U) -> (T, U) {}
 
@@ -250,7 +251,7 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   typealias InnerI = HasNested<Int>.Inner
   var innerI = InnerI(5)
   typealias InnerF = HasNested<Float>.Inner
-  var innerF : InnerF = innerI // expected-error{{cannot convert value of type 'InnerI' (aka 'HasNested<Int>.Inner') to specified type 'InnerF' (aka 'HasNested<Float>.Inner')}}
+  var innerF : InnerF = innerI // expected-error{{cannot convert parent type 'HasNested<Int>' to expected type 'HasNested<Float>'}}
 
   _ = innerI.identity(i)
   i = innerI.identity(i)
@@ -260,17 +261,18 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   var id = hni.f(1, u: 3.14159)
   id = (2, 3.14159)
   hni.f(1.5, 3.14159) // expected-error{{missing argument label 'u:' in call}}
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
   hni.f(1.5, u: 3.14159) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   // Generic constructor of a generic struct
   HNI(1, 2.71828) // expected-warning{{unused}}
-  HNI(1.5, 2.71828) // expected-error{{'Double' is not convertible to 'Int'}}
+  HNI(1.5, 2.71828) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   // Generic function in a nested generic struct
   var ids = xis.g(1, u: "Hello", v: 3.14159)
   ids = (2, "world", 2.71828)
 
-  xis = xfs // expected-error{{cannot assign value of type 'HasNested<Float>.InnerGeneric<String>' to type 'HasNested<Int>.InnerGeneric<String>'}}
+  xis = xfs // expected-error{{cannot convert parent type 'HasNested<Float>' to expected type 'HasNested<Int>'}}
 }
 
 // Extensions of nested generic types
@@ -298,9 +300,9 @@ extension OuterGeneric.MidGeneric : HasAssocType {
   func takesAssocType(first: D, second: F) {}
 }
 
-typealias OuterGenericMidGeneric<T> = OuterGeneric<T>.MidGeneric
+typealias OuterGenericMidNonGeneric<T> = OuterGeneric<T>.MidNonGeneric
 
-extension OuterGenericMidGeneric {
+extension OuterGenericMidNonGeneric {
 
 }
 
@@ -377,8 +379,8 @@ protocol ExpressibleByDogLiteral {}
 struct Kitten : ExpressibleByCatLiteral {}
 struct Puppy : ExpressibleByDogLiteral {}
 
-struct Claws<A: ExpressibleByCatLiteral> {
-  struct Fangs<B: ExpressibleByDogLiteral> { }
+struct Claws<A: ExpressibleByCatLiteral> { // expected-note 3 {{'A' declared as parameter to type 'Claws'}}
+  struct Fangs<B: ExpressibleByDogLiteral> { } // expected-note {{where 'B' = 'NotADog'}}
 }
 
 struct NotADog {}
@@ -387,7 +389,7 @@ func pets<T>(fur: T) -> Claws<Kitten>.Fangs<T> {
   return Claws<Kitten>.Fangs<T>()
 }
 
-func something<T>() -> T { // expected-note {{in call to function 'something()'}}
+func something<T>() -> T {
   while true {}
 }
 
@@ -398,11 +400,14 @@ func test() {
   let _: Claws.Fangs<Puppy> = pets(fur: Puppy())
   let _: Claws.Fangs<Puppy> = Claws<Kitten>.Fangs()
   let _: Claws.Fangs<Puppy> = Claws.Fangs()
-  // expected-error@-1 {{cannot convert value of type 'Claws<_>.Fangs<_>' to specified type 'Claws.Fangs<Puppy>'}}
+  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{36-36=<<#A: ExpressibleByCatLiteral#>>}}
   let _: Claws.Fangs<NotADog> = something()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}} // FIXME: bad diagnostic
+  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
   _ = Claws.Fangs<NotADog>()
-  // expected-error@-1 {{type 'NotADog' does not conform to protocol 'ExpressibleByDogLiteral'}}
+  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  // expected-error@-2 {{generic struct 'Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
+  // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<<#A: ExpressibleByCatLiteral#>>}}
 }
 
 // https://bugs.swift.org/browse/SR-4379
@@ -416,7 +421,6 @@ extension OuterGeneric.MidNonGeneric {
   }
 
   func doMoreStuffWrong() -> Self {
-    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'OuterGeneric.MidNonGeneric'?}}
 
   }
 }

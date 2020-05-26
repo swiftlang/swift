@@ -8,7 +8,8 @@ import TestsUtils
 public var COWTree = BenchmarkInfo(
   name: "COWTree",
   runFunction: run_COWTree,
-  tags: [.validation, .abstraction, .String]
+  tags: [.validation, .abstraction, .String],
+  legacyFactor: 20
 )
 
 @inline(never)
@@ -17,7 +18,7 @@ public func run_COWTree(_ N: Int) {
   var tree2 = Tree<String>()
   var tree3 = Tree<String>()
 
-  for _ in 1...1000*N {
+  for _ in 1...50*N {
     tree1 = Tree<String>()
     tree1.insert("Emily")
     tree2 = tree1
@@ -69,7 +70,7 @@ public struct Tree<T: Comparable> {
   public init() { }
 
   // constructor from a sequence
-  public init<S: Sequence>(_ seq: S) where S.Iterator.Element == T {
+  public init<S: Sequence>(_ seq: S) where S.Element == T {
     var g = seq.makeIterator()
     while let x = g.next() {
       self.insert(x)

@@ -3,7 +3,7 @@
 // RUN:   | %FileCheck %s
 public func g<T>(_ t: T) {}
 public func f(_ i: Int32) {
-  // CHECK: function_ref @$S4main1fyys5Int32VFyycfU_
+  // CHECK: function_ref @$s4main1fyys5Int32VFyycfU_
   // CHECK-SAME: loc "{{.*}}":13:3,
   // CHECK: %[[CLOSURE:.*]] = partial_apply
   // CHECK-SAME: loc "{{.*}}":13:3,{{.*}}auto_gen

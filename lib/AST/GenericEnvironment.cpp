@@ -46,42 +46,13 @@ GenericEnvironment::getGenericParams() const {
   return Signature->getGenericParams();
 }
 
-GenericEnvironment::GenericEnvironment(GenericSignature *signature,
+GenericEnvironment::GenericEnvironment(GenericSignature signature,
                                        GenericSignatureBuilder *builder)
   : Signature(signature), Builder(builder)
 {
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
                           Type());
-}
-
-void GenericEnvironment::setOwningDeclContext(DeclContext *newOwningDC) {
-  if (!OwningDC) {
-    OwningDC = newOwningDC;
-    return;
-  }
-
-  if (!newOwningDC || OwningDC == newOwningDC)
-    return;
-
-  // Find the least common ancestor context to be the owner.
-  unsigned oldDepth = OwningDC->getSyntacticDepth();
-  unsigned newDepth = newOwningDC->getSyntacticDepth();
-
-  while (oldDepth > newDepth) {
-    OwningDC = OwningDC->getParent();
-    --oldDepth;
-  }
-
-  while (newDepth > oldDepth) {
-    newOwningDC = newOwningDC->getParent();
-    --newDepth;
-  }
-
-  while (OwningDC != newOwningDC) {
-    OwningDC = OwningDC->getParent();
-    newOwningDC = newOwningDC->getParent();
-  }
 }
 
 void GenericEnvironment::addMapping(GenericParamKey key,
@@ -122,7 +93,11 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
 }
 
 Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
-  return cast<ArchetypeType>(type)->getInterfaceType();
+  auto archetype = cast<ArchetypeType>(type);
+  if (isa<OpaqueTypeArchetypeType>(archetype->getRoot()))
+    return Type();
+  
+  return archetype->getInterfaceType();
 }
 
 Type TypeBase::mapTypeOutOfContext() {
@@ -176,8 +151,7 @@ Type GenericEnvironment::mapTypeIntoContext(
 
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
-                           (SubstFlags::AllowLoweredTypes|
-                            SubstFlags::UseErrorType));
+                           SubstFlags::AllowLoweredTypes);
   assert((!result->hasTypeParameter() || result->hasError()) &&
          "not fully substituted");
   return result;
@@ -185,8 +159,8 @@ Type GenericEnvironment::mapTypeIntoContext(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(Type type) const {
-  auto *sig = getGenericSignature();
-  return mapTypeIntoContext(type, LookUpConformanceInSignature(*sig));
+  auto sig = getGenericSignature();
+  return mapTypeIntoContext(type, LookUpConformanceInSignature(sig.getPointer()));
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
@@ -219,7 +193,7 @@ Type GenericEnvironment::getSugaredType(Type type) const {
 }
 
 SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
-  auto *genericSig = getGenericSignature();
+  auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,
                               QueryInterfaceTypeSubstitutions(this),
                               MakeAbstractConformanceForGenericType());
@@ -241,7 +215,7 @@ GenericEnvironment::mapConformanceRefIntoContext(
                                      ProtocolConformanceRef conformance) const {
   auto contextConformance = conformance.subst(conformingInterfaceType,
     QueryInterfaceTypeSubstitutions(this),
-    LookUpConformanceInSignature(*getGenericSignature()));
+    LookUpConformanceInSignature(getGenericSignature().getPointer()));
   
   auto contextType = mapTypeIntoContext(conformingInterfaceType);
   return {contextType, contextConformance};

@@ -1,0 +1,604 @@
+// RUN: %target-sil-opt -enable-experimental-static-assert %s -dataflow-diagnostics -verify
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Static assertion that "1 + 1 == 2".
+sil [ossa] @test1 : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = builtin "add_Int32"(%0 : $Builtin.Int32, %0 : $Builtin.Int32) : $(Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 2
+  %3 = builtin "cmp_eq_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $(Builtin.Int1)
+  %4 = string_literal utf8 ""
+  %5 = builtin "poundAssert"(%3 : $Builtin.Int1, %4 : $Builtin.RawPointer) : $()
+  return undef : $()
+}
+
+// Static assertion that "2 + 2 == 5".
+sil [ossa] @test2 : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = builtin "add_Int32"(%0 : $Builtin.Int32, %0 : $Builtin.Int32) : $(Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 5
+  %3 = builtin "cmp_eq_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $(Builtin.Int1)
+  %4 = string_literal utf8 ""
+  // expected-error @+1 {{assertion failed}}
+  %5 = builtin "poundAssert"(%3 : $Builtin.Int1, %4 : $Builtin.RawPointer) : $()
+  return undef : $()
+}
+
+// Tests that piecewise initialization of memory works during flow-sensitive
+// evaluation, by piecewise initializing a tuple in a function.
+sil [ossa] @piecewiseInitFlowSensitive : $@convention(thin) () -> Bool {
+bb0:
+  // Allocate and initialize the tuple to (1, 2).
+  %0 = alloc_stack $(Int64, Int64), var, name "tup"
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %2 = tuple_element_addr %0 : $*(Int64, Int64), 1
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to [trivial] %1 : $*Int64
+  %6 = integer_literal $Builtin.Int64, 2
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  store %7 to [trivial] %2 : $*Int64
+
+  // Read the first element from the tuple.
+  %9 = begin_access [read] [static] %0 : $*(Int64, Int64)
+  %10 = tuple_element_addr %9 : $*(Int64, Int64), 0
+  %11 = load [trivial] %10 : $*Int64
+  end_access %9 : $*(Int64, Int64)
+
+  // Check that the first element is what we put in.
+  %13 = struct_extract %11 : $Int64, #Int64._value
+  %14 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %15 = struct $Bool (%14 : $Builtin.Int1)
+
+  // Deallocate and return.
+  dealloc_stack %0 : $*(Int64, Int64)
+  return %15 : $Bool
+}
+
+sil [ossa] @piecewiseInitFlowSensitiveDestructure : $@convention(thin) () -> Bool {
+bb0:
+  // Allocate and initialize the tuple to (1, 2).
+  %0 = alloc_stack $(Int64, Int64), var, name "tup"
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %2 = tuple_element_addr %0 : $*(Int64, Int64), 1
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to [trivial] %1 : $*Int64
+  %6 = integer_literal $Builtin.Int64, 2
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  store %7 to [trivial] %2 : $*Int64
+
+  // Read the first element from the tuple.
+  %9 = begin_access [read] [static] %0 : $*(Int64, Int64)
+  %10 = tuple_element_addr %9 : $*(Int64, Int64), 0
+  %11 = load [trivial] %10 : $*Int64
+  end_access %9 : $*(Int64, Int64)
+
+  // Check that the first element is what we put in.
+  %13 = destructure_struct %11 : $Int64
+  %14 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %15 = struct $Bool (%14 : $Builtin.Int1)
+
+  // Deallocate and return.
+  dealloc_stack %0 : $*(Int64, Int64)
+  return %15 : $Bool
+}
+
+sil [ossa] @invokePiecewiseInitFlowSensitiveTest : $@convention(thin) () -> () {
+  %0 = function_ref @piecewiseInitFlowSensitive : $@convention(thin) () -> Bool
+  %1 = apply %0() : $@convention(thin) () -> Bool
+  %2 = struct_extract %1 : $Bool, #Bool._value
+  %3 = string_literal utf8 ""
+  %4 = builtin "poundAssert"(%2 : $Builtin.Int1, %3 : $Builtin.RawPointer) : $()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [ossa] @invokePiecewiseInitFlowSensitiveTestDestructure : $@convention(thin) () -> () {
+  %0 = function_ref @piecewiseInitFlowSensitive : $@convention(thin) () -> Bool
+  %1 = apply %0() : $@convention(thin) () -> Bool
+  %2 = destructure_struct %1 : $Bool
+  %3 = string_literal utf8 ""
+  %4 = builtin "poundAssert"(%2 : $Builtin.Int1, %3 : $Builtin.RawPointer) : $()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Tests copy_addr interpretation.
+sil [ossa] @copyAddr : $@convention(thin) () -> Bool {
+  // Allocate an initialize an Int64 to 1.
+  %0 = alloc_stack $Int64
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  store %2 to [trivial] %0 : $*Int64
+
+  // Allocate another Int64 and copy to it.
+  %4 = alloc_stack $Int64
+  copy_addr %0 to %4 : $*Int64
+
+  // Check that the value is what we put in the original Int64.
+  %5 = begin_access [read] [static] %4 : $*Int64
+  %6 = load [trivial] %5 : $*Int64
+  end_access %5 : $*Int64
+  %8 = struct_extract %6 : $Int64, #Int64._value
+  %9 = builtin "cmp_eq_Int64"(%1 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int1
+  %10 = struct $Bool (%9 : $Builtin.Int1)
+
+  // Deallocate and return.
+  dealloc_stack %4 : $*Int64
+  dealloc_stack %0 : $*Int64
+  return %10 : $Bool
+}
+
+// Tests copy_addr interpretation.
+sil [ossa] @copyAddrDestructure : $@convention(thin) () -> Bool {
+  // Allocate an initialize an Int64 to 1.
+  %0 = alloc_stack $Int64
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  store %2 to [trivial] %0 : $*Int64
+
+  // Allocate another Int64 and copy to it.
+  %4 = alloc_stack $Int64
+  copy_addr %0 to %4 : $*Int64
+
+  // Check that the value is what we put in the original Int64.
+  %5 = begin_access [read] [static] %4 : $*Int64
+  %6 = load [trivial] %5 : $*Int64
+  end_access %5 : $*Int64
+  %8 = destructure_struct %6 : $Int64
+  %9 = builtin "cmp_eq_Int64"(%1 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int1
+  %10 = struct $Bool (%9 : $Builtin.Int1)
+
+  // Deallocate and return.
+  dealloc_stack %4 : $*Int64
+  dealloc_stack %0 : $*Int64
+  return %10 : $Bool
+}
+
+sil [ossa] @invokeCopyAddrTest : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @copyAddr : $@convention(thin) () -> Bool
+  %1 = apply %0() : $@convention(thin) () -> Bool
+  %2 = struct_extract %1 : $Bool, #Bool._value
+  %3 = string_literal utf8 ""
+  %4 = builtin "poundAssert"(%2 : $Builtin.Int1, %3 : $Builtin.RawPointer) : $()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [ossa] @invokeCopyAddrTestDestructure : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @copyAddr : $@convention(thin) () -> Bool
+  %1 = apply %0() : $@convention(thin) () -> Bool
+  %2 = destructure_struct %1 : $Bool
+  %3 = string_literal utf8 ""
+  %4 = builtin "poundAssert"(%2 : $Builtin.Int1, %3 : $Builtin.RawPointer) : $()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// A function with @out result to help with some tests.
+sil [ossa] @setInt64To1 : $@convention(thin) () -> (@out Int64) {
+bb0(%0 : $*Int64):
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  store %2 to [trivial] %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Tests that initialization of memory using `store` works during top-level
+// evaluation.
+sil [ossa] @storeInitTopLevel : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  store %2 to [trivial] %0 : $*Int64
+  %4 = load [trivial] %0 : $*Int64
+  %5 = struct_extract %4 : $Int64, #Int64._value
+  %6 = builtin "cmp_eq_Int64"(%1 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
+  %7 = string_literal utf8 ""
+  %8 = builtin "poundAssert"(%6 : $Builtin.Int1, %7 : $Builtin.RawPointer) : $()
+  dealloc_stack %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [ossa] @storeInitTopLevelDestructure : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  store %2 to [trivial] %0 : $*Int64
+  %4 = load [trivial] %0 : $*Int64
+  %5 = destructure_struct %4 : $Int64
+  %6 = builtin "cmp_eq_Int64"(%1 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
+  %7 = string_literal utf8 ""
+  %8 = builtin "poundAssert"(%6 : $Builtin.Int1, %7 : $Builtin.RawPointer) : $()
+  dealloc_stack %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+
+// Tests that initialization of memory using `copy_addr` works during top-level
+// evaluation.
+sil [ossa] @copyInitTopLevel : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = alloc_stack $Int64
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to [trivial] %0 : $*Int64
+  copy_addr %0 to %1 : $*Int64
+  %6 = load [trivial] %1 : $*Int64
+  %7 = struct_extract %6 : $Int64, #Int64._value
+  %8 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  %9 = string_literal utf8 ""
+  %10 = builtin "poundAssert"(%8 : $Builtin.Int1, %9 : $Builtin.RawPointer) : $()
+  dealloc_stack %1 : $*Int64
+  dealloc_stack %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Tests that initialization of memory using `copy_addr` works during top-level
+// evaluation... but with destructures instead of struct_extract.
+sil [ossa] @copyInitTopLevelDestructure : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = alloc_stack $Int64
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to [trivial] %0 : $*Int64
+  copy_addr %0 to %1 : $*Int64
+  %6 = load [trivial] %1 : $*Int64
+  %7 = destructure_struct %6 : $Int64
+  %8 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  %9 = string_literal utf8 ""
+  %10 = builtin "poundAssert"(%8 : $Builtin.Int1, %9 : $Builtin.RawPointer) : $()
+  dealloc_stack %1 : $*Int64
+  dealloc_stack %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Tests that initialization of memory using `apply` works during top-level
+// evaluation.
+sil [ossa] @applyInitTopLevel : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = function_ref @setInt64To1: $@convention(thin) () -> (@out Int64)
+  %2 = apply %1(%0) : $@convention(thin) () -> (@out Int64)
+  %3 = load [trivial] %0 : $*Int64
+  %4 = struct_extract %3 : $Int64, #Int64._value
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = builtin "cmp_eq_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
+  %7 = string_literal utf8 ""
+  %8 = builtin "poundAssert"(%6 : $Builtin.Int1, %7 : $Builtin.RawPointer) : $()
+  dealloc_stack %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Tests that initialization of memory using `apply` works during top-level
+// evaluation... with destructure
+sil [ossa] @applyInitTopLevelDestructure : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = function_ref @setInt64To1: $@convention(thin) () -> (@out Int64)
+  %2 = apply %1(%0) : $@convention(thin) () -> (@out Int64)
+  %3 = load [trivial] %0 : $*Int64
+  %4 = destructure_struct %3 : $Int64
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = builtin "cmp_eq_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
+  %7 = string_literal utf8 ""
+  %8 = builtin "poundAssert"(%6 : $Builtin.Int1, %7 : $Builtin.RawPointer) : $()
+  dealloc_stack %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+
+// Tests that piecewise initialization of tuple memory works during top-level
+// evaluation.
+sil [ossa] @piecewiseInitTopLevel : $@convention(thin) () -> () {
+bb0:
+  // Allocate and initialize the tuple to (1, 2).
+  %0 = alloc_stack $(Int64, Int64), var, name "tup"
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %2 = tuple_element_addr %0 : $*(Int64, Int64), 1
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to [trivial] %1 : $*Int64
+  %6 = integer_literal $Builtin.Int64, 2
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  store %7 to [trivial] %2 : $*Int64
+
+  // Read the first element from the tuple.
+  // TODO: Allow `begin_access` in top level initialization.
+  // %9 = begin_access [read] [static] %0 : $*(Int64, Int64)
+  %10 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %11 = load [trivial] %10 : $*Int64
+  // end_access %9 : $*(Int64, Int64)
+
+  // Check that the first element is what we put in.
+  %13 = struct_extract %11 : $Int64, #Int64._value
+  %14 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %15 = string_literal utf8 ""
+  %16 = builtin "poundAssert"(%14 : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+
+  // Deallocate and return.
+  dealloc_stack %0 : $*(Int64, Int64)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Tests that piecewise initialization of tuple memory works during top-level
+// evaluation.
+sil [ossa] @piecewiseInitTopLevelDestructure : $@convention(thin) () -> () {
+bb0:
+  // Allocate and initialize the tuple to (1, 2).
+  %0 = alloc_stack $(Int64, Int64), var, name "tup"
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %2 = tuple_element_addr %0 : $*(Int64, Int64), 1
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to [trivial] %1 : $*Int64
+  %6 = integer_literal $Builtin.Int64, 2
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  store %7 to [trivial] %2 : $*Int64
+
+  // Read the first element from the tuple.
+  // TODO: Allow `begin_access` in top level initialization.
+  // %9 = begin_access [read] [static] %0 : $*(Int64, Int64)
+  %10 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %11 = load [trivial] %10 : $*Int64
+  // end_access %9 : $*(Int64, Int64)
+
+  // Check that the first element is what we put in.
+  %13 = destructure_struct %11 : $Int64
+  %14 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %15 = string_literal utf8 ""
+  %16 = builtin "poundAssert"(%14 : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+
+  // Deallocate and return.
+  dealloc_stack %0 : $*(Int64, Int64)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Tests that top-level evaluation detects memory that gets written to twice.
+sil [ossa] @doubleWriteTopLevel : $@convention(thin) () -> () {
+  // expected-note @+1 {{top-level value has multiple assignments}}
+  %0 = alloc_stack $Int64
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  store %2 to [trivial] %0 : $*Int64
+  store %2 to [trivial] %0 : $*Int64
+  %5 = load [trivial] %0 : $*Int64
+  %6 = struct_extract %5 : $Int64, #Int64._value
+  %7 = builtin "cmp_eq_Int64"(%1 : $Builtin.Int64, %6 : $Builtin.Int64) : $Builtin.Int1
+  %8 = string_literal utf8 ""
+  // expected-error @+1 {{#assert condition not constant}}
+  %9 = builtin "poundAssert"(%7 : $Builtin.Int1, %8 : $Builtin.RawPointer) : $()
+  dealloc_stack %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Tests that top-level evaluation detects memory that gets written to twice.
+sil [ossa] @doubleWriteTopLevelDestructure : $@convention(thin) () -> () {
+  // expected-note @+1 {{top-level value has multiple assignments}}
+  %0 = alloc_stack $Int64
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  store %2 to [trivial] %0 : $*Int64
+  store %2 to [trivial] %0 : $*Int64
+  %5 = load [trivial] %0 : $*Int64
+  %6 = destructure_struct %5 : $Int64
+  %7 = builtin "cmp_eq_Int64"(%1 : $Builtin.Int64, %6 : $Builtin.Int64) : $Builtin.Int1
+  %8 = string_literal utf8 ""
+  // expected-error @+1 {{#assert condition not constant}}
+  %9 = builtin "poundAssert"(%7 : $Builtin.Int1, %8 : $Builtin.RawPointer) : $()
+  dealloc_stack %0 : $*Int64
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// There was a bug where the evalutor would not detect a double-write to a
+// tuple element at the top level if one of the writes writes an unknown value.
+sil [ossa] @doubleWriteTupleElement : $@convention(thin) (Int64) -> () {
+bb0(%arg : $Int64):
+  // Allocate and initialize the tuple to (1, 2).
+  %0 = alloc_stack $(Int64, Int64), var, name "tup"
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %2 = tuple_element_addr %0 : $*(Int64, Int64), 1
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to [trivial] %1 : $*Int64
+  %6 = integer_literal $Builtin.Int64, 2
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  store %7 to [trivial] %2 : $*Int64
+
+  // Store %arg, whose value is unknown, to the first element of the tuple.
+  %addr = tuple_element_addr %0 : $*(Int64, Int64), 0
+  store %arg to [trivial] %addr : $*Int64
+
+  // Read the first element from the tuple.
+  // TODO: Allow `begin_access` in top level initialization.
+  // %9 = begin_access [read] [static] %0 : $*(Int64, Int64)
+  %10 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %11 = load [trivial] %10 : $*Int64
+  // end_access %9 : $*(Int64, Int64)
+
+  // Check that the first element is what we put in.
+  %13 = struct_extract %11 : $Int64, #Int64._value
+  %14 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %15 = string_literal utf8 ""
+  // expected-error @+1 {{#assert condition not constant}}
+  %16 = builtin "poundAssert"(%14 : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+    // expected-note @-1 {{cannot evaluate expression as constant here}}
+
+  // Deallocate and return.
+  dealloc_stack %0 : $*(Int64, Int64)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// This tests the same bug as the previous test, but adding in destructures
+// instead of struct_extract.
+sil [ossa] @doubleWriteTupleElementDestructure : $@convention(thin) (Int64) -> () {
+bb0(%arg : $Int64):
+  // Allocate and initialize the tuple to (1, 2).
+  %0 = alloc_stack $(Int64, Int64), var, name "tup"
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %2 = tuple_element_addr %0 : $*(Int64, Int64), 1
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to [trivial] %1 : $*Int64
+  %6 = integer_literal $Builtin.Int64, 2
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  store %7 to [trivial] %2 : $*Int64
+
+  // Store %arg, whose value is unknown, to the first element of the tuple.
+  %addr = tuple_element_addr %0 : $*(Int64, Int64), 0
+  store %arg to [trivial] %addr : $*Int64
+
+  // Read the first element from the tuple.
+  // TODO: Allow `begin_access` in top level initialization.
+  // %9 = begin_access [read] [static] %0 : $*(Int64, Int64)
+  %10 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %11 = load [trivial] %10 : $*Int64
+  // end_access %9 : $*(Int64, Int64)
+
+  // Check that the first element is what we put in.
+  %13 = destructure_struct %11 : $Int64
+  %14 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %13 : $Builtin.Int64) : $Builtin.Int1
+  %15 = string_literal utf8 ""
+  // expected-error @+1 {{#assert condition not constant}}
+  %16 = builtin "poundAssert"(%14 : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+    // expected-note @-1 {{cannot evaluate expression as constant here}}
+
+  // Deallocate and return.
+  dealloc_stack %0 : $*(Int64, Int64)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+struct BiggerStruct {
+  var lhs: Int64
+  var rhs: Int64
+}
+
+// This tests the  same bug as the  previous two tests but adds  in missing code
+// coverage of destructure_tuples, tuple_extracts, and tuples.
+sil [ossa] @doubleWriteTupleElementDestructureWithMoreFeeling : $@convention(thin) (BiggerStruct) -> () {
+bb0(%arg : $BiggerStruct):
+  // Allocate and initialize the tuple to (1, 2).
+  %0 = alloc_stack $(BiggerStruct, BiggerStruct), var, name "tup"
+  %1 = tuple_element_addr %0 : $*(BiggerStruct, BiggerStruct), 0
+  %3 = integer_literal $Builtin.Int64, 1
+  %3a = struct $Int64 (%3 : $Builtin.Int64)
+  %4 = struct $BiggerStruct (%3a : $Int64, %3a : $Int64)
+  store %4 to [trivial] %1 : $*BiggerStruct
+
+  %2 = tuple_element_addr %0 : $*(BiggerStruct, BiggerStruct), 1
+  %6 = integer_literal $Builtin.Int64, 2
+  %6a = struct $Int64 (%6 : $Builtin.Int64)
+  %7 = struct $BiggerStruct (%6a : $Int64, %6a : $Int64)
+  store %7 to [trivial] %2 : $*BiggerStruct
+
+  // Read the first element from the tuple.
+  %10 = tuple_element_addr %0 : $*(BiggerStruct, BiggerStruct), 1
+  %11 = load [trivial] %10 : $*BiggerStruct
+
+  // Check that the first element is what we put in.
+  (%13, %13a) = destructure_struct %11 : $BiggerStruct
+  %13b = tuple(%13 : $Int64, %13a : $Int64)
+  (%13c, %13d) = destructure_tuple %13b : $(Int64, Int64)
+  %13e = tuple(%13c : $Int64, %13d : $Int64)
+  %13f = tuple_extract %13e : $(Int64, Int64), 0
+  %13g = struct_extract %13f : $Int64, #Int64._value
+  %14 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %13g : $Builtin.Int64) : $Builtin.Int1
+  %14a = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %13g : $Builtin.Int64) : $Builtin.Int1
+  %15 = string_literal utf8 ""
+  // Make sure that we are able to simplify this completely.
+  // expected-error @+1 {{assertion failed}}
+  %16 = builtin "poundAssert"(%14 : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+  // Make sure that this matches.
+  %17 = builtin "poundAssert"(%14a : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+  // Deallocate and return.
+  dealloc_stack %0 : $*(BiggerStruct, BiggerStruct)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+enum Either {
+case left(Builtin.Int64)
+case right(Builtin.Int64)
+}
+
+// Make sure that we properly handle failure default cases.
+sil [ossa] @switch_enum_test_callee_1 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = enum $Either, #Either.left!enumelt, %0 : $Builtin.Int64
+  switch_enum %1 : $Either, case #Either.left!enumelt: bb1, default bb2
+
+bb1(%2 : $Builtin.Int64):
+  br bb3(%2 : $Builtin.Int64)
+
+bb2(%3 : $Either):
+  %4 = integer_literal $Builtin.Int64, 1
+  br bb3(%4 : $Builtin.Int64)
+
+bb3(%5 : $Builtin.Int64):
+  return %5 : $Builtin.Int64
+}
+
+sil [ossa] @switch_enum_test_callee_2 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = enum $Either, #Either.left!enumelt, %0 : $Builtin.Int64
+  // Make sure we go down the bad path.
+  switch_enum %1 : $Either, case #Either.right!enumelt: bb4, default bb5
+
+bb4(%7 : $Builtin.Int64):
+  br bb6(%7 : $Builtin.Int64)
+
+bb5(%8 : $Either):
+  %9 = unchecked_enum_data %8 : $Either, #Either.right!enumelt
+  br bb6(%9 : $Builtin.Int64)
+
+bb6(%10 : $Builtin.Int64):
+  return %10 : $Builtin.Int64
+}
+
+sil [ossa] @switch_enum_test_caller : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @switch_enum_test_callee_1 : $@convention(thin) () -> Builtin.Int64
+  %0a = function_ref @switch_enum_test_callee_2 : $@convention(thin) () -> Builtin.Int64
+  %2 = apply %0() : $@convention(thin) () -> Builtin.Int64
+  %3 = apply %0a() : $@convention(thin) () -> Builtin.Int64
+  %str = string_literal utf8 ""
+  %resultPositive = integer_literal $Builtin.Int64, 0
+  %resultNegative = integer_literal $Builtin.Int64, 1
+  %cmp1Positive = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %resultPositive : $Builtin.Int64) : $Builtin.Int1
+  builtin "poundAssert"(%cmp1Positive : $Builtin.Int1, %str : $Builtin.RawPointer) : $()
+  // Make sure we simplified down the bb1 path.
+  %cmp2Positive = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %resultPositive : $Builtin.Int64) : $Builtin.Int1
+  builtin "poundAssert"(%cmp2Positive : $Builtin.Int1, %str : $Builtin.RawPointer) : $()
+
+  %cmp1Negative = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %resultNegative : $Builtin.Int64) : $Builtin.Int1
+  // expected-error @+1 {{assertion failed}}
+  builtin "poundAssert"(%cmp1Negative : $Builtin.Int1, %str : $Builtin.RawPointer) : $()
+  %cmp2Negative = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %resultNegative : $Builtin.Int64) : $Builtin.Int1
+  // expected-error @+1 {{assertion failed}}
+  builtin "poundAssert"(%cmp2Negative : $Builtin.Int1, %str : $Builtin.RawPointer) : $()
+
+  %9999 = tuple()
+  return %9999 : $()
+}

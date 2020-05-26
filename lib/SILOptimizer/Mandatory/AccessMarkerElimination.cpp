@@ -48,7 +48,7 @@ struct AccessMarkerElimination {
       : Mod(&F->getModule()), F(F) {}
 
   void notifyErased(SILInstruction *inst) {
-    DEBUG(llvm::dbgs() << "Erasing access marker: " << *inst);
+    LLVM_DEBUG(llvm::dbgs() << "Erasing access marker: " << *inst);
     removedAny = true;
   }
 
@@ -81,6 +81,7 @@ bool AccessMarkerElimination::shouldPreserveAccess(
   case SILAccessEnforcement::Dynamic:
     return Mod->getOptions().EnforceExclusivityDynamic;
   }
+  llvm_unreachable("unhandled enforcement");
 }
 
 // Check if the instruction is a marker that should be eliminated. If so, delete
@@ -142,7 +143,7 @@ AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
 bool AccessMarkerElimination::stripMarkers() {
   // Iterating in reverse eliminates more begin_access users before they
   // need to be replaced.
-  for (auto &BB : reversed(*F)) {
+  for (auto &BB : llvm::reverse(*F)) {
     // Don't cache the begin iterator since we're reverse iterating.
     for (auto II = BB.end(); II != BB.begin();) {
       SILInstruction *inst = &*(--II);
@@ -159,7 +160,8 @@ bool AccessMarkerElimination::stripMarkers() {
 // Implement a SILModule::SILFunctionBodyCallback that strips all access
 // markers from newly deserialized function bodies.
 static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
-  DEBUG(llvm::dbgs() << "Stripping all markers in: " << F->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Stripping all markers in: " << F->getName()
+                          << "\n");
 
   AccessMarkerElimination(F).stripMarkers();
 }
@@ -180,8 +182,13 @@ struct AccessMarkerEliminationPass : SILModuleTransform {
 
       // Markers from all current SIL functions are stripped. Register a
       // callback to strip an subsequently loaded functions on-the-fly.
-      if (!EnableOptimizedAccessMarkers)
-        M.registerDeserializationCallback(prepareSILFunctionForOptimization);
+      if (!EnableOptimizedAccessMarkers) {
+        using NotificationHandlerTy =
+            FunctionBodyDeserializationNotificationHandler;
+        auto *n = new NotificationHandlerTy(prepareSILFunctionForOptimization);
+        std::unique_ptr<DeserializationNotificationHandler> ptr(n);
+        M.registerDeserializationNotificationHandler(std::move(ptr));
+      }
     }
   }
 };

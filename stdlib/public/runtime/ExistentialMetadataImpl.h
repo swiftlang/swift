@@ -25,13 +25,11 @@ namespace swift {
 namespace metadataimpl {
 
 /// A common base class for opaque-existential and class-existential boxes.
-template<typename Impl>
-struct LLVM_LIBRARY_VISIBILITY ExistentialBoxBase {
-};
+template <typename Impl> struct SWIFT_LIBRARY_VISIBILITY ExistentialBoxBase {};
 
 /// A common base class for fixed and non-fixed opaque-existential box
 /// implementations.
-struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
+struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
     : ExistentialBoxBase<OpaqueExistentialBoxBase> {
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
@@ -290,7 +288,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
 /// witness tables.  Note that the WitnessTables field is accessed via
 /// spooky action from Header.
 template <unsigned NumWitnessTables>
-struct LLVM_LIBRARY_VISIBILITY FixedOpaqueExistentialContainer {
+struct SWIFT_LIBRARY_VISIBILITY FixedOpaqueExistentialContainer {
   OpaqueExistentialContainer Header;
   const void *WitnessTables[NumWitnessTables];
 };
@@ -304,7 +302,7 @@ struct FixedOpaqueExistentialContainer<0> {
 /// A box implementation class for an opaque existential type with
 /// a fixed number of witness tables.
 template <unsigned NumWitnessTables>
-struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
+struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBox
     : OpaqueExistentialBoxBase {
   struct Container : FixedOpaqueExistentialContainer<NumWitnessTables> {
     const Metadata *getType() const {
@@ -328,12 +326,25 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
   static constexpr size_t stride = sizeof(Container);
   static constexpr size_t isPOD = false;
   static constexpr bool isBitwiseTakable = true;
-  static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr unsigned numExtraInhabitants =
+    swift_getHeapObjectExtraInhabitantCount();
+
+  static void storeExtraInhabitantTag(Container *dest, unsigned tag) {
+    swift_storeHeapObjectExtraInhabitant(
+        const_cast<HeapObject **>(
+            reinterpret_cast<const HeapObject **>(&dest->Header.Type)),
+        tag - 1);
+  }
+
+  static unsigned getExtraInhabitantTag(const Container *src) {
+    return swift_getHeapObjectExtraInhabitantIndex(const_cast<HeapObject **>(
+        reinterpret_cast<const HeapObject *const *>(&src->Header.Type))) + 1;
+  }
 };
 
 /// A non-fixed box implementation class for an opaque existential
 /// type with a dynamic number of witness tables.
-struct LLVM_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
+struct SWIFT_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
     : OpaqueExistentialBoxBase {
   struct Container {
     OpaqueExistentialContainer Header;
@@ -371,19 +382,30 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
   };
 
   using type = Container;
-  static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr unsigned numExtraInhabitants =
+    swift_getHeapObjectExtraInhabitantCount();
+  
+  static void storeExtraInhabitantTag(Container *dest, unsigned tag) {
+    swift_storeHeapObjectExtraInhabitant(
+                            (HeapObject**)(uintptr_t)&dest->Header.Type, tag - 1);
+  }
+
+  static unsigned getExtraInhabitantTag(const Container *src) {
+    return swift_getHeapObjectExtraInhabitantIndex(
+                             (HeapObject* const *)(uintptr_t)&src->Header.Type) + 1;
+  }
 };
 
 /// A common base class for fixed and non-fixed class-existential box
 /// implementations.
-struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
+struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
     : ExistentialBoxBase<ClassExistentialBoxBase> {
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
 
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
-    swift_unknownRelease(*value->getValueSlot());
+    swift_unknownObjectRelease(*value->getValueSlot());
   }
   
   template <class Container, class... A>
@@ -392,7 +414,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     src->copyTypeInto(dest, args...);
     auto newValue = *src->getValueSlot();
     *dest->getValueSlot() = newValue;
-    swift_unknownRetain(newValue);
+    swift_unknownObjectRetain(newValue);
     return dest;  
   }
 
@@ -411,8 +433,8 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     auto newValue = *src->getValueSlot();
     auto oldValue = *dest->getValueSlot();
     *dest->getValueSlot() = newValue;
-    swift_unknownRetain(newValue);
-    swift_unknownRelease(oldValue);
+    swift_unknownObjectRetain(newValue);
+    swift_unknownObjectRelease(oldValue);
     return dest;
   }
 
@@ -423,29 +445,27 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     auto newValue = *src->getValueSlot();
     auto oldValue = *dest->getValueSlot();
     *dest->getValueSlot() = newValue;
-    swift_unknownRelease(oldValue);
+    swift_unknownObjectRelease(oldValue);
     return dest;
   }
 
   template <class Container, class... A>
-  static void storeExtraInhabitant(Container *dest, int index, A... args) {
+  static void storeExtraInhabitantTag(Container *dest, unsigned tag, A... args) {
     swift_storeHeapObjectExtraInhabitant((HeapObject**) dest->getValueSlot(),
-                                         index);
+                                         tag - 1);
   }
 
   template <class Container, class... A>
-  static int getExtraInhabitantIndex(const Container *src, A... args) {
+  static int getExtraInhabitantTag(const Container *src, A... args) {
     return swift_getHeapObjectExtraInhabitantIndex(
-                                  (HeapObject* const *) src->getValueSlot());
+                                  (HeapObject* const *) src->getValueSlot()) + 1;
   }
-  
 };
 
 /// A box implementation class for an existential container with
 /// a class constraint and a fixed number of protocol witness tables.
 template <unsigned NumWitnessTables>
-struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
-    : ClassExistentialBoxBase {
+struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBox : ClassExistentialBoxBase {
   struct Container {
     ClassExistentialContainer Header;
     const void *TypeInfo[NumWitnessTables];
@@ -471,7 +491,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
 
 /// A non-fixed box implementation class for a class existential
 /// type with a dynamic number of witness tables.
-struct LLVM_LIBRARY_VISIBILITY NonFixedClassExistentialBox
+struct SWIFT_LIBRARY_VISIBILITY NonFixedClassExistentialBox
     : ClassExistentialBoxBase {
   struct Container {
     ClassExistentialContainer Header;
@@ -508,7 +528,7 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedClassExistentialBox
 
 /// A common base class for fixed and non-fixed existential metatype box
 /// implementations.
-struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
+struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
     : ExistentialBoxBase<ExistentialMetatypeBoxBase> {
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
@@ -550,24 +570,24 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
   }
 
   template <class Container, class... A>
-  static void storeExtraInhabitant(Container *dest, int index, A... args) {
+  static void storeExtraInhabitantTag(Container *dest, unsigned tag, A... args) {
     Metadata **MD = const_cast<Metadata **>(dest->getValueSlot());
     swift_storeHeapObjectExtraInhabitant(reinterpret_cast<HeapObject **>(MD),
-                                         index);
+                                         tag - 1);
   }
 
   template <class Container, class... A>
-  static int getExtraInhabitantIndex(const Container *src, A... args) {
+  static int getExtraInhabitantTag(const Container *src, A... args) {
     Metadata **MD = const_cast<Metadata **>(src->getValueSlot());
     return swift_getHeapObjectExtraInhabitantIndex(
-        reinterpret_cast<HeapObject *const *>(MD));
+        reinterpret_cast<HeapObject *const *>(MD)) + 1;
   }
 };
 
 /// A box implementation class for an existential metatype container
 /// with a fixed number of protocol witness tables.
 template <unsigned NumWitnessTables>
-struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBox
+struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBox
     : ExistentialMetatypeBoxBase {
   struct Container {
     ExistentialMetatypeContainer Header;
@@ -594,13 +614,13 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBox
 
 /// A non-fixed box implementation class for an existential metatype
 /// type with a dynamic number of witness tables.
-struct LLVM_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
+struct SWIFT_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
     : ExistentialMetatypeBoxBase {
   struct Container {
     ExistentialMetatypeContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
-      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self); 
+      auto castSelf = static_cast<const ExistentialMetatypeMetadata*>(self); 
       return castSelf->Flags.getNumWitnessTables();
     }
 

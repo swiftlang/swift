@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 ///  \file
-///  \brief This file provides implementations of a few helper functions
+///  This file provides implementations of a few helper functions
 ///  which provide abstracted entrypoints to the SILPasses stage.
 ///
 ///  \note The actual SIL passes should be implemented in per-pass source files,
@@ -21,14 +21,14 @@
 
 #define DEBUG_TYPE "sil-optimizer"
 
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -40,8 +40,10 @@
 using namespace swift;
 
 bool swift::runSILDiagnosticPasses(SILModule &Module) {
+  auto &opts = Module.getOptions();
+
   // Verify the module, if required.
-  if (Module.getOptions().VerifyAll)
+  if (opts.VerifyAll)
     Module.verify();
 
   // If we parsed a .sil file that is already in canonical form, don't rerun
@@ -49,24 +51,23 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   if (Module.getStage() != SILStage::Raw)
     return false;
 
-  auto &Ctx = Module.getASTContext();
-
-  SILPassManager PM(&Module, "", /*isMandatoryPipeline=*/ true);
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getDiagnosticPassPipeline(Module.getOptions()));
+  executePassPipelinePlan(&Module,
+                          SILPassPipelinePlan::getDiagnosticPassPipeline(opts),
+                          /*isMandatory*/ true);
 
   // If we were asked to debug serialization, exit now.
-  if (Module.getOptions().DebugSerialization)
+  auto &Ctx = Module.getASTContext();
+  if (opts.DebugSerialization)
     return Ctx.hadError();
 
   // Generate diagnostics.
   Module.setStage(SILStage::Canonical);
 
   // Verify the module, if required.
-  if (Module.getOptions().VerifyAll)
+  if (opts.VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 
   // If errors were produced during SIL analysis, return true.
@@ -76,41 +77,48 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 bool swift::runSILOwnershipEliminatorPass(SILModule &Module) {
   auto &Ctx = Module.getASTContext();
 
-  SILPassManager PM(&Module);
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getOwnershipEliminatorPassPipeline());
+  auto &opts = Module.getOptions();
+  executePassPipelinePlan(
+      &Module, SILPassPipelinePlan::getOwnershipEliminatorPassPipeline(opts));
 
   return Ctx.hadError();
 }
 
-// Prepare SIL for the -O pipeline.
-void swift::runSILOptPreparePasses(SILModule &Module) {
-  SILPassManager PM(&Module);
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getSILOptPreparePassPipeline(Module.getOptions()));
-}
-
 void swift::runSILOptimizationPasses(SILModule &Module) {
+  auto &opts = Module.getOptions();
+
   // Verify the module, if required.
-  if (Module.getOptions().VerifyAll)
+  if (opts.VerifyAll)
     Module.verify();
 
-  if (Module.getOptions().DisableSILPerfOptimizations)
+  if (opts.DisableSILPerfOptimizations) {
+    // If we are not supposed to run SIL perf optzns, we may still need to
+    // serialize. So serialize now.
+    executePassPipelinePlan(
+        &Module, SILPassPipelinePlan::getSerializeSILPassPipeline(opts),
+        /*isMandatory*/ true);
     return;
+  }
 
-  SILPassManager PM(&Module);
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPerformancePassPipeline(Module.getOptions()));
+  executePassPipelinePlan(
+      &Module, SILPassPipelinePlan::getPerformancePassPipeline(opts));
+
+  // Check if we actually serialized our module. If we did not, serialize now.
+  if (!Module.isSerialized()) {
+    executePassPipelinePlan(
+        &Module, SILPassPipelinePlan::getSerializeSILPassPipeline(opts),
+        /*isMandatory*/ true);
+  }
 
   // If we were asked to debug serialization, exit now.
-  if (Module.getOptions().DebugSerialization)
+  if (opts.DebugSerialization)
     return;
 
   // Verify the module, if required.
-  if (Module.getOptions().VerifyAll)
+  if (opts.VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 }
 
@@ -121,22 +129,23 @@ void swift::runSILPassesForOnone(SILModule &Module) {
 
   // We want to run the Onone passes also for function which have an explicit
   // Onone attribute.
-  SILPassManager PM(&Module, "Onone", /*isMandatoryPipeline=*/ true);
-  PM.executePassPipelinePlan(SILPassPipelinePlan::getOnonePassPipeline());
+  executePassPipelinePlan(
+      &Module, SILPassPipelinePlan::getOnonePassPipeline(Module.getOptions()),
+      /*isMandatory*/ true);
 
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 }
 
 void swift::runSILOptimizationPassesWithFileSpecification(SILModule &M,
                                                           StringRef Filename) {
-  SILPassManager PM(&M);
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineFromFile(Filename));
+  auto &opts = M.getOptions();
+  executePassPipelinePlan(
+      &M, SILPassPipelinePlan::getPassPipelineFromFile(opts, Filename));
 }
 
 /// Get the Pass ID enum value from an ID string.
@@ -186,8 +195,10 @@ StringRef swift::PassKindTag(PassKind Kind) {
 // convert it to a module pass to ensure that the SIL input is always at the
 // same stage of lowering.
 void swift::runSILLoweringPasses(SILModule &Module) {
-  SILPassManager PM(&Module, "LoweringPasses", /*isMandatoryPipeline=*/ true);
-  PM.executePassPipelinePlan(SILPassPipelinePlan::getLoweringPassPipeline());
+  auto &opts = Module.getOptions();
+  executePassPipelinePlan(&Module,
+                          SILPassPipelinePlan::getLoweringPassPipeline(opts),
+                          /*isMandatory*/ true);
 
   assert(Module.getStage() == SILStage::Lowered);
 }

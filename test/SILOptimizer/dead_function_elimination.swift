@@ -180,7 +180,7 @@ internal func donotEliminate() {
 // CHECK-TESTING: sil {{.*}}publicClassMethod
 // CHECK-TESTING: sil {{.*}}DeadWitness
 
-// CHECK-LABEL: @$S25dead_function_elimination14donotEliminateyyF
+// CHECK-LABEL: @$s25dead_function_elimination14donotEliminateyyF
 
 // CHECK-LABEL: sil_vtable Base
 // CHECK: aliveMethod
@@ -211,8 +211,8 @@ internal func donotEliminate() {
 // CHECK: notInOther
 
 // CHECK-LABEL: sil_witness_table hidden Adopt: Prot
-// CHECK: aliveWitness!1: {{.*}} : @{{.*}}aliveWitness
-// CHECK: DeadWitness!1: {{.*}} : nil
+// CHECK: aliveWitness: {{.*}} : @{{.*}}aliveWitness
+// CHECK: DeadWitness: {{.*}} : nil
 
 // CHECK-TESTING-LABEL: sil_witness_table Adopt: Prot
 // CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness

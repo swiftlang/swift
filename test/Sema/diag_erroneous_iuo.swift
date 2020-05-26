@@ -116,7 +116,7 @@ _ = [Int!]() // expected-error {{'!' is not allowed here; perhaps '?' was intend
 let _: [Int!] = [1] // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{12-13=?}}
 _ = Optional<Int!>(nil) // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{17-18=?}}
 let _: Optional<Int!> = nil // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{20-21=?}}
-_ = Int!?(0) // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{8-9=?}}
+_ = Int!?(0) // expected-error 3 {{'!' is not allowed here; perhaps '?' was intended?}}{{8-9=?}}
 let _: Int!? = 0 // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{11-12=?}}
 _ = (
   Int!, // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{6-7=?}}
@@ -219,6 +219,6 @@ struct T {
 }
 
 func select(i: Int!, m: Int, t: T) {
-  let _ = i ? i : m // expected-error {{result values in '? :' expression have mismatching types 'Int?' and 'Int'}}
-  let _ = t.i ? t.j : t.k // expected-error {{result values in '? :' expression have mismatching types 'Int?' and 'Int'}}
+  let _ = i ? i : m // expected-error {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}} {{11-11=(}} {{12-12= != nil)}}
+  let _ = t.i ? t.j : t.k // expected-error {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}} {{11-11=(}} {{14-14= != nil)}}
 }

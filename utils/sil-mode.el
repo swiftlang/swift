@@ -76,8 +76,7 @@
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Borrowing
-   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow_argument") 'words) . font-lock-keyword-face)
-   '("\\(end_borrow\\) %[[:alnum:]]+ \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
+   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow") 'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Exclusivity
    `(,(regexp-opt '("begin_access" "end_access") 'words) . font-lock-keyword-face)
@@ -93,10 +92,11 @@
                     "load_unowned" "store_unowned"
                     "fix_lifetime" "mark_dependence"
                     "end_lifetime"
-                    "is_unique" "is_unique_or_pinned"
+                    "is_unique"
                     "is_escaping_closure"
                     "copy_block"
-                    "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
+                    "copy_block_without_escaping"
+                    "is_unique")
                   'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref"
@@ -123,7 +123,7 @@
                     "autorelease_value" "copy_value" "destroy_value"
                     "unmanaged_retain_value" "unmanaged_release_value"
                     "unmanaged_autorelease_value"
-                    "copy_unowned_value"
+                    "strong_copy_unowned_value" "strong_copy_unmanaged_value"
                     "destructure_struct" "destructure_tuple")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a

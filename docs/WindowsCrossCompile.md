@@ -19,9 +19,9 @@ export VCToolsInstallDir=".../Microsoft Visual Studio/2017/Community"
 ## 2. Set up the `visualc` and `ucrt` modules
 The `ucrt.modulemap` located at
 `swift/stdlib/public/Platform/ucrt.modulemap` needs to be copied into
-`${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt`. The `visualc.modulemap`
-located at `swift/stdlib/public/Platform/visualc.modulemap` needs to be copied
-into `${VCToolsInstallDir}/include`.
+`${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`. The
+`visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap`
+needs to be copied into `${VCToolsInstallDir}/include` as `module.modulemap`
 
 ## 3. Configure the runtime to be built with the just built `clang`
 Ensure that we use the tools from the just built LLVM and `clang` tools to 

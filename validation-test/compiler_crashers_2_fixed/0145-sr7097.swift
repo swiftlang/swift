@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -o -
 
@@ -25,10 +25,8 @@ protocol P5 {
 }
 
 extension P5 {
-  // CHECK-LABEL: P5.testSR7097
+  // CHECK-LABEL: P5 extension.testSR7097
   // CHECK-NEXT: Generic signature: <Self, M where Self : P5, M : P3>
   // CHECK-NEXT: <τ_0_0, τ_1_0 where τ_0_0 : P5, τ_1_0 : P3>
   func testSR7097<M>(_: S0<M>.Type) {}
 }
-
-

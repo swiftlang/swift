@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Diff.h"
+#include "Diff.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
@@ -26,8 +26,8 @@
 using namespace swift;
 using namespace swift::migrator;
 
-bool migrator::updateCodeAndEmitRemapIfNeeded(
-    CompilerInstance *Instance, const CompilerInvocation &Invocation) {
+bool migrator::updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance) {
+  const auto &Invocation = Instance->getInvocation();
   if (!Invocation.getMigratorOptions().shouldRunMigrator())
     return false;
 
@@ -59,7 +59,11 @@ bool migrator::updateCodeAndEmitRemapIfNeeded(
   // Phase 2: Syntactic Transformations
   // Don't run these passes if we're already in newest Swift version.
   if (EffectiveVersion != CurrentVersion) {
-    auto FailedSyntacticPasses = M.performSyntacticPasses();
+    SyntacticPassOptions Opts;
+
+    // Type of optional try changes since Swift 5.
+    Opts.RunOptionalTryMigration = !EffectiveVersion.isVersionAtLeast(5);
+    auto FailedSyntacticPasses = M.performSyntacticPasses(Opts);
     if (FailedSyntacticPasses) {
       return true;
     }
@@ -132,23 +136,6 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
     LLVMArgs.erase(aarch64_use_tbi);
   }
 
-  if (StartInvocation.getLangOptions().EffectiveLanguageVersion.isVersion3()) {
-    // SE-0160: When migrating, always use the Swift 3 @objc inference rules,
-    // which drives warnings with the "@objc" Fix-Its.
-    Invocation.getLangOptions().EnableSwift3ObjCInference = true;
-
-    // The default behavior of the migrator, referred to as "minimal" migration
-    // in SE-0160, only adds @objc Fix-Its to those cases where the Objective-C
-    // entry point is explicitly used somewhere in the source code. The user
-    // may also select a workflow that adds @objc for every declaration that
-    // would infer @objc under the Swift 3 rules but would no longer infer
-    // @objc in Swift 4.
-    Invocation.getLangOptions().WarnSwift3ObjCInference =
-      getMigratorOptions().KeepObjcVisibility
-        ? Swift3ObjCInferenceWarnings::Complete
-        : Swift3ObjCInferenceWarnings::Minimal;
-  }
-
   const auto &OrigFrontendOpts = StartInvocation.getFrontendOptions();
 
   assert(OrigFrontendOpts.InputsAndOutputs.hasPrimaryInputs() &&
@@ -159,7 +146,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
                   input.isPrimary() ? InputBuffer.get() : input.buffer()));
   }
 
-  auto Instance = llvm::make_unique<swift::CompilerInstance>();
+  auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation)) {
     return nullptr;
   }
@@ -190,7 +177,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   return Instance;
 }
 
-bool Migrator::performSyntacticPasses() {
+bool Migrator::performSyntacticPasses(SyntacticPassOptions Opts) {
   clang::FileSystemOptions ClangFileSystemOptions;
   clang::FileManager ClangFileManager { ClangFileSystemOptions };
 
@@ -198,7 +185,7 @@ bool Migrator::performSyntacticPasses() {
     new clang::DiagnosticIDs()
   };
   auto ClangDiags =
-    llvm::make_unique<clang::DiagnosticsEngine>(DummyClangDiagIDs,
+    std::make_unique<clang::DiagnosticsEngine>(DummyClangDiagIDs,
                                                 new clang::DiagnosticOptions,
                                                 new clang::DiagnosticConsumer(),
                                                 /*ShouldOwnClient=*/true);
@@ -214,10 +201,10 @@ bool Migrator::performSyntacticPasses() {
 
   runAPIDiffMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
                          getMigratorOptions());
-  runTupleSplatMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
-                            getMigratorOptions());
-  runTypeOfMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
-                        getMigratorOptions());
+  if (Opts.RunOptionalTryMigration) {
+    runOptionalTryMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
+                               getMigratorOptions());
+  }
 
   Edits.commit(Editor.getEdits());
 
@@ -292,7 +279,8 @@ void printRemap(const StringRef OriginalFilename,
   assert(!OriginalFilename.empty());
 
   diff_match_patch<std::string> DMP;
-  const auto Diffs = DMP.diff_main(InputText, OutputText, /*checkLines=*/false);
+  const auto Diffs =
+      DMP.diff_main(InputText.str(), OutputText.str(), /*checkLines=*/false);
 
   OS << "[";
 
@@ -367,7 +355,7 @@ void printRemap(const StringRef OriginalFilename,
       continue;
     Current.Offset -= 1;
     Current.Remove += 1;
-    Current.Text = InputText.substr(Current.Offset, 1);
+    Current.Text = InputText.substr(Current.Offset, 1).str();
   }
 
   for (auto Rep = Replacements.begin(); Rep != Replacements.end(); ++Rep) {

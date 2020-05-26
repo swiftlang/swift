@@ -3,5 +3,6 @@ add_sourcekit_library(SourceKitCore
   Context.cpp
   LangSupport.cpp
   NotificationCenter.cpp
-  LINK_LIBS SourceKitSupport
 )
+target_link_libraries(SourceKitCore PRIVATE
+  SourceKitSupport)

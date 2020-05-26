@@ -1,5 +1,3 @@
-// XFAIL: broken_std_regex
-
 struct A {}
 struct B {}
 
@@ -71,8 +69,8 @@ func test004() {
 }
 // RUN: %complete-test -group=overloads -tok=FOO_SUBSCRIPT_0 %s | %FileCheck -check-prefix=FOO_SUBSCRIPT_0 %s
 // FOO_SUBSCRIPT_0-LABEL: [:
-// FOO_SUBSCRIPT_0-NEXT:   [A]
-// FOO_SUBSCRIPT_0-NEXT:   [B]
+// FOO_SUBSCRIPT_0-NEXT:   [x: A]
+// FOO_SUBSCRIPT_0-NEXT:   [x: B]
 
 struct Bar {
   init() {}
@@ -89,6 +87,7 @@ func test005() {
 // BAR_INIT_0: ()
 // BAR_INIT_0-NEXT: (x: A)
 // BAR_INIT_0-NEXT: (x: B)
+// BAR_INIT_0-NEXT: .foo(self: Bar)
 // BAR_INIT_0-NEXT: .self
 
 extension Bar {

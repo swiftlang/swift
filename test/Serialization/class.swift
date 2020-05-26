@@ -46,9 +46,9 @@ var p = Pair(a: 1, b: 2.5)
 p.first = 2
 p.second = 5.0
 
-struct Int {}
+struct MyInt {}
 
-var gc = GenericCtor<Int>(42)
+var gc = GenericCtor<MyInt>(42)
 gc.doSomething(42)
 
 
@@ -76,7 +76,7 @@ var rsrc = Resource()
 
 getReqPairLike()
 
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$SSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
+// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
 
 func test(_ sharer: ResourceSharer) {}
 

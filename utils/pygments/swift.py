@@ -33,7 +33,7 @@ class SwiftLexer(RegexLexer):
 
     _isa = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s*)(:)(\s*)([A-Z0-9_][a-zA-Z0-9_]*)'
     _isa_comma = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s*)(:)(\s*)' + \
-                 '([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
+                 r'([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
     _name = u'([@a-zA-Z_\U00000100-\U00100000]' + \
             u'[a-zA-Z0-9_\U00000100-\U00100000]*)'
 
@@ -206,7 +206,7 @@ class SwiftLexer(RegexLexer):
                 Name.Attribute,
                 Punctuation,
                 Whitespace)),
-            (':\s*', Punctuation),
+            (r':\s*', Punctuation),
             include('tuple'),
             include('var-isa-comma'),
             include('var-isa-pop'),
@@ -299,7 +299,7 @@ class SwiftLexer(RegexLexer):
         ],
 
         'in-interpolated': [
-            ('\)', String.Interpol, '#pop'),
+            (r'\)', String.Interpol, '#pop'),
             include('root2'),
         ],
 

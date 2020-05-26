@@ -11,7 +11,7 @@ class Super {
 }
 
 class Sub : Super {
-  override var i: Int { get { return 5 } } // expected-error{{var overrides a 'final' var}}
+  override var i: Int { get { return 5 } } // expected-error{{property overrides a 'final' property}}
   override func foo() { }  // expected-error{{instance method overrides a 'final' instance method}}
   override subscript (i: Int) -> Int {  // expected-error{{subscript overrides a 'final' subscript}}
     get { 
@@ -71,7 +71,7 @@ class Super2 {
 }
 
 class Sub2 : Super2 { //// expected-error{{inheritance from a final class 'Super2'}}
-  override var i: Int { get { return 5 } } // expected-error{{var overrides a 'final' var}}
+  override var i: Int { get { return 5 } } // expected-error{{property overrides a 'final' property}}
   override func foo() { }  // expected-error{{instance method overrides a 'final' instance method}}
   override subscript (i: Int) -> Int {  // expected-error{{subscript overrides a 'final' subscript}}
     get { 
@@ -81,3 +81,8 @@ class Sub2 : Super2 { //// expected-error{{inheritance from a final class 'Super
 
   final override init() {} // expected-error {{'final' modifier cannot be applied to this declaration}} {{3-9=}}
 }
+
+struct Box<T> {
+  final class Super3 {}
+}
+class Sub3: Box<Int>.Super3 {} // expected-error{{inheritance from a final class 'Box.Super3'}}

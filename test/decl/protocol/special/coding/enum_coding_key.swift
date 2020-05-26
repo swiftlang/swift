@@ -41,14 +41,10 @@ enum Int8Key : Int8, CodingKey { // expected-error {{type 'Int8Key' does not con
 
 // Structs conforming to CodingKey should not get implicit derived conformance.
 struct StructKey : CodingKey { // expected-error {{type 'StructKey' does not conform to protocol 'CodingKey'}}
-  // expected-note@-1 {{candidate has non-matching type '()'}}
-  // expected-note@-2 {{candidate has non-matching type '()'}}
 }
 
 // Classes conforming to CodingKey should not get implict derived conformance.
 class ClassKey : CodingKey { //expected-error {{type 'ClassKey' does not conform to protocol 'CodingKey'}}
-  // expected-note@-1 {{candidate has non-matching type '()'}}
-  // expected-note@-2 {{candidate has non-matching type '()'}}
 }
 
 // Types which are valid for CodingKey derived conformance should not get that
@@ -64,6 +60,7 @@ let _ = Z.a.stringValue // expected-error {{value of type 'Z' has no member 'str
 let _ = X(stringValue: "a") // expected-error {{'X' cannot be constructed because it has no accessible initializers}}
 let _ = Y(stringValue: "a") // expected-error {{incorrect argument label in call (have 'stringValue:', expected 'rawValue:')}}
 let _ = Z(stringValue: "a") // expected-error {{incorrect argument label in call (have 'stringValue:', expected 'rawValue:')}}
+// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
 let _ = X.a.intValue // expected-error {{value of type 'X' has no member 'intValue'}}
 let _ = Y.a.intValue // expected-error {{value of type 'Y' has no member 'intValue'; did you mean 'rawValue'?}}
@@ -71,6 +68,7 @@ let _ = Z.a.intValue // expected-error {{value of type 'Z' has no member 'intVal
 
 let _ = X(intValue: 0) // expected-error {{'X' cannot be constructed because it has no accessible initializers}}
 let _ = Y(intValue: 0) // expected-error {{incorrect argument label in call (have 'intValue:', expected 'rawValue:')}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 let _ = Z(intValue: 0) // expected-error {{incorrect argument label in call (have 'intValue:', expected 'rawValue:')}}
 
 // Types which are valid for CodingKey derived conformance should get derivation

@@ -21,7 +21,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
@@ -37,16 +36,10 @@ namespace swift {
   /// Determine whether the given string can be the name of a member.
   bool canBeMemberName(StringRef identifier);
 
-  /// Describes the kind of preposition a word is.
-  enum PrepositionKind {
-    PK_None = 0,
-    PK_Directional,
-    PK_Nondirectional
-  };
-
-  /// Determine what kind of preposition the given word is, if any,
-  /// ignoring case.
-  PrepositionKind getPrepositionKind(StringRef word);
+  /// Returns true if the given word is one of Swift's known prepositions.
+  ///
+  /// This can be faster than getPartOfSpeech(StringRef).
+  bool isPreposition(StringRef word);
 
   /// Describes the part of speech of a particular word.
   enum class PartOfSpeech {
@@ -65,6 +58,8 @@ namespace swift {
 
   public:
     StringRef copyString(StringRef string);
+
+    llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
   };
 
   namespace camel_case {
@@ -314,29 +309,6 @@ namespace swift {
     size_t findWord(StringRef string, StringRef word);
   } // end namespace camel_case
 
-/// Describes the role that a particular name has within a
-/// signature, which can affect how we omit needless words.
-enum class NameRole {
-  /// The base name of a function or method.
-  BaseName,
-
-  /// The base name of a method where the omission type name is the
-  /// 'self' type.
-  BaseNameSelf,
-
-  /// The first parameter of a function or method.
-  FirstParameter,
-
-  // Subsequent parameters in a function or method.
-  SubsequentParameter,
-
-  // The name of a property.
-  Property,
-
-  // A partial name; used internally.
-  Partial,
-};
-
 /// Flags used by \c OmissionTypeName to describe the input type.
 enum class OmissionTypeFlags {
   /// Whether the parameter with this type has a default argument.
@@ -430,11 +402,13 @@ StringRef matchLeadingTypeName(StringRef name, OmissionTypeName typeName);
 /// Describes a set of names with an inheritance relationship.
 class InheritedNameSet {
   const InheritedNameSet *Parent;
-  llvm::StringSet<> Names;
+  llvm::StringSet<llvm::BumpPtrAllocator &> Names;
 
 public:
   /// Construct a new inherited name set with the given parent.
-  explicit InheritedNameSet(const InheritedNameSet *parent) : Parent(parent) { }
+  InheritedNameSet(const InheritedNameSet *parent,
+                   llvm::BumpPtrAllocator &allocator)
+      : Parent(parent), Names(allocator) { }
 
   // Add a new name to the set.
   void add(StringRef name);

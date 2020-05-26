@@ -1,0 +1,115 @@
+// RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefix=CHECK
+
+// REQUIRES: CPU=arm64e
+// REQUIRES: OS=ios
+
+import Builtin
+
+struct S { var a, b, c: Builtin.NativeObject }
+// CHECK: @"$s4test1SVwCP.ptrauth" = private constant {{.*}} i64 55882
+// CHECK: @"$s4test1SVwxx.ptrauth" = private constant {{.*}} i64 1272
+// CHECK: @"$s4test1SVwcp.ptrauth" = private constant {{.*}} i64 58298
+// CHECK: @"$s4test1SVwca.ptrauth" = private constant {{.*}} i64 34641
+// CHECK: @__swift_memcpy24_8.ptrauth = private constant {{.*}} i64 18648
+// CHECK: @"$s4test1SVwta.ptrauth" = private constant {{.*}} i64 61402
+// CHECK: @"$s4test1SVwet.ptrauth" = private constant {{.*}} i64 24816
+// CHECK: @"$s4test1SVwst.ptrauth" = private constant {{.*}} i64 41169
+
+sil @test_destroy : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  destroy_addr %0 : $*T
+  %result = tuple ()
+  return %result : $()
+}
+// CHECK-LABEL: define swiftcc void @test_destroy(
+// CHECK:      [[VWT:%.*]] = load i8**,
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
+// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
+// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 1272)
+// CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %0, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK-NEXT: ret void
+
+sil @test_copy_init : $@convention(thin) <T> (@in_guaranteed T) -> (@out T) {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr %1 to [initialization] %0 : $*T
+  %result = tuple ()
+  return %result : $()
+}
+// CHECK-LABEL: define swiftcc void @test_copy_init(
+// CHECK:      [[VWT:%.*]] = load i8**,
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
+// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
+// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 58298)
+// CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK-NEXT: ret void
+
+sil @test_take_init : $@convention(thin) <T> (@in T) -> (@out T) {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %result = tuple ()
+  return %result : $()
+}
+// CHECK-LABEL: define swiftcc void @test_take_init(
+// CHECK:      [[VWT:%.*]] = load i8**,
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
+// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
+// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 18648)
+// CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK-NEXT: ret void
+
+sil @test_copy_assign : $@convention(thin) <T> (@inout T, @in_guaranteed T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr %1 to %0 : $*T
+  %result = tuple ()
+  return %result : $()
+}
+// CHECK-LABEL: define swiftcc void @test_copy_assign(
+// CHECK:      [[VWT:%.*]] = load i8**,
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
+// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
+// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 34641)
+// CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* %0, %swift.opaque* %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK-NEXT: ret void
+
+sil @test_take_assign : $@convention(thin) <T> (@inout T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr [take] %1 to %0 : $*T
+  %result = tuple ()
+  return %result : $()
+}
+// CHECK-LABEL: define swiftcc void @test_take_assign(
+// CHECK:      [[VWT:%.*]] = load i8**,
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
+// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
+// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 61402)
+// CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK-NEXT: ret void
+
+// Make sure that the local-type-data caching mechanism sets things up right.
+sil @test_destroy_twice : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  destroy_addr %0 : $*T
+  destroy_addr %1 : $*T
+  %result = tuple ()
+  return %result : $()
+}
+// CHECK-LABEL: define swiftcc void @test_destroy_twice(
+// CHECK:      [[VWT:%.*]] = load i8**,
+// CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32
+// CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
+// CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
+// CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 1272)
+// CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %0, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+// CHECK-NEXT: ret void

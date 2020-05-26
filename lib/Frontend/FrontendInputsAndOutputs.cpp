@@ -13,7 +13,9 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/Range.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -155,23 +157,38 @@ unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
 
 bool FrontendInputsAndOutputs::shouldTreatAsLLVM() const {
   if (hasSingleInput()) {
-    StringRef Input(getFilenameOfFirstInput());
-    return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
-           llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
+    StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
+    switch (file_types::lookupTypeForExtension(InputExt)) {
+    case file_types::TY_LLVM_BC:
+    case file_types::TY_LLVM_IR:
+      return true;
+    default:
+      return false;
+    }
   }
   return false;
+}
+
+bool FrontendInputsAndOutputs::shouldTreatAsModuleInterface() const {
+  if (!hasSingleInput())
+    return false;
+
+  StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
+  file_types::ID InputType = file_types::lookupTypeForExtension(InputExt);
+  return InputType == file_types::TY_SwiftModuleInterfaceFile;
 }
 
 bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
-    const std::string &Input(getFilenameOfFirstInput());
-    return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
+    StringRef extension = llvm::sys::path::extension(getFilenameOfFirstInput());
+    return file_types::lookupTypeForExtension(extension) == file_types::TY_SIL;
   }
   // If we have one primary input and it's a filename with extension "sil",
   // treat the input as SIL.
-  unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(SIL_EXTENSION);
+  const unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(
+      file_types::getExtension(file_types::TY_SIL));
   if (silPrimaryCount == 0)
     return false;
   if (silPrimaryCount == primaryInputCount()) {
@@ -186,7 +203,8 @@ bool FrontendInputsAndOutputs::areAllNonPrimariesSIB() const {
   for (const InputFile &input : AllInputs) {
     if (input.isPrimary())
       continue;
-    if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
+    StringRef extension = llvm::sys::path::extension(input.file());
+    if (file_types::lookupTypeForExtension(extension) != file_types::TY_SIB) {
       return false;
     }
   }
@@ -394,6 +412,18 @@ bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
         return outs.ReferenceDependenciesFilePath;
       });
 }
+bool FrontendInputsAndOutputs::hasSwiftRangesPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.SwiftRangesFilePath;
+      });
+}
+bool FrontendInputsAndOutputs::hasCompiledSourcePath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.CompiledSourceFilePath;
+      });
+}
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
@@ -416,6 +446,24 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
         return outs.ModuleDocOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleSourceInfoOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleSourceInfoOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleInterfaceOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleInterfaceOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasPrivateModuleInterfaceOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.PrivateModuleInterfaceOutputPath;
       });
 }
 bool FrontendInputsAndOutputs::hasTBDPath() const {

@@ -30,7 +30,7 @@ import Foundation
 }
 
 class C {
-  var nonObjC: String? // expected-note{{add '@objc' to expose this var to Objective-C}}{{3-3=@objc }}
+  var nonObjC: String? // expected-note{{add '@objc' to expose this property to Objective-C}}{{3-3=@objc }}
 }
 
 extension NSArray {
@@ -121,7 +121,7 @@ func testAsStaticString() {
 
 func testSemanticErrors() {
   let _: String = #keyPath(A.blarg) // expected-error{{type 'A' has no member 'blarg'}}
-  let _: String = #keyPath(blarg) // expected-error{{use of unresolved identifier 'blarg'}}
+  let _: String = #keyPath(blarg) // expected-error{{cannot find 'blarg' in scope}}
   let _: String = #keyPath(AnyObject.ambiguous) // expected-error{{ambiguous reference to member 'ambiguous'}}
   let _: String = #keyPath(C.nonObjC) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'nonObjC'}}
   let _: String = #keyPath(A.propArray.UTF8View) // expected-error{{type 'String' has no member 'UTF8View'}}
@@ -135,11 +135,32 @@ func testParseErrors() {
   let _: String = #keyPath; // expected-error{{expected '(' following '#keyPath'}}
   let _: String = #keyPath(123; // expected-error{{expected property or type name within '#keyPath(...)'}}
   let _: String = #keyPath(a.123; // expected-error{{expected property or type name within '#keyPath(...)'}}
-  let _: String = #keyPath(A(b:c:d:).propSet); // expected-error{{an Objective-C key path cannot reference a declaration with a compound name}} expected-error{{unresolved identifier 'propSet'}}
+  let _: String = #keyPath(A(b:c:d:).propSet); // expected-error{{an Objective-C key path cannot reference a declaration with a compound name}} expected-error{{cannot find 'propSet' in scope}}
   let _: String = #keyPath(A.propString; // expected-error{{expected ')' to complete '#keyPath' expression}}
     // expected-note@-1{{to match this opening '('}}
 }
 
 func testTypoCorrection() {
   let _: String = #keyPath(A.proString) // expected-error {{type 'A' has no member 'proString'}}
+}
+
+class SR_10146_1 {
+  @objc let b = 1
+}
+
+class SR_10146_2: SR_10146_1 {
+  let a = \AnyObject.b // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
+}
+
+class SR_10146_3 {
+  @objc let abc: Int = 1
+  
+  func doNotCrash() {
+    let _: KeyPath<AnyObject, Int> = \.abc // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
+  }
+
+  func doNotCrash_1(_ obj: AnyObject, _ kp: KeyPath<AnyObject, Int>) {
+    let _ = obj[keyPath: \.abc] // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
+    let _ = obj[keyPath: kp] // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
+  }
 }

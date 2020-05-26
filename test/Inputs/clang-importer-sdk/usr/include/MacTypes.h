@@ -14,7 +14,9 @@ STDLIB_TYPEDEF(__UINT8_TYPE__, UInt8);
 STDLIB_TYPEDEF(__UINT16_TYPE__, UInt16);
 STDLIB_TYPEDEF(__UINT32_TYPE__, UInt32);
 
+#if !defined(_WIN32)
 #include <stdint.h>
+#endif
 
 typedef SInt32                          Fixed;
 typedef Fixed *                         FixedPtr;

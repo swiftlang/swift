@@ -113,4 +113,12 @@ extern void IAMClassInvert(IAMOtherName iamOtherName);
 // Test collision where we can see the getter, but not setter
 extern float IAMStruct1GetCollisionNonProperty(struct IAMStruct1, int);
 
+/// Struct with pointer properties and a synthesized memberwise init.
+struct IAMPointerStruct {
+  double *ptr1;
+  double *ptr2;
+};
+
+extern struct IAMPointerStruct IAMPointerStructCreateOther(double *ptr);
+
 #endif // INFER_IMPORT_AS_MEMBER_H

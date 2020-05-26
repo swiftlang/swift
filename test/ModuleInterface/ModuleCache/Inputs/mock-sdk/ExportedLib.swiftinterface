@@ -1,0 +1,11 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -parse-stdlib -module-name ExportedLib
+
+@_exported import SomeCModule
+
+public struct ExportedInterface {
+  @inlinable public init() {}
+}
+public var testValue: ExportedInterface {
+  @inlinable get { return ExportedInterface() }
+}

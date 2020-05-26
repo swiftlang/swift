@@ -19,9 +19,15 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/PointerUnion.h"
 
 using namespace swift;
+
+#define STMT(Id, _) \
+  static_assert(IsTriviallyDestructible<Id##Stmt>::value, \
+                "Stmts are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/StmtNodes.def"
 
 //===----------------------------------------------------------------------===//
 // Stmt methods.
@@ -135,6 +141,12 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
   Bits.BraceStmt.NumElements = elts.size();
   std::uninitialized_copy(elts.begin(), elts.end(),
                           getTrailingObjects<ASTNode>());
+
+#ifndef NDEBUG
+  for (auto elt : elts)
+    if (auto *decl = elt.dyn_cast<Decl *>())
+      assert(!isa<AccessorDecl>(decl) && "accessors should not be added here");
+#endif
 }
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
@@ -143,6 +155,22 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
+  // Uncomment the following after rdar://53254395 is done:
+  //  if (
+  //    !std::is_sorted(
+  //      elts.begin(), elts.end(),
+  //      [&](ASTNode n1, ASTNode n2) {
+  //        return !ctx.SourceMgr.isBeforeInBuffer(n2.getEndLoc(),
+  //                                              n1.getEndLoc());
+  //      })) {
+  //    llvm::errs() << "Brace statement elements out of order: \n";
+  //    for (auto n: elts) {
+  //      llvm::errs() << n.getOpaqueValue() << ": ";
+  //      n.dump(llvm::errs());
+  //    }
+  //    llvm_unreachable("brace elements out of order")
+  //  }
+
   void *Buffer = ctx.Allocate(totalSizeToAlloc<ASTNode>(elts.size()),
                               alignof(BraceStmt));
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
@@ -157,6 +185,18 @@ SourceLoc ReturnStmt::getEndLoc() const {
   if (Result && Result->getEndLoc().isValid())
     return Result->getEndLoc();
   return ReturnLoc;
+}
+
+YieldStmt *YieldStmt::create(const ASTContext &ctx, SourceLoc yieldLoc,
+                             SourceLoc lpLoc, ArrayRef<Expr*> yields,
+                             SourceLoc rpLoc, Optional<bool> implicit) {
+  void *buffer = ctx.Allocate(totalSizeToAlloc<Expr*>(yields.size()),
+                              alignof(YieldStmt));
+  return ::new(buffer) YieldStmt(yieldLoc, lpLoc, yields, rpLoc, implicit);
+}
+
+SourceLoc YieldStmt::getEndLoc() const {
+  return RPLoc.isInvalid() ? getYields()[0]->getEndLoc() : RPLoc;
 }
 
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
@@ -222,25 +262,25 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
-void CatchStmt::setErrorPattern(Pattern *pattern) {
-  ErrorPattern = pattern;
-  ErrorPattern->markOwnedByStatement(this);
-}
-
-
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
-                                 ArrayRef<CatchStmt*> catches,
+                                 ArrayRef<CaseStmt *> catches,
                                  Optional<bool> implicit) {
-  void *mem = ctx.Allocate(totalSizeToAlloc<CatchStmt*>(catches.size()),
+  void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
 }
 
+bool CaseLabelItem::isSyntacticallyExhaustive() const {
+  return getGuardExpr() == nullptr && !getPattern()->isRefutablePattern();
+}
+
 bool DoCatchStmt::isSyntacticallyExhaustive() const {
   for (auto clause : getCatches()) {
-    if (clause->isSyntacticallyExhaustive())
-      return true;
+    for (auto &LabelItem : clause->getCaseLabelItems()) {
+      if (LabelItem.isSyntacticallyExhaustive())
+        return true;
+    }
   }
   return false;
 }
@@ -256,26 +296,23 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   Cond = e;
 }
 
-bool CatchStmt::isSyntacticallyExhaustive() const {
-  // It cannot have a guard expression and the pattern cannot be refutable.
-  return getGuardExpr() == nullptr &&
-         !getErrorPattern()->isRefutablePattern();
-}
-
-
 PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                SourceLoc PoundLoc,
+                                               SourceLoc LParenLoc,
                                        ArrayRef<AvailabilitySpec *> queries,
                                                      SourceLoc RParenLoc) {
   unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
-  return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
+  return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
+                                           RParenLoc);
 }
 
 SourceLoc PoundAvailableInfo::getEndLoc() const {
   if (RParenLoc.isInvalid()) {
     if (NumQueries == 0) {
-      return PoundLoc;
+      if (LParenLoc.isInvalid())
+        return PoundLoc;
+      return LParenLoc;
     }
     return getQueries()[NumQueries - 1]->getSourceRange().End;
   }
@@ -367,33 +404,58 @@ SourceLoc CaseLabelItem::getEndLoc() const {
   return CasePattern->getEndLoc();
 }
 
-CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
-                   bool HasBoundDecls, SourceLoc UnknownAttrLoc,
-                   SourceLoc ColonLoc, Stmt *Body, Optional<bool> Implicit)
-    : Stmt(StmtKind::Case, getDefaultImplicitFlag(Implicit, CaseLoc)),
-      UnknownAttrLoc(UnknownAttrLoc), CaseLoc(CaseLoc), ColonLoc(ColonLoc),
-      BodyAndHasBoundDecls(Body, HasBoundDecls) {
-  Bits.CaseStmt.NumPatterns = CaseLabelItems.size();
+CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
+                   ArrayRef<CaseLabelItem> caseLabelItems,
+                   SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
+                   Stmt *body,
+                   Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
+                   Optional<bool> implicit,
+                   NullablePtr<FallthroughStmt> fallthroughStmt)
+    : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
+      UnknownAttrLoc(unknownAttrLoc), ItemIntroducerLoc(itemIntroducerLoc),
+      ItemTerminatorLoc(itemTerminatorLoc), ParentKind(parentKind),
+      BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()),
+      CaseBodyVariables(caseBodyVariables) {
+  Bits.CaseStmt.NumPatterns = caseLabelItems.size();
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
-  MutableArrayRef<CaseLabelItem> Items{ getTrailingObjects<CaseLabelItem>(),
-                                        Bits.CaseStmt.NumPatterns };
+  assert(
+      !(parentKind == CaseParentKind::DoCatch && fallthroughStmt.isNonNull()) &&
+      "Only switch cases can have a fallthrough.");
+  if (hasFallthroughDest()) {
+    *getTrailingObjects<FallthroughStmt *>() = fallthroughStmt.get();
+  }
 
-  for (unsigned i = 0; i < Bits.CaseStmt.NumPatterns; ++i) {
-    new (&Items[i]) CaseLabelItem(CaseLabelItems[i]);
-    Items[i].getPattern()->markOwnedByStatement(this);
+  MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
+                                       Bits.CaseStmt.NumPatterns};
+
+  // At the beginning mark all of our var decls as being owned by this
+  // statement. In the typechecker we wireup the case stmt var decl list since
+  // we know everything is lined up/typechecked then.
+  for (unsigned i : range(Bits.CaseStmt.NumPatterns)) {
+    new (&items[i]) CaseLabelItem(caseLabelItems[i]);
+    items[i].getPattern()->markOwnedByStatement(this);
+  }
+  for (auto *vd : caseBodyVariables.getValueOr(MutableArrayRef<VarDecl *>())) {
+    vd->setParentPatternStmt(this);
   }
 }
 
-CaseStmt *CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
-                           ArrayRef<CaseLabelItem> CaseLabelItems,
-                           bool HasBoundDecls, SourceLoc UnknownAttrLoc,
-                           SourceLoc ColonLoc, Stmt *Body,
-                           Optional<bool> Implicit) {
-  void *Mem = C.Allocate(totalSizeToAlloc<CaseLabelItem>(CaseLabelItems.size()),
-                         alignof(CaseStmt));
-  return ::new (Mem) CaseStmt(CaseLoc, CaseLabelItems, HasBoundDecls,
-                              UnknownAttrLoc, ColonLoc, Body, Implicit);
+CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
+                           SourceLoc caseLoc,
+                           ArrayRef<CaseLabelItem> caseLabelItems,
+                           SourceLoc unknownAttrLoc, SourceLoc colonLoc,
+                           Stmt *body,
+                           Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
+                           Optional<bool> implicit,
+                           NullablePtr<FallthroughStmt> fallthroughStmt) {
+  void *mem =
+      ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
+                       fallthroughStmt.isNonNull(), caseLabelItems.size()),
+                   alignof(CaseStmt));
+  return ::new (mem)
+      CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
+               body, caseVarDecls, implicit, fallthroughStmt);
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
@@ -418,4 +480,32 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
   std::uninitialized_copy(Cases.begin(), Cases.end(),
                           theSwitch->getTrailingObjects<ASTNode>());
   return theSwitch;
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is
+// defined here to avoid too much layering violation / circular linkage
+// dependency.
+
+struct StmtTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const Stmt *S = static_cast<const Stmt *>(Entity);
+    OS << Stmt::getKindName(S->getKind());
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const Stmt *S = static_cast<const Stmt *>(Entity);
+    S->getSourceRange().print(OS, *SM, false);
+  }
+};
+
+static StmtTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Stmt *>() {
+  return &TF;
 }

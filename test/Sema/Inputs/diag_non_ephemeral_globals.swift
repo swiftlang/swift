@@ -1,0 +1,2 @@
+
+var globalS = S()

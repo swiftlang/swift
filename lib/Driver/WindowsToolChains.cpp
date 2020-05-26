@@ -21,7 +21,6 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
@@ -46,12 +45,18 @@ std::string toolchains::Windows::sanitizerRuntimeLibName(StringRef Sanitizer,
 }
 
 ToolChain::InvocationInfo
-toolchains::Windows::constructInvocation(const LinkJobAction &job,
+toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
                                          const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
 
   ArgStringList Arguments;
+
+  std::string Target = getTriple().str();
+  if (!Target.empty()) {
+    Arguments.push_back("-target");
+    Arguments.push_back(context.Args.MakeArgString(Target));
+  }
 
   switch (job.getKind()) {
   case LinkKind::None:
@@ -62,6 +67,8 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
     break;
+  case LinkKind::StaticLibrary:
+    llvm_unreachable("invalid link kind");
   }
 
   // Select the linker to use.
@@ -72,58 +79,66 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   if (!Linker.empty())
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 
-  if (context.OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
-      Arguments.push_back("-Wl,/DEBUG");
+  if (context.OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back("/DEBUG");
+  }
 
   // Configure the toolchain.
-  // By default, use the system clang++ to link.
-  const char *Clang = nullptr;
+  //
+  // By default use the system `clang` to perform the link.  We use `clang` for
+  // the driver here because we do not wish to select a particular C++ runtime.
+  // Furthermore, until C++ interop is enabled, we cannot have a dependency on
+  // C++ code from pure Swift code.  If linked libraries are C++ based, they
+  // should properly link C++.  In the case of static linking, the user can
+  // explicitly specify the C++ runtime to link against.  This is particularly
+  // important for platforms like android where as it is a Linux platform, the
+  // default C++ runtime is `libstdc++` which is unsupported on the target but
+  // as the builds are usually cross-compiled from Linux, libstdc++ is going to
+  // be present.  This results in linking the wrong version of libstdc++
+  // generating invalid binaries.  It is also possible to use different C++
+  // runtimes than the default C++ runtime for the platform (e.g. libc++ on
+  // Windows rather than msvcprt).  When C++ interop is enabled, we will need to
+  // surface this via a driver flag.  For now, opt for the simpler approach of
+  // just using `clang` and avoid a dependency on the C++ runtime.
+  const char *Clang = "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
     // If there is a clang in the toolchain folder, use that instead.
-    if (auto toolchainClang =
-            llvm::sys::findProgramByName("clang++", {toolchainPath}))
-      Clang = context.Args.MakeArgString(toolchainClang.get());
-  }
-  if (Clang == nullptr) {
-    if (auto pathClang = llvm::sys::findProgramByName("clang++", None))
-      Clang = context.Args.MakeArgString(pathClang.get());
-  }
-  assert(Clang &&
-         "clang++ was not found in the toolchain directory or system path.");
-
-  std::string Target = getTriple().str();
-  if (!Target.empty()) {
-    Arguments.push_back("-target");
-    Arguments.push_back(context.Args.MakeArgString(Target));
+    if (auto tool = llvm::sys::findProgramByName("clang", {toolchainPath}))
+      Clang = context.Args.MakeArgString(tool.get());
   }
 
-  SmallString<128> SharedRuntimeLibPath;
-  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args,
-                        /*Shared=*/true);
+  // Rely on `-libc` to correctly identify the MSVC Runtime Library.  We use
+  // `-nostartfiles` as that limits the difference to just the
+  // `-defaultlib:libcmt` which is passed unconditionally with the `clang++`
+  // driver rather than the `clang-cl` driver.
+  Arguments.push_back("-nostartfiles");
 
-  // Link the standard library.
-  Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
-    SmallString<128> StaticRuntimeLibPath;
-    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args,
-                          /*Shared=*/false);
+  bool wantsStaticStdlib =
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                           options::OPT_no_static_stdlib, false);
 
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/!wantsStaticStdlib);
+
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
     // Since Windows has separate libraries per architecture, link against the
     // architecture specific version of the static library.
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath + "/" +
-                                                   getTriple().getArchName()));
-  } else {
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath + "/" +
+    Arguments.push_back(context.Args.MakeArgString(path + "/" +
                                                    getTriple().getArchName()));
   }
 
-  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+
+  SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,
                           swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+  llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
   Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
@@ -148,10 +163,14 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
     if (context.OI.SelectedSanitizers & SanitizerKind::Address)
       addLinkRuntimeLib(context.Args, Arguments,
                         sanitizerRuntimeLibName("asan"));
+
+    if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
+      addLinkRuntimeLib(context.Args, Arguments,
+                        sanitizerRuntimeLibName("ubsan"));
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedRuntimeLibPath);
+    SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
 
@@ -165,6 +184,7 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
   // Run clang++ in verbose mode if "-v" is set
   if (context.Args.hasArg(options::OPT_v)) {
@@ -177,6 +197,34 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
   InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
+}
+
+ToolChain::InvocationInfo
+toolchains::Windows::constructInvocation(const StaticLinkJobAction &job,
+                                         const JobContext &context) const {
+   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+
+  ArgStringList Arguments;
+
+  const char *Linker = "link";
+  if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld))
+    Linker = context.Args.MakeArgString(A->getValue());
+
+  Arguments.push_back("/lib");
+  Arguments.push_back("-nologo");
+
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  StringRef OutputFile = context.Output.getPrimaryOutputFilename();
+  Arguments.push_back(context.Args.MakeArgString(Twine("/OUT:") + OutputFile));
+
+  InvocationInfo II{Linker, Arguments};
   II.allowsResponseFiles = true;
 
   return II;

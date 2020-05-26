@@ -25,12 +25,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -44,8 +44,6 @@ class AssumeSingleThreaded : public swift::SILFunctionTransform {
     for (auto &BB : *getFunction()) {
       for (auto &I : BB) {
         if (auto RCInst = dyn_cast<RefCountingInst>(&I))
-          RCInst->setNonAtomic();
-        if (auto RCInst = dyn_cast<StrongPinInst>(&I))
           RCInst->setNonAtomic();
       }
     }

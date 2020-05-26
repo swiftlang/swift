@@ -1,0 +1,135 @@
+// RUN: %target-sil-opt %s -o - | %target-sil-opt
+
+// Just make sure we can parse polymorphic builtins, recognize them, round trip
+// them.
+
+sil_stage raw
+
+import Builtin
+
+sil @generic_add_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_add"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_add_indirect_param_test : $@convention(thin) (@in Builtin.Vec4xInt32, @in Builtin.Vec4xInt32) -> @out Builtin.Vec4xInt32 {
+bb0(%0 : $*Builtin.Vec4xInt32, %1 : $*Builtin.Vec4xInt32, %2 : $*Builtin.Vec4xInt32):
+  %3 = builtin "generic_add"<Builtin.Vec4xInt32>(%0 : $*Builtin.Vec4xInt32, %1 : $*Builtin.Vec4xInt32, %2 : $*Builtin.Vec4xInt32) : $()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @generic_fadd_test : $@convention(thin) (Builtin.Vec4xFPIEEE32, Builtin.Vec4xFPIEEE32) -> Builtin.Vec4xFPIEEE32 {
+bb0(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32):
+  %2 = builtin "generic_fadd"<Builtin.Vec4xFPIEEE32>(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32) : $Builtin.Vec4xFPIEEE32
+  return %2 : $Builtin.Vec4xFPIEEE32
+}
+
+sil @generic_and_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_and"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_ashr_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_ashr"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_lshr_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_lshr"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_or_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_or"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_fdiv_test : $@convention(thin) (Builtin.Vec4xFPIEEE32, Builtin.Vec4xFPIEEE32) -> Builtin.Vec4xFPIEEE32 {
+bb0(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32):
+  %2 = builtin "generic_fdiv"<Builtin.Vec4xFPIEEE32>(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32) : $Builtin.Vec4xFPIEEE32
+  return %2 : $Builtin.Vec4xFPIEEE32
+}
+
+sil @generic_mul_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_mul"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_fmul_test : $@convention(thin) (Builtin.Vec4xFPIEEE32, Builtin.Vec4xFPIEEE32) -> Builtin.Vec4xFPIEEE32 {
+bb0(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32):
+  %2 = builtin "generic_fmul"<Builtin.Vec4xFPIEEE32>(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32) : $Builtin.Vec4xFPIEEE32
+  return %2 : $Builtin.Vec4xFPIEEE32
+}
+
+sil @generic_sdiv_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_sdiv"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_sdiv_exact_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_sdiv_exact"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_shl_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_shl"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_srem_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_srem"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_sub_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_sub"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_udiv_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_udiv"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_udiv_exact_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_udiv_exact"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_xor_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_xor"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+sil @generic_fsub_test : $@convention(thin) (Builtin.Vec4xFPIEEE32, Builtin.Vec4xFPIEEE32) -> Builtin.Vec4xFPIEEE32 {
+bb0(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32):
+  %2 = builtin "generic_fsub"<Builtin.Vec4xFPIEEE32>(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32) : $Builtin.Vec4xFPIEEE32
+  return %2 : $Builtin.Vec4xFPIEEE32
+}
+
+sil @generic_frem_test : $@convention(thin) (Builtin.Vec4xFPIEEE32, Builtin.Vec4xFPIEEE32) -> Builtin.Vec4xFPIEEE32 {
+bb0(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32):
+  %2 = builtin "generic_frem"<Builtin.Vec4xFPIEEE32>(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32) : $Builtin.Vec4xFPIEEE32
+  return %2 : $Builtin.Vec4xFPIEEE32
+}
+
+sil @generic_urem_test : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "generic_urem"<Builtin.Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  return %2 : $Builtin.Int64
+}

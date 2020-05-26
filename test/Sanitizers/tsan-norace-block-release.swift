@@ -1,21 +1,31 @@
-// RUN: %target-swiftc_driver %s -g -sanitize=thread -target %sanitizers-target-triple -o %t_tsan-binary
-// RUN: env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=1 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
+// RUN: %target-swiftc_driver %s -g -sanitize=thread %import-libdispatch -target %sanitizers-target-triple -o %t_tsan-binary
+// RUN: %target-codesign %t_tsan-binary
+// RUN: env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s --implicit-check-not='ThreadSanitizer'
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
 
-// Test that we do not report a race on block release operation.
-import Foundation
+// FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
+// don't support TSan.
+// UNSUPPORTED: remote_run
 
-public class Sad : NSObject {
+// Test that we do not report a race on block release operation.
+import Dispatch
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#else
+#error("Unsupported platform")
+#endif
+
+public class Sad {
     private var _source: DispatchSourceTimer?
-    public override init() {
+    public init() {
         _source = DispatchSource.makeTimerSource()
 
         // If this line is commented out no data race.
         _source?.setEventHandler(handler: globalFuncHandler)
 
-        super.init()
         _source?.resume()
     }
     deinit {
@@ -35,4 +45,3 @@ sleep(1)
 print("Done.")
 
 // CHECK: Done.
-// CHECK-NOT: ThreadSanitizer: data race

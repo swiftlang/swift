@@ -140,13 +140,13 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
 -> SourceLocArgs {
   auto &ctx = getASTContext();
   
-  StringRef filename = "";
+  std::string filename = "";
   unsigned line = 0;
   unsigned column = 0;
   if (sourceLoc.isValid()) {
-    unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(sourceLoc);
-    filename = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
-    std::tie(line, column) = ctx.SourceMgr.getLineAndColumn(sourceLoc);
+    filename = getMagicFileString(sourceLoc);
+    std::tie(line, column) =
+        ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceLoc);
   }
   
   bool isASCII = true;
@@ -161,7 +161,7 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
   auto i1Ty = SILType::getBuiltinIntegerType(1, ctx);
   
   SourceLocArgs result;
-  SILValue literal = B.createStringLiteral(emitLoc, filename,
+  SILValue literal = B.createStringLiteral(emitLoc, StringRef(filename),
                                            StringLiteralInst::Encoding::UTF8);
   result.filenameStartPointer = ManagedValue::forUnmanaged(literal);
   // File length
@@ -182,7 +182,8 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
 
 ManagedValue
 SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
-                                                 ManagedValue optional) {
+                                                 ManagedValue optional,
+                                                 bool isImplicitUnwrap) {
   // Generate code to the optional is present, and if not, abort with a message
   // (provided by the stdlib).
   SILBasicBlock *contBB = createBasicBlock();
@@ -214,15 +215,22 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
 
   // Call the standard library implementation of _diagnoseUnexpectedNilOptional.
   if (auto diagnoseFailure =
-        getASTContext().getDiagnoseUnexpectedNilOptional(nullptr)) {
+        getASTContext().getDiagnoseUnexpectedNilOptional()) {
     auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
+    
+    auto i1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    auto isImplicitUnwrapLiteral =
+      B.createIntegerLiteral(loc, i1Ty, isImplicitUnwrap);
+    auto isImplicitUnwrapValue =
+      ManagedValue::forUnmanaged(isImplicitUnwrapLiteral);
     
     emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, SubstitutionMap(),
                                 {
                                   args.filenameStartPointer,
                                   args.filenameLength,
                                   args.filenameIsAscii,
-                                  args.line
+                                  args.line,
+                                  isImplicitUnwrapValue
                                 },
                                 SGFContext());
   }
@@ -235,7 +243,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   SILType payloadType = optional.getType().getOptionalObjectType();
 
   if (payloadType.isObject()) {
-    result = B.createOwnedPHIArgument(payloadType);
+    result = B.createOwnedPhiArgument(payloadType);
   } else {
     result =
         B.createUncheckedTakeEnumDataAddr(loc, optional, someDecl, payloadType);
@@ -268,10 +276,11 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
 
 ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
                                                       ManagedValue src,
+                                                      bool isImplicitUnwrap,
                                                       const TypeLowering &optTL,
                                                       SGFContext C) {
   // TODO: Make this take optTL.
-  return emitPreconditionOptionalHasValue(loc, src);
+  return emitPreconditionOptionalHasValue(loc, src, isImplicitUnwrap);
 }
 
 ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(
@@ -411,7 +420,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         emitTemporaryAllocation(loc, resultTy), resultTL);
   } else {
     SILGenSavedInsertionPoint IP(*this, contBB);
-    finalResult = B.createOwnedPHIArgument(resultTL.getLoweredType());
+    finalResult = B.createOwnedPhiArgument(resultTL.getLoweredType());
   }
 
   SEBuilder.addOptionalSomeCase(
@@ -473,7 +482,7 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
                                      CanType inputType,
                                      CanType outputType,
                                      SGFContext C) {
-  auto converter = getASTContext().getConvertPointerToPointerArgument(nullptr);
+  auto converter = getASTContext().getConvertPointerToPointerArgument();
 
   auto origValue = input;
   if (silConv.useLoweredAddresses()) {
@@ -490,7 +499,7 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   auto firstSubMap = inputType->getContextSubstitutionMap(M, proto);
   auto secondSubMap = outputType->getContextSubstitutionMap(M, proto);
 
-  auto *genericSig = converter->getGenericSignature();
+  auto genericSig = converter->getGenericSignature();
   auto subMap =
     SubstitutionMap::combineSubstitutionMaps(firstSubMap,
                                              secondSubMap,
@@ -505,28 +514,94 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
 namespace {
 
 /// This is an initialization for an address-only existential in memory.
-class ExistentialInitialization : public KnownAddressInitialization {
-  CleanupHandle Cleanup;
+class ExistentialInitialization final : public SingleBufferInitialization {
+  SILValue existential;
+  CanType concreteFormalType;
+  ArrayRef<ProtocolConformanceRef> conformances;
+  ExistentialRepresentation repr;
+  
+  // Initialized lazily when the address for initialization is demanded.
+  SILValue concreteBuffer;
+  CleanupHandle deinitExistentialCleanup;
 public:
   /// \param existential The existential container
-  /// \param address Address of value in existential container
   /// \param concreteFormalType Unlowered AST type of value
-  /// \param repr Representation of container
-  ExistentialInitialization(SILValue existential, SILValue address,
+  /// \param conformances Conformances for concrete type to existential's
+  ///        protocols
+  ExistentialInitialization(SILGenFunction &SGF,
+                            SILValue existential,
                             CanType concreteFormalType,
-                            ExistentialRepresentation repr,
-                            SILGenFunction &SGF)
-      : KnownAddressInitialization(address) {
-    // Any early exit before we store a value into the existential must
-    // clean up the existential container.
-    Cleanup = SGF.enterDeinitExistentialCleanup(existential,
-                                                concreteFormalType,
-                                                repr);
+                            ArrayRef<ProtocolConformanceRef> conformances,
+                            ExistentialRepresentation repr)
+    : existential(existential),
+      concreteFormalType(concreteFormalType),
+      conformances(conformances),
+      repr(repr)
+  {
+    assert(existential->getType().isAddress());
+    
+    // Create a cleanup to deallocate an allocated but uninitialized concrete
+    // type buffer.
+    // It won't be activated until that buffer is formed later, though.
+    deinitExistentialCleanup =
+      SGF.enterDeinitExistentialCleanup(CleanupState::Dormant,
+                                        existential, concreteFormalType, repr);
+
+  }
+  
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
+    // Create the buffer when needed, because in some cases the type may
+    // be the opened type from another existential that hasn't been opened
+    // at the point the existential destination was formed.
+    assert(!concreteBuffer && "concrete buffer already formed?!");
+    
+    auto concreteLoweredType =
+        SGF.getLoweredType(AbstractionPattern::getOpaque(), concreteFormalType);
+    
+    switch (repr) {
+    case ExistentialRepresentation::Opaque: {
+      concreteBuffer = SGF.B.createInitExistentialAddr(loc, existential,
+                                           concreteFormalType,
+                                           concreteLoweredType.getAddressType(),
+                                           conformances);
+      break;
+    }
+    case ExistentialRepresentation::Boxed: {
+      auto box = SGF.B.createAllocExistentialBox(loc,
+                       existential->getType().getObjectType(),
+                       concreteFormalType,
+                       conformances);
+      concreteBuffer = SGF.B.createProjectExistentialBox(loc,
+                                           concreteLoweredType.getAddressType(),
+                                           box);
+      SGF.B.createStore(loc, box, existential,
+                        StoreOwnershipQualifier::Init);
+      break;
+    }
+    case ExistentialRepresentation::Class:
+    case ExistentialRepresentation::Metatype:
+    case ExistentialRepresentation::None:
+      llvm_unreachable("not supported");
+    }
+    
+    // Activate the cleanup to deallocate the buffer we just allocated, should
+    SGF.Cleanups.setCleanupState(deinitExistentialCleanup,
+                                 CleanupState::Active);
+
+    return concreteBuffer;
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override {
+    return existential && isa<GlobalAddrInst>(existential);
   }
 
   void finishInitialization(SILGenFunction &SGF) override {
     SingleBufferInitialization::finishInitialization(SGF);
-    SGF.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
+    // We've fully initialized the existential by this point, so we can
+    // retire the partial cleanup.
+    SGF.Cleanups.setCleanupState(deinitExistentialCleanup,
+                                 CleanupState::Dead);
   }
 };
 
@@ -551,11 +626,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   if (ctx.LangOpts.EnableObjCInterop && conformances.size() == 1 &&
       conformances[0].getRequirement() == ctx.getErrorDecl() &&
       ctx.getNSErrorDecl()) {
-    auto nsErrorDecl = ctx.getNSErrorDecl();
-
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.
-    auto nsErrorType = nsErrorDecl->getDeclaredType()->getCanonicalType();
+    auto nsErrorType = ctx.getNSErrorType()->getCanonicalType();
     if (nsErrorType->isExactSuperclassOf(concreteFormalType)) {
       ManagedValue nsError =  F(SGFContext());
       if (nsErrorType != concreteFormalType) {
@@ -567,19 +640,20 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete type is known to conform to _BridgedStoredNSError,
     // call the _nsError witness getter to extract the NSError directly,
     // then just erase the NSError.
-    if (auto storedNSErrorConformance =
-          SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType)) {
+    auto storedNSErrorConformance =
+        SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType);
+    if (storedNSErrorConformance) {
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
-      if (!nsErrorVar) return emitUndef(loc, existentialTL.getLoweredType());
+      if (!nsErrorVar) return emitUndef(existentialTL.getLoweredType());
 
       SubstitutionMap nsErrorVarSubstitutions;
 
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
-      if (storedNSErrorConformance->isConcrete()) {
+      if (storedNSErrorConformance.isConcrete()) {
         if (auto normal = dyn_cast<NormalProtocolConformance>(
-                                    storedNSErrorConformance->getConcrete())) {
-          if (auto witnessVar = normal->getWitness(nsErrorVar, nullptr)) {
+                storedNSErrorConformance.getConcrete())) {
+          if (auto witnessVar = normal->getWitness(nsErrorVar)) {
             nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
             nsErrorVarSubstitutions = witnessVar.getSubstitutions();
           }
@@ -592,7 +666,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       ManagedValue nsError =
           emitRValueForStorageLoad(
               loc, nativeError, concreteFormalType,
-              /*super*/ false, nsErrorVar, RValue(),
+              /*super*/ false, nsErrorVar, PreparedArguments(),
               nsErrorVarSubstitutions,
               AccessSemantics::Ordinary, nsErrorType, SGFContext())
               .getAsSingleValue(*this, loc);
@@ -612,7 +686,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // NSError from the value.
       auto getEmbeddedNSErrorFn = SGM.getGetErrorEmbeddedNSError(loc);
       if (!getEmbeddedNSErrorFn)
-        return emitUndef(loc, existentialTL.getLoweredType());
+        return emitUndef(existentialTL.getLoweredType());
 
       auto getEmbeddedNSErrorSubstitutions =
         SubstitutionMap::getProtocolSubstitutions(ctx.getErrorDecl(),
@@ -653,7 +727,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
             potentialNSError.getType().getOptionalObjectType();
-        ManagedValue nsError = B.createOwnedPHIArgument(anyObjectTy);
+        ManagedValue nsError = B.createOwnedPhiArgument(anyObjectTy);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 
@@ -682,14 +756,14 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // Continue.
       B.emitBlock(contBB);
 
-      SILValue existentialResult = contBB->createPHIArgument(
+      SILValue existentialResult = contBB->createPhiArgument(
           existentialTL.getLoweredType(), ValueOwnershipKind::Owned);
       return emitManagedRValueWithCleanup(existentialResult, existentialTL);
     }
   }
 
   switch (existentialTL.getLoweredType().getObjectType()
-            .getPreferredExistentialRepresentation(SGM.M, concreteFormalType)) {
+            .getPreferredExistentialRepresentation(concreteFormalType)) {
   case ExistentialRepresentation::None:
     llvm_unreachable("not an existential type");
   case ExistentialRepresentation::Metatype: {
@@ -701,8 +775,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
     auto upcast =
       B.createInitExistentialMetatype(loc, metatype,
-                                      existentialTL.getLoweredType(),
-                                      conformances);
+                      existentialTL.getLoweredType(),
+                      conformances);
     return ManagedValue::forUnmanaged(upcast);
   }
   case ExistentialRepresentation::Class: {
@@ -714,24 +788,32 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                                       concreteFormalType, sub, conformances);
   }
   case ExistentialRepresentation::Boxed: {
-    // Allocate the existential.
-    auto *existential = B.createAllocExistentialBox(loc,
-                                           existentialTL.getLoweredType(),
-                                           concreteFormalType,
-                                           conformances);
-    auto *valueAddr = B.createProjectExistentialBox(loc,
-                                           concreteTL.getLoweredType(),
-                                           existential);
-    // Initialize the concrete value in-place.
-    ExistentialInitialization init(existential, valueAddr, concreteFormalType,
-                                   ExistentialRepresentation::Boxed, *this);
-    ManagedValue mv = F(SGFContext(&init));
-    if (!mv.isInContext()) {
-      mv.ensurePlusOne(*this, loc).forwardInto(*this, loc, init.getAddress());
-      init.finishInitialization(*this);
+    // We defer allocation of the box to when the address is demanded.
+    // Create a stack slot to hold the box once it's allocated.
+    SILValue boxValue;
+    auto buf = B.bufferForExpr(
+      loc, existentialTL.getLoweredType(), existentialTL, C,
+      [&](SILValue existential) {
+        // Initialize the existential in-place.
+        ExistentialInitialization init(*this, existential,
+                                       concreteFormalType,
+                                       conformances,
+                                       ExistentialRepresentation::Boxed);
+        ManagedValue mv = F(SGFContext(&init));
+        if (!mv.isInContext()) {
+          init.copyOrInitValueInto(*this, loc, mv.ensurePlusOne(*this, loc),
+                                    /*init*/ true);
+          init.finishInitialization(*this);
+        }
+      });
+
+    if (buf.isInContext()) {
+      return buf;
     }
-    
-    return emitManagedRValueWithCleanup(existential);
+
+    auto value = B.createLoad(loc, buf.forward(*this),
+                              LoadOwnershipQualifier::Take);
+    return emitManagedRValueWithCleanup(value);
   }
   case ExistentialRepresentation::Opaque: {
   
@@ -746,12 +828,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
           loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
           concreteValue, {});
     };
-    
-    auto concreteTLPtr = &concreteTL;
+
     if (this->F.getLoweredFunctionType()->isPseudogeneric()) {
       if (anyObjectTy && concreteFormalType->is<ArchetypeType>()) {
         concreteFormalType = anyObjectTy;
-        concreteTLPtr = &getTypeLowering(anyObjectTy);
         F = eraseToAnyObject;
       }
     }
@@ -770,22 +850,16 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return B.bufferForExpr(
         loc, existentialTL.getLoweredType(), existentialTL, C,
         [&](SILValue existential) {
-          // Allocate the concrete value inside the container.
-          SILValue valueAddr = B.createInitExistentialAddr(
-              loc, existential,
-              concreteFormalType,
-              concreteTLPtr->getLoweredType(),
-              conformances);
-          // Initialize the concrete value in-place.
-          InitializationPtr init(
-              new ExistentialInitialization(existential, valueAddr, concreteFormalType,
-                                            ExistentialRepresentation::Opaque,
-                                            *this));
-          ManagedValue mv = F(SGFContext(init.get()));
+          // Initialize the existential in-place.
+          ExistentialInitialization init(*this, existential,
+                                         concreteFormalType,
+                                         conformances,
+                                         ExistentialRepresentation::Opaque);
+          ManagedValue mv = F(SGFContext(&init));
           if (!mv.isInContext()) {
-            init->copyOrInitValueInto(*this, loc, mv.ensurePlusOne(*this, loc),
+            init.copyOrInitValueInto(*this, loc, mv.ensurePlusOne(*this, loc),
                                       /*init*/ true);
-            init->finishInitialization(*this);
+            init.finishInitialization(*this);
           }
         });
   }
@@ -847,25 +921,20 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   return emitManagedRValueWithCleanup(value);
 }
 
-SILGenFunction::OpaqueValueState
+ManagedValue
 SILGenFunction::emitOpenExistential(
        SILLocation loc,
        ManagedValue existentialValue,
-       ArchetypeType *openedArchetype,
        SILType loweredOpenedType,
        AccessKind accessKind) {
-  // Open the existential value into the opened archetype value.
-  bool isUnique = true;
-  bool canConsume;
-  ManagedValue archetypeMV;
-  
+  assert(isInFormalEvaluationScope());
+
   SILType existentialType = existentialValue.getType();
-  switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
+  switch (existentialType.getPreferredExistentialRepresentation()) {
   case ExistentialRepresentation::Opaque: {
     // With CoW existentials we can't consume the boxed value inside of
     // the existential. (We could only do so after a uniqueness check on
     // the box holding the value).
-    canConsume = false;
     if (existentialType.isAddress()) {
       OpenedExistentialAccess allowedAccess =
           getOpenedExistentialAccessFor(accessKind);
@@ -878,28 +947,20 @@ SILGenFunction::emitOpenExistential(
       SILValue archetypeValue =
         B.createOpenExistentialAddr(loc, existentialValue.getValue(),
                                     loweredOpenedType, allowedAccess);
-      archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
+      return ManagedValue::forUnmanaged(archetypeValue);
     } else {
       // borrow the existential and return an unmanaged opened value.
-      archetypeMV = getBuilder().createOpenExistentialValue(
+      return B.createOpenExistentialValue(
           loc, existentialValue, loweredOpenedType);
     }
-    break;
   }
   case ExistentialRepresentation::Metatype:
     assert(existentialType.isObject());
-    archetypeMV = B.createOpenExistentialMetatype(
+    return B.createOpenExistentialMetatype(
         loc, existentialValue, loweredOpenedType);
-    // Metatypes are always trivial. Consuming would be a no-op.
-    canConsume = false;
-    break;
-  case ExistentialRepresentation::Class: {
+  case ExistentialRepresentation::Class:
     assert(existentialType.isObject());
-    archetypeMV =
-        B.createOpenExistentialRef(loc, existentialValue, loweredOpenedType);
-    canConsume = archetypeMV.hasCleanup();
-    break;
-  }
+    return B.createOpenExistentialRef(loc, existentialValue, loweredOpenedType);
   case ExistentialRepresentation::Boxed:
     if (existentialType.isAddress()) {
       existentialValue = emitLoad(loc, existentialValue.getValue(),
@@ -911,67 +972,43 @@ SILGenFunction::emitOpenExistential(
     existentialType = existentialValue.getType();
     assert(existentialType.isObject());
     if (loweredOpenedType.isAddress()) {
-      archetypeMV = ManagedValue::forUnmanaged(
-        B.createOpenExistentialBox(loc, existentialValue.getValue(),
-                                   loweredOpenedType));
+      return B.createOpenExistentialBox(loc, existentialValue,
+                                        loweredOpenedType);
     } else {
       assert(!silConv.useLoweredAddresses());
-      archetypeMV = getBuilder().createOpenExistentialBoxValue(
+      return B.createOpenExistentialBoxValue(
         loc, existentialValue, loweredOpenedType);
     }
-    // NB: Don't forward the cleanup, because consuming a boxed value won't
-    // consume the box reference.
-    // The boxed value can't be assumed to be uniquely referenced.
-    // We can never consume it.
-    // TODO: We could use isUniquelyReferenced to shorten the duration of
-    // the box to the point that the opaque value is copied out.
-    isUnique = false;
-    canConsume = false;
-    break;
   case ExistentialRepresentation::None:
     llvm_unreachable("not existential");
   }
-
-  assert(!canConsume || isUnique); (void) isUnique;
-
-  return SILGenFunction::OpaqueValueState{
-    archetypeMV,
-    /*isConsumable*/ canConsume,
-    /*hasBeenConsumed*/ false
-  };
+  llvm_unreachable("covered switch");
 }
 
-ManagedValue SILGenFunction::manageOpaqueValue(OpaqueValueState &entry,
+ManagedValue SILGenFunction::manageOpaqueValue(ManagedValue value,
                                                SILLocation loc,
                                                SGFContext C) {
   // If the opaque value is consumable, we can just return the
   // value with a cleanup. There is no need to retain it separately.
-  if (entry.IsConsumable) {
-    assert(!entry.HasBeenConsumed
-           && "Uniquely-referenced opaque value already consumed");
-    entry.HasBeenConsumed = true;
-    return entry.Value;
-  }
-
-  assert(!entry.Value.hasCleanup());
+  if (value.isPlusOne(*this))
+    return value;
 
   // If the context wants a +0 value, guaranteed or immediate, we can
   // give it to them, because OpenExistential emission guarantees the
   // value.
-  if (C.isGuaranteedPlusZeroOk()) {
-    return entry.Value;
-  }
+  if (C.isGuaranteedPlusZeroOk())
+    return value;
 
   // If the context has an initialization a buffer, copy there instead
   // of making a temporary allocation.
   if (auto I = C.getEmitInto()) {
-    I->copyOrInitValueInto(*this, loc, entry.Value, /*init*/ false);
+    I->copyOrInitValueInto(*this, loc, value, /*init*/ false);
     I->finishInitialization(*this);
     return ManagedValue::forInContext();
   }
 
   // Otherwise, copy the value into a temporary.
-  return entry.Value.copyUnmanaged(*this, loc);
+  return value.copyUnmanaged(*this, loc);
 }
 
 ManagedValue SILGenFunction::emitConvertedRValue(Expr *E,
@@ -1103,7 +1140,9 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
   case ForceAndBridgeToObjC: {
     auto &tl = SGF.getTypeLowering(value.getType());
     auto sourceValueType = getBridgingSourceType().getOptionalObjectType();
-    value = SGF.emitCheckedGetOptionalValueFrom(loc, value, tl, SGFContext());
+    value = SGF.emitCheckedGetOptionalValueFrom(loc, value,
+                                                /*isImplicitUnwrap*/ true,
+                                                tl, SGFContext());
     return SGF.emitNativeToBridgedValue(loc, value, sourceValueType,
                                         getBridgingResultType(),
                                         getBridgingLoweredResultType(), C);
@@ -1125,12 +1164,14 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
   case SubstToOrig:
     return SGF.emitSubstToOrigValue(loc, value,
                                     getReabstractionOrigType(),
-                                    getReabstractionSubstType(), C);
+                                    getReabstractionSubstType(),
+                                    getReabstractionLoweredResultType(), C);
 
   case OrigToSubst:
     return SGF.emitOrigToSubstValue(loc, value,
                                     getReabstractionOrigType(),
-                                    getReabstractionSubstType(), C);
+                                    getReabstractionSubstType(),
+                                    getReabstractionLoweredResultType(), C);
   }
   llvm_unreachable("bad kind");
 }
@@ -1192,6 +1233,8 @@ static void printReabstraction(const Conversion &conversion,
   conversion.getReabstractionOrigType().print(out);
   out << ", subst: ";
   conversion.getReabstractionSubstType().print(out);
+  out << ", loweredResult: ";
+  conversion.getReabstractionLoweredResultType().print(out);
   out << ')';
 }
 
@@ -1438,7 +1481,11 @@ Lowering::emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
 
     auto value = produceOrigValue(SGF, loc, SGFContext());
     auto &optTL = SGF.getTypeLowering(value.getType());
-    return SGF.emitCheckedGetOptionalValueFrom(loc, value, optTL, C);
+    // isForceUnwrap is hardcoded true because hint.isForced() is only
+    // set by implicit force unwraps.
+    return SGF.emitCheckedGetOptionalValueFrom(loc, value,
+                                               /*isForceUnwrap*/ true,
+                                               optTL, C);
   };
 
   auto getBridgingSourceType = [&] {

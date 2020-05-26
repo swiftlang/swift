@@ -16,7 +16,7 @@ class A22108568 {
 
 class B22108568 : A22108568 {
   required init() {
-    try super.init(a: unwrap()) // expected-error {{argument passed to call that takes no arguments}}
+    try super.init(a: unwrap()) // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
   }
 }
 

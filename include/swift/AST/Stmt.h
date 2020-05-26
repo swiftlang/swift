@@ -17,25 +17,30 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
-#include "swift/AST/ASTNode.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
-  class AnyPattern;
-  class ASTContext;
-  class ASTWalker;
-  class Decl;
-  class Expr;
-  class FuncDecl;
-  class Pattern;
-  class PatternBindingDecl;
-  class VarDecl;
-  
+
+class AnyPattern;
+class ASTContext;
+class ASTWalker;
+class Decl;
+class Expr;
+class FuncDecl;
+class Pattern;
+class PatternBindingDecl;
+class VarDecl;
+class CaseStmt;
+
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
 #define LAST_STMT(ID) Last_Stmt = ID,
@@ -84,6 +89,11 @@ protected:
     CaseCount : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(YieldStmt, Stmt, 32,
+    : NumPadBits,
+    NumYields : 32
+  );
+
   } Bits;
 
   /// Return the given value for the 'implicit' flag if present, or if None,
@@ -101,17 +111,17 @@ public:
 
   StmtKind getKind() const { return StmtKind(Bits.Stmt.Kind); }
 
-  /// \brief Retrieve the name of the given statement kind.
+  /// Retrieve the name of the given statement kind.
   ///
   /// This name should only be used for debugging dumps and other
   /// developer aids, and should never be part of a diagnostic or exposed
   /// to the user of the compiler in any way.
   static StringRef getKindName(StmtKind kind);
 
-  /// \brief Return the location of the start of the statement.
+  /// Return the location of the start of the statement.
   SourceLoc getStartLoc() const;
   
-  /// \brief Return the location of the end of the statement.
+  /// Return the location of the end of the statement.
   SourceLoc getEndLoc() const;
   
   SourceRange getSourceRange() const;
@@ -125,10 +135,8 @@ public:
   Stmt *walk(ASTWalker &walker);
   Stmt *walk(ASTWalker &&walker) { return walk(walker); }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  void print(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
@@ -164,10 +172,13 @@ public:
   
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
+  bool empty() const { return getNumElements() == 0; }
   unsigned getNumElements() const { return Bits.BraceStmt.NumElements; }
 
-  ASTNode getElement(unsigned i) const { return getElements()[i]; }
-  void setElement(unsigned i, ASTNode node) { getElements()[i] = node; }
+  ASTNode getFirstElement() const { return getElements().front(); }
+  ASTNode getLastElement() const { return getElements().back(); }
+
+  void setFirstElement(ASTNode node) { getElements().front() = node; }
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
@@ -209,7 +220,49 @@ public:
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return;}
 };
+
+/// YieldStmt - A yield statement.  The yield-values sequence is not optional,
+/// but the parentheses are.
+///    yield 42
+class YieldStmt final
+    : public Stmt, private llvm::TrailingObjects<YieldStmt, Expr*> {
+  friend TrailingObjects;
+
+  SourceLoc YieldLoc;
+  SourceLoc LPLoc;
+  SourceLoc RPLoc;
+
+  YieldStmt(SourceLoc yieldLoc, SourceLoc lpLoc, ArrayRef<Expr *> yields,
+            SourceLoc rpLoc, Optional<bool> implicit = None)
+    : Stmt(StmtKind::Yield, getDefaultImplicitFlag(implicit, yieldLoc)),
+      YieldLoc(yieldLoc), LPLoc(lpLoc), RPLoc(rpLoc) {
+    Bits.YieldStmt.NumYields = yields.size();
+    memcpy(getMutableYields().data(), yields.data(),
+           yields.size() * sizeof(Expr*));
+  }
+
+public:
+  static YieldStmt *create(const ASTContext &ctx, SourceLoc yieldLoc,
+                           SourceLoc lp, ArrayRef<Expr*> yields, SourceLoc rp,
+                           Optional<bool> implicit = None);
+
+  SourceLoc getYieldLoc() const { return YieldLoc; }
+  SourceLoc getLParenLoc() const { return LPLoc; }
+  SourceLoc getRParenLoc() const { return RPLoc; }
+
+  SourceLoc getStartLoc() const { return YieldLoc; }
+  SourceLoc getEndLoc() const;
+
+  ArrayRef<Expr*> getYields() const {
+    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+  }
+  MutableArrayRef<Expr*> getMutableYields() {
+    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+  }
   
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
+};
+
 /// DeferStmt - A 'defer' statement.  This runs the substatement it contains
 /// when the enclosing scope is exited.
 ///
@@ -260,7 +313,7 @@ public:
 };
 
   
-/// \brief An expression that guards execution based on whether the run-time
+/// An expression that guards execution based on whether the run-time
 /// configuration supports a given API, e.g.,
 /// #available(OSX >= 10.9, iOS >= 7.0).
 class alignas(8) PoundAvailableInfo final :
@@ -268,6 +321,7 @@ class alignas(8) PoundAvailableInfo final :
   friend TrailingObjects;
 
   SourceLoc PoundLoc;
+  SourceLoc LParenLoc;
   SourceLoc RParenLoc;
 
   // The number of queries tail allocated after this object.
@@ -276,17 +330,27 @@ class alignas(8) PoundAvailableInfo final :
   /// The version range when this query will return true. This value is
   /// filled in by Sema.
   VersionRange AvailableRange;
-  
-  PoundAvailableInfo(SourceLoc PoundLoc, ArrayRef<AvailabilitySpec *> queries,
-                     SourceLoc RParenLoc)
-   : PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
-     AvailableRange(VersionRange::empty()) {
+
+  /// For zippered builds, this is the version range for the target variant
+  /// that must hold for the query to return true. For example, when
+  /// compiling with target x86_64-macosx10.15 and target-variant
+  /// x86_64-ios13.0 a query of #available(macOS 10.22, iOS 20.0, *) will
+  /// have a variant range of [20.0, +inf).
+  /// This is filled in by Sema.
+  VersionRange VariantAvailableRange;
+
+  PoundAvailableInfo(SourceLoc PoundLoc, SourceLoc LParenLoc,
+                     ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc)
+   : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+     NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
+     VariantAvailableRange(VersionRange::empty()) {
     std::uninitialized_copy(queries.begin(), queries.end(),
                             getTrailingObjects<AvailabilitySpec *>());
   }
   
 public:
   static PoundAvailableInfo *create(ASTContext &ctx, SourceLoc PoundLoc,
+                                    SourceLoc LParenLoc,
                                     ArrayRef<AvailabilitySpec *> queries,
                                     SourceLoc RParenLoc);
   
@@ -295,6 +359,9 @@ public:
                               NumQueries);
   }
   
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
+
   SourceLoc getStartLoc() const { return PoundLoc; }
   SourceLoc getEndLoc() const;
   SourceLoc getLoc() const { return PoundLoc; }
@@ -303,6 +370,13 @@ public:
   
   const VersionRange &getAvailableRange() const { return AvailableRange; }
   void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
+
+  const VersionRange &getVariantAvailableRange() const {
+    return VariantAvailableRange;
+  }
+  void setVariantAvailableRange(const VersionRange &Range) {
+    VariantAvailableRange = Range;
+  }
 };
 
 
@@ -485,105 +559,6 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Do; }
 };
 
-/// An individual 'catch' clause.
-/// 
-/// This isn't really an independent statement any more than CaseStmt
-/// is; it's just a structural part of a DoCatchStmt.
-class CatchStmt : public Stmt {
-  SourceLoc CatchLoc;
-  SourceLoc WhereLoc;
-  Pattern *ErrorPattern;
-  Expr *GuardExpr;
-  Stmt *CatchBody;
-
-public:
-  CatchStmt(SourceLoc catchLoc, Pattern *errorPattern,
-            SourceLoc whereLoc, Expr *guardExpr, Stmt *body,
-            Optional<bool> implicit = None)
-    : Stmt(StmtKind::Catch, getDefaultImplicitFlag(implicit, catchLoc)),
-      CatchLoc(catchLoc), WhereLoc(whereLoc),
-      ErrorPattern(nullptr), GuardExpr(guardExpr), CatchBody(body) {
-    setErrorPattern(errorPattern);
-  }
-
-  SourceLoc getCatchLoc() const { return CatchLoc; }
-
-  /// The location of the 'where' keyword if there's a guard expression.
-  SourceLoc getWhereLoc() const { return WhereLoc; }
-
-  SourceLoc getStartLoc() const { return CatchLoc; }
-  SourceLoc getEndLoc() const { return CatchBody->getEndLoc(); }
-
-  Stmt *getBody() const { return CatchBody; }
-  void setBody(Stmt *body) { CatchBody = body; }
-
-  Pattern *getErrorPattern() { return ErrorPattern; }
-  const Pattern *getErrorPattern() const { return ErrorPattern; }
-  void setErrorPattern(Pattern *pattern);
-
-  /// Is this catch clause "syntactically exhaustive"?
-  bool isSyntacticallyExhaustive() const;
-
-  /// Return the guard expression if present, or null if the catch has
-  /// no guard.
-  Expr *getGuardExpr() const { return GuardExpr; }
-  void setGuardExpr(Expr *guard) { GuardExpr = guard; }
-
-  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Catch; }
-};
-
-/// DoCatchStmt - do statement with trailing 'catch' clauses.
-class DoCatchStmt final : public LabeledStmt,
-    private llvm::TrailingObjects<DoCatchStmt, CatchStmt *> {
-  friend TrailingObjects;
-
-  SourceLoc DoLoc;
-  Stmt *Body;
-
-  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
-              Stmt *body, ArrayRef<CatchStmt*> catches,
-              Optional<bool> implicit)
-    : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
-                  labelInfo), DoLoc(doLoc), Body(body) {
-    Bits.DoCatchStmt.NumCatches = catches.size();
-    std::uninitialized_copy(catches.begin(), catches.end(),
-                            getTrailingObjects<CatchStmt *>());
-  }
-
-public:
-  static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                             SourceLoc doLoc, Stmt *body,
-                             ArrayRef<CatchStmt*> catches,
-                             Optional<bool> implicit = None);
-
-  SourceLoc getDoLoc() const { return DoLoc; }
-
-  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
-  SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
-
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *s) { Body = s; }
-
-  ArrayRef<CatchStmt*> getCatches() const {
-    return {getTrailingObjects<CatchStmt*>(), Bits.DoCatchStmt.NumCatches};
-  }
-  MutableArrayRef<CatchStmt*> getMutableCatches() {
-    return {getTrailingObjects<CatchStmt*>(), Bits.DoCatchStmt.NumCatches};
-  }
-
-  /// Does this statement contain a syntactically exhaustive catch
-  /// clause?
-  ///
-  /// Note that an exhaustive do/catch statement can still throw
-  /// errors out of its catch block(s).
-  bool isSyntacticallyExhaustive() const;
-
-  static bool classof(const Stmt *S) {
-    return S->getKind() == StmtKind::DoCatch;
-  }
-};
-
-
 /// Either an "if let" case or a simple boolean expression can appear as the
 /// condition of an 'if' or 'while' statement.
 using StmtCondition = MutableArrayRef<StmtConditionElement>;
@@ -702,6 +677,7 @@ public:
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(WhileLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+  SourceLoc getWhileLoc() const { return WhileLoc; }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
@@ -723,9 +699,10 @@ public:
                   getDefaultImplicitFlag(implicit, RepeatLoc),
                   LabelInfo),
       RepeatLoc(RepeatLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
-  
+
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(RepeatLoc); }
   SourceLoc getEndLoc() const;
+  SourceLoc getRepeatLoc() const { return RepeatLoc; }
   
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
@@ -750,31 +727,55 @@ class ForEachStmt : public LabeledStmt {
   Pattern *Pat;
   SourceLoc InLoc;
   Expr *Sequence;
+  SourceLoc WhereLoc;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
-  
-  /// The iterator variable along with its initializer.
-  PatternBindingDecl *Iterator = nullptr;
-  /// The expression that advances the iterator and returns an Optional with
-  /// the next value or None to signal end-of-stream.
-  Expr *IteratorNext = nullptr;
+
+  // Set by Sema:
+  ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
+  VarDecl *iteratorVar = nullptr;
+  Expr *iteratorVarRef = nullptr;
+  OpaqueValueExpr *elementExpr = nullptr;
+  Expr *convertElementExpr = nullptr;
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
-              SourceLoc InLoc, Expr *Sequence, Expr *WhereExpr, BraceStmt *Body,
-              Optional<bool> implicit = None)
+              SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
+              Expr *WhereExpr, BraceStmt *Body, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
       ForLoc(ForLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
-      WhereExpr(WhereExpr), Body(Body) {
+      WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
   }
-  
+
+  void setIteratorVar(VarDecl *var) { iteratorVar = var; }
+  VarDecl *getIteratorVar() const { return iteratorVar; }
+
+  void setIteratorVarRef(Expr *var) { iteratorVarRef = var; }
+  Expr *getIteratorVarRef() const { return iteratorVarRef; }
+
+  void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
+  OpaqueValueExpr *getElementExpr() const { return elementExpr; }
+
+  void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
+  Expr *getConvertElementExpr() const { return convertElementExpr; }
+
+  void setSequenceConformance(ProtocolConformanceRef conformance) {
+    sequenceConformance = conformance;
+  }
+  ProtocolConformanceRef getSequenceConformance() const {
+    return sequenceConformance;
+  }
+
   /// getForLoc - Retrieve the location of the 'for' keyword.
   SourceLoc getForLoc() const { return ForLoc; }
 
   /// getInLoc - Retrieve the location of the 'in' keyword.
   SourceLoc getInLoc() const { return InLoc; }
+
+  /// getWhereLoc - Retrieve the location of the 'where' keyword.
+  SourceLoc getWhereLoc() const { return WhereLoc; }
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
@@ -790,15 +791,6 @@ public:
   /// expression to extract a range, use \c getRangeInit().
   Expr *getSequence() const { return Sequence; }
   void setSequence(Expr *S) { Sequence = S; }
-  
-  /// Retrieve the pattern binding that contains the (implicit) iterator
-  /// variable and its initialization from the container.
-  PatternBindingDecl *getIterator() const { return Iterator; }
-  void setIterator(PatternBindingDecl *It) { Iterator = It; }
-  
-  /// Retrieve the expression that advances the iterator.
-  Expr *getIteratorNext() const { return IteratorNext; }
-  void setIteratorNext(Expr *E) { IteratorNext = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
@@ -871,11 +863,55 @@ public:
   bool isDefault() const {
     return GuardExprAndKind.getInt() == Kind::Default;
   }
+
+  bool isSyntacticallyExhaustive() const;
 };
 
-/// A 'case' or 'default' block of a switch statement.  Only valid as the
-/// substatement of a SwitchStmt.  A case block begins either with one or more
-/// CaseLabelItems or a single 'default' label.
+/// FallthroughStmt - The keyword "fallthrough".
+class FallthroughStmt : public Stmt {
+  SourceLoc Loc;
+  CaseStmt *FallthroughSource;
+  CaseStmt *FallthroughDest;
+
+public:
+  FallthroughStmt(SourceLoc Loc, Optional<bool> implicit = None)
+      : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
+        Loc(Loc), FallthroughSource(nullptr), FallthroughDest(nullptr) {}
+
+  SourceLoc getLoc() const { return Loc; }
+
+  SourceRange getSourceRange() const { return Loc; }
+
+  /// Get the CaseStmt block from which the fallthrough transfers control.
+  /// Set during Sema. (May stay null if fallthrough is invalid.)
+  CaseStmt *getFallthroughSource() const { return FallthroughSource; }
+  void setFallthroughSource(CaseStmt *C) {
+    assert(!FallthroughSource && "fallthrough source already set?!");
+    FallthroughSource = C;
+  }
+
+  /// Get the CaseStmt block to which the fallthrough transfers control.
+  /// Set during Sema.
+  CaseStmt *getFallthroughDest() const {
+    assert(FallthroughDest && "fallthrough dest is not set until Sema");
+    return FallthroughDest;
+  }
+  void setFallthroughDest(CaseStmt *C) {
+    assert(!FallthroughDest && "fallthrough dest already set?!");
+    FallthroughDest = C;
+  }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Fallthrough;
+  }
+};
+
+enum CaseParentKind { Switch, DoCatch };
+
+/// A 'case' or 'default' block of a switch statement, or a 'catch' clause of a
+/// do-catch statement.  Only valid as the substatement of a SwitchStmt or
+/// DoCatchStmt.  A case block begins either with one or more CaseLabelItems or
+/// a single 'default' label.
 ///
 /// Some examples:
 /// \code
@@ -886,42 +922,70 @@ public:
 ///   default:
 /// \endcode
 ///
-class CaseStmt final : public Stmt,
-    private llvm::TrailingObjects<CaseStmt, CaseLabelItem> {
+class CaseStmt final
+    : public Stmt,
+      private llvm::TrailingObjects<CaseStmt, FallthroughStmt *,
+                                    CaseLabelItem> {
   friend TrailingObjects;
 
   SourceLoc UnknownAttrLoc;
-  SourceLoc CaseLoc;
-  SourceLoc ColonLoc;
+  SourceLoc ItemIntroducerLoc;
+  SourceLoc ItemTerminatorLoc;
+  CaseParentKind ParentKind;
 
-  llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
+  llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasFallthrough;
 
-  CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
-           bool HasBoundDecls, SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
-           Stmt *Body, Optional<bool> Implicit);
+  Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
+
+  CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
+           ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
+           SourceLoc ItemTerminatorLoc, Stmt *Body,
+           Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+           Optional<bool> Implicit,
+           NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
-  static CaseStmt *create(ASTContext &C, SourceLoc CaseLoc,
-                          ArrayRef<CaseLabelItem> CaseLabelItems,
-                          bool HasBoundDecls, SourceLoc UnknownAttrLoc,
-                          SourceLoc ColonLoc, Stmt *Body,
-                          Optional<bool> Implicit = None);
+  static CaseStmt *
+  create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
+         ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
+         SourceLoc ItemTerminatorLoc, Stmt *Body,
+         Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+         Optional<bool> Implicit = None,
+         NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+
+  CaseParentKind getParentKind() const { return ParentKind; }
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
   }
+
   MutableArrayRef<CaseLabelItem> getMutableCaseLabelItems() {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
   }
 
-  Stmt *getBody() const { return BodyAndHasBoundDecls.getPointer(); }
-  void setBody(Stmt *body) { BodyAndHasBoundDecls.setPointer(body); }
+  unsigned getNumCaseLabelItems() const { return Bits.CaseStmt.NumPatterns; }
+
+  NullablePtr<CaseStmt> getFallthroughDest() const {
+    return const_cast<CaseStmt &>(*this).getFallthroughDest();
+  }
+
+  NullablePtr<CaseStmt> getFallthroughDest() {
+    if (!hasFallthroughDest())
+      return nullptr;
+    return (*getTrailingObjects<FallthroughStmt *>())->getFallthroughDest();
+  }
+
+  bool hasFallthroughDest() const { return BodyAndHasFallthrough.getInt(); }
+
+  Stmt *getBody() const { return BodyAndHasFallthrough.getPointer(); }
+  void setBody(Stmt *body) { BodyAndHasFallthrough.setPointer(body); }
 
   /// True if the case block declares any patterns with local variable bindings.
-  bool hasBoundDecls() const { return BodyAndHasBoundDecls.getInt(); }
+  bool hasBoundDecls() const { return CaseBodyVariables.hasValue(); }
 
-  /// Get the source location of the 'case' or 'default' of the first label.
-  SourceLoc getLoc() const { return CaseLoc; }
+  /// Get the source location of the 'case', 'default', or 'catch' of the first
+  /// label.
+  SourceLoc getLoc() const { return ItemIntroducerLoc; }
 
   SourceLoc getStartLoc() const {
     if (UnknownAttrLoc.isValid())
@@ -929,8 +993,29 @@ public:
     return getLoc();
   }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
+
   SourceRange getLabelItemsRange() const {
-    return ColonLoc.isValid() ? SourceRange(getLoc(), ColonLoc) : getSourceRange();
+    switch (ParentKind) {
+    case CaseParentKind::Switch:
+      // The range extends from 'case' to the colon at the end.
+      return ItemTerminatorLoc.isValid()
+                 ? SourceRange(getLoc(), ItemTerminatorLoc)
+                 : getSourceRange();
+    case CaseParentKind::DoCatch: {
+      // The range extends from 'catch' to the end of the last non-implicit
+      // item.
+      auto items = getCaseLabelItems();
+      for (auto item = items.rbegin(), end = items.rend(); item != end;
+           ++item) {
+        auto itemEndLoc = item->getEndLoc();
+        if (itemEndLoc.isValid())
+          return SourceRange(getLoc(), itemEndLoc);
+      }
+      // Handle the 'catch {' case.
+      return SourceRange(getLoc(), getLoc());
+    }
+    }
+    llvm_unreachable("invalid parent kind");
   }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
@@ -943,7 +1028,50 @@ public:
     return UnknownAttrLoc.isValid();
   }
 
+  /// Return an ArrayRef containing the case body variables of this CaseStmt.
+  ///
+  /// Asserts if case body variables was not explicitly initialized. In contexts
+  /// where one wants a non-asserting version, \see
+  /// getCaseBodyVariablesOrEmptyArray.
+  ArrayRef<VarDecl *> getCaseBodyVariables() const {
+    ArrayRef<VarDecl *> a = *CaseBodyVariables;
+    return a;
+  }
+
+  bool hasCaseBodyVariables() const { return CaseBodyVariables.hasValue(); }
+
+  /// Return an MutableArrayRef containing the case body variables of this
+  /// CaseStmt.
+  ///
+  /// Asserts if case body variables was not explicitly initialized. In contexts
+  /// where one wants a non-asserting version, \see
+  /// getCaseBodyVariablesOrEmptyArray.
+  MutableArrayRef<VarDecl *> getCaseBodyVariables() {
+    return *CaseBodyVariables;
+  }
+
+  ArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() const {
+    if (!CaseBodyVariables)
+      return ArrayRef<VarDecl *>();
+    ArrayRef<VarDecl *> a = *CaseBodyVariables;
+    return a;
+  }
+
+  MutableArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() {
+    if (!CaseBodyVariables)
+      return MutableArrayRef<VarDecl *>();
+    return *CaseBodyVariables;
+  }
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
+
+  size_t numTrailingObjects(OverloadToken<CaseLabelItem>) const {
+    return getNumCaseLabelItems();
+  }
+
+  size_t numTrailingObjects(OverloadToken<FallthroughStmt *>) const {
+    return hasFallthroughDest() ? 1 : 0;
+  }
 };
 
 /// Switch statement.
@@ -1014,6 +1142,58 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Switch;
+  }
+};
+
+/// DoCatchStmt - do statement with trailing 'catch' clauses.
+class DoCatchStmt final
+    : public LabeledStmt,
+      private llvm::TrailingObjects<DoCatchStmt, CaseStmt *> {
+  friend TrailingObjects;
+
+  SourceLoc DoLoc;
+  Stmt *Body;
+
+  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, Stmt *body,
+              ArrayRef<CaseStmt *> catches, Optional<bool> implicit)
+      : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
+                    labelInfo),
+        DoLoc(doLoc), Body(body) {
+    Bits.DoCatchStmt.NumCatches = catches.size();
+    std::uninitialized_copy(catches.begin(), catches.end(),
+                            getTrailingObjects<CaseStmt *>());
+  }
+
+public:
+  static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
+                             SourceLoc doLoc, Stmt *body,
+                             ArrayRef<CaseStmt *> catches,
+                             Optional<bool> implicit = None);
+
+  SourceLoc getDoLoc() const { return DoLoc; }
+
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
+  SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
+
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *s) { Body = s; }
+
+  ArrayRef<CaseStmt *> getCatches() const {
+    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+  }
+  MutableArrayRef<CaseStmt *> getMutableCatches() {
+    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+  }
+
+  /// Does this statement contain a syntactically exhaustive catch
+  /// clause?
+  ///
+  /// Note that an exhaustive do/catch statement can still throw
+  /// errors out of its catch block(s).
+  bool isSyntacticallyExhaustive() const;
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::DoCatch;
   }
 };
 
@@ -1088,48 +1268,6 @@ public:
   }
 };
 
-/// FallthroughStmt - The keyword "fallthrough".
-class FallthroughStmt : public Stmt {
-  SourceLoc Loc;
-  CaseStmt *FallthroughSource;
-  CaseStmt *FallthroughDest;
-  
-public:
-  FallthroughStmt(SourceLoc Loc, Optional<bool> implicit = None)
-    : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
-      Loc(Loc), FallthroughSource(nullptr), FallthroughDest(nullptr)
-  {}
-  
-  SourceLoc getLoc() const { return Loc; }
-  
-  SourceRange getSourceRange() const { return Loc; }
-
-  /// Get the CaseStmt block from which the fallthrough transfers control.
-  /// Set during Sema. (May stay null if fallthrough is invalid.)
-  CaseStmt *getFallthroughSource() const {
-    return FallthroughSource;
-  }
-  void setFallthroughSource(CaseStmt *C) {
-    assert(!FallthroughSource && "fallthrough source already set?!");
-    FallthroughSource = C;
-  }
-
-  /// Get the CaseStmt block to which the fallthrough transfers control.
-  /// Set during Sema.
-  CaseStmt *getFallthroughDest() const {
-    assert(FallthroughDest && "fallthrough dest is not set until Sema");
-    return FallthroughDest;
-  }
-  void setFallthroughDest(CaseStmt *C) {
-    assert(!FallthroughDest && "fallthrough dest already set?!");
-    FallthroughDest = C;
-  }
-  
-  static bool classof(const Stmt *S) {
-    return S->getKind() == StmtKind::Fallthrough;
-  }
-};
-
 /// FailStmt - A statement that indicates a failable, which is currently
 /// spelled as "return nil" and can only be used within failable initializers.
 class FailStmt : public Stmt {
@@ -1175,6 +1313,31 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Throw;
+  }
+};
+
+/// PoundAssertStmt - Asserts that a condition is true, at compile time.
+class PoundAssertStmt : public Stmt {
+  SourceRange Range;
+  Expr *Condition;
+  StringRef Message;
+
+ public:
+  PoundAssertStmt(SourceRange Range, Expr *condition, StringRef message)
+      : Stmt(StmtKind::PoundAssert, /*Implicit=*/false),
+        Range(Range),
+        Condition(condition),
+        Message(message) {}
+
+  SourceRange getSourceRange() const { return Range; }
+
+  Expr *getCondition() const { return Condition; }
+  StringRef getMessage() const { return Message; }
+
+  void setCondition(Expr *condition) { Condition = condition; }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::PoundAssert;
   }
 };
 

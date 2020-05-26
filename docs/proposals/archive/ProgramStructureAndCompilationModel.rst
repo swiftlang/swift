@@ -1,6 +1,5 @@
 :orphan:
 
-.. @raise litre.TestsAreMissing
 .. _ProgramStructureAndCompilationModel:
 
 .. highlight:: none

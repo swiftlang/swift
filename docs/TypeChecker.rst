@@ -1,5 +1,3 @@
-.. @raise litre.TestsAreMissing
-
 Type Checker Design and Implementation
 ========================================
 
@@ -372,12 +370,12 @@ guesswork. However, we note that the type of an enum member actually
 has a regular structure. For example, consider the ``Optional`` type::
 
   enum Optional<T> {
-    case None
-    case Some(T)
+    case none
+    case some(T)
   }
 
-The type of ``Optional<T>.None`` is ``Optional<T>``, while the type of
-``Optional<T>.Some`` is ``(T) -> Optional<T>``. In fact, the
+The type of ``Optional<T>.none`` is ``Optional<T>``, while the type of
+``Optional<T>.some`` is ``(T) -> Optional<T>``. In fact, the
 type of an enum element can have one of two forms: it can be ``T0``,
 for an enum element that has no extra data, or it can be ``T2 -> T0``,
 where ``T2`` is the data associated with the enum element.  For the
@@ -720,7 +718,7 @@ Locators
 During constraint generation and solving, numerous constraints are
 created, broken apart, and solved. During constraint application as
 well as during diagnostics emission, it is important to track the
-relationship between the constraints and the actual expressions from
+relationship between the constraints and the actual AST nodes from
 which they originally came. For example, consider the following type
 checking problem::
 
@@ -756,16 +754,16 @@ functions was selected to perform the conversion, so that conversion
 function can be called by constraint application if all else succeeds.
 
 *Locators* address both issues by tracking the location and derivation
-of constraints. Each locator is anchored at a specific expression,
-i.e., the function application ``f(10.5, x)``, and contains a path of
-zero or more derivation steps from that anchor. For example, the
-"``T(f)`` ==Fn ``T0 -> T1``" constraint has a locator that is
-anchored at the function application and a path with the "apply
-function" derivation step, meaning that this is the function being
-applied. Similarly, the "``(T2, X) <c T0`` constraint has a
-locator anchored at the function application and a path with the
-"apply argument" derivation step, meaning that this is the argument
-to the function.
+of constraints. Each locator is anchored at a specific AST node
+(expression, pattern, declaration etc.) i.e., the function application
+``f(10.5, x)``, and contains a path of zero or more derivation steps
+from that anchor. For example, the "``T(f)`` ==Fn ``T0 -> T1``"
+constraint has a locator that is anchored at the function application
+and a path with the "apply function" derivation step, meaning that
+this is the function being applied. Similarly, the "``(T2, X) <c T0``
+constraint has a locator anchored at the function application and a
+path with the "apply argument" derivation step, meaning that this is
+the argument to the function.
 
 When constraints are simplified, the resulting constraints have
 locators with longer paths. For example, when a conversion constraint between two
@@ -814,7 +812,7 @@ Locators provide the derivation of location information that follows
 the path of the solver, and can be used to query and recover the
 important decisions made by the solver. However, the locators
 determined by the solver may not directly refer to the most specific
-expression for the purposes of identifying the corresponding source
+AST node for the purposes of identifying the corresponding source
 location. For example, the failed constraint "``Int`` conforms to
 ``ExpressibleByFloatLiteral``" can most specifically by centered on the
 floating-point literal ``10.5``, but its locator is::
@@ -822,7 +820,7 @@ floating-point literal ``10.5``, but its locator is::
   function application -> apply argument -> tuple element #0
 
 The process of locator simplification maps a locator to its most
-specific expression. Essentially, it starts at the anchor of the
+specific AST node. Essentially, it starts at the anchor of the
 locator (in this case, the application ``f(10.5, x)``) and then walks
 the path, matching derivation steps to subexpressions. The "function
 application" derivation step extracts the argument (``(10.5,
@@ -973,3 +971,10 @@ well-typed suggestions.
   meets and joins, so the solver continues until it runs out of
   supertypes to enumerate.
 
+New Diagnostic Architecture
+---------------------------
+
+We are currently working on porting type-check based diagnostics over
+to the new diagnostic framework, which is described in detail in this
+`blog post
+<https://swift.org/blog/new-diagnostic-arch-overview/>`_.

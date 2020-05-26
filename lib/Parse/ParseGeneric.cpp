@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Parse/Lexer.h"
@@ -55,13 +56,16 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Note that we're parsing a declaration.
     StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                     StructureMarkerKind::Declaration);
+    
+    if (ParsingDecl.isFailed()) {
+      return makeParserError();
+    }
 
     // Parse attributes.
     DeclAttributes attributes;
     if (Tok.hasComment())
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-    bool foundCCTokenInAttr;
-    parseDeclAttributeList(attributes, foundCCTokenInAttr);
+    parseDeclAttributeList(attributes);
 
     // Parse the name of the parameter.
     Identifier Name;
@@ -225,12 +229,8 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   if (Tok.is(tok::kw_where))
     WhereClauseText << ',';
 
-  // For Swift 3, keep this warning. 
-  const auto Message = Context.isSwiftVersion3() 
-                             ? diag::swift3_where_inside_brackets 
-                             : diag::where_inside_brackets;
-
-  auto Diag = diagnose(WhereRangeInsideBrackets.Start, Message);
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start,
+                       diag::where_inside_brackets);
 
   Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
                         RemoveWhereRange.getEnd());
@@ -274,16 +274,31 @@ ParserStatus Parser::parseGenericWhereClause(
                                       SyntaxKind::GenericRequirementList);
   bool HasNextReq;
   do {
-    SyntaxParsingContext ReqContext(SyntaxContext, SyntaxContextKind::Syntax);
-    // Parse the leading type-identifier.
-    ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
+    SyntaxParsingContext ReqContext(SyntaxContext,
+                                    SyntaxKind::GenericRequirement);
+    Optional<SyntaxParsingContext> BodyContext;
+    BodyContext.emplace(SyntaxContext);
+
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeGenericRequirement();
+      consumeToken(tok::code_complete);
+      Status.setHasCodeCompletion();
+      break;
+    }
+
+    // Parse the leading type. It doesn't necessarily have to be just a type
+    // identifier if we're dealing with a same-type constraint.
+    ParserResult<TypeRepr> FirstType = parseType();
 
     if (FirstType.hasCodeCompletion()) {
+      BodyContext->setTransparent();
       Status.setHasCodeCompletion();
       FirstTypeInComplete = true;
     }
 
     if (FirstType.isNull()) {
+      BodyContext->setTransparent();
       Status.setIsParseError();
       break;
     }
@@ -291,13 +306,13 @@ ParserStatus Parser::parseGenericWhereClause(
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
       SourceLoc ColonLoc = consumeToken();
-      ReqContext.setCreateSyntax(SyntaxKind::ConformanceRequirement);
+      BodyContext->setCreateSyntax(SyntaxKind::ConformanceRequirement);
       if (Tok.is(tok::identifier) &&
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
         // Parse a layout constraint.
-        auto LayoutName = Context.getIdentifier(Tok.getText());
-        auto LayoutLoc = consumeToken();
+        Identifier LayoutName;
+        auto LayoutLoc = consumeIdentifier(&LayoutName);
         auto LayoutInfo = parseLayoutConstraint(LayoutName);
         if (!LayoutInfo->isKnownLayout()) {
           // There was a bug in the layout constraint.
@@ -317,13 +332,9 @@ ParserStatus Parser::parseGenericWhereClause(
       } else {
         // Parse the protocol or composition.
         ParserResult<TypeRepr> Protocol = parseType();
-
-        if (Protocol.isNull()) {
-          Status.setIsParseError();
-          if (Protocol.hasCodeCompletion())
-            Status.setHasCodeCompletion();
-          break;
-        }
+        Status |= Protocol;
+        if (Protocol.isNull())
+          Protocol = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
 
         // Add the requirement.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
@@ -331,7 +342,7 @@ ParserStatus Parser::parseGenericWhereClause(
       }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
-      ReqContext.setCreateSyntax(SyntaxKind::SameTypeRequirement);
+      BodyContext->setCreateSyntax(SyntaxKind::SameTypeRequirement);
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
         diagnose(Tok, diag::requires_single_equal)
@@ -341,24 +352,34 @@ ParserStatus Parser::parseGenericWhereClause(
 
       // Parse the second type.
       ParserResult<TypeRepr> SecondType = parseType();
-      if (SecondType.isNull()) {
-        Status.setIsParseError();
-        if (SecondType.hasCodeCompletion())
-          Status.setHasCodeCompletion();
-        break;
-      }
+      Status |= SecondType;
+      if (SecondType.isNull())
+        SecondType = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
 
       // Add the requirement
       Requirements.push_back(RequirementRepr::getSameType(FirstType.get(),
                                                       EqualLoc,
                                                       SecondType.get()));
+    } else if (FirstType.hasCodeCompletion()) {
+      // Recover by adding dummy constraint.
+      Requirements.push_back(RequirementRepr::getTypeConstraint(
+          FirstType.get(), PreviousLoc, new (Context) ErrorTypeRepr(PreviousLoc)));
     } else {
+      BodyContext->setTransparent();
       diagnose(Tok, diag::expected_requirement_delim);
       Status.setIsParseError();
       break;
     }
+    BodyContext.reset();
     HasNextReq = consumeIf(tok::comma);
     // If there's a comma, keep parsing the list.
+    // If there's a "&&", diagnose replace with a comma and keep parsing
+    if (Tok.isBinaryOperator() && Tok.getText() == "&&" && !HasNextReq) {
+      diagnose(Tok, diag::requires_comma)
+        .fixItReplace(SourceRange(Tok.getLoc()), ",");
+      consumeToken();
+      HasNextReq = true;
+    }
   } while (HasNextReq);
 
   if (Requirements.empty())
@@ -368,21 +389,15 @@ ParserStatus Parser::parseGenericWhereClause(
 }
 
 
-/// Parse a free-standing where clause attached to a declaration, adding it to
-/// a generic parameter list that may (or may not) already exist.
+/// Parse a free-standing where clause attached to a declaration,
+/// adding it to a generic parameter list, if any, or to the given
+/// generic context representing the declaration.
 ParserStatus Parser::
-parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
-                                    WhereClauseKind kind) {
+parseFreestandingGenericWhereClause(GenericContext *genCtx,
+                                    GenericParamList *&genericParams,
+                                    ParseDeclOptions flags) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
-  
-  // Push the generic arguments back into a local scope so that references will
-  // find them.
-  Scope S(this, ScopeKind::Generics);
-  
-  if (genericParams)
-    for (auto pd : genericParams->getParams())
-      addToScope(pd);
-  
+
   SmallVector<RequirementRepr, 4> Requirements;
   SourceLoc WhereLoc;
   bool FirstTypeInComplete;
@@ -391,10 +406,21 @@ parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
   if (result.shouldStopParsing() || Requirements.empty())
     return result;
 
-  if (!genericParams)
-    diagnose(WhereLoc, diag::where_without_generic_params, unsigned(kind));
-  else
+  if (genericParams) {
+    // Push the generic arguments back into a local scope so that references will
+    // find them.
+    Scope S(this, ScopeKind::Generics);
+    for (auto pd : genericParams->getParams())
+      addToScope(pd);
+
     genericParams->addTrailingWhereClause(Context, WhereLoc, Requirements);
+
+  } else {
+    // A where clause against outer generic parameters.
+    genCtx->setTrailingWhereClause(
+        TrailingWhereClause::create(Context, WhereLoc, Requirements));
+  }
+
   return ParserStatus();
 }
 

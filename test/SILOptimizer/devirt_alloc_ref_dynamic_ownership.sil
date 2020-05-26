@@ -1,0 +1,43 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -devirtualizer -dce | %FileCheck %s
+
+// REQUIRES: SR9831
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class A {
+  init(m: Int)
+  convenience init(n: Int)
+  func foo() -> Int32
+   deinit
+}
+
+// test.A.foo (test.A)() -> Swift.Int32
+sil hidden [noinline] [ossa] @_TFC4test1A3foofS0_FT_Vs5Int32 : $@convention(method) (@guaranteed A) -> Int32 {
+bb0(%0 : @guaranteed $A):
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
+}
+
+// CHECK-LABEL: @test_alloc_ref_dynamic_devirt
+// CHECK-NOT: class_method
+// CHECK: function_ref @_TFC4test1A3foofS0_FT_Vs5Int32
+// CHECK: apply
+// CHECK: return
+sil [ossa] @test_alloc_ref_dynamic_devirt : $@convention(thin) () -> Int32 {
+bb0:
+  %1 = metatype $@thick A.Type
+  %2 = alloc_ref_dynamic %1 : $@thick A.Type, $A
+  %8 = class_method %2 : $A, #A.foo : (A) -> () -> Int32, $@convention(method) (@guaranteed A) -> Int32
+  %9 = apply %8(%2) : $@convention(method) (@guaranteed A) -> Int32
+  destroy_value %2 : $A
+  return %9 : $Int32
+}
+
+sil_vtable A {
+  #A.foo: @_TFC4test1A3foofS0_FT_Vs5Int32
+}

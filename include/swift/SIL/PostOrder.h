@@ -70,14 +70,6 @@ public:
                       PostOrder.rend());
   }
 
-  using enumerated_range = EnumeratorRange<decltype(PostOrder)::iterator>;
-  enumerated_range getEnumeratedPostOrder() { return enumerate(PostOrder); }
-  using reverse_enumerated_range =
-      EnumeratorRange<decltype(PostOrder)::reverse_iterator>;
-  reverse_enumerated_range getEnumeratedReversePostOrder() {
-    return enumerate(PostOrder.rbegin(), PostOrder.rend());
-  }
-
   unsigned size() const { return PostOrder.size(); }
 
   Optional<unsigned> getPONumber(SILBasicBlock *BB) const {

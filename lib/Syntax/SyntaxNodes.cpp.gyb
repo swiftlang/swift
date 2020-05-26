@@ -69,8 +69,11 @@ ${child.type_name} ${node.name}::get${child.name}() {
 
 %     child_node = NODE_MAP.get(child.syntax_kind)
 %     if child_node and child_node.is_syntax_collection():
-%       child_elt = child_node.collection_element_name
+%       child_elt = child.collection_element_name
 %       child_elt_type = child_node.collection_element_type
+%       if not child_elt:
+%         raise Exception("'collection_element_name' should be set for '%s' of '%s'" % (child.name, node.name))
+%       end
 ${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
   RC<RawSyntax> raw = getRaw()->getChild(Cursor::${child.name});
   if (raw)
@@ -99,3 +102,7 @@ ${node.name} ${node.name}::with${child.name}(
 
 %   end
 % end
+
+const char* swift::syntax::getSyntaxStructureVersioningIdentifier() {
+  return "${calculate_node_hash()}";
+}

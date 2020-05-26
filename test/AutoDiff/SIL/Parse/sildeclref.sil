@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt %s -module-name=sildeclref_parse | %target-sil-opt -module-name=sildeclref_parse | %FileCheck %s
+
+// Parse AutoDiff derivative SILDeclRefs via `witness_method` and `class_method` instructions.
+
+import Swift
+import _Differentiation
+
+protocol Protocol {
+  @differentiable(wrt: (x, y))
+  func f(_ x: Float, _ y: Float) -> Float
+}
+
+class Class<T> {
+  @differentiable(wrt: (x, y) where T: Differentiable)
+  func f(_ x: T, _ y: Float) -> T
+}
+
+// CHECK-LABEL: sil hidden @witness_method
+sil hidden @witness_method : $@convention(thin) <T where T : Protocol> (@in T) -> () {
+bb0(%0 : $*T):
+  // CHECK: witness_method $T, #Protocol.f
+  %1 = witness_method $T, #Protocol.f : <Self where Self : Protocol> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Protocol) <τ_0_0 where τ_0_0 : Protocol> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  // CHECK: witness_method $T, #Protocol.f!jvp.SSS
+  %2 = witness_method $T, #Protocol.f!jvp.SSS : <Self where Self : Protocol> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Protocol) <τ_0_0 where τ_0_0 : Protocol> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  // CHECK: witness_method $T, #Protocol.f!jvp.UUS
+  %3 = witness_method $T, #Protocol.f!jvp.UUS : <Self where Self : Protocol> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Protocol) <τ_0_0 where τ_0_0 : Protocol> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  // CHECK: witness_method $T, #Protocol.f!vjp.SSS
+  %4 = witness_method $T, #Protocol.f!vjp.SSS : <Self where Self : Protocol> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Protocol) <τ_0_0 where τ_0_0 : Protocol> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  // CHECK: witness_method $T, #Protocol.f!vjp.UUS
+  %5 = witness_method $T, #Protocol.f!vjp.UUS : <Self where Self : Protocol> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Protocol) <τ_0_0 where τ_0_0 : Protocol> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil hidden @class_method
+sil hidden @class_method : $@convention(thin) <T where T : Differentiable> (@guaranteed Class<T>) -> () {
+bb0(%0 : $Class<T>):
+  // CHECK: class_method %0 : $Class<T>, #Class.f
+  %1 = class_method %0 : $Class<T>, #Class.f : <T> (Class<T>) -> (T, Float) -> T, $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, Float, @guaranteed Class<τ_0_0>) -> @out τ_0_0
+
+  // CHECK: class_method %0 : $Class<T>, #Class.f!jvp.SSU
+  %2 = class_method %0 : $Class<T>, #Class.f!jvp.SSU.<T where T : Differentiable> : <T> (Class<T>) -> (T, Float) -> T, $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float, @guaranteed Class<τ_0_0>) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, Float) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
+
+  // CHECK: class_method %0 : $Class<T>, #Class.f!vjp.SSU
+  %3 = class_method %0 : $Class<T>, #Class.f!vjp.SSU.<T where T : Differentiable> : <T> (Class<T>) -> (T, Float) -> T, $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float, @guaranteed Class<τ_0_0>) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, Float) for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
+
+  %6 = tuple ()
+  return %6 : $()
+}

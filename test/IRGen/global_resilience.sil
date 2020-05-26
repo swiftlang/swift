@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-resilience -emit-module -emit-module-path %t/resilient_struct.swiftmodule
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -I %t -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -I %t -emit-ir -O %s
+// RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-library-evolution -emit-module -emit-module-path %t/resilient_struct.swiftmodule
+// RUN: %target-swift-frontend -enable-library-evolution -I %t -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-library-evolution -I %t -emit-ir -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
@@ -22,7 +22,7 @@ public struct SmallResilientStruct {
   let x: Int32 = 0
 }
 
-// CHECK: @smallGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer
+// CHECK: @smallGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer{{.*}}align {{(8|4)}}
 sil_global [let] @smallGlobal : $SmallResilientStruct
 
 //
@@ -77,7 +77,7 @@ bb0:
 sil @testLargeGlobal : $@convention(thin) () -> () {
 bb0:
   // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_slowAlloc([[INT]] 32, [[INT]] 7)
-  // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align 1
+  // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align {{(8|4)}}
   alloc_global @largeGlobal
 
   // CHECK: [[VALUE:%.*]] = load %T17global_resilience20LargeResilientStructV*, %T17global_resilience20LargeResilientStructV** bitcast ([[BUFFER]]* @largeGlobal to %T17global_resilience20LargeResilientStructV**)
@@ -109,7 +109,7 @@ bb0:
 // CHECK-LABEL: define {{.*}} @testOtherGlobal
 sil @testOtherGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
   // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* [[METADATA]], %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
     alloc_global @otherGlobal
@@ -123,26 +123,26 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_allocate_value_buffer(%swift.type*, %swift.opaque*)
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_allocate_value_buffer(%swift.type* %0, %swift.opaque* %1)
 // CHECK: entry:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 9
-// CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
-// CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
-// CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
-// CHECK:   [[ISINLINE:%.*]] = icmp eq {{.*}} [[ISNOTINLINE]], 0
+// CHECK:   [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 10
+// CHECK:   [[FLAGS:%.*]] = load i32, i32* [[FLAGS_ADDR]]
+// CHECK:   [[ISNOTINLINE:%.*]] = and i32 [[FLAGS]], 131072
+// CHECK:   [[ISINLINE:%.*]] = icmp eq i32 [[ISNOTINLINE]], 0
 // CHECK:   br i1 [[ISINLINE]], label %done, label %outline.allocateValueInBuffer
 //
 // CHECK: outline.allocateValueInBuffer:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
-// CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
-// CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
-// CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
+// CHECK:   [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 8
+// CHECK:   [[SIZE:%.*]] = load [[INT]], [[INT]]* [[SIZE_ADDR]]
+// CHECK:   [[ALIGN:%.*]] = and {{.*}}, 255
 // CHECK:   [[PTR:%.*]] = call noalias i8* @swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* %1 to i8**
 // CHECK:   store i8* [[PTR]], i8** [[ADDR]]
@@ -154,15 +154,15 @@ bb0:
 // CHECK:   ret %swift.opaque* [[PHI]]
 
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_project_value_buffer(%swift.type*, %swift.opaque*)
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_project_value_buffer(%swift.type* %0, %swift.opaque* %1)
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 9
-// CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
-// CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
-// CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
-// CHECK:   [[ISINLINE:%.*]] = icmp eq {{.*}} [[ISNOTINLINE]], 0
+// CHECK:   [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 10
+// CHECK:   [[FLAGS:%.*]] = load i32, i32* [[FLAGS_ADDR]]
+// CHECK:   [[ISNOTINLINE:%.*]] = and i32 [[FLAGS]], 131072
+// CHECK:   [[ISINLINE:%.*]] = icmp eq i32 [[ISNOTINLINE]], 0
 // CHECK:   br i1 [[ISINLINE]], label %done, label %outline.projectValueInBuffer
 //
 // CHECK: outline.projectValueInBuffer:

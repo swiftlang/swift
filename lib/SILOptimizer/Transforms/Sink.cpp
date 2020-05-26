@@ -19,18 +19,18 @@
 
 #define DEBUG_TYPE "sink-instructions"
 
-#include "swift/SIL/Dominance.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
-#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -48,7 +48,7 @@ public:
   PostOrderFunctionInfo *PO;
   SILLoopInfo *LoopInfo;
 
-  /// \brief returns True if were able to sink the instruction \p II
+  /// returns True if were able to sink the instruction \p II
   /// closer to it's users.
   bool sinkInstruction(SILInstruction *II) {
 

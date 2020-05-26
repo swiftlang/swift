@@ -27,13 +27,11 @@ func makeCollection(elements: [OpaqueValue<Int>])
   let base = MinimalCollection(elements: baseElements)
   let startIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count))
+    offsetBy: prefix.count)
   let endIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count + elements.count))
-  return Slice(
-    base: base,
-    bounds: startIndex..<endIndex)
+    offsetBy: prefix.count + elements.count)
+  return Slice(base: base, bounds: startIndex..<endIndex)
 }
 
 func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
@@ -44,13 +42,11 @@ func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
   let base = MinimalCollection(elements: baseElements)
   let startIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count))
+    offsetBy: prefix.count)
   let endIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count + elements.count))
-  return Slice(
-    base: base,
-    bounds: startIndex..<endIndex)
+    offsetBy: prefix.count + elements.count)
+  return Slice(base: base, bounds: startIndex..<endIndex)
 }
 
 func makeCollectionOfComparable(elements: [MinimalComparableValue])
@@ -61,13 +57,11 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
   let base = MinimalCollection(elements: baseElements)
   let startIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count))
+    offsetBy: prefix.count)
   let endIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count + elements.count))
-  return Slice(
-    base: base,
-    bounds: startIndex..<endIndex)
+    offsetBy: prefix.count + elements.count)
+  return Slice(base: base, bounds: startIndex..<endIndex)
 }
 
 var resiliencyChecks = CollectionMisuseResiliencyChecks.all

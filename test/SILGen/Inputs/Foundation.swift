@@ -113,12 +113,6 @@ extension Set : _ObjectiveCBridgeable {
   }
 }
 
-extension NSObject : Hashable {
-  public var hashValue: Int { return 0 }
-}
-
-public func == (x: NSObject, y: NSObject) -> Bool { return true }
-
 extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -60,14 +60,10 @@
 public protocol MutableCollection: Collection
 where SubSequence: MutableCollection
 {
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
+  // FIXME: Associated type inference requires these.
+  override associatedtype Element
+  override associatedtype Index
+  override associatedtype SubSequence
 
   /// Accesses the element at the specified position.
   ///
@@ -87,7 +83,10 @@ where SubSequence: MutableCollection
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
-  subscript(position: Index) -> Element { get set }
+  ///
+  /// - Complexity: O(1)
+  @_borrowed
+  override subscript(position: Index) -> Element { get set }
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -99,7 +98,7 @@ where SubSequence: MutableCollection
   /// the index of one of the strings in the slice, and then using that index
   /// in the original array.
   ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
   ///     let streetsSlice = streets[2 ..< streets.endIndex]
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
@@ -111,7 +110,9 @@ where SubSequence: MutableCollection
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
-  subscript(bounds: Range<Index>) -> SubSequence { get set }
+  ///
+  /// - Complexity: O(1)
+  override subscript(bounds: Range<Index>) -> SubSequence { get set }
 
   /// Reorders the elements of the collection such that all the elements
   /// that match the given predicate are after all the elements that don't
@@ -148,7 +149,7 @@ where SubSequence: MutableCollection
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index
@@ -162,6 +163,8 @@ where SubSequence: MutableCollection
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
   mutating func swapAt(_ i: Index, _ j: Index)
   
   /// Call `body(p)`, where `p` is a pointer to the collection's
@@ -177,12 +180,33 @@ where SubSequence: MutableCollection
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
+
+  /// Call `body(p)`, where `p` is a pointer to the collection's
+  /// mutable contiguous storage.  If no such storage exists, it is
+  /// first created.  If the collection does not support an internal
+  /// representation in a form of mutable contiguous storage, `body` is not
+  /// called and `nil` is returned.
+  ///
+  /// Often, the optimizer can eliminate bounds- and uniqueness-checks
+  /// within an algorithm, but when that fails, invoking the
+  /// same algorithm on `body`\ 's argument lets you trade safety for
+  /// speed.
+  mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
 }
 
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
   @inlinable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return nil
+  }
+
+  @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return nil
@@ -198,7 +222,7 @@ extension MutableCollection {
   /// the index of one of the strings in the slice, and then using that index
   /// in the original array.
   ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
   ///     let streetsSlice = streets[2 ..< streets.endIndex]
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
@@ -210,6 +234,8 @@ extension MutableCollection {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
@@ -230,12 +256,165 @@ extension MutableCollection {
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public mutating func swapAt(_ i: Index, _ j: Index) {
     guard i != j else { return }
     let tmp = self[i]
     self[i] = self[j]
     self[j] = tmp
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// moveSubranges(_:to:)
+//===----------------------------------------------------------------------===//
+
+extension MutableCollection {
+  /// Moves the elements in the given subranges to just before the element at
+  /// the specified index.
+  ///
+  /// This example finds all the uppercase letters in the array and then
+  /// moves them to between `"i"` and `"j"`.
+  ///
+  ///     var letters = Array("ABCdeFGhijkLMNOp")
+  ///     let uppercaseRanges = letters.subranges(where: { $0.isUppercase })
+  ///     let rangeOfUppercase = letters.moveSubranges(uppercaseRanges, to: 10)
+  ///     // String(letters) == "dehiABCFGLMNOjkp"
+  ///     // rangeOfUppercase == 4..<13
+  ///
+  /// - Parameters:
+  ///   - subranges: The subranges of the elements to move.
+  ///   - insertionPoint: The index to use as the destination of the elements.
+  /// - Returns: The new bounds of the moved elements.
+  ///
+  /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @discardableResult
+  public mutating func moveSubranges(
+    _ subranges: RangeSet<Index>, to insertionPoint: Index
+  ) -> Range<Index> {
+    let lowerCount = distance(from: startIndex, to: insertionPoint)
+    let upperCount = distance(from: insertionPoint, to: endIndex)
+    let start = _indexedStablePartition(
+      count: lowerCount,
+      range: startIndex..<insertionPoint,
+      by: { subranges.contains($0) })
+    let end = _indexedStablePartition(
+      count: upperCount,
+      range: insertionPoint..<endIndex,
+      by: { !subranges.contains($0) })
+    return start..<end
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// _rotate(in:shiftingToStart:)
+//===----------------------------------------------------------------------===//
+
+extension MutableCollection {
+  /// Rotates the elements of the collection so that the element at `middle`
+  /// ends up first.
+  ///
+  /// - Returns: The new index of the element that was first pre-rotation.
+  ///
+  /// - Complexity: O(*n*)
+  @discardableResult
+  internal mutating func _rotate(
+    in subrange: Range<Index>,
+    shiftingToStart middle: Index
+  ) -> Index {
+    var m = middle, s = subrange.lowerBound
+    let e = subrange.upperBound
+    
+    // Handle the trivial cases
+    if s == m { return e }
+    if m == e { return s }
+    
+    // We have two regions of possibly-unequal length that need to be
+    // exchanged.  The return value of this method is going to be the
+    // position following that of the element that is currently last
+    // (element j).
+    //
+    //   [a b c d e f g|h i j]   or   [a b c|d e f g h i j]
+    //   ^             ^     ^        ^     ^             ^
+    //   s             m     e        s     m             e
+    //
+    var ret = e // start with a known incorrect result.
+    while true {
+      // Exchange the leading elements of each region (up to the
+      // length of the shorter region).
+      //
+      //   [a b c d e f g|h i j]   or   [a b c|d e f g h i j]
+      //    ^^^^^         ^^^^^          ^^^^^ ^^^^^
+      //   [h i j d e f g|a b c]   or   [d e f|a b c g h i j]
+      //   ^     ^       ^     ^         ^    ^     ^       ^
+      //   s    s1       m    m1/e       s   s1/m   m1      e
+      //
+      let (s1, m1) = _swapNonemptySubrangePrefixes(s..<m, m..<e)
+      
+      if m1 == e {
+        // Left-hand case: we have moved element j into position.  if
+        // we haven't already, we can capture the return value which
+        // is in s1.
+        //
+        // Note: the STL breaks the loop into two just to avoid this
+        // comparison once the return value is known.  I'm not sure
+        // it's a worthwhile optimization, though.
+        if ret == e { ret = s1 }
+        
+        // If both regions were the same size, we're done.
+        if s1 == m { break }
+      }
+      
+      // Now we have a smaller problem that is also a rotation, so we
+      // can adjust our bounds and repeat.
+      //
+      //    h i j[d e f g|a b c]   or    d e f[a b c|g h i j]
+      //         ^       ^     ^              ^     ^       ^
+      //         s       m     e              s     m       e
+      s = s1
+      if s == m { m = m1 }
+    }
+    
+    return ret
+  }
+  
+  /// Swaps the elements of the two given subranges, up to the upper bound of
+  /// the smaller subrange. The returned indices are the ends of the two
+  /// ranges that were actually swapped.
+  ///
+  ///     Input:
+  ///     [a b c d e f g h i j k l m n o p]
+  ///      ^^^^^^^         ^^^^^^^^^^^^^
+  ///      lhs             rhs
+  ///
+  ///     Output:
+  ///     [i j k l e f g h a b c d m n o p]
+  ///             ^               ^
+  ///             p               q
+  ///
+  /// - Precondition: !lhs.isEmpty && !rhs.isEmpty
+  /// - Postcondition: For returned indices `(p, q)`:
+  ///
+  ///   - distance(from: lhs.lowerBound, to: p) == distance(from:
+  ///     rhs.lowerBound, to: q)
+  ///   - p == lhs.upperBound || q == rhs.upperBound
+  internal mutating func _swapNonemptySubrangePrefixes(
+    _ lhs: Range<Index>, _ rhs: Range<Index>
+  ) -> (Index, Index) {
+    assert(!lhs.isEmpty)
+    assert(!rhs.isEmpty)
+    
+    var p = lhs.lowerBound
+    var q = rhs.lowerBound
+    repeat {
+      swapAt(p, q)
+      formIndex(after: &p)
+      formIndex(after: &q)
+    } while p != lhs.upperBound && q != rhs.upperBound
+    return (p, q)
   }
 }
 

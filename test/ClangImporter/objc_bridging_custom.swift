@@ -79,12 +79,12 @@ func checkThatBridgingIsWorking(fridge: Refrigerator) {
   override init(singleArgument: APPRefrigerator) {} // expected-error {{initializer does not override a designated initializer from its superclass}}
 
   // FIXME: expected-error@+2 {{getter for 'prop' with Objective-C selector 'prop' conflicts with getter for 'prop' from superclass 'Base' with the same Objective-C selector}}
-  // expected-note@+1 {{type does not match superclass var with type 'Refrigerator'}} {{22-37=Refrigerator}}
+  // expected-note@+1 {{type does not match superclass property with type 'Refrigerator'}} {{22-37=Refrigerator}}
   override var prop: APPRefrigerator { // expected-error {{property 'prop' with type 'APPRefrigerator' cannot override a property with type 'Refrigerator'}}
     return super.prop as APPRefrigerator
   }
   // FIXME: expected-error@+2 {{getter for 'propGeneric' with Objective-C selector 'propGeneric' conflicts with getter for 'propGeneric' from superclass 'Base' with the same Objective-C selector}}
-  // expected-note@+1 {{type does not match superclass var with type 'ManufacturerInfo<NSString>'}} {{29-59=ManufacturerInfo<NSString>}}
+  // expected-note@+1 {{type does not match superclass property with type 'ManufacturerInfo<NSString>'}} {{29-59=ManufacturerInfo<NSString>}}
   override var propGeneric: APPManufacturerInfo<AnyObject> { // expected-error {{property 'propGeneric' with type 'APPManufacturerInfo<AnyObject>' cannot override a property with type 'ManufacturerInfo<NSString>'}}
     return super.prop // expected-error {{return type}}
   }
@@ -201,13 +201,13 @@ protocol TestProto {
 
   // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
   // expected-note@+1 {{candidate has non-matching type 'APPRefrigerator?'}} {{13-29=Refrigerator?}}
-  var prop: APPRefrigerator? { // expected-warning {{var 'prop' nearly matches optional requirement 'prop' of protocol 'TestObjCProto'}} {{none}}
+  var prop: APPRefrigerator? { // expected-warning {{property 'prop' nearly matches optional requirement 'prop' of protocol 'TestObjCProto'}} {{none}}
     return nil
   }
 
   // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
   // expected-note@+1 {{candidate has non-matching type 'APPManufacturerInfo<AnyObject>?'}} {{20-51=ManufacturerInfo<NSString>?}}
-  var propGeneric: APPManufacturerInfo<AnyObject>? { // expected-warning {{var 'propGeneric' nearly matches optional requirement 'propGeneric' of protocol 'TestObjCProto'}} {{none}}
+  var propGeneric: APPManufacturerInfo<AnyObject>? { // expected-warning {{property 'propGeneric' nearly matches optional requirement 'propGeneric' of protocol 'TestObjCProto'}} {{none}}
     return nil
   }
 }

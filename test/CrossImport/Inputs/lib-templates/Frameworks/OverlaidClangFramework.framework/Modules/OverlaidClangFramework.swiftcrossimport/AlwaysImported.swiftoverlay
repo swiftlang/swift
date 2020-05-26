@@ -1,0 +1,6 @@
+%YAML 1.2
+---
+version: 1
+modules:
+  # use Platform to test the underlying module's cross-imports are loaded
+  - name: _AlwaysImportedPlatformOverlay

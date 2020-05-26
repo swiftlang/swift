@@ -81,12 +81,21 @@ void simple_display(llvm::raw_ostream &out, ArithmeticExpr *expr) {
   }
 }
 
+/// Helper to short-circuit errors to NaN.
+template<typename Request>
+static double evalOrNaN(Evaluator &evaluator, const Request &request) {
+  return evaluateOrDefault(evaluator, request, NAN);
+}
+
 /// Rule to evaluate the value of the expression.
-template<typename Derived, CacheKind Caching>
+template<typename Derived, RequestFlags Caching>
 struct EvaluationRule
-  : public SimpleRequest<Derived, Caching, double, ArithmeticExpr *>
+  : public SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
 {
-  using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
+  using SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
+      ::SimpleRequest;
+
+  static bool brokeCycle;
 
   double evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
     switch (expr->kind) {
@@ -97,9 +106,17 @@ struct EvaluationRule
       auto binary = static_cast<Binary *>(expr);
 
       // Evaluate the left- and right-hand sides.
-      double lhsValue, rhsValue;
-      std::tie(lhsValue, rhsValue) =
-        evaluator(Derived{binary->lhs}, Derived{binary->rhs});
+      auto lhsValue = evalOrNaN(evaluator, Derived{binary->lhs});
+      if (std::isnan(lhsValue)) {
+        brokeCycle = true;
+        return lhsValue;
+      }
+      auto rhsValue = evalOrNaN(evaluator, Derived{binary->rhs});
+      if (std::isnan(rhsValue)) {
+        brokeCycle = true;
+        return rhsValue;
+      }
+
       switch (binary->operatorKind) {
       case Binary::OperatorKind::Sum:
         return lhsValue + rhsValue;
@@ -111,21 +128,14 @@ struct EvaluationRule
     }
   }
 
-  static bool brokeCycle;
-  double breakCycle() const {
-    brokeCycle = true;
-    return NAN;
-  }
-
-  void diagnoseCycle(DiagnosticEngine &diags) const { }
-  void noteCycleStep(DiagnosticEngine &diags) const { }
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
 };
 
-template<typename Derived, CacheKind Caching>
+template<typename Derived, RequestFlags Caching>
 bool EvaluationRule<Derived, Caching>::brokeCycle = false;
 
 struct InternallyCachedEvaluationRule :
-EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
+EvaluationRule<InternallyCachedEvaluationRule, RequestFlags::Cached>
 {
   using EvaluationRule::EvaluationRule;
 
@@ -142,13 +152,13 @@ EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
 };
 
 struct UncachedEvaluationRule
-    : EvaluationRule<UncachedEvaluationRule, CacheKind::Uncached> {
+    : EvaluationRule<UncachedEvaluationRule, RequestFlags::Uncached> {
   using EvaluationRule::EvaluationRule;
 };
 
 struct ExternallyCachedEvaluationRule
     : EvaluationRule<ExternallyCachedEvaluationRule,
-                     CacheKind::SeparatelyCached> {
+                     RequestFlags::SeparatelyCached> {
   using EvaluationRule::EvaluationRule;
 
   bool isCached() const {
@@ -178,12 +188,11 @@ struct ExternallyCachedEvaluationRule
 
 // Define the arithmetic evaluator's zone.
 namespace swift {
-#define SWIFT_ARITHMETIC_EVALUATOR_ZONE 255
-#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
+#define SWIFT_TYPEID_ZONE ArithmeticEvaluator
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
-#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
+#define SWIFT_TYPEID_ZONE ArithmeticEvaluator
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 
@@ -191,11 +200,12 @@ namespace swift {
 
 /// All of the arithmetic request functions.
 static AbstractRequestFunction *arithmeticRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "ArithmeticEvaluatorTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
+
 
 TEST(ArithmeticEvaluator, Simple) {
   // (3.14159 + 2.71828) * 42
@@ -208,32 +218,35 @@ TEST(ArithmeticEvaluator, Simple) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
-  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+  Evaluator evaluator(diags,
+                      /*debugDumpCycles=*/false,
+                      /*buildDependencyGraph=*/true,
+                      /*privateDependencies*/false);
+  evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
   const double expectedResult = (3.14159 + 2.71828) * 42.0;
-  EXPECT_EQ(evaluator(InternallyCachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, InternallyCachedEvaluationRule(product)),
             expectedResult);
 
   // Cached response.
-  EXPECT_EQ(evaluator(InternallyCachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, InternallyCachedEvaluationRule(product)),
             expectedResult);
 
   // Uncached
   evaluator.clearCache();
-  EXPECT_EQ(evaluator(UncachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, UncachedEvaluationRule(product)),
             expectedResult);
-  EXPECT_EQ(evaluator(UncachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, UncachedEvaluationRule(product)),
             expectedResult);
 
   // External cached query.
   evaluator.clearCache();
-  EXPECT_EQ(evaluator(ExternallyCachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, ExternallyCachedEvaluationRule(product)),
             expectedResult);
   EXPECT_EQ(*sum->cachedValue, 3.14159 + 2.71828);
   EXPECT_EQ(*product->cachedValue, expectedResult);
-  EXPECT_EQ(evaluator(ExternallyCachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, ExternallyCachedEvaluationRule(product)),
             expectedResult);
   EXPECT_EQ(*sum->cachedValue, 3.14159 + 2.71828);
   EXPECT_EQ(*product->cachedValue, expectedResult);
@@ -241,7 +254,8 @@ TEST(ArithmeticEvaluator, Simple) {
   // Dependency printing.
 
   // Cache some values first, so they show up in the result.
-  (void)evaluator(InternallyCachedEvaluationRule(product));
+  (void)llvm::cantFail(evaluator(InternallyCachedEvaluationRule(product)),
+                       "no explicit cycles were requested");
 
   std::string productDependencies;
   {
@@ -330,40 +344,49 @@ TEST(ArithmeticEvaluator, Cycle) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
-  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+  Evaluator evaluator(diags,
+                      /*debugDumpCycles=*/false,
+                      /*buildDependencyGraph=*/false,
+                      /*privateDependencies*/false);
+  evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
   // Evaluate when there is a cycle.
   UncachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(UncachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   UncachedEvaluationRule(product))));
   EXPECT_TRUE(UncachedEvaluationRule::brokeCycle);
 
   // Cycle-breaking result is cached.
-  EXPECT_TRUE(std::isnan(evaluator(UncachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   UncachedEvaluationRule(product))));
   UncachedEvaluationRule::brokeCycle = false;
   EXPECT_FALSE(UncachedEvaluationRule::brokeCycle);
 
   // Evaluate when there is a cycle.
   evaluator.clearCache();
   InternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(InternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   InternallyCachedEvaluationRule(product))));
   EXPECT_TRUE(InternallyCachedEvaluationRule::brokeCycle);
 
   // Cycle-breaking result is cached.
   InternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(InternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   InternallyCachedEvaluationRule(product))));
   EXPECT_FALSE(InternallyCachedEvaluationRule::brokeCycle);
 
   // Evaluate when there is a cycle.
   evaluator.clearCache();
   ExternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(ExternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   ExternallyCachedEvaluationRule(product))));
   EXPECT_TRUE(ExternallyCachedEvaluationRule::brokeCycle);
 
   // Cycle-breaking result is cached.
   ExternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(ExternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evalOrNaN(evaluator,
+                                   ExternallyCachedEvaluationRule(product))));
   EXPECT_FALSE(ExternallyCachedEvaluationRule::brokeCycle);
 
   // Dependency printing.
@@ -374,12 +397,8 @@ TEST(ArithmeticEvaluator, Cycle) {
   }
 
   EXPECT_EQ(productDependencies,
-    " `--InternallyCachedEvaluationRule(Binary: product)\n"
-    "     `--InternallyCachedEvaluationRule(Binary: sum)\n"
-    "     |   `--InternallyCachedEvaluationRule(Literal: 3.141590e+00)\n"
-    "     |   `--InternallyCachedEvaluationRule(Binary: product) "
-      "(cyclic dependency)\n"
-    "     `--InternallyCachedEvaluationRule(Literal: 4.200000e+01)\n");
+    " `--InternallyCachedEvaluationRule(Binary: product) "
+      "(dependency not evaluated)\n");
 
   // Cleanup
   delete pi;

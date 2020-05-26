@@ -21,15 +21,22 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
 
-/// TypeSubstCloner - a utility class for cloning code while remapping types.
-template<typename ImplClass>
+/// A utility class for cloning code while remapping types.
+///
+/// \tparam FunctionBuilderTy Function builder type injected by
+/// subclasses. Used to break a circular dependency from SIL <=>
+/// SILOptimizer that would be caused by us needing to use
+/// SILOptFunctionBuilder here.
+template<typename ImplClass, typename FunctionBuilderTy>
 class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
@@ -62,28 +69,27 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       if (!Cloner.Inlining) {
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
-        if (FRI && FRI->getReferencedFunction() == AI.getFunction() &&
+        if (FRI && FRI->getInitiallyReferencedFunction() == AI.getFunction() &&
             Subs == Cloner.SubsMap) {
           // Handle recursions by replacing the apply to the callee with an
           // apply to the newly specialized function, but only if substitutions
           // are the same.
           auto LoweredFnTy = Builder.getFunction().getLoweredFunctionType();
           auto RecursiveSubstCalleeSILType = LoweredFnTy;
-          auto GenSig = LoweredFnTy->getGenericSignature();
+          auto GenSig = LoweredFnTy->getInvocationGenericSignature();
           if (GenSig) {
             // Compute substitutions for the specialized function. These
             // substitutions may be different from the original ones, e.g.
             // there can be less substitutions.
             RecursiveSubs = SubstitutionMap::get(
-              AI.getFunction()
-                ->getLoweredFunctionType()
-                ->getGenericSignature(),
+              LoweredFnTy->getSubstGenericSignature(),
               Subs);
 
             // Use the new set of substitutions to compute the new
             // substituted callee type.
             RecursiveSubstCalleeSILType = LoweredFnTy->substGenericArgs(
-                AI.getModule(), RecursiveSubs);
+                AI.getModule(), RecursiveSubs,
+                Builder.getTypeExpansionContext());
           }
 
           // The specialized recursive function may have different calling
@@ -102,7 +108,8 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       assert(Subs.empty() ||
              SubstCalleeSILType ==
-                 Callee->getType().substGenericArgs(AI.getModule(), Subs));
+                 Callee->getType().substGenericArgs(
+                     AI.getModule(), Subs, Builder.getTypeExpansionContext()));
     }
 
     ArrayRef<SILValue> getArguments() const {
@@ -128,8 +135,8 @@ public:
   using SILClonerWithScopes<ImplClass>::getTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpType;
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
-  using SILClonerWithScopes<ImplClass>::doPostProcess;
-  using SILClonerWithScopes<ImplClass>::ValueMap;
+  using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
+  using SILClonerWithScopes<ImplClass>::recordFoldedValue;
   using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
   using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
 
@@ -156,23 +163,45 @@ public:
       Inlining(Inlining) {
   }
 
-
 protected:
   SILType remapType(SILType Ty) {
     SILType &Sty = TypeCache[Ty];
     if (!Sty) {
       Sty = Ty.subst(Original.getModule(), SubsMap);
+      if (!Sty.getASTType()->hasOpaqueArchetype() ||
+          !getBuilder()
+               .getTypeExpansionContext()
+               .shouldLookThroughOpaqueTypeArchetypes())
+        return Sty;
+      // Remap types containing opaque result types in the current context.
+      Sty = getBuilder().getTypeLowering(Sty).getLoweredType().getCategoryType(
+          Sty.getCategory());
     }
     return Sty;
   }
 
   CanType remapASTType(CanType ty) {
-    return ty.subst(SubsMap)->getCanonicalType();
+    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    if (!substTy->hasOpaqueArchetype() ||
+        !getBuilder().getTypeExpansionContext()
+            .shouldLookThroughOpaqueTypeArchetypes())
+      return substTy;
+    // Remap types containing opaque result types in the current context.
+    return getBuilder().getModule().Types.getLoweredRValueType(
+        TypeExpansionContext(getBuilder().getFunction()), substTy);
   }
 
-  ProtocolConformanceRef remapConformance(Type type,
+  ProtocolConformanceRef remapConformance(Type ty,
                                           ProtocolConformanceRef conf) {
-    return conf.subst(type, SubsMap);
+    auto conformance = conf.subst(ty, SubsMap);
+    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    auto context = getBuilder().getTypeExpansionContext();
+    if (substTy->hasOpaqueArchetype() &&
+        context.shouldLookThroughOpaqueTypeArchetypes()) {
+      conformance =
+          substOpaqueTypesWithUnderlyingTypes(conformance, substTy, context);
+    }
+    return conformance;
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
@@ -187,7 +216,14 @@ protected:
                                  Helper.getArguments(), Inst->isNonThrowing(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    // Specialization can return noreturn applies that were not identified as
+    // such before.
+    if (N->isCalleeNoReturn() &&
+        !isa<UnreachableInst>(*std::next(SILBasicBlock::iterator(Inst)))) {
+      noReturnApplies.push_back(N);
+    }
+
+    recordClonedInstruction(Inst, N);
   }
 
   void visitTryApplyInst(TryApplyInst *Inst) {
@@ -199,7 +235,7 @@ protected:
         getOpBasicBlock(Inst->getErrorBB()),
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    recordClonedInstruction(Inst, N);
   }
 
   void visitPartialApplyInst(PartialApplyInst *Inst) {
@@ -209,9 +245,9 @@ protected:
     PartialApplyInst *N = getBuilder().createPartialApply(
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
-        GenericSpecializationInformation::create(
-          Inst, getBuilder()));
-    doPostProcess(Inst, N);
+        Inst->isOnStack(),
+        GenericSpecializationInformation::create(Inst, getBuilder()));
+    recordClonedInstruction(Inst, N);
   }
 
   /// Attempt to simplify a conditional checked cast.
@@ -219,8 +255,8 @@ protected:
     SILLocation loc = getOpLocation(inst->getLoc());
     SILValue src = getOpValue(inst->getSrc());
     SILValue dest = getOpValue(inst->getDest());
-    CanType sourceType = getOpASTType(inst->getSourceType());
-    CanType targetType = getOpASTType(inst->getTargetType());
+    CanType sourceType = getOpASTType(inst->getSourceFormalType());
+    CanType targetType = getOpASTType(inst->getTargetFormalType());
     SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());
     SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
 
@@ -252,7 +288,7 @@ protected:
     // there is no need for an upcast and we can just use the operand.
     if (getOpType(Upcast->getType()) ==
         getOpValue(Upcast->getOperand())->getType()) {
-      ValueMap.insert({SILValue(Upcast), getOpValue(Upcast->getOperand())});
+      recordFoldedValue(SILValue(Upcast), getOpValue(Upcast->getOperand()));
       return;
     }
     super::visitUpcastInst(Upcast);
@@ -261,8 +297,8 @@ protected:
   void visitCopyValueInst(CopyValueInst *Copy) {
     // If the substituted type is trivial, ignore the copy.
     SILType copyTy = getOpType(Copy->getType());
-    if (copyTy.isTrivial(Copy->getModule())) {
-      ValueMap.insert({SILValue(Copy), getOpValue(Copy->getOperand())});
+    if (copyTy.isTrivial(*Copy->getFunction())) {
+      recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
       return;
     }
     super::visitCopyValueInst(Copy);
@@ -271,10 +307,156 @@ protected:
   void visitDestroyValueInst(DestroyValueInst *Destroy) {
     // If the substituted type is trivial, ignore the destroy.
     SILType destroyTy = getOpType(Destroy->getOperand()->getType());
-    if (destroyTy.isTrivial(Destroy->getModule())) {
+    if (destroyTy.isTrivial(*Destroy->getFunction())) {
       return;
     }
     super::visitDestroyValueInst(Destroy);
+  }
+
+  void visitDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    // If the extractee is the original function, do regular cloning.
+    if (dfei->getExtractee() ==
+        NormalDifferentiableFunctionTypeComponent::Original) {
+      super::visitDifferentiableFunctionExtractInst(dfei);
+      return;
+    }
+    // If the extractee is a derivative function, check whether the *remapped
+    // derivative function type* (bc) is equal to the *derivative remapped
+    // function type* (ad).
+    //
+    // ┌────────────────┐        remap       ┌─────────────────────────┐
+    // │ orig.  fn type │  ───────(a)──────► │ remapped orig.  fn type │
+    // └────────────────┘                    └─────────────────────────┘
+    //         │                                                │
+    //    (b, SILGen)   getAutoDiffDerivativeFunctionType   (d, here)
+    //         │                                                │
+    //         ▼                                                ▼
+    // ┌────────────────┐        remap       ┌─────────────────────────┐
+    // │ deriv. fn type │  ───────(c)──────► │ remapped deriv. fn type │
+    // └────────────────┘                    └─────────────────────────┘
+    //
+    // (ad) does not always commute with (bc):
+    // - (ad) is the result of remapping, then computing the derivative type.
+    //   This is the default cloning behavior, but may break invariants in the
+    //   initial SIL generated by SILGen.
+    // - (bc) is the result of computing the derivative type (SILGen), then
+    //   remapping. This is the expected type, preserving invariants from
+    //   earlier transforms.
+    //
+    // If (ad) is not equal to (bc), use (bc) as the explicit type.
+    SILType remappedOrigType = getOpType(dfei->getOperand()->getType());
+    auto remappedOrigFnType = remappedOrigType.castTo<SILFunctionType>();
+    auto derivativeRemappedFnType =
+        remappedOrigFnType
+            ->getAutoDiffDerivativeFunctionType(
+                remappedOrigFnType->getDifferentiabilityParameterIndices(),
+                /*resultIndex*/ 0, dfei->getDerivativeFunctionKind(),
+                getBuilder().getModule().Types,
+                LookUpConformanceInModule(SwiftMod))
+            ->getWithoutDifferentiability();
+    SILType remappedDerivativeFnType = getOpType(dfei->getType());
+    // If remapped derivative type and derivative remapped type are equal, do
+    // regular cloning.
+    if (SILType::getPrimitiveObjectType(derivativeRemappedFnType) ==
+        remappedDerivativeFnType) {
+      super::visitDifferentiableFunctionExtractInst(dfei);
+      return;
+    }
+    // Otherwise, explicitly use the remapped derivative type.
+    recordClonedInstruction(
+        dfei,
+        getBuilder().createDifferentiableFunctionExtract(
+            getOpLocation(dfei->getLoc()), dfei->getExtractee(),
+            getOpValue(dfei->getOperand()), remappedDerivativeFnType));
+  }
+
+  /// One abstract function in the debug info can only have one set of variables
+  /// and types. This function determines whether applying the substitutions in
+  /// \p SubsMap on the generic signature \p Sig will change the generic type
+  /// parameters in the signature. This is used to decide whether it's necessary
+  /// to clone a unique copy of the function declaration with the substitutions
+  /// applied for the debug info.
+  static bool substitutionsChangeGenericTypeParameters(SubstitutionMap SubsMap,
+                                                       GenericSignature Sig) {
+
+    // If there are no substitutions, just reuse
+    // the original decl.
+    if (SubsMap.empty())
+      return false;
+
+    bool Result = false;
+    Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
+      if (!Canonical)
+        return;
+      if (!Type(ParamType).subst(SubsMap)->isEqual(ParamType))
+        Result = true;
+    });
+
+    return Result;
+  }
+
+  enum { ForInlining = true };
+  /// Helper function to clone the parent function of a SILDebugScope if
+  /// necessary when inlining said function into a new generic context.
+  /// \param SubsMap - the substitutions of the inlining/specialization process.
+  /// \param RemappedSig - the generic signature.
+  static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
+                                          SILModule &M,
+                                          SILFunction *ParentFunction,
+                                          SubstitutionMap SubsMap,
+                                          GenericSignature RemappedSig,
+                                          bool ForInlining = false) {
+    // If the original, non-inlined version of the function had no generic
+    // environment, there is no need to remap it.
+    auto *OriginalEnvironment = ParentFunction->getGenericEnvironment();
+    if (!RemappedSig || !OriginalEnvironment)
+      return ParentFunction;
+
+    if (SubsMap.hasArchetypes())
+      SubsMap = SubsMap.mapReplacementTypesOutOfContext();
+
+    if (!substitutionsChangeGenericTypeParameters(SubsMap, RemappedSig))
+      return ParentFunction;
+
+    // Note that mapReplacementTypesOutOfContext() can't do anything for
+    // opened existentials, and since archetypes can't be mangled, ignore
+    // this case for now.
+    if (SubsMap.hasArchetypes())
+      return ParentFunction;
+
+    // Clone the function with the substituted type for the debug info.
+    Mangle::GenericSpecializationMangler Mangler(
+        ParentFunction, SubsMap, IsNotSerialized, false, ForInlining);
+    std::string MangledName = Mangler.mangle(RemappedSig);
+
+    if (ParentFunction->getName() == MangledName)
+      return ParentFunction;
+    if (auto *CachedFn = M.lookUpFunction(MangledName))
+      ParentFunction = CachedFn;
+    else {
+      // Create a new function with this mangled name with an empty
+      // body. There won't be any IR generated for it (hence the linkage),
+      // but the symbol will be refered to by the debug info metadata.
+      ParentFunction = FuncBuilder.getOrCreateFunction(
+          ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
+          ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
+          ParentFunction->isTransparent(), ParentFunction->isSerialized(),
+          IsNotDynamic, 0, ParentFunction->isThunk(),
+          ParentFunction->getClassSubclassScope());
+      // Increment the ref count for the inlined function, so it doesn't
+      // get deleted before we can emit abstract debug info for it.
+      if (!ParentFunction->isZombie()) {
+        ParentFunction->setInlined();
+        // If the function was newly created with an empty body mark it as
+        // undead.
+        if (ParentFunction->empty()) {
+          FuncBuilder.eraseFunction(ParentFunction);
+          ParentFunction->setGenericEnvironment(OriginalEnvironment);
+        }
+      }
+    }
+    return ParentFunction;
   }
 
   /// The Swift module that the cloned function belongs to.
@@ -287,6 +469,9 @@ protected:
   SILFunction &Original;
   /// True, if used for inlining.
   bool Inlining;
+  // Generic specialization can create noreturn applications that where
+  // previously not identifiable as such.
+  SmallVector<ApplyInst *, 16> noReturnApplies;
 };
 
 } // end namespace swift

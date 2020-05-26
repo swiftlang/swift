@@ -1,5 +1,5 @@
-// RUN: %swift -target armv7-apple-ios7 %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=IOS
-// RUN: %swift -target armv7k-apple-watchos2 %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=WATCHOS
+// RUN: %swift -target armv7-apple-ios7 -disable-legacy-type-info %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=IOS
+// RUN: %swift -target armv7k-apple-watchos2 -disable-legacy-type-info %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=WATCHOS
 
 // REQUIRES: CODEGENERATOR=ARM
 

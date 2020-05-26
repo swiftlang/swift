@@ -18,6 +18,7 @@
 #define SWIFT_AST_SYNTAXASTMAP_H
 
 #include "swift/AST/ASTNode.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Syntax/Syntax.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
@@ -49,7 +50,7 @@ public:
   void clearSyntaxMap();
 
   /// Dump the entire syntax node -> semantic node map for debugging purposes.
-  void dumpSyntaxMap() const;
+  SWIFT_DEBUG_DUMPER(dumpSyntaxMap());
 };
 
 } // end namespace swift

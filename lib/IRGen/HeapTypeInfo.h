@@ -52,8 +52,9 @@ enum class IsaEncoding : uint8_t {
 /// of this type:
 ///   ReferenceCounting getReferenceCounting() const;
 template <class Impl>
-class HeapTypeInfo : public SingleScalarTypeInfo<Impl, ReferenceTypeInfo> {
-  using super = SingleScalarTypeInfo<Impl, ReferenceTypeInfo>;
+class HeapTypeInfo
+    : public SingleScalarTypeInfoWithTypeLayout<Impl, ReferenceTypeInfo> {
+  using super = SingleScalarTypeInfoWithTypeLayout<Impl, ReferenceTypeInfo>;
 
   llvm::Type *getOptionalIntType() const {
     return llvm::IntegerType::get(this->getStorageType()->getContext(),
@@ -72,6 +73,13 @@ public:
     if (refcounting)
       *refcounting = asDerived().getReferenceCounting();
     return true;
+  }
+  
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    // Refcounting functions are no-ops when passed a null pointer, which is the
+    // first extra inhabitant.
+    return index == 0;
   }
   
   IsaEncoding getIsaEncoding(ResilienceExpansion expansion) const {
@@ -220,6 +228,10 @@ public:
     return LoadedRef(ptr, true);
   }
 
+  ReferenceCounting getReferenceCountingType() const override {
+    return asDerived().getReferenceCounting();
+  }
+
   // Extra inhabitants of heap object pointers.
 
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -237,13 +249,14 @@ public:
   }
 
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                       SILType T)
+                                       SILType T, bool isOutlined)
   const override {
     return getHeapObjectExtraInhabitantIndex(IGF, src);
   }
 
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                            Address dest, SILType T) const override {
+                            Address dest, SILType T, bool isOutlined)
+  const override {
     return storeHeapObjectExtraInhabitant(IGF, index, dest);
   }
 };

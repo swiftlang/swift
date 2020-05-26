@@ -25,8 +25,7 @@ namespace migrator {
 
 struct FixitFilter {
   /// Returns true if the fix-it should be applied.
-  bool shouldTakeFixit(const DiagnosticKind Kind,
-                       const DiagnosticInfo &Info) const {
+  bool shouldTakeFixit(const DiagnosticInfo &Info) const {
     // Do not add a semi or comma as it is wrong in most cases during migration
     if (Info.ID == diag::statement_same_line_without_semi.ID ||
         Info.ID == diag::declaration_same_line_without_semi.ID ||
@@ -114,7 +113,7 @@ struct FixitFilter {
       return false;
     }
 
-    if (Kind == DiagnosticKind::Error)
+    if (Info.Kind == DiagnosticKind::Error)
       return true;
 
     // Fixits from warnings/notes that should be applied.
@@ -127,8 +126,6 @@ struct FixitFilter {
         Info.ID == diag::where_inside_brackets.ID ||
         Info.ID == diag::selector_construction_suggest.ID ||
         Info.ID == diag::selector_literal_deprecated_suggest.ID ||
-        Info.ID == diag::attr_noescape_deprecated.ID ||
-        Info.ID == diag::attr_autoclosure_escaping_deprecated.ID ||
         Info.ID == diag::attr_warn_unused_result_removed.ID ||
         Info.ID == diag::any_as_anyobject_fixit.ID ||
         Info.ID == diag::deprecated_protocol_composition.ID ||

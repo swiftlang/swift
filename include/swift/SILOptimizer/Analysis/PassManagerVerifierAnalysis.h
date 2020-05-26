@@ -16,6 +16,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace swift {
 
@@ -25,12 +26,15 @@ namespace swift {
 /// All methods are no-ops when asserts are disabled.
 class PassManagerVerifierAnalysis : public SILAnalysis {
   /// The module that we are processing.
+  LLVM_ATTRIBUTE_UNUSED
   SILModule &mod;
 
-  /// The set of "live" functions that we are tracking.
+  /// The set of "live" functions that we are tracking. We store the names of
+  /// the functions so that if a function is deleted we do not need to touch its
+  /// memory to get its name.
   ///
   /// All functions in mod must be in liveFunctions and vis-a-versa.
-  llvm::DenseSet<SILFunction *> liveFunctions;
+  llvm::StringSet<> liveFunctionNames;
 
 public:
   PassManagerVerifierAnalysis(SILModule *mod);
@@ -57,7 +61,7 @@ public:
   void invalidateFunctionTables() override final;
 
   /// Run the entire verification.
-  void verify() const override final;
+  void verifyFull() const override final;
 };
 
 } // namespace swift

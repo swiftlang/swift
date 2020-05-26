@@ -1,0 +1,50 @@
+//===--- NSValue.swift - Bridging things in NSValue -----------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+from gyb_foundation_support import ObjectiveCBridgeableImplementationForNSValue
+}%
+
+import CoreGraphics
+
+${ ObjectiveCBridgeableImplementationForNSValue("NSRange") }
+${ ObjectiveCBridgeableImplementationForNSValue("CGRect") }
+${ ObjectiveCBridgeableImplementationForNSValue("CGPoint") }
+${ ObjectiveCBridgeableImplementationForNSValue("CGVector") }
+${ ObjectiveCBridgeableImplementationForNSValue("CGSize") }
+${ ObjectiveCBridgeableImplementationForNSValue("CGAffineTransform") }
+
+extension NSValue {
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    public func value<StoredType>(of type: StoredType.Type) -> StoredType? {
+        if StoredType.self is AnyObject.Type {
+            let encoding = String(cString: objCType)
+            // some subclasses of NSValue can return @ and the default initialized variant returns ^v for encoding
+            guard encoding == "^v" || encoding == "@" else {
+                return nil
+            }
+            return nonretainedObjectValue as? StoredType
+        } else if _isPOD(StoredType.self) {
+            var storedSize = 0
+            var storedAlignment = 0
+            NSGetSizeAndAlignment(objCType, &storedSize, &storedAlignment)
+            guard MemoryLayout<StoredType>.size == storedSize && MemoryLayout<StoredType>.alignment == storedAlignment else {
+                return nil
+            }
+            let allocated = UnsafeMutablePointer<StoredType>.allocate(capacity: 1)
+            defer { allocated.deallocate() }
+            getValue(allocated, size: storedSize)
+            return allocated.pointee
+        }
+        return nil
+    }
+}

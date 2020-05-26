@@ -168,4 +168,118 @@ SwitchTestSuite.test("GenericVar") {
   expectTrue(l === Gesture.pinch(l).valueVar as! LifetimeTracked)
 }
 
+SwitchTestSuite.test("TupleUnforwarding") {
+  // None of these switches should leak.
+  do {
+    let l = LifetimeTracked(0)
+    let r: Optional<Any> = LifetimeTracked(0) as Any
+
+    switch (l, r) {
+    case (_, _):
+      break
+    default:
+      break
+    }
+  }
+
+  do {
+    let l = LifetimeTracked(0)
+    let r: Optional<Any> = LifetimeTracked(0) as Any
+    switch (l, r) {
+    case let (x, _):
+      break
+    case let (_, y as AnyObject):
+      break
+    default:
+      break
+    }
+  }
+
+  do {
+    let l: Optional<LifetimeTracked> = LifetimeTracked(0)
+    let r: Optional<Any> = LifetimeTracked(0) as Any
+    switch (l, r) {
+    case let (_, _):
+      break
+    case let (_, y as AnyObject):
+      break
+    default:
+      break
+    }
+  }
+
+  do {
+    let l = LifetimeTracked(0)
+    let r: Optional<Any> = LifetimeTracked(0) as Any
+    switch (l, r) {
+    case let (_, y as AnyObject):
+      break
+    case let (x as AnyObject, _):
+      break
+    default:
+      break
+    }
+  }
+}
+
+protocol P {}
+
+SwitchTestSuite.test("Protocol Conformance Check Leaks") {
+  do {
+    let x = LifetimeTracked(0)
+    let y = LifetimeTracked(1)
+    switch (x, y) {
+    case (is P, is P):
+      break
+    default:
+      break
+    }
+  }
+}
+
+SwitchTestSuite.test("Enum Initialization Leaks") {
+  enum Enum1 {
+  case case1(LifetimeTracked)
+  case case2(LifetimeTracked, Int)
+  }
+
+  enum Enum2 {
+  case case1(LifetimeTracked)
+  case case2(Enum1, LifetimeTracked)
+  }
+
+  struct Struct {
+    var value: Enum2 = .case2(.case1(LifetimeTracked(0)), LifetimeTracked(1))
+
+    func doSomethingIfLet() {
+      if case let .case2(.case2(k, _), _) = value {
+        return
+      }
+    }
+
+    func doSomethingSwitch() {
+      switch value {
+      case let .case2(.case2(k, _), _):
+        return
+      default:
+        return
+      }
+      return
+    }
+
+    func doSomethingGuardLet() {
+      guard case let .case2(.case2(k, _), _) = value else {
+        return
+      }
+    }
+  }
+
+  do {
+    let s = Struct()
+    s.doSomethingIfLet()
+    s.doSomethingSwitch()
+    s.doSomethingGuardLet()
+  }
+}
+
 runAllTests()

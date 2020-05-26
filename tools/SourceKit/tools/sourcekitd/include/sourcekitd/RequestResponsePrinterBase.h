@@ -103,6 +103,11 @@ public:
       OSColor(OS, UIDColor) << UID;
     }
   }
+
+  void visitData(const void *Data, size_t Size) {
+    // FIXME: We should probably print the real data here
+    OS << "<data>";
+  }
 };
 
 }

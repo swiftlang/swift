@@ -1,0 +1,10 @@
+module CoreKit {
+  header "CoreKit.h"
+  export *
+}
+
+module ExportAsCoreKit_BAD {
+  header "ExportAsCoreKit.h"
+  export_as CoreKit
+  export *
+}

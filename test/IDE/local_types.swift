@@ -38,11 +38,12 @@ public func singleFunc() {
     case sfgei(Int)
   }
 
-  // We'll need to handle this if we start saving alias types.
-  // NEGATIVE-NOT: AliasAAA
+  // CHECK-DAG: AliasAAA
   typealias SingleFuncAliasAAA = Int
+  // We don't handle generic typealiases correctly quite yet.
+  // Re-enable this when <rdar://problem/43110802> is fixed.
   // NEGATIVE-NOT: AliasGGG
-  typealias GenericAliasGGG<T> = (T, T)
+  //typealias GenericAliasGGG<T> = (T, T)
 }
 
 public func singleFuncWithDuplicates(_ fake: Bool) {

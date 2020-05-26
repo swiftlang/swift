@@ -113,18 +113,18 @@ class FuncBugReducerTestCase(unittest.TestCase):
         args.extend(self.passes)
         output = self.run_check_output(args).split("\n")
         self.assertTrue("*** Successfully Reduced file!" in output)
-        self.assertTrue("*** Final Functions: "
-                        "$S18testreducefunction6foo505yyF")
+        self.assertTrue("*** Final Functions: " +
+                        "$s9testbasic6foo413yyF" in output)
         re_end = 'testfuncbugreducer_testbasic_'
-        re_end += '609e1004db568b06fd38729912380639.sib'
-        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        re_end += '92196894259b5d6c98d1b77f19240904.sib'
+        output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 1)
+        self.assertEqual(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in
         # the output. We want users to get sil output when they type in
         # the relevant command.
-        self.assertEquals([], [o for o in output if '-emit-sib' in o])
+        self.assertEqual([], [o for o in output if '-emit-sib' in o])
 
 
 if __name__ == '__main__':

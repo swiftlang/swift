@@ -1,0 +1,12 @@
+struct Test {
+    var base: Int
+    /*test:def*/<keywordBase>init</keywordBase>(<arglabel index=0>base</arglabel><param index=0></param>: Int) {}
+}
+
+_ = /*test:call*/Test(<callarg index=0>base</callarg><callcolon index=0>: </callcolon>3)
+_ = Test . /*test:call*/<keywordBase>init</keywordBase>(<callarg index=0>base</callarg><callcolon index=0>: </callcolon>3)
+_ = Test . /*test:ref*/<keywordBase>init</keywordBase>
+_ = Test . /*test:ref*/<keywordBase>init</keywordBase>(<sel index=0>base</sel>:)
+
+
+

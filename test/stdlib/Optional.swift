@@ -218,11 +218,11 @@ OptionalTests.test("flatMap") {
   let half: (Int32) -> Int16? =
     { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .none } }
 
-  expectOptionalEqual(2 as Int16, half(4))
+  expectEqual(2 as Int16, half(4))
   expectNil(half(3))
 
   expectNil((.none as Int32?).flatMap(half))
-  expectOptionalEqual(2 as Int16, (4 as Int32?).flatMap(half))
+  expectEqual(2 as Int16, (4 as Int32?).flatMap(half))
   expectNil((3 as Int32?).flatMap(half))
 }
 

@@ -11,7 +11,7 @@ representation of source, and facilities for *structured editing*.
 What is structured editing? It's an editing strategy that is keenly aware of the
 *structure* of source code, not necessarily its *representation* (i.e.
 characters or bytes). This can be achieved at different granularities: replacing
-an identifier, changing a call to global function to a method call, or indenting
+an identifier, changing a global function call to a method call, or indenting
 and formatting an entire source file based on declarative rules. These kinds of
 diverse operations are critical to the Swift Migrator, which is the immediate
 client for this library, now developed in the open. Along with that, the library
@@ -163,7 +163,7 @@ struct YourStruct {}
 At any point in the building process, you can call `build()` and get a
 reasonably formed Syntax node (i.e. with no raw `nullptr`s) using what you've
 provided to the builder so far. Anything that you haven't supplied is marked as
-*missing*. This is essentially what the parser does so, looking forward to
+*missing*. This is essentially what the parser does; so, looking forward to
 future adoption, the builders are designed with the parser in mind, with the
 hope that we can better specify recovery behavior and incremental (re-)parsing.
 
@@ -260,7 +260,7 @@ pieces of syntax that aren't really relevant to the semantics of the program,
 such as whitespace and comments. These are modeled as collections and, with the
 exception of comments, are sort of "run-length" encoded. For example, a sequence
 of four spaces is represented by `{ Kind: TriviaKind::Space, Count: 4 }`, not
-the literal text `"    "`.
+the literal text `"    "`.
 
 Some examples of the "atoms" of `Trivia`:
 
@@ -280,7 +280,10 @@ new `Syntax` nodes:
    the next newline character.
 
 2. Looking backward in the text, a token owns all of the leading trivia
-   up to and including the first contiguous sequence of newlines characters.
+   up to and including the first newline character.
+   
+In other words, a contiguous stretch of trivia between two tokens is split on the
+leftmost newline.
 
 Let's take a look at how this shows up in practice with a small snippet of Swift
 code.
@@ -387,7 +390,8 @@ Beyond this, `SyntaxData` nodes have *no significant public API*.
 
 - `SyntaxData` are immutable.
    However, they may mutate themselves in order to implement lazy instantiation
-   of children and caching. That caching operation transparent and thread-safe.
+   of children and caching. That caching operation is transparent and
+   thread-safe.
 - `SyntaxData` have identity, i.e. they can be compared with "pointer equality".
 - `SyntaxData` are implementation detail have no public API.
 
@@ -428,7 +432,7 @@ auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
 auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer,
                                             /*Semicolon=*/ None);
 
-auto RightBrace = SyntaxFactory::makeLeftBraceToken({}, {});
+auto RightBrace = SyntaxFactory::makeRightBraceToken({}, {});
 
 auto Statements = SyntaxFactory::makeBlankStmtList()
   .addStmt(Return);
@@ -502,7 +506,7 @@ following fields:
 
 | Key | Type | Description |
 | --- | ---- | ----------- |
-| `kind` | `String` | The `SyntaxKind` of this child. This must have a corresponding `Node` with that kind. |
+| `kind` | `String` | The `SyntaxKind` of this child. This must have a corresponding `Node` with that kind (or corresponding `Token` in both `include/swift/Syntax/TokenKinds.def` and `SYNTAX_TOKENS`). |
 | `is_optional` | `Bool?` | Whether this child is required in a fully-formed object, or if it is allowed to remain `missing`. Defaults to `false` if not present.
 | `token_choices` | `[String]?` | A list of `Token`s which are considered "valid" values for `Token` children. |
 | `text_choices` | `[String]?` | A list of valid textual values for tokens. If this is not provided, any textual value is accepted for tokens like `IdentifierToken`. |
@@ -510,7 +514,7 @@ following fields:
 #### Tokens
 
 A `Token` represents one of the `tok::` enums in
-`include/Syntax/TokenKinds.def`. `Token.py` has a top-level array of token
+`include/swift/Syntax/TokenKinds.def`. `Token.py` has a top-level array of token
 declarations. The `Token` class has the following fields.
 
 | Key | Type | Description |
@@ -523,7 +527,7 @@ declarations. The `Token` class has the following fields.
 
 libSyntax uses Swift's `gyb` tool to generate the `Syntax` subclasses,
 `SyntaxFactory` methods, `SyntaxKind` enum entry, and `SyntaxBuilder` class.
-These files rely on a support library located at `utils/gyb_syntax_support.py`
+These files rely on a support library located at `utils/gyb_syntax_support/`
 which holds some common logic used inside the `gyb` files. These `gyb` files
 will be re-generated whenever any Python files are changed.
 
@@ -555,47 +559,5 @@ Here's a handy checklist when implementing a production in the grammar.
     - check for a zero-diff print with `-round-trip-parse`
 - Update `lib/Syntax/Status.md` if applicable.
 
-## Try libSyntax in Xcode
-
-Here's how to build a Swift command line tool in Xcode using libSyntax:
-1. Download the latest open source toolchain from swift.org:
-  [Trunk Development (master)](https://swift.org/download/#snapshots).
-2. Run the downloaded package installer.
-3. Start Xcode and specify the just-installed toolchain to use in
-`Xcode->Toolchains->Swift Development Snapshot...`
-4. Create a new Swift command line tool project in Xcode.
-5. In the project's build setting, specify two variables:
-    - Runpath search paths: `$(TOOLCHAIN_DIR)/usr/lib/swift/macosx`
-    - Library search paths: `$(TOOLCHAIN_DIR)/usr/lib/swift/macosx`
-6. Now, in `main.swift`, we can `import SwiftSyntax` and experiment with its APIs.
-  For example, the following code snippet renames every function called `foo` to `bar`.
-
-```swift
-import Foundation
-import SwiftSyntax
-
-class Renamer: SyntaxRewriter {
-  override func visit(_ node: FunctionDeclSyntax) -> DeclSyntax {
-    if node.identifier.text == "foo" {
-      return super.visit(node.withIdentifier(SyntaxFactory.makeIdentifier("bar")))
-    } else {
-      return super.visit(node)
-    }
-  }
-}
-
-// Parse a .swift file
-let currentFile = URL(fileURLWithPath: "/tmp/test.swift")
-let currentFileContents = try String(contentsOf: currentFile)
-let parsed = try SourceFileSyntax.parse(currentFile)
-
-// Print the original file
-print("\n//======== Original =========\n")
-print(parsed)
-
-let R = Renamer()
-
-// Print the file after renaming
-print("\n//======== Renamed =========\n")
-print(R.visit(parsed))
-```
+## Use libSyntax from Swift code
+SwiftSyntax has been moved to [its own repository](https://github.com/apple/swift-syntax) as a SwiftPM package. Please follow the instructions in that repository for how to use it for a Swift tool.

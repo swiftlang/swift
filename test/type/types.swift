@@ -3,8 +3,8 @@
 var a : Int
 
 func test() {
-  var y : a   // expected-error {{use of undeclared type 'a'}}
-  var z : y   // expected-error {{use of undeclared type 'y'}}
+  var y : a   // expected-error {{cannot find type 'a' in scope}}
+  var z : y   // expected-error {{cannot find type 'y' in scope}}
   var w : Swift.print   // expected-error {{no type named 'print' in module 'Swift'}}
 }
 
@@ -18,14 +18,22 @@ var d3 : () -> Float = { 4 }
 
 var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{26-26=()}}
 
-var e0 : [Int]
-e0[] // expected-error {{cannot subscript a value of type '[Int]' with an index of type '()'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (Range<Int>),}}
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  var e0 : [Int]
+  e0[] // expected-error {{no exact matches in call to subscript}}
+  // expected-note@-1 {{candidate has partially matching parameter list (Int)}}
+  // expected-note@-2 {{candidate has partially matching parameter list (Range<Int>)}}
+  // expected-note@-3 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
+  // expected-note@-4 {{candidate has partially matching parameter list (RangeSet<Array<Int>.Index>)}}
+  // expected-note@-5 {{candidate has partially matching parameter list (Range<Array<Int>.Index>)}}
+  // expected-note@-6 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
+  // expected-note@-7 {{candidate has partially matching parameter list (RangeSet<Array<Int>.Index>)}}
+}
 
 var f0 : [Float]
 var f1 : [(Int,Int)]
 
-var g : Swift // expected-error {{use of undeclared type 'Swift'}} expected-note {{cannot use module 'Swift' as a type}}
+var g : Swift // expected-error {{cannot find type 'Swift' in scope}} expected-note {{cannot use module 'Swift' as a type}}
 
 var h0 : Int?
 _ = h0 == nil // no-warning
@@ -188,7 +196,7 @@ func foo3(inout a: Int -> Void) {} // expected-error {{'inout' before a paramete
 func sr5505(arg: Int) -> String {
   return "hello"
 }
-var _: sr5505 = sr5505 // expected-error {{use of undeclared type 'sr5505'}}
+var _: sr5505 = sr5505 // expected-error {{cannot find type 'sr5505' in scope}}
 
 typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'inout' must not be used on variadic parameters}}
                                                           // expected-error@-1 {{only a single element can be variadic}} {{35-39=}}

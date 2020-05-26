@@ -48,6 +48,7 @@ namespace swift {
   class Type;
   class Decl;
   class DeclContext;
+  class CallExpr;
   class ClangNode;
   class ClangImporter;
   class Token;
@@ -77,8 +78,8 @@ struct SourceCompleteResult {
 };
 
 SourceCompleteResult
-isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
-SourceCompleteResult isSourceInputComplete(StringRef Text);
+isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
+SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
 
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                     CompilerInvocation &Invok,
@@ -130,13 +131,6 @@ void getLocationInfoForClangNode(ClangNode ClangNode,
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
-Decl *getDeclFromUSR(ASTContext &context, StringRef USR, std::string &error);
-Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
-                                   std::string &error);
-
-Type getTypeFromMangledSymbolname(ASTContext &Ctx, StringRef mangledName,
-                                  std::string &error);
-
 class XMLEscapingPrinter : public StreamPrinter {
   public:
   XMLEscapingPrinter(raw_ostream &OS) : StreamPrinter(OS){};
@@ -170,7 +164,13 @@ struct ResolvedCursorInfo {
 
   ResolvedCursorInfo() = default;
   ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
-  
+
+  friend bool operator==(const ResolvedCursorInfo &lhs,
+                         const ResolvedCursorInfo &rhs) {
+    return lhs.SF == rhs.SF &&
+      lhs.Loc.getOpaquePointerValue() == rhs.Loc.getOpaquePointerValue();
+  }
+
   void setValueRef(ValueDecl *ValueD,
                    TypeDecl *CtorTyRef,
                    ExtensionDecl *ExtTyRef,
@@ -203,44 +203,7 @@ struct ResolvedCursorInfo {
   bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }
 };
 
-class CursorInfoResolver : public SourceEntityWalker {
-  SourceFile &SrcFile;
-  SourceLoc LocToResolve;
-  ResolvedCursorInfo CursorInfo;
-  Type ContainerType;
-  llvm::SmallVector<Expr*, 4> TrailingExprStack;
-
-public:
-  explicit CursorInfoResolver(SourceFile &SrcFile) :
-    SrcFile(SrcFile), CursorInfo(&SrcFile) {}
-  ResolvedCursorInfo resolve(SourceLoc Loc);
-  SourceManager &getSourceMgr() const;
-private:
-  bool walkToExprPre(Expr *E) override;
-  bool walkToExprPost(Expr *E) override;
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
-  bool walkToDeclPost(Decl *D) override;
-  bool walkToStmtPre(Stmt *S) override;
-  bool walkToStmtPost(Stmt *S) override;
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override;
-  bool visitCallArgName(Identifier Name, CharSourceRange Range,
-                        ValueDecl *D) override;
-  bool visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc,
-                                    ValueDecl *D) override;
-  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
-  bool rangeContainsLoc(SourceRange Range) const;
-  bool rangeContainsLoc(CharSourceRange Range) const;
-  bool isDone() const { return CursorInfo.isValid(); }
-  bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                  SourceLoc Loc, bool IsRef, Type Ty = Type());
-  bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
-  bool tryResolve(Stmt *St);
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                               Optional<AccessKind> AccKind,
-                               bool IsOpenBracket) override;
-};
+void simple_display(llvm::raw_ostream &out, const ResolvedCursorInfo &info);
 
 struct UnresolvedLoc {
   SourceLoc Loc;
@@ -259,9 +222,16 @@ struct ResolvedLoc {
   ASTWalker::ParentTy Node;
   CharSourceRange Range;
   std::vector<CharSourceRange> LabelRanges;
+  Optional<unsigned> FirstTrailingLabel;
   LabelRangeType LabelType;
   bool IsActive;
   bool IsInSelector;
+};
+
+/// Used by NameMatcher to track parent CallExprs when walking a checked AST.
+struct CallingParent {
+  Expr *ApplicableTo;
+  CallExpr *Call;
 };
 
 
@@ -275,8 +245,15 @@ class NameMatcher: public ASTWalker {
   std::vector<UnresolvedLoc> LocsToResolve;
   std::vector<ResolvedLoc> ResolvedLocs;
   ArrayRef<Token> TokensToCheck;
+
+  /// The \c Expr argument of a parent \c CustomAttr (if one exists) and
+  /// the \c SourceLoc of the type name it applies to.
+  llvm::Optional<Located<Expr *>> CustomAttrArg;
   unsigned InactiveConfigRegionNestings = 0;
   unsigned SelectorNestings = 0;
+
+  /// The stack of parent CallExprs and the innermost expression they apply to.
+  std::vector<CallingParent> ParentCalls;
 
   SourceManager &getSourceMgr() const;
 
@@ -290,10 +267,12 @@ class NameMatcher: public ASTWalker {
   bool shouldSkip(SourceRange Range);
   bool shouldSkip(CharSourceRange Range);
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc);
-  bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc, Expr *Arg,
-                  bool checkParentForLabels = false);
+  bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc, Expr *Arg);
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc, LabelRangeType RangeType,
-                  ArrayRef<CharSourceRange> LabelLocs);
+                  ArrayRef<CharSourceRange> LabelLocs,
+                  Optional<unsigned> FirstTrailingLabel);
+  bool handleCustomAttrs(Decl *D);
+  Expr *getApplicableArgFor(Expr* E);
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override;
   Expr* walkToExprPost(Expr *E) override;
@@ -308,10 +287,13 @@ class NameMatcher: public ASTWalker {
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
   bool shouldWalkIntoGenericParams() override { return true; }
 
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override { return true; }
 
 public:
   explicit NameMatcher(SourceFile &SrcFile) : SrcFile(SrcFile) { }
   std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
+  ResolvedLoc resolve(UnresolvedLoc Loc);
 };
 
 enum class RangeKind : int8_t {
@@ -401,32 +383,26 @@ struct ResolvedRangeInfo {
                     TokensInRange, nullptr, /*Commom Expr Parent*/nullptr,
                     /*Single entry*/true, /*unhandled error*/false,
                     OrphanKind::None, {}, {}, {}) {}
-  void print(llvm::raw_ostream &OS);
+  ResolvedRangeInfo(): ResolvedRangeInfo(ArrayRef<Token>()) {}
+  void print(llvm::raw_ostream &OS) const;
   ExitState exit() const { return ExitInfo.Exit; }
   Type getType() const { return ExitInfo.ReturnType; }
+
+  friend bool operator==(const ResolvedRangeInfo &lhs,
+                         const ResolvedRangeInfo &rhs) {
+    if (lhs.TokensInRange.size() != rhs.TokensInRange.size())
+      return false;
+    if (lhs.TokensInRange.empty())
+      return true;
+    return lhs.TokensInRange.front().getLoc() ==
+      rhs.TokensInRange.front().getLoc();
+  }
 
 private:
   static CharSourceRange calculateContentRange(ArrayRef<Token> Tokens);
 };
 
-class RangeResolver : public SourceEntityWalker {
-  struct Implementation;
-  std::unique_ptr<Implementation> Impl;
-  bool walkToExprPre(Expr *E) override;
-  bool walkToExprPost(Expr *E) override;
-  bool walkToStmtPre(Stmt *S) override;
-  bool walkToStmtPost(Stmt *S) override;
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
-  bool walkToDeclPost(Decl *D) override;
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override;
-public:
-  RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
-  RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);
-  ~RangeResolver();
-  ResolvedRangeInfo resolve();
-};
+void simple_display(llvm::raw_ostream &out, const ResolvedRangeInfo &info);
 
 /// This provides a utility to view a printed name by parsing the components
 /// of that name. The components include a base name and an array of argument
@@ -598,15 +574,33 @@ enum class LabelRangeEndAt: int8_t {
 struct CallArgInfo {
   Expr *ArgExp;
   CharSourceRange LabelRange;
+  bool IsTrailingClosure;
   CharSourceRange getEntireCharRange(const SourceManager &SM) const;
 };
 
 std::vector<CallArgInfo>
 getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
 
-// Get the ranges of argument labels from an Arg, either tuple or paren.
-std::vector<CharSourceRange>
+// Get the ranges of argument labels from an Arg, either tuple or paren, and
+// the index of the first trailing closure argument, if any. This includes empty
+// ranges for any unlabelled arguments, including the first trailing closure.
+std::pair<std::vector<CharSourceRange>, Optional<unsigned>>
 getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
+
+/// Whether a decl is defined from clang source.
+bool isFromClang(const Decl *D);
+
+/// Retrieve the effective Clang node for the given declaration, which
+/// copes with the odd case of imported Error enums.
+ClangNode getEffectiveClangNode(const Decl *decl);
+
+/// Retrieve the Clang node for the given extension, if it has one.
+ClangNode extensionGetClangNode(const ExtensionDecl *ext);
+
+/// Utility for finding the referenced declaration from a call, which might
+/// include a second level of function application for a 'self.' expression,
+/// or a curry thunk, etc.
+std::pair<Type, ConcreteDeclRef> getReferencedDecl(Expr *expr);
 
 } // namespace ide
 } // namespace swift

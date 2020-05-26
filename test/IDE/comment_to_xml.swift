@@ -6,4 +6,5 @@
 // RUN: %FileCheck %s -check-prefix=WRONG < %t.txt
 
 // REQUIRES: no_asan
+// REQUIRES: libxml2
 // WRONG-NOT: CommentXMLInvalid

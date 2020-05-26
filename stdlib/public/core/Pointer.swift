@@ -32,7 +32,7 @@ extension _Pointer {
   ///
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
   @_transparent
-  public init(_ from : OpaquePointer) {
+  public init(_ from: OpaquePointer) {
     self.init(from._rawValue)
   }
 
@@ -41,7 +41,7 @@ extension _Pointer {
   /// - Parameter from: The opaque pointer to convert to a typed pointer. If
   ///   `from` is `nil`, the result of this initializer is `nil`.
   @_transparent
-  public init?(_ from : OpaquePointer?) {
+  public init?(_ from: OpaquePointer?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
@@ -80,7 +80,7 @@ extension _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  public init(_ other: Self) {
+  public init(@_nonEphemeral _ other: Self) {
     self.init(other._rawValue)
   }
 
@@ -89,37 +89,9 @@ extension _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?(_ other: Self?) {
+  public init?(@_nonEphemeral _ other: Self?) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped._rawValue)
-  }
-
-  // all pointers are creatable from mutable pointers
-  
-  /// Creates a new pointer from the given mutable pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The typed pointer to convert.
-  @_transparent
-  public init<T>(_ other: UnsafeMutablePointer<T>) {
-    self.init(other._rawValue)
-  }
-
-  /// Creates a new raw pointer from the given typed pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
-  ///   result is `nil`.
-  @_transparent
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
-    guard let unwrapped = other else { return nil }
-    self.init(unwrapped)
   }
 }
 
@@ -165,7 +137,7 @@ extension _Pointer /*: Strideable*/ {
   ///
   /// - Returns: A pointer advanced from this pointer by
   ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
+  @_transparent
   public func successor() -> Self {
     return advanced(by: 1)
   }
@@ -177,7 +149,7 @@ extension _Pointer /*: Strideable*/ {
   ///
   /// - Returns: A pointer shifted backward from this pointer by
   ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
+  @_transparent
   public func predecessor() -> Self {
     return advanced(by: -1)
   }
@@ -199,7 +171,7 @@ extension _Pointer /*: Strideable*/ {
   /// - Returns: The distance from this pointer to `end`, in strides of the
   ///   pointer's `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
-  @inlinable
+  @_transparent
   public func distance(to end: Self) -> Int {
     return
       Int(Builtin.sub_Word(Builtin.ptrtoint_Word(end._rawValue),
@@ -222,7 +194,7 @@ extension _Pointer /*: Strideable*/ {
   ///   zero.
   /// - Returns: A pointer offset from this pointer by `n` instances of the
   ///   `Pointee` type.
-  @inlinable
+  @_transparent
   public func advanced(by n: Int) -> Self {
     return Self(Builtin.gep_Word(
       self._rawValue, n._builtinWordValue, Pointee.self))
@@ -236,7 +208,7 @@ extension _Pointer /*: Hashable */ {
   }
 
   @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     return Hasher._hash(seed: seed, UInt(bitPattern: self))
   }
 }
@@ -264,7 +236,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable
+  @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
       self = Int(Builtin.ptrtoint_Word(pointer._rawValue))
@@ -282,7 +254,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable
+  @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
       self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))
@@ -293,19 +265,19 @@ extension UInt {
 }
 
 // Pointer arithmetic operators (formerly via Strideable)
-extension Strideable where Self : _Pointer {
+extension Strideable where Self: _Pointer {
   @_transparent
-  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+  public static func + (@_nonEphemeral lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: rhs)
   }
 
   @_transparent
-  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+  public static func + (lhs: Self.Stride, @_nonEphemeral rhs: Self) -> Self {
     return rhs.advanced(by: lhs)
   }
 
   @_transparent
-  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+  public static func - (@_nonEphemeral lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: -rhs)
   }
 
@@ -329,8 +301,8 @@ extension Strideable where Self : _Pointer {
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertPointerToPointerArgument<
-  FromPointer : _Pointer,
-  ToPointer : _Pointer
+  FromPointer: _Pointer,
+  ToPointer: _Pointer
 >(_ from: FromPointer) -> ToPointer {
   return ToPointer(from._rawValue)
 }
@@ -339,7 +311,7 @@ func _convertPointerToPointerArgument<
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertInOutToPointerArgument<
-  ToPointer : _Pointer
+  ToPointer: _Pointer
 >(_ from: Builtin.RawPointer) -> ToPointer {
   return ToPointer(from)
 }
@@ -374,7 +346,7 @@ func _convertConstArrayToPointerArgument<
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
-  ToPointer : _Pointer
+  ToPointer: _Pointer
 >(_ a: inout [FromElement]) -> (AnyObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
@@ -387,10 +359,9 @@ func _convertMutableArrayToPointerArgument<
 }
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
-@inlinable // FIXME(sil-serialize-all)
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
-  ToPointer : _Pointer
+  ToPointer: _Pointer
 >(_ str: String) -> (AnyObject?, ToPointer) {
   let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)

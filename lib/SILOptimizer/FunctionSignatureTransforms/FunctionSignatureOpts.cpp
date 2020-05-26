@@ -41,12 +41,13 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -64,10 +65,16 @@ using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 //===----------------------------------------------------------------------===//
 
 /// Set to true to enable the support for partial specialization.
-llvm::cl::opt<bool>
+static llvm::cl::opt<bool>
     FSOEnableGenerics("sil-fso-enable-generics", llvm::cl::init(true),
                       llvm::cl::desc("Support function signature optimization "
                                      "of generic functions"));
+
+static llvm::cl::opt<bool>
+    FSOOptimizeIfNotCalled("sil-fso-optimize-if-not-called",
+                           llvm::cl::init(false),
+                           llvm::cl::desc("Optimize even if a function isn't "
+                                          "called. For testing only!"));
 
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
@@ -88,7 +95,7 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
-/// Returns true if F is a function which the pass know show to specialize
+/// Returns true if F is a function which the pass knows how to specialize
 /// function signatures for.
 static bool canSpecializeFunction(SILFunction *F,
                                   const CallerAnalysis::FunctionInfo *FuncInfo,
@@ -100,6 +107,10 @@ static bool canSpecializeFunction(SILFunction *F,
 
   // For now ignore functions with indirect results.
   if (F->getConventions().hasIndirectSILResults())
+    return false;
+
+  // For now ignore coroutines.
+  if (F->getLoweredFunctionType()->isCoroutine())
     return false;
 
   // Do not specialize the signature of always inline functions. We
@@ -185,10 +196,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
     Mangler.setReturnValueOwnedToUnowned();
   }
 
-  auto MangledName = Mangler.mangle();
-  assert(!F->getModule().hasFunction(MangledName));
-
-  return MangledName;
+  return Mangler.mangle();
 }
 
 /// Collect all archetypes used by a function.
@@ -196,25 +204,36 @@ static bool usesGenerics(SILFunction *F,
                          ArrayRef<SILParameterInfo> InterfaceParams,
                          ArrayRef<SILResultInfo> InterfaceResults) {
   CanSILFunctionType FTy = F->getLoweredFunctionType();
-  auto HasGenericSignature = FTy->getGenericSignature() != nullptr;
+  auto HasGenericSignature = FTy->getInvocationGenericSignature() != nullptr;
   if (!HasGenericSignature)
     return false;
 
   bool UsesGenerics = false;
 
-  auto FindArchetypesAndGenericTypes = [&UsesGenerics](Type Ty) {
-    if (Ty.findIf([](Type Ty) -> bool {
-          return (Ty->hasTypeParameter() || Ty->hasArchetype());
+  auto FindArchetypesAndGenericTypes = [FTy, &UsesGenerics](Type Ty) {
+    if (Ty.findIf([FTy](Type Ty) -> bool {
+          // Assume archetypes are always a problem.
+          // TODO: This can ignore non-contextual archetypes.
+          if (Ty->hasArchetype()) return true;
+
+          // Assume type parameters are always a problem.  However, this
+          // can ignore types that would substitute to concrete types.
+          if (Ty->isTypeParameter()) {
+            auto subs = FTy->getPatternSubstitutions();
+            return (!subs || Ty.subst(subs)->isTypeParameter());
+          }
+
+          return false;
         }))
       UsesGenerics = true;
   };
 
   for (auto Param : InterfaceParams) {
-    Param.getType().visit(FindArchetypesAndGenericTypes);
+    Param.getInterfaceType().visit(FindArchetypesAndGenericTypes);
   }
 
   for (auto Result : InterfaceResults) {
-    Result.getType().visit(FindArchetypesAndGenericTypes);
+    Result.getInterfaceType().visit(FindArchetypesAndGenericTypes);
   }
 
   if (UsesGenerics)
@@ -270,26 +289,26 @@ static void mapInterfaceTypes(SILFunction *F,
                               Optional<SILResultInfo> &InterfaceErrorResult) {
 
   for (auto &Param : InterfaceParams) {
-    if (!Param.getType()->hasArchetype())
+    if (!Param.getInterfaceType()->hasArchetype())
       continue;
     Param = SILParameterInfo(
-        Param.getType()->mapTypeOutOfContext()->getCanonicalType(),
+        Param.getInterfaceType()->mapTypeOutOfContext()->getCanonicalType(),
         Param.getConvention());
   }
 
   for (auto &Result : InterfaceResults) {
-    if (!Result.getType()->hasArchetype())
+    if (!Result.getInterfaceType()->hasArchetype())
       continue;
-    auto InterfaceResult = Result.getWithType(
-        Result.getType()->mapTypeOutOfContext()->getCanonicalType());
+    auto InterfaceResult = Result.getWithInterfaceType(
+        Result.getInterfaceType()->mapTypeOutOfContext()->getCanonicalType());
     Result = InterfaceResult;
   }
 
   if (InterfaceErrorResult.hasValue()) {
-    if (InterfaceErrorResult.getValue().getType()->hasArchetype()) {
+    if (InterfaceErrorResult.getValue().getInterfaceType()->hasArchetype()) {
       InterfaceErrorResult =
           SILResultInfo(InterfaceErrorResult.getValue()
-                            .getType()
+                            .getInterfaceType()
                             ->mapTypeOutOfContext()
                             ->getCanonicalType(),
                         InterfaceErrorResult.getValue().getConvention());
@@ -302,7 +321,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
   SILFunction *F = OriginalFunction;
   CanSILFunctionType FTy = F->getLoweredFunctionType();
   auto ExpectedFTy = F->getLoweredType().castTo<SILFunctionType>();
-  auto HasGenericSignature = FTy->getGenericSignature() != nullptr;
+  auto HasGenericSignature = FTy->getSubstGenericSignature() != nullptr;
 
   // The only way that we modify the arity of function parameters is here for
   // dead arguments. Doing anything else is unsafe since by definition non-dead
@@ -322,7 +341,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
       auto &RV = ResultDescList[0];
       if (!RV.CalleeRetain.empty()) {
         ++NumOwnedConvertedToNotOwnedResult;
-        InterfaceResults.push_back(SILResultInfo(InterfaceResult.getType(),
+        InterfaceResults.push_back(SILResultInfo(InterfaceResult.getInterfaceType(),
                                                  ResultConvention::Unowned));
         continue;
       }
@@ -354,27 +373,26 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     // The set of used archetypes is complete now.
     if (!UsesGenerics) {
       // None of the generic type parameters are used.
-      DEBUG(llvm::dbgs() << "None of generic parameters are used by "
-                         << F->getName() << "\n";
-            llvm::dbgs() << "Interface params:\n";
-            for (auto Param : InterfaceParams) {
-              Param.getType().dump();
-            }
+      LLVM_DEBUG(llvm::dbgs() << "None of generic parameters are used by "
+                              << F->getName() << "\n";
+                 llvm::dbgs() << "Interface params:\n";
+                 for (auto Param : InterfaceParams) {
+                   Param.getInterfaceType().dump(llvm::dbgs());
+                 }
 
-            llvm::dbgs()
-            << "Interface results:\n";
-            for (auto Result : InterfaceResults) {
-              Result.getType().dump();
-            });
+                 llvm::dbgs() << "Interface results:\n";
+                 for (auto Result : InterfaceResults) {
+                   Result.getInterfaceType().dump(llvm::dbgs());
+                 });
     }
   }
 
   // Don't use a method representation if we modified self.
   auto ExtInfo = FTy->getExtInfo();
-  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrNone();
+  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrInvalid();
   if (shouldModifySelfArgument) {
     ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-    witnessMethodConformance = None;
+    witnessMethodConformance = ProtocolConformanceRef::forInvalid();
   }
 
   Optional<SILResultInfo> InterfaceErrorResult;
@@ -386,12 +404,13 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
   // proper interface type. This is required for generic functions.
   mapInterfaceTypes(F, InterfaceParams, InterfaceResults, InterfaceErrorResult);
 
-  GenericSignature *GenericSig =
-      UsesGenerics ? FTy->getGenericSignature() : nullptr;
+  GenericSignature GenericSig =
+      UsesGenerics ? FTy->getInvocationGenericSignature() : nullptr;
 
   return SILFunctionType::get(
       GenericSig, ExtInfo, FTy->getCoroutineKind(), FTy->getCalleeConvention(),
       InterfaceParams, InterfaceYields, InterfaceResults, InterfaceErrorResult,
+      FTy->getPatternSubstitutions(), SubstitutionMap(),
       F->getModule().getASTContext(), witnessMethodConformance);
 }
 
@@ -420,9 +439,9 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
     AD.ProjTree.getLiveLeafNodes(LeafNodes);
     for (auto Node : LeafNodes) {
       SILType Ty = Node->getType();
-      DEBUG(llvm::dbgs() << "                " << Ty << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "                " << Ty << "\n");
       // If Ty is trivial, just pass it directly.
-      if (Ty.isTrivial(AD.Arg->getModule())) {
+      if (Ty.isTrivial(*AD.Arg->getFunction())) {
         SILParameterInfo NewInfo(Ty.getASTType(),
                                  ParameterConvention::Direct_Unowned);
         Out.push_back(NewInfo);
@@ -460,7 +479,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
       llvm_unreachable("Unknown parameter convention transformation");
     }
 
-    SILParameterInfo NewInfo(AD.PInfo.getValue().getType(),
+    SILParameterInfo NewInfo(AD.PInfo.getValue().getInterfaceType(),
                              ParameterConvention);
     Out.push_back(NewInfo);
     return;
@@ -479,13 +498,19 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
   SILModule &M = F->getModule();
   std::string Name = TransformDescriptor.createOptimizedSILFunctionName();
+  // The transformed function must not already exist. This would indicate
+  // repeated application of FSO on the same function. That situation should be
+  // detected earlier by avoiding reoptimization of FSO thunks.
+  assert(!F->getModule().hasFunction(Name));
+
   SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
-  DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  -> create specialized function " << Name
+                          << "\n");
 
   auto NewFTy = TransformDescriptor.createOptimizedSILFunctionType();
   GenericEnvironment *NewFGenericEnv;
-  if (NewFTy->getGenericSignature()) {
+  if (NewFTy->getInvocationGenericSignature()) {
     NewFGenericEnv = F->getGenericEnvironment();
   } else {
     NewFGenericEnv = nullptr;
@@ -494,14 +519,15 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // The specialized function is an internal detail, so we need to disconnect it
   // from a parent class, if one exists, thus the override of the
   // classSubclassScope.
-  TransformDescriptor.OptimizedFunction = M.createFunction(
+  TransformDescriptor.OptimizedFunction = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), F->getEntryCount(), F->isThunk(),
+      F->isTransparent(), F->isSerialized(), IsNotDynamic, F->getEntryCount(),
+      F->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
   SILFunction *NewF = TransformDescriptor.OptimizedFunction.get();
-  if (!F->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!F->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
 
   if (F->isSpecialization()) {
@@ -523,10 +549,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   ArgumentExplosionFinalizeOptimizedFunction();
 
   // Update the ownership kinds of function entry BB arguments.
-  for (auto Arg : NewF->begin()->getFunctionArguments()) {
+  for (auto Arg : NewF->begin()->getSILFunctionArguments()) {
     SILType MappedTy = Arg->getType();
     auto Ownershipkind =
-        ValueOwnershipKind(M, MappedTy, Arg->getArgumentConvention());
+        ValueOwnershipKind(*NewF, MappedTy, Arg->getArgumentConvention());
     Arg->setOwnershipKind(Ownershipkind);
   }
 
@@ -557,7 +583,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
   SILValue ReturnValue;
   SILType LoweredType = NewF->getLoweredType();
-  SILType ResultType = NewF->getConventions().getSILResultType();
+  SILType ResultType = NewF->getConventions().getSILResultType(
+      Builder.getTypeExpansionContext());
   auto GenCalleeType = NewF->getLoweredFunctionType();
   auto SubstCalleeSILType = LoweredType;
   SubstitutionMap Subs;
@@ -566,11 +593,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // Produce a substitutions list and a set of substituted SIL types
     // required for creating a new SIL function.
     Subs = F->getForwardingSubstitutionMap();
-    auto SubstCalleeType =
-        GenCalleeType->substGenericArgs(M, Subs);
+    auto SubstCalleeType = GenCalleeType->substGenericArgs(
+        M, Subs, Builder.getTypeExpansionContext());
     SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
     SILFunctionConventions Conv(SubstCalleeType, M);
-    ResultType = Conv.getSILResultType();
+    ResultType = Conv.getSILResultType(Builder.getTypeExpansionContext());
   }
   auto FunctionTy = LoweredType.castTo<SILFunctionType>();
   if (FunctionTy->hasErrorResult()) {
@@ -578,23 +605,23 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
     ReturnValue =
-        NormalBlock->createPHIArgument(ResultType, ValueOwnershipKind::Owned);
+        NormalBlock->createPhiArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
-        SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
+        SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getInterfaceType());
     auto *ErrorArg =
-        ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
+        ErrorBlock->createPhiArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, Subs, ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);
     Builder.createThrow(Loc, ErrorArg);
     Builder.setInsertionPoint(NormalBlock);
   } else {
-    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs, false);
+    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs);
   }
 
   // Set up the return results.
-  if (NewF->isNoReturnFunction()) {
+  if (NewF->isNoReturnFunction(Builder.getTypeExpansionContext())) {
     Builder.createUnreachable(Loc);
   } else {
     Builder.createReturn(Loc, ReturnValue);
@@ -608,27 +635,46 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
 // Run the optimization.
 bool FunctionSignatureTransform::run(bool hasCaller) {
-  bool Changed = false;
+  // We use a reference here on purpose so our transformations can know if we
+  // are going to make a thunk and thus should just optimize.
+  bool &Changed = TransformDescriptor.Changed;
+  bool hasOnlyDirectInModuleCallers =
+      TransformDescriptor.hasOnlyDirectInModuleCallers;
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
-  if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
-    DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
+  // If we are asked to assume a caller for testing purposes, set the flag.
+  hasCaller |= FSOOptimizeIfNotCalled;
+
+  if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
+                     canBeCalledIndirectly(F->getRepresentation()))) {
+    LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
+    return false;
+  }
+
+  // Bail if we have a pseudo-generic function. We do not handle these today. If
+  // we let it through here we crash when attempting to compute the optimized
+  // function type.
+  //
+  // TODO: Add support for this.
+  if (F->getLoweredFunctionType()->isPseudogeneric()) {
+    LLVM_DEBUG(llvm::dbgs() << "  function is pseudo-generic -> abort\n");
     return false;
   }
 
   // Run OwnedToGuaranteed optimization.
   if (OwnedToGuaranteedAnalyze()) {
     Changed = true;
-    DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
+    LLVM_DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
     OwnedToGuaranteedTransform();
   }
 
   // Run DeadArgument elimination transformation. We only specialize
   // if this function has a caller inside the current module or we have
   // already created a thunk.
-  if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
+  if ((hasCaller || Changed || hasOnlyDirectInModuleCallers) &&
+      DeadArgumentAnalyzeParameters()) {
     Changed = true;
-    DEBUG(llvm::dbgs() << "  remove dead arguments\n");
+    LLVM_DEBUG(llvm::dbgs() << "  remove dead arguments\n");
     DeadArgumentTransformFunction();
   }
 
@@ -644,7 +690,8 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // In order to not miss any opportunity, we send the optimized function
   // to the passmanager to optimize any opportunities exposed by argument
   // explosion.
-  if ((hasCaller || Changed) && ArgumentExplosionAnalyzeParameters()) {
+  if ((hasCaller || Changed || hasOnlyDirectInModuleCallers) &&
+      ArgumentExplosionAnalyzeParameters()) {
     Changed = true;
   }
 
@@ -697,12 +744,12 @@ bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
     // parameters (as a replacement for the removed partial_apply).
     //
     // TODO: Maybe we can skip this restriction when we have semantic ARC.
-    if (ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
+    if (ArgumentDescList[Idx].Arg->getType().isTrivial(*F))
       continue;
     return false;
   }
 
-  DEBUG(llvm::dbgs() << "  remove dead arguments for partial_apply\n");
+  LLVM_DEBUG(llvm::dbgs() << "  remove dead arguments for partial_apply\n");
   DeadArgumentTransformFunction();
   createFunctionSignatureOptimizedFunction();
   return true;
@@ -737,8 +784,12 @@ public:
     if (!F->shouldOptimize())
       return;
 
+    if (F->isDynamicallyReplaceable())
+      return;
+
     // This is the function to optimize.
-    DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName()
+                            << " ***\n");
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
@@ -746,18 +797,31 @@ public:
     // applies.
     if (!OptForPartialApply &&
         !canSpecializeFunction(F, nullptr, OptForPartialApply)) {
-      DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
+      LLVM_DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
       return;
     }
 
-    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
-    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
+    const CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getFunctionInfo(F);
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
     if (OptForPartialApply &&
         !canSpecializeFunction(F, &FuncInfo, OptForPartialApply)) {
-      DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
+      LLVM_DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
+      return;
+    }
+
+    // Never repeat the same function signature optimization on the same
+    // function. Multiple function signature optimizations are composed by
+    // successively optmizing the newly created functions. Each optimization
+    // creates a new level of thunk which are all ultimately inlined away.
+    //
+    // This happens, for example, when a reference to the original function is
+    // discovered during devirtualization. That will cause the original function
+    // (now an FSO thunk) to be pushed back on the function pass pipeline.
+    if (F->isThunk() == IsSignatureOptimizedThunk) {
+      LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
       return;
     }
 
@@ -784,7 +848,7 @@ public:
     llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
     llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
-    auto Args = F->begin()->getFunctionArguments();
+    auto Args = F->begin()->getSILFunctionArguments();
     for (unsigned i : indices(Args)) {
       ArgumentDescList.emplace_back(Args[i], Allocator);
     }
@@ -792,15 +856,17 @@ public:
       ResultDescList.emplace_back(IR);
     }
 
+    SILOptFunctionBuilder FuncBuilder(*this);
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, RCIA, EA, Mangler, AIM,
-                                   ArgumentDescList, ResultDescList);
+    FunctionSignatureTransform FST(FuncBuilder, F, RCIA, EA, Mangler, AIM,
+                                   ArgumentDescList, ResultDescList,
+                                   FuncInfo.foundAllCallers());
 
     bool Changed = false;
     if (OptForPartialApply) {
       Changed = FST.removeDeadArgs(FuncInfo.getMinPartialAppliedArgs());
     } else {
-      Changed = FST.run(FuncInfo.hasCaller());
+      Changed = FST.run(FuncInfo.hasDirectCaller());
     }
 
     if (!Changed) {
@@ -815,7 +881,7 @@ public:
 
     // Make sure the PM knows about this function. This will also help us
     // with self-recursion.
-    notifyAddFunction(FST.getOptimizedFunction(), F);
+    addFunctionToPassManagerWorklist(FST.getOptimizedFunction(), F);
 
     if (!OptForPartialApply) {
       // We have to restart the pipeline for this thunk in order to run the

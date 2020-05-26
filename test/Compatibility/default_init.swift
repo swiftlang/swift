@@ -4,13 +4,15 @@
 
 class NotInitializableOptionalClass {
   var opt: Optional<Int>
+  var empty: Void
 }
 
-struct NotInitializableOptionalStruct { // expected-note {{'init(opt:)' declared here}}
+struct NotInitializableOptionalStruct {
   var opt: Optional<Int>
+  var empty: Void
 }
 
 func testBadDefaultInit() {
-  _ = NotInitializableOptionalStruct() // expected-error {{missing argument for parameter 'opt' in call}}
+  _ = NotInitializableOptionalStruct()
   _ = NotInitializableOptionalClass()
 }

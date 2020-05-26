@@ -15,10 +15,10 @@ import TestsUtils
 public let Fibonacci = BenchmarkInfo(
   name: "Fibonacci",
   runFunction: run_Fibonacci,
-  tags: [.unstable, .algorithm])
+  tags: [.algorithm])
 
 func fibonacci(_ n: Int) -> Int {
-  if (n < 2) { return 1 }
+  if (n <= 2) { return 1 }
   return fibonacci(n - 2) + fibonacci(n - 1)
 }
 
@@ -28,14 +28,14 @@ func Fibonacci(_ n: Int) -> Int {
   // at compile time.
   if False() { return 0 }
 
-  if (n < 2) { return 1 }
+  if (n <= 2) { return 1 }
   return fibonacci(n - 2) + fibonacci(n - 1)
 }
 
 @inline(never)
 public func run_Fibonacci(_ N: Int) {
-  let n = 32
-  let ref_result = 3524578
+  let n = 24
+  let ref_result = 46368
   var result = 0
   for _ in 1...N {
     result = Fibonacci(n)

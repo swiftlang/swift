@@ -1,7 +1,8 @@
+open class Root {}
 
 #if BEFORE
 
-open class FirstMiddle {
+open class FirstMiddle : Root {
   let x: String
 
   public init(x: String) {
@@ -13,7 +14,7 @@ open class FirstMiddle {
   }
 }
 
-open class SecondMiddle {
+open class SecondMiddle : Root {
   let x: String
 
   public init(x: String) {
@@ -25,7 +26,7 @@ open class SecondMiddle {
   }
 }
 
-open class GenericMiddle<T> {
+open class GenericMiddle<T> : Root {
   let x: T
 
   public init(x: T) {
@@ -40,7 +41,7 @@ open class GenericMiddle<T> {
 #else
 
 // Insert concrete superclass
-open class Base {
+open class Base : Root {
   let x: String
 
   public init(t: String) {
@@ -59,7 +60,7 @@ open class FirstMiddle : Base {
 }
 
 // Insert generic superclass
-open class GenericBase<T> {
+open class GenericBase<T> : Root {
   let x: T
 
   public init(t: T) {

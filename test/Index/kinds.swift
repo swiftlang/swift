@@ -108,14 +108,16 @@ class AClass {
   }
 
   // ClassProperty
-  class let classProperty = 1
-  // CHECK: [[@LINE-1]]:13 | class-property/Swift | classProperty | s:14swift_ide_test6AClassC13classPropertySivpZ | Def,RelChild | rel: 1
+  class var classProperty: Int!
+  // CHECK: [[@LINE-1]]:13 | class-property/Swift | classProperty | s:14swift_ide_test6AClassC13classPropertySiSgvpZ | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
+  // CHECK: [[@LINE-3]]:13 | class-method/acc-get/Swift | getter:classProperty | s:14swift_ide_test6AClassC13classPropertySiSgvgZ | Def,Dyn,Impl,RelChild,RelAcc | rel: 1
 
   // StaticProperty
-  static let staticProperty = 1
-  // CHECK: [[@LINE-1]]:14 | static-property/Swift | staticProperty | s:14swift_ide_test6AClassC14staticPropertySivpZ | Def,RelChild | rel: 1
+  static var staticProperty: Int!
+  // CHECK: [[@LINE-1]]:14 | static-property/Swift | staticProperty | s:14swift_ide_test6AClassC14staticPropertySiSgvpZ | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
+  // CHECK: [[@LINE-3]]:14 | static-method/acc-get/Swift | getter:staticProperty | s:14swift_ide_test6AClassC14staticPropertySiSgvgZ | Def,Impl,RelChild,RelAcc | rel: 1
 
   // Constructor
   init() {}
@@ -247,3 +249,11 @@ _ = ImplCtors()
 // CHECK: [[@LINE-1]]:5 | constructor/Swift | init() | [[ImplCtors_init_USR]] | Ref,Call | rel: 0
 _ = ImplCtors(x:0)
 // CHECK: [[@LINE-1]]:5 | constructor/Swift | init(x:) | [[ImplCtors_init_with_param_USR]] | Ref,Call | rel: 0
+
+var globalCompProp: Int // CHECK: [[@LINE]]:5 | variable/Swift | [[globalCompProp:.*]] | Def
+{ // CHECK: [[@LINE]]:1 | function/acc-get/Swift | getter:globalCompProp |
+  // CHECK-NEXT: RelChild,RelAcc | variable/Swift | [[globalCompProp]]
+  // Check that the accessor def is not showing up twice.
+  // CHECK-NOT: [[@LINE-3]]:1 | function/acc-get/Swift
+  return 0
+}

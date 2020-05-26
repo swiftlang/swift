@@ -1,3 +1,4 @@
+// REQUIRES: VENDOR=apple 
 // RUN: %empty-directory(%t)
 
 // RUN: cd %t; %target-build-swift -emit-module -emit-tbd %s

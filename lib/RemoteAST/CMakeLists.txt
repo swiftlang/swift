@@ -11,9 +11,12 @@ else()
   set(REMOTE_LIB_HEADERS)
 endif()
 
-add_swift_library(swiftRemoteAST STATIC
+add_swift_host_library(swiftRemoteAST STATIC
   RemoteAST.cpp
   InProcessMemoryReader.cpp
-  ${REMOTE_LIB_HEADERS}
-  LINK_LIBRARIES
-    swiftSema swiftIRGen)
+  ${REMOTE_LIB_HEADERS})
+target_link_libraries(swiftRemoteAST PUBLIC
+  swiftDemangling)
+target_link_libraries(swiftRemoteAST PRIVATE
+  swiftIRGen
+  swiftSema)

@@ -1,0 +1,14 @@
+struct Adder {
+    var base: Int
+    func /*test:def*/<keywordBase>callAsFunction</keywordBase>(<arglabel index=0>x</arglabel><param index=0></param>: Int, <arglabel index=1>y</arglabel><param index=1></param>: Int) -> Adder {
+        return self
+    }
+}
+
+let add3 = Adder(base: 3)
+_ = add3/*test:call*/(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>10, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>11)
+_ = add3 . /*test:call*/<keywordBase>callAsFunction</keywordBase>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>10, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>11)
+_ = add3 . /*test:ref*/<keywordBase>callAsFunction</keywordBase>(<sel index=0>x</sel>:<sel index=1>y</sel>:)
+_ = add3 . /*test:ref*/<keywordBase>callAsFunction</keywordBase>
+_ = (add3 . /*test:call*/<keywordBase>callAsFunction</keywordBase>())/*test:call*/(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>10, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>11)
+

@@ -1,0 +1,53 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public protocol Decodable {
+  init(json: [String : Any])
+}
+
+public class Item : Decodable {
+  required public init(json: [String : Any])
+  deinit
+}
+
+public class ItemSubclass : Item {
+  deinit
+  required public init(json: [String : Any])
+}
+
+sil [ossa] @witness_method_impl : $@convention(witness_method: Decodable) (@owned Dictionary<String, Any>, @thick Item.Type) -> @out Item {
+bb0(%0 : $*Item, %1 : @owned $Dictionary<String, Any>, %2 : $@thick Item.Type):
+  %3 = class_method %2 : $@thick Item.Type, #Item.init!allocator : (Item.Type) -> ([String : Any]) -> Item, $@convention(method) (@owned Dictionary<String, Any>, @thick Item.Type) -> @owned Item
+  %4 = apply %3(%1, %2) : $@convention(method) (@owned Dictionary<String, Any>, @thick Item.Type) -> @owned Item
+  store %4 to [init] %0 : $*Item
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// Check that it is possible to devirtualize a partial_appy of a generic witness_method.
+// Since it is a derived class that invokes an implementation from a base class,
+// make sure that the resulting closure is properly converted into a required type.
+
+// CHECK-LABEL: sil [ossa] @test_generic_witness_method_partial_apply_devirt : $@convention(thin) (@thick ItemSubclass.Type) -> @owned @callee_owned (@owned Dictionary<String, Any>) -> @out ItemSubclass
+// CHECK: %[[UPCASTED_ARG:[0-9]+]] = upcast %0 : $@thick ItemSubclass.Type to $@thick Item.Type
+// CHECK: %[[FUNCTION_REF:[0-9]+]] = function_ref @witness_method_impl
+// CHECK: %[[PA:[0-9]+]] = partial_apply %[[FUNCTION_REF]](%[[UPCASTED_ARG]]) : $@convention(witness_method: Decodable) (@owned Dictionary<String, Any>, @thick Item.Type) -> @out Item
+// CHECK: %[[RETURN_VALUE:[0-9]+]] = convert_function %[[PA]] : $@callee_owned (@owned Dictionary<String, Any>) -> @out Item to $@callee_owned (@owned Dictionary<String, Any>) -> @out ItemSubclass
+// CHECK: return %[[RETURN_VALUE]] : $@callee_owned (@owned Dictionary<String, Any>) -> @out ItemSubclass
+
+sil [ossa]@test_generic_witness_method_partial_apply_devirt : $@convention(thin) (@thick ItemSubclass.Type) -> @owned @callee_owned (@owned Dictionary<String, Any>) -> @out ItemSubclass {
+bb0(%0 : $@thick ItemSubclass.Type):
+  %1 = witness_method $ItemSubclass, #Decodable.init!allocator : <Self where Self : Decodable> (Self.Type) -> ([String : Any]) -> Self : $@convention(witness_method: Decodable) <τ_0_0 where τ_0_0 : Decodable> (@owned Dictionary<String, Any>, @thick τ_0_0.Type) -> @out τ_0_0
+  %2 = partial_apply %1<ItemSubclass>(%0) : $@convention(witness_method: Decodable) <τ_0_0 where τ_0_0 : Decodable> (@owned Dictionary<String, Any>, @thick τ_0_0.Type) -> @out τ_0_0
+  return %2 : $@callee_owned (@owned Dictionary<String, Any>) -> @out ItemSubclass
+}
+
+sil_witness_table [serialized] Item: Decodable module main {
+  method #Decodable.init!allocator: <Self where Self : Decodable> (Self.Type) -> ([String : Any]) -> Self : @witness_method_impl
+}
+

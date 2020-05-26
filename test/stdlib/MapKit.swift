@@ -20,11 +20,14 @@ func spansEqual(_ x: MKCoordinateSpan, _ y: MKCoordinateSpan)
 }
 
 if #available(tvOS 9.2, *) {
-  mapKit.test("NSValue bridging") {
+  mapKit.test("CLLocationCoordinate2D bridging") {
     expectBridgeToNSValue(CLLocationCoordinate2D(latitude: 17, longitude: 38),
                           nsValueInitializer: { NSValue(mkCoordinate: $0) },
                           nsValueGetter: { $0.mkCoordinateValue },
                           equal: coordinatesEqual)
+  }
+
+  mapKit.test("MKCoordinateSpan bridging") {
     expectBridgeToNSValue(MKCoordinateSpan(latitudeDelta: 6,
                                            longitudeDelta: 79),
                           nsValueInitializer: { NSValue(mkCoordinateSpan: $0) },

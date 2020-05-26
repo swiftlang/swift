@@ -15,24 +15,35 @@ import TestsUtils
 public let Array2D = BenchmarkInfo(
   name: "Array2D",
   runFunction: run_Array2D,
-  tags: [.validation, .api, .Array])
+  tags: [.validation, .api, .Array],
+  setUpFunction: { blackHole(inputArray) },
+  tearDownFunction: { inputArray = nil },
+  legacyFactor: 16)
+
+let size = 256
+
+var inputArray: [[Int]]! = {
+  var A: [[Int]] = []
+  A.reserveCapacity(size)
+  for _ in 0 ..< size {
+    A.append(Array(0 ..< size))
+  }
+  return A
+}()
 
 @inline(never)
-public func run_Array2D(_ N: Int) {
-  var A: [[Int]] = []
-  for _ in 0 ..< 1024 {
-    var B: [Int] = []
-    for y in 0 ..< 1024 {
-      B.append(y)
-    }
-    A.append(B)
-  }
+func modifyArray(_ A: inout [[Int]], _ N: Int) {
   for _ in 0..<N {
-    for i in 0 ..< 1024 {
-      for y in 0 ..< 1024 {
+    for i in 0 ..< size {
+      for y in 0 ..< size {
         A[i][y] = A[i][y] + 1
         A[i][y] = A[i][y] - 1
       }
     }
   }
+}
+
+@inline(never)
+public func run_Array2D(_ N: Int) {
+  modifyArray(&inputArray, N)
 }

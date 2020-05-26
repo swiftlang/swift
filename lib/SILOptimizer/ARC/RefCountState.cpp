@@ -301,19 +301,19 @@ handleRefCountInstMatch(SILInstruction *RefCountInst) {
 bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
 
   auto NewState = MergeBottomUpLatticeStates(LatState, Other.LatState);
-  DEBUG(llvm::dbgs() << "            Performing BottomUp Merge.\n");
-  DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
-                     << Other.LatState << "; Result: " << NewState << "\n");
-  DEBUG(llvm::dbgs() << "                V: ";
-        if (hasRCRoot())
-          getRCRoot()->dump();
-        else
-          llvm::dbgs() << "\n";
-        llvm::dbgs() << "                OtherV: ";
-        if (Other.hasRCRoot())
-          Other.getRCRoot()->dump();
-        else
-          llvm::dbgs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "            Performing BottomUp Merge.\n");
+  LLVM_DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
+                          << Other.LatState << "; Result: " << NewState <<"\n");
+  LLVM_DEBUG(llvm::dbgs() << "                V: ";
+             if (hasRCRoot())
+               getRCRoot()->dump();
+             else
+               llvm::dbgs() << "\n";
+             llvm::dbgs() << "                OtherV: ";
+             if (Other.hasRCRoot())
+               Other.getRCRoot()->dump();
+             else
+               llvm::dbgs() << "\n");
 
   LatState = NewState;
   KnownSafe &= Other.KnownSafe;
@@ -326,15 +326,15 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   //
   // TODO: Add support for working around control dependence issues.
   if (LatState == BottomUpRefCountState::LatticeState::None) {
-    DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
-                          "Clearing State!\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
+                               "Clearing State!\n");
     clear();
     return false;
   }
 
   if (!Transition.isValid() || !Other.Transition.isValid() ||
       !Transition.merge(Other.Transition)) {
-    DEBUG(llvm::dbgs() << "            Failed merge!\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Failed merge!\n");
     clear();
     return false;
   }
@@ -447,8 +447,8 @@ void BottomUpRefCountState::updateForSameLoopInst(
   // pointer up to this point. This has the effect of performing a use and a
   // decrement.
   if (handlePotentialGuaranteedUser(I, SetFactory, AA)) {
-    DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
-                       << getRCRoot());
+    LLVM_DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
+                            << getRCRoot());
     return;
   }
 
@@ -456,8 +456,8 @@ void BottomUpRefCountState::updateForSameLoopInst(
   // the reference counted value we are tracking... in a manner that could
   // cause us to change states. If we do change states continue...
   if (handlePotentialDecrement(I, AA)) {
-    DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-                       << getRCRoot());
+    LLVM_DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
+                            << getRCRoot());
     return;
   }
 
@@ -465,7 +465,8 @@ void BottomUpRefCountState::updateForSameLoopInst(
   // could be used by the given instruction.
   if (!handlePotentialUser(I, SetFactory, AA))
     return;
-  DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
+  LLVM_DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
+                          << getRCRoot());
 }
 
 void BottomUpRefCountState::updateForDifferentLoopInst(
@@ -478,8 +479,8 @@ void BottomUpRefCountState::updateForDifferentLoopInst(
   if (valueCanBeGuaranteedUsedGivenLatticeState()) {
     if (mayGuaranteedUseValue(I, getRCRoot(), AA) ||
         mayDecrementRefCount(I, getRCRoot(), AA)) {
-      DEBUG(llvm::dbgs() << "    Found potential guaranteed use:\n        "
-                         << getRCRoot());
+      LLVM_DEBUG(llvm::dbgs() << "    Found potential guaranteed use:\n        "
+                              << getRCRoot());
       handleGuaranteedUser(getRCRoot(), SetFactory, AA);
       return;
     }
@@ -490,7 +491,8 @@ void BottomUpRefCountState::updateForDifferentLoopInst(
   // use.
   if (!handlePotentialUser(I, SetFactory, AA))
     return;
-  DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
+  LLVM_DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
+                          << getRCRoot());
 }
 
 void BottomUpRefCountState::updateForPredTerminators(
@@ -750,19 +752,20 @@ handleRefCountInstMatch(SILInstruction *RefCountInst) {
 
 bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   auto NewState = MergeTopDownLatticeStates(LatState, Other.LatState);
-  DEBUG(llvm::dbgs() << "        Performing TopDown Merge.\n");
-  DEBUG(llvm::dbgs() << "            Left: " << LatState << "; Right: "
-                     << Other.LatState << "; Result: " << NewState << "\n");
-  DEBUG(llvm::dbgs() << "            V: ";
-        if (hasRCRoot())
-          getRCRoot()->dump();
-        else
-          llvm::dbgs() << "\n";
-        llvm::dbgs() << "            OtherV: ";
-        if (Other.hasRCRoot())
-          Other.getRCRoot()->dump();
-        else
-          llvm::dbgs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "        Performing TopDown Merge.\n");
+  LLVM_DEBUG(llvm::dbgs() << "            Left: " << LatState << "; Right: "
+                          << Other.LatState << "; Result: "
+                          << NewState << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "            V: ";
+             if (hasRCRoot())
+               getRCRoot()->dump();
+             else
+               llvm::dbgs() << "\n";
+             llvm::dbgs() << "            OtherV: ";
+             if (Other.hasRCRoot())
+               Other.getRCRoot()->dump();
+             else
+               llvm::dbgs() << "\n");
 
   LatState = NewState;
   KnownSafe &= Other.KnownSafe;
@@ -775,14 +778,14 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   // TODO: Add support for determining control dependence.
   if (LatState == TopDownRefCountState::LatticeState::None) {
     clear();
-    DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
-                          "Clearing State!\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
+                               "Clearing State!\n");
     return false;
   }
 
   if (!Transition.isValid() || !Other.Transition.isValid() ||
       !Transition.merge(Other.Transition)) {
-    DEBUG(llvm::dbgs() << "            Failed merge!\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Failed merge!\n");
     clear();
     return false;
   }
@@ -880,8 +883,8 @@ void TopDownRefCountState::updateForSameLoopInst(
   // pointer up to this point. This has the effect of performing a use and a
   // decrement.
   if (handlePotentialGuaranteedUser(I, SetFactory, AA)) {
-    DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
-                       << getRCRoot());
+    LLVM_DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
+                            << getRCRoot());
     return;
   }
 
@@ -889,8 +892,8 @@ void TopDownRefCountState::updateForSameLoopInst(
   // the reference counted value we are tracking in a manner that could
   // cause us to change states. If we do change states continue...
   if (handlePotentialDecrement(I, SetFactory, AA)) {
-    DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-                       << getRCRoot());
+    LLVM_DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
+                            << getRCRoot());
     return;
   }
 
@@ -898,7 +901,8 @@ void TopDownRefCountState::updateForSameLoopInst(
   // could be used by the given instruction.
   if (!handlePotentialUser(I, AA))
     return;
-  DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
+  LLVM_DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
+                          << getRCRoot());
 }
 
 void TopDownRefCountState::updateForDifferentLoopInst(
@@ -911,7 +915,7 @@ void TopDownRefCountState::updateForDifferentLoopInst(
   if (valueCanBeGuaranteedUsedGivenLatticeState()) {
     if (mayGuaranteedUseValue(I, getRCRoot(), AA) ||
         mayDecrementRefCount(I, getRCRoot(), AA)) {
-      DEBUG(llvm::dbgs() << "    Found potential guaranteed use!\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Found potential guaranteed use!\n");
       handleGuaranteedUser(I, getRCRoot(), SetFactory, AA);
       return;
     }
@@ -919,7 +923,8 @@ void TopDownRefCountState::updateForDifferentLoopInst(
 
   if (!handlePotentialUser(I, AA))
     return;
-  DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
+  LLVM_DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
+                          << getRCRoot());
 }
 
 //===----------------------------------------------------------------------===//

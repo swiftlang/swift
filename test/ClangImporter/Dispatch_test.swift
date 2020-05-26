@@ -1,9 +1,10 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: objc_interop
+// REQUIRES: libdispatch
+// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-android
 
 import Dispatch
-import Foundation
 
 func test1(_ queue: dispatch_queue_t) {} // expected-error {{'dispatch_queue_t' is unavailable}}
 func test2(_ queue: DispatchQueue) {

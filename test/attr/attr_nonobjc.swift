@@ -67,8 +67,8 @@ class ObjCAndNonObjCNotAllowed {
   @objc @nonobjc func redundantAttributes() { } // expected-error {{declaration is marked @objc, and cannot be marked @nonobjc}}
 }
 
-class DynamicAndNonObjCNotAllowed {
-  @nonobjc dynamic func redundantAttributes() { } // expected-error {{a declaration cannot be both '@nonobjc' and 'dynamic'}}
+class DynamicAndNonObjCAreFineNow {
+  @nonobjc dynamic func someAttributes() { }
 }
 
 class IBOutletAndNonObjCNotAllowed {
@@ -110,4 +110,8 @@ protocol SR4226_Protocol : class {}
 
 extension SR4226_Protocol {
   @nonobjc func function() {} // expected-error {{only class members and extensions of classes can be declared @nonobjc}}
+}
+
+@objc enum SomeEnum: Int {
+  @nonobjc case what // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
 }

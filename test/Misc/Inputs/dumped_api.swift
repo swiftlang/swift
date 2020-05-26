@@ -55,5 +55,9 @@ public class FooIteratorBox<
   Base: IteratorProtocol
 > : AnyIterator<Base.Element> {
 
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// Note: subclasses must override this method.
   public override func next() -> Base.Element?
 }

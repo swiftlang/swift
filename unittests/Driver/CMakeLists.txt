@@ -1,8 +1,11 @@
 add_swift_unittest(SwiftDriverTests
-  DependencyGraphTests.cpp
+  FineGrainedDependencyGraphTests.cpp
+  MockingFineGrainedDependencyGraphs.cpp
+  TypeBodyFingerprintsDependencyGraphTests.cpp
+  UnitTestSourceFileDepGraphFactory.cpp
 )
 
-target_link_libraries(SwiftDriverTests
-   PRIVATE
-   swiftDriver
-)
+target_link_libraries(SwiftDriverTests PRIVATE
+   swiftAST
+   swiftClangImporter
+   swiftDriver)

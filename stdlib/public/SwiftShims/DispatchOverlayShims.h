@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Note that this file is used by both swift-corelibs-libdispatch and the
-// Dispatch overlay for Darwin in swift/stdlib/public/SDK/Dispatch/.
+// Dispatch overlay for Darwin in swift/stdlib/public/Darwin/Dispatch/.
 //
 //===----------------------------------------------------------------------===//
 
@@ -113,12 +113,10 @@ _swift_dispatch_source_create(
   return source;
 }
 
-static inline __swift_shims_dispatch_block_t
+static inline SWIFT_DISPATCH_RETURNS_RETAINED __swift_shims_dispatch_block_t
 _swift_dispatch_block_create_with_qos_class(
-    dispatch_block_flags_t flags,
-    dispatch_qos_class_t qos,
-    int relative_priority,
-    __swift_shims_dispatch_block_t _Nonnull block) {
+    dispatch_block_flags_t flags, dispatch_qos_class_t qos,
+    int relative_priority, __swift_shims_dispatch_block_t _Nonnull block) {
   return dispatch_block_create_with_qos_class(
       flags, qos, relative_priority, block);
 }
@@ -195,9 +193,9 @@ static inline void _swift_dispatch_after(
 
 static inline void _swift_dispatch_apply_current(
     size_t iterations,
-    void SWIFT_DISPATCH_NOESCAPE (^block)(long)) {
+    void SWIFT_DISPATCH_NOESCAPE (^block)(intptr_t)) {
   dispatch_apply(iterations, (dispatch_queue_t _Nonnull)0, ^(size_t i){
-    block((long)i);
+    block((intptr_t)i);
   });
 }
 
@@ -241,7 +239,7 @@ static inline void _swift_dispatch_source_set_registration_handler(
 }
 
 #if defined(__ANDROID__)
-extern void _dispatch_install_thread_detach_callback(dispatch_function_t cb);
+extern void _dispatch_install_thread_detach_callback(void (*cb)(void));
 #endif
 
 static inline void _swift_dispatch_retain(dispatch_object_t object) {

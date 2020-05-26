@@ -66,8 +66,13 @@ public:
 
   bool readString(RemoteAddress address, std::string &dest) override {
     auto length = getStringLength(address);
-    if (!length)
-      return false;
+    if (length == 0) {
+      // A length of zero unfortunately might mean either that there's a zero
+      // length string at the location we're trying to read, or that reading
+      // failed. We can do a one-byte read to tell them apart.
+      auto buf = readBytes(address, 1);
+      return buf && ((const char*)buf.get())[0] == 0;
+    }
 
     auto Buf = readBytes(address, length);
     if (!Buf)

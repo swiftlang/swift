@@ -16,6 +16,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace sourcekitd_test;
@@ -105,6 +106,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
         .Case("version", SourceKitRequest::ProtocolVersion)
+        .Case("compiler-version", SourceKitRequest::CompilerVersion)
         .Case("demangle", SourceKitRequest::DemangleNames)
         .Case("mangle", SourceKitRequest::MangleSimpleClasses)
         .Case("index", SourceKitRequest::Index)
@@ -114,6 +116,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("complete.update", SourceKitRequest::CodeCompleteUpdate)
         .Case("complete.cache.ondisk", SourceKitRequest::CodeCompleteCacheOnDisk)
         .Case("complete.setpopularapi", SourceKitRequest::CodeCompleteSetPopularAPI)
+        .Case("typecontextinfo", SourceKitRequest::TypeContextInfo)
+        .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)
@@ -149,6 +153,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("markup-xml", SourceKitRequest::MarkupToXML)
         .Case("stats", SourceKitRequest::Statistics)
         .Case("track-compiles", SourceKitRequest::EnableCompileNotifications)
+        .Case("collect-type", SourceKitRequest::CollectExpresstionType)
+        .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Default(SourceKitRequest::None);
 
       if (Request == SourceKitRequest::None) {
@@ -160,7 +166,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
                "open/close/edit/print-annotations/print-diags/extract-comment/module-groups/"
                "range/syntactic-rename/find-rename-ranges/translate/markup-xml/stats/"
-               "track-compiles\n";
+               "track-compiles/collect-type\n";
         return true;
       }
       break;
@@ -349,8 +355,55 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       }
       break;
 
-    case OPT_force_libsyntax_based_processing:
-      ForceLibSyntaxBasedProcessing = true;
+    case OPT_vfs_files:
+      VFSName = VFSName.getValueOr("in-memory-vfs");
+      for (const char *vfsFile : InputArg->getValues()) {
+        StringRef name, target;
+        std::tie(name, target) = StringRef(vfsFile).split('=');
+        llvm::SmallString<64> nativeName;
+        llvm::sys::path::native(name, nativeName);
+        bool passAsSourceText = target.consume_front("@");
+        VFSFiles.try_emplace(nativeName.str(), VFSFile(target.str(), passAsSourceText));
+      }
+      break;
+
+    case OPT_vfs_name:
+      VFSName = InputArg->getValue();
+      break;
+
+    case OPT_optimize_for_ide: {
+      bool Value;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, Value)) {
+        llvm::errs() << "error: expected 0 or 1 for 'for-ide'\n";
+        return true;
+      }
+      OptimizeForIde = Value;
+      break;
+    }
+
+    case OPT_completion_check_dependency_interval: {
+      int64_t Value;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, Value)) {
+        llvm::errs() << "error: expected number for inteval\n";
+        return true;
+      } else if (Value < 0) {
+        llvm::errs() << "error: completion-check-dependency-interval must be > 0\n";
+        return true;
+      }
+      CompletionCheckDependencyInterval = Value;
+      break;
+    }
+
+    case OPT_suppress_config_request:
+      SuppressDefaultConfigRequest = true;
+      break;
+
+    case OPT_module_cache_path:
+      ModuleCachePath = InputArg->getValue();
+      break;
+
+    case OPT_shell:
+      ShellExecution = true;
       break;
 
     case OPT_UNKNOWN:
@@ -379,6 +432,6 @@ void TestOptions::printHelp(bool ShowHidden) const {
 
   TestOptTable Table;
 
-  Table.PrintHelp(llvm::outs(), "sourcekitd-test", "SourceKit Testing Tool",
-                      ShowHidden);
+  Table.PrintHelp(llvm::outs(), "sourcekitd-test [options] <inputs>",
+                  "SourceKit Testing Tool", ShowHidden);
 }

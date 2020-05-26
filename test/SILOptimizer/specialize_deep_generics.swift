@@ -27,7 +27,7 @@ func computeNat<T: Nat>(_ v : Int32, _ t: T) -> Int32 {
   return computeNat(v - 1, PlusOne<T>())
 }
 
-// CHECK-LABEL: sil @$S24specialize_deep_generics14testComputeNats5Int32VyF
+// CHECK-LABEL: sil @$s24specialize_deep_generics14testComputeNats5Int32VyF
 public func testComputeNat() -> Int32 {
  return computeNat(8, Zero())
 }
@@ -39,7 +39,7 @@ func computeTuple<T>(t: T) {
   computeTuple(t: (t, t))
 }
 
-// CHECK-LABEL: sil @$S24specialize_deep_generics16testComputeTupleyyF
+// CHECK-LABEL: sil @$s24specialize_deep_generics16testComputeTupleyyF
 public func testComputeTuple() {
   computeTuple(t: 0)
 }
@@ -50,7 +50,7 @@ public func computeMetatype<T>(t: T) {
   computeMetatype(t: T.self)
 }
 
-// CHECK-LABEL: sil @$S24specialize_deep_generics19testComputeMetatypeyyF
+// CHECK-LABEL: sil @$s24specialize_deep_generics19testComputeMetatypeyyF
 public func testComputeMetatype() {
   computeMetatype(t: 0)
 }
