@@ -341,12 +341,14 @@ class ModuleInterfaceLoaderImpl {
   const ModuleLoadingMode loadMode;
   const bool remarkOnRebuildFromInterface;
   const bool disableInterfaceLock;
+  const bool disableImplicitModule;
 
   ModuleInterfaceLoaderImpl(
     ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
     StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
     SourceLoc diagLoc, bool remarkOnRebuildFromInterface,
     bool disableInterfaceLock,
+    bool disableImplicitModule,
     DependencyTracker *dependencyTracker = nullptr,
     ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
@@ -355,7 +357,8 @@ class ModuleInterfaceLoaderImpl {
     cacheDir(cacheDir), diagnosticLoc(diagLoc),
     dependencyTracker(dependencyTracker), loadMode(loadMode),
     remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
-    disableInterfaceLock(disableInterfaceLock) {}
+    disableInterfaceLock(disableInterfaceLock),
+    disableImplicitModule(disableImplicitModule) {}
 
   /// Constructs the full path of the dependency \p dep by prepending the SDK
   /// path if necessary.
@@ -886,6 +889,11 @@ class ModuleInterfaceLoaderImpl {
       return std::move(module.moduleBuffer);
     }
 
+    // If implicit module building is disabled, fail the loading. Other loaders
+    // should be responsible for diagnostics.
+    if (disableImplicitModule) {
+      return std::make_error_code(std::errc::function_not_supported);
+    }
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 
     // We didn't discover a module corresponding to this interface.
@@ -965,6 +973,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
                 Ctx, ModPath, InPath, ModuleName,
                 CacheDir, PrebuiltCacheDir, ModuleID.Loc,
                 RemarkOnRebuildFromInterface, DisableInterfaceFileLock,
+                DisableImplicitModules,
                 dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?

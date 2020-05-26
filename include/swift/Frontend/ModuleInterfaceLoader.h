@@ -138,12 +138,13 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
       bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile,
-      bool DisableInterfaceFileLock)
+      bool DisableInterfaceFileLock, bool DisableImplicitModules)
   : SerializedModuleLoaderBase(ctx, tracker, loadMode,
                                IgnoreSwiftSourceInfoFile),
   CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
   RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
   DisableInterfaceFileLock(DisableInterfaceFileLock),
+  DisableImplicitModules(DisableImplicitModules),
   PreferInterfaceForModules(PreferInterfaceForModules)
   {}
 
@@ -151,6 +152,7 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   std::string PrebuiltCacheDir;
   bool RemarkOnRebuildFromInterface;
   bool DisableInterfaceFileLock;
+  bool DisableImplicitModules;
   ArrayRef<std::string> PreferInterfaceForModules;
 
   std::error_code findModuleFilesInDirectory(
@@ -170,14 +172,16 @@ public:
          ArrayRef<std::string> PreferInterfaceForModules = {},
          bool RemarkOnRebuildFromInterface = false,
          bool IgnoreSwiftSourceInfoFile = false,
-         bool DisableInterfaceFileLock = false) {
+         bool DisableInterfaceFileLock = false,
+         bool DisableImplicitModules = false) {
     return std::unique_ptr<ModuleInterfaceLoader>(
       new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
                                          tracker, loadMode,
                                          PreferInterfaceForModules,
                                          RemarkOnRebuildFromInterface,
                                          IgnoreSwiftSourceInfoFile,
-                                         DisableInterfaceFileLock));
+                                         DisableInterfaceFileLock,
+                                         DisableImplicitModules));
   }
 
   /// Append visible module names to \p names. Note that names are possibly

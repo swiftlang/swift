@@ -214,6 +214,11 @@ def disable_objc_attr_requires_foundation_module :
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Deprecated, use -enable-library-evolution instead">;
 
+def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
+  HelpText<"Disable building Swift modules explicitly by the compiler">;
+
+def disable_implicit_pcms: Flag<["-"], "disable-implicit-pcms">,
+  HelpText<"Disable building Clang modules explicitly by the compiler">;
 }
 
 

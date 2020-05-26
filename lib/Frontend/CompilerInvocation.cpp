@@ -816,6 +816,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
 
+  Opts.DisableImplicitPCMs |= Args.hasArg(OPT_disable_implicit_pcms);
   return false;
 }
 

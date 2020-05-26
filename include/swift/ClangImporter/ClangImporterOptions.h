@@ -54,6 +54,9 @@ public:
   /// Disable validating the persistent PCH.
   bool PCHDisableValidation = false;
 
+  /// Disable builing PCMs implicitly from the compiler.
+  bool DisableImplicitPCMs = false;
+
   /// \see Mode
   enum class Modes : uint8_t {
     /// Set up Clang for importing modules into Swift and generating IR from

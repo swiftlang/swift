@@ -518,7 +518,10 @@ importer::getNormalInvocationArguments(
   if (!importerOpts.DebuggerSupport)
     invocationArgStrs.push_back(
         "-Werror=non-modular-include-in-framework-module");
-
+  // Pass to Clang if no implicit modules are allowed.
+  if (importerOpts.DisableImplicitPCMs) {
+    invocationArgStrs.push_back("-fno-implicit-modules");
+  }
   if (LangOpts.EnableObjCInterop) {
     bool EnableCXXInterop = LangOpts.EnableCXXInterop;
     invocationArgStrs.insert(
