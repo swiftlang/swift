@@ -683,6 +683,13 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique_native(&object))
 }
 
+@_alwaysEmitIntoClient
+@_transparent
+public // @testable
+func _COWBufferForReading<T: AnyObject>(_ object: T) -> T {
+  return Builtin.COWBufferForReading(object)
+}
+
 /// Returns `true` if type is a POD type. A POD type is a type that does not
 /// require any special handling on copying or destruction.
 @_transparent
