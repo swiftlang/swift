@@ -201,3 +201,15 @@ struct InternalStruct {
     let propertyReferencingPublicClassFromModule: Module.ModuleClass
     let propertyReferencingPublicClassFromExportedModule: Exported.ExportedClass
 }
+
+public typealias Alias = Int
+
+public var globalVariable: Int = 0
+
+protocol ProtocolWithAssociatedType {
+    associatedtype T
+}
+
+struct ProtocolWithAssociatedTypeImpl: ProtocolWithAssociatedType {
+    typealias T = Int
+}

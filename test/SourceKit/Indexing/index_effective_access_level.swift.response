@@ -366,8 +366,7 @@
           key.name: "T",
           key.usr: "s:28index_effective_access_level21PublicPropertyWrapperV1Txmfp",
           key.line: 53,
-          key.column: 37,
-          key.effective_access: source.decl.effective_access.internal
+          key.column: 37
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -477,8 +476,7 @@
           key.name: "T",
           key.usr: "s:28index_effective_access_level23InternalPropertyWrapperV1Txmfp",
           key.line: 61,
-          key.column: 32,
-          key.effective_access: source.decl.effective_access.internal
+          key.column: 32
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -539,8 +537,7 @@
           key.name: "T",
           key.usr: "s:28index_effective_access_level26FilePrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV1Txmfp",
           key.line: 66,
-          key.column: 47,
-          key.effective_access: source.decl.effective_access.fileprivate
+          key.column: 47
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -619,8 +616,7 @@
           key.name: "T",
           key.usr: "s:28index_effective_access_level22PrivatePropertyWrapper33_2295DDF1454D6A6D9229E8222CD85214LLV1Txmfp",
           key.line: 71,
-          key.column: 39,
-          key.effective_access: source.decl.effective_access.fileprivate
+          key.column: 39
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -3623,6 +3619,150 @@
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: "s:28index_effective_access_level14InternalStructV40propertyReferencingPublicClassFromModule0ghijk8ExportedL0AC0L00lJ0C_0M00mJ0Ctcfc",
           key.line: 200,
+          key.column: 8,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.typealias,
+      key.name: "Alias",
+      key.usr: "s:28index_effective_access_level5Aliasa",
+      key.line: 205,
+      key.column: 18,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 205,
+          key.column: 26
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.name: "globalVariable",
+      key.usr: "s:28index_effective_access_level14globalVariableSivp",
+      key.line: 207,
+      key.column: 12,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.usr: "s:28index_effective_access_level14globalVariableSivg",
+          key.line: 207,
+          key.column: 12,
+          key.is_implicit: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.usr: "s:28index_effective_access_level14globalVariableSivs",
+          key.line: 207,
+          key.column: 12,
+          key.is_implicit: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.public
+            }
+          ]
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.effective_access: source.decl.effective_access.public
+    },
+    {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "Int",
+      key.usr: "s:Si",
+      key.line: 207,
+      key.column: 28
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "ProtocolWithAssociatedType",
+      key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP",
+      key.line: 209,
+      key.column: 10,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.associatedtype,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP1TQa",
+          key.line: 210,
+          key.column: 20,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "ProtocolWithAssociatedTypeImpl",
+      key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplV",
+      key.line: 213,
+      key.column: 8,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "ProtocolWithAssociatedType",
+          key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP",
+          key.line: 213,
+          key.column: 40
+        }
+      ],
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "ProtocolWithAssociatedType",
+          key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP",
+          key.line: 213,
+          key.column: 40
+        },
+        {
+          key.kind: source.lang.swift.decl.typealias,
+          key.name: "T",
+          key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplV1Ta",
+          key.line: 214,
+          key.column: 15,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.associatedtype,
+              key.name: "T",
+              key.usr: "s:28index_effective_access_level26ProtocolWithAssociatedTypeP1TQa"
+            }
+          ],
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 214,
+              key.column: 19
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplVACycfc",
+          key.line: 213,
           key.column: 8,
           key.is_implicit: 1,
           key.effective_access: source.decl.effective_access.internal

@@ -148,12 +148,6 @@ private:
   bool shouldOutputEffectiveAccessOfValueSymbol(SymbolInfo Info) {
     SymbolKind Kind = Info.Kind;
     SymbolSubKind SubKind = Info.SubKind;
-    switch (Kind) {
-      case SymbolKind::Extension:
-        return false;
-     default:
-        break;
-    }
     switch (SubKind) {
       case SymbolSubKind::AccessorGetter:
       case SymbolSubKind::AccessorSetter:
@@ -161,11 +155,31 @@ private:
       case SymbolSubKind::SwiftAccessorDidSet:
       case SymbolSubKind::SwiftAccessorAddressor:
       case SymbolSubKind::SwiftAccessorMutableAddressor:
+      case SymbolSubKind::SwiftGenericTypeParam:
         return false;
       default:
        break;
     }
-    return true;
+    switch (Kind) {
+      case SymbolKind::Enum:
+      case SymbolKind::Struct:
+      case SymbolKind::Class:
+      case SymbolKind::Protocol:
+      case SymbolKind::Constructor:
+      case SymbolKind::EnumConstant:
+      case SymbolKind::Function:
+      case SymbolKind::StaticMethod:
+      case SymbolKind::Variable:
+      case SymbolKind::InstanceMethod:
+      case SymbolKind::ClassMethod:
+      case SymbolKind::InstanceProperty:
+      case SymbolKind::ClassProperty:
+      case SymbolKind::StaticProperty:
+      case SymbolKind::TypeAlias:
+        return true;
+     default:
+        return false;
+    }
   }
 
   template <typename F>
