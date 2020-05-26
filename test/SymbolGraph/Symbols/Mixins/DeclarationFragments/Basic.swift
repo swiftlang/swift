@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -module-name DeclarationFragments -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name DeclarationFragments -I %t -pretty-print -output-dir %t
-// RUN: %FileCheck %s --input-file %t/DeclarationFragments.symbols.json
+// RUN: %target-build-swift %s -module-name Basic -emit-module -emit-module-path %t/
+// RUN: %target-swift-symbolgraph-extract -module-name Basic -I %t -pretty-print -output-dir %t
+// RUN: %FileCheck %s --input-file %t/Basic.symbols.json
 
 public func foo<S>(f: @escaping () -> (), ext int: Int = 2, s: S) {}
 
