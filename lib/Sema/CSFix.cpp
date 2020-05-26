@@ -287,9 +287,11 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
                            solution.getType(coerceExpr->getSubExpr()),
                            solution.getType(coerceExpr));
   } else if (auto *assignExpr = getAsExpr<AssignExpr>(locator->getAnchor())) {
-    return std::make_tuple(CTP_AssignSource,
+    auto CTP = isa<SubscriptExpr>(assignExpr->getDest()) ? CTP_SubscriptAssignSource
+                                                         : CTP_AssignSource;
+    return std::make_tuple(CTP,
                            solution.getType(assignExpr->getSrc()),
-                           solution.getType(assignExpr->getDest()));
+                           solution.getType(assignExpr->getDest())->getRValueType());
   } else if (auto *call = getAsExpr<CallExpr>(locator->getAnchor())) {
     assert(isa<TypeExpr>(call->getFn()));
     return std::make_tuple(
@@ -332,8 +334,10 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
     return false;
   }
 
-  TupleContextualFailure failure(solution, purpose, fromType, toType, indices,
-                                 locator);
+  TupleContextualFailure failure(solution, purpose,
+                                 fromType->lookThroughAllOptionalTypes(),
+                                 toType->lookThroughAllOptionalTypes(),
+                                 indices, locator);
   return failure.diagnose(asNote);
 }
 

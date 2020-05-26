@@ -94,7 +94,7 @@ toRemarkLocation(const SourceLoc &loc, const SourceManager &srcMgr) {
 
   StringRef file = srcMgr.getDisplayNameForLoc(loc);
   unsigned line, col;
-  std::tie(line, col) = srcMgr.getLineAndColumn(loc);
+  std::tie(line, col) = srcMgr.getPresumedLineAndColumnForLoc(loc);
   return llvm::remarks::RemarkLocation{file, line, col};
 }
 

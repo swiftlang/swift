@@ -65,8 +65,6 @@ public:
   void setInvalidType(ASTContext &C);
   void setType(Type Ty);
 
-  TypeLoc clone(ASTContext &ctx) const;
-  
   friend llvm::hash_code hash_value(const TypeLoc &owner) {
     return llvm::hash_combine(owner.Ty.getPointer(), owner.TyR);
   }

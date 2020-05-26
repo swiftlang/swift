@@ -34,7 +34,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
@@ -5038,10 +5037,11 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
-SmallVector<ProtocolConformance *, 2>
+std::vector<ProtocolConformance *>
 LookupAllConformancesInContextRequest::evaluate(
     Evaluator &eval, const IterableDeclContext *IDC) const {
-  return IDC->getLocalConformances(ConformanceLookupKind::All);
+  auto result = IDC->getLocalConformances(ConformanceLookupKind::All);
+  return std::vector<ProtocolConformance *>(result.begin(), result.end());
 }
 
 void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {

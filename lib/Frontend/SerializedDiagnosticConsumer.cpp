@@ -250,7 +250,7 @@ void SerializedDiagnosticConsumer::addLocToRecord(SourceLoc Loc,
 
   auto bufferId = SM.findBufferContainingLoc(Loc);
   unsigned line, col;
-  std::tie(line, col) = SM.getLineAndColumn(Loc);
+  std::tie(line, col) = SM.getPresumedLineAndColumnForLoc(Loc);
 
   Record.push_back(getEmitFile(Filename));
   Record.push_back(line);

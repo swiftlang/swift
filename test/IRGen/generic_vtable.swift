@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_vtable.swift
-// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize -check-prefix CHECK-%target-import-type -check-prefix CHECK-%target-abi
+// RUN: %target-swift-frontend -enable-objc-interop  %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-import-type,CHECK-%target-abi -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-objc-interop %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-import-type,CHECK-%target-abi -DINT=i%target-ptrsize
 
 public class Base {
   public func m1() {}
@@ -25,8 +26,10 @@ public class Concrete : Derived<Int> {
 // CHECK-DIRECT-SAME: <i32 0x8000_0050>,
 // CHECK-INDIRECT-SAME: <i32 0x8001_0050>,
 // -- vtable offset
-// CHECK-32-SAME: i32 16,
-// CHECK-64-SAME: i32 10,
+// CHECK-objc32-SAME: i32 16,
+// CHECK-native32-SAME: i32 13,
+// CHECK-objc64-SAME: i32 10,
+// CHECK-native64-SAME: i32 7,
 // -- vtable size
 // CHECK-SAME: i32 3,
 // -- vtable entry for m1()
@@ -59,8 +62,10 @@ public class Concrete : Derived<Int> {
 // -- flags: has vtable, has override table, is class, is unique, is generic
 // CHECK-SAME: <i32 0xC000_00D0>,
 // -- vtable offset
-// CHECK-32-SAME: i32 17,
-// CHECK-64-SAME: i32 14,
+// CHECK-objc32-SAME: i32 17,
+// CHECK-native32-SAME: i32 14,
+// CHECK-objc64-SAME: i32 14,
+// CHECK-native64-SAME: i32 11,
 // -- vtable size
 // CHECK-SAME: i32 1,
 // -- vtable entry for m3()
@@ -95,8 +100,10 @@ public class Concrete : Derived<Int> {
 // -- flags: has vtable, has override table, in-place initialization, is class, is unique
 // CHECK-SAME: <i32 0xC001_0050>,
 // -- vtable offset
-// CHECK-32-SAME: i32 19,
-// CHECK-64-SAME: i32 15,
+// CHECK-objc32-SAME: i32 19,
+// CHECK-native32-SAME: i32 16,
+// CHECK-objc64-SAME: i32 15,
+// CHECK-native64-SAME: i32 12,
 // -- vtable size
 // CHECK-SAME: i32 1,
 // -- vtable entry for m4()

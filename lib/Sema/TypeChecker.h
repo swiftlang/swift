@@ -561,6 +561,9 @@ bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 Optional<BraceStmt *> applyFunctionBuilderBodyTransform(FuncDecl *func,
                                                         Type builderType);
 
+/// Find the return statements within the body of the given function.
+std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
+
 bool typeCheckClosureBody(ClosureExpr *closure);
 
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -1012,8 +1015,8 @@ LookupResult lookupConstructors(
 PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
                                                            Expr *op);
 
-PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
-                                           SourceLoc nameLoc);
+PrecedenceGroupLookupResult
+lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
 
 /// Check whether the given declaration can be written as a
 /// member of the given base type.

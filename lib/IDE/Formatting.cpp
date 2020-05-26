@@ -316,7 +316,7 @@ public:
 
   std::pair<unsigned, unsigned> indentLineAndColumn() {
     if (InnermostCtx)
-      return SM.getLineAndColumn(InnermostCtx->ContextLoc);
+      return SM.getPresumedLineAndColumnForLoc(InnermostCtx->ContextLoc);
     return std::make_pair(0, 0);
   }
 

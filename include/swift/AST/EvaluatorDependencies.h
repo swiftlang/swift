@@ -110,6 +110,8 @@ using DependencySource = llvm::PointerIntPair<SourceFile *, 1, DependencyScope>;
 struct DependencyRecorder;
 
 struct DependencyCollector {
+  friend DependencyRecorder;
+
   struct Reference {
   public:
     enum class Kind {
@@ -123,38 +125,41 @@ struct DependencyCollector {
 
     NominalTypeDecl *subject;
     DeclBaseName name;
+    bool cascades;
 
   private:
-    Reference(Kind kind, NominalTypeDecl *subject, DeclBaseName name)
-        : kind(kind), subject(subject), name(name) {}
+    Reference(Kind kind, NominalTypeDecl *subject, DeclBaseName name,
+              bool cascades)
+        : kind(kind), subject(subject), name(name), cascades(cascades) {}
 
   public:
     static Reference empty() {
       return {Kind::Empty, llvm::DenseMapInfo<NominalTypeDecl *>::getEmptyKey(),
-              llvm::DenseMapInfo<DeclBaseName>::getEmptyKey()};
+              llvm::DenseMapInfo<DeclBaseName>::getEmptyKey(), false};
     }
 
     static Reference tombstone() {
-      return {Kind::Empty,
+      return {Kind::Tombstone,
               llvm::DenseMapInfo<NominalTypeDecl *>::getTombstoneKey(),
-              llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey()};
+              llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey(), false};
     }
 
   public:
-    static Reference usedMember(NominalTypeDecl *subject, DeclBaseName name) {
-      return {Kind::UsedMember, subject, name};
+    static Reference usedMember(NominalTypeDecl *subject, DeclBaseName name,
+                                bool cascades) {
+      return {Kind::UsedMember, subject, name, cascades};
     }
 
-    static Reference potentialMember(NominalTypeDecl *subject) {
-      return {Kind::PotentialMember, subject, DeclBaseName()};
+    static Reference potentialMember(NominalTypeDecl *subject, bool cascades) {
+      return {Kind::PotentialMember, subject, DeclBaseName(), cascades};
     }
 
-    static Reference topLevel(DeclBaseName name) {
-      return {Kind::TopLevel, nullptr, name};
+    static Reference topLevel(DeclBaseName name, bool cascades) {
+      return {Kind::TopLevel, nullptr, name, cascades};
     }
 
-    static Reference dynamic(DeclBaseName name) {
-      return {Kind::Dynamic, nullptr, name};
+    static Reference dynamic(DeclBaseName name, bool cascades) {
+      return {Kind::Dynamic, nullptr, name, cascades};
     }
 
   public:
@@ -174,8 +179,12 @@ struct DependencyCollector {
     };
   };
 
+public:
+  using ReferenceSet = llvm::DenseSet<Reference, Reference::Info>;
+
+private:
   DependencyRecorder &parent;
-  llvm::DenseSet<Reference, Reference::Info> scratch;
+  ReferenceSet scratch;
 
 public:
   explicit DependencyCollector(DependencyRecorder &parent) : parent(parent) {}
@@ -226,11 +235,7 @@ public:
 /// particular \c DependencyScope during the course of request evaluation.
 struct DependencyRecorder {
   friend DependencyCollector;
-private:
-  /// A stack of dependency sources in the order they were evaluated.
-  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
 
-public:
   enum class Mode {
     // Enables the current "status quo" behavior of the dependency collector.
     //
@@ -244,14 +249,19 @@ public:
     // the primary file being acted upon instead of to the destination file.
     ExperimentalPrivateDependencies,
   };
-  Mode mode;
-  llvm::DenseMap<AnyRequest, llvm::DenseSet<DependencyCollector::Reference,
-                                            DependencyCollector::Reference::Info>>
+
+private:
+  /// A stack of dependency sources in the order they were evaluated.
+  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
+  llvm::DenseMap<SourceFile *, DependencyCollector::ReferenceSet>
+      fileReferences;
+  llvm::DenseMap<AnyRequest, DependencyCollector::ReferenceSet>
       requestReferences;
+  Mode mode;
   bool isRecording;
 
-  explicit DependencyRecorder(Mode mode)
-      : mode{mode}, requestReferences{}, isRecording{false} {};
+public:
+  explicit DependencyRecorder(Mode mode) : mode{mode}, isRecording{false} {};
 
 private:
   void realize(const DependencyCollector::Reference &ref);
@@ -260,6 +270,12 @@ public:
   void replay(const swift::ActiveRequest &req);
   void record(const llvm::SetVector<swift::ActiveRequest> &stack,
               llvm::function_ref<void(DependencyCollector &)> rec);
+
+public:
+  using ReferenceEnumerator =
+      llvm::function_ref<void(const DependencyCollector::Reference &)>;
+  void enumerateReferencesInFile(const SourceFile *SF,
+                                 ReferenceEnumerator f) const ;
 
 public:
   /// Returns the scope of the current active scope.
@@ -321,25 +337,6 @@ private:
     if (dependencySources.empty())
       return nullptr;
     return dependencySources.front().getPointer();
-  }
-
-  /// If there is an active dependency source, returns its
-  /// \c ReferencedNameTracker. Else, returns \c nullptr.
-  ReferencedNameTracker *getActiveDependencyTracker() const {
-    SourceFile *source = nullptr;
-    switch (mode) {
-    case Mode::StatusQuo:
-      source = getActiveDependencySourceOrNull();
-      break;
-    case Mode::ExperimentalPrivateDependencies:
-      source = getFirstDependencySourceOrNull();
-      break;
-    }
-    
-    if (!source)
-      return nullptr;
-
-    return source->getRequestBasedReferencedNameTracker();
   }
 
   /// Returns \c true if the scope of the current active source cascades.

@@ -318,7 +318,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     if (Loc.isValid()) {
       const auto &SM = D->getASTContext().SourceMgr;
       StringRef FileName = SM.getDisplayNameForLoc(Loc);
-      auto LineAndColumn = SM.getLineAndColumn(Loc);
+      auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
       OS << " file=\"";
       appendWithXMLEscaping(OS, FileName);
       OS << "\"";

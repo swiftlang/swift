@@ -43,6 +43,12 @@ namespace clang {
   class Type;
   class VisibleDeclConsumer;
   class DeclarationName;
+  class CompilerInvocation;
+namespace tooling {
+namespace dependencies {
+  struct FullDependenciesResult;
+}
+}
 }
 
 namespace swift {
@@ -148,6 +154,14 @@ public:
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
 
+  static std::vector<std::string>
+  getClangArguments(ASTContext &ctx, const ClangImporterOptions &importerOpts);
+
+  static std::unique_ptr<clang::CompilerInvocation>
+  createClangInvocation(ClangImporter *importer,
+                        const ClangImporterOptions &importerOpts,
+                        ArrayRef<std::string> invocationArgStrs,
+                        std::vector<std::string> *CC1Args = nullptr);
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
   ClangImporter &operator=(const ClangImporter &) = delete;
@@ -369,6 +383,10 @@ public:
 
   void verifyAllModules() override;
 
+  void recordModuleDependencies(
+      ModuleDependenciesCache &cache,
+      const clang::tooling::dependencies::FullDependenciesResult &clangDependencies);
+
   Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
@@ -459,6 +477,12 @@ public:
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
                              ArrayRef<clang::Module *> Exported);
+
+/// Extract the specified-or-defaulted -module-cache-path that winds up in
+/// the clang importer, for reuse as the .swiftmodule cache path when
+/// building a ModuleInterfaceLoader.
+std::string
+getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
 } // end namespace swift
 

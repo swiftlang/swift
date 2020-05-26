@@ -713,7 +713,7 @@ writer.write<uint32_t>(data.X.Column);
   LineColumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
     LineColumn Result;
     if (Loc.isValid()) {
-      auto LC = SM.getLineAndColumn(Loc);
+      auto LC = SM.getPresumedLineAndColumnForLoc(Loc);
       Result.Line = LC.first;
       Result.Column = LC.second;
     }

@@ -879,10 +879,8 @@ function(_add_swift_target_library_single target name)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
-    target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
-    set_target_properties(${target}
-                          PROPERTIES
-                            CXX_STANDARD 14)
+    target_include_directories("${target}" SYSTEM PRIVATE
+      ${SWIFTLIB_INCLUDE})
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
