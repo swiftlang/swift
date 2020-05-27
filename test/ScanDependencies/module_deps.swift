@@ -22,20 +22,20 @@
 // RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/BuildModules/main.swift -o %t/ModuleBuilder
 // RUN: %target-codesign %t/ModuleBuilder
 
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/A-*.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path B.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/B-*.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path C.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/C-*.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/A-*.swiftmodule
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path E.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/E-*.swiftmodule
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path F.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/F-*.swiftmodule
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path G.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/G-*.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.pcm -o %t/clang-module-cache/A.pcm | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/A.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path B.pcm -o %t/clang-module-cache/B.pcm -clang-module-map-file=%S/Inputs/CHeaders/module.modulemap -clang-module-file=%t/clang-module-cache/A.pcm | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/B.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path C.pcm -o %t/clang-module-cache/B.pcm -clang-module-map-file=%S/Inputs/CHeaders/module.modulemap -clang-module-file=%t/clang-module-cache/B.pcm | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/C.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.swiftmodule -o %t/clang-module-cache/A.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/A.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path E.swiftmodule -o %t/clang-module-cache/E.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/E.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path F.swiftmodule -o %t/clang-module-cache/F.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/F.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path G.swiftmodule -o %t/clang-module-cache/G.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/G.swiftmodule
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -136,8 +136,6 @@ import G
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-target"
 // CHECK: "-sdk"
-// CHECK: "-o"
-// CHECK: /clang-module-cache/G-{{.*}}.swiftmodule"
 // CHECK: "-module-name"
 // CHECK: "G"
 // CHECK: "-swift-version"

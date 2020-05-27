@@ -219,6 +219,12 @@ def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules"
 
 def disable_implicit_pcms: Flag<["-"], "disable-implicit-pcms">,
   HelpText<"Disable building Clang modules explicitly by the compiler">;
+
+def clang_module_map_file_EQ : Joined<["-"], "clang-module-map-file=">,
+  HelpText<"Pass down to Clang as -fmodule-map-file=">;
+
+def clang_module_file_EQ : Joined<["-"], "clang-module-file=">,
+  HelpText<"Pass down to Clang as -fmodule-file=">;
 }
 
 

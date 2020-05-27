@@ -817,6 +817,16 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
       Args.hasArg(OPT_disable_clangimporter_source_import);
 
   Opts.DisableImplicitPCMs |= Args.hasArg(OPT_disable_implicit_pcms);
+
+  // These flags are for explicitly built PCMs.
+  for (auto A: Args.getAllArgValues(OPT_clang_module_map_file_EQ)) {
+    Opts.ExtraArgs.push_back("-Xclang");
+    Opts.ExtraArgs.push_back((Twine("-fmodule-map-file=") + A).str());
+  }
+  for (auto A: Args.getAllArgValues(OPT_clang_module_file_EQ)) {
+    Opts.ExtraArgs.push_back("-Xclang");
+    Opts.ExtraArgs.push_back((Twine("-fmodule-file=") + A).str());
+  }
   return false;
 }
 
