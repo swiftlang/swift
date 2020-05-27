@@ -3163,7 +3163,7 @@ static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
         continue;
       
       auto &SM = ctx.SourceMgr;
-      auto prevLineCol = SM.getPresumedLineAndColumnForLoc(prevLoc);
+      auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
       if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
         continue;
 
