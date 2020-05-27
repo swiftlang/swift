@@ -177,20 +177,17 @@ private func _NSStringCopyUTF8(
   into bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
   let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  let success = 0 != o._getCString(
+  // We use _getCString rather than getCString because it happens to be faster
+  // for tagged pointer NSStrings currently
+  guard 0 != o._getCString(
     ptr,
-    maxLength: bufPtr.count,
+    maxLength: bufPtr.count - 1,
     encoding: 0x08000100 /* kCFStringEncodingUTF8 */
-  )
-  if !success {
+  ) else {
     return nil
   }
   
-  for i in (0 ..< bufPtr.count).reversed() {
-    if bufPtr[i] != 0 { return i }
-  }
-  
-  return nil
+  return bufPtr.firstIndex(of: 0)
 }
 
 @_effects(releasenone)
