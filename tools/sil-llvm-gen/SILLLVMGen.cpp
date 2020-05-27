@@ -189,10 +189,10 @@ int main(int argc, char **argv) {
 
   std::unique_ptr<SILModule> SILMod;
   if (PerformWMO) {
-    SILMod = performSILGeneration(mod, CI.getSILTypes(), CI.getSILOptions());
+    SILMod = performASTLowering(mod, CI.getSILTypes(), CI.getSILOptions());
   } else {
-    SILMod = performSILGeneration(*mod->getFiles()[0], CI.getSILTypes(),
-                                  CI.getSILOptions());
+    SILMod = performASTLowering(*mod->getFiles()[0], CI.getSILTypes(),
+                                CI.getSILOptions());
   }
 
   // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for

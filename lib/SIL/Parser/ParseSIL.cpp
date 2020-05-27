@@ -101,7 +101,7 @@ SILParserState::~SILParserState() {
 
 std::unique_ptr<SILModule>
 ParseSILModuleRequest::evaluate(Evaluator &evaluator,
-                                SILGenDescriptor desc) const {
+                                ASTLoweringDescriptor desc) const {
   auto *SF = desc.getSourceFileToParse();
   assert(SF);
 

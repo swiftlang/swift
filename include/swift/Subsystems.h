@@ -172,13 +172,13 @@ namespace swift {
   /// The module must contain source files. The optimizer will assume that the
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
-                       const SILOptions &options);
+  performASTLowering(ModuleDecl *M, Lowering::TypeConverter &TC,
+                     const SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
-                       const SILOptions &options);
+  performASTLowering(FileUnit &SF, Lowering::TypeConverter &TC,
+                     const SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
