@@ -1243,7 +1243,7 @@ public:
       if (superMV.getValue() != SGF.InitDelegationSelf.getValue()) {
         SILValue underlyingSelf = SGF.InitDelegationSelf.getValue();
         SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
-        CleanupHandle newWriteback = SGF.enterDelegateInitSelfWritebackCleanup(
+        CleanupHandle newWriteback = SGF.enterOwnedValueWritebackCleanup(
             SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
             superMV.forward(SGF));
         SGF.SuperInitDelegationSelf =
@@ -4881,8 +4881,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
       unsigned Value = 0;
       if (Loc.isValid()) {
         Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
-                    ? ctx.SourceMgr.getLineAndColumn(Loc).first
-                    : ctx.SourceMgr.getLineAndColumn(Loc).second;
+                    ? ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first
+                    : ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).second;
       }
 
       auto silTy = SILType::getBuiltinIntegerLiteralType(ctx);

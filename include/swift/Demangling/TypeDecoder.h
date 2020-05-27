@@ -23,6 +23,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <vector>
 
 namespace swift {
@@ -93,7 +94,7 @@ enum class ImplParameterDifferentiability {
   NotDifferentiable
 };
 
-static inline Optional<ImplParameterDifferentiability>
+static inline llvm::Optional<ImplParameterDifferentiability>
 getDifferentiabilityFromString(StringRef string) {
   if (string.empty())
     return ImplParameterDifferentiability::DifferentiableOrNotApplicable;
@@ -114,7 +115,7 @@ public:
   using ConventionType = ImplParameterConvention;
   using DifferentiabilityType = ImplParameterDifferentiability;
 
-  static Optional<ConventionType>
+  static llvm::Optional<ConventionType>
   getConventionFromString(StringRef conventionString) {
     if (conventionString == "@in")
       return ConventionType::Indirect_In;
@@ -167,7 +168,7 @@ class ImplFunctionResult {
 public:
   using ConventionType = ImplResultConvention;
 
-  static Optional<ConventionType>
+  static llvm::Optional<ConventionType>
   getConventionFromString(StringRef conventionString) {
     if (conventionString == "@out")
       return ConventionType::Indirect;
@@ -267,8 +268,8 @@ public:
 #if SWIFT_OBJC_INTEROP
 /// For a mangled node that refers to an Objective-C class or protocol,
 /// return the class or protocol name.
-static inline Optional<StringRef> getObjCClassOrProtocolName(
-    NodePointer node) {
+static inline llvm::Optional<StringRef>
+getObjCClassOrProtocolName(NodePointer node) {
   if (node->getKind() != Demangle::Node::Kind::Class &&
       node->getKind() != Demangle::Node::Kind::Protocol)
     return None;
@@ -434,7 +435,7 @@ class TypeDecoder {
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
       unsigned i = 0;
-      Optional<ImplMetatypeRepresentation> repr;
+      llvm::Optional<ImplMetatypeRepresentation> repr;
 
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
@@ -649,7 +650,7 @@ class TypeDecoder {
         }
       }
 
-      Optional<ImplFunctionResult<BuiltType>> errorResult;
+      llvm::Optional<ImplFunctionResult<BuiltType>> errorResult;
       switch (errorResults.size()) {
       case 0:
         break;
@@ -876,7 +877,7 @@ class TypeDecoder {
         }
       }
       genericArgsLevels.push_back(genericArgsBuf.size());
-      std::vector<ArrayRef<BuiltType>> genericArgs;
+      std::vector<llvm::ArrayRef<BuiltType>> genericArgs;
       for (unsigned i = 0; i < genericArgsLevels.size() - 1; ++i) {
         auto start = genericArgsLevels[i], end = genericArgsLevels[i+1];
         genericArgs.emplace_back(genericArgsBuf.data() + start,
@@ -895,7 +896,7 @@ class TypeDecoder {
 private:
   template <typename T>
   bool decodeImplFunctionPart(Demangle::NodePointer node,
-                              SmallVectorImpl<T> &results) {
+                              llvm::SmallVectorImpl<T> &results) {
     if (node->getNumChildren() != 2)
       return true;
     
@@ -904,7 +905,7 @@ private:
       return true;
 
     StringRef conventionString = node->getChild(0)->getText();
-    Optional<typename T::ConventionType> convention =
+    llvm::Optional<typename T::ConventionType> convention =
         T::getConventionFromString(conventionString);
     if (!convention)
       return true;
@@ -918,7 +919,7 @@ private:
 
   bool decodeImplFunctionParam(
       Demangle::NodePointer node,
-      SmallVectorImpl<ImplFunctionParam<BuiltType>> &results) {
+      llvm::SmallVectorImpl<ImplFunctionParam<BuiltType>> &results) {
     // Children: `convention, differentiability?, type`
     if (node->getNumChildren() != 2 && node->getNumChildren() != 3)
       return true;
@@ -1020,7 +1021,7 @@ private:
 
   bool decodeMangledFunctionInputType(
       Demangle::NodePointer node,
-      SmallVectorImpl<FunctionParam<BuiltType>> &params,
+      llvm::SmallVectorImpl<FunctionParam<BuiltType>> &params,
       bool &hasParamFlags) {
     // Look through a couple of sugar nodes.
     if (node->getKind() == NodeKind::Type ||
@@ -1071,8 +1072,8 @@ private:
       return true;
     };
 
-    auto decodeParam = [&](NodePointer paramNode)
-        -> Optional<FunctionParam<BuiltType>> {
+    auto decodeParam =
+        [&](NodePointer paramNode) -> llvm::Optional<FunctionParam<BuiltType>> {
       if (paramNode->getKind() != NodeKind::TupleElement)
         return None;
 

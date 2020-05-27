@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,6 +13,8 @@
 //  This file implements the SerializedDiagnosticConsumer class.
 //
 //===----------------------------------------------------------------------===//
+
+#include "clang/Frontend/SerializedDiagnostics.h"
 
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/AST/DiagnosticConsumer.h"
@@ -30,39 +32,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
 
-// For constant values only.
-#include "clang/Frontend/SerializedDiagnosticPrinter.h"
-
 using namespace swift;
-
-//===----------------------------------------------------------------------===//
-// These must match Clang's diagnostic IDs.  We can consider sharing the
-// header files to avoid this copy-paste.
-//===----------------------------------------------------------------------===//
-
-enum BlockIDs {
-  /// A top-level block which represents any meta data associated
-  /// with the diagnostics, including versioning of the format.
-  BLOCK_META = llvm::bitc::FIRST_APPLICATION_BLOCKID,
-
-  /// The this block acts as a container for all the information
-  /// for a specific diagnostic.
-  BLOCK_DIAG
-};
-
-enum RecordIDs {
-  RECORD_VERSION = 1,
-  RECORD_DIAG,
-  RECORD_SOURCE_RANGE,
-  RECORD_DIAG_FLAG,
-  RECORD_CATEGORY,
-  RECORD_FILENAME,
-  RECORD_FIXIT,
-  RECORD_FIRST = RECORD_VERSION,
-  RECORD_LAST = RECORD_FIXIT
-};
-
-//===----------------------------------------------------------------------===//
+using namespace clang::serialized_diags;
 
 namespace {
 class AbbreviationMap {
@@ -193,9 +164,6 @@ public:
 
   void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 
-  /// The version of the diagnostics file.
-  enum { Version = 1 };
-
 private:
   /// Emit bitcode for the preamble.
   void emitPreamble();
@@ -282,7 +250,7 @@ void SerializedDiagnosticConsumer::addLocToRecord(SourceLoc Loc,
 
   auto bufferId = SM.findBufferContainingLoc(Loc);
   unsigned line, col;
-  std::tie(line, col) = SM.getLineAndColumn(Loc);
+  std::tie(line, col) = SM.getPresumedLineAndColumnForLoc(Loc);
 
   Record.push_back(getEmitFile(Filename));
   Record.push_back(line);
@@ -334,7 +302,7 @@ void SerializedDiagnosticConsumer::emitMetaBlock() {
   Stream.EnterSubblock(BLOCK_META, 3);
   Record.clear();
   Record.push_back(RECORD_VERSION);
-  Record.push_back(Version);
+  Record.push_back(clang::serialized_diags::VersionNumber);
   Stream.EmitRecordWithAbbrev(Abbrevs.get(RECORD_VERSION), Record);
   Stream.ExitBlock();
 }

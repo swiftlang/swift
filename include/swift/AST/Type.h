@@ -147,10 +147,7 @@ enum class SubstFlags {
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x02,
   /// Substitute types involving opaque type archetypes.
-  SubstituteOpaqueArchetypes = 0x04,
-  /// Force substitution of opened archetypes. Normally -- without these flag --
-  /// opened archetype conformances are not substituted.
-  ForceSubstituteOpenedExistentials = 0x08,
+  SubstituteOpaqueArchetypes = 0x04
 };
 
 /// Options for performing substitutions into a type.
@@ -384,7 +381,7 @@ SourceLoc extractNearestSourceLoc(Type ty);
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
+  static bool isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
                                   bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
@@ -436,7 +433,7 @@ public:
   ///   - existentials with class or class protocol bounds
   /// But not:
   ///   - function types
-  bool allowsOwnership(GenericSignatureImpl *sig) const {
+  bool allowsOwnership(const GenericSignatureImpl *sig) const {
     return isReferenceTypeImpl(*this, sig,
                                /*functions count*/ false);
   }

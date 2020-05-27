@@ -234,6 +234,10 @@ enum class FixKind : uint8_t {
   /// inferred and has to be specified explicitly.
   SpecifyBaseTypeForContextualMember,
 
+  /// Type of the closure parameter used in the body couldn't be inferred
+  /// and has to be specified explicitly.
+  SpecifyClosureParameterType,
+
   /// Closure return type has to be explicitly specified because it can't be
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
@@ -253,7 +257,7 @@ enum class FixKind : uint8_t {
 
   /// A warning fix that allows a coercion to perform a force-cast.
   AllowCoercionToForceCast,
-  
+
   /// Allow key path root type mismatch when applying a key path that has a
   /// root type not convertible to the type of the base instance.
   AllowKeyPathRootTypeMismatch,
@@ -1326,6 +1330,8 @@ class AllowInvalidRefInKeyPath final : public ConstraintFix {
     // Allow a reference to a initializer instance as a key path
     // component.
     Initializer,
+    // Allow a reference to an enum case as a key path component.
+    EnumCase,
   } Kind;
 
   ValueDecl *Member;
@@ -1347,6 +1353,8 @@ public:
       return "allow reference to a method as a key path component";
     case RefKind::Initializer:
       return "allow reference to an init method as a key path component";
+    case RefKind::EnumCase:
+      return "allow reference to an enum case as a key path component";
     }
     llvm_unreachable("covered switch");
   }
@@ -1710,6 +1718,19 @@ public:
 
   static SpecifyBaseTypeForContextualMember *
   create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
+};
+
+class SpecifyClosureParameterType final : public ConstraintFix {
+  SpecifyClosureParameterType(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyClosureParameterType, locator) {}
+
+public:
+  std::string getName() const;
+
+  bool diagnose(const Solution &solution, bool asNote = false) const;
+
+  static SpecifyClosureParameterType *create(ConstraintSystem &cs,
+                                             ConstraintLocator *locator);
 };
 
 class SpecifyClosureReturnType final : public ConstraintFix {

@@ -394,9 +394,16 @@ class DerivativeFunctionTypeError
     : public llvm::ErrorInfo<DerivativeFunctionTypeError> {
 public:
   enum class Kind {
+    /// Original function type has no semantic results.
     NoSemanticResults,
+    /// Original function type has multiple semantic results.
+    // TODO(TF-1250): Support function types with multiple semantic results.
     MultipleSemanticResults,
-    NonDifferentiableParameters,
+    /// Differentiability parmeter indices are empty.
+    NoDifferentiabilityParameters,
+    /// A differentiability parameter does not conform to `Differentiable`.
+    NonDifferentiableDifferentiabilityParameter,
+    /// The original result type does not conform to `Differentiable`.
     NonDifferentiableResult
   };
 
@@ -406,12 +413,13 @@ public:
   /// The error kind.
   Kind kind;
 
+  /// The type and index of a differentiability parameter or result.
+  using TypeAndIndex = std::pair<Type, unsigned>;
+
 private:
   union Value {
-    IndexSubset *indices;
-    Type type;
-    Value(IndexSubset *indices) : indices(indices) {}
-    Value(Type type) : type(type) {}
+    TypeAndIndex typeAndIndex;
+    Value(TypeAndIndex typeAndIndex) : typeAndIndex(typeAndIndex) {}
     Value() {}
   } value;
 
@@ -419,29 +427,21 @@ public:
   explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind)
       : functionType(functionType), kind(kind), value(Value()) {
     assert(kind == Kind::NoSemanticResults ||
-           kind == Kind::MultipleSemanticResults);
+           kind == Kind::MultipleSemanticResults ||
+           kind == Kind::NoDifferentiabilityParameters);
   };
 
   explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind,
-                                       IndexSubset *nonDiffParameterIndices)
-      : functionType(functionType), kind(kind), value(nonDiffParameterIndices) {
-    assert(kind == Kind::NonDifferentiableParameters);
+                                       TypeAndIndex nonDiffTypeAndIndex)
+      : functionType(functionType), kind(kind), value(nonDiffTypeAndIndex) {
+    assert(kind == Kind::NonDifferentiableDifferentiabilityParameter ||
+           kind == Kind::NonDifferentiableResult);
   };
 
-  explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind,
-                                       Type nonDiffResultType)
-      : functionType(functionType), kind(kind), value(nonDiffResultType) {
-    assert(kind == Kind::NonDifferentiableResult);
-  };
-
-  IndexSubset *getNonDifferentiableParameterIndices() const {
-    assert(kind == Kind::NonDifferentiableParameters);
-    return value.indices;
-  }
-
-  Type getNonDifferentiableResultType() const {
-    assert(kind == Kind::NonDifferentiableResult);
-    return value.type;
+  TypeAndIndex getNonDifferentiableTypeAndIndex() const {
+    assert(kind == Kind::NonDifferentiableDifferentiabilityParameter ||
+           kind == Kind::NonDifferentiableResult);
+    return value.typeAndIndex;
   }
 
   void log(raw_ostream &OS) const override;

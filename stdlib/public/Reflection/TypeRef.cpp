@@ -1072,9 +1072,9 @@ public:
         newArgsBuffer.push_back(visit(arg));
       }
     }
-    
-    std::vector<ArrayRef<const TypeRef *>> newArgLists;
-    
+
+    std::vector<llvm::ArrayRef<const TypeRef *>> newArgLists;
+
     return OpaqueArchetypeTypeRef::create(Builder, O->getID(), O->getDescription(),
                                           O->getOrdinal(),
                                           newArgLists);

@@ -47,3 +47,10 @@ public struct UsesBuilderProperty {
   // CHECK: public func myFunc(@FunctionBuilders.TupleBuilder fn: () -> ())
   public func myFunc(@TupleBuilder fn: () -> ()) {}
 }
+
+public protocol ProtocolWithBuilderProperty {
+  associatedtype Assoc
+  
+  // CHECK: @FunctionBuilders.TupleBuilder var myVar: Self.Assoc { get }
+  @TupleBuilder var myVar: Assoc { get }
+}

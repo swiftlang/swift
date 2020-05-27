@@ -35,7 +35,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
@@ -88,6 +87,14 @@ bool TypeVariableType::Implementation::isClosureType() const {
     return false;
 
   return isExpr<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
+}
+
+bool TypeVariableType::Implementation::isClosureParameterType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  return isExpr<ClosureExpr>(locator->getAnchor()) &&
+         locator->isLastElement<LocatorPathElt::TupleElement>();
 }
 
 bool TypeVariableType::Implementation::isClosureResultType() const {
@@ -2214,8 +2221,8 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   if (!expr)
     return nullptr;
 
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
+  if (CS.isDebugMode()) {
+    auto &log = llvm::errs();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
     log << "\n";
@@ -2228,8 +2235,8 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
     return nullptr;
 
   auto &solution = viable[0];
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
+  if (CS.isDebugMode()) {
+    auto &log = llvm::errs();
     log << "---Solution---\n";
     solution.dump(log);
   }

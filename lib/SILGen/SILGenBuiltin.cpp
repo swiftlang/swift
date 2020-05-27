@@ -901,6 +901,60 @@ emitBuiltinIsUnique_native(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(result);
 }
 
+static ManagedValue
+emitBuiltinBeginCOWMutation(SILGenFunction &SGF,
+                            SILLocation loc,
+                            SubstitutionMap subs,
+                            ArrayRef<ManagedValue> args,
+                            SGFContext C) {
+
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "BeginCOWMutation should have one sub.");
+  assert(args.size() == 1 && "isUnique_native should have one arg.");
+
+  SILValue refAddr = args[0].getValue();
+  auto *ref = SGF.B.createLoad(loc, refAddr, LoadOwnershipQualifier::Take);
+  BeginCOWMutationInst *beginCOW = SGF.B.createBeginCOWMutation(loc, ref, /*isNative*/ false);
+  SGF.B.createStore(loc, beginCOW->getBufferResult(), refAddr, StoreOwnershipQualifier::Init);
+  return ManagedValue::forUnmanaged(beginCOW->getUniquenessResult());
+}
+
+static ManagedValue
+emitBuiltinBeginCOWMutation_native(SILGenFunction &SGF,
+                            SILLocation loc,
+                            SubstitutionMap subs,
+                            ArrayRef<ManagedValue> args,
+                            SGFContext C) {
+
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "BeginCOWMutation should have one sub.");
+  assert(args.size() == 1 && "isUnique_native should have one arg.");
+
+  SILValue refAddr = args[0].getValue();
+  auto *ref = SGF.B.createLoad(loc, refAddr, LoadOwnershipQualifier::Take);
+  BeginCOWMutationInst *beginCOW = SGF.B.createBeginCOWMutation(loc, ref, /*isNative*/ true);
+  SGF.B.createStore(loc, beginCOW->getBufferResult(), refAddr, StoreOwnershipQualifier::Init);
+  return ManagedValue::forUnmanaged(beginCOW->getUniquenessResult());
+}
+
+static ManagedValue
+emitBuiltinEndCOWMutation(SILGenFunction &SGF,
+                           SILLocation loc,
+                           SubstitutionMap subs,
+                           ArrayRef<ManagedValue> args,
+                           SGFContext C) {
+
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "EndCOWMutation should have one sub.");
+  assert(args.size() == 1 && "isUnique_native should have one arg.");
+
+  SILValue refAddr = args[0].getValue();
+  auto ref = SGF.B.createLoad(loc, refAddr, LoadOwnershipQualifier::Take);
+  auto endRef = SGF.B.createEndCOWMutation(loc, ref);
+  SGF.B.createStore(loc, endRef, refAddr, StoreOwnershipQualifier::Init);
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
 static ManagedValue emitBuiltinBindMemory(SILGenFunction &SGF,
                                           SILLocation loc,
                                           SubstitutionMap subs,

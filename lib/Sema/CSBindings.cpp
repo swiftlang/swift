@@ -107,9 +107,8 @@ ConstraintSystem::determineBestBindings() {
 
     inferTransitiveSupertypeBindings(cache, bindings);
 
-    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      bindings.dump(typeVar, log, solverState->depth * 2);
+    if (isDebugMode()) {
+      bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
     }
 
     // If these are the first bindings, or they are better than what
@@ -1087,32 +1086,37 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       // resolved and had to be bound to a placeholder "hole" type.
       cs.increaseScore(SK_Hole);
 
+      ConstraintFix *fix = nullptr;
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-        auto path = dstLocator->getPath();
-        // Drop `generic parameter` locator element so that all missing
-        // generic parameters related to the same path can be coalesced later.
-        auto *fix = DefaultGenericArgument::create(
-            cs, GP,
-            cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
-        if (cs.recordFix(fix))
-          return true;
+        // If it is represetative for a key path root, let's emit a more
+        // specific diagnostic.
+        auto *keyPathRoot =
+            cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
+        if (keyPathRoot) {
+          fix = SpecifyKeyPathRootType::create(
+              cs, keyPathRoot->getImpl().getLocator());
+        } else {
+          auto path = dstLocator->getPath();
+          // Drop `generic parameter` locator element so that all missing
+          // generic parameters related to the same path can be coalesced later.
+          fix = DefaultGenericArgument::create(
+              cs, GP,
+              cs.getConstraintLocator(dstLocator->getAnchor(),
+                                      path.drop_back()));
+        }
+      } else if (TypeVar->getImpl().isClosureParameterType()) {
+        fix = SpecifyClosureParameterType::create(cs, dstLocator);
       } else if (TypeVar->getImpl().isClosureResultType()) {
-        auto *fix = SpecifyClosureReturnType::create(
-            cs, TypeVar->getImpl().getLocator());
-        if (cs.recordFix(fix))
-          return true;
+        fix = SpecifyClosureReturnType::create(cs, dstLocator);
       } else if (srcLocator->getAnchor() &&
                  isExpr<ObjectLiteralExpr>(srcLocator->getAnchor())) {
-        auto *fix = SpecifyObjectLiteralTypeImport::create(
-            cs, TypeVar->getImpl().getLocator());
-        if (cs.recordFix(fix))
-          return true;
+        fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
       } else if (srcLocator->isKeyPathRoot()) {
-        auto *fix =
-            SpecifyKeyPathRootType::create(cs, TypeVar->getImpl().getLocator());
-        if (cs.recordFix(fix))
-          return true;
+        fix = SpecifyKeyPathRootType::create(cs, dstLocator);
       }
+
+      if (fix && cs.recordFix(fix))
+        return true;
     }
   }
 

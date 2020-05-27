@@ -558,10 +558,12 @@ protected:
     IsIncompatibleWithWeakReferences : 1
   );
 
-  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1+1,
     /// True if this struct has storage for fields that aren't accessible in
     /// Swift.
-    HasUnreferenceableStorage : 1
+    HasUnreferenceableStorage : 1,
+    /// True if this struct is imported from C++ and not trivially copyable.
+    IsCxxNotTriviallyCopyable : 1
   );
   
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
@@ -573,7 +575,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -599,7 +601,10 @@ protected:
 
     /// Whether the module was imported from Clang (or, someday, maybe another
     /// language).
-    IsNonSwiftModule : 1
+    IsNonSwiftModule : 1,
+
+    /// Whether this module is the main module.
+    IsMainModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -3822,6 +3827,14 @@ public:
   void setHasUnreferenceableStorage(bool v) {
     Bits.StructDecl.HasUnreferenceableStorage = v;
   }
+
+  bool isCxxNotTriviallyCopyable() const {
+    return Bits.StructDecl.IsCxxNotTriviallyCopyable;
+  }
+
+  void setIsCxxNotTriviallyCopyable(bool v) {
+    Bits.StructDecl.IsCxxNotTriviallyCopyable = v;
+  }
 };
 
 /// This is the base type for AncestryOptions. Each flag describes possible
@@ -4104,8 +4117,8 @@ public:
   ///
   /// \param isInstance Whether we are looking for an instance method
   /// (vs. a class method).
-  MutableArrayRef<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
-                                                       bool isInstance);
+  TinyPtrVector<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
+                                                     bool isInstance);
 
   /// Record the presence of an @objc method with the given selector.
   void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
@@ -5218,6 +5231,12 @@ public:
   /// property wrappers.
   Optional<PropertyWrapperMutability>
       getPropertyWrapperMutability() const;
+
+  /// Returns whether this property is the backing storage property or a storage
+  /// wrapper for wrapper instance's projectedValue. If this property is
+  /// neither, then it returns `None`.
+  Optional<PropertyWrapperSynthesizedPropertyKind>
+  getPropertyWrapperSynthesizedPropertyKind() const;
 
   /// Retrieve the backing storage property for a property that has an
   /// attached property wrapper.
@@ -7035,6 +7054,10 @@ public:
     return Name;
   }
 
+  // This is needed to allow templated code to work with both ValueDecls and
+  // PrecedenceGroupDecls.
+  DeclBaseName getBaseName() const { return Name; }
+
   SourceLoc getLBraceLoc() const { return LBraceLoc; }
   SourceLoc getRBraceLoc() const { return RBraceLoc; }
 
@@ -7192,6 +7215,10 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
 
+  // This is needed to allow templated code to work with both ValueDecls and
+  // OperatorDecls.
+  DeclBaseName getBaseName() const { return name; }
+
   /// Get the list of identifiers after the colon in the operator declaration.
   ///
   /// This list includes the names of designated types. For infix operators, the
@@ -7252,12 +7279,6 @@ public:
 
   PrecedenceGroupDecl *getPrecedenceGroup() const;
 
-  /// True if this decl's attributes conflict with those declared by another
-  /// operator.
-  bool conflictsWith(InfixOperatorDecl *other) {
-    return getPrecedenceGroup() != other->getPrecedenceGroup();
-  }
-  
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::InfixOperator;
   }
@@ -7286,12 +7307,6 @@ public:
     return { getOperatorLoc(), getNameLoc() };
   }
 
-  /// True if this decl's attributes conflict with those declared by another
-  /// PrefixOperatorDecl.
-  bool conflictsWith(PrefixOperatorDecl *other) {
-    return false;
-  }
-  
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PrefixOperator;
   }
@@ -7318,12 +7333,6 @@ public:
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
-  }
-
-  /// True if this decl's attributes conflict with those declared by another
-  /// PostfixOperatorDecl.
-  bool conflictsWith(PostfixOperatorDecl *other) {
-    return false;
   }
   
   static bool classof(const Decl *D) {

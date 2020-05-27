@@ -101,8 +101,8 @@ protected:
 
   FulfillmentMap Fulfillments;
 
-  GenericSignature::ConformsToArray getConformsTo(Type t) {
-    return Generics->getConformsTo(t);
+  GenericSignature::RequiredProtocols getRequiredProtocols(Type t) {
+    return Generics->getRequiredProtocols(t);
   }
 
   CanType getSuperclassBound(Type t) {
@@ -166,9 +166,9 @@ private:
     bool hasLimitedInterestingConformances(CanType type) const override {
       return true;
     }
-    GenericSignature::ConformsToArray
+    GenericSignature::RequiredProtocols
     getInterestingConformances(CanType type) const override {
-      return Self.getConformsTo(type);
+      return Self.getRequiredProtocols(type);
     }
     CanType getSuperclassBound(CanType type) const override {
       return Self.getSuperclassBound(type);
@@ -1203,7 +1203,7 @@ public:
           bool hasLimitedInterestingConformances(CanType type) const override {
             return false;
           }
-          GenericSignature::ConformsToArray
+          GenericSignature::RequiredProtocols
           getInterestingConformances(CanType type) const override {
             llvm_unreachable("no limits");
           }

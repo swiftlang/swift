@@ -48,7 +48,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 FingerprintAndMembers
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
-  SourceFile &sf = *idc->getDecl()->getDeclContext()->getParentSourceFile();
+  SourceFile &sf = *idc->getAsGenericContext()->getParentSourceFile();
   unsigned bufferID = *sf.getBufferID();
 
   // Lexer diaganostics have been emitted during skipping, so we disable lexer's
@@ -96,8 +96,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
     SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
     SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
     unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
-    Parser parser(bufferID, sf, static_cast<SILParserTUStateBase *>(nullptr),
-                  nullptr, nullptr);
+    Parser parser(bufferID, sf, /*SIL*/ nullptr);
     parser.SyntaxContext->disable();
     auto body = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
@@ -168,7 +167,7 @@ ArrayRef<Decl *> ParseSourceFileRequest::evaluate(Evaluator &evaluator,
 }
 
 evaluator::DependencySource ParseSourceFileRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
 }
 
@@ -196,7 +195,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 evaluator::DependencySource
 CodeCompletionSecondPassRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   return {std::get<0>(getStorage()), e.getActiveSourceScope()};
 }
 

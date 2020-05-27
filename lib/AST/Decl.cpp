@@ -924,53 +924,13 @@ GenericParamList::clone(DeclContext *dc) const {
       GenericTypeParamDecl::InvalidDepth,
       param->getIndex());
     params.push_back(newParam);
-
-    SmallVector<TypeLoc, 2> inherited;
-    for (auto loc : param->getInherited())
-      inherited.push_back(loc.clone(ctx));
-    newParam->setInherited(ctx.AllocateCopy(inherited));
-  }
-
-  SmallVector<RequirementRepr, 2> requirements;
-  for (auto reqt : getRequirements()) {
-    switch (reqt.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      auto first = reqt.getSubjectLoc();
-      auto second = reqt.getConstraintLoc();
-      reqt = RequirementRepr::getTypeConstraint(
-          first.clone(ctx),
-          reqt.getSeparatorLoc(),
-          second.clone(ctx));
-      break;
-    }
-    case RequirementReprKind::SameType: {
-      auto first = reqt.getFirstTypeLoc();
-      auto second = reqt.getSecondTypeLoc();
-      reqt = RequirementRepr::getSameType(
-          first.clone(ctx),
-          reqt.getSeparatorLoc(),
-          second.clone(ctx));
-      break;
-    }
-    case RequirementReprKind::LayoutConstraint: {
-      auto first = reqt.getSubjectLoc();
-      auto layout = reqt.getLayoutConstraintLoc();
-      reqt = RequirementRepr::getLayoutConstraint(
-          first.clone(ctx),
-          reqt.getSeparatorLoc(),
-          layout);
-      break;
-    }
-    }
-
-    requirements.push_back(reqt);
   }
 
   return GenericParamList::create(ctx,
                                   getLAngleLoc(),
                                   params,
                                   getWhereLoc(),
-                                  requirements,
+                                  /*requirements=*/{},
                                   getRAngleLoc());
 }
 
@@ -4090,6 +4050,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
     StructLoc(StructLoc)
 {
   Bits.StructDecl.HasUnreferenceableStorage = false;
+  Bits.StructDecl.IsCxxNotTriviallyCopyable = false;
 }
 
 bool NominalTypeDecl::hasMemberwiseInitializer() const {
@@ -5969,6 +5930,17 @@ VarDecl::getPropertyWrapperMutability() const {
       None);
 }
 
+Optional<PropertyWrapperSynthesizedPropertyKind>
+VarDecl::getPropertyWrapperSynthesizedPropertyKind() const {
+  if (getOriginalWrappedProperty(
+          PropertyWrapperSynthesizedPropertyKind::Backing))
+    return PropertyWrapperSynthesizedPropertyKind::Backing;
+  if (getOriginalWrappedProperty(
+          PropertyWrapperSynthesizedPropertyKind::StorageWrapper))
+    return PropertyWrapperSynthesizedPropertyKind::StorageWrapper;
+  return None;
+}
+
 VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
 }
@@ -6140,8 +6112,6 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
       nullptr, PD->DefaultValueAndFlags.getInt());
   Clone->Bits.ParamDecl.defaultArgumentKind =
       PD->Bits.ParamDecl.defaultArgumentKind;
-  if (auto *repr = PD->getTypeRepr())
-    Clone->setTypeRepr(repr->clone(Ctx));
 
   Clone->setSpecifier(PD->getSpecifier());
   Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
@@ -6354,10 +6324,6 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
 }
 
 Type ValueDecl::getFunctionBuilderType() const {
-  // Fast path: most declarations (especially parameters, which is where
-  // this is hottest) do not have any custom attributes at all.
-  if (!getAttrs().hasAttribute<CustomAttr>()) return Type();
-
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
@@ -6366,10 +6332,6 @@ Type ValueDecl::getFunctionBuilderType() const {
 }
 
 CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
-  // Fast path: most declarations (especially parameters, which is where
-  // this is hottest) do not have any custom attributes at all.
-  if (!getAttrs().hasAttribute<CustomAttr>()) return nullptr;
-
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
@@ -6493,9 +6455,13 @@ ParamDecl::getDefaultValueStringRepresentation(
           return getASTContext().SourceMgr.extractText(charRange);
         }
 
-        // If there is no parent initializer, we used the default initializer.
-        auto parentInit = original->getParentInitializer();
-        if (!parentInit) {
+        // If there is no initial wrapped value, we used the default initializer.
+        Expr *wrappedValue = nullptr;
+        if (auto *parentInit = original->getParentInitializer())
+          if (auto *placeholder = findWrappedValuePlaceholder(parentInit))
+            wrappedValue = placeholder->getOriginalWrappedValue();
+
+        if (!wrappedValue) {
           if (auto type = original->getPropertyWrapperBackingPropertyType()) {
             if (auto nominal = type->getAnyNominal()) {
               scratch.clear();
@@ -6510,9 +6476,8 @@ ParamDecl::getDefaultValueStringRepresentation(
           return ".init()";
         }
 
-        auto init =
-            findWrappedValuePlaceholder(parentInit)->getOriginalWrappedValue();
-        return extractInlinableText(getASTContext().SourceMgr, init, scratch);
+        auto &sourceMgr = getASTContext().SourceMgr;
+        return extractInlinableText(sourceMgr, wrappedValue, scratch);
       }
     }
 

@@ -1966,8 +1966,8 @@ SILCloner<ImplClass>::visitRefElementAddrInst(RefElementAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createRefElementAddr(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getField(), getOpType(Inst->getType())));
+            getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+            Inst->getField(), getOpType(Inst->getType()), Inst->isImmutable()));
 }
 
 template<typename ImplClass>
@@ -1977,7 +1977,8 @@ SILCloner<ImplClass>::visitRefTailAddrInst(RefTailAddrInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createRefTailAddr(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getOperand()),
-                                           getOpType(Inst->getType())));
+                                           getOpType(Inst->getType()),
+                                           Inst->isImmutable()));
 }
 
 template <typename ImplClass>
@@ -2369,6 +2370,20 @@ void SILCloner<ImplClass>::visitIsUniqueInst(IsUniqueInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createIsUnique(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand())));
+}
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitBeginCOWMutationInst(BeginCOWMutationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createBeginCOWMutation(getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getOperand()), Inst->isNative()));
+}
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitEndCOWMutationInst(EndCOWMutationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createEndCOWMutation(getOpLocation(Inst->getLoc()),
+                        getOpValue(Inst->getOperand()), Inst->doKeepUnique()));
 }
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitIsEscapingClosureInst(

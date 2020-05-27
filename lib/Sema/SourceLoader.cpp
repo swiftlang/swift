@@ -104,10 +104,6 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
     dependencyTracker->addDependency(inputFile->getBufferIdentifier(),
                                      /*isSystem=*/false);
 
-  // Turn off debugging while parsing other modules.
-  llvm::SaveAndRestore<bool>
-      turnOffDebug(Ctx.TypeCheckerOpts.DebugConstraintSolver, false);
-
   unsigned bufferID;
   if (auto BufID =
        Ctx.SourceMgr.getIDForBufferIdentifier(inputFile->getBufferIdentifier()))

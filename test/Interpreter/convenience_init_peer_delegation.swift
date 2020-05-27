@@ -1,11 +1,26 @@
 // RUN: %empty-directory(%t)
-
+//
 // RUN: %target-build-swift %s -Xfrontend -disable-objc-attr-requires-foundation-module -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
+// RUN: %empty-directory(%t)
+//
 // RUN: sed -e 's/required//g' < %s > %t/without_required.swift
 // RUN: %target-build-swift %t/without_required.swift -Xfrontend -disable-objc-attr-requires-foundation-module -o %t/without_required
+// RUN: %target-codesign %t/without_required
+// RUN: %target-run %t/without_required | %FileCheck %s
+
+// RUN: %empty-directory(%t)
+//
+// RUN: %target-build-swift %s -Xfrontend -disable-objc-attr-requires-foundation-module -o %t/main -swift-version 5
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
+
+// RUN: %empty-directory(%t)
+//
+// RUN: sed -e 's/required//g' < %s > %t/without_required.swift
+// RUN: %target-build-swift %t/without_required.swift -Xfrontend -disable-objc-attr-requires-foundation-module -o %t/without_required -swift-version 5
 // RUN: %target-codesign %t/without_required
 // RUN: %target-run %t/without_required | %FileCheck %s
 

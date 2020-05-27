@@ -793,7 +793,7 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
 
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                      SmallVectorImpl<const void *> &extraArguments,
+                      llvm::SmallVectorImpl<const void *> &extraArguments,
                       SubstGenericParameterFn substGenericParam,
                       SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {

@@ -1184,7 +1184,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
-  auto LineAndCol = SM.getLineAndColumn(NameLoc);
+  auto LineAndCol = SM.getPresumedLineAndColumnForLoc(NameLoc);
 
   UnresolvedLoc UnresoledName{NameLoc, true};
 
@@ -1202,12 +1202,14 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   auto Ranges = Renamer.Ranges;
 
   std::vector<NoteRegion> NoteRegions(Renamer.Ranges.size());
-  std::transform(Ranges.begin(), Ranges.end(), NoteRegions.begin(),
-                 [&SM](RenameRangeDetail &Detail) -> NoteRegion {
-    auto Start = SM.getLineAndColumn(Detail.Range.getStart());
-    auto End = SM.getLineAndColumn(Detail.Range.getEnd());
-    return {Detail.RangeKind, Start.first, Start.second, End.first, End.second, Detail.Index};
-  });
+  std::transform(
+      Ranges.begin(), Ranges.end(), NoteRegions.begin(),
+      [&SM](RenameRangeDetail &Detail) -> NoteRegion {
+        auto Start = SM.getPresumedLineAndColumnForLoc(Detail.Range.getStart());
+        auto End = SM.getPresumedLineAndColumnForLoc(Detail.Range.getEnd());
+        return {Detail.RangeKind, Start.first, Start.second,
+                End.first,        End.second,  Detail.Index};
+      });
 
   return NoteRegions;
 }
@@ -2801,7 +2803,8 @@ bool RefactoringActionConvertToTernaryExpr::performChange() {
 /// these stubs should be filled.
 class FillProtocolStubContext {
 
-  std::vector<ValueDecl*> getUnsatisfiedRequirements(const DeclContext *DC);
+  std::vector<ValueDecl*>
+  getUnsatisfiedRequirements(const IterableDeclContext *IDC);
 
   /// Context in which the content should be filled; this could be either a
   /// nominal type declaraion or an extension declaration.
@@ -2872,12 +2875,12 @@ getContextFromCursorInfo(ResolvedCursorInfo CursorInfo) {
 }
 
 std::vector<ValueDecl*> FillProtocolStubContext::
-getUnsatisfiedRequirements(const DeclContext *DC) {
+getUnsatisfiedRequirements(const IterableDeclContext *IDC) {
   // The results to return.
   std::vector<ValueDecl*> NonWitnessedReqs;
 
   // For each conformance of the extended nominal.
-  for(ProtocolConformance *Con : DC->getLocalConformances()) {
+  for(ProtocolConformance *Con : IDC->getLocalConformances()) {
 
     // Collect non-witnessed requirements.
     Con->forEachNonWitnessedRequirement(
@@ -3070,8 +3073,8 @@ bool RefactoringActionExpandSwitchCases::performChange() {
     InsertRange = CharSourceRange(SM, RBraceLoc, RBraceLoc);
   }
   EditorConsumerInsertStream OS(EditConsumer, SM, InsertRange);
-  if (SM.getLineNumber(SwitchS->getLBraceLoc()) ==
-      SM.getLineNumber(SwitchS->getRBraceLoc())) {
+  if (SM.getLineAndColumnInBuffer(SwitchS->getLBraceLoc()).first ==
+      SM.getLineAndColumnInBuffer(SwitchS->getRBraceLoc()).first) {
     OS << "\n";
   }
   auto Result = performCasesExpansionInSwitchStmt(SwitchS,

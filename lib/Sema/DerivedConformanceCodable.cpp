@@ -372,7 +372,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     return nullptr;
 
   // Forcibly derive conformance to CodingKey.
-  TypeChecker::checkConformancesInContext(enumDecl, enumDecl);
+  TypeChecker::checkConformancesInContext(enumDecl);
 
   // Add to the type.
   target->addMember(enumDecl);

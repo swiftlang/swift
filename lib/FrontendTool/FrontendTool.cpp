@@ -35,7 +35,6 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
@@ -653,9 +652,6 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
-static void emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
-                                  const CompilerInstance &Instance);
-
 static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
                                    const CompilerInstance &Instance,
                                    SourceFile *SF) {
@@ -695,11 +691,25 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
-    if (auto *R = SF->getConfiguredReferencedNameTracker()) {
-      C.NumReferencedTopLevelNames += R->getTopLevelNames().size();
-      C.NumReferencedDynamicNames += R->getDynamicLookupNames().size();
-      C.NumReferencedMemberNames += R->getUsedMembers().size();
-    }
+    auto &Ctx = SF->getASTContext();
+    Ctx.evaluator.enumerateReferencesInFile(SF, [&C](const auto &ref) {
+    using NodeKind = evaluator::DependencyCollector::Reference::Kind;
+      switch (ref.kind) {
+      case NodeKind::Empty:
+      case NodeKind::Tombstone:
+        llvm_unreachable("Cannot enumerate dead dependency!");
+      case NodeKind::TopLevel:
+        C.NumReferencedTopLevelNames += 1;
+        return;
+      case NodeKind::Dynamic:
+        C.NumReferencedDynamicNames += 1;
+        return;
+      case NodeKind::PotentialMember:
+      case NodeKind::UsedMember:
+        C.NumReferencedMemberNames += 1;
+        return;
+      }
+    });
   }
 
   if (!Instance.getPrimarySourceFiles().empty()) {
@@ -1115,13 +1125,16 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   return result;
 }
 
+static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
+                                       const CompilerInstance &Instance);
+
 /// Emits index data for all primary inputs, or the main module.
 static void emitIndexData(const CompilerInstance &Instance) {
   if (Instance.getPrimarySourceFiles().empty()) {
-    emitIndexDataIfNeeded(nullptr, Instance);
+    emitIndexDataForSourceFile(nullptr, Instance);
   } else {
     for (SourceFile *SF : Instance.getPrimarySourceFiles())
-      emitIndexDataIfNeeded(SF, Instance);
+      emitIndexDataForSourceFile(SF, Instance);
   }
 }
 
@@ -1200,12 +1213,7 @@ static bool performCompile(CompilerInstance &Instance,
                            FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
-  FrontendOptions::ActionType Action = opts.RequestedAction;
-
-  if (Action == FrontendOptions::ActionType::EmitSyntax) {
-    Instance.getASTContext().LangOpts.BuildSyntaxTree = true;
-    Instance.getASTContext().LangOpts.VerifySyntaxTree = true;
-  }
+  const FrontendOptions::ActionType Action = opts.RequestedAction;
 
   // We've been asked to precompile a bridging header or module; we want to
   // avoid touching any other inputs and just parse, emit and exit.
@@ -1288,12 +1296,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   SWIFT_DEFER {
     // We might have freed the ASTContext already, but in that case we must have
-    // emitted the dependencies first.
-    if (Instance.hasASTContext())
+    // emitted the dependencies and index first.
+    if (Instance.hasASTContext()) {
       emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+      emitIndexData(Instance);
+    }
   };
 
-  emitIndexData(Instance);
 
   if (Context.hadError())
     return true;
@@ -1489,9 +1498,10 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
     return;
   }
 
-  // Make sure we emit dependencies now, because we can't do it after the
-  // context is gone.
+  // Make sure we emit dependencies and index now, because we can't do it after
+  // the context is gone.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  emitIndexData(Instance);
 
   Instance.freeASTContext();
 }
@@ -1664,8 +1674,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
          HadError;
 }
 
-static void emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
-                                  const CompilerInstance &Instance) {
+static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
+                                       const CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
 
@@ -2172,11 +2182,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
     if (!Instance->getPrimarySourceFiles().empty()) {
       HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
-                                            *Instance->getDependencyTracker(),
                                             Instance->getPrimarySourceFiles());
     } else {
       HadError |= swift::verifyDependencies(
-          Instance->getSourceMgr(), *Instance->getDependencyTracker(),
+          Instance->getSourceMgr(),
           Instance->getMainModule()->getFiles());
     }
   }

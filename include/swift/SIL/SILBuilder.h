@@ -1422,9 +1422,10 @@ public:
   }
 
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
-                                           VarDecl *Field, SILType ResultTy) {
+                                           VarDecl *Field, SILType ResultTy,
+                                           bool IsImmutable = false) {
     return insert(new (getModule()) RefElementAddrInst(
-        getSILDebugLocation(Loc), Operand, Field, ResultTy));
+        getSILDebugLocation(Loc), Operand, Field, ResultTy, IsImmutable));
   }
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
                                            VarDecl *Field) {
@@ -1434,9 +1435,10 @@ public:
   }
 
   RefTailAddrInst *createRefTailAddr(SILLocation Loc, SILValue Ref,
-                                     SILType ResultTy) {
+                                     SILType ResultTy,
+                                     bool IsImmutable = false) {
     return insert(new (getModule()) RefTailAddrInst(getSILDebugLocation(Loc),
-                                                      Ref, ResultTy));
+                                                  Ref, ResultTy, IsImmutable));
   }
 
   DestructureStructInst *createDestructureStruct(SILLocation Loc,
@@ -1721,6 +1723,17 @@ public:
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsUniqueInst(getSILDebugLocation(Loc),
                                                    operand, Int1Ty));
+  }
+  BeginCOWMutationInst *createBeginCOWMutation(SILLocation Loc,
+                                    SILValue operand, bool isNative) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(BeginCOWMutationInst::create(getSILDebugLocation(Loc), operand,
+                                        Int1Ty, getFunction(), isNative));
+  }
+  EndCOWMutationInst *createEndCOWMutation(SILLocation Loc, SILValue operand,
+                                           bool keepUnique = false) {
+    return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
+                                                  operand, keepUnique));
   }
   IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
                                                  SILValue operand,

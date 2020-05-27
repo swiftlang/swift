@@ -4855,9 +4855,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
     diagnose(Tok.getLoc(), diag::extra_tokens_line_directive);
     return makeParserError();
   }
-  
-  int LineOffset = StartLine - SourceMgr.getLineNumber(nextLineStartLoc);
- 
+
+  int LineOffset =
+      StartLine - SourceMgr.getLineAndColumnInBuffer(nextLineStartLoc).first;
+
   // Create a new virtual file for the region started by the #line marker.
   bool isNewFile = SourceMgr.openVirtualFile(nextLineStartLoc,
                                              Filename.getValue(), LineOffset);

@@ -12,6 +12,11 @@ if(POLICY CMP0067)
   cmake_policy(SET CMP0067 NEW)
 endif()
 
+# Convert relative paths to absolute for subdirectory `target_sources`
+if(POLICY CMP0076)
+  cmake_policy(SET CMP0076 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -143,12 +148,22 @@ set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
 
 # Indicate whether Swift should attempt to use the lld linker.
-set(SWIFT_ENABLE_LLD_LINKER TRUE CACHE BOOL
+if(CMAKE_SYSTEM_NAME STREQUAL Windows AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+  set(SWIFT_ENABLE_LLD_LINKER_default TRUE)
+else()
+  set(SWIFT_ENABLE_LLD_LINKER_default FALSE)
+endif()
+set(SWIFT_ENABLE_LLD_LINKER ${SWIFT_ENABLE_LLD_LINKER_default} CACHE BOOL
     "Enable using the lld linker when available")
 
 # Indicate whether Swift should attempt to use the gold linker.
 # This is not used on Darwin.
-set(SWIFT_ENABLE_GOLD_LINKER TRUE CACHE BOOL
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin OR CMAKE_SYSTEM_NAME STREQUAL Windows)
+  set(SWIFT_ENABLE_GOLD_LINKER_default FALSE)
+else()
+  set(SWIFT_ENABLE_GOLD_LINKER_default TRUE)
+endif()
+set(SWIFT_ENABLE_GOLD_LINKER ${SWIFT_ENABLE_GOLD_LINKER_default} CACHE BOOL
     "Enable using the gold linker when available")
 
 set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
@@ -554,9 +569,6 @@ set(SWIFT_MODULE_CACHE_PATH
 if(XCODE)
   swift_common_xcode_cxx_config()
 endif()
-
-include(SwiftCheckCXXNativeRegex)
-check_cxx_native_regex(SWIFT_HAVE_WORKING_STD_REGEX)
 
 # If SWIFT_HOST_VARIANT_SDK not given, try to detect from the CMAKE_SYSTEM_NAME.
 if(SWIFT_HOST_VARIANT_SDK)

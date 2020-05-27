@@ -250,6 +250,9 @@ ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
 
+ERROR(cannot_infer_closure_parameter_type,none,
+      "unable to infer type of a closure parameter %0 in the current context",
+       (StringRef))
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
 ERROR(cannot_infer_closure_result_type,none,
@@ -554,6 +557,9 @@ ERROR(expr_keypath_mutating_getter,none,
 ERROR(expr_keypath_static_member,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
       (DeclName, bool))
+ERROR(expr_keypath_enum_case,none,
+      "%select{key path|dynamic key path member lookup}1 cannot refer to enum case %0",
+      (DeclName, bool))
 ERROR(expr_keypath_empty,none,
       "empty key path does not refer to a property", ())
 ERROR(expr_unsupported_objc_key_path_component,none,
@@ -757,12 +763,20 @@ ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 ERROR(invalid_redecl_init,none,
       "invalid redeclaration of synthesized %select{|memberwise }1%0",
       (DeclName, bool))
+ERROR(invalid_redecl_implicit,none,
+      "invalid redeclaration of synthesized "
+      "%select{%0|implementation for protocol requirement}1 %2",
+      (DescriptiveDeclKind, bool, DeclName))
 WARNING(invalid_redecl_swift5_warning,none,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
 
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
+NOTE(invalid_redecl_implicit_wrapper,none,
+     "%0 synthesized for property wrapper "
+     "%select{projected value|backing storage}1",
+     (DeclName, bool))
 
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))
@@ -2750,10 +2764,10 @@ WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
-      "requires all stored properties not marked with `@noDerivative` to be "
-      "mutable; add an explicit '@noDerivative' attribute"
+      "requires 'wrappedValue' in property wrapper %0 to be mutable; "
+      "add an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
-      (/*wrapperType*/ StringRef, /*nominalName*/ Identifier,
+      (/*wrapperType*/ Identifier, /*nominalName*/ Identifier,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %0 "
@@ -2990,8 +3004,6 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
-ERROR(differentiable_attr_void_result,none,
-      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -3010,9 +3022,6 @@ ERROR(differentiable_attr_invalid_access,none,
       "derivative function %0 is required to either be public or "
       "'@usableFromInline' because the original function %1 is public or "
       "'@usableFromInline'", (DeclNameRef, DeclName))
-ERROR(differentiable_attr_result_not_differentiable,none,
-      "can only differentiate functions with results that conform to "
-      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
@@ -3119,6 +3128,9 @@ ERROR(autodiff_attr_original_void_result,none,
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
       "cannot differentiate functions with both an 'inout' parameter and a "
       "result", ())
+ERROR(autodiff_attr_result_not_differentiable,none,
+      "can only differentiate functions with results that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
@@ -4274,8 +4286,8 @@ ERROR(objc_invalid_on_subscript,none,
 ERROR(objc_invalid_on_static_subscript,none,
       "%0 cannot be %" OBJC_ATTR_SELECT "1", (DescriptiveDeclKind, unsigned))
 ERROR(objc_invalid_with_generic_params,none,
-      "method cannot be %" OBJC_ATTR_SELECT "0 because it has generic "
-      "parameters", (unsigned))
+      "%0 cannot be %" OBJC_ATTR_SELECT "1 because it has generic parameters",
+      (DescriptiveDeclKind, unsigned))
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
@@ -5057,6 +5069,14 @@ NOTE(function_builder_remove_attr, none,
      "remove the attribute to explicitly disable the function builder", ())
 NOTE(function_builder_remove_returns, none,
      "remove 'return' statements to apply the function builder", ())
+ERROR(function_builder_infer_ambig, none,
+      "ambiguous function builder inferred for %0: %1 or %2",
+      (DeclName, Type, Type))
+NOTE(function_builder_infer_add_return, none,
+     "add an explicit 'return' statement to not use a function builder", ())
+NOTE(function_builder_infer_pick_specific, none,
+     "apply function builder %0 (inferred from protocol %1)",
+     (Type, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

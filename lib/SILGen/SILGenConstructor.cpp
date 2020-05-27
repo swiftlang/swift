@@ -252,6 +252,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
     RValue value;
 
+    FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+
     // If it's memberwise initialized, do so now.
     if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/false)) {
       assert(elti != eltEnd && "number of args does not match number of fields");
@@ -276,7 +278,6 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     }
 
     // Cleanup after this initialization.
-    FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
     SILValue v = maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
                                                        std::move(value))
         .forwardAsSingleStorageValue(SGF, fieldTy, Loc);

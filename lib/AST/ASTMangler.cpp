@@ -2539,8 +2539,9 @@ void ASTMangler::appendGenericSignatureParts(
 DependentMemberType *
 ASTMangler::dropProtocolFromAssociatedType(DependentMemberType *dmt) {
   auto baseTy = dmt->getBase();
-  bool unambiguous = (!dmt->getAssocType() ||
-                      CurGenericSignature->getConformsTo(baseTy).size() <= 1);
+  bool unambiguous =
+      (!dmt->getAssocType() ||
+       CurGenericSignature->getRequiredProtocols(baseTy).size() <= 1);
 
   if (auto *baseDMT = baseTy->getAs<DependentMemberType>())
     baseTy = dropProtocolFromAssociatedType(baseDMT);
@@ -2573,8 +2574,8 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
     // If the base type is known to have a single protocol conformance
     // in the current generic context, then we don't need to disambiguate the
     // associated type name by protocol.
-    if (!OptimizeProtocolNames || !CurGenericSignature
-        || CurGenericSignature->getConformsTo(dmt->getBase()).size() > 1) {
+    if (!OptimizeProtocolNames || !CurGenericSignature ||
+        CurGenericSignature->getRequiredProtocols(dmt->getBase()).size() > 1) {
       appendAnyGenericType(assocTy->getProtocol());
     }
     return;

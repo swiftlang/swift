@@ -1,5 +1,3 @@
-sil_register_sources(
+target_sources(swiftSIL PRIVATE
   ParseSIL.cpp
-  SILParsedLocalValueMap.cpp
-)
-
+  SILParsedLocalValueMap.cpp)

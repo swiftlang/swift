@@ -49,21 +49,22 @@ protected:
 
 public:
   void layout() {
+    static_assert(MetadataAdjustmentIndex::Class == 2,
+                  "Adjustment index must be synchronized with this layout");
+
     // HeapMetadata header.
     asImpl().addDestructorFunction();
 
     // Metadata header.
     super::layout();
 
-    // ClassMetadata header.  In ObjCInterop mode, this must be
-    // layout-compatible with an Objective-C class.  The superclass
-    // pointer is useful regardless of mode, but the rest of the data
-    // isn't necessary.
-    // FIXME: Figure out what can be removed altogether in non-objc-interop
-    // mode and remove it. rdar://problem/18801263
+    // ClassMetadata header. This must be layout-compatible with Objective-C
+    // classes when interoperability is enabled.
     asImpl().addSuperclass();
-    asImpl().addClassCacheData();
-    asImpl().addClassDataPointer();
+    if (IGM.ObjCInterop) {
+      asImpl().addClassCacheData();
+      asImpl().addClassDataPointer();
+    }
 
     asImpl().addClassFlags();
     asImpl().addInstanceAddressPoint();

@@ -1446,6 +1446,10 @@ namespace {
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
+      if (D->isCxxNotTriviallyCopyable()) {
+        properties.setAddressOnly();
+      }
+
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
 
       // Classify the type according to its stored properties.

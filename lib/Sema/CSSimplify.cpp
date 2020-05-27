@@ -3356,13 +3356,18 @@ bool ConstraintSystem::repairFailures(
       // related to immutability, otherwise it's a type mismatch.
       auto result = matchTypes(lhs, rhs, ConstraintKind::Conversion,
                                TMF_ApplyingFix, locator);
-
+      
+      auto *loc = getConstraintLocator(locator);
       if (getType(destExpr)->is<LValueType>() || result.isFailure()) {
-        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
-            *this, lhs, rhs, getConstraintLocator(locator)));
-      } else {
+        // Let this asignment failure be diagnosed by the AllowTupleTypeMismatch
+        // fix already recorded.
+        if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
+          return true;
+
         conversionsOrFixes.push_back(
-            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+            IgnoreAssignmentDestinationType::create(*this, lhs, rhs, loc));
+      } else {
+        conversionsOrFixes.push_back(TreatRValueAsLValue::create(*this, loc));
       }
 
       return true;
@@ -5674,6 +5679,19 @@ static bool isForKeyPathSubscript(ConstraintSystem &cs,
   return false;
 }
 
+static bool isForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
+                                              ConstraintLocator *locator) {
+  if (!locator || !locator->getAnchor())
+    return false;
+
+  if (auto *SE = getAsExpr<SubscriptExpr>(locator->getAnchor())) {
+    auto *indexExpr = SE->getIndex();
+    return isa<ParenExpr>(indexExpr) &&
+           isa<KeyPathExpr>(indexExpr->getSemanticsProvidingExpr());
+  }
+  return false;
+}
+
 /// Determine whether all of the given candidate overloads
 /// found through conditional conformances of a given base type.
 /// This is useful to figure out whether it makes sense to
@@ -5801,7 +5819,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
 
-  if (isForKeyPathSubscript(*this, memberLocator)) {
+  // Add key path result.
+  // If we are including inaccessible members, check for the use of a keypath
+  // subscript without a `keyPath:` label. Add it to the result so that it
+  // can be caught by the missing argument label checking later.
+  if (isForKeyPathSubscript(*this, memberLocator) ||
+      (isForKeyPathSubscriptWithoutLabel(*this, memberLocator)
+       && includeInaccessibleMembers)) {
     if (baseTy->isAnyObject()) {
       result.addUnviable(
           OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication),
@@ -7664,10 +7688,30 @@ ConstraintSystem::simplifyKeyPathConstraint(
     return true;
   };
   
-  // We have a hole, the solver can't infer the key path type. So let's
-  // just assume this is solved.
-  if (shouldAttemptFixes() && keyPathTy->isHole()) {
-    return SolutionKind::Solved;
+  // If we have a hole somewhere in the key path, the solver won't be able to
+  // infer the key path type. So let's just assume this is solved.
+  if (shouldAttemptFixes()) {
+    if (keyPathTy->isHole())
+      return SolutionKind::Solved;
+
+    // If the root type has been bound to a hole, we cannot infer it.
+    if (getFixedTypeRecursive(rootTy, /*wantRValue*/ true)->isHole())
+      return SolutionKind::Solved;
+
+    // If we have e.g a missing member somewhere, a component type variable
+    // will have been marked as a potential hole.
+    // FIXME: This relies on the fact that we only mark an overload type
+    // variable as a potential hole once we've added a corresponding fix. We
+    // can't use 'isHole' instead, as that doesn't handle cases where the
+    // overload type variable gets bound to another type from the context rather
+    // than a hole. We need to come up with a better way of handling the
+    // relationship between key paths and overloads.
+    if (llvm::any_of(componentTypeVars, [&](TypeVariableType *tv) {
+          return tv->getImpl().getLocator()->isForKeyPathComponent() &&
+                 tv->getImpl().canBindToHole();
+        })) {
+      return SolutionKind::Solved;
+    }
   }
 
   // If we're fixed to a bound generic type, trying harvesting context from it.
@@ -7718,34 +7762,11 @@ ConstraintSystem::simplifyKeyPathConstraint(
       // to determine whether the result will be a function type vs BGT KeyPath
       // type, so continue through components to create new constraint at the
       // end.
-      if (!overload || anyComponentsUnresolved) {
+      if (!overload) {
         if (flags.contains(TMF_GenerateConstraints)) {
           anyComponentsUnresolved = true;
           continue;
         }
-
-        if (shouldAttemptFixes()) {
-          auto typeVar =
-              llvm::find_if(componentTypeVars, [&](TypeVariableType *typeVar) {
-                auto *locator = typeVar->getImpl().getLocator();
-                auto elt = locator->findLast<LocatorPathElt::KeyPathComponent>();
-                return elt && elt->getIndex() == i;
-              });
-
-          // If one of the components haven't been resolved, let's check
-          // whether it has been determined to be a "hole" and if so,
-          // let's allow component validation to contiunue.
-          //
-          // This helps to, for example, diagnose problems with missing
-          // members used as part of a key path.
-          if (typeVar != componentTypeVars.end() &&
-              (*typeVar)->getImpl().canBindToHole()) {
-            anyComponentsUnresolved = true;
-            capability = ReadOnly;
-            continue;
-          }
-        }
-
         return SolutionKind::Unsolved;
       }
 
@@ -8128,10 +8149,8 @@ retry_after_fail:
 
   // If we have a common result type, bind the expected result type to it.
   if (commonResultType && !commonResultType->is<ErrorType>()) {
-    ASTContext &ctx = getASTContext();
-    if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
-      auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 : 0)
+    if (isDebugMode()) {
+      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
         << commonResultType.getString()
         << ")\n";
@@ -8851,6 +8870,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                 CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
           return !recordFix(fix, impact);
       }
+      
+      // We already have a fix for this locator indicating a
+      // tuple mismatch.
+      if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
+        return true;
 
       if (restriction == ConversionRestrictionKind::ValueToOptional ||
           restriction == ConversionRestrictionKind::OptionalToOptional)
@@ -9270,9 +9294,8 @@ static bool isAugmentingFix(ConstraintFix *fix) {
 }
 
 bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
-  auto &ctx = getASTContext();
-  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = ctx.TypeCheckerDebug->getStream();
+  if (isDebugMode()) {
+    auto &log = llvm::errs();
     log.indent(solverState ? solverState->depth * 2 : 0)
       << "(attempting fix ";
     fix->print(log);
@@ -9590,6 +9613,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTupleSplatForSingleParameter:
   case FixKind::AllowInvalidUseOfTrailingClosure:
   case FixKind::AllowNonClassTypeToConvertToAnyObject:
+  case FixKind::SpecifyClosureParameterType:
   case FixKind::SpecifyClosureReturnType:
   case FixKind::AddQualifierToAccessTopLevelName:
     llvm_unreachable("handled elsewhere");
@@ -9700,14 +9724,21 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
           path[0].getKind() == ConstraintLocator::SubscriptMember) ||
          (path.size() == 2 &&
           path[1].getKind() == ConstraintLocator::KeyPathDynamicMember));
+
   auto indexTuple = dyn_cast<TupleExpr>(subscript->getIndex());
-  if (!indexTuple || indexTuple->getNumElements() != 1)
-    return;
-  
-  auto keyPathExpr = dyn_cast<KeyPathExpr>(indexTuple->getElement(0));
+  auto indexParen = dyn_cast<ParenExpr>(subscript->getIndex());
+  // If a keypath subscript is used without the expected `keyPath:` label,
+  // continue with type-checking when attempting fixes so that it gets caught
+  // by the argument label checking. In such cases, the KeyPathExpr is contained
+  // in a ParenExpr, instead of a TupleExpr.
+  assert(((indexTuple && indexTuple->getNumElements() == 1) || indexParen) &&
+         "Expected KeyPathExpr to be in either TupleExpr or ParenExpr");
+
+  auto keyPathExpr = dyn_cast<KeyPathExpr>(
+      indexTuple ? indexTuple->getElement(0) : indexParen->getSubExpr());
   if (!keyPathExpr)
     return;
-  
+
   auto typeVar = getType(keyPathExpr)->getAs<TypeVariableType>();
   if (!typeVar)
     return;

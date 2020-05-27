@@ -74,6 +74,12 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
     CG(*new ConstraintGraph(*this))
 {
   assert(DC && "context required");
+  // Respect the global debugging flag, but turn off debugging while
+  // parsing and loading other modules.
+  if (Context.TypeCheckerOpts.DebugConstraintSolver &&
+      DC->getParentModule()->isMainModule()) {
+    Options |= ConstraintSystemFlags::DebugConstraints;
+  }
 }
 
 ConstraintSystem::~ConstraintSystem() {
@@ -216,9 +222,19 @@ getDynamicResultSignature(ValueDecl *decl) {
   }
 
   if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
+    auto ty = asd->getInterfaceType();
+
+    // Strip off a generic signature if we have one. This matches the logic
+    // for methods, and ensures that we don't take a protocol's generic
+    // signature into account for a subscript requirement.
+    if (auto *genericFn = ty->getAs<GenericFunctionType>()) {
+      ty = FunctionType::get(genericFn->getParams(), genericFn->getResult(),
+                             genericFn->getExtInfo());
+    }
+
     // Handle properties and subscripts, anchored by the getter's selector.
     return std::make_tuple(asd->isStatic(), asd->getObjCGetterSelector(),
-                           asd->getInterfaceType()->getCanonicalType());
+                           ty->getCanonicalType());
   }
 
   llvm_unreachable("Not a valid @objc member");
@@ -444,6 +460,10 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
 
   if (locator->findLast<LocatorPathElt::DynamicCallable>()) {
     return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
+  }
+
+  if (locator->isLastElement<LocatorPathElt::ArgumentAttribute>()) {
+    return getConstraintLocator(anchor, path.drop_back());
   }
 
   // If we have a locator that starts with a key path component element, we
@@ -881,6 +901,31 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
   }
 
   return type;
+}
+
+TypeVariableType *ConstraintSystem::isRepresentativeFor(
+    TypeVariableType *typeVar, ConstraintLocator::PathElementKind kind) const {
+  // We only attempt to look for this if type variable is
+  // a representative.
+  if (getRepresentative(typeVar) != typeVar)
+    return nullptr;
+
+  auto &CG = getConstraintGraph();
+  auto result = CG.lookupNode(typeVar);
+  auto equivalence = result.first.getEquivalenceClass();
+  auto member = llvm::find_if(equivalence, [=](TypeVariableType *eq) {
+    auto *loc = eq->getImpl().getLocator();
+    if (!loc)
+      return false;
+
+    auto path = loc->getPath();
+    return !path.empty() && path.back().getKind() == kind;
+  });
+
+  if (member == equivalence.end())
+    return nullptr;
+
+  return *member;
 }
 
 /// Does a var or subscript produce an l-value?
@@ -2398,11 +2443,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                      verifyThatArgumentIsHashable);
   }
 
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+  if (isDebugMode()) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log.indent(solverState ? solverState->depth * 2 : 2)
+    llvm::errs().indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
       << boundType->getString(PO) << " := "
       << refType->getString(PO) << ")\n";
@@ -2560,10 +2604,8 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
 }
 
 SolutionResult ConstraintSystem::salvage() {
-  auto &ctx = getASTContext();
-  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = ctx.TypeCheckerDebug->getStream();
-    log << "---Attempting to salvage and emit diagnostics---\n";
+  if (isDebugMode()) {
+    llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";
   }
 
   setPhase(ConstraintSystemPhase::Diagnostics);
@@ -2609,8 +2651,8 @@ SolutionResult ConstraintSystem::salvage() {
 
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (viable.size() > 1) {
-      if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
+      if (isDebugMode()) {
+        auto &log = llvm::errs();
         log << "---Ambiguity error: " << viable.size()
             << " solutions found---\n";
         int i = 0;
@@ -3511,6 +3553,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
+    case ConstraintLocator::ArgumentAttribute: {
+      // At this point we should have already found argument expression
+      // this attribute belogs to, so we can leave this element in place
+      // because it points out exact location useful for diagnostics.
+      break;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -4235,6 +4284,8 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
     if (!outermostWrapperType)
       return;
 
+    bool isImplicit = false;
+
     // Retrieve the outermost wrapper argument. If there isn't one, we're
     // performing default initialization.
     auto outermostArg = outermostWrapperAttr->getArg();
@@ -4242,6 +4293,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
       SourceLoc fakeParenLoc = outermostWrapperAttr->getRange().End;
       outermostArg = TupleExpr::createEmpty(
           ctx, fakeParenLoc, fakeParenLoc, /*Implicit=*/true);
+      isImplicit = true;
     }
 
     auto typeExpr = TypeExpr::createImplicitHack(
@@ -4252,7 +4304,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
         outermostWrapperAttr->getArgumentLabels(),
         outermostWrapperAttr->getArgumentLabelLocs(),
         /*hasTrailingClosure=*/false,
-        /*implicit=*/false);
+        /*implicit=*/isImplicit);
   }
   wrapperAttrs[0]->setSemanticInit(backingInitializer);
 
@@ -4268,7 +4320,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     bool bindPatternVarsOneWay) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
-  if (!isa<OptionalSomePattern>(pattern) &&
+  if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
       patternType && !patternType->isHole()) {
     contextualType = TypeLoc::withoutLoc(patternType);
 

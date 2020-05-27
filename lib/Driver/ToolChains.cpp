@@ -180,6 +180,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
 
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
+  inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
@@ -286,6 +287,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     if (!OptArg || OptArg->getOption().matches(options::OPT_Onone))
       arguments.push_back("-enable-anonymous-context-mangled-names");
   }
+
+  inputArgs.AddLastArg(arguments, options::OPT_disable_leaf_frame_pointer_elim);
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);

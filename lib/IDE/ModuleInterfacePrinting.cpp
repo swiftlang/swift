@@ -840,6 +840,16 @@ void swift::ide::printSwiftSourceInterface(SourceFile &File,
   File.print(Printer, Options);
 }
 
+static Decl* getTopLevelDecl(Decl *D) {
+  while (!D->getDeclContext()->isModuleScopeContext()) {
+    auto *ParentD = D->getDeclContext()->getAsDecl();
+    if (!ParentD)
+      break;
+    D = ParentD;
+  }
+  return D;
+}
+
 void swift::ide::printHeaderInterface(
        StringRef Filename,
        ASTContext &Ctx,
@@ -858,10 +868,8 @@ void swift::ide::printHeaderInterface(
   SmallVector<Decl *, 32> ClangDecls;
   llvm::SmallPtrSet<Decl *, 32> SeenDecls;
   auto headerReceiver = [&](Decl *D) {
-    if (SeenDecls.count(D) == 0) {
-      SeenDecls.insert(D);
+    if (SeenDecls.insert(getTopLevelDecl(D)).second)
       ClangDecls.push_back(D);
-    }
   };
 
   Importer.lookupDeclsFromHeader(Filename, headerFilter, headerReceiver);
@@ -881,6 +889,10 @@ void swift::ide::printHeaderInterface(
     PrinterToUse = &RegularCommentPrinter;
 
   for (auto *D : ClangDecls) {
+    // Even though the corresponding clang decl should be top-level, its
+    // equivalent Swift decl may not be. E.g. a top-level function may be mapped
+    // to a property accessor in Swift.
+    D = getTopLevelDecl(D);
     ASTPrinter &Printer = *PrinterToUse;
     if (!AdjustedOptions.shouldPrint(D)) {
       Printer.callAvoidPrintDeclPost(D);

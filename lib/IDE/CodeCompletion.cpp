@@ -2344,7 +2344,7 @@ public:
       }
 
       if (t->isTypeParameter()) {
-        auto protos = genericSig->getConformsTo(t);
+        const auto protos = genericSig->getRequiredProtocols(t);
         if (!protos.empty())
           return buildProtocolComposition(protos);
       }
@@ -4729,7 +4729,7 @@ public:
     bool hasExplicitAnyObject = false;
     if (auto superTy = genericSig->getSuperclassBound(ResultT))
       opaqueTypes.push_back(superTy);
-    for (auto proto : genericSig->getConformsTo(ResultT))
+    for (const auto proto : genericSig->getRequiredProtocols(ResultT))
       opaqueTypes.push_back(proto->getDeclaredInterfaceType());
     if (auto layout = genericSig->getLayoutConstraint(ResultT))
       hasExplicitAnyObject = layout->isClass();
@@ -6196,6 +6196,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
+  llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
+
   for (auto &Request: Lookup.RequestedCachedResults) {
     // Use the current SourceFile as the DeclContext so that we can use it to
     // perform qualified lookup, and to get the correct visibility for
@@ -6248,7 +6250,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           return; // already handled.
         RequestedModules.push_back({std::move(K), TheModule,
           Request.OnlyTypes, Request.OnlyPrecedenceGroups});
-        if (Request.IncludeModuleQualifier)
+
+        if (Request.IncludeModuleQualifier &&
+            seenModuleNames.insert(TheModule->getName()).second)
           Lookup.addModuleName(TheModule);
       }
     };
@@ -6263,8 +6267,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.getToplevelCompletions(Request.OnlyTypes);
 
       // Add the qualifying module name
-      if (Request.IncludeModuleQualifier)
-        Lookup.addModuleName(CurDeclContext->getParentModule());
+      auto curModule = CurDeclContext->getParentModule();
+      if (Request.IncludeModuleQualifier &&
+          seenModuleNames.insert(curModule->getName()).second)
+        Lookup.addModuleName(curModule);
 
       // Add results for all imported modules.
       ModuleDecl::ImportFilter ImportFilter;

@@ -602,7 +602,7 @@ private:
   getLineColAndOffset(SourceLoc Loc) {
     if (Loc.isInvalid())
       return std::make_tuple(0, 0, None);
-    auto lineAndColumn = SrcMgr.getLineAndColumn(Loc, BufferID);
+    auto lineAndColumn = SrcMgr.getPresumedLineAndColumnForLoc(Loc, BufferID);
     unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
     return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
   }
@@ -777,11 +777,12 @@ bool IndexSwiftASTWalker::visitImports(
 }
 
 bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitness> &explicitWitnesses) {
-  auto DC = dyn_cast<DeclContext>(D);
-  if (!DC)
+  const auto *const IDC = dyn_cast<IterableDeclContext>(D);
+  if (!IDC)
     return true;
 
-  for (auto *conf : DC->getLocalConformances()) {
+  const auto DC = IDC->getAsGenericContext();
+  for (auto *conf : IDC->getLocalConformances()) {
     if (conf->isInvalid())
       continue;
 

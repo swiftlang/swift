@@ -345,10 +345,16 @@ public:
   /// in \p map.
   ///
   /// \sa recordConditionalConformances
-  static void collectSkippedConditionalConformances(PerTypeMap &map,
-                                                    const Decl *D) {
+  static void collectSkippedConditionalConformances(
+                                            PerTypeMap &map,
+                                            const Decl *D,
+                                            const PrintOptions &printOptions) {
     auto *extension = dyn_cast<ExtensionDecl>(D);
     if (!extension || !extension->isConstrainedExtension())
+      return;
+
+    // Skip SPI extensions in the public interface.
+    if (!printOptions.PrintSPIs && extension->isSPI())
       return;
 
     const NominalTypeDecl *nominal = extension->getExtendedNominal();
@@ -497,8 +503,9 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
     if (!D->shouldPrintInContext(printOptions) ||
         !printOptions.shouldPrint(D)) {
+
       InheritedProtocolCollector::collectSkippedConditionalConformances(
-          inheritedProtocolMap, D);
+          inheritedProtocolMap, D, printOptions);
       continue;
     }
 

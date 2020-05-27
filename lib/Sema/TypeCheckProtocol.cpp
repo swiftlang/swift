@@ -34,7 +34,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
@@ -751,8 +750,8 @@ static const RequirementEnvironment &getOrCreateRequirementEnvironment(
 }
 
 static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
-    constraints::ConstraintFix *fix, ValueDecl *witness,
-    ProtocolConformance *conformance,
+    constraints::Solution &solution, constraints::ConstraintFix *fix,
+    ValueDecl *witness, ProtocolConformance *conformance,
     const RequirementEnvironment &reqEnvironment) {
   Type type, missingType;
   RequirementKind requirementKind;
@@ -784,6 +783,15 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   default:
     return Optional<RequirementMatch>();
   }
+
+  type = solution.simplifyType(type);
+  missingType = solution.simplifyType(missingType);
+
+  missingType = missingType->mapTypeOutOfContext();
+  if (missingType->hasTypeParameter())
+    if (auto env = conformance->getGenericEnvironment())
+      if (auto assocType = env->mapTypeIntoContext(missingType))
+        missingType = assocType;
 
   auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
     Requirement requirement(requirementKind, type, missingType);
@@ -986,7 +994,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     if (solution && conformance && solution->Fixes.size()) {
       for (auto fix : solution->Fixes) {
         if (auto result = findMissingGenericRequirementForSolutionFix(
-                fix, witness, conformance, reqEnvironment))
+                *solution, fix, witness, conformance, reqEnvironment))
           return *result;
       }
     }
@@ -2329,8 +2337,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
         diags.diagnose(witness, diag::protocol_witness_settable_conflict);
     if (auto VD = dyn_cast<VarDecl>(witness)) {
       if (VD->hasStorage()) {
-        auto PBD = VD->getParentPatternBinding();
-        diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+        if (auto PBD = VD->getParentPatternBinding()) {
+          diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+        }
       }
     }
     break;
@@ -3683,23 +3692,30 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 
 # pragma mark Type witness resolution
 
-CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
-                                               ProtocolDecl *proto,
+CheckTypeWitnessResult swift::checkTypeWitness(Type type,
                                                AssociatedTypeDecl *assocType,
-                                               Type type) {
-  auto genericSig = proto->getGenericSignature();
-  auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
-                                         assocType);
-
+                                               NormalProtocolConformance *Conf) {
   if (type->hasError())
-    return ErrorType::get(proto->getASTContext());
+    return ErrorType::get(assocType->getASTContext());
+
+  const auto proto = Conf->getProtocol();
+  const auto dc = Conf->getDeclContext();
+  const auto genericSig = proto->getGenericSignature();
+  const auto depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
+                                              assocType);
 
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
 
-  // FIXME: This is incorrect; depTy is written in terms of the protocol's
-  // associated types, and we need to substitute in known type witnesses.
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
+    // If the superclass has a type parameter, substitute in known type
+    // witnesses.
+    if (superclass->hasTypeParameter()) {
+      const auto subMap = SubstitutionMap::getProtocolSubstitutions(
+          proto, Conf->getType(), ProtocolConformanceRef(Conf));
+
+      superclass = superclass.subst(subMap);
+    }
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
   }
@@ -3707,7 +3723,7 @@ CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
   auto *module = dc->getParentModule();
 
   // Check protocol conformances.
-  for (auto reqProto : genericSig->getConformsTo(depTy)) {
+  for (const auto reqProto : genericSig->getRequiredProtocols(depTy)) {
     if (module->lookupConformance(contextType, reqProto)
             .isInvalid())
       return CheckTypeWitnessResult(reqProto->getDeclaredType());
@@ -3796,7 +3812,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
     // Check this type against the protocol requirements.
     if (auto checkResult =
-            checkTypeWitness(DC, Proto, assocType, candidate.MemberType)) {
+            checkTypeWitness(candidate.MemberType, assocType, Conformance)) {
       nonViable.push_back({candidate.Member, checkResult});
     } else {
       viable.push_back(candidate);
@@ -5021,36 +5037,31 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
-SmallVector<ProtocolConformance *, 2>
+std::vector<ProtocolConformance *>
 LookupAllConformancesInContextRequest::evaluate(
-    Evaluator &eval, const DeclContext *DC) const {
-  return DC->getLocalConformances(ConformanceLookupKind::All);
+    Evaluator &eval, const IterableDeclContext *IDC) const {
+  auto result = IDC->getLocalConformances(ConformanceLookupKind::All);
+  return std::vector<ProtocolConformance *>(result.begin(), result.end());
 }
 
-void TypeChecker::checkConformancesInContext(DeclContext *dc,
-                                             IterableDeclContext *idc) {
+void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
+  auto *const dc = idc->getAsGenericContext();
+
   // For anything imported from Clang, lazily check conformances.
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
     return;
 
+  const auto *const nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+
   // Determine the access level of this conformance.
-  Decl *currentDecl = nullptr;
-  AccessLevel defaultAccess;
-  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    const NominalTypeDecl *nominal = ext->getExtendedNominal();
-    if (!nominal)
-      return;
-    defaultAccess = nominal->getFormalAccess();
-    currentDecl = ext;
-  } else {
-    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
-    currentDecl = cast<NominalTypeDecl>(dc);
-  }
+  const auto defaultAccess = nominal->getFormalAccess();
 
   // Check each of the conformances associated with this context.
   auto conformances =
       evaluateOrDefault(dc->getASTContext().evaluator,
-                        LookupAllConformancesInContextRequest{dc}, {});
+                        LookupAllConformancesInContextRequest{idc}, {});
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();
@@ -5106,7 +5117,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                     groupChecker.getUnsatisfiedRequirements().end());
 
   // Diagnose any conflicts attributed to this declaration context.
-  for (const auto &diag : dc->takeConformanceDiagnostics()) {
+  for (const auto &diag : idc->takeConformanceDiagnostics()) {
     // Figure out the declaration of the existing conformance.
     Decl *existingDecl = dyn_cast<NominalTypeDecl>(diag.ExistingDC);
     if (!existingDecl)

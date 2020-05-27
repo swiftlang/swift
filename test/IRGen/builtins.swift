@@ -683,6 +683,12 @@ func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
   return Builtin.isUnique(&iuo)
 }
 
+// CHECK-LABEL: define hidden {{.*}} @"$s8builtins19COWBufferForReadingyAA1CCADnF"
+// CHECK: ret %T8builtins1CC* %0
+func COWBufferForReading(_ ref: __owned C) -> C {
+  return Builtin.COWBufferForReading(ref)
+}
+
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
   // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T:%.*]], i32 10

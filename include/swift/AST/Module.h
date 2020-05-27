@@ -22,7 +22,6 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
@@ -69,7 +68,6 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolDecl;
   struct PrintOptions;
-  class ReferencedNameTracker;
   class Token;
   class TupleType;
   class Type;
@@ -347,6 +345,13 @@ public:
     return new (ctx) ModuleDecl(name, ctx, importInfo);
   }
 
+  static ModuleDecl *
+  createMainModule(ASTContext &ctx, Identifier name, ImplicitImportInfo iinfo) {
+    auto *Mod = ModuleDecl::create(name, ctx, iinfo);
+    Mod->Bits.ModuleDecl.IsMainModule = true;
+    return Mod;
+  }
+
   using Decl::getASTContext;
 
   /// Retrieves information about which modules are implicitly imported by
@@ -542,6 +547,10 @@ public:
     Bits.ModuleDecl.IsNonSwiftModule = flag;
   }
 
+  bool isMainModule() const {
+    return Bits.ModuleDecl.IsMainModule;
+  }
+
   /// Retrieve the top-level module. If this module is already top-level, this
   /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
   /// returns the module \c Foo.
@@ -580,21 +589,6 @@ public:
   /// FIXME: Refactor main file parsing to not pump the parser incrementally.
   /// FIXME: Remove the integrated REPL.
   void clearLookupCache();
-
-  /// @{
-
-  /// Look up the given operator in this module.
-  ///
-  /// If the operator is not found, or if there is an ambiguity, returns null.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name,
-                                         SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name,
-                                           SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name,
-                                             SourceLoc diagLoc = {});
-  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name,
-                                             SourceLoc diagLoc = {});
-  /// @}
 
   /// Finds all class members defined in this module.
   ///

@@ -849,6 +849,10 @@ function(_add_swift_target_library_single target name)
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
               ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
+  # NOTE: always inject the LLVMSupport directory before anything else.  We want
+  # to ensure that the runtime is built with our local copy of LLVMSupport
+  target_include_directories(${target} BEFORE PRIVATE
+    ${SWIFT_SOURCE_DIR}/stdlib/include)
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF") AND
      SWIFTLIB_SINGLE_TARGET_LIBRARY)
@@ -875,10 +879,8 @@ function(_add_swift_target_library_single target name)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
-    target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
-    set_target_properties(${target}
-                          PROPERTIES
-                            CXX_STANDARD 14)
+    target_include_directories("${target}" SYSTEM PRIVATE
+      ${SWIFTLIB_INCLUDE})
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")

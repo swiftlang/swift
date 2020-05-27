@@ -111,7 +111,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
   class SILBoxType;
@@ -121,7 +120,7 @@ namespace swift {
   class UnifiedStatsReporter;
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
-  struct SubASTContextDelegate;
+  struct InterfaceSubContextDelegate;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -238,10 +237,10 @@ public:
   UnifiedStatsReporter *Stats = nullptr;
 
   /// The language options used for translation.
-  LangOptions &LangOpts;
+  const LangOptions &LangOpts;
 
   /// The type checker options.
-  TypeCheckerOptions &TypeCheckerOpts;
+  const TypeCheckerOptions &TypeCheckerOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -275,9 +274,6 @@ public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
-
-  /// A consumer of type checker debug output.
-  std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
 
   /// Cache for names of canonical GenericTypeParamTypes.
   mutable llvm::DenseMap<unsigned, Identifier>
@@ -721,7 +717,7 @@ public:
       StringRef moduleName,
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
-      SubASTContextDelegate &delegate);
+      InterfaceSubContextDelegate &delegate);
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -752,11 +748,13 @@ public:
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested. This list will be
   /// extended with any methods found in subsequent generations.
-  void loadObjCMethods(ClassDecl *classDecl,
-                       ObjCSelector selector,
-                       bool isInstanceMethod,
-                       unsigned previousGeneration,
-                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+  ///
+  /// \param swiftOnly If true, only loads methods from imported Swift modules,
+  /// skipping the Clang importer.
+  void loadObjCMethods(ClassDecl *classDecl, ObjCSelector selector,
+                       bool isInstanceMethod, unsigned previousGeneration,
+                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods,
+                       bool swiftOnly = false);
 
   /// Load derivative function configurations for the given
   /// AbstractFunctionDecl.

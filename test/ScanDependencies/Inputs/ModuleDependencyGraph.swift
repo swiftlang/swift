@@ -65,6 +65,10 @@ struct SwiftModuleDetails: Codable {
 
   /// The bridging header, if any.
   var bridgingHeader: BridgingHeader?
+
+  /// The Swift command line arguments that need to be passed through
+  /// to the -compile-module-from-interface action to build this module.
+  var commandLine: [String]?
 }
 
 /// Details specific to Clang modules.
@@ -144,11 +148,3 @@ struct ModuleDependencyGraph: Codable {
   /// Information about the main module.
   var mainModule: ModuleDependencies { modules[.swift(mainModuleName)]! }
 }
-
-let fileName = CommandLine.arguments[1]
-let data = try! Data(contentsOf: URL(fileURLWithPath: fileName))
-
-let decoder = JSONDecoder()
-let moduleDependencyGraph = try! decoder.decode(
-  ModuleDependencyGraph.self, from: data)
-print(moduleDependencyGraph)

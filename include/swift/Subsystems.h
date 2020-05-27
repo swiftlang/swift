@@ -58,7 +58,6 @@ namespace swift {
   class SerializationOptions;
   class SILOptions;
   class SILModule;
-  class SILParserTUState;
   class SourceFile;
   enum class SourceFileKind;
   class SourceManager;
@@ -73,17 +72,6 @@ namespace swift {
   namespace Lowering {
     class TypeConverter;
   }
-
-  /// Used to optionally maintain SIL parsing context for the parser.
-  ///
-  /// When not parsing SIL, this has no overhead.
-  class SILParserState {
-  public:
-    std::unique_ptr<SILParserTUState> Impl;
-
-    explicit SILParserState(SILModule *M);
-    ~SILParserState();
-  };
 
   /// @{
 
@@ -151,14 +139,6 @@ namespace swift {
   /// provide a somewhat defined order in which diagnostics should be
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
-
-  /// Checks to see if any of the imports in \p M use `@_implementationOnly` in
-  /// one file and not in another.
-  ///
-  /// Like redeclaration checking, but for imports. This isn't part of
-  /// swift::performWholeModuleTypeChecking because it's linear in the number
-  /// of declarations in the module.
-  void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
 
   /// Recursively validate the specified type.
   ///

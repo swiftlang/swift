@@ -835,9 +835,7 @@ static bool getDeadInstsAfterInitializerRemoved(
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
-  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized &&
-      ArraySemanticsCall(AI).getKind() !=
-          ArrayCallKind::kArrayUninitializedIntrinsic)
+  if (!isAllocatingApply(AI))
     return false;
 
   llvm::SmallVector<SILInstruction *, 8> instsDeadAfterInitializerRemoved;

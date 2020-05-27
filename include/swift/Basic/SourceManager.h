@@ -206,7 +206,7 @@ public:
   ///
   /// This respects \c #sourceLocation directives.
   std::pair<unsigned, unsigned>
-  getLineAndColumn(SourceLoc Loc, unsigned BufferID = 0) const {
+  getPresumedLineAndColumnForLoc(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
     int LineOffset = getLineOffset(Loc);
     int l, c;
@@ -215,14 +215,15 @@ public:
     return { LineOffset + l, c };
   }
 
-  /// Returns the real line number for a source location.
+  /// Returns the real line and column for a source location.
   ///
   /// If \p BufferID is provided, \p Loc must come from that source buffer.
   ///
   /// This does not respect \c #sourceLocation directives.
-  unsigned getLineNumber(SourceLoc Loc, unsigned BufferID = 0) const {
+  std::pair<unsigned, unsigned>
+  getLineAndColumnInBuffer(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
-    return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
+    return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
   }
 
   StringRef getEntireTextForBuffer(unsigned BufferID) const;
@@ -267,6 +268,11 @@ private:
       return VFile->LineOffset;
     else
       return 0;
+  }
+
+public:
+  bool isLocInVirtualFile(SourceLoc Loc) const {
+    return getVirtualFile(Loc) != nullptr;
   }
 };
 

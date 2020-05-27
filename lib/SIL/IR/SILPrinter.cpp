@@ -710,13 +710,20 @@ public:
       if (SILPrintSourceInfo) {
         auto CurSourceLoc = I.getLoc().getSourceLoc();
         if (CurSourceLoc.isValid()) {
-          if (!PrevLoc || SM.getLineNumber(CurSourceLoc) > SM.getLineNumber(PrevLoc->getSourceLoc())) {
-              auto Buffer = SM.findBufferContainingLoc(CurSourceLoc);
-              auto Line = SM.getLineNumber(CurSourceLoc);
-              auto LineLength = SM.getLineLength(Buffer, Line);
-              PrintState.OS << "  // " << SM.extractText({SM.getLocForLineCol(Buffer, Line, 0), LineLength.getValueOr(0)}) <<
-              "\tSourceLoc: " << SM.getDisplayNameForLoc(CurSourceLoc) << ":" << Line << "\n";
-              PrevLoc = I.getLoc();
+          if (!PrevLoc ||
+              SM.getLineAndColumnInBuffer(CurSourceLoc).first >
+                  SM.getLineAndColumnInBuffer(PrevLoc->getSourceLoc()).first) {
+            auto Buffer = SM.findBufferContainingLoc(CurSourceLoc);
+            auto Line = SM.getLineAndColumnInBuffer(CurSourceLoc).first;
+            auto LineLength = SM.getLineLength(Buffer, Line);
+            PrintState.OS << "  // "
+                          << SM.extractText(
+                                 {SM.getLocForLineCol(Buffer, Line, 0),
+                                  LineLength.getValueOr(0)})
+                          << "\tSourceLoc: "
+                          << SM.getDisplayNameForLoc(CurSourceLoc) << ":"
+                          << Line << "\n";
+            PrevLoc = I.getLoc();
           }
         }
       }
@@ -1775,13 +1782,15 @@ public:
     *this << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
-    *this << getIDAndType(EI->getOperand()) << ", #";
+    *this << (EI->isImmutable() ? "[immutable] " : "")
+          << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
   }
 
   void visitRefTailAddrInst(RefTailAddrInst *RTAI) {
-    *this << getIDAndType(RTAI->getOperand()) << ", " << RTAI->getTailType();
+    *this << (RTAI->isImmutable() ? "[immutable] " : "")
+          << getIDAndType(RTAI->getOperand()) << ", " << RTAI->getTailType();
   }
 
   void visitDestructureStructInst(DestructureStructInst *DSI) {
@@ -1938,6 +1947,16 @@ public:
   }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
+  }
+  void visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI) {
+    if (BCMI->isNative())
+      *this << "[native] ";
+    *this << getIDAndType(BCMI->getOperand());
+  }
+  void visitEndCOWMutationInst(EndCOWMutationInst *ECMI) {
+    if (ECMI->doKeepUnique())
+      *this << "[keep_unique] ";
+    *this << getIDAndType(ECMI->getOperand());
   }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
     if (CUI->getVerificationType())
@@ -3520,6 +3539,9 @@ ID SILPrintContext::getID(const SILNode *node) {
     return {ID::SILUndef, 0};
   
   SILBasicBlock *BB = node->getParentBlock();
+  if (!BB) {
+    return { ID::Null, 0 };
+  }
   if (SILFunction *F = BB->getParent()) {
     setContext(F);
     // Lazily initialize the instruction -> ID mapping.

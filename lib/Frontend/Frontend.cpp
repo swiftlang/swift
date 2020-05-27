@@ -298,32 +298,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
-  const auto &frontendOpts = Invocation.getFrontendOptions();
-
-  // If we are asked to emit a module documentation file, configure lexing and
-  // parsing to remember comments.
-  if (frontendOpts.InputsAndOutputs.hasModuleDocOutputPath())
-    Invocation.getLangOptions().AttachCommentsToDecls = true;
-
-  // If we are doing index-while-building, configure lexing and parsing to
-  // remember comments.
-  if (!frontendOpts.IndexStorePath.empty()) {
-    Invocation.getLangOptions().AttachCommentsToDecls = true;
-  }
-
-  // Set up the type checker options.
-  auto &typeCkOpts = Invocation.getTypeCheckerOptions();
-  if (isWholeModuleCompilation()) {
-    typeCkOpts.DelayWholeModuleChecking = true;
-  }
-  if (FrontendOptions::isActionImmediate(frontendOpts.RequestedAction)) {
-    typeCkOpts.InImmediateMode = true;
-  }
-
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
-
-  if (isInSILMode())
-    Invocation.getLangOptions().EnableAccessControl = false;
 
   if (setUpInputs())
     return true;
@@ -717,7 +692,8 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
 ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = ModuleDecl::create(ID, *Context, getImplicitImportInfo());
+    MainModule = ModuleDecl::createMainModule(*Context, ID,
+                                              getImplicitImportInfo());
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
     if (Invocation.getFrontendOptions().EnablePrivateImports)
@@ -870,19 +846,16 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports() {
   return hadLoadError;
 }
 
-static void
-forEachSourceFileIn(ModuleDecl *module,
-                    llvm::function_ref<void(SourceFile &)> fn) {
-  for (auto fileName : module->getFiles()) {
-    if (auto SF = dyn_cast<SourceFile>(fileName))
-      fn(*SF);
-  }
-}
-
 void CompilerInstance::forEachFileToTypeCheck(
     llvm::function_ref<void(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
-    forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
+    for (auto fileName : MainModule->getFiles()) {
+      auto *SF = dyn_cast<SourceFile>(fileName);
+      if (!SF) {
+        continue;
+      }
+      fn(*SF);
+    }
   } else {
     for (auto *SF : PrimarySourceFiles) {
       fn(*SF);
@@ -891,13 +864,9 @@ void CompilerInstance::forEachFileToTypeCheck(
 }
 
 void CompilerInstance::finishTypeChecking() {
-  if (getASTContext().TypeCheckerOpts.DelayWholeModuleChecking) {
-    forEachSourceFileIn(MainModule, [&](SourceFile &SF) {
-      performWholeModuleTypeChecking(SF);
-    });
-  }
-
-  checkInconsistentImplementationOnlyImports(MainModule);
+  forEachFileToTypeCheck([](SourceFile &SF) {
+    performWholeModuleTypeChecking(SF);
+  });
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
@@ -924,7 +893,6 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   if (isPrimary) {
     PrimarySourceFiles.push_back(inputFile);
     inputFile->enableInterfaceHash();
-    inputFile->createReferencedNameTracker();
   }
 
   if (bufferID == SourceMgr.getCodeCompletionBufferID()) {

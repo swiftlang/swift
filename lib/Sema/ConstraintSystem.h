@@ -30,7 +30,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -300,6 +299,10 @@ public:
 
   /// Determine whether this type variable represents a closure type.
   bool isClosureType() const;
+
+  /// Determine whether this type variable represents one of the
+  /// parameter types associated with a closure.
+  bool isClosureParameterType() const;
 
   /// Determine whether this type variable represents a closure result type.
   bool isClosureResultType() const;
@@ -1089,6 +1092,16 @@ enum class ConstraintSystemFlags {
   /// If set, constraint system always reuses type of pre-typechecked
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x08,
+
+  /// If set, verbose output is enabled for this constraint system.
+  ///
+  /// Note that this flag is automatically applied to all constraint systems
+  /// when \c DebugConstraintSolver is set in \c TypeCheckerOptions. It can be
+  /// automatically enabled for select constraint solving attempts by setting
+  /// \c DebugConstraintSolverAttempt. Finally, it be automatically enabled
+  /// for a pre-configured set of expressions on line numbers by setting
+  /// \c DebugConstraintSolverOnLines.
+  DebugConstraints = 0x10,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1434,7 +1447,8 @@ public:
   bool isOptionalSomePatternInit() const {
     return kind == Kind::expression &&
         expression.contextualPurpose == CTP_Initialization &&
-        isa<OptionalSomePattern>(expression.pattern);
+        isa<OptionalSomePattern>(expression.pattern) &&
+        !expression.pattern->isImplicit();
   }
 
   /// Whether to bind the types of any variables within the pattern via
@@ -1895,11 +1909,6 @@ private:
 
     FreeTypeVariableBinding AllowFreeTypeVariables;
 
-    /// Old value of DebugConstraintSolver.
-    /// FIXME: Move the "debug constraint solver" bit into the constraint 
-    /// system itself.
-    bool OldDebugConstraintSolver;
-
     /// Depth of the solution stack.
     unsigned depth = 0;
 
@@ -2319,6 +2328,12 @@ public:
   /// Determine whether this constraint system has any free type
   /// variables.
   bool hasFreeTypeVariables();
+
+  /// Check whether constraint solver is running in "debug" mode,
+  /// which should output diagnostic information.
+  bool isDebugMode() const {
+    return Options.contains(ConstraintSystemFlags::DebugConstraints);
+  }
 
 private:
   /// Finalize this constraint system; we're done attempting to solve
@@ -2946,7 +2961,7 @@ public:
   /// Whether we should record the failure of a constraint.
   bool shouldRecordFailedConstraint() const {
     // If we're debugging, always note a failure so we can print it out.
-    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver)
+    if (isDebugMode())
       return true;
 
     // Otherwise, only record it if we don't already have a failed constraint.
@@ -2961,8 +2976,8 @@ public:
     if (!failedConstraint)
       failedConstraint = constraint;
 
-    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
+    if (isDebugMode()) {
+      auto &log = llvm::errs();
       log.indent(solverState ? solverState->depth * 2 : 0)
           << "(failed constraint ";
       constraint->print(log, &getASTContext().SourceMgr);
@@ -3054,6 +3069,13 @@ public:
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) const {
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
+
+  /// Find if the given type variable is representative for a type
+  /// variable which last locator path element is of the specified kind.
+  /// If true returns the type variable which it is the representative for.
+  TypeVariableType *
+  isRepresentativeFor(TypeVariableType *typeVar,
+                      ConstraintLocator::PathElementKind kind) const;
 
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// storage wrapper if the decl has an associated storage wrapper.
@@ -4406,7 +4428,7 @@ private:
 
     void dump(ConstraintSystem *cs,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
-      dump(cs->getASTContext().TypeCheckerDebug->getStream());
+      dump(llvm::errs());
     }
 
     void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,

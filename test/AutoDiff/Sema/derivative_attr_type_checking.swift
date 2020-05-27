@@ -707,6 +707,14 @@ extension InoutParameters {
   ) { fatalError() }
 }
 
+// Test no semantic results.
+
+func noSemanticResults(_ x: Float) {}
+
+// expected-error @+1 {{cannot differentiate void function 'noSemanticResults'}}
+@derivative(of: noSemanticResults)
+func vjpNoSemanticResults(_ x: Float) -> (value: Void, pullback: Void) {}
+
 // Test multiple semantic results.
 
 extension InoutParameters {

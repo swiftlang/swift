@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 556; // dont serialize Pattern::isImplicit
+const uint16_t SWIFTMODULE_VERSION_MINOR = 557; // COW instructions
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -397,6 +397,21 @@ static inline OperatorKind getStableFixity(OperatorFixity fixity) {
     return Postfix;
   case OperatorFixity::Infix:
     return Infix;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+/// Translates a stable Serialization fixity back to an AST operator fixity.
+static inline OperatorFixity getASTOperatorFixity(OperatorKind fixity) {
+  switch (fixity) {
+  case Prefix:
+    return OperatorFixity::Prefix;
+  case Postfix:
+    return OperatorFixity::Postfix;
+  case Infix:
+    return OperatorFixity::Infix;
+  case PrecedenceGroup:
+    llvm_unreachable("Not an operator kind");
   }
   llvm_unreachable("Unhandled case in switch");
 }

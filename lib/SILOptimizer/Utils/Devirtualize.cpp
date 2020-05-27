@@ -89,13 +89,6 @@ static bool isEffectivelyFinalMethod(FullApplySite applySite, CanType classType,
   if (cd && cd->isFinal())
     return true;
 
-  const DeclContext *dc = applySite.getModule().getAssociatedContext();
-
-  // Without an associated context we cannot perform any
-  // access-based optimizations.
-  if (!dc)
-    return false;
-
   auto *cmi = cast<MethodInst>(applySite.getCallee());
 
   if (!calleesAreStaticallyKnowable(applySite.getModule(), cmi->getMember()))
@@ -149,18 +142,11 @@ static bool isEffectivelyFinalMethod(FullApplySite applySite, CanType classType,
 ///   it is a whole-module compilation.
 static bool isKnownFinalClass(ClassDecl *cd, SILModule &module,
                               ClassHierarchyAnalysis *cha) {
-  const DeclContext *dc = module.getAssociatedContext();
-
   if (cd->isFinal())
     return true;
 
-  // Without an associated context we cannot perform any
-  // access-based optimizations.
-  if (!dc)
-    return false;
-
   // Only handle classes defined within the SILModule's associated context.
-  if (!cd->isChildContextOf(dc))
+  if (!cd->isChildContextOf(module.getAssociatedContext()))
     return false;
 
   if (!cd->hasAccess())

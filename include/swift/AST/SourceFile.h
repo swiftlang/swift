@@ -30,7 +30,6 @@ class SourceFile final : public FileUnit {
   friend class ParseSourceFileRequest;
 
 public:
-  class Impl;
   struct SourceFileSyntaxInfo;
 
   /// Possible attributes for imports in source files.
@@ -137,9 +136,6 @@ private:
   /// This is set during type checking.
   TypeRefinementContext *TRC = nullptr;
 
-  /// If non-null, used to track name lookups that happen within this file.
-  Optional<ReferencedNameTracker> RequestReferencedNames;
-
   /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
   /// that calls main on the type marked @main.
   Decl *MainDecl = nullptr;
@@ -198,7 +194,6 @@ private:
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
   friend ASTContext;
-  friend Impl;
 
 public:
   /// Appends the given declaration to the end of the top-level decls list. Do
@@ -438,25 +433,6 @@ public:
   SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   virtual bool walk(ASTWalker &walker) override;
-
-  ReferencedNameTracker *getRequestBasedReferencedNameTracker() {
-    return RequestReferencedNames ? RequestReferencedNames.getPointer() : nullptr;
-  }
-  const ReferencedNameTracker *getRequestBasedReferencedNameTracker() const {
-    return RequestReferencedNames ? RequestReferencedNames.getPointer() : nullptr;
-  }
-
-  /// Creates and installs the referenced name trackers in this source file.
-  ///
-  /// This entrypoint must be called before incremental compilation can proceed,
-  /// else reference dependencies will not be registered.
-  void createReferencedNameTracker();
-
-  /// Retrieves the appropriate referenced name tracker instance.
-  ///
-  /// If incremental dependencies tracking is not enabled or \c createReferencedNameTracker()
-  /// has not been invoked on this source file, the result is \c nullptr.
-  const ReferencedNameTracker *getConfiguredReferencedNameTracker() const;
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
