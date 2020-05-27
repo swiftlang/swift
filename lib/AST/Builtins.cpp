@@ -1745,7 +1745,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
   case IITDescriptor::HalfVecArgument:
-  case IITDescriptor::ScalableVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecElementArgument:
@@ -1774,7 +1773,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Vector: {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
-    return makeVector(eltType, D.Vector_Width);
+    return makeVector(eltType, D.Vector_Width.Min);
   }
 
   // A pointer to an immediate type.
