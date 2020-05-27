@@ -51,8 +51,8 @@ From the settings application, go to `Update & Security`.  In the `For developer
 ## Clone the repositories
 
 1. Clone `apple/llvm-project` into a directory for the toolchain
-2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-llbuild`, `apple/swift-package-manager` into the toolchain directory
-3. Clone `compnerd/swift-build` as a peer of the toolchain directory
+2. Clone `apple/swift-cmark` and `apple/swift` into the toolchain directory
+3. Clone `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-llbuild`, `apple/swift-package-manager` `compnerd/swift-build` as peers of the toolchain directory
 
 - Currently, other repositories in the Swift project have not been tested and may not be supported.
 
@@ -142,6 +142,8 @@ cmake -B "S:\b\toolchain" ^
   -D SWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib" ^
   -D CMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" ^
   -D PYTHON_EXECUTABLE=C:\Python27\python.exe ^
+  -D PYTHON3_LIBRARIES="%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64\Libs\python3.lib" ^
+  -D PYTHON3_INCLUDE_DIRS="%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64\include" ^
   -D SWIFT_BUILD_DYNAMIC_STDLIB=YES ^
   -D SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES ^
   -G Ninja ^
