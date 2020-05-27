@@ -1851,7 +1851,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
       auto fnType = getCallee().getFunctionPointer().getFunctionType();
       assert(fnType->getNumParams() > 0);
       auto resultTy = fnType->getParamType(0)->getPointerElementType();
-      auto temp = IGF.createAlloca(resultTy, Alignment(0), "indirect.result");
+      auto temp = IGF.createAlloca(resultTy, Alignment(), "indirect.result");
       emitToMemory(temp, substResultTI, isOutlined);
       return;
     }

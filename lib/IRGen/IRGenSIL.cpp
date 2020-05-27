@@ -698,9 +698,8 @@ public:
 
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
-                              SILDebugVariable VarInfo, Alignment Align) {
-    if (Align.isZero())
-      Align = IGM.getPointerAlignment();
+                              SILDebugVariable VarInfo, llvm::Optional<Alignment> _Align) {
+    auto Align = _Align.getValueOr(IGM.getPointerAlignment());
 
     unsigned ArgNo = VarInfo.ArgNo;
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
@@ -721,7 +720,7 @@ public:
                                       const SILDebugScope *Scope,
                                       SILDebugVariable VarInfo,
                                       bool IsAnonymous,
-                                      Alignment Align = Alignment(0)) {
+                                      llvm::Optional<Alignment> Align = None) {
     // Never emit shadow copies when optimizing, or if already on the stack.
     // No debug info is emitted for refcounts either.
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
