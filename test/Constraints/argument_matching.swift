@@ -705,12 +705,10 @@ func testUnlabeledParameterBindingPosition() {
     // expected-error@-1:6 {{missing argument label 'aa:' in call}}
 
     f(0, xx: 1)
-    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
-    // expected-error@-2:14 {{extra argument 'xx' in call}}
+    // expected-error@-1:6 {{incorrect argument labels in call (have '_:xx:', expected 'aa:_:')}}
 
     f(xx: 0, 1)
-    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
-    // expected-error@-2:14 {{extra argument in call}}
+    // expected-error@-1:6 {{incorrect argument label in call (have 'xx:_:', expected 'aa:_:')}}
 
     f(0, 1, 9)
     // expected-error@-1:13 {{extra argument in call}}
@@ -719,7 +717,7 @@ func testUnlabeledParameterBindingPosition() {
     // expected-error@-1:17 {{extra argument 'xx' in call}}
 
     f(xx: 91, 1, 92)
-    // expected-error@-1 {{extra arguments at positions #2, #3 in call}}
+    // expected-error@-1 {{extra arguments at positions #1, #3 in call}}
     // expected-error@-2 {{missing argument for parameter 'aa' in call}}
   }
 
@@ -727,7 +725,7 @@ func testUnlabeledParameterBindingPosition() {
     func f(_ aa: Int, bb: Int, _ cc: Int) { }
 
     f(bb: 1, 0, 2)
-    // expected-error@-1 {{unnamed argument #3 must precede argument 'bb'}}
+    // expected-error@-1 {{unnamed argument #2 must precede argument 'bb'}}
   }
 
   do {
@@ -755,7 +753,8 @@ func testUnlabeledParameterBindingPosition() {
     func f(aa: Int, _ bb: Int, _ cc: Int) {}
 
     f(0, 1)
-    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
+    // expected-error@-1:6 {{missing argument label 'aa:' in call}}
+    // expected-error@-2:11 {{missing argument for parameter #3 in call}}
   }
 
   do {
@@ -763,7 +762,8 @@ func testUnlabeledParameterBindingPosition() {
     func f(aa: Int, _ bb: Int = 81, _ cc: Int) {}
 
     f(0, 1)
-    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
+    // expected-error@-1:6 {{missing argument label 'aa:' in call}}
+    // expected-error@-2:11 {{missing argument for parameter #3 in call}}
   }
 
   do {
