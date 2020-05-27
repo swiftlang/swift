@@ -131,7 +131,7 @@ public struct Mirror {
   public typealias Children = AnyCollection<Child>
 
   internal typealias _Children
-    = EitherCollection<ReflectedChildren,AnyCollection<Child>>
+    = _EitherCollection<ReflectedChildren,AnyCollection<Child>>
 
   internal var _children: _Children
 

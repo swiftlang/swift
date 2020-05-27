@@ -1,4 +1,4 @@
-////===--- EitherSequence.swift - A sequence type-erasing two sequences -----===//
+////===--- _EitherSequence.swift - A sequence type-erasing two sequences -----===//
 ////
 //// This source file is part of the Swift.org open source project
 ////
@@ -12,17 +12,17 @@
 
 // Not public stdlib API, currently used in Mirror.children implementation.
 
-internal enum Either<Left, Right> {
+internal enum _Either<Left, Right> {
   case left(Left), right(Right)
 }
 
-extension Either {
+extension _Either {
   internal init(_ left: Left, or other: Right.Type) { self = .left(left) }
   internal init(_ left: Left) { self = .left(left) }
   internal init(_ right: Right) { self = .right(right) }
 }
 
-extension Either: Equatable where Left: Equatable, Right: Equatable {
+extension _Either: Equatable where Left: Equatable, Right: Equatable {
   internal static func == (lhs: Self, rhs: Self) -> Bool {
     switch (lhs, rhs) {
     case let (.left(l), .left(r)): return l == r
@@ -32,7 +32,7 @@ extension Either: Equatable where Left: Equatable, Right: Equatable {
   }
 }
 
-extension Either: Comparable where Left: Comparable, Right: Comparable {
+extension _Either: Comparable where Left: Comparable, Right: Comparable {
   internal static func < (lhs: Self, rhs: Self) -> Bool {
     switch (lhs, rhs) {
     case let (.left(l), .left(r)): return l < r
@@ -51,17 +51,17 @@ extension Either: Comparable where Left: Comparable, Right: Comparable {
 /// AnySequence, giving you a fast path for the known one.
 ///
 /// If you have 3+ types to erase, you can nest them.
-typealias EitherSequence<L: Sequence, R: Sequence> =
-  Either<L,R> where L.Element == R.Element
+typealias _EitherSequence<L: Sequence, R: Sequence> =
+  _Either<L,R> where L.Element == R.Element
 
-extension EitherSequence {
+extension _EitherSequence {
   internal struct Iterator {
     var left: Left.Iterator?
     var right: Right.Iterator?
   }
 }
 
-extension Either.Iterator: IteratorProtocol {
+extension _Either.Iterator: IteratorProtocol {
   internal typealias Element = Left.Element
 
   internal mutating func next() -> Element? {
@@ -69,7 +69,7 @@ extension Either.Iterator: IteratorProtocol {
   }
 }
 
-extension EitherSequence: Sequence {
+extension _EitherSequence: Sequence {
   internal typealias Element = Left.Element
 
   internal func makeIterator() -> Iterator {
@@ -82,12 +82,12 @@ extension EitherSequence: Sequence {
   }
 }
 
-internal typealias EitherCollection<
+internal typealias _EitherCollection<
   T: Collection, U: Collection
-> = EitherSequence<T,U> where T.Element == U.Element
+> = _EitherSequence<T,U> where T.Element == U.Element
 
-extension EitherCollection: Collection {
-  internal typealias Index = Either<Left.Index, Right.Index>
+extension _EitherCollection: Collection {
+  internal typealias Index = _Either<Left.Index, Right.Index>
 
   internal var startIndex: Index {
     switch self {
@@ -107,7 +107,7 @@ extension EitherCollection: Collection {
     switch (self,position) {
     case let (.left(s),.left(i)): return s[i]
     case let (.right(s),.right(i)): return s[i]
-    default: fatalError("EitherCollecton: Sequence used with other index type")
+    default: fatalError("_EitherCollecton: Sequence used with other index type")
     }
   }
 
@@ -115,7 +115,7 @@ extension EitherCollection: Collection {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(after: i))
     case let (.right(s),.right(i)): return .right(s.index(after: i))
-    default: fatalError("EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollecton: wrong type of index used")
     }
   }
 
@@ -129,7 +129,7 @@ extension EitherCollection: Collection {
       return s.index(i, offsetBy: distance, limitedBy: limit).map { .left($0) }
     case let (.right(s),.right(i),.right(limit)):
       return s.index(i, offsetBy: distance, limitedBy: limit).map { .right($0) }
-    default: fatalError("EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollecton: wrong type of index used")
     }
   }
 
@@ -137,7 +137,7 @@ extension EitherCollection: Collection {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(i, offsetBy: distance))
     case let (.right(s),.right(i)): return .right(s.index(i, offsetBy: distance))
-    default: fatalError("EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollecton: wrong type of index used")
     }
   }
 
@@ -147,32 +147,32 @@ extension EitherCollection: Collection {
       return s.distance(from: i, to: j)
     case let (.right(s),.right(i),.right(j)):
       return s.distance(from: i, to: j)
-    default: fatalError("EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollecton: wrong type of index used")
     }
   }
 }
 
-internal typealias EitherBidirectionalCollection<
+internal typealias _EitherBidirectionalCollection<
   L: BidirectionalCollection, R: BidirectionalCollection
-> = Either<L,R> where L.Element == R.Element
+> = _Either<L,R> where L.Element == R.Element
 
-extension EitherBidirectionalCollection: BidirectionalCollection {
+extension _EitherBidirectionalCollection: BidirectionalCollection {
   internal func index(before i: Index) -> Index {
     switch (self,i) {
     case let (.left(s),.left(i)): return .left(s.index(before: i))
     case let (.right(s),.right(i)): return .right(s.index(before: i))
-    default: fatalError("EitherCollecton: wrong type of index used")
+    default: fatalError("_EitherCollecton: wrong type of index used")
     }
   }
 }
 
-internal typealias EitherRandomAccessCollection<
+internal typealias _EitherRandomAccessCollection<
   L: RandomAccessCollection, R: RandomAccessCollection
-> = Either<L,R> where L.Element == R.Element
+> = _Either<L,R> where L.Element == R.Element
 
-extension EitherRandomAccessCollection: RandomAccessCollection { }
+extension _EitherRandomAccessCollection: RandomAccessCollection { }
 
-extension Either {
+extension _Either {
   init<T, C: Collection>(
     _ collection: C
   ) where Right == AnyCollection<T>, C.Element == T {
@@ -182,7 +182,7 @@ extension Either {
 
 extension AnyCollection {
   init<L: Collection,R: Collection>(
-    _ other: Either<L,R>
+    _ other: _Either<L,R>
   ) where L.Element == Element, R.Element == Element {
     // Strip away the Either and put the actual collection into the existential,
     // trying to use the custom initializer from another AnyCollection.
