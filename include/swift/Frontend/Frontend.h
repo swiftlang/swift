@@ -653,10 +653,11 @@ private:
   /// Retrieve a description of which modules should be implicitly imported.
   ImplicitImportInfo getImplicitImportInfo() const;
 
-  void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
+  void performSemaUpTo(SourceFile::ASTStage_t LimitStage,
+                       SourceFile::ParsingOptions POpts = {});
 
   /// Return true if had load error
-  bool parsePartialModulesAndInputFiles();
+  bool loadPartialModulesAndImplicitImports();
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 

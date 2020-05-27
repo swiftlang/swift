@@ -48,6 +48,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
@@ -3473,6 +3474,25 @@ namespace {
       }
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
+
+      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+        result->setIsCxxNotTriviallyCopyable(
+            !cxxRecordDecl->isTriviallyCopyable());
+
+        for (auto ctor : cxxRecordDecl->ctors()) {
+          if (ctor->isCopyConstructor() &&
+              (ctor->isDeleted() || ctor->getAccess() != clang::AS_public)) {
+            result->setIsCxxNotTriviallyCopyable(true);
+            break;
+          }
+        }
+
+        if (auto dtor = cxxRecordDecl->getDestructor()) {
+          if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
+            result->setIsCxxNotTriviallyCopyable(true);
+          }
+        }
+      }
 
       return result;
     }

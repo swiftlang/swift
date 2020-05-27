@@ -440,6 +440,11 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   if (TTOCMI->getFunction()->hasOwnership())
     return nullptr;
 
+  if (auto *OCTTMI = dyn_cast<ObjCToThickMetatypeInst>(TTOCMI->getOperand())) {
+    TTOCMI->replaceAllUsesWith(OCTTMI->getOperand());
+    return eraseInstFromFunction(*TTOCMI);
+  }
+
   // Perform the following transformations:
   // (thick_to_objc_metatype (metatype @thick)) ->
   // (metatype @objc_metatype)
@@ -459,6 +464,11 @@ SILInstruction *
 SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   if (OCTTMI->getFunction()->hasOwnership())
     return nullptr;
+
+  if (auto *TTOCMI = dyn_cast<ThickToObjCMetatypeInst>(OCTTMI->getOperand())) {
+    OCTTMI->replaceAllUsesWith(TTOCMI->getOperand());
+    return eraseInstFromFunction(*OCTTMI);
+  }
 
   // Perform the following transformations:
   // (objc_to_thick_metatype (metatype @objc_metatype)) ->

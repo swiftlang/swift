@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-sil-ownership-verifier -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_invalid_loc %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_invalid_loc %s | %FileCheck %s
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 // The implicit tuple and array exprs formed to call `dynamicallyCall`

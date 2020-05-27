@@ -1631,7 +1631,7 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
-    ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) {
+    ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate) {
   for (auto &loader : getImpl().ModuleLoaders) {
     if (isUnderlyingClangModule &&
         loader.get() != getImpl().TheClangModuleLoader)
@@ -3891,11 +3891,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
       superclass = superclass.subst(Substitutions);
     }
   #endif
-  SmallVector<ProtocolDecl*, 4> protos;
-  for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
-    protos.push_back(proto);
-  }
-  
+  const auto protos = signature->getRequiredProtocols(opaqueInterfaceTy);
+
   auto mem = ctx.Allocate(
     OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
       protos.size(), superclass ? 1 : 0, layout ? 1 : 0),

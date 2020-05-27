@@ -46,14 +46,18 @@ SourceLoc swift::extractNearestSourceLoc(const SILGenDescriptor &desc) {
   return SourceLoc();
 }
 
-evaluator::DependencySource SILGenSourceFileRequest::readDependencySource(
+evaluator::DependencySource SILGenerationRequest::readDependencySource(
     const evaluator::DependencyCollector &e) const {
   auto &desc = std::get<0>(getStorage());
+
+  // We don't track dependencies in whole-module mode.
+  if (auto *mod = desc.context.dyn_cast<ModuleDecl *>()) {
+    return {nullptr, e.getActiveSourceScope()};
+  }
+
+  // If we have a single source file, it's the source of dependencies.
   auto *unit = desc.context.get<FileUnit *>();
-  return {
-    dyn_cast_or_null<SourceFile>(unit),
-    evaluator::DependencyScope::Cascading
-  };
+  return {dyn_cast<SourceFile>(unit), evaluator::DependencyScope::Cascading};
 }
 
 ArrayRef<FileUnit *> SILGenDescriptor::getFiles() const {
@@ -63,10 +67,6 @@ ArrayRef<FileUnit *> SILGenDescriptor::getFiles() const {
   // For a single file, we can form an ArrayRef that points at its storage in
   // the union.
   return llvm::makeArrayRef(*context.getAddrOfPtr1());
-}
-
-bool SILGenDescriptor::isWholeModule() const {
-  return context.is<ModuleDecl *>();
 }
 
 SourceFile *SILGenDescriptor::getSourceFileToParse() const {

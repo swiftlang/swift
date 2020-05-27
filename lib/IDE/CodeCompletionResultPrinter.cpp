@@ -43,16 +43,23 @@ void swift::ide::printCodeCompletionResultDescription(
           C.is(ChunkKind::Whitespace))
         continue;
 
-      if (isOperator && C.is(ChunkKind::CallParameterType))
-        continue;
-      if (isOperator && C.is(ChunkKind::CallParameterTypeBegin)) {
-        auto nestingLevel = C.getNestingLevel();
-        ++I;
-        while (I != E && I->endsPreviousNestedGroup(nestingLevel))
-          ++I;
+      // Skip TypeAnnotation group.
+      if (C.is(ChunkKind::TypeAnnotationBegin)) {
+        auto level = I->getNestingLevel();
+        do { ++I; } while (I != E && !I->endsPreviousNestedGroup(level));
         --I;
         continue;
       }
+
+      if (isOperator && C.is(ChunkKind::CallParameterType))
+        continue;
+      if (isOperator && C.is(ChunkKind::CallParameterTypeBegin)) {
+        auto level = I->getNestingLevel();
+        do { ++I; } while (I != E && !I->endsPreviousNestedGroup(level));
+        --I;
+        continue;
+      }
+      
       if (C.hasText()) {
         TextSize += C.getText().size();
         OS << C.getText();
@@ -64,7 +71,7 @@ void swift::ide::printCodeCompletionResultDescription(
 }
 
 namespace {
-class AnnotatingDescriptionPrinter {
+class AnnotatingResultPrinter {
   raw_ostream &OS;
 
   /// Print \p content enclosing with \p tag.
@@ -154,9 +161,9 @@ class AnnotatingDescriptionPrinter {
   }
 
 public:
-  AnnotatingDescriptionPrinter(raw_ostream &OS) : OS(OS) {}
+  AnnotatingResultPrinter(raw_ostream &OS) : OS(OS) {}
 
-  void print(const CodeCompletionResult &result, bool leadingPunctuation) {
+  void printDescription(const CodeCompletionResult &result, bool leadingPunctuation) {
     auto str = result.getCompletionString();
     bool isOperator = result.isOperator();
 
@@ -165,20 +172,49 @@ public:
       auto chunks = str->getChunks().slice(*FirstTextChunk);
       for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
         using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
+
+        // Skip the type annotation.
+        if (i->is(ChunkKind::TypeAnnotationBegin)) {
+          auto level = i->getNestingLevel();
+          do { ++i; } while (i != e && !i->endsPreviousNestedGroup(level));
+          --i;
+          continue;
+        }
+
+        // Print call argument group.
         if (i->is(ChunkKind::CallParameterBegin)) {
-          auto start = i++;
-          for (; i != e; ++i) {
-            if (i->endsPreviousNestedGroup(start->getNestingLevel()))
-              break;
-          }
+          auto start = i;
+          auto level = i->getNestingLevel();
+          do { ++i; } while (i != e && !i->endsPreviousNestedGroup(level));
           if (!isOperator)
             printCallArg({start, i});
-          if (i == e)
-            break;
+          --i;
+          continue;
         }
+
         if (isOperator && i->is(ChunkKind::CallParameterType))
           continue;
         printTextChunk(*i);
+      }
+    }
+  }
+
+  void printTypeName(const CodeCompletionResult &result) {
+    auto Chunks = result.getCompletionString()->getChunks();
+
+    for (auto i = Chunks.begin(), e = Chunks.end(); i != e; ++i) {
+
+      if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation))
+        OS << i->getText();
+
+      if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
+        auto nestingLevel = i->getNestingLevel();
+        ++i;
+        for (; i != e && !i->endsPreviousNestedGroup(nestingLevel); ++i) {
+          if (i->hasText())
+            printTextChunk(*i);
+        }
+        --i;
       }
     }
   }
@@ -189,6 +225,33 @@ public:
 void swift::ide::printCodeCompletionResultDescriptionAnnotated(
     const CodeCompletionResult &Result, raw_ostream &OS,
     bool leadingPunctuation) {
-  AnnotatingDescriptionPrinter printer(OS);
-  printer.print(Result, leadingPunctuation);
+  AnnotatingResultPrinter printer(OS);
+  printer.printDescription(Result, leadingPunctuation);
+}
+
+
+void swift::ide::printCodeCompletionResultTypeName(const CodeCompletionResult &Result,
+                                                   llvm::raw_ostream &OS) {
+  auto Chunks = Result.getCompletionString()->getChunks();
+
+  for (auto i = Chunks.begin(), e = Chunks.end(); i != e; ++i) {
+
+    if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation))
+      OS << i->getText();
+
+    if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
+      auto nestingLevel = i->getNestingLevel();
+      i++;
+      for (; i != e && !i->endsPreviousNestedGroup(nestingLevel); ++i) {
+        if (i->hasText())
+          OS << i->getText();
+      }
+      --i;
+    }
+  }
+}
+
+void swift::ide::printCodeCompletionResultTypeNameAnnotated(const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
+  AnnotatingResultPrinter printer(OS);
+  printer.printTypeName(Result);
 }

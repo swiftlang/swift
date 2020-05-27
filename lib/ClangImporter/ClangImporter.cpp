@@ -817,7 +817,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   CI.setInvocation(std::move(invocation));
   CI.setTarget(&Impl.Instance->getTarget());
   CI.setDiagnostics(
-      &*CompilerInstance::createDiagnostics(new clang::DiagnosticOptions()));
+      &*clang::CompilerInstance::createDiagnostics(new clang::DiagnosticOptions()));
 
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
@@ -1903,7 +1903,7 @@ ClangImporter::getWrapperForModule(const clang::Module *mod,
   return clangUnit->getParentModule();
 }
 
-PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
+PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     : platformKind(targetPlatform(langOpts)) {
   switch (platformKind) {
   case PlatformKind::iOS:

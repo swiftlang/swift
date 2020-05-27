@@ -2542,7 +2542,13 @@ static void concretizeNestedTypeFromConcreteParent(
     GenericSignatureBuilder &builder) {
   auto parentEquiv = parent->getEquivalenceClassIfPresent();
   assert(parentEquiv && "can't have a concrete type without an equiv class");
+
+  bool isSuperclassConstrained = false;
   auto concreteParent = parentEquiv->concreteType;
+  if (!concreteParent) {
+    isSuperclassConstrained = true;
+    concreteParent = parentEquiv->superclass;
+  }
   assert(concreteParent &&
          "attempting to resolve concrete nested type of non-concrete PA");
 
@@ -2564,8 +2570,14 @@ static void concretizeNestedTypeFromConcreteParent(
          "No conformance requirement");
   const RequirementSource *parentConcreteSource = nullptr;
   for (const auto &constraint : parentEquiv->conformsTo.find(proto)->second) {
-    if (constraint.source->kind == RequirementSource::Concrete) {
-      parentConcreteSource = constraint.source;
+    if (!isSuperclassConstrained) {
+      if (constraint.source->kind == RequirementSource::Concrete) {
+        parentConcreteSource = constraint.source;
+      }
+    } else {
+      if (constraint.source->kind == RequirementSource::Superclass) {
+        parentConcreteSource = constraint.source;
+      }
     }
   }
 
@@ -3502,6 +3514,19 @@ GenericSignatureBuilder::getLookupConformanceFn()
 }
 
 ProtocolConformanceRef
+GenericSignatureBuilder::LookUpConformanceInBuilder::operator()(
+    CanType dependentType, Type conformingReplacementType,
+    ProtocolDecl *conformedProtocol) const {
+  // Lookup conformances for opened existential.
+  if (conformingReplacementType->isOpenedExistential()) {
+    return conformedProtocol->getModuleContext()->lookupConformance(
+        conformingReplacementType, conformedProtocol);
+  }
+  return builder->lookupConformance(dependentType, conformingReplacementType,
+                                    conformedProtocol);
+}
+
+ProtocolConformanceRef
 GenericSignatureBuilder::lookupConformance(CanType dependentType,
                                            Type conformingReplacementType,
                                            ProtocolDecl *conformedProtocol) {
@@ -4285,6 +4310,15 @@ bool GenericSignatureBuilder::updateSuperclass(
   auto updateSuperclassConformances = [&] {
     for (const auto &conforms : equivClass->conformsTo) {
       (void)resolveSuperConformance(type, conforms.first);
+    }
+
+    // Eagerly resolve any existing nested types to their concrete forms (others
+    // will be "concretized" as they are constructed, in getNestedType).
+    for (auto equivT : equivClass->members) {
+      for (auto nested : equivT->getNestedTypes()) {
+        concretizeNestedTypeFromConcreteParent(equivT, nested.second.front(),
+                                               *this);
+      }
     }
   };
 
@@ -7175,6 +7209,12 @@ void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
     pa->dump(out, &Context.SourceMgr, 2);
   }
   out << "\n";
+
+  out << "Equivalence classes:\n";
+  for (auto &equiv : Impl->EquivalenceClasses) {
+    equiv.dump(out, this);
+  }
+  out << "\n";
 }
 
 void GenericSignatureBuilder::addGenericSignature(GenericSignature sig) {
@@ -7421,7 +7461,7 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
 GenericSignature
 AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
-         GenericSignatureImpl *baseSignature,
+         const GenericSignatureImpl *baseSignature,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
          SmallVector<Requirement, 2> addedRequirements) const {
   // If nothing is added to the base signature, just return the base
@@ -7534,7 +7574,7 @@ AbstractGenericSignatureRequest::evaluate(
 GenericSignature
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
-        GenericSignatureImpl *parentSig,
+        const GenericSignatureImpl *parentSig,
         GenericParamSource paramSource,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,

@@ -421,12 +421,20 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
   case Kind::MultipleSemanticResults:
     OS << "has multiple semantic results";
     break;
-  case Kind::NonDifferentiableParameters:
-    OS << "has non-differentiable parameters: ";
-    value.indices->print(OS);
+  case Kind::NoDifferentiabilityParameters:
+    OS << "has no differentiability parameters";
     break;
-  case Kind::NonDifferentiableResult:
-    OS << "has non-differentiable result: " << value.type;
+  case Kind::NonDifferentiableDifferentiabilityParameter: {
+    auto nonDiffParam = getNonDifferentiableTypeAndIndex();
+    OS << "has non-differentiable differentiability parameter "
+       << nonDiffParam.second << ": " << nonDiffParam.first;
     break;
+  }
+  case Kind::NonDifferentiableResult: {
+    auto nonDiffResult = getNonDifferentiableTypeAndIndex();
+    OS << "has non-differentiable result " << nonDiffResult.second << ": "
+       << nonDiffResult.first;
+    break;
+  }
   }
 }

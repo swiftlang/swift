@@ -137,6 +137,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (auto *SE = dyn_cast<SubscriptExpr>(E))
         CallArgs.insert(SE->getIndex());
 
+      if (auto *DSE = dyn_cast<DynamicSubscriptExpr>(E))
+        CallArgs.insert(DSE->getIndex());
+
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (auto Comp : KPE->getComponents()) {
           if (auto *Arg = Comp.getIndexExpr())
@@ -3749,10 +3752,9 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
     // checking for a type, which forced it to be promoted to a double optional
     // type.
     if (auto ooType = subExpr->getType()->getOptionalObjectType()) {
-      if (auto TP = dyn_cast<TypedPattern>(p))
+      if (auto OSP = dyn_cast<OptionalSomePattern>(p)) {
         // Check for 'if let' to produce a tuned diagnostic.
-        if (isa<OptionalSomePattern>(TP->getSubPattern()) &&
-            TP->getSubPattern()->isImplicit()) {
+        if (auto *TP = dyn_cast<TypedPattern>(OSP->getSubPattern())) {
           ctx.Diags.diagnose(cond.getIntroducerLoc(),
                              diag::optional_check_promotion,
                              subExpr->getType())
@@ -3761,6 +3763,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
                           ooType->getString());
           return;
         }
+      }
       ctx.Diags.diagnose(cond.getIntroducerLoc(),
                          diag::optional_pattern_match_promotion,
                          subExpr->getType(), cond.getInitializer()->getType())

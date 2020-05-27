@@ -59,51 +59,26 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
   }
 }
 
-struct InterfaceSubASTContextDelegate: SubASTContextDelegate {
-  bool runInSubContext(ASTContext &ctx, StringRef interfacePath,
-                       llvm::function_ref<bool(ASTContext&)> action) override {
-    // Parse the interface file using the current context to get the additional
-    // compiler arguments we should use when creating a sub-ASTContext.
-    // These arguments are in "swift-module-flags:"
-    version::Version Vers;
-    StringRef CompilerVersion;
-    llvm::BumpPtrAllocator Allocator;
-    llvm::StringSaver SubArgSaver(Allocator);
-    SmallVector<const char *, 64> SubArgs;
-    if (extractSwiftInterfaceVersionAndArgs(ctx.SourceMgr, ctx.Diags,
-                                            interfacePath, Vers, CompilerVersion,
-                                            SubArgSaver, SubArgs)) {
-      return true;
-    }
-    CompilerInvocation invok;
-
-    // Inherit options from the parent ASTContext so we have all search paths, etc.
-    inheritOptionsForBuildingInterface(invok, ctx.SearchPathOpts, ctx.LangOpts);
-    CompilerInstance inst;
-    // Use the additional flags to setup the compiler instance.
-    if (invok.parseArgs(SubArgs, ctx.Diags)) {
-      return true;
-    }
-    if (inst.setup(invok)) {
-      return true;
-    }
-    // Add the diag consumers to the sub context to make sure we don't lose
-    // diagnostics.
-    for (auto *consumer: ctx.Diags.getConsumers()) {
-      inst.getDiags().addConsumer(*consumer);
-    }
-    // Run the action under the sub-ASTContext.
-    return action(inst.getASTContext());
-  }
-};
-
 /// Resolve the direct dependencies of the given module.
 static std::vector<ModuleDependencyID> resolveDirectDependencies(
-    ASTContext &ctx, ModuleDependencyID module,
+    CompilerInstance &instance, ModuleDependencyID module,
     ModuleDependenciesCache &cache) {
+  auto &ctx = instance.getASTContext();
   auto knownDependencies = *cache.findDependencies(module.first, module.second);
   auto isSwift = knownDependencies.isSwiftModule();
-  InterfaceSubASTContextDelegate ASTDelegate;
+  auto ModuleCachePath = getModuleCachePathFromClang(ctx
+    .getClangModuleLoader()->getClangInstance());
+  auto &FEOpts = instance.getInvocation().getFrontendOptions();
+  InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
+                                              ctx.SearchPathOpts, ctx.LangOpts,
+                                              ctx.getClangModuleLoader(),
+                                              /*buildModuleCacheDirIfAbsent*/false,
+                                              ModuleCachePath,
+                                              FEOpts.PrebuiltModuleCachePath,
+                                              FEOpts.SerializeModuleInterfaceDependencyHashes,
+                                              FEOpts.TrackSystemDeps,
+                                              FEOpts.RemarkOnRebuildFromModuleInterface,
+                                              FEOpts.DisableInterfaceFileLock);
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
@@ -248,7 +223,7 @@ namespace {
 }
 
 static void writeJSON(llvm::raw_ostream &out,
-                      ASTContext &ctx,
+                      CompilerInstance &instance,
                       ModuleDependenciesCache &cache,
                       ArrayRef<ModuleDependencyID> allModules) {
   // Write out a JSON description of all of the dependencies.
@@ -268,7 +243,7 @@ static void writeJSON(llvm::raw_ostream &out,
   };
   for (const auto &module : allModules) {
     auto directDependencies = resolveDirectDependencies(
-        ctx, ModuleDependencyID(module.first, module.second), cache);
+        instance, ModuleDependencyID(module.first, module.second), cache);
 
     // Grab the completed module dependencies.
     auto moduleDeps = *cache.findDependencies(module.first, module.second);
@@ -315,7 +290,21 @@ static void writeJSON(llvm::raw_ostream &out,
         writeJSONSingleField(
             out, "moduleInterfacePath",
             *swiftDeps->swiftInterfaceFile, 5,
-            /*trailingComma=*/swiftDeps->bridgingHeaderFile.hasValue());
+            /*trailingComma=*/true);
+        writeJSONSingleField(out, "contextHash",
+                             swiftDeps->contextHash, 5,
+                             /*trailingComma=*/true);
+        out.indent(5 * 2);
+        out << "\"commandLine\": [\n";
+        for (auto &arg :swiftDeps->buildCommandLine) {
+          out.indent(6 * 2);
+          out << "\"" << arg << "\"";
+          if (&arg != &swiftDeps->buildCommandLine.back())
+            out << ",";
+          out << "\n";
+        }
+        out.indent(5 * 2);
+        out << "]\n";
       }
 
       /// Bridging header and its source file dependencies, if any.
@@ -462,12 +451,12 @@ bool swift::scanDependencies(CompilerInstance &instance) {
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
-        resolveDirectDependencies(Context, module, cache);
+        resolveDirectDependencies(instance, module, cache);
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
 
   // Write out the JSON description.
-  writeJSON(out, Context, cache, allModules.getArrayRef());
+  writeJSON(out, instance, cache, allModules.getArrayRef());
 
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {

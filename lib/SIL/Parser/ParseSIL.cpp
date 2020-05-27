@@ -117,9 +117,8 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   auto bufferID = SF->getBufferID();
   assert(bufferID);
 
-  auto *mod = SF->getParentModule();
-  auto silMod = SILModule::createEmptyModule(mod, desc.conv, desc.opts,
-                                             desc.isWholeModule());
+  auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
+                                             desc.opts);
   SILParserState parserState(silMod.get());
   Parser parser(*bufferID, *SF, parserState.Impl.get());
   PrettyStackTraceParser StackTrace(parser);
@@ -128,8 +127,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   if (hadError) {
     // The rest of the SIL pipeline expects well-formed SIL, so if we encounter
     // a parsing error, just return an empty SIL module.
-    return SILModule::createEmptyModule(mod, desc.conv, desc.opts,
-                                        desc.isWholeModule());
+    return SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   }
   return silMod;
 }
@@ -2996,6 +2994,24 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
+  case SILInstructionKind::BeginCOWMutationInst: {
+    bool native = false;
+    if (parseSILOptional(native, *this, "native") ||
+        parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createBeginCOWMutation(InstLoc, Val, native);
+    break;
+  }
+  case SILInstructionKind::EndCOWMutationInst: {
+    bool keepUnique = false;
+    if (parseSILOptional(keepUnique, *this, "keep_unique") ||
+        parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createEndCOWMutation(InstLoc, Val, keepUnique);
+    break;
+  }
   case SILInstructionKind::IsEscapingClosureInst: {
     bool IsObjcVerifcationType = false;
     if (parseSILOptional(IsObjcVerifcationType, *this, "objc"))
@@ -4459,7 +4475,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     case SILInstructionKind::RefElementAddrInst: {
       ValueDecl *FieldV;
       SourceLoc NameLoc;
-      if (parseTypedValueRef(Val, B) ||
+      bool IsImmutable = false;
+      if (parseSILOptional(IsImmutable, *this, "immutable") ||
+          parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseSILDottedPath(FieldV) || parseSILDebugLocation(InstLoc, B))
         return true;
@@ -4470,18 +4488,21 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       VarDecl *Field = cast<VarDecl>(FieldV);
       auto ResultTy = Val->getType().getFieldType(Field, SILMod,
                                                   B.getTypeExpansionContext());
-      ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
+      ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy,
+                                         IsImmutable);
       break;
     }
     case SILInstructionKind::RefTailAddrInst: {
       SourceLoc NameLoc;
       SILType ResultObjTy;
-      if (parseTypedValueRef(Val, B) ||
+      bool IsImmutable = false;
+      if (parseSILOptional(IsImmutable, *this, "immutable") ||
+          parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseSILType(ResultObjTy) || parseSILDebugLocation(InstLoc, B))
         return true;
       SILType ResultTy = ResultObjTy.getAddressType();
-      ResultVal = B.createRefTailAddr(InstLoc, Val, ResultTy);
+      ResultVal = B.createRefTailAddr(InstLoc, Val, ResultTy, IsImmutable);
       break;
     }
     case SILInstructionKind::IndexAddrInst: {

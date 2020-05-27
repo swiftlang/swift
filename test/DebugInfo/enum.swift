@@ -8,7 +8,6 @@ protocol P {}
 enum Either {
   case First(Int64), Second(P), Neither
 // CHECK: !DICompositeType({{.*}}name: "Either",
-// CHECK-SAME:             line: [[@LINE-3]],
 // CHECK-SAME:             size: {{328|168}},
 }
 // CHECK: ![[EMPTY:.*]] = !{}
@@ -16,7 +15,6 @@ enum Either {
 let E : Either = .Neither;
 
 // CHECK: !DICompositeType({{.*}}name: "Color",
-// CHECK-SAME:             line: [[@LINE+3]]
 // CHECK-SAME:             size: 8,
 // CHECK-SAME:             identifier: "$s4enum5ColorOD"
 enum Color : UInt64 {
@@ -29,7 +27,6 @@ enum Color : UInt64 {
 }
 
 // CHECK: !DICompositeType({{.*}}name: "MaybeIntPair",
-// CHECK-SAME:             line: [[@LINE+3]],
 // CHECK-SAME:             size: 136{{[,)]}}
 // CHECK-SAME:             identifier: "$s4enum12MaybeIntPairOD"
 enum MaybeIntPair {
@@ -51,7 +48,6 @@ enum Maybe<T> {
 let r = Color.Red
 let c = MaybeIntPair.just(74, 75)
 // CHECK: !DICompositeType({{.*}}name: "Maybe",
-// CHECK-SAME:             line: [[@LINE-8]],
 // CHECK-SAME:             identifier: "$s4enum5MaybeOyAA5ColorOGD"
 let movie : Maybe<Color> = .none
 

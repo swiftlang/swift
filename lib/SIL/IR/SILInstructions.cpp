@@ -2166,6 +2166,36 @@ OpenExistentialValueInst::OpenExistentialValueInst(SILDebugLocation DebugLoc,
                                                      SILType SelfTy)
     : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {}
 
+BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,
+                               SILValue operand,
+                               ArrayRef<SILType> resultTypes,
+                               ArrayRef<ValueOwnershipKind> resultOwnerships,
+                               bool isNative)
+    : UnaryInstructionBase(loc, operand),
+      MultipleValueInstructionTrailingObjects(this, resultTypes,
+                                              resultOwnerships) {
+  assert(resultTypes.size() == 2 && resultOwnerships.size() == 2);
+  assert(operand->getType() == resultTypes[1]);
+  setNative(isNative);
+}
+
+BeginCOWMutationInst *
+BeginCOWMutationInst::create(SILDebugLocation loc, SILValue operand,
+                             SILType boolTy, SILFunction &F, bool isNative) {
+
+  SILType resultTypes[2] = { boolTy, operand->getType() };
+  ValueOwnershipKind ownerships[2] = { ValueOwnershipKind::None, ValueOwnershipKind::Owned };
+
+  void *buffer =
+    allocateTrailingInst<BeginCOWMutationInst,
+                         MultipleValueInstruction*, BeginCOWMutationResult>(
+      F, 1, 2);
+  return ::new(buffer) BeginCOWMutationInst(loc, operand,
+                                  ArrayRef<SILType>(resultTypes, 2),
+                                  ArrayRef<ValueOwnershipKind>(ownerships, 2),
+                                  isNative);
+}
+
 UncheckedRefCastInst *
 UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                              SILType Ty, SILFunction &F,

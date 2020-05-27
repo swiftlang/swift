@@ -2612,11 +2612,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   auto type = decl->getInterfaceType();
   Printer << ": ";
   TypeLoc tyLoc;
-  if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr())
+  if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr()) {
     tyLoc = TypeLoc(repr, type);
-  else
+  } else {
     tyLoc = TypeLoc::withoutLoc(type);
-
+  }
   Printer.printDeclResultTypePre(decl, tyLoc);
 
   // HACK: When printing result types for vars with opaque result types,

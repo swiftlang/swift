@@ -504,7 +504,7 @@ struct S_3520 {
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
 sr3520_set_via_closure({ $0.number1 = $1 })
 // expected-error@-1 {{generic parameter 'S' could not be inferred}}
-// expected-error@-2 {{generic parameter 'T' could not be inferred}}
+// expected-error@-2 {{unable to infer type of a closure parameter $1 in the current context}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -1017,3 +1017,21 @@ func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T
 
 overloaded_with_default_and_autoclosure { 42 } // Ok
 overloaded_with_default_and_autoclosure(42) // Ok
+
+// SR-12815 - `error: type of expression is ambiguous without more context` in many cases where methods are missing
+func sr12815() {
+  let _ = { a, b in }
+  // expected-error@-1 {{unable to infer type of a closure parameter 'a' in the current context}}
+  // expected-error@-2 {{unable to infer type of a closure parameter 'b' in the current context}}
+
+  _ = .a { b in } // expected-error {{cannot infer contextual base in reference to member 'a'}}
+
+  struct S {}
+
+  func test(s: S) {
+    S.doesntExist { b in } // expected-error {{type 'S' has no member 'doesntExist'}}
+    s.doesntExist { b in } // expected-error {{value of type 'S' has no member 'doesntExist'}}
+    s.doesntExist1 { v in } // expected-error {{value of type 'S' has no member 'doesntExist1'}}
+     .doesntExist2() { $0 }
+  }
+}

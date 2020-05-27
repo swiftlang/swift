@@ -138,8 +138,6 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
       SGM.emitForeignToNativeThunk(constant);
     } else if (constant.isNativeToForeignThunk()) {
       SGM.emitNativeToForeignThunk(constant);
-    } else if (constant.kind == SILDeclRef::Kind::EnumElement) {
-      SGM.emitEnumConstructor(cast<EnumElementDecl>(constant.getDecl()));
     }
   }
 

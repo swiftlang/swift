@@ -34,7 +34,7 @@ extension A: K {
 
 struct B {
     let v: String
-    func f1<T, E>(block: (T) -> E) -> B { // expected-note {{in call to function 'f1(block:)'}}
+    func f1<T, E>(block: (T) -> E) -> B {
         return self
     }
 
@@ -42,7 +42,7 @@ struct B {
     }
 }
 func f3() {
-    B(v: "").f1(block: { _ in }).f2(keyPath: \B.v) // expected-error{{}}
+    B(v: "").f1(block: { _ in }).f2(keyPath: \B.v) // expected-error{{unable to infer type of a closure parameter '_' in the current context}}
 }
 
 // SR-5375

@@ -31,7 +31,9 @@ func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' is '@_spi' a
 @_spi(S) public struct SPIStruct {} // expected-note 2 {{struct 'SPIStruct' is not '@usableFromInline' or public}}
 
 @frozen public struct FrozenStruct {
-  @_spi(S) public var asdf = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
+  @_spi(S) public var spiInFrozen = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
+  // expected-error @-1 {{stored property 'spiInFrozen' cannot be declared '@_spi' in a '@frozen' struct}}
+
   var asdf = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
 }
 

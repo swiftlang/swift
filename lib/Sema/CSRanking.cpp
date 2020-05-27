@@ -35,7 +35,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   unsigned index = static_cast<unsigned>(kind);
   CurrentScore.Data[index] += value;
 
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver && value > 0) {
+  if (isDebugMode() && value > 0) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solverState)
       log.indent(solverState->depth * 2);
@@ -102,7 +102,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
       CurrentScore <= *solverState->BestScore)
     return false;
 
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+  if (isDebugMode()) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
       << "(solution is worse than the best solution)\n";
@@ -386,7 +386,9 @@ bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
-  if (C.TypeCheckerOpts.DebugConstraintSolver) {
+  // Construct a constraint system to compare the two declarations.
+  ConstraintSystem cs(dc, ConstraintSystemOptions());
+  if (cs.isDebugMode()) {
     auto &log = C.TypeCheckerDebug->getStream();
     log << "Comparing declarations\n";
     decl1->print(log); 
@@ -397,8 +399,8 @@ bool CompareDeclSpecializationRequest::evaluate(
     log << ")\n";
   }
 
-  auto completeResult = [&C](bool result) {
-    if (C.TypeCheckerOpts.DebugConstraintSolver) {
+  auto completeResult = [&C, &cs](bool result) {
+    if (cs.isDebugMode()) {
       auto &log = C.TypeCheckerDebug->getStream();
       log << "comparison result: " << (result ? "better" : "not better")
           << "\n";
@@ -499,8 +501,6 @@ bool CompareDeclSpecializationRequest::evaluate(
     return cs.openType(type, replacements);
   };
 
-  // Construct a constraint system to compare the two declarations.
-  ConstraintSystem cs(dc, ConstraintSystemOptions());
   bool knownNonSubtype = false;
 
   auto *locator = cs.getConstraintLocator({});
@@ -737,7 +737,7 @@ static void addKeyPathDynamicMemberOverloads(
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
-  if (cs.getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+  if (cs.isDebugMode()) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log.indent(cs.solverState->depth * 2)
       << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
@@ -1261,7 +1261,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   if (viable.size() == 1)
     return 0;
 
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+  if (isDebugMode()) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
         << "Comparing " << viable.size() << " viable solutions\n";

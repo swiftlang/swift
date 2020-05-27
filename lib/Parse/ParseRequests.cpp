@@ -48,7 +48,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 FingerprintAndMembers
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
-  SourceFile &sf = *idc->getDecl()->getDeclContext()->getParentSourceFile();
+  SourceFile &sf = *idc->getAsGenericContext()->getParentSourceFile();
   unsigned bufferID = *sf.getBufferID();
 
   // Lexer diaganostics have been emitted during skipping, so we disable lexer's

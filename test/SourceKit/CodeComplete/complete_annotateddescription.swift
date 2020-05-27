@@ -9,6 +9,11 @@ struct MyStruct {
 func test(value: MyStruct) {
   value 
 }
+func test() {
+  MyStruct.
+}
 
-// RUN: %sourcekitd-test -req=complete -pos=10:8 -req-opts=annotateddescription=1 %s -- %s > %t.result
+// RUN: %sourcekitd-test \
+// RUN: -req=complete -pos=10:8 -req-opts=annotateddescription=1 %s -- %s == \
+// RUN: -req=complete -pos=13:12 -req-opts=annotateddescription=1 %s -- %s > %t.result
 // RUN: %diff -u %s.result %t.result

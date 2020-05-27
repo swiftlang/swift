@@ -777,11 +777,12 @@ bool IndexSwiftASTWalker::visitImports(
 }
 
 bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitness> &explicitWitnesses) {
-  auto DC = dyn_cast<DeclContext>(D);
-  if (!DC)
+  const auto *const IDC = dyn_cast<IterableDeclContext>(D);
+  if (!IDC)
     return true;
 
-  for (auto *conf : DC->getLocalConformances()) {
+  const auto DC = IDC->getAsGenericContext();
+  for (auto *conf : IDC->getLocalConformances()) {
     if (conf->isInvalid())
       continue;
 

@@ -393,12 +393,16 @@ static void collectPossibleCalleesByQualifiedLookup(
       tyExpr->setType(nullptr);
   }
 
-  auto baseTyOpt = getTypeOfCompletionContextExpr(
-      DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr, ref);
-  if (!baseTyOpt)
-    return;
-
-  auto baseTy = (*baseTyOpt)->getWithoutSpecifierType();
+  Type baseTy = baseExpr->getType();
+  if (!baseTy || baseTy->is<ErrorType>()) {
+    auto baseTyOpt = getTypeOfCompletionContextExpr(
+        DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr,
+        ref);
+    if (!baseTyOpt)
+      return;
+    baseTy = *baseTyOpt;
+  }
+  baseTy = baseTy->getWithoutSpecifierType();
   if (!baseTy->getMetatypeInstanceType()->mayHaveMembers())
     return;
 

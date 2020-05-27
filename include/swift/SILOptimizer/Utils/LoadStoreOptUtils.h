@@ -169,14 +169,16 @@ public:
   }
 
   /// Print the LSBase.
-  virtual void print(llvm::raw_ostream &os, SILModule *Mod,
-                     TypeExpansionContext context) {
+  virtual void print(llvm::raw_ostream &os) {
     os << Base;
-    Path.getValue().print(os, *Mod, context);
+    SILFunction *F = Base->getFunction();
+    if (F) {
+      Path.getValue().print(os, F->getModule(), TypeExpansionContext(*F));
+    }
   }
 
-  virtual void dump(SILModule *Mod, TypeExpansionContext context) {
-    print(llvm::dbgs(), Mod, context);
+  virtual void dump() {
+    print(llvm::dbgs());
   }
 };
 
@@ -260,13 +262,12 @@ public:
     return Path.getValue().createExtract(Base, Inst, true);
   }
 
-  void print(llvm::raw_ostream &os, SILModule *Mod,
-             TypeExpansionContext context) {
+  void print(llvm::raw_ostream &os) {
     if (CoveringValue) {
       os << "Covering Value";
       return;
     }
-    LSBase::print(os, Mod, context);
+    LSBase::print(os);
   }
 
   /// Expand this SILValue to all individual fields it contains.

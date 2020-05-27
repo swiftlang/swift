@@ -29,9 +29,6 @@
 using namespace swift;
 using namespace Demangle;
 
-using llvm::Optional;
-using llvm::None;
-
 namespace {
   struct FindPtr {
     FindPtr(Node *v) : Target(v) {}
@@ -251,12 +248,12 @@ private:
     Parent->addChild(Child, Factory);
   }
   
-  Optional<Directness> demangleDirectness() {
+  llvm::Optional<Directness> demangleDirectness() {
     if (Mangled.nextIf('d'))
       return Directness::Direct;
     if (Mangled.nextIf('i'))
       return Directness::Indirect;
-    return None;
+    return llvm::None;
   }
 
   bool demangleNatural(Node::IndexType &num) {
@@ -288,13 +285,13 @@ private:
     return false;
   }
 
-  Optional<ValueWitnessKind> demangleValueWitnessKind() {
+  llvm::Optional<ValueWitnessKind> demangleValueWitnessKind() {
     char Code[2];
     if (!Mangled)
-      return None;
+      return llvm::None;
     Code[0] = Mangled.next();
     if (!Mangled)
-      return None;
+      return llvm::None;
     Code[1] = Mangled.next();
 
     StringRef CodeStr(Code, 2);
@@ -302,7 +299,7 @@ private:
   if (CodeStr == #MANGLING) return ValueWitnessKind::NAME;
 #include "swift/Demangling/ValueWitnessMangling.def"
 
-    return None;
+    return llvm::None;
   }
 
   NodePointer demangleGlobal() {
@@ -374,7 +371,7 @@ private:
 
     // Value witnesses.
     if (Mangled.nextIf('w')) {
-      Optional<ValueWitnessKind> w = demangleValueWitnessKind();
+      llvm::Optional<ValueWitnessKind> w = demangleValueWitnessKind();
       if (!w.hasValue())
         return nullptr;
       auto witness =
@@ -754,7 +751,7 @@ private:
     return demangleIdentifier();
   }
 
-  NodePointer demangleIdentifier(Optional<Node::Kind> kind = None) {
+  NodePointer demangleIdentifier(llvm::Optional<Node::Kind> kind = llvm::None) {
     if (!Mangled)
       return nullptr;
     

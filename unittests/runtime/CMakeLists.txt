@@ -83,6 +83,9 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
                              PRIVATE
                                swiftCore_EXPORTS)
 
+  target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
+    ${SWIFT_SOURCE_DIR}/stdlib/include)
+
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeTests
     PRIVATE

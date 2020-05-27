@@ -558,10 +558,12 @@ protected:
     IsIncompatibleWithWeakReferences : 1
   );
 
-  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1+1,
     /// True if this struct has storage for fields that aren't accessible in
     /// Swift.
-    HasUnreferenceableStorage : 1
+    HasUnreferenceableStorage : 1,
+    /// True if this struct is imported from C++ and not trivially copyable.
+    IsCxxNotTriviallyCopyable : 1
   );
   
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
@@ -573,7 +575,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -599,7 +601,10 @@ protected:
 
     /// Whether the module was imported from Clang (or, someday, maybe another
     /// language).
-    IsNonSwiftModule : 1
+    IsNonSwiftModule : 1,
+
+    /// Whether this module is the main module.
+    IsMainModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -3835,6 +3840,14 @@ public:
 
   void setHasUnreferenceableStorage(bool v) {
     Bits.StructDecl.HasUnreferenceableStorage = v;
+  }
+
+  bool isCxxNotTriviallyCopyable() const {
+    return Bits.StructDecl.IsCxxNotTriviallyCopyable;
+  }
+
+  void setIsCxxNotTriviallyCopyable(bool v) {
+    Bits.StructDecl.IsCxxNotTriviallyCopyable = v;
   }
 };
 

@@ -171,25 +171,17 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
   InferredAssociatedTypesByWitnesses result;
 
-  auto isExtensionUsableForInference = [&](ExtensionDecl *extension) -> bool {
-
-    // The extension where the conformance being checked is declared.
-    auto conformanceExtension = checker.Conformance->
-      getDeclContext()->getAsDecl();
-    if (extension == conformanceExtension)
+  auto isExtensionUsableForInference = [&](const ExtensionDecl *extension) {
+    // The context the conformance being checked is declared on.
+    const auto conformanceCtx = checker.Conformance->getDeclContext();
+    if (extension == conformanceCtx)
       return true;
-
-    auto *extendedNominal = extension->getExtendedNominal();
 
     // Invalid case.
+    const auto extendedNominal = extension->getExtendedNominal();
     if (extendedNominal == nullptr)
       return true;
-    
-    // Assume unconstrained concrete extensions we found witnesses in are
-    // always viable.
-    if (!isa<ProtocolDecl>(extendedNominal))
-      return !extension->isConstrainedExtension();
-    
+
     // FIXME: The extension may not have a generic signature set up yet as
     // resolving signatures may trigger associated type inference.  This cycle
     // is now detectable and we should look into untangling it
@@ -197,9 +189,21 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (!extension->hasComputedGenericSignature())
       return true;
 
-    // Build a generic signature.
-    auto extensionSig = extension->getGenericSignature();
-    
+    // Retrieve the generic signature of the extension.
+    const auto extensionSig = extension->getGenericSignature();
+
+    // If the extension is bound to the nominal the conformance is
+    // declared on, it is viable for inference when its conditional
+    // requirements are satisfied by those of the conformance context.
+    if (!isa<ProtocolDecl>(extendedNominal)) {
+      // Extensions of non-generic nominals are always viable for inference.
+      if (!extensionSig)
+        return true;
+
+      return extensionSig->requirementsNotSatisfiedBy(
+          conformanceCtx->getGenericSignatureOfContext()).empty();
+    }
+
     // The condition here is a bit more fickle than
     // `isExtensionApplied`. That check would prematurely reject
     // extensions like `P where AssocType == T` if we're relying on a
@@ -376,7 +380,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
         // Check that the type witness meets the
         // requirements on the associated type.
         if (auto failed =
-                checkTypeWitness(dc, proto, result.first, result.second)) {
+                checkTypeWitness(result.second, result.first, conformance)) {
           witnessResult.NonViable.push_back(
                           std::make_tuple(result.first,result.second,failed));
           LLVM_DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
@@ -413,9 +417,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   InferredAssociatedTypes result;
   for (auto member : proto->getMembers()) {
     auto req = dyn_cast<ValueDecl>(member);
-    if (!req)
-      continue;
-    if (!req->isProtocolRequirement())
+    if (!req || !req->isProtocolRequirement())
       continue;
 
     // Infer type witnesses for associated types.
@@ -449,18 +451,13 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
     // Check whether any of the associated types we care about are
     // referenced in this value requirement.
-    bool anyAssocTypeMatches = false;
-    for (auto assocType : checker.getReferencedAssociatedTypes(req)) {
-      if (assocTypes.count(assocType) > 0) {
-        anyAssocTypeMatches = true;
-        break;
-      }
+    {
+      const auto referenced = checker.getReferencedAssociatedTypes(req);
+      if (llvm::find_if(referenced, [&](AssociatedTypeDecl *const assocType) {
+                          return assocTypes.count(assocType);
+                        }) == referenced.end())
+        continue;
     }
-
-    // We cannot deduce anything from the witnesses of this
-    // requirement; skip it.
-    if (!anyAssocTypeMatches)
-      continue;
 
     // Infer associated types from the potential value witnesses for
     // this requirement.
@@ -857,7 +854,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
   if (defaultType->hasError())
     return Type();
 
-  if (auto failed = checkTypeWitness(dc, proto, assocType, defaultType)) {
+  if (auto failed = checkTypeWitness(defaultType, assocType, conformance)) {
     // Record the failure, if we haven't seen one already.
     if (!failedDefaultedAssocType && !failed.isError()) {
       failedDefaultedAssocType = defaultedAssocType;
@@ -889,7 +886,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
     return Type();
 
   // Make sure that the derived type is sane.
-  if (checkTypeWitness(dc, proto, assocType, derivedType)) {
+  if (checkTypeWitness(derivedType, assocType, conformance)) {
     /// FIXME: Diagnose based on this.
     failedDerivedAssocType = assocType;
     failedDerivedWitness = derivedType;

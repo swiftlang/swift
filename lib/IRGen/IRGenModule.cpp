@@ -55,6 +55,7 @@
 #include "ConformanceDescription.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
+#include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
@@ -342,6 +343,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
+  static_assert(MetadataAdjustmentIndex::ValueType == 1,
+                "Adjustment index must be synchronized with this layout");
   FullTypeMetadataStructTy = createStructType(*this, "swift.full_type", {
     WitnessTablePtrTy,
     TypeMetadataStructTy
@@ -354,6 +357,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
+  static_assert(MetadataAdjustmentIndex::Class == 2,
+                "Adjustment index must be synchronized with this layout");
   FullHeapMetadataStructTy =
                   createStructType(*this, "swift.full_heapmetadata", {
     dtorPtrTy,
@@ -1214,14 +1219,9 @@ static bool isFirstObjectFileInModule(IRGenModule &IGM) {
   if (IGM.getSILModule().isWholeModule())
     return IGM.IRGen.getPrimaryIGM() == &IGM;
 
-  const DeclContext *DC = IGM.getSILModule().getAssociatedContext();
-  if (!DC)
-    return false;
-
-  assert(!isa<ModuleDecl>(DC) && "that would be a whole module build");
-  assert(isa<FileUnit>(DC) && "compiling something smaller than a file?");
-  ModuleDecl *containingModule = cast<FileUnit>(DC)->getParentModule();
-  return containingModule->getFiles().front() == DC;
+  auto *file = cast<FileUnit>(IGM.getSILModule().getAssociatedContext());
+  auto *containingModule = file->getParentModule();
+  return containingModule->getFiles().front() == file;
 }
 
 void IRGenModule::emitAutolinkInfo() {

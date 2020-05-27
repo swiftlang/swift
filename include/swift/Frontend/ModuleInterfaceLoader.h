@@ -108,6 +108,7 @@
 #define SWIFT_FRONTEND_MODULEINTERFACELOADER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/Support/StringSaver.h"
@@ -203,18 +204,67 @@ public:
 std::string
 getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
-bool extractSwiftInterfaceVersionAndArgs(SourceManager &SM,
-                                         DiagnosticEngine &Diags,
-                                         StringRef InterfacePath,
-                                         version::Version &Vers,
-                                         StringRef &CompilerVersion,
-                                         llvm::StringSaver &SubArgSaver,
-                                         SmallVectorImpl<const char *> &SubArgs,
-                                         SourceLoc diagnosticLoc = SourceLoc());
+struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
+private:
+  SourceManager &SM;
+  DiagnosticEngine &Diags;
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver ArgSaver;
+  std::vector<StringRef> GenericArgs;
+  CompilerInvocation subInvocation;
+  std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
 
-void inheritOptionsForBuildingInterface(CompilerInvocation &Invok,
-                                        const SearchPathOptions &SearchPathOpts,
-                                        const LangOptions &LangOpts);
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(StringRef interfacePath,
+                              SourceLoc diagnosticLoc,
+                              Diag<ArgTypes...> ID,
+                        typename detail::PassArgument<ArgTypes>::type... Args) {
+    SourceLoc loc = diagnosticLoc;
+    if (diagnosticLoc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
+    }
+    return Diags.diagnose(loc, ID, std::move(Args)...);
+  }
+  void inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
+                                          const LangOptions &LangOpts);
+  bool extractSwiftInterfaceVersionAndArgs(SmallVectorImpl<const char *> &SubArgs,
+                                           std::string &CompilerVersion,
+                                           StringRef interfacePath,
+                                           SourceLoc diagnosticLoc);
+public:
+  InterfaceSubContextDelegateImpl(SourceManager &SM,
+                                  DiagnosticEngine &Diags,
+                                  const SearchPathOptions &searchPathOpts,
+                                  const LangOptions &langOpts,
+                                  ClangModuleLoader *clangImporter,
+                                  bool buildModuleCacheDirIfAbsent,
+                                  StringRef moduleCachePath,
+                                  StringRef prebuiltCachePath,
+                                  bool serializeDependencyHashes,
+                                  bool trackSystemDependencies,
+                                  bool remarkOnRebuildFromInterface,
+                                  bool disableInterfaceFileLock);
+  bool runInSubContext(StringRef moduleName,
+                       StringRef interfacePath,
+                       StringRef outputPath,
+                       SourceLoc diagLoc,
+    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>, StringRef)> action) override;
+  bool runInSubCompilerInstance(StringRef moduleName,
+                                StringRef interfacePath,
+                                StringRef outputPath,
+                                SourceLoc diagLoc,
+            llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) override;
+
+  ~InterfaceSubContextDelegateImpl() = default;
+
+  /// includes a hash of relevant key data.
+  StringRef computeCachedOutputPath(StringRef moduleName,
+                                    StringRef UseInterfacePath,
+                                    llvm::SmallString<256> &OutPath,
+                                    StringRef &CacheHash);
+  std::string getCacheHash(StringRef useInterfacePath);
+};
 }
 
 #endif

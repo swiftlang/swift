@@ -81,6 +81,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
+    case CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin:
       return Str;
 
     case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr:
@@ -108,7 +109,8 @@ static void toDisplayString(CodeCompletionResult *Result,
       OS << C.getText();
       continue;
     }
-    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) {
+    if (C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) ||
+        C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
       if (Result->getKind() == CodeCompletionResult::Declaration) {
         switch (Result->getAssociatedDeclKind()) {
         case CodeCompletionDeclKind::Module:
@@ -150,7 +152,8 @@ static void toDisplayString(CodeCompletionResult *Result,
       } else {
         OS << ": ";
       }
-      OS << C.getText();
+      if (C.hasText())
+        OS << C.getText();
     }
   }
 }

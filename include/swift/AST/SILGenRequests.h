@@ -81,19 +81,16 @@ public:
   /// If the module or file contains SIL that needs parsing, returns the file
   /// to be parsed, or \c nullptr if parsing isn't required.
   SourceFile *getSourceFileToParse() const;
-
-  /// Whether the SIL is being emitted for a whole module.
-  bool isWholeModule() const;
 };
 
 void simple_display(llvm::raw_ostream &out, const SILGenDescriptor &d);
 
 SourceLoc extractNearestSourceLoc(const SILGenDescriptor &desc);
 
-class SILGenSourceFileRequest :
-    public SimpleRequest<SILGenSourceFileRequest,
-                         std::unique_ptr<SILModule>(SILGenDescriptor),
-                         RequestFlags::Uncached|RequestFlags::DependencySource> {
+class SILGenerationRequest
+    : public SimpleRequest<
+          SILGenerationRequest, std::unique_ptr<SILModule>(SILGenDescriptor),
+          RequestFlags::Uncached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -103,32 +100,11 @@ private:
   // Evaluation.
   std::unique_ptr<SILModule>
   evaluate(Evaluator &evaluator, SILGenDescriptor desc) const;
-
-public:
-  bool isCached() const { return true; }
 
 public:
   // Incremental dependencies.
   evaluator::DependencySource
   readDependencySource(const evaluator::DependencyCollector &) const;
-};
-
-class SILGenWholeModuleRequest :
-    public SimpleRequest<SILGenWholeModuleRequest,
-                         std::unique_ptr<SILModule>(SILGenDescriptor),
-                         RequestFlags::Uncached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  std::unique_ptr<SILModule>
-  evaluate(Evaluator &evaluator, SILGenDescriptor desc) const;
-
-public:
-  bool isCached() const { return true; }
 };
 
 /// Parses a .sil file into a SILModule.

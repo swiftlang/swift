@@ -379,5 +379,10 @@ ERROR(expectation_missing_opening_braces,none,
 ERROR(expectation_missing_closing_braces,none,
       "didn't find '}}' to match '{{' in expectation", ())
 
+WARNING(module_incompatible_with_skip_function_bodies,none,
+        "module '%0' cannot be built with "
+        "-experimental-skip-non-inlinable-function-bodies; this option has "
+        "been automatically disabled", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

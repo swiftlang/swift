@@ -502,6 +502,47 @@ bb6:
   return %12 : $()
 }
 
+// CHECK-LABEL: sil @hoist_when_store_is_in_preheader
+// CHECK: bb0(%0 : $*Int32, %1 : $Int32):
+// CHECK:   store
+// CHECK:   load
+// CHECK: bb1(%{{[0-9]+}} : $Int32):
+// CHECK-NOT: load
+// CHECK-NOT: store
+// CHECK: bb4([[P:%[0-9]+]] : $Int32):
+// CHECK: bb6:
+// CHECK:   store [[P]] to %0
+// CHECK: } // end sil function 'hoist_when_store_is_in_preheader'
+sil @hoist_when_store_is_in_preheader : $@convention(thin) (@inout Int32, Int32) -> () {
+bb0(%0 : $*Int32, %1 : $Int32):
+  %8 = struct_element_addr %0 : $*Int32, #Int32._value
+  %9 = struct_extract %1 : $Int32, #Int32._value
+  %10 = integer_literal $Builtin.Int1, 0
+  store %1 to %0 : $*Int32
+  br bb1
+
+bb1:
+  %17 = load %8 : $*Builtin.Int32
+  %18 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 0
+  %20 = struct $Int32 (%19 : $Builtin.Int32)
+  cond_br undef, bb2, bb3
+bb2:
+  br bb4
+bb3:
+  store %20 to %0 : $*Int32
+  br bb4
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %12 = tuple ()
+  return %12 : $()
+}
+
 // CHECK-LABEL: sil @hoist_loads_and_stores_multiple_exits
 // CHECK:   [[V1:%[0-9]+]] = load %0
 // CHECK:   br bb1([[V1]] : $Int32)

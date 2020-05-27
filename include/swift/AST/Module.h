@@ -347,6 +347,13 @@ public:
     return new (ctx) ModuleDecl(name, ctx, importInfo);
   }
 
+  static ModuleDecl *
+  createMainModule(ASTContext &ctx, Identifier name, ImplicitImportInfo iinfo) {
+    auto *Mod = ModuleDecl::create(name, ctx, iinfo);
+    Mod->Bits.ModuleDecl.IsMainModule = true;
+    return Mod;
+  }
+
   using Decl::getASTContext;
 
   /// Retrieves information about which modules are implicitly imported by
@@ -540,6 +547,10 @@ public:
   /// \see #isNonSwiftModule
   void setIsNonSwiftModule(bool flag = true) {
     Bits.ModuleDecl.IsNonSwiftModule = flag;
+  }
+
+  bool isMainModule() const {
+    return Bits.ModuleDecl.IsMainModule;
   }
 
   /// Retrieve the top-level module. If this module is already top-level, this

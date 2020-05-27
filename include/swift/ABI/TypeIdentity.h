@@ -184,7 +184,7 @@ public:
   StringRef FullIdentity;
 
   /// Any extended information that type might have.
-  Optional<TypeImportInfo<StringRef>> ImportInfo;
+  llvm::Optional<TypeImportInfo<StringRef>> ImportInfo;
 
   /// The ABI name of the type.
   StringRef getABIName() const {

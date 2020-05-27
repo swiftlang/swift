@@ -2375,3 +2375,9 @@ class SR_9035_C {}
   func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 }
+
+// SR-12801: Make sure we reject an @objc generic subscript.
+class SR12801 {
+  @objc subscript<T>(foo : [T]) -> Int { return 0 }
+  // expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
+}

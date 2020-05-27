@@ -14,10 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(SILGen, SILGenSourceFileRequest,
-              std::unique_ptr<SILModule>(SILGenDescriptor),
-              Uncached, NoLocationInfo)
-SWIFT_REQUEST(SILGen, SILGenWholeModuleRequest,
+SWIFT_REQUEST(SILGen, SILGenerationRequest,
               std::unique_ptr<SILModule>(SILGenDescriptor),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(SILGen, ParseSILModuleRequest,

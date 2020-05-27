@@ -475,6 +475,16 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   setInterfaceType(ModuleType::get(this));
 
   setAccess(AccessLevel::Public);
+
+  Bits.ModuleDecl.TestingEnabled = 0;
+  Bits.ModuleDecl.FailedToLoad = 0;
+  Bits.ModuleDecl.RawResilienceStrategy = 0;
+  Bits.ModuleDecl.HasResolvedImports = 0;
+  Bits.ModuleDecl.PrivateImportsEnabled = 0;
+  Bits.ModuleDecl.ImplicitDynamicEnabled = 0;
+  Bits.ModuleDecl.IsSystemModule = 0;
+  Bits.ModuleDecl.IsNonSwiftModule = 0;
+  Bits.ModuleDecl.IsMainModule = 0;
 }
 
 ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {

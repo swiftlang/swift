@@ -225,7 +225,7 @@ static void recordModuleDependencies(
 
 Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
-    SubASTContextDelegate &delegate) {
+    InterfaceSubContextDelegate &delegate) {
   // Check whether there is already a cached result.
   if (auto found = cache.findDependencies(
           moduleName, ModuleDependenciesKind::Clang))

@@ -315,7 +315,7 @@ extension _ArrayBuffer {
   /// The number of elements the buffer can store without reallocation.
   @inlinable
   internal var capacity: Int {
-    return _fastPath(_isNative) ? _native.capacity : _nonNative.count
+    return _fastPath(_isNative) ? _native.capacity : _nonNative.endIndex
   }
 
   @inlinable
@@ -510,7 +510,6 @@ extension _ArrayBuffer {
 
   @inlinable
   internal var _nonNative: _CocoaArrayWrapper {
-    @inline(__always)
     get {
       _internalInvariant(_isClassOrObjCExistential(Element.self))
       return _CocoaArrayWrapper(_storage.objCInstance)

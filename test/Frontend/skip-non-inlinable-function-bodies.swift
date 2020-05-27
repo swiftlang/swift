@@ -1,10 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// 1. Make sure you can't -emit-ir or -c when you're skipping non-inlinable function bodies
+// 1a. Make sure you can't -emit-ir or -c when you're skipping non-inlinable function bodies
+// 1b. Also make sure we warn when you try to build SwiftONoneSupport with this option enabled
 
 // RUN: not %target-swift-frontend -emit-ir %s -experimental-skip-non-inlinable-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
 // RUN: not %target-swift-frontend -c %s -experimental-skip-non-inlinable-function-bodies %s 2>&1 | %FileCheck %s --check-prefix ERROR
+// RUN: %target-swift-frontend -typecheck -experimental-skip-non-inlinable-function-bodies -module-name SwiftOnoneSupport %s 2>&1 | %FileCheck %s --check-prefix WARNING
 // ERROR: -experimental-skip-non-inlinable-function-bodies does not support emitting IR
+// WARNING: module 'SwiftOnoneSupport' cannot be built with -experimental-skip-non-inlinable-function-bodies; this option has been automatically disabled
 
 // 2. Emit the SIL for a module and check it against the expected strings in function bodies.
 //    If we're doing the right skipping, then the strings that are CHECK-NOT'd won't have been typechecked or SILGen'd.

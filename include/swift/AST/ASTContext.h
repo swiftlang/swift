@@ -121,7 +121,7 @@ namespace swift {
   class UnifiedStatsReporter;
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
-  struct SubASTContextDelegate;
+  struct InterfaceSubContextDelegate;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -238,10 +238,10 @@ public:
   UnifiedStatsReporter *Stats = nullptr;
 
   /// The language options used for translation.
-  LangOptions &LangOpts;
+  const LangOptions &LangOpts;
 
   /// The type checker options.
-  TypeCheckerOptions &TypeCheckerOpts;
+  const TypeCheckerOptions &TypeCheckerOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -753,7 +753,7 @@ public:
       StringRef moduleName,
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
-      SubASTContextDelegate &delegate);
+      InterfaceSubContextDelegate &delegate);
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.

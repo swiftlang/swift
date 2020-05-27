@@ -71,6 +71,11 @@ ERROR(could_not_find_value_dynamic_member_corrected,none,
 ERROR(could_not_find_value_dynamic_member,none,
       "value of type %0 has no dynamic member %2 using key path from root type %1",
       (Type, Type, DeclNameRef))
+ERROR(cannot_infer_contextual_keypath_type_specify_root,none,
+      "cannot infer key path type from context; consider explicitly specifying a root type", ())
+ERROR(cannot_infer_keypath_root_anykeypath_context,none,
+     "'AnyKeyPath' does not provide enough context for root type to be inferred; "
+     "consider explicitly specifying a root type", ())
 
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclNameRef))
@@ -245,6 +250,9 @@ ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
 
+ERROR(cannot_infer_closure_parameter_type,none,
+      "unable to infer type of a closure parameter %0 in the current context",
+       (StringRef))
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
 ERROR(cannot_infer_closure_result_type,none,
@@ -1706,6 +1714,13 @@ ERROR(spi_attribute_on_non_public,none,
       "cannot be declared '@_spi' because only public and open "
       "declarations can be '@_spi'",
       (AccessLevel, DescriptiveDeclKind))
+ERROR(spi_attribute_on_protocol_requirement,none,
+      "protocol requirement %0 cannot be declared '@_spi' without "
+      "a default implementation in a protocol extension",
+      (DeclName))
+ERROR(spi_attribute_on_frozen_stored_properties,none,
+      "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
+      (DeclName))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -2995,8 +3010,6 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
-ERROR(differentiable_attr_void_result,none,
-      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -3015,9 +3028,6 @@ ERROR(differentiable_attr_invalid_access,none,
       "derivative function %0 is required to either be public or "
       "'@usableFromInline' because the original function %1 is public or "
       "'@usableFromInline'", (DeclNameRef, DeclName))
-ERROR(differentiable_attr_result_not_differentiable,none,
-      "can only differentiate functions with results that conform to "
-      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
@@ -3128,6 +3138,9 @@ ERROR(autodiff_attr_original_void_result,none,
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
       "cannot differentiate functions with both an 'inout' parameter and a "
       "result", ())
+ERROR(autodiff_attr_result_not_differentiable,none,
+      "can only differentiate functions with results that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
@@ -4321,8 +4334,8 @@ ERROR(objc_invalid_on_subscript,none,
 ERROR(objc_invalid_on_static_subscript,none,
       "%0 cannot be %" OBJC_ATTR_SELECT "1", (DescriptiveDeclKind, unsigned))
 ERROR(objc_invalid_with_generic_params,none,
-      "method cannot be %" OBJC_ATTR_SELECT "0 because it has generic "
-      "parameters", (unsigned))
+      "%0 cannot be %" OBJC_ATTR_SELECT "1 because it has generic parameters",
+      (DescriptiveDeclKind, unsigned))
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))

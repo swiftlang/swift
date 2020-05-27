@@ -90,6 +90,14 @@ bool TypeVariableType::Implementation::isClosureType() const {
   return isExpr<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
 }
 
+bool TypeVariableType::Implementation::isClosureParameterType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  return isExpr<ClosureExpr>(locator->getAnchor()) &&
+         locator->isLastElement<LocatorPathElt::TupleElement>();
+}
+
 bool TypeVariableType::Implementation::isClosureResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;
@@ -2214,7 +2222,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   if (!expr)
     return nullptr;
 
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+  if (CS.isDebugMode()) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -2228,7 +2236,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
     return nullptr;
 
   auto &solution = viable[0];
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+  if (CS.isDebugMode()) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);

@@ -1124,8 +1124,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
 ///  pattern-type-annotation ::= (':' type)?
 ///
 ParserResult<Pattern> Parser::
-parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
-                                   bool isOptional) {
+parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
   if (!Tok.is(tok::colon))
     return result;
 
@@ -1151,11 +1150,6 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
   TypeRepr *repr = Ty.getPtrOrNull();
   if (!repr)
     repr = new (Context) ErrorTypeRepr(PreviousLoc);
-
-  // In an if-let, the actual type of the expression is Optional of whatever
-  // was written.
-  if (isOptional)
-    repr = new (Context) OptionalTypeRepr(repr, SourceLoc());
 
   return makeParserResult(status, new (Context) TypedPattern(P, repr));
 }

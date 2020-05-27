@@ -375,11 +375,10 @@ ConstraintSystem::SolverState::SolverState(
   // If we're supposed to debug a specific constraint solver attempt,
   // turn on debugging now.
   ASTContext &ctx = CS.getASTContext();
-  auto &tyOpts = ctx.TypeCheckerOpts;
-  OldDebugConstraintSolver = tyOpts.DebugConstraintSolver;
+  const auto &tyOpts = ctx.TypeCheckerOpts;
   if (tyOpts.DebugConstraintSolverAttempt &&
       tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
-    tyOpts.DebugConstraintSolver = true;
+    CS.Options |= ConstraintSystemFlags::DebugConstraints;
     llvm::raw_ostream &dbgOut = ctx.TypeCheckerDebug->getStream();
     dbgOut << "---Constraint system #" << SolutionAttempt << "---\n";
     CS.print(dbgOut);
@@ -420,9 +419,14 @@ ConstraintSystem::SolverState::~SolverState() {
     CS.activateConstraint(constraint);
   }
 
-  // Restore debugging state.
-  TypeCheckerOptions &tyOpts = CS.getASTContext().TypeCheckerOpts;
-  tyOpts.DebugConstraintSolver = OldDebugConstraintSolver;
+  // If global constraing debugging is off and we are finished logging the
+  // current solution attempt, switch debugging back off.
+  const auto &tyOpts = CS.getASTContext().TypeCheckerOpts;
+  if (!tyOpts.DebugConstraintSolver &&
+      tyOpts.DebugConstraintSolverAttempt &&
+      tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
+    CS.Options -= ConstraintSystemFlags::DebugConstraints;
+  }
 
   // Write our local statistics back to the overall statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
@@ -627,8 +631,8 @@ bool ConstraintSystem::Candidate::solve(
     return false;
 
   auto &ctx = cs.getASTContext();
-  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+  if (cs.isDebugMode()) {
+    auto &log = ctx.TypeCheckerDebug->getStream();
     log << "--- Solving candidate for shrinking at ";
     auto R = E->getSourceRange();
     if (R.isValid()) {
@@ -664,8 +668,8 @@ bool ConstraintSystem::Candidate::solve(
     cs.solveImpl(solutions);
   }
 
-  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+  if (cs.isDebugMode()) {
+    auto &log = ctx.TypeCheckerDebug->getStream();
     if (solutions.empty()) {
       log << "--- No Solutions ---\n";
     } else {
@@ -1130,14 +1134,15 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
     SolutionApplicationTarget &target,
     FreeTypeVariableBinding allowFreeTypeVariables
 ) {
-  llvm::SaveAndRestore<bool> debugForExpr(
-      getASTContext().TypeCheckerOpts.DebugConstraintSolver,
-      debugConstraintSolverForTarget(getASTContext(), target));
+  llvm::SaveAndRestore<ConstraintSystemOptions> debugForExpr(Options);
+  if (debugConstraintSolverForTarget(getASTContext(), target)) {
+    Options |= ConstraintSystemFlags::DebugConstraints;
+  }
 
   /// Dump solutions for debugging purposes.
   auto dumpSolutions = [&](const SolutionResult &result) {
     // Debug-print the set of solutions.
-    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+    if (isDebugMode()) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       if (result.getKind() == SolutionResult::Success) {
         log << "---Solution---\n";
@@ -1224,7 +1229,7 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
 SolutionResult
 ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+  if (isDebugMode()) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Constraint solving at ";
     auto R = target.getSourceRange();
@@ -1272,7 +1277,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Solve the system.
   solveImpl(solutions);
 
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+  if (isDebugMode()) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Solver statistics---\n";
     log << "Total number of scopes explored: " << solverState->NumStatesExplored << "\n";
@@ -1409,7 +1414,7 @@ ConstraintSystem::filterDisjunction(
       continue;
     }
 
-    if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
+    if (isDebugMode()) {
       auto &log = ctx.TypeCheckerDebug->getStream();
       log.indent(solverState ? solverState->depth * 2 : 0)
         << "(disabled disjunction term ";
@@ -1470,7 +1475,7 @@ ConstraintSystem::filterDisjunction(
       recordDisjunctionChoice(disjunction->getLocator(), choiceIdx);
     }
 
-    if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
+    if (isDebugMode()) {
       auto &log = ctx.TypeCheckerDebug->getStream();
       log.indent(solverState ? solverState->depth * 2 : 0)
         << "(introducing single enabled disjunction term ";

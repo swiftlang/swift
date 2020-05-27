@@ -1243,7 +1243,7 @@ public:
       if (superMV.getValue() != SGF.InitDelegationSelf.getValue()) {
         SILValue underlyingSelf = SGF.InitDelegationSelf.getValue();
         SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
-        CleanupHandle newWriteback = SGF.enterDelegateInitSelfWritebackCleanup(
+        CleanupHandle newWriteback = SGF.enterOwnedValueWritebackCleanup(
             SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
             superMV.forward(SGF));
         SGF.SuperInitDelegationSelf =
@@ -3818,7 +3818,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
                                                   resultFnType.getParams(),
                                                   /*canonicalVararg*/ true);
     auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
-    payload = ArgumentSource(element, std::move(arg));
+    payload = ArgumentSource(uncurriedLoc, std::move(arg));
     formalResultType = cast<FunctionType>(formalResultType).getResult();
     origFormalType = origFormalType.getFunctionResultType();
   } else {

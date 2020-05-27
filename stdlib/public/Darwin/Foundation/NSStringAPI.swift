@@ -1257,7 +1257,7 @@ extension StringProtocol where Index == String.Index {
       in: _toRelativeNSRange(range),
       scheme: NSLinguisticTagScheme(rawValue: tagScheme._ephemeralString),
       options: opts,
-      orthography: orthography != nil ? orthography! : nil
+      orthography: orthography
     ) {
       var stop_ = false
       body($0!.rawValue, self._toRange($1), self._toRange($2), &stop_)

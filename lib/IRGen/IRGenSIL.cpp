@@ -975,6 +975,8 @@ public:
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
   void visitIsUniqueInst(IsUniqueInst *i);
+  void visitBeginCOWMutationInst(BeginCOWMutationInst *i);
+  void visitEndCOWMutationInst(EndCOWMutationInst *i);
   void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
@@ -2659,16 +2661,20 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   if (isSimplePartialApply(*this, i)) {
     Explosion function;
     
-    auto schema = IGM.getTypeInfo(v->getType()).getSchema();
+    auto &ti = IGM.getTypeInfo(v->getType());
+    auto schema = ti.getSchema();
     assert(schema.size() == 2);
     auto calleeTy = schema[0].getScalarType();
     auto contextTy = schema[1].getScalarType();
-    
     auto callee = getLoweredExplosion(i->getCallee());
     auto calleeValue = callee.claimNext();
     assert(callee.empty());
     calleeValue = Builder.CreateBitOrPointerCast(calleeValue, calleeTy);
-    function.add(calleeValue);
+    
+    // Re-sign the implementation pointer as a closure entry point.
+    auto calleeFn = FunctionPointer::forExplosionValue(*this, calleeValue,
+                                                       i->getOrigCalleeType());
+    function.add(calleeFn.getExplosionValue(*this, i->getFunctionType()));
 
     Explosion context;
     for (auto arg : i->getArguments()) {
@@ -4157,6 +4163,42 @@ void IRGenSILFunction::visitIsUniqueInst(swift::IsUniqueInst *i) {
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);
+}
+
+void IRGenSILFunction::visitBeginCOWMutationInst(BeginCOWMutationInst *i) {
+  SILValue ref = i->getOperand();
+  Explosion bufferEx = getLoweredExplosion(ref);
+  llvm::Value *buffer = *bufferEx.begin();
+  setLoweredExplosion(i->getBufferResult(), bufferEx);
+
+  Explosion isUnique;
+  if (hasReferenceSemantics(*this, ref->getType())) {
+    if (i->getUniquenessResult()->use_empty()) {
+      // No need to call isUnique if the result is not used.
+      isUnique.add(llvm::UndefValue::get(IGM.Int1Ty));
+    } else {
+      ReferenceCounting style = cast<ReferenceTypeInfo>(
+          getTypeInfo(ref->getType())).getReferenceCountingType();
+      if (i->isNative())
+        style = ReferenceCounting::Native;
+
+      llvm::Value *castBuffer =
+        Builder.CreateBitCast(buffer, IGM.getReferenceType(style));
+
+      isUnique.add(emitIsUniqueCall(castBuffer, i->getLoc().getSourceLoc(),
+                                    /*isNonNull*/ true));
+    }
+  } else {
+    emitTrap("beginCOWMutation called for a non-reference",
+             /*EmitUnreachable=*/false);
+    isUnique.add(llvm::UndefValue::get(IGM.Int1Ty));
+  }
+  setLoweredExplosion(i->getUniquenessResult(), isUnique);
+}
+
+void IRGenSILFunction::visitEndCOWMutationInst(EndCOWMutationInst *i) {
+  Explosion v = getLoweredExplosion(i->getOperand());
+  setLoweredExplosion(i, v);
 }
 
 void IRGenSILFunction::visitIsEscapingClosureInst(

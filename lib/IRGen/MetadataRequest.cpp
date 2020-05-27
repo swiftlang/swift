@@ -741,7 +741,7 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
 
   auto allWitnessTablesAreReferenceable = llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
     auto signature = environment->getGenericSignature();
-    auto protocols = signature->getConformsTo(parameter);
+    const auto protocols = signature->getRequiredProtocols(parameter);
     auto argument = ((Type *)parameter)->subst(substitutions);
     auto canonicalType = argument->getCanonicalType();
     auto witnessTablesAreReferenceable = [&]() {

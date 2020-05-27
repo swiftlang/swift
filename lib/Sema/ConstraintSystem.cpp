@@ -74,6 +74,12 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
     CG(*new ConstraintGraph(*this))
 {
   assert(DC && "context required");
+  // Respect the global debugging flag, but turn off debugging while
+  // parsing and loading other modules.
+  if (Context.TypeCheckerOpts.DebugConstraintSolver &&
+      DC->getParentModule()->isMainModule()) {
+    Options |= ConstraintSystemFlags::DebugConstraints;
+  }
 }
 
 ConstraintSystem::~ConstraintSystem() {
@@ -216,9 +222,19 @@ getDynamicResultSignature(ValueDecl *decl) {
   }
 
   if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
+    auto ty = asd->getInterfaceType();
+
+    // Strip off a generic signature if we have one. This matches the logic
+    // for methods, and ensures that we don't take a protocol's generic
+    // signature into account for a subscript requirement.
+    if (auto *genericFn = ty->getAs<GenericFunctionType>()) {
+      ty = FunctionType::get(genericFn->getParams(), genericFn->getResult(),
+                             genericFn->getExtInfo());
+    }
+
     // Handle properties and subscripts, anchored by the getter's selector.
     return std::make_tuple(asd->isStatic(), asd->getObjCGetterSelector(),
-                           asd->getInterfaceType()->getCanonicalType());
+                           ty->getCanonicalType());
   }
 
   llvm_unreachable("Not a valid @objc member");
@@ -2401,7 +2417,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                      verifyThatArgumentIsHashable);
   }
 
-  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+  if (isDebugMode()) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -2564,7 +2580,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
 
 SolutionResult ConstraintSystem::salvage() {
   auto &ctx = getASTContext();
-  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
+  if (isDebugMode()) {
     auto &log = ctx.TypeCheckerDebug->getStream();
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
@@ -2627,7 +2643,7 @@ SolutionResult ConstraintSystem::salvage() {
       }
       // SWIFT_ENABLE_TENSORFLOW
 
-      if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+      if (isDebugMode()) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
         log << "---Ambiguity error: " << viable.size()
             << " solutions found---\n";
@@ -4286,7 +4302,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     bool bindPatternVarsOneWay) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
-  if (!isa<OptionalSomePattern>(pattern) &&
+  if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
       patternType && !patternType->isHole()) {
     contextualType = TypeLoc::withoutLoc(patternType);
 
