@@ -1423,9 +1423,15 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Minus:
     case clang::OverloadedOperatorKind::OO_Star:
     case clang::OverloadedOperatorKind::OO_Slash:
-      baseName = clang::getOperatorSpelling(op);
-      isFunction = true;
-      argumentNames.resize(cast<clang::FunctionDecl>(D)->param_size());
+      if (auto FD = dyn_cast<clang::FunctionDecl>(D)) {
+        baseName = clang::getOperatorSpelling(op);
+        isFunction = true;
+        argumentNames.resize(FD->param_size());
+      } else {
+        // This can happen for example for templated operators functions.
+        // We don't support those, yet.
+        return ImportedName();
+      }
       break;
     default:
       // We don't import these yet.
