@@ -8817,14 +8817,15 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  auto matchPointerBaseTypes = [&](Type baseType1,
-                                   Type baseType2) -> SolutionKind {
+  auto matchPointerBaseTypes =
+      [&](llvm::PointerIntPair<Type, 3, unsigned> baseType1,
+          llvm::PointerIntPair<Type, 3, unsigned> baseType2) -> SolutionKind {
     if (restriction != ConversionRestrictionKind::PointerToPointer)
       increaseScore(ScoreKind::SK_ValueToPointerConversion);
 
     auto result =
-        matchTypes(baseType1, baseType2, ConstraintKind::BindToPointerType,
-                   subflags, locator);
+        matchTypes(baseType1.getPointer(), baseType2.getPointer(),
+                   ConstraintKind::BindToPointerType, subflags, locator);
 
     if (!(result.isFailure() && shouldAttemptFixes()))
       return result;
@@ -8837,13 +8838,14 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     case ConversionRestrictionKind::InoutToPointer: {
       ptr2 = type2->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
       ptr1 = BoundGenericType::get(ptr2->getDecl(), ptr2->getParent(),
-                                   {baseType1});
+                                   {baseType1.getPointer()});
       break;
     }
 
     case ConversionRestrictionKind::PointerToPointer:
-      ptr1 = type1->castTo<BoundGenericType>();
-      ptr2 = type2->castTo<BoundGenericType>();
+      // Original types could be wrapped into a different number of optional.
+      ptr1 = type1->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
+      ptr2 = type2->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
       break;
 
     default:
@@ -8852,7 +8854,15 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     auto *fix = GenericArgumentsMismatch::create(*this, ptr1, ptr2, {0},
                                                  getConstraintLocator(locator));
-    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+
+    // It's possible to implicitly promote pointer into an optional
+    // before matching base types if other side is an optional, so
+    // score needs to account for number of such promotions.
+    int optionalWraps = baseType2.getInt() - baseType1.getInt();
+    return recordFix(fix,
+                     /*impact=*/1 + abs(optionalWraps))
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   };
 
   auto fixContextualFailure = [&](Type fromType, Type toType,
@@ -9040,7 +9050,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     increaseScore(SK_ValueToOptional, ptr2.getInt());
 
-    return matchPointerBaseTypes(baseType1, ptr2.getPointer());
+    return matchPointerBaseTypes({baseType1, 0}, ptr2);
   }
 
   // String ===> UnsafePointer<[U]Int8>
@@ -9101,7 +9111,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     increaseScore(SK_ValueToOptional, ptr2.getInt());
 
-    return matchPointerBaseTypes(baseType1, ptr2.getPointer());
+    return matchPointerBaseTypes({baseType1, 0}, ptr2);
   }
       
   // T <p U ===> UnsafeMutablePointer<T> <a UnsafeMutablePointer<U>
@@ -9112,7 +9122,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto ptr1 = getBaseTypeForPointer(t1);
     auto ptr2 = getBaseTypeForPointer(t2);
 
-    return matchPointerBaseTypes(ptr1.getPointer(), ptr2.getPointer());
+    return matchPointerBaseTypes(ptr1, ptr2);
   }
     
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
