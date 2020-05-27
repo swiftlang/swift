@@ -1344,10 +1344,6 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
-  // Add -o for building the module explicitly.
-  BuildArgs.push_back("-o");
-  BuildArgs.push_back(outputPath);
-
   SmallVector<const char *, 64> SubArgs;
   std::string CompilerVersion;
   // Extract compiler arguments from the interface file and use them to configure
