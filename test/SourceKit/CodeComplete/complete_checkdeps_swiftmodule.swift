@@ -5,7 +5,6 @@ func foo() {
   /*HERE*/
 }
 
-// REQUIRES: rdar62923248
 // REQUIRES: shell
 
 // RUN: %empty-directory(%t/Frameworks)
@@ -36,8 +35,8 @@ func foo() {
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
 // RUN:   -shell -- echo '### Modify framework (s)' == \
-// RUN:   -shell --  %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name $INPUT_DIR/SwiftFW_src_mod/Funcs.swift == \
 // RUN:   -shell -- sleep $SLEEP_TIME == \
+// RUN:   -shell --  %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name $INPUT_DIR/SwiftFW_src_mod/Funcs.swift == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
 // RUN:   -shell -- echo '### Fast completion' == \

@@ -5,7 +5,6 @@ func foo() {
   /*HERE*/
 }
 
-// REQUIRES: rdar62923248
 // REQUIRES: shell
 
 // RUN: %empty-directory(%t/Frameworks)
@@ -36,8 +35,8 @@ func foo() {
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
 // RUN:   -shell -- echo '### Modify framework (c)' == \
-// RUN:   -shell -- cp -R $INPUT_DIR/ClangFW.framework_mod/* %t/Frameworks/ClangFW.framework/ == \
 // RUN:   -shell -- sleep $SLEEP_TIME == \
+// RUN:   -shell -- cp -R $INPUT_DIR/ClangFW.framework_mod/* %t/Frameworks/ClangFW.framework/ == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
 // RUN:   -shell -- echo '### Fast completion' == \
