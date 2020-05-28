@@ -73,6 +73,15 @@ extension _StringGuts {
       isASCII: isASCII,
       length: length))
   }
+  
+  internal init(
+    taggedConstantCocoa: AnyObject,
+    length: Int
+  ) {
+    self.init(_StringObject(
+      taggedConstantCocoa: cocoa,
+      length: length))
+  }
 }
 
 // Queries

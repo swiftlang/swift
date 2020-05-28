@@ -37,9 +37,9 @@
   ╞═════════════════════╬═════╪═════╪═════╪═════╡
   │ Foreign             ║  x  │  0  │  0  │  1  │
   ├─────────────────────╫─────┼─────┼─────┼─────┤
-  │ Foreign, Bridged    ║  0  │  1  │  0  │  1  │
+  │ Foreign, Bridged    ║  x  │  1  │  0  │  1  │
   └─────────────────────╨─────┴─────┴─────┴─────┘
-
+ 
   b63: isImmortal: Should the Swift runtime skip ARC
     - Small strings are just values, always immortal
     - Large strings can sometimes be immortal, e.g. literals
@@ -221,6 +221,26 @@ extension _StringObject {
     pointerBits: UInt64, discriminator: UInt64, countAndFlags: CountAndFlags
   ) {
     let builtinValueBits: Builtin.Int64 = pointerBits._value
+    let builtinDiscrim: Builtin.Int64 = discriminator._value
+    self.init(
+      bridgeObject: Builtin.valueToBridgeObject(Builtin.stringObjectOr_Int64(
+        builtinValueBits, builtinDiscrim)),
+      countAndFlags: countAndFlags)
+  }
+
+  // Initializer to use for constant ObjC tagged values
+  @inline(__always)
+  internal init(
+    objcConstantTaggedPointerBits: UInt64, countAndFlags: CountAndFlags
+  ) {
+    let assertionMask = 0xF000_0000_0000_0000
+    // The incoming constant tagged NSString's top nibble should be 1100
+    let assertionValue = 0xC000_0000_0000_0000
+    precondition(objcConstantTaggedPointerBits & assertionMask == assertionValue)
+    let builtinValueBits: Builtin.Int64 = objcConstantTaggedPointerBits._value
+    
+    // Top nibble 1101: Immortal, bridged, foreign
+    let discriminator = 0xD000_0000_0000_0000
     let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
       bridgeObject: Builtin.valueToBridgeObject(Builtin.stringObjectOr_Int64(
@@ -852,7 +872,12 @@ extension _StringObject {
     }
     return object
 #else
-    _internalInvariant(largeIsCocoa && !isImmortal)
+    if largeIsCocoa && isImmortal {
+      // Object is a constant tagged pointer with bit 4 of the top nibble set
+      // Clear the bit we set before trying to treat it as an object
+      return Builtin.reinterpretCast(largeAddressBits & ~0x1000_0000_0000_0000)
+    }
+    _internalInvariant(largeIsCocoa)
     return Builtin.reinterpretCast(largeAddressBits)
 #endif
   }
@@ -910,7 +935,8 @@ extension _StringObject {
   internal var hasObjCBridgeableObject: Bool {
     @_effects(releasenone) get {
       // Currently, all mortal objects can zero-cost bridge
-      return !self.isImmortal
+      // as can immmortal bridged foreign objects
+      return !self.isImmortal || self.largeIsCocoa
     }
   }
 
@@ -918,7 +944,8 @@ extension _StringObject {
   @inline(__always)
   internal var objCBridgeableObject: AnyObject {
     _internalInvariant(hasObjCBridgeableObject)
-    return Builtin.reinterpretCast(largeAddressBits)
+    
+    return cocoaObject
   }
 
   // Whether the object provides fast UTF-8 contents that are nul-terminated
@@ -989,6 +1016,19 @@ extension _StringObject {
       countAndFlags: storage._countAndFlags)
 #endif
   }
+  
+#if arch(arm64) && runtime(ObjC)
+  internal init(
+    taggedConstantCocoa: AnyObject, length: Int
+  ) {
+    let countAndFlags = CountAndFlags(sharedCount: length, isASCII: true)
+    self.init(
+      objcConstantTaggedPointerBits: cocoa, countAndFlags: countAndFlags
+    )
+    _internalInvariant(self.cocoaObject == Builtin.reinterpretCast(cocoa))
+    _internalInvariant(self.largeCount == length)
+  }
+#endif
 
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int

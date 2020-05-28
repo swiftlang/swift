@@ -424,24 +424,29 @@ private var expectedConstantTagValue:UInt {
 #endif
 
 @inline(__always)
-private func formConstantTaggedCocoaString(
-  untaggedCocoa: _CocoaString
-) -> AnyObject? {
-#if !arch(arm64)
-  return nil
-#else
-
-  let constantPtr:UnsafeRawPointer = Builtin.reinterpretCast(untaggedCocoa)
-
-  // Check if what we're pointing to is actually a valid tagged constant
-  guard _swift_stdlib_dyld_is_objc_constant_string(constantPtr) == 1 else {
+private func validateConstantTaggedCocoa(_ cocoaString: _CocoaString) -> Bool? {
+  #if !arch(arm64)
+    return nil
+  #else
+  guard _isObjCTaggedPointer(cocoaString) else {
     return nil
   }
 
-  let retaggedPointer = UInt(bitPattern: constantPtr) | expectedConstantTagValue
+  let taggedValue = unsafeBitCast(cocoaString, to: UInt.self)
 
-  return unsafeBitCast(retaggedPointer, to: AnyObject.self)
-#endif
+  guard taggedValue & constantTagMask == expectedConstantTagValue else {
+    return nil
+  }
+
+  let payloadMask = ~constantTagMask
+  let payload = taggedValue & payloadMask
+  let ivarPointer = UnsafePointer<_swift_shims_builtin_CFString>(
+    bitPattern: payload
+  )!
+
+  return _swift_stdlib_dyld_is_objc_constant_string(
+    unsafeBitCast(ivarPointer, to: UnsafeRawPointer.self)
+  ) == 1
 }
 
 @inline(__always)
@@ -458,8 +463,6 @@ private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
   }
 
   let taggedValue = unsafeBitCast(cocoaString, to: UInt.self)
-  
-
 
   guard taggedValue & constantTagMask == expectedConstantTagValue else {
     return nil
@@ -507,9 +510,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   case .constantTagged:
     let taggedContents = getConstantTaggedCocoaContents(cocoaString)!
     return _StringGuts(
-      cocoa: taggedContents.untaggedCocoa,
-      providesFastUTF8: false, //TODO: if contentsPtr is UTF8 compatible, use it
-      isASCII: true,
+      taggedConstantCocoa: cocoaString,
       length: taggedContents.utf16Length
     )
 #endif
@@ -622,7 +623,13 @@ extension String {
     _internalInvariant(_guts._object.hasObjCBridgeableObject,
       "Unknown non-bridgeable object case")
     let result = _guts._object.objCBridgeableObject
-    return formConstantTaggedCocoaString(untaggedCocoa: result) ?? result
+    
+    if let taggedConstantValidity = validateConstantTaggedCocoa(result)
+      && !taggedConstantValidity {
+      return nil
+    }
+    
+    return result
   }
 }
 
