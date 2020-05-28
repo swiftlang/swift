@@ -1203,6 +1203,17 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   return hadAnyError;
 }
 
+/// Perform any actions that must have access to the ASTContext, and need to be
+/// delayed until the Swift compile pipeline has finished. This may be called
+/// before or after LLVM depending on when the ASTContext gets freed.
+static void performEndOfPipelineActions(CompilerInstance &Instance) {
+  assert(Instance.hasASTContext());
+
+  // Emit dependencies and index data.
+  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  emitIndexData(Instance);
+}
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
@@ -1295,14 +1306,11 @@ static bool performCompile(CompilerInstance &Instance,
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 
   SWIFT_DEFER {
-    // We might have freed the ASTContext already, but in that case we must have
-    // emitted the dependencies and index first.
-    if (Instance.hasASTContext()) {
-      emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
-      emitIndexData(Instance);
-    }
+    // We might have freed the ASTContext already, but in that case we would
+    // have already performed these actions.
+    if (Instance.hasASTContext())
+      performEndOfPipelineActions(Instance);
   };
-
 
   if (Context.hadError())
     return true;
@@ -1498,10 +1506,9 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
     return;
   }
 
-  // Make sure we emit dependencies and index now, because we can't do it after
-  // the context is gone.
-  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
-  emitIndexData(Instance);
+  // Make sure to perform the end of pipeline actions now, because they need
+  // access to the ASTContext.
+  performEndOfPipelineActions(Instance);
 
   Instance.freeASTContext();
 }
