@@ -46,16 +46,17 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
   if (this->M.getNameStr().equals(M->getNameStr())) {
     return &MainGraph;
   }
-  auto Found = ExtendedModuleGraphs.find(M);
+  auto Found = ExtendedModuleGraphs.find(M->getNameStr());
   if (Found != ExtendedModuleGraphs.end()) {
-    return Found->getSecond();
+    return Found->getValue();
   }
   auto *Memory = Ctx.allocate(sizeof(SymbolGraph), alignof(SymbolGraph));  
   auto *SG = new (Memory) SymbolGraph(*this,
                                       MainGraph.M,
                                       Optional<ModuleDecl *>(M),
                                       Ctx);
-  ExtendedModuleGraphs.insert({M, SG});
+
+  ExtendedModuleGraphs.insert({M->getNameStr(), SG});
   return SG;
 }
 
@@ -108,8 +109,8 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     const auto *ExtendedNominal = Extension->getExtendedNominal();
     auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
-    // Ignore effecively private decls.
-    if (ExtendedSG->isImplicitlyPrivate(ExtendedNominal)) {
+    // Ignore effectively private decls.
+    if (ExtendedSG->isImplicitlyPrivate(Extension)) {
       return false;
     }
 
