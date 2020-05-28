@@ -1,7 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// REQUIRES: SR12741
+// FIXME(SR-12741): Enable test for all platforms after debugging
+// iphonesimulator-i386-specific failures.
+// REQUIRES: CPU=x86_64
 
 import _Differentiation
 import StdlibUnittest
