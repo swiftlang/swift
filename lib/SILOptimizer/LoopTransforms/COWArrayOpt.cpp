@@ -288,6 +288,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kGetCapacity:
   case ArrayCallKind::kGetElement:
   case ArrayCallKind::kGetElementAddress:
+  case ArrayCallKind::kEndMutation:
     return true;
   case ArrayCallKind::kMakeMutable:
   case ArrayCallKind::kMutateUnknown:
@@ -296,6 +297,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
   case ArrayCallKind::kArrayUninitializedIntrinsic:
+  case ArrayCallKind::kArrayFinalizeIntrinsic:
   case ArrayCallKind::kAppendContentsOf:
   case ArrayCallKind::kAppendElement:
     return false;

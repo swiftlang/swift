@@ -1,0 +1,158 @@
+// RUN: %target-sil-opt %s -cow-opts | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+final class Buffer {
+  @_hasStorage var i: Int { get set }
+  init()
+}
+
+sil @unknown : $@convention(thin) (@guaranteed Buffer) -> ()
+
+// CHECK-LABEL: sil @test_complete_removal
+// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK:   [[T:%[0-9]+]] = tuple ([[I]] : $Builtin.Int1, %0 : $Buffer)
+// CHECK:   return [[T]]
+// CHECK: } // end sil function 'test_complete_removal'
+sil @test_complete_removal : $@convention(thin) (@owned Buffer) -> (Builtin.Int1, @owned Buffer) {
+bb0(%0 : $Buffer):
+  %e = end_cow_mutation %0 : $Buffer
+  (%u, %b) = begin_cow_mutation %e : $Buffer
+  %t = tuple (%u : $Builtin.Int1, %b : $Buffer)
+  return %t : $(Builtin.Int1, Buffer)
+}
+
+// CHECK-LABEL: sil @test_simple
+// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK:   ({{.*}}, [[B:%[0-9]+]]) = begin_cow_mutation
+// CHECK:   [[T:%[0-9]+]] = tuple ({{.*}}, [[I]] : $Builtin.Int1, [[B]] : $Buffer)
+// CHECK:   return [[T]]
+// CHECK: } // end sil function 'test_simple'
+sil @test_simple : $@convention(thin) (@owned Buffer) -> (Int, Builtin.Int1, @owned Buffer) {
+bb0(%0 : $Buffer):
+  %e = end_cow_mutation %0 : $Buffer
+  %addr = ref_element_addr [immutable] %e : $Buffer, #Buffer.i
+  %i = load %addr : $*Int
+  (%u, %b) = begin_cow_mutation %e : $Buffer
+  %t = tuple (%i : $Int, %u : $Builtin.Int1, %b : $Buffer)
+  return %t : $(Int, Builtin.Int1, Buffer)
+}
+
+// CHECK-LABEL: sil @test_store
+// CHECK:   end_cow_mutation
+// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK:   begin_cow_mutation
+// CHECK:   return [[I]]
+// CHECK: } // end sil function 'test_store'
+sil @test_store : $@convention(thin) (@inout Buffer) -> Builtin.Int1 {
+bb0(%0 : $*Buffer):
+  %l = load %0 : $*Buffer
+  %e = end_cow_mutation %l : $Buffer
+  store %e to %0 : $*Buffer
+  (%u, %b) = begin_cow_mutation %e : $Buffer
+  store %b to %0 : $*Buffer
+  return %u : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @test_store_and_load
+// CHECK:   end_cow_mutation
+// CHECK:   ([[U:%[0-9]+]], {{.*}}) = begin_cow_mutation
+// CHECK:   return [[U]]
+// CHECK: } // end sil function 'test_store_and_load'
+sil @test_store_and_load : $@convention(thin) (@inout Buffer) -> Builtin.Int1 {
+bb0(%0 : $*Buffer):
+  %l = load %0 : $*Buffer
+  %e = end_cow_mutation %l : $Buffer
+  store %e to %0 : $*Buffer
+  %l2 = load %0 : $*Buffer
+  %f = function_ref @unknown : $@convention(thin) (@guaranteed Buffer) -> ()
+  apply %f(%l2) : $@convention(thin) (@guaranteed Buffer) -> ()
+  (%u, %b) = begin_cow_mutation %e : $Buffer
+  store %b to %0 : $*Buffer
+  return %u : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @test_store_and_load_outside_liverange
+// CHECK:   end_cow_mutation
+// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK:   begin_cow_mutation
+// CHECK:   return [[I]]
+// CHECK: } // end sil function 'test_store_and_load_outside_liverange'
+sil @test_store_and_load_outside_liverange : $@convention(thin) (@inout Buffer) -> Builtin.Int1 {
+bb0(%0 : $*Buffer):
+  %l = load %0 : $*Buffer
+  %e = end_cow_mutation %l : $Buffer
+  store %e to %0 : $*Buffer
+  (%u, %b) = begin_cow_mutation %e : $Buffer
+  %l2 = load %0 : $*Buffer
+  %f = function_ref @unknown : $@convention(thin) (@guaranteed Buffer) -> ()
+  apply %f(%l2) : $@convention(thin) (@guaranteed Buffer) -> ()
+  store %b to %0 : $*Buffer
+  return %u : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @test_loop
+// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK:   [[B:%[0-9]+]] = end_cow_mutation
+// CHECK:   [[T:%[0-9]+]] = tuple ([[I]] : $Builtin.Int1, [[B]] : $Buffer)
+// CHECK:   return [[T]]
+// CHECK: } // end sil function 'test_loop'
+sil @test_loop : $@convention(thin) (@owned Buffer) -> (Builtin.Int1, @owned Buffer) {
+bb0(%0 : $Buffer):
+  %e = end_cow_mutation %0 : $Buffer
+  br bb1(%e : $Buffer)
+bb1(%a : $Buffer):
+  (%u, %b) = begin_cow_mutation %a : $Buffer
+  %e2 = end_cow_mutation %b : $Buffer
+  cond_br undef, bb1(%e2 : $Buffer), bb2
+bb2:
+  %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
+  return %t : $(Builtin.Int1, Buffer)
+}
+
+// CHECK-LABEL: sil @test_escape_in_loop
+// CHECK:   ([[U:%[0-9]+]], {{.*}}) = begin_cow_mutation
+// CHECK:   [[B:%[0-9]+]] = end_cow_mutation
+// CHECK:   [[T:%[0-9]+]] = tuple ([[U]] : $Builtin.Int1, [[B]] : $Buffer)
+// CHECK:   return [[T]]
+// CHECK: } // end sil function 'test_escape_in_loop'
+sil @test_escape_in_loop : $@convention(thin) (@owned Buffer) -> (Builtin.Int1, @owned Buffer) {
+bb0(%0 : $Buffer):
+  %f = function_ref @unknown : $@convention(thin) (@guaranteed Buffer) -> ()
+  %e = end_cow_mutation %0 : $Buffer
+  br bb1(%e : $Buffer)
+bb1(%a : $Buffer):
+  (%u, %b) = begin_cow_mutation %a : $Buffer
+  %e2 = end_cow_mutation %b : $Buffer
+  apply %f(%e2) : $@convention(thin) (@guaranteed Buffer) -> ()
+  cond_br undef, bb1(%e2 : $Buffer), bb2
+bb2:
+  %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
+  return %t : $(Builtin.Int1, Buffer)
+}
+
+// CHECK-LABEL: sil @test_escape_outside_loop
+// CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK:   [[B:%[0-9]+]] = end_cow_mutation
+// CHECK:   [[T:%[0-9]+]] = tuple ([[I]] : $Builtin.Int1, [[B]] : $Buffer)
+// CHECK:   return [[T]]
+// CHECK: } // end sil function 'test_escape_outside_loop'
+sil @test_escape_outside_loop : $@convention(thin) (@owned Buffer) -> (Builtin.Int1, @owned Buffer) {
+bb0(%0 : $Buffer):
+  %f = function_ref @unknown : $@convention(thin) (@guaranteed Buffer) -> ()
+  %e = end_cow_mutation %0 : $Buffer
+  br bb1(%e : $Buffer)
+bb1(%a : $Buffer):
+  (%u, %b) = begin_cow_mutation %a : $Buffer
+  %e2 = end_cow_mutation %b : $Buffer
+  cond_br undef, bb1(%e2 : $Buffer), bb2
+bb2:
+  apply %f(%e2) : $@convention(thin) (@guaranteed Buffer) -> ()
+  %t = tuple (%u : $Builtin.Int1, %e2 : $Buffer)
+  return %t : $(Builtin.Int1, Buffer)
+}
+

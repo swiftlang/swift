@@ -230,6 +230,10 @@ WARNING(tbd_only_supported_in_whole_module,none,
         "TBD generation is only supported when the whole module can be seen",
         ())
 
+ERROR(tbd_not_supported_with_cmo,none,
+        "Test-Based InstallAPI (TBD) is not support with cross-module-optimization",
+        ())
+
 WARNING(linker_directives_choice_confusion,none,
         "only one of -emit-ldadd-cfile-path and -module-installname-map-file can be specified;"
         "the c file won't be generated",

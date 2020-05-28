@@ -34,6 +34,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/OperatorKinds.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Sema/Lookup.h"
@@ -1410,11 +1411,34 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::CXXConversionFunctionName:
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
-  case clang::DeclarationName::CXXOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
   case clang::DeclarationName::CXXDeductionGuideName:
     // TODO: Handling these is part of C++ interoperability.
     return ImportedName();
+
+  case clang::DeclarationName::CXXOperatorName: {
+    auto op = D->getDeclName().getCXXOverloadedOperator();
+    switch (op) {
+    case clang::OverloadedOperatorKind::OO_Plus:
+    case clang::OverloadedOperatorKind::OO_Minus:
+    case clang::OverloadedOperatorKind::OO_Star:
+    case clang::OverloadedOperatorKind::OO_Slash:
+      if (auto FD = dyn_cast<clang::FunctionDecl>(D)) {
+        baseName = clang::getOperatorSpelling(op);
+        isFunction = true;
+        argumentNames.resize(FD->param_size());
+      } else {
+        // This can happen for example for templated operators functions.
+        // We don't support those, yet.
+        return ImportedName();
+      }
+      break;
+    default:
+      // We don't import these yet.
+      return ImportedName();
+    }
+    break;
+  }
 
   case clang::DeclarationName::Identifier:
     // Map the identifier.

@@ -62,6 +62,7 @@ namespace {
     SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
+    SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
     SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
     SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
     SILValue visitBeginAccessInst(BeginAccessInst *BAI);
@@ -329,6 +330,21 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   return SILValue();
 }
 
+/// If the only use of a cast is a destroy, just destroy the cast operand.
+static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
+  for (Operand *op : Cast->getUses()) {
+    switch (op->getUser()->getKind()) {
+      case SILInstructionKind::DestroyValueInst:
+      case SILInstructionKind::StrongReleaseInst:
+      case SILInstructionKind::StrongRetainInst:
+        break;
+      default:
+        return SILValue();
+    }
+  }
+  return Cast->getOperand(0);
+}
+
 SILValue
 InstSimplifier::
 visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
@@ -351,7 +367,8 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
   if (OPRI->getOperand()->getType() == OPRI->getType())
     return OPRI->getOperand();
 
-  return SILValue();
+  // (destroy_value (unchecked_ref_cast x)) -> destroy_value x
+  return simplifyDeadCast(OPRI);
 }
 
 SILValue
@@ -375,7 +392,8 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
     if (URCI->getOperand()->getType() == UI->getType())
       return URCI->getOperand();
 
-  return SILValue();
+  // (destroy_value (upcast x)) -> destroy_value x
+  return simplifyDeadCast(UI);
 }
 
 #define LOADABLE_REF_STORAGE(Name, ...) \
@@ -408,6 +426,11 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
       return Op->getOperand();
 
   return SILValue();
+}
+
+SILValue InstSimplifier::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
+  // (destroy_value (end_cow_mutation x)) -> destroy_value x
+  return simplifyDeadCast(ECM);
 }
 
 SILValue
