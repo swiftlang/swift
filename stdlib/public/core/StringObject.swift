@@ -33,11 +33,11 @@
   ├─────────────────────╫─────┼─────┼─────┼─────┤
   │ Shared              ║  x  │  0  │  0  │  0  │
   ├─────────────────────╫─────┼─────┼─────┼─────┤
-  │ Shared, Bridged     ║  0  │  1  │  0  │  0  │
+  │ Shared, Bridged     ║  x  │  1  │  0  │  0  │
   ╞═════════════════════╬═════╪═════╪═════╪═════╡
   │ Foreign             ║  x  │  0  │  0  │  1  │
   ├─────────────────────╫─────┼─────┼─────┼─────┤
-  │ Foreign, Bridged    ║  x  │  1  │  0  │  1  │
+  │ Foreign, Bridged    ║  0  │  1  │  0  │  1  │
   └─────────────────────╨─────┴─────┴─────┴─────┘
  
   b63: isImmortal: Should the Swift runtime skip ARC
@@ -233,16 +233,12 @@ extension _StringObject {
   internal init(
     objcConstantTaggedPointerBits: UInt64, countAndFlags: CountAndFlags
   ) {
-    let assertionMask:UInt64 = 0xF000_0000_0000_0000
-    // The incoming constant tagged NSString's top nibble should be 1100
-    let assertionValue:UInt64 = 0xC000_0000_0000_0000
-    precondition(objcConstantTaggedPointerBits & assertionMask == assertionValue)
+    // The incoming constant tagged NSString's top nibble should already be 1100
+    precondition(objcConstantTaggedPointerBits & 0xF000_0000_0000_0000 ==
+                  _StringObject.Nibbles.taggedConstantCocoa())
     let builtinValueBits: Builtin.Int64 = objcConstantTaggedPointerBits._value
-    let discriminator = _StringObject.Nibbles.taggedConstantCocoa()
-    let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
-      bridgeObject: Builtin.valueToBridgeObject(Builtin.stringObjectOr_Int64(
-        builtinValueBits, builtinDiscrim)),
+      bridgeObject: Builtin.valueToBridgeObject(builtinValueBits),
       countAndFlags: countAndFlags)
   }
 
@@ -402,9 +398,9 @@ extension _StringObject.Nibbles {
   }
   
   // Discriminator for bridged constant tagged pointer NSStrings
-  // Immortal, bridged, and foreign
+  // Immortal, bridged, but not foreign since we can get the char *
   internal static func taggedConstantCocoa() -> UInt64 {
-    return 0xD000_0000_0000_0000
+    return 0xC000_0000_0000_0000
   }
 }
 
@@ -490,6 +486,12 @@ extension _StringObject {
   internal var largeIsCocoa: Bool {
     _internalInvariant(isLarge)
     return (discriminatedObjectRawBits & 0x4000_0000_0000_0000) != 0
+  }
+  
+  @inline(__always)
+  internal var isImmortalCocoa: Bool {
+    let nibbleValue = _StringObject.Nibbles.taggedConstantCocoa()
+    return (discriminatedObjectRawBits & 0xF000_0000_0000_0000) == nibbleValue
   }
 
   // Whether this string is in one of our fastest representations:
@@ -876,14 +878,8 @@ extension _StringObject {
     }
     return object
 #else
-    _internalInvariant(largeIsCocoa)
-    var bits = largeAddressBits
-    if isImmortal {
-      // Object is a constant tagged pointer with bit 4 of the top nibble set
-      // Clear the bit we set before trying to treat it as an object
-      bits &= ~0x1000_0000_0000_0000
-    }
-    return Builtin.reinterpretCast(bits)
+    _internalInvariant((largeIsCocoa && !isImmortal) || isImmortalCocoa)
+    return Builtin.reinterpretCast(largeAddressBits)
 #endif
   }
 
@@ -940,8 +936,8 @@ extension _StringObject {
   internal var hasObjCBridgeableObject: Bool {
     @_effects(releasenone) get {
       // Currently, all mortal objects can zero-cost bridge
-      // as can immmortal bridged foreign objects
-      return !isImmortal || (isLarge && largeIsCocoa)
+      // as can immortal bridged foreign objects
+      return !isImmortal || isImmortalCocoa
     }
   }
 
@@ -950,7 +946,7 @@ extension _StringObject {
   internal var objCBridgeableObject: AnyObject {
     _internalInvariant(hasObjCBridgeableObject)
     
-    return cocoaObject
+    return Builtin.reinterpretCast(largeAddressBits)
   }
 
   // Whether the object provides fast UTF-8 contents that are nul-terminated
