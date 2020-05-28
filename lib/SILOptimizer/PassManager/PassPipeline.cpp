@@ -606,6 +606,10 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
 
+  // Sometimes stack promotion can catch cases only at this late stage of the
+  // pipeline, after FunctionSignatureOpts.
+  P.addStackPromotion();
+
   // Optimize overflow checks.
   P.addRedundantOverflowCheckRemoval();
   P.addMergeCondFails();
