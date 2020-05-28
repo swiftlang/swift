@@ -22,6 +22,7 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/Validation.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "clang/Basic/Module.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
@@ -341,14 +342,16 @@ class ModuleInterfaceLoaderImpl {
   const ModuleLoadingMode loadMode;
   const bool remarkOnRebuildFromInterface;
   const bool disableInterfaceLock;
-  const bool disableImplicitModule;
+  const bool disableImplicitModules;
+  const bool disableImplicitPCMs;
 
   ModuleInterfaceLoaderImpl(
     ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
     StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
     SourceLoc diagLoc, bool remarkOnRebuildFromInterface,
     bool disableInterfaceLock,
-    bool disableImplicitModule,
+    bool disableImplicitModules,
+    bool disableImplicitPCMs,
     DependencyTracker *dependencyTracker = nullptr,
     ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
@@ -358,7 +361,8 @@ class ModuleInterfaceLoaderImpl {
     dependencyTracker(dependencyTracker), loadMode(loadMode),
     remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
     disableInterfaceLock(disableInterfaceLock),
-    disableImplicitModule(disableImplicitModule) {}
+    disableImplicitModules(disableImplicitModules),
+    disableImplicitPCMs(disableImplicitPCMs) {}
 
   /// Constructs the full path of the dependency \p dep by prepending the SDK
   /// path if necessary.
@@ -838,7 +842,9 @@ class ModuleInterfaceLoaderImpl {
                                                 /*serializeDependencyHashes*/false,
                                                 trackSystemDependencies,
                                                 remarkOnRebuildFromInterface,
-                                                disableInterfaceLock);
+                                                disableInterfaceLock,
+                                                disableImplicitModules,
+                                                disableImplicitPCMs);
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
     ModuleInterfaceBuilder builder(
@@ -891,7 +897,7 @@ class ModuleInterfaceLoaderImpl {
 
     // If implicit module building is disabled, fail the loading. Other loaders
     // should be responsible for diagnostics.
-    if (disableImplicitModule) {
+    if (disableImplicitModules) {
       return std::make_error_code(std::errc::function_not_supported);
     }
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
@@ -924,11 +930,84 @@ class ModuleInterfaceLoaderImpl {
 
 } // end anonymous namespace
 
+class ModuleInterfaceLoader::ExplicitSwiftModuleLoader {
+  ASTContext &Ctx;
+  DiagnosticEngine &Diags;
+  llvm::StringMap<const char*> ModuleMap;
+public:
+  explicit ExplicitSwiftModuleLoader(ASTContext &Ctx,
+                                     ArrayRef<std::string> ModulePaths):
+                                       Ctx(Ctx), Diags(Ctx.Diags) {
+    for (auto &Path: ModulePaths) {
+      std::string result;
+      auto errc = getNameOfModule(Ctx, Path, result);
+      if (result.empty()) {
+        Diags.diagnose(SourceLoc(), diag::error_open_input_file, Path,
+                       errc.message());
+      }
+      assert(!result.empty());
+      ModuleMap[result] = Path.c_str();
+    }
+  }
+
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+  loadModule(StringRef moduleName) {
+    auto It = ModuleMap.find(moduleName);
+    if (It == ModuleMap.end())
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    return std::move(Ctx.SourceMgr.getFileSystem()
+                    ->getBufferForFile(It->second).get());
+  }
+};
+
+ModuleInterfaceLoader::ModuleInterfaceLoader(
+    ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
+    DependencyTracker *tracker, ModuleLoadingMode loadMode,
+    ArrayRef<std::string> ExplicitModules,
+    ArrayRef<std::string> PreferInterfaceForModules,
+    bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile,
+    bool DisableInterfaceFileLock, bool DisableImplicitModules,
+    bool DisableImplicitPCMs)
+: SerializedModuleLoaderBase(ctx, tracker, loadMode,
+                             IgnoreSwiftSourceInfoFile),
+  CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
+  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
+  DisableInterfaceFileLock(DisableInterfaceFileLock),
+  DisableImplicitModules(DisableImplicitModules),
+  DisableImplicitPCMs(DisableImplicitPCMs),
+  PreferInterfaceForModules(PreferInterfaceForModules),
+  ExplicitLoader(*new ExplicitSwiftModuleLoader(ctx, ExplicitModules)) {}
+
+std::unique_ptr<ModuleInterfaceLoader>
+ModuleInterfaceLoader::create(ASTContext &ctx,
+       StringRef cacheDir, StringRef prebuiltCacheDir,
+       DependencyTracker *tracker, ModuleLoadingMode loadMode,
+       ArrayRef<std::string> ExplicitModules,
+       ArrayRef<std::string> PreferInterfaceForModules,
+       bool RemarkOnRebuildFromInterface,
+       bool IgnoreSwiftSourceInfoFile,
+       bool DisableInterfaceFileLock,
+       bool DisableImplicitModules,
+       bool DisableImplicitPCMs) {
+  return std::unique_ptr<ModuleInterfaceLoader>(
+    new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
+                                       tracker, loadMode,
+                                       ExplicitModules,
+                                       PreferInterfaceForModules,
+                                       RemarkOnRebuildFromInterface,
+                                       IgnoreSwiftSourceInfoFile,
+                                       DisableInterfaceFileLock,
+                                       DisableImplicitModules,
+                                       DisableImplicitPCMs));
+}
+
 bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
   if (!CacheDir.empty() && DepPath.startswith(CacheDir))
     return true;
   return !PrebuiltCacheDir.empty() && DepPath.startswith(PrebuiltCacheDir);
 }
+
+ModuleInterfaceLoader::~ModuleInterfaceLoader() { delete &ExplicitLoader; }
 
 /// Load a .swiftmodule associated with a .swiftinterface either from a
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
@@ -974,6 +1053,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
                 CacheDir, PrebuiltCacheDir, ModuleID.Loc,
                 RemarkOnRebuildFromInterface, DisableInterfaceFileLock,
                 DisableImplicitModules,
+                DisableImplicitPCMs,
                 dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?
@@ -982,6 +1062,9 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   // Ask the impl to find us a module that we can load or give us an error
   // telling us that we couldn't load it.
   auto ModuleBufferOrErr = Impl.findOrBuildLoadableModule();
+  if (!ModuleBufferOrErr) {
+    ModuleBufferOrErr = ExplicitLoader.loadModule(ModuleName);
+  }
   if (!ModuleBufferOrErr)
     return ModuleBufferOrErr.getError();
 
@@ -1012,7 +1095,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock) {
+    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock,
+    bool DisableImplicitModule, bool DisableImplicitPCMs) {
   InterfaceSubContextDelegateImpl astDelegate(SourceMgr, Diags,
                                               SearchPathOpts, LangOpts,
                                               /*clangImporter*/nullptr,
@@ -1021,7 +1105,9 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
                                               SerializeDependencyHashes,
                                               TrackSystemDependencies,
                                               RemarkOnRebuildFromInterface,
-                                              DisableInterfaceFileLock);
+                                              DisableInterfaceFileLock,
+                                              DisableImplicitModule,
+                                              DisableImplicitPCMs);
   ModuleInterfaceBuilder builder(SourceMgr, Diags, astDelegate, InPath,
                                  ModuleName, CacheDir, PrebuiltCacheDir,
                                  DisableInterfaceFileLock);
@@ -1179,7 +1265,9 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     bool serializeDependencyHashes,
     bool trackSystemDependencies,
     bool remarkOnRebuildFromInterface,
-    bool disableInterfaceFileLock): SM(SM), Diags(Diags), ArgSaver(Allocator) {
+    bool disableInterfaceFileLock,
+    bool disableImplicitModule,
+    bool disableImplicitPCMs): SM(SM), Diags(Diags), ArgSaver(Allocator) {
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts);
   // Configure front-end input.
   auto &SubFEOpts = subInvocation.getFrontendOptions();
@@ -1225,6 +1313,15 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back("-Rmodule-interface-rebuild");
   }
 
+  // Disable implicitly building dependencies if asked to.
+  if (disableImplicitModule) {
+    subInvocation.getFrontendOptions().DisableImplicitModules = true;
+    GenericArgs.push_back("-disable-implicit-swift-modules");
+  }
+  if (disableImplicitPCMs) {
+    GenericArgs.push_back("-disable-implicit-pcms");
+    subInvocation.getClangImporterOptions().DisableImplicitPCMs = true;
+  }
   // Note that we don't assume cachePath is the same as the Clang
   // module cache path at this point.
   if (buildModuleCacheDirIfAbsent && !moduleCachePath.empty())

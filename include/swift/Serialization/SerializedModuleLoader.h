@@ -441,7 +441,8 @@ public:
   }
 };
 
-
+std::error_code getNameOfModule(ASTContext &Ctx, StringRef modulePath,
+                                std::string &name);
 } // end namespace swift
 
 #endif

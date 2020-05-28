@@ -389,6 +389,28 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   return std::move(dependencies);
 }
 
+std::error_code
+swift::getNameOfModule(ASTContext &Ctx, StringRef modulePath, std::string &Name) {
+  // Open the module file
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto moduleBuf = fs.getBufferForFile(modulePath);
+  if (!moduleBuf)
+    return moduleBuf.getError();
+
+  // Load the module file without validation.
+  std::unique_ptr<ModuleFile> loadedModuleFile;
+  bool isFramework = false;
+  serialization::ValidationInfo loadInfo =
+      ModuleFile::load(modulePath.str(),
+                       std::move(moduleBuf.get()),
+                       nullptr,
+                       nullptr,
+                       /*isFramework*/isFramework, loadedModuleFile,
+                       nullptr);
+  Name = loadedModuleFile->Name;
+  return std::error_code();
+}
+
 std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,

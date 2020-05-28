@@ -225,6 +225,9 @@ def clang_module_map_file_EQ : Joined<["-"], "clang-module-map-file=">,
 
 def clang_module_file_EQ : Joined<["-"], "clang-module-file=">,
   HelpText<"Pass down to Clang as -fmodule-file=">;
+
+def swift_module_file_EQ : Joined<["-"], "swift-module-file=">,
+  HelpText<"Specify Swift module explicitly built from textual interface">;
 }
 
 

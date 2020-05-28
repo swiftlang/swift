@@ -234,6 +234,11 @@ void ClangImporter::recordModuleDependencies(
     for(auto arg: clangModuleDep.NonPathCommandLine) {
       addClangArg(arg);
     }
+    // We shouldn't implicitly build Swift modules.
+    // We don't pass down "-disable-implicit-pcms" because a Clang flag
+    // "-fno-implicit-modules" is returned from the Clang dependencies scanner.
+    swiftArgs.push_back("-disable-implicit-swift-modules");
+
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");

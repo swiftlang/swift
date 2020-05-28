@@ -77,6 +77,8 @@ class ModuleFile
   /// The name of the module.
   StringRef Name;
   friend StringRef getNameOfModule(const ModuleFile *);
+  friend std::error_code getNameOfModule(ASTContext &Ctx, StringRef modulePath,
+                                         std::string &name);
 
   /// The target the module was built for.
   StringRef TargetTriple;

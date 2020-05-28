@@ -136,24 +136,20 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   explicit ModuleInterfaceLoader(
       ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
+      ArrayRef<std::string> ExplicitModules,
       ArrayRef<std::string> PreferInterfaceForModules,
       bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile,
-      bool DisableInterfaceFileLock, bool DisableImplicitModules)
-  : SerializedModuleLoaderBase(ctx, tracker, loadMode,
-                               IgnoreSwiftSourceInfoFile),
-  CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
-  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
-  DisableInterfaceFileLock(DisableInterfaceFileLock),
-  DisableImplicitModules(DisableImplicitModules),
-  PreferInterfaceForModules(PreferInterfaceForModules)
-  {}
-
+      bool DisableInterfaceFileLock, bool DisableImplicitModules,
+      bool DisableImplicitPCMs);
   std::string CacheDir;
   std::string PrebuiltCacheDir;
   bool RemarkOnRebuildFromInterface;
   bool DisableInterfaceFileLock;
   bool DisableImplicitModules;
+  bool DisableImplicitPCMs;
   ArrayRef<std::string> PreferInterfaceForModules;
+  class ExplicitSwiftModuleLoader;
+  ExplicitSwiftModuleLoader &ExplicitLoader;
 
   std::error_code findModuleFilesInDirectory(
     AccessPathElem ModuleID,
@@ -169,20 +165,13 @@ public:
   static std::unique_ptr<ModuleInterfaceLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
+         ArrayRef<std::string> ExplicitModules = {},
          ArrayRef<std::string> PreferInterfaceForModules = {},
          bool RemarkOnRebuildFromInterface = false,
          bool IgnoreSwiftSourceInfoFile = false,
          bool DisableInterfaceFileLock = false,
-         bool DisableImplicitModules = false) {
-    return std::unique_ptr<ModuleInterfaceLoader>(
-      new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
-                                         tracker, loadMode,
-                                         PreferInterfaceForModules,
-                                         RemarkOnRebuildFromInterface,
-                                         IgnoreSwiftSourceInfoFile,
-                                         DisableInterfaceFileLock,
-                                         DisableImplicitModules));
-  }
+         bool DisableImplicitModules = false,
+         bool DisableImplicitPCMs = false);
 
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
@@ -199,7 +188,9 @@ public:
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock);
+    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock,
+    bool DisableImplicitModule, bool DisableImplicitPCMs);
+  ~ModuleInterfaceLoader();
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -242,7 +233,9 @@ public:
                                   bool serializeDependencyHashes,
                                   bool trackSystemDependencies,
                                   bool remarkOnRebuildFromInterface,
-                                  bool disableInterfaceFileLock);
+                                  bool disableInterfaceFileLock,
+                                  bool disableImplicitModule,
+                                  bool disableImplicitPCMs);
   bool runInSubContext(StringRef moduleName,
                        StringRef interfacePath,
                        StringRef outputPath,

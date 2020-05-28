@@ -457,11 +457,14 @@ bool CompilerInstance::setUpModuleLoaders() {
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
-        getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
+        getDependencyTracker(), MLM,
+        FEOpts.ExplicitSwiftModules,
+        FEOpts.PreferInterfaceForModules,
         FEOpts.RemarkOnRebuildFromModuleInterface,
         IgnoreSourceInfoFile,
         FEOpts.DisableInterfaceFileLock,
-        FEOpts.DisableImplicitModules);
+        FEOpts.DisableImplicitModules,
+        Invocation.getClangImporterOptions().DisableImplicitPCMs);
     Context->addModuleLoader(std::move(PIML));
   }
 

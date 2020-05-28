@@ -78,7 +78,10 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
                                               FEOpts.TrackSystemDeps,
                                               FEOpts.RemarkOnRebuildFromModuleInterface,
-                                              FEOpts.DisableInterfaceFileLock);
+                                              FEOpts.DisableInterfaceFileLock,
+                                              FEOpts.DisableImplicitModules,
+                                              instance.getInvocation()
+                                                .getClangImporterOptions().DisableImplicitPCMs);
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {

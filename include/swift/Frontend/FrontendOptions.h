@@ -262,6 +262,8 @@ public:
   /// built and given to the compiler invocation.
   bool DisableImplicitModules = false;
 
+  std::vector<std::string> ExplicitSwiftModules;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.
