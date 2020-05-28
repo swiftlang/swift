@@ -2124,10 +2124,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   PDC.setPrintEducationalNotes(
       Invocation.getDiagnosticOptions().PrintEducationalNotes);
 
-  // Temporarily stage the new diagnostic formatting style behind
-  // -enable-descriptive-diagnostics
-  if (Invocation.getDiagnosticOptions().EnableExperimentalFormatting)
-    PDC.enableExperimentalFormatting();
+  PDC.setFormattingStyle(
+      Invocation.getDiagnosticOptions().PrintedFormattingStyle);
 
   if (Invocation.getFrontendOptions().DebugTimeCompilation)
     SharedTimer::enableCompilationTimers();
