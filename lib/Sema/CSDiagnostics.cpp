@@ -6410,9 +6410,50 @@ bool MissingRawRepresentativeInitFailure::diagnoseAsError() {
 
   if (auto *E = getAsExpr(getAnchor())) {
     auto range = E->getSourceRange();
-    diagnostic
-        .fixItInsert(range.Start, RawReprType->getString() + "(rawValue: ")
-        .fixItInsertAfter(range.End, ") ?? <#default value#>");
+    auto rawReprObjType = RawReprType->getOptionalObjectType();
+    auto valueObjType = ValueType->getOptionalObjectType();
+
+    if (rawReprObjType && valueObjType) {
+      std::string mapCodeFix;
+
+      // Check whether expression has been be wrapped in parens first.
+      if (!E->canAppendPostfixExpression()) {
+        diagnostic.fixItInsert(range.Start, "(");
+        mapCodeFix += ")";
+      }
+
+      mapCodeFix += ".map { ";
+      mapCodeFix += rawReprObjType->getString();
+      mapCodeFix += "(rawValue: $0) }";
+
+      diagnostic.fixItInsertAfter(range.End, mapCodeFix);
+    } else if (rawReprObjType) {
+      diagnostic
+          .fixItInsert(range.Start, rawReprObjType->getString() + "(rawValue: ")
+          .fixItInsertAfter(range.End, ")");
+    } else if (valueObjType) {
+      diagnostic.flush();
+
+      std::string fixItBefore = RawReprType->getString() + "(rawValue: ";
+      std::string fixItAfter;
+
+      if (!E->canAppendPostfixExpression(true)) {
+        fixItBefore += "(";
+        fixItAfter += ")";
+      }
+
+      fixItAfter += "!) ?? <#default value#>";
+
+      emitDiagnostic(diag::construct_raw_representable_from_unwrapped_value,
+                     RawReprType, valueObjType)
+          .highlight(range)
+          .fixItInsert(range.Start, fixItBefore)
+          .fixItInsertAfter(range.End, fixItAfter);
+    } else {
+      diagnostic
+          .fixItInsert(range.Start, RawReprType->getString() + "(rawValue: ")
+          .fixItInsertAfter(range.End, ") ?? <#default value#>");
+    }
   }
 
   return true;
