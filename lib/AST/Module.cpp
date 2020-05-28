@@ -507,19 +507,6 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
-void ModuleDecl::removeFile(FileUnit &existingFile) {
-  // Do a reverse search; usually the file to be deleted will be at the end.
-  std::reverse_iterator<decltype(Files)::iterator> I(Files.end()),
-  E(Files.begin());
-  I = std::find(I, E, &existingFile);
-  assert(I != E);
-
-  // Adjust for the std::reverse_iterator offset.
-  ++I;
-  Files.erase(I.base());
-  clearLookupCache();
-}
-
 #define FORWARD(name, args) \
   for (const FileUnit *file : getFiles()) \
     file->name args;

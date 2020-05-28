@@ -837,10 +837,16 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports() {
   // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
-    if (!SML->loadAST(*MainModule, SourceLoc(), /*moduleInterfacePath*/"",
-                      std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
-                      std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false))
+    auto *file =
+        SML->loadAST(*MainModule, SourceLoc(), /*moduleInterfacePath*/ "",
+                     std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
+                     std::move(PM.ModuleSourceInfoBuffer),
+                     /*isFramework*/ false);
+    if (file) {
+      MainModule->addFile(*file);
+    } else {
       hadLoadError = true;
+    }
   }
   return hadLoadError;
 }

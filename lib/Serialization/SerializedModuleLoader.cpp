@@ -680,7 +680,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
-    M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
     if (extendedInfo.arePrivateImportsEnabled())
@@ -705,8 +704,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
       findOverlayFiles(diagLoc.getValueOr(SourceLoc()), &M, fileUnit);
       return fileUnit;
     }
-
-    M.removeFile(*fileUnit);
   }
 
   // From here on is the failure path.
@@ -960,12 +957,15 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   StringRef moduleInterfacePathStr =
     Ctx.AllocateCopy(moduleInterfacePath.str());
 
-  if (!loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
-               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
-               std::move(moduleSourceInfoInputBuffer), isFramework)) {
+  auto *file =
+      loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
+              std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
+              std::move(moduleSourceInfoInputBuffer), isFramework);
+  if (file) {
+    M->addFile(*file);
+  } else {
     M->setFailedToLoad();
   }
-
   return M;
 }
 
@@ -996,11 +996,12 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto *M = ModuleDecl::create(moduleID.Item, Ctx);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
-  if (!loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
-               std::move(moduleInputBuffer), {}, {}, isFramework)) {
+  auto *file = loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
+                       std::move(moduleInputBuffer), {}, {}, isFramework);
+  if (!file)
     return nullptr;
-  }
 
+  M->addFile(*file);
   Ctx.LoadedModules[moduleID.Item] = M;
   return M;
 }

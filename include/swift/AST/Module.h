@@ -371,7 +371,6 @@ public:
 
   bool isClangModule() const;
   void addFile(FileUnit &newFile);
-  void removeFile(FileUnit &existingFile);
 
   /// Creates a map from \c #filePath strings to corresponding \c #file
   /// strings, diagnosing any conflicts.

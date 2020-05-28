@@ -195,6 +195,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
       return;
     }
 
+    Mod->addFile(*FUnit);
     Mod->setHasResolvedImports();
   }
 
