@@ -17,10 +17,12 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 
 namespace swift {
