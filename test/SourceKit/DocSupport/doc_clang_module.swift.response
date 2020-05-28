@@ -6525,7 +6525,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_1",
-    key.usr: "c:Foo.h@3720@macro@FOO_MACRO_1",
+    key.usr: "c:Foo.h@3836@macro@FOO_MACRO_1",
     key.offset: 5394,
     key.length: 30,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_1</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6533,7 +6533,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_2",
-    key.usr: "c:Foo.h@3742@macro@FOO_MACRO_2",
+    key.usr: "c:Foo.h@3858@macro@FOO_MACRO_2",
     key.offset: 5425,
     key.length: 30,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_2</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6541,7 +6541,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_3",
-    key.usr: "c:Foo.h@3764@macro@FOO_MACRO_3",
+    key.usr: "c:Foo.h@3880@macro@FOO_MACRO_3",
     key.offset: 5456,
     key.length: 30,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_3</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6549,7 +6549,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_4",
-    key.usr: "c:Foo.h@3828@macro@FOO_MACRO_4",
+    key.usr: "c:Foo.h@3944@macro@FOO_MACRO_4",
     key.offset: 5487,
     key.length: 31,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_4</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6557,7 +6557,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_5",
-    key.usr: "c:Foo.h@3860@macro@FOO_MACRO_5",
+    key.usr: "c:Foo.h@3976@macro@FOO_MACRO_5",
     key.offset: 5519,
     key.length: 31,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_5</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt64V\">UInt64</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6565,7 +6565,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_6",
-    key.usr: "c:Foo.h@3902@macro@FOO_MACRO_6",
+    key.usr: "c:Foo.h@4018@macro@FOO_MACRO_6",
     key.offset: 5551,
     key.length: 38,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_6</decl.name>: <decl.var.type><ref.typealias usr=\"c:Foo.h@T@typedef_int_t\">typedef_int_t</ref.typealias></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6573,7 +6573,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_7",
-    key.usr: "c:Foo.h@3943@macro@FOO_MACRO_7",
+    key.usr: "c:Foo.h@4059@macro@FOO_MACRO_7",
     key.offset: 5590,
     key.length: 38,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_7</decl.name>: <decl.var.type><ref.typealias usr=\"c:Foo.h@T@typedef_int_t\">typedef_int_t</ref.typealias></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6581,7 +6581,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_8",
-    key.usr: "c:Foo.h@3984@macro@FOO_MACRO_8",
+    key.usr: "c:Foo.h@4100@macro@FOO_MACRO_8",
     key.offset: 5629,
     key.length: 29,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_8</decl.name>: <decl.var.type><ref.struct usr=\"s:s4Int8V\">Int8</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6589,7 +6589,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_9",
-    key.usr: "c:Foo.h@4015@macro@FOO_MACRO_9",
+    key.usr: "c:Foo.h@4131@macro@FOO_MACRO_9",
     key.offset: 5659,
     key.length: 30,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_9</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6597,7 +6597,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_10",
-    key.usr: "c:Foo.h@4045@macro@FOO_MACRO_10",
+    key.usr: "c:Foo.h@4161@macro@FOO_MACRO_10",
     key.offset: 5690,
     key.length: 31,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_10</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int16V\">Int16</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6605,7 +6605,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_11",
-    key.usr: "c:Foo.h@4079@macro@FOO_MACRO_11",
+    key.usr: "c:Foo.h@4195@macro@FOO_MACRO_11",
     key.offset: 5722,
     key.length: 29,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_11</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6613,7 +6613,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_OR",
-    key.usr: "c:Foo.h@4112@macro@FOO_MACRO_OR",
+    key.usr: "c:Foo.h@4228@macro@FOO_MACRO_OR",
     key.offset: 5752,
     key.length: 31,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_OR</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6621,7 +6621,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_AND",
-    key.usr: "c:Foo.h@4161@macro@FOO_MACRO_AND",
+    key.usr: "c:Foo.h@4277@macro@FOO_MACRO_AND",
     key.offset: 5784,
     key.length: 32,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_AND</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6629,7 +6629,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_BITWIDTH",
-    key.usr: "c:Foo.h@4211@macro@FOO_MACRO_BITWIDTH",
+    key.usr: "c:Foo.h@4327@macro@FOO_MACRO_BITWIDTH",
     key.offset: 5817,
     key.length: 38,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_BITWIDTH</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt64V\">UInt64</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6637,7 +6637,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_SIGNED",
-    key.usr: "c:Foo.h@4266@macro@FOO_MACRO_SIGNED",
+    key.usr: "c:Foo.h@4382@macro@FOO_MACRO_SIGNED",
     key.offset: 5856,
     key.length: 36,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_SIGNED</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6645,7 +6645,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_REDEF_1",
-    key.usr: "c:Foo.h@4477@macro@FOO_MACRO_REDEF_1",
+    key.usr: "c:Foo.h@4593@macro@FOO_MACRO_REDEF_1",
     key.offset: 5893,
     key.length: 36,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_REDEF_1</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6653,7 +6653,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_MACRO_REDEF_2",
-    key.usr: "c:Foo.h@4534@macro@FOO_MACRO_REDEF_2",
+    key.usr: "c:Foo.h@4650@macro@FOO_MACRO_REDEF_2",
     key.offset: 5930,
     key.length: 36,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_REDEF_2</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
@@ -6920,7 +6920,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FOO_NIL",
-    key.usr: "c:Foo.h@5323@macro@FOO_NIL",
+    key.usr: "c:Foo.h@5439@macro@FOO_NIL",
     key.offset: 6822,
     key.length: 15,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_NIL</decl.name>: <decl.var.type><tuple>()</tuple></decl.var.type></decl.var.global>",
