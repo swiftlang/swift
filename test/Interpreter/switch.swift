@@ -282,4 +282,24 @@ SwitchTestSuite.test("Enum Initialization Leaks") {
   }
 }
 
+SwitchTestSuite.test("Destroy all elements: protocol and trivial") {
+  enum ProtocolAndTrivial {
+    case a(P)
+    case b(Int)
+    case c(LifetimeTracked)
+  }
+
+  func testEnumWithProtocolAndTrivial(_ e: ProtocolAndTrivial) -> Bool {
+    switch (e) {
+    case .a(_): return true
+    case .b(_): return true
+    case .c(_): return true
+    }
+  }
+  
+  do {
+    testEnumWithProtocolAndTrivial(.c(LifetimeTracked(0)))
+  }
+}
+
 runAllTests()

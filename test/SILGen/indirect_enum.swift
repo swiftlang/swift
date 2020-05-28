@@ -225,7 +225,8 @@ func switchTreeA<T>(_ x: TreeA<T>) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s13indirect_enum11switchTreeB{{[_0-9a-zA-Z]*}}F
 func switchTreeB<T>(_ x: TreeB<T>) {
-  // CHECK:       copy_addr %0 to [initialization] [[SCRATCH:%.*]] :
+  // CHECK:       [[SCRATCH:%.*]] = alloc_stack
+  // CHECK:       copy_addr %0 to [initialization] [[SCRATCH]]
   // CHECK:       switch_enum_addr [[SCRATCH]]
   switch x {
 

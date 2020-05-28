@@ -191,9 +191,9 @@ struct Z : P { func p() {} }
 
 // CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_41pyAA1P_p_tF : $@convention(thin) (@in_guaranteed P) -> () {
 func test_var_4(p p: P) {
+  // CHECK:   [[PAIR:%.*]] = alloc_stack $(P, Int)
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   switch (p, foo()) {
-  // CHECK:   [[PAIR:%.*]] = alloc_stack $(P, Int)
   // CHECK:   store
   // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
   // CHECK:   [[T0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 1
@@ -215,7 +215,7 @@ func test_var_4(p p: P) {
   // CHECK:   function_ref @$s10switch_var1a1xySi_tF
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   dealloc_stack [[TMP]]
-  // CHECK:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK:   destroy_addr [[PAIR]]
   // CHECK:   dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
@@ -249,7 +249,7 @@ func test_var_4(p p: P) {
   // CHECK:   function_ref @$s10switch_var1b1xySi_tF
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   dealloc_stack [[TMP]]
-  // CHECK:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK:   destroy_addr [[PAIR]]
   // CHECK:   dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT]]
     b(x: y)
@@ -291,9 +291,8 @@ func test_var_4(p p: P) {
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1d1xySi_tF
   // CHECK:   destroy_value [[WADDR]]
-  // CHECK-NEXT:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK-NEXT:   destroy_addr [[PAIR]]
   // CHECK-NEXT:   dealloc_stack [[PAIR]]
-  // CHECK-NEXT:   dealloc_stack
   // CHECK-NEXT:   br [[CONT]]
     d(x: w)
   }
