@@ -481,6 +481,47 @@ void VJPEmitter::visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
   visitSwitchEnumInstBase(seai);
 }
 
+void VJPEmitter::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
+  // Build pullback struct value for original block.
+  auto *pbStructVal = buildPullbackValueStructValue(ccbi->getParent());
+  // Create a new `checked_cast_branch` instruction.
+  getBuilder().createCheckedCastBranch(
+      ccbi->getLoc(), ccbi->isExact(), getOpValue(ccbi->getOperand()),
+      getOpType(ccbi->getTargetLoweredType()),
+      getOpASTType(ccbi->getTargetFormalType()),
+      createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getSuccessBB()),
+      createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getFailureBB()),
+      ccbi->getTrueBBCount(), ccbi->getFalseBBCount());
+}
+
+void VJPEmitter::visitCheckedCastValueBranchInst(
+    CheckedCastValueBranchInst *ccvbi) {
+  // Build pullback struct value for original block.
+  auto *pbStructVal = buildPullbackValueStructValue(ccvbi->getParent());
+  // Create a new `checked_cast_value_branch` instruction.
+  getBuilder().createCheckedCastValueBranch(
+      ccvbi->getLoc(), getOpValue(ccvbi->getOperand()),
+      getOpASTType(ccvbi->getSourceFormalType()),
+      getOpType(ccvbi->getTargetLoweredType()),
+      getOpASTType(ccvbi->getTargetFormalType()),
+      createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getSuccessBB()),
+      createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getFailureBB()));
+}
+
+void VJPEmitter::visitCheckedCastAddrBranchInst(
+    CheckedCastAddrBranchInst *ccabi) {
+  // Build pullback struct value for original block.
+  auto *pbStructVal = buildPullbackValueStructValue(ccabi->getParent());
+  // Create a new `checked_cast_addr_branch` instruction.
+  getBuilder().createCheckedCastAddrBranch(
+      ccabi->getLoc(), ccabi->getConsumptionKind(), getOpValue(ccabi->getSrc()),
+      getOpASTType(ccabi->getSourceFormalType()), getOpValue(ccabi->getDest()),
+      getOpASTType(ccabi->getTargetFormalType()),
+      createTrampolineBasicBlock(ccabi, pbStructVal, ccabi->getSuccessBB()),
+      createTrampolineBasicBlock(ccabi, pbStructVal, ccabi->getFailureBB()),
+      ccabi->getTrueBBCount(), ccabi->getFalseBBCount());
+}
+
 void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   // If callee should not be differentiated, do standard cloning.
   if (!pullbackInfo.shouldDifferentiateApplySite(ai)) {

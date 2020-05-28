@@ -153,6 +153,12 @@ public:
 
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai);
 
+  void visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi);
+
+  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *ccvbi);
+
+  void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi);
+
   // If an `apply` has active results or active inout arguments, replace it
   // with an `apply` of its VJP.
   void visitApplyInst(ApplyInst *ai);
