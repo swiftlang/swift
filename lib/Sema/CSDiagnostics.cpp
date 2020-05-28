@@ -6407,7 +6407,12 @@ bool MissingRawRepresentativeInitFailure::diagnoseAsError() {
     return false;
 
   auto diagnostic = emitDiagnostic(*message, ValueType, RawReprType);
+  fixIt(diagnostic);
+  return true;
+}
 
+void MissingRawRepresentativeInitFailure::fixIt(
+    InFlightDiagnostic &diagnostic) const {
   if (auto *E = getAsExpr(getAnchor())) {
     auto range = E->getSourceRange();
     auto rawReprObjType = RawReprType->getOptionalObjectType();
@@ -6455,6 +6460,33 @@ bool MissingRawRepresentativeInitFailure::diagnoseAsError() {
           .fixItInsertAfter(range.End, ") ?? <#default value#>");
     }
   }
+}
 
-  return true;
+bool MissingRawRepresentativeInitFailure::diagnoseAsNote() {
+  auto *locator = getLocator();
+
+  Optional<InFlightDiagnostic> diagnostic;
+  if (locator->isForContextualType()) {
+    auto overload = getCalleeOverloadChoiceIfAvailable(locator);
+    if (!overload)
+      return false;
+
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      diagnostic.emplace(emitDiagnosticAt(
+          decl, diag::cannot_convert_candidate_result_to_contextual_type,
+          decl->getName(), ValueType, RawReprType));
+    }
+  } else if (auto argConv =
+                 locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
+    diagnostic.emplace(
+        emitDiagnostic(diag::candidate_has_invalid_argument_at_position,
+                       RawReprType, argConv->getParamIdx(), /*inOut=*/false));
+  }
+
+  if (diagnostic) {
+    fixIt(*diagnostic);
+    return true;
+  }
+
+  return false;
 }

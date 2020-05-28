@@ -2128,6 +2128,10 @@ public:
         ValueType(resolveType(valueType)) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic) const;
 };
 
 } // end namespace constraints
