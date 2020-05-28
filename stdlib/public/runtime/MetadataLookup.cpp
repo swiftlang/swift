@@ -988,8 +988,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
   // requirements and fill in the generic arguments vector.
   if (!genericParamCounts.empty()) {
     // Compute the set of generic arguments "as written".
-    SmallVector<const Metadata *, 8> allGenericArgs;
-    
+    llvm::SmallVector<const Metadata *, 8> allGenericArgs;
+
     // If we have a parent, gather it's generic arguments "as written".
     if (parent) {
       gatherWrittenGenericArgs(parent, parent->getTypeContextDescriptor(),
@@ -1183,16 +1183,16 @@ public:
     if (!descriptor)
       return BuiltType();
     auto outerContext = descriptor->Parent.get();
-    
-    SmallVector<BuiltType, 8> allGenericArgs;
+
+    llvm::SmallVector<BuiltType, 8> allGenericArgs;
     for (auto argSet : genericArgs) {
       allGenericArgs.append(argSet.begin(), argSet.end());
     }
     
     // Gather the generic parameters we need to parameterize the opaque decl.
-    SmallVector<unsigned, 8> genericParamCounts;
-    SmallVector<const void *, 8> allGenericArgsVec;
-    
+    llvm::SmallVector<unsigned, 8> genericParamCounts;
+    llvm::SmallVector<const void *, 8> allGenericArgsVec;
+
     if (!_gatherGenericParameters(outerContext,
                                   allGenericArgs,
                                   BuiltType(), /* no parent */
@@ -1291,8 +1291,8 @@ public:
 
     // Figure out the various levels of generic parameters we have in
     // this type.
-    SmallVector<unsigned, 8> genericParamCounts;
-    SmallVector<const void *, 8> allGenericArgsVec;
+    llvm::SmallVector<unsigned, 8> genericParamCounts;
+    llvm::SmallVector<const void *, 8> allGenericArgsVec;
 
     if (!_gatherGenericParameters(typeDecl,
                                   genericArgs,
@@ -1366,8 +1366,8 @@ public:
   BuiltType
   createFunctionType(llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
                      BuiltType result, FunctionTypeFlags flags) const {
-    SmallVector<BuiltType, 8> paramTypes;
-    SmallVector<uint32_t, 8> paramFlags;
+    llvm::SmallVector<BuiltType, 8> paramTypes;
+    llvm::SmallVector<uint32_t, 8> paramFlags;
 
     // Fill in the parameters.
     paramTypes.reserve(params.size());
@@ -2032,7 +2032,7 @@ void swift::gatherWrittenGenericArgs(
   // canonicalized away. Use same-type requirements to reconstitute them.
 
   // Retrieve the mapping information needed for depth/index -> flat index.
-  SmallVector<unsigned, 8> genericParamCounts;
+  llvm::SmallVector<unsigned, 8> genericParamCounts;
   (void)_gatherGenericParameterCounts(description, genericParamCounts,
                                       BorrowFrom);
 

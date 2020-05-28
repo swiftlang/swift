@@ -36,8 +36,8 @@ namespace llvm {
   template <typename T, unsigned N> class SmallPtrSet;
 #if !defined(swiftCore_EXPORTS)
   template <typename T> class SmallVectorImpl;
-#endif
   template <typename T, unsigned N> class SmallVector;
+#endif
   template <unsigned N> class SmallString;
   template <typename T, unsigned N> class SmallSetVector;
 #if !defined(swiftCore_EXPORTS)
@@ -86,8 +86,8 @@ namespace swift {
   using llvm::SmallPtrSetImpl;
   using llvm::SmallSetVector;
   using llvm::SmallString;
-  using llvm::SmallVector;
 #if !defined(swiftCore_EXPORTS)
+  using llvm::SmallVector;
   using llvm::SmallVectorImpl;
 #endif
   using llvm::StringLiteral;
