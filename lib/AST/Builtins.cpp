@@ -1740,6 +1740,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   IITDescriptor D = Table.front();
   Table = Table.slice(1);
   switch (D.Kind) {
+  case IITDescriptor::BFloat:
   case IITDescriptor::MMX:
   case IITDescriptor::Metadata:
   case IITDescriptor::ExtendArgument:
