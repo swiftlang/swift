@@ -2123,8 +2123,9 @@ public:
   MissingRawRepresentativeInitFailure(const Solution &solution,
                                       Type rawReprType, Type valueType,
                                       ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), RawReprType(rawReprType),
-        ValueType(valueType) {}
+      : FailureDiagnostic(solution, locator),
+        RawReprType(resolveType(rawReprType)),
+        ValueType(resolveType(valueType)) {}
 
   bool diagnoseAsError() override;
 };
