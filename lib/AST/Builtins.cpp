@@ -1762,6 +1762,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Half:
     return Context.TheIEEE16Type;
   case IITDescriptor::Float:
+  case IITDescriptor::BFloat:
     return Context.TheIEEE32Type;
   case IITDescriptor::Double:
     return Context.TheIEEE64Type;
