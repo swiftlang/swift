@@ -749,7 +749,10 @@ bool irgen::isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
       auto superclassType =
           type->getSuperclass(/*useArchetypes=*/false)->getCanonicalType();
       if (!isInitializableTypeMetadataStaticallyAddressable(IGM,
-                                                            superclassType)) {
+                                                            superclassType) &&
+          !tryEmitConstantHeapMetadataRef(
+              IGM, superclassType,
+              /*allowDynamicUninitialized=*/false)) {
         return false;
       }
     }
@@ -2171,12 +2174,21 @@ emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
     return;
   }
   initializedTypes.insert(theType);
-  llvm::Function *accessor =
-      IGF.IGM.getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
-          theType, NotForDefinition);
+  auto *classDecl = theType->getClassOrBoundGenericClass();
+  assert(classDecl);
+  if (classDecl->isGenericContext()) {
+    llvm::Function *accessor =
+        IGF.IGM.getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
+            theType, NotForDefinition);
 
-  auto request = DynamicMetadataRequest(MetadataState::Complete);
-  IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, {}, request);
+    auto request = DynamicMetadataRequest(MetadataState::Complete);
+    IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, {}, request);
+  } else {
+    llvm::Function *accessor =
+        IGF.IGM.getAddrOfTypeMetadataAccessFunction(theType, NotForDefinition);
+    auto request = DynamicMetadataRequest(MetadataState::Complete);
+    IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, {}, request);
+  }
 }
 
 MetadataResponse
@@ -2196,10 +2208,6 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   assert(nominal->isGenericContext());
   assert(!theType->hasUnboundGenericType());
 
-  auto *uninitializedMetadata = IGF.IGM.getAddrOfTypeMetadata(theType);
-  initializedTypes.insert(theType);
-  auto *initializedMetadata =
-      emitIdempotentClassMetadataInitialization(IGF, uninitializedMetadata);
   auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
   auto substitutions =
       theType->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), nominal);
@@ -2219,12 +2227,14 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   if (superclassType) {
     auto superclass = superclassType->getCanonicalType();
     auto *superclassNominal = superclass->getAnyNominal();
-    if (superclassNominal->isGenericContext()) {
-      emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
-          IGF, superclassType->getCanonicalType(), initializedTypes);
-    }
+    emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
+        IGF, superclassType->getCanonicalType(), initializedTypes);
   }
 
+  auto *uninitializedMetadata = IGF.IGM.getAddrOfTypeMetadata(theType);
+  initializedTypes.insert(theType);
+  auto *initializedMetadata =
+      emitIdempotentClassMetadataInitialization(IGF, uninitializedMetadata);
   return MetadataResponse::forComplete(initializedMetadata);
 }
 

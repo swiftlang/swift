@@ -329,8 +329,8 @@ doit()
 
 //         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4]]LLCyAA9Argument1ACLLCySiGAFySSGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]}} {
 //         CHECK: entry:
-// CHECK-unknown:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
-// CHECK-unknown:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySSGMb"([[INT]] 0)
+//         CHECK:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
+//         CHECK:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySSGMb"([[INT]] 0)
 // CHECK-unknown:  ret
 //   CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call %objc_class* @objc_opt_self(
 //              :    %objc_class* bitcast (
@@ -375,8 +375,6 @@ doit()
 //              :    )
 //              :  )
 //   CHECK-apple:  [[INITIALIZED_METADATA:%[0-9]+]] = bitcast %objc_class* [[INITIALIZED_CLASS]] to %swift.type*
-//   CHECK-apple:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
-//   CHECK-apple:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySSGMb"([[INT]] 0)
 //   CHECK-apple:  [[PARTIAL_METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, %swift.type* [[INITIALIZED_METADATA]], 0
 //   CHECK-apple:  [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
 //   CHECK-apple:  ret %swift.metadata_response [[METADATA_RESPONSE]]
