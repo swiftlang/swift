@@ -75,12 +75,10 @@ extension _StringGuts {
   }
   
   internal init(
-    taggedConstantCocoa: AnyObject,
+    taggedConstantCocoa cocoa: AnyObject,
     length: Int
   ) {
-    self.init(_StringObject(
-      taggedConstantCocoa: cocoa,
-      length: length))
+    self.init(_StringObject(taggedConstantCocoa: cocoa, length: length))
   }
 }
 

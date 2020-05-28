@@ -233,12 +233,12 @@ extension _StringObject {
   internal init(
     objcConstantTaggedPointerBits: UInt64, countAndFlags: CountAndFlags
   ) {
-    let assertionMask = 0xF000_0000_0000_0000
+    let assertionMask:UInt64 = 0xF000_0000_0000_0000
     // The incoming constant tagged NSString's top nibble should be 1100
-    let assertionValue = 0xC000_0000_0000_0000
+    let assertionValue:UInt64 = 0xC000_0000_0000_0000
     precondition(objcConstantTaggedPointerBits & assertionMask == assertionValue)
     let builtinValueBits: Builtin.Int64 = objcConstantTaggedPointerBits._value
-    let discriminator = StringObject.Nibbles.taggedConstantCocoa
+    let discriminator = _StringObject.Nibbles.taggedConstantCocoa()
     let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
       bridgeObject: Builtin.valueToBridgeObject(Builtin.stringObjectOr_Int64(
@@ -403,7 +403,7 @@ extension _StringObject.Nibbles {
   
   // Discriminator for bridged constant tagged pointer NSStrings
   // Immortal, bridged, and foreign
-  internal static func taggedConstantCocoa -> UInt64 {
+  internal static func taggedConstantCocoa() -> UInt64 {
     return 0xD000_0000_0000_0000
   }
 }
@@ -1021,18 +1021,17 @@ extension _StringObject {
 #endif
   }
   
-#if arch(arm64) && runtime(ObjC)
   internal init(
-    taggedConstantCocoa: AnyObject, length: Int
+    taggedConstantCocoa cocoa: AnyObject, length: Int
   ) {
     let countAndFlags = CountAndFlags(sharedCount: length, isASCII: true)
     self.init(
-      objcConstantTaggedPointerBits: cocoa, countAndFlags: countAndFlags
+      objcConstantTaggedPointerBits: unsafeBitCast(cocoa, to: UInt64.self),
+      countAndFlags: countAndFlags
     )
     _internalInvariant(self.cocoaObject == Builtin.reinterpretCast(cocoa))
     _internalInvariant(self.largeCount == length)
   }
-#endif
 
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
