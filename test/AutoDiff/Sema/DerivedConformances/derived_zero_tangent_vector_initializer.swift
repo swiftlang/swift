@@ -102,6 +102,15 @@ enum SelfTangentVectorEnum: Differentiable & AdditiveArithmetic {
   // Expected fallback `zeroTangentVectorInitializer` synthesis (2).
 }
 
+enum CustomTangentVectorEnum<T: Differentiable>: Differentiable {
+  case a(T)
+
+  typealias TangentVector = T.TangentVector
+  mutating func move(along direction: TangentVector) {}
+
+  // Expected fallback `zeroTangentVectorInitializer` synthesis (2).
+}
+
 // CHECK-LABEL: // MemberwiseTangentVectorStruct.zeroTangentVectorInitializer.getter
 // CHECK-NEXT: sil hidden [_semantics "autodiff.nonvarying"] [ossa] @${{.*}}MemberwiseTangentVectorStructV0bgH11InitializerAC0gH0Vycvg : $@convention(method) (MemberwiseTangentVectorStruct) -> @owned @callee_guaranteed () -> MemberwiseTangentVectorStruct.TangentVector {
 // CHECK: bb0([[SELF:%.*]] : $MemberwiseTangentVectorStruct):
@@ -183,6 +192,13 @@ enum SelfTangentVectorEnum: Differentiable & AdditiveArithmetic {
 // CHECK:   function_ref @${{.*}}SelfTangentVectorEnumO0bgH11InitializerACycvgACycfU5_
 // CHECK: }
 
+// CHECK-LABEL: // CustomTangentVectorEnum.zeroTangentVectorInitializer.getter
+// CHECK-NEXT: sil hidden [_semantics "autodiff.nonvarying"] [ossa] @${{.*}}CustomTangentVectorEnumO0bgH11Initializer0gH0Qzycvg : $@convention(method) <T where T : Differentiable> (@in_guaranteed CustomTangentVectorEnum<T>) -> @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T.TangentVector> {
+// CHECK: bb0([[SELF:%.*]] : $*CustomTangentVectorEnum<T>):
+// CHECK:   // function_ref closure #8 in CustomTangentVectorEnum.zeroTangentVectorInitializer.getter
+// CHECK:   function_ref @${{.*}}CustomTangentVectorEnumO0bgH11Initializer0gH0QzycvgAFycfU6_
+// CHECK: }
+
 // CHECK-LABEL: // closure #1 in MemberwiseTangentVectorStruct.zeroTangentVectorInitializer.getter
 // CHECK-NEXT: sil private [ossa] @${{.*}}MemberwiseTangentVectorStructV0bgH11InitializerAC0gH0VycvgAFycfU_ : $@convention(thin) (@guaranteed @callee_guaranteed () -> Float, @guaranteed @callee_guaranteed () -> Double) -> MemberwiseTangentVectorStruct.TangentVector {
 // CHECK:   // function_ref MemberwiseTangentVectorStruct.TangentVector.init(x:y:)
@@ -225,4 +241,9 @@ enum SelfTangentVectorEnum: Differentiable & AdditiveArithmetic {
 // CHECK-NEXT: sil private [ossa] @${{.*}}SelfTangentVectorEnumO0bgH11InitializerACycvgACycfU5_ : $@convention(thin) () -> @owned SelfTangentVectorEnum {
 // CHECK:   // function_ref static SelfTangentVectorEnum.zero.getter
 // CHECK:   function_ref @${{.*}}SelfTangentVectorEnumO0B0ACvgZ : $@convention(method) (@thin SelfTangentVectorEnum.Type) -> @owned SelfTangentVectorEnum
+// CHECK: }
+
+// CHECK-LABEL: // closure #8 in CustomTangentVectorEnum.zeroTangentVectorInitializer.getter
+// CHECK-NEXT: sil private [ossa] @$s39derived_zero_tangent_vector_initializer23CustomTangentVectorEnumO0bgH11Initializer0gH0QzycvgAFycfU6_ : $@convention(thin) <T where T : Differentiable> () -> @out T.TangentVector {
+// CHECK:   witness_method $T.TangentVector, #AdditiveArithmetic.zero!getter
 // CHECK: }
