@@ -884,8 +884,8 @@ public:
       assert(Region.hasStartLoc() && "invalid region");
       assert(Region.hasEndLoc() && "incomplete region");
 
-      auto Start = SM.getPresumedLineAndColumnForLoc(Region.getStartLoc());
-      auto End = SM.getPresumedLineAndColumnForLoc(Region.getEndLoc());
+      auto Start = SM.getLineAndColumnInBuffer(Region.getStartLoc());
+      auto End = SM.getLineAndColumnInBuffer(Region.getEndLoc());
       assert(Start.first <= End.first && "region start and end out of order");
 
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,
