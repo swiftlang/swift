@@ -363,6 +363,7 @@ public:
   ArrayRef<ImplicitImport> getImplicitImports() const;
 
   ArrayRef<FileUnit *> getFiles() {
+    assert(!Files.empty() || failedToLoad());
     return Files;
   }
   ArrayRef<const FileUnit *> getFiles() const {
