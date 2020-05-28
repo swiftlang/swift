@@ -422,6 +422,8 @@ void LinearMapInfo::generateDifferentiationDataStructures(
         // initialization is linear and handled separately.
         if (!shouldDifferentiateApplySite(ai) || isArrayLiteralIntrinsic(ai))
           continue;
+        if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC))
+          continue;
         LLVM_DEBUG(getADDebugStream()
                    << "Adding linear map struct field for " << *ai);
         addLinearMapToStruct(context, ai);
