@@ -152,7 +152,8 @@ public:
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
+         ArrayRef<StringRef> FrontendArgs = {});
 
   static std::vector<std::string>
   getClangArguments(ASTContext &ctx, const ClangImporterOptions &importerOpts);

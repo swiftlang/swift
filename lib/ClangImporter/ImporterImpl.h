@@ -390,8 +390,8 @@ private:
   /// Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::MangleContext> Mangler;
 
-  /// Clang arguments used to create the Clang invocation.
-  std::vector<std::string> ClangArgs;
+  /// Swift arguments used to create the Clang invocation.
+  std::vector<std::string> SwiftArgs;
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;

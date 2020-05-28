@@ -126,6 +126,7 @@ namespace swift {
 class LangOptions;
 class SearchPathOptions;
 class CompilerInvocation;
+struct InterfaceSubContextDelegateImpl;
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
@@ -136,17 +137,14 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   explicit ModuleInterfaceLoader(
       ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
+      std::unique_ptr<InterfaceSubContextDelegateImpl> astDelegate,
       ArrayRef<std::string> ExplicitModules,
-      ArrayRef<std::string> PreferInterfaceForModules,
-      bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile,
-      bool DisableInterfaceFileLock, bool DisableImplicitModules,
-      bool DisableImplicitPCMs);
+      ArrayRef<std::string> PreferInterfaceForModules);
   std::string CacheDir;
   std::string PrebuiltCacheDir;
   bool RemarkOnRebuildFromInterface;
   bool DisableInterfaceFileLock;
-  bool DisableImplicitModules;
-  bool DisableImplicitPCMs;
+  std::unique_ptr<InterfaceSubContextDelegateImpl> astDelegate;
   ArrayRef<std::string> PreferInterfaceForModules;
   class ExplicitSwiftModuleLoader;
   ExplicitSwiftModuleLoader &ExplicitLoader;
@@ -165,13 +163,9 @@ public:
   static std::unique_ptr<ModuleInterfaceLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
+         std::unique_ptr<InterfaceSubContextDelegateImpl> astDelegate,
          ArrayRef<std::string> ExplicitModules = {},
-         ArrayRef<std::string> PreferInterfaceForModules = {},
-         bool RemarkOnRebuildFromInterface = false,
-         bool IgnoreSwiftSourceInfoFile = false,
-         bool DisableInterfaceFileLock = false,
-         bool DisableImplicitModules = false,
-         bool DisableImplicitPCMs = false);
+         ArrayRef<std::string> PreferInterfaceForModules = {});
 
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
@@ -189,18 +183,34 @@ public:
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock,
-    bool DisableImplicitModule, bool DisableImplicitPCMs);
+    InterfaceSubContextDelegate &astDelegate);
   ~ModuleInterfaceLoader();
+};
+
+struct FrontendArgsReconstructor {
+private:
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver ArgSaver;
+  std::vector<StringRef> GenericArgs;
+  CompilerInvocation subInvocation;
+public:
+  FrontendArgsReconstructor(const SearchPathOptions &searchPathOpts,
+                                  const LangOptions &langOpts,
+                                  const FrontendOptions &FEOpts,
+                                  const ClangImporterOptions &ClangOpts,
+                                  StringRef moduleCachePath);
+  ArrayRef<StringRef> getArgs() const { return GenericArgs; }
+  CompilerInvocation &getInvocation() { return subInvocation; }
+  void inheritOptionsForSearchPaths(const SearchPathOptions &SearchPathOpts,
+                                    const LangOptions &LangOpts);
+  llvm::StringSaver &getArgSaver() { return ArgSaver; }
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
 private:
   SourceManager &SM;
   DiagnosticEngine &Diags;
-  llvm::BumpPtrAllocator Allocator;
-  llvm::StringSaver ArgSaver;
-  std::vector<StringRef> GenericArgs;
-  CompilerInvocation subInvocation;
+  FrontendArgsReconstructor ArgReconstructor;
   std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
 
   template<typename ...ArgTypes>
@@ -215,8 +225,6 @@ private:
     }
     return Diags.diagnose(loc, ID, std::move(Args)...);
   }
-  void inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
-                                          const LangOptions &LangOpts);
   bool extractSwiftInterfaceVersionAndArgs(SmallVectorImpl<const char *> &SubArgs,
                                            std::string &CompilerVersion,
                                            StringRef interfacePath,
@@ -226,16 +234,10 @@ public:
                                   DiagnosticEngine &Diags,
                                   const SearchPathOptions &searchPathOpts,
                                   const LangOptions &langOpts,
-                                  ClangModuleLoader *clangImporter,
+                                  const FrontendOptions &FEOpts,
+                                  const ClangImporterOptions &ClangOpts,
                                   bool buildModuleCacheDirIfAbsent,
-                                  StringRef moduleCachePath,
-                                  StringRef prebuiltCachePath,
-                                  bool serializeDependencyHashes,
-                                  bool trackSystemDependencies,
-                                  bool remarkOnRebuildFromInterface,
-                                  bool disableInterfaceFileLock,
-                                  bool disableImplicitModule,
-                                  bool disableImplicitPCMs);
+                                  StringRef moduleCachePath);
   bool runInSubContext(StringRef moduleName,
                        StringRef interfacePath,
                        StringRef outputPath,
@@ -255,6 +257,7 @@ public:
                                     llvm::SmallString<256> &OutPath,
                                     StringRef &CacheHash);
   std::string getCacheHash(StringRef useInterfacePath);
+  FrontendOptions &getFrontendOpts();
 };
 }
 

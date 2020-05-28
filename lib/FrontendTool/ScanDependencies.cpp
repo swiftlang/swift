@@ -71,17 +71,10 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
   auto &FEOpts = instance.getInvocation().getFrontendOptions();
   InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
                                               ctx.SearchPathOpts, ctx.LangOpts,
-                                              ctx.getClangModuleLoader(),
+                                              FEOpts,
+                                              instance.getInvocation().getClangImporterOptions(),
                                               /*buildModuleCacheDirIfAbsent*/false,
-                                              ModuleCachePath,
-                                              FEOpts.PrebuiltModuleCachePath,
-                                              FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                              FEOpts.TrackSystemDeps,
-                                              FEOpts.RemarkOnRebuildFromModuleInterface,
-                                              FEOpts.DisableInterfaceFileLock,
-                                              FEOpts.DisableImplicitModules,
-                                              instance.getInvocation()
-                                                .getClangImporterOptions().DisableImplicitPCMs);
+                                              ModuleCachePath);
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {

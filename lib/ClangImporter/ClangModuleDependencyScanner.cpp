@@ -210,34 +210,19 @@ void ClangImporter::recordModuleDependencies(
     for (const auto &fileDep : clangModuleDep.FileDeps) {
       fileDeps.push_back(fileDep.getKey().str());
     }
-    // Inherit all Clang driver args when creating the clang importer.
-    std::vector<std::string> allArgs = Impl.ClangArgs;
-    ClangImporterOptions Opts;
-    std::vector<std::string> cc1Args;
-
-    // Calling this to convert driver args to CC1 args.
-    createClangInvocation(this, Opts, allArgs, &cc1Args);
-    std::vector<std::string> swiftArgs;
-    // We are using Swift frontend mode.
-    swiftArgs.push_back("-frontend");
+    // Inherit all Swift args when creating the clang importer.
+    std::vector<std::string> swiftArgs = Impl.SwiftArgs;
     auto addClangArg = [&](StringRef arg) {
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back("-Xclang");
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back(arg.str());
     };
-    // Add all args inheritted from creating the importer.
-    for (auto arg: cc1Args) {
-      addClangArg(arg);
-    }
+
     // Add all args reported from the Clang dependencies scanner.
     for(auto arg: clangModuleDep.NonPathCommandLine) {
       addClangArg(arg);
     }
-    // We shouldn't implicitly build Swift modules.
-    // We don't pass down "-disable-implicit-pcms" because a Clang flag
-    // "-fno-implicit-modules" is returned from the Clang dependencies scanner.
-    swiftArgs.push_back("-disable-implicit-swift-modules");
 
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");

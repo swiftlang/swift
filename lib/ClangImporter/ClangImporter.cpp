@@ -963,11 +963,13 @@ ClangImporter::createClangInvocation(ClangImporter *importer,
 std::unique_ptr<ClangImporter>
 ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
                       std::string swiftPCHHash, DependencyTracker *tracker,
-                      DWARFImporterDelegate *dwarfImporterDelegate) {
+                      DWARFImporterDelegate *dwarfImporterDelegate,
+                      ArrayRef<StringRef> FrontendArgs) {
   std::unique_ptr<ClangImporter> importer{
       new ClangImporter(ctx, importerOpts, tracker, dwarfImporterDelegate)};
-  importer->Impl.ClangArgs = getClangArguments(ctx, importerOpts);
-  ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
+  importer->Impl.SwiftArgs.insert(importer->Impl.SwiftArgs.begin(),
+                                  FrontendArgs.begin(), FrontendArgs.end());
+  std::vector<std::string> invocationArgStrs = getClangArguments(ctx, importerOpts);
 
   if (importerOpts.DumpClangDiagnostics) {
     llvm::errs() << "'";

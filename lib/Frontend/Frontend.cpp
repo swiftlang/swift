@@ -442,9 +442,18 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
+  FrontendArgsReconstructor
+    ArgReconstructor(Invocation.getSearchPathOptions(),
+                     Invocation.getLangOptions(),
+                     Invocation.getFrontendOptions(),
+                     Invocation.getClangImporterOptions(),
+                     Invocation.getClangImporterOptions().ModuleCachePath);
   std::unique_ptr<ClangImporter> clangImporter =
     ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getPCHHash(), getDependencyTracker());
+                          Invocation.getPCHHash(),
+                          getDependencyTracker(),
+                          nullptr,
+                          ArgReconstructor.getArgs());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
@@ -455,16 +464,19 @@ bool CompilerInstance::setUpModuleLoaders() {
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
     auto &FEOpts = Invocation.getFrontendOptions();
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
+    auto astDelegate =
+      std::make_unique<InterfaceSubContextDelegateImpl>(SourceMgr, Diagnostics,
+                                                        Invocation.getSearchPathOptions(),
+                                                        Invocation.getLangOptions(),
+                                                        Invocation.getFrontendOptions(),
+                                                        Invocation.getClangImporterOptions(),
+                                                        true,
+                                                        ModuleCachePath);
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
-        getDependencyTracker(), MLM,
+        getDependencyTracker(), MLM, std::move(astDelegate),
         FEOpts.ExplicitSwiftModules,
-        FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface,
-        IgnoreSourceInfoFile,
-        FEOpts.DisableInterfaceFileLock,
-        FEOpts.DisableImplicitModules,
-        Invocation.getClangImporterOptions().DisableImplicitPCMs);
+        FEOpts.PreferInterfaceForModules);
     Context->addModuleLoader(std::move(PIML));
   }
 

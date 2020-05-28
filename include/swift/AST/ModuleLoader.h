@@ -105,7 +105,6 @@ struct InterfaceSubContextDelegate {
                                         StringRef outputPath,
                                         SourceLoc diagLoc,
                     llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) = 0;
-
   virtual ~InterfaceSubContextDelegate() = default;
 };
 
