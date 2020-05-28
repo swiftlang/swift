@@ -2487,9 +2487,9 @@ public:
                                                         depth,
                                                         index);
 
-    // Always create GenericTypeParamDecls in the associated module;
-    // the real context will reparent them.
-    auto DC = MF.getAssociatedModule();
+    // Always create GenericTypeParamDecls in the associated file; the real
+    // context will reparent them.
+    auto *DC = MF.getFile();
     auto genericParam = MF.createDecl<GenericTypeParamDecl>(
         DC, MF.getIdentifier(nameID), SourceLoc(), depth, index);
     declOrOffset = genericParam;
