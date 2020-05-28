@@ -1418,6 +1418,19 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   // special `store` and `copy_addr` support.
   if (isArrayLiteralIntrinsic(ai))
     return;
+  auto loc = ai->getLoc();
+  auto *bb = ai->getParent();
+  // Handle `array.finalize_intrinsic` applications. `array.finalize_intrinsic`
+  // semantically behaves like an identity function.
+  if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC)) {
+    assert(ai->getNumArguments() == 1 &&
+           "Expected intrinsic to have one operand");
+    // Accumulate result's adjoint into argument's adjoint.
+    auto adjResult = getAdjointValue(bb, ai);
+    auto origArg = ai->getArgumentsWithoutIndirectResults().front();
+    addAdjointValue(bb, origArg, adjResult, loc);
+    return;
+  }
   // Replace a call to a function with a call to its pullback.
   auto &nestedApplyInfo = getContext().getNestedApplyInfo();
   auto applyInfoLookup = nestedApplyInfo.find(ai);
@@ -1433,7 +1446,6 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   // Get the pullback.
   auto *field = getPullbackInfo().lookUpLinearMapDecl(ai);
   assert(field);
-  auto loc = ai->getLoc();
   auto pullback = getPullbackStructElement(ai->getParent(), field);
 
   // Get the original result of the `apply` instruction.
@@ -1464,7 +1476,6 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
 
   // Get the seed (i.e. adjoint value of the original result).
   SILValue seed;
-  auto *bb = ai->getParent();
   if (origResult->getType().isObject()) {
     // Otherwise, materialize adjoint value of `ai`.
     seed = materializeAdjoint(getAdjointValue(bb, origResult), loc);
