@@ -238,9 +238,7 @@ extension _StringObject {
     let assertionValue = 0xC000_0000_0000_0000
     precondition(objcConstantTaggedPointerBits & assertionMask == assertionValue)
     let builtinValueBits: Builtin.Int64 = objcConstantTaggedPointerBits._value
-    
-    // Top nibble 1101: Immortal, bridged, foreign
-    let discriminator = 0xD000_0000_0000_0000
+    let discriminator = StringObject.Nibbles.taggedConstantCocoa
     let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
       bridgeObject: Builtin.valueToBridgeObject(Builtin.stringObjectOr_Int64(
@@ -401,6 +399,12 @@ extension _StringObject.Nibbles {
 
   internal static func largeCocoa(providesFastUTF8: Bool) -> UInt64 {
     return providesFastUTF8 ? 0x4000_0000_0000_0000 : 0x5000_0000_0000_0000
+  }
+  
+  // Discriminator for bridged constant tagged pointer NSStrings
+  // Immortal, bridged, and foreign
+  internal static func taggedConstantCocoa -> UInt64 {
+    return 0xD000_0000_0000_0000
   }
 }
 
