@@ -744,6 +744,10 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
   if (LimitStage > SourceFile::Unprocessed &&
       Invocation.getImplicitStdlibKind() == ImplicitStdlibKind::Stdlib
       && !loadStdlib()) {
+    // If we failed to load the stdlib, mark the main module as having
+    // "failed to load", as it will contain no files.
+    // FIXME: We need to better handle a missing stdlib.
+    mainModule->setFailedToLoad();
     return;
   }
 
@@ -757,8 +761,12 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
   // If we aren't in a parse-only context, load the remaining serialized inputs
   // and resolve implicit imports.
   if (LimitStage > SourceFile::Unprocessed &&
-      loadPartialModulesAndImplicitImports())
+      loadPartialModulesAndImplicitImports()) {
+    // If we failed to load a partial module, mark the main module as having
+    // "failed to load", as it may contain no files.
+    mainModule->setFailedToLoad();
     return;
+  }
 
   // Then parse all the input files.
   // FIXME: This is the only demand point for InputSourceCodeBufferIDs. We

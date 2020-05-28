@@ -94,6 +94,9 @@ Once you are able to build things successfully and have a compile-test-debug
 loop going, check out the [development tips](docs/DevelopmentTips.md) for
 better productivity while working on the compiler.
 
+You can also skim [docs/README.md](/docs/README.md) to understand what
+high-level documentation is available.
+
 ### System Requirements
 
 macOS and Ubuntu Linux LTS 18.04 are the current supported host development
