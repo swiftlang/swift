@@ -1144,18 +1144,19 @@ bool ExpandArrayIntoVarargs::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool ExplicitlyConstructRawRepresentable::diagnose(const Solution &solution,
+                                                   bool asNote) const {
+  MissingRawRepresentativeInitFailure failure(solution, RawReprType, ValueType,
+                                              getLocator());
+  return failure.diagnose(asNote);
+}
+
 ExplicitlyConstructRawRepresentable *
-ExplicitlyConstructRawRepresentable::attempt(ConstraintSystem &cs, Type argType,
-                                             Type paramType,
-                                             ConstraintLocatorBuilder locator) {
-  auto rawRepresentableType = paramType->lookThroughAllOptionalTypes();
-  auto valueType = argType->lookThroughAllOptionalTypes();
-
-  if (isValueOfRawRepresentable(cs, rawRepresentableType, valueType))
-    return new (cs.getAllocator()) ExplicitlyConstructRawRepresentable(
-        cs, valueType, rawRepresentableType, cs.getConstraintLocator(locator));
-
-  return nullptr;
+ExplicitlyConstructRawRepresentable::create(ConstraintSystem &cs,
+                                            Type rawReprType, Type valueType,
+                                            ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      ExplicitlyConstructRawRepresentable(cs, rawReprType, valueType, locator);
 }
 
 UseValueTypeOfRawRepresentative *

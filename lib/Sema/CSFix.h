@@ -1594,21 +1594,27 @@ public:
                                          ConstraintLocatorBuilder locator);
 };
 
-class ExplicitlyConstructRawRepresentable final : public AllowArgumentMismatch {
-  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type argType,
-                                      Type paramType,
+class ExplicitlyConstructRawRepresentable final : public ConstraintFix {
+  Type RawReprType;
+  Type ValueType;
+
+  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type rawReprType,
+                                      Type valueType,
                                       ConstraintLocator *locator)
-      : AllowArgumentMismatch(cs, FixKind::ExplicitlyConstructRawRepresentable,
-                              argType, paramType, locator) {}
+      : ConstraintFix(cs, FixKind::ExplicitlyConstructRawRepresentable,
+                      locator),
+        RawReprType(rawReprType), ValueType(valueType) {}
 
 public:
   std::string getName() const override {
     return "explicitly construct a raw representable type";
   }
 
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
   static ExplicitlyConstructRawRepresentable *
-  attempt(ConstraintSystem &cs, Type argType, Type paramType,
-          ConstraintLocatorBuilder locator);
+  create(ConstraintSystem &cs, Type rawTypeRepr, Type valueType,
+         ConstraintLocator *locator);
 };
 
 class UseValueTypeOfRawRepresentative final : public AllowArgumentMismatch {
