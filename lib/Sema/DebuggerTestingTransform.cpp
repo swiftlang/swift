@@ -15,6 +15,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTWalker.h"
@@ -32,35 +33,6 @@
 using namespace swift;
 
 namespace {
-
-/// Find available closure discriminators.
-///
-/// The parser typically takes care of assigning unique discriminators to
-/// closures, but the parser is unavailable to this transform.
-class DiscriminatorFinder : public ASTWalker {
-  unsigned NextDiscriminator = 0;
-
-public:
-  Expr *walkToExprPost(Expr *E) override {
-    auto *ACE = dyn_cast<AbstractClosureExpr>(E);
-    if (!ACE)
-      return E;
-
-    unsigned Discriminator = ACE->getDiscriminator();
-    assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
-           "Existing closures should have valid discriminators");
-    if (Discriminator >= NextDiscriminator)
-      NextDiscriminator = Discriminator + 1;
-    return E;
-  }
-
-  // Get the next available closure discriminator.
-  unsigned getNextDiscriminator() {
-    if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
-      llvm::report_fatal_error("Out of valid closure discriminators");
-    return NextDiscriminator++;
-  }
-};
 
 /// Instrument decls with sanity-checks which the debugger can evaluate.
 class DebuggerTestingTransform : public ASTWalker {

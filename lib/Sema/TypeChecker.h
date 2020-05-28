@@ -1316,6 +1316,12 @@ public:
   const StringRef Message;
 };
 
+/// Returns the protocol requirement kind of the given declaration.
+/// Used in diagnostics.
+///
+/// Asserts that the given declaration is a protocol requirement.
+diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
+
 /// Returns true if the given method is an valid implementation of a
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or

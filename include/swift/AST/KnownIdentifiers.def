@@ -223,6 +223,7 @@ IDENTIFIER(move)
 IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
 IDENTIFIER(zero)
+IDENTIFIER(zeroTangentVectorInitializer)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_
