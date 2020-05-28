@@ -2732,7 +2732,18 @@ public:
       PrettyStackTraceDecl debugStack("verifying GenericTypeParamDecl", GTPD);
 
       const DeclContext *DC = GTPD->getDeclContext();
-      if (!GTPD->getDeclContext()->isInnermostContextGeneric()) {
+
+      // Skip verification of deserialized generic param decls that have the
+      // the file set as their parent. This happens when they have not yet had
+      // their correct parent set.
+      // FIXME: This is a hack to workaround the fact that we don't necessarily
+      // parent a GenericTypeParamDecl if we just deserialize its type.
+      if (auto *fileDC = dyn_cast<FileUnit>(DC)) {
+        if (fileDC->getKind() == FileUnitKind::SerializedAST)
+          return;
+      }
+
+      if (!DC->isInnermostContextGeneric()) {
         Out << "DeclContext of GenericTypeParamDecl does not have "
                "generic params\n";
         abort();
