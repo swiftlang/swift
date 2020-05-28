@@ -167,6 +167,12 @@ and *zero* protocols; the latter is the `Any` type).
 Describes a type or function where making changes will break binary
 compatibility. See [LibraryEvolution.rst](LibraryEvolution.rst).
 
+## gardening
+
+Describes contributions which fix code that is not executed
+(such as in a manifesto or README) and written text
+(correcting typos and grammatical errors).
+
 ## generic environment
 
 Provides context for interpreting a type that may have generic parameters
