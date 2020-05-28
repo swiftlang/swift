@@ -770,12 +770,11 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
       return genericArgument && genericArgument->isGenericContext() && 
         (protocols.size() > 0);
     };
-    auto isExistential = [&]() { return argument->isExistentialType(); };
     auto metadataAccessIsTrivial = [&]() {
       return irgen::isCompleteTypeMetadataStaticallyAddressable(IGM,
                                                 argument->getCanonicalType());
     };
-    return !isGenericWithoutPrespecializedConformance() && !isExistential() && 
+    return !isGenericWithoutPrespecializedConformance() &&
            metadataAccessIsTrivial() && witnessTablesAreReferenceable();
   });
   return allWitnessTablesAreReferenceable

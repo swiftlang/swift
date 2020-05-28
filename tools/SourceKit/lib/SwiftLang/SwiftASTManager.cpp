@@ -1051,7 +1051,7 @@ ASTUnitRef ASTProducer::createASTUnit(
     if (auto SF = CompIns.getPrimarySourceFile()) {
       SILOptions SILOpts = Invocation.getSILOptions();
       auto &TC = CompIns.getSILTypes();
-      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, TC, SILOpts);
+      std::unique_ptr<SILModule> SILMod = performASTLowering(*SF, TC, SILOpts);
       runSILDiagnosticPasses(*SILMod);
     }
   }
