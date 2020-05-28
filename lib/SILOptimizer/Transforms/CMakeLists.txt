@@ -8,6 +8,7 @@ target_sources(swiftSILOptimizer PRIVATE
   ArrayCountPropagation.cpp
   ArrayElementValuePropagation.cpp
   AssumeSingleThreaded.cpp
+  COWOpts.cpp
   CSE.cpp
   ConditionForwarding.cpp
   CopyForwarding.cpp
