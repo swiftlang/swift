@@ -533,11 +533,12 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     TypeSubstCloner::visitApplyInst(ai);
     return;
   }
-  // If callee is the array literal initialization intrinsic, do standard
-  // cloning. Array literal differentiation is handled separately.
-  if (isArrayLiteralIntrinsic(ai)) {
-    LLVM_DEBUG(getADDebugStream() << "Cloning array literal intrinsic `apply`\n"
-                                  << *ai << '\n');
+  // If callee is `array.uninitialized_intrinsic`, do standard cloning.
+  // `array.unininitialized_intrinsic` differentiation is handled separately.
+  if (ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC)) {
+    LLVM_DEBUG(getADDebugStream()
+               << "Cloning `array.unininitialized_intrinsic` `apply`:\n"
+               << *ai << '\n');
     TypeSubstCloner::visitApplyInst(ai);
     return;
   }

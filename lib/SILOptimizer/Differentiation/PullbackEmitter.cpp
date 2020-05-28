@@ -272,7 +272,8 @@ void PullbackEmitter::accumulateArrayLiteralElementAddressAdjoints(
       originalValue->getDefiningInstruction());
   if (!dti)
     return;
-  if (!getAllocateUninitializedArrayIntrinsic(dti->getOperand()))
+  if (!ArraySemanticsCall(dti->getOperand(),
+                          semantics::ARRAY_UNINITIALIZED_INTRINSIC))
     return;
   if (originalValue != dti->getResult(0))
     return;
@@ -1420,9 +1421,9 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
 
 void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   assert(getPullbackInfo().shouldDifferentiateApplySite(ai));
-  // Skip `array.uninitialized_intrinsic` intrinsic applications, which have
-  // special `store` and `copy_addr` support.
-  if (isArrayLiteralIntrinsic(ai))
+  // Skip `array.uninitialized_intrinsic` applications, which have special
+  // `store` and `copy_addr` support.
+  if (ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC))
     return;
   auto loc = ai->getLoc();
   auto *bb = ai->getParent();
