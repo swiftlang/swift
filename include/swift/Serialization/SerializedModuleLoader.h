@@ -149,12 +149,13 @@ public:
   ///
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
-  FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
-                    StringRef moduleInterfacePath,
-                    std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
-                    std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-                    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-                    bool isFramework, bool treatAsPartialModule);
+  FileUnit *
+  loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
+          StringRef moduleInterfacePath,
+          std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+          std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+          std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
+          bool isFramework);
 
   /// Check whether the module with a given name can be imported without
   /// importing it.

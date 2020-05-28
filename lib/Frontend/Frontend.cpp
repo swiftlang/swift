@@ -839,8 +839,7 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports() {
     assert(PM.ModuleBuffer);
     if (!SML->loadAST(*MainModule, SourceLoc(), /*moduleInterfacePath*/"",
                       std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
-                      std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false,
-                      /*treatAsPartialModule*/true))
+                      std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false))
       hadLoadError = true;
   }
   return hadLoadError;

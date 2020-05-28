@@ -651,7 +651,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-    bool isFramework, bool treatAsPartialModule) {
+    bool isFramework) {
   assert(moduleInputBuffer);
 
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -688,8 +688,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
-        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid,
-                                                   treatAsPartialModule);
+        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
 
     // FIXME: This seems wrong. Overlay for system Clang module doesn't
     // necessarily mean it's "system" module. User can make their own overlay
@@ -963,8 +962,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   if (!loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
                std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
-               std::move(moduleSourceInfoInputBuffer),
-               isFramework, /*treatAsPartialModule*/false)) {
+               std::move(moduleSourceInfoInputBuffer), isFramework)) {
     M->setFailedToLoad();
   }
 
@@ -990,7 +988,6 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
     return nullptr;
 
   bool isFramework = false;
-  bool treatAsPartialModule = false;
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
   moduleInputBuffer = std::move(bufIter->second);
   MemoryBuffers.erase(bufIter);
@@ -1000,8 +997,7 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   if (!loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
-               std::move(moduleInputBuffer), {}, {},
-               isFramework, treatAsPartialModule)) {
+               std::move(moduleInputBuffer), {}, {}, isFramework)) {
     return nullptr;
   }
 
