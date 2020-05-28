@@ -2102,6 +2102,33 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to initialize raw representable type or convert to it
+/// a value of some other type that matches its `RawValue` type.
+///
+/// ```swift
+/// enum E : Int {
+///   case a, b, c
+/// }
+///
+/// let _: E = 0
+/// ```
+///
+/// `0` has to be wrapped into `E(rawValue: 0)` and either defaulted via `??` or
+/// force unwrapped to constitute a valid binding.
+class MissingRawRepresentativeInitFailure final : public FailureDiagnostic {
+  Type RawReprType;
+  Type ValueType;
+
+public:
+  MissingRawRepresentativeInitFailure(const Solution &solution,
+                                      Type rawReprType, Type valueType,
+                                      ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), RawReprType(rawReprType),
+        ValueType(valueType) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

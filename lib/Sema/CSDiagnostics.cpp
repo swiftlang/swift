@@ -6389,3 +6389,31 @@ bool UnableToInferKeyPathRootFailure::diagnoseAsError() {
       .fixItInsertAfter(keyPathExpr->getStartLoc(), "<#Root#>");
   return true;
 }
+
+bool MissingRawRepresentativeInitFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  Optional<Diag<Type, Type>> message;
+
+  if (locator->isForContextualType()) {
+    message = diag::cannot_convert_initializer_value;
+  } else if (locator->isForAssignment()) {
+    message = diag::cannot_convert_assign;
+  } else if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+    message = diag::cannot_convert_argument_value;
+  }
+
+  if (!message)
+    return false;
+
+  auto diagnostic = emitDiagnostic(*message, ValueType, RawReprType);
+
+  if (auto *E = getAsExpr(getAnchor())) {
+    auto range = E->getSourceRange();
+    diagnostic
+        .fixItInsert(range.Start, RawReprType->getString() + "(rawValue: ")
+        .fixItInsertAfter(range.End, ") ?? <#default value#>");
+  }
+
+  return true;
+}
