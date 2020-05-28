@@ -272,8 +272,8 @@ int main(int argc, char **argv) {
   if (CI.getASTContext().hadError())
     return 1;
 
-  auto SILMod = performSILGeneration(CI.getMainModule(), CI.getSILTypes(),
-                                     CI.getSILOptions());
+  auto SILMod = performASTLowering(CI.getMainModule(), CI.getSILTypes(),
+                                   CI.getSILOptions());
 
   // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
   // us.

@@ -1082,7 +1082,11 @@ extension RangeReplaceableCollection {
   public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Self {
-    return try Self(self.lazy.filter(isIncluded))
+    var result = Self()
+    for element in self where try isIncluded(element) {
+      result.append(element)
+    }
+    return result
   }
 }
 

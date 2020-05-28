@@ -19,7 +19,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
-#include "llvm/ADT/StringSet.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -28,7 +27,6 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/xxhash.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -85,7 +83,6 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
   InitialDepNames.push_back(interfacePath);
   InitialDepNames.insert(InitialDepNames.end(),
                          extraDependencies.begin(), extraDependencies.end());
-  llvm::StringSet<> AllDepNames;
   SmallString<128> Scratch;
 
   for (const auto &InitialDepName : InitialDepNames) {
@@ -104,7 +101,7 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
     if (!prebuiltCachePath.empty() && DepName.startswith(prebuiltCachePath))
       continue;
 
-    if (AllDepNames.insert(DepName).second && dependencyTracker) {
+    if (dependencyTracker) {
       dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
     }
 
@@ -209,7 +206,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     SILOptions &SILOpts = subInvocation.getSILOptions();
     auto Mod = SubInstance.getMainModule();
     auto &TC = SubInstance.getSILTypes();
-    auto SILMod = performSILGeneration(Mod, TC, SILOpts);
+    auto SILMod = performASTLowering(Mod, TC, SILOpts);
     if (!SILMod) {
       LLVM_DEBUG(llvm::dbgs() << "SILGen did not produce a module\n");
       return true;

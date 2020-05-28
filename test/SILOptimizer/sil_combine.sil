@@ -809,6 +809,44 @@ bb0(%0 : $C3):
   return %2 : $C1
 }
 
+// CHECK-LABEL: sil @dead_upcast
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_upcast : $@convention(thin) (C2) -> C2 {
+bb0(%0 : $C2):
+  %1 = upcast %0 : $C2 to $C1
+  strong_retain %1 : $C1
+  strong_release %0 : $C2
+  return %0 : $C2
+}
+
+// CHECK-LABEL: sil @dead_unchecked_ref_cast
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_unchecked_ref_cast : $@convention(thin) (C1) -> C1 {
+bb0(%0 : $C1):
+  %1 = unchecked_ref_cast %0 : $C1 to $C2
+  strong_retain %1 : $C2
+  strong_release %0 : $C1
+  return %0 : $C1
+}
+
+// CHECK-LABEL: sil @dead_end_cow_mutation
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_end_cow_mutation : $@convention(thin) (C1) -> C1 {
+bb0(%0 : $C1):
+  %1 = end_cow_mutation %0 : $C1
+  strong_retain %1 : $C1
+  strong_release %0 : $C1
+  return %0 : $C1
+}
 
 struct XS {
   var m: Int
@@ -2294,14 +2332,13 @@ bb0(%0 : $B, %1 : $@sil_unowned B, %2 : $AnyObject, %3: $@sil_unmanaged AnyObjec
 // CHECK-NOT:     open_existential_ref
 // CHECK:         unchecked_ref_cast [[Ref]]
 
-sil @collapse_existential_pack_unpack_unchecked_ref_cast : $@convention(thin) (MyClass) -> () {
+sil @collapse_existential_pack_unpack_unchecked_ref_cast : $@convention(thin) (MyClass) -> Builtin.NativeObject {
 bb0(%0: $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
   %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
   %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
   strong_retain %3: $Builtin.NativeObject
-  %5 = tuple ()
-  return %5 : $()
+  return %3 : $Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil @collapse_existential_pack_unpack_ref_to_raw_pointer
@@ -2531,15 +2568,12 @@ sil @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () {
 // CHECK-NOT: alloc_ref_dynamic
 // CHECK-NEXT: [[R:%[0-9]+]] = alloc_ref $E
 // CHECK-NEXT: [[C:%[0-9]+]] = upcast [[R]] : $E to $B
-// CHECK-NEXT: strong_release [[C]]
-// CHECK: return
-sil @alloc_ref_dynamic_with_upcast_metatype : $() -> () {
+// CHECK-NEXT: return [[C]]
+sil @alloc_ref_dynamic_with_upcast_metatype : $() -> B {
   %1 = metatype $@thick E.Type
   %2 = upcast %1 : $@thick E.Type to $@thick B.Type
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
-  strong_release %3 : $B
-  %4 = tuple()
-  return %4 : $()
+  return %3 : $B
 }
 
 // CHECK-LABEL: @alloc_ref_dynamic_after_successful_checked_cast_br
@@ -2570,8 +2604,7 @@ bb3 (%10: $Builtin.Int32):
 // CHECK: bb1
 // CHECK-NOT: alloc_ref_dynamic
 // CHECK:      [[R:%[0-9]+]] = alloc_ref $E
-// CHECK-NEXT: [[C:%[0-9]+]] = upcast [[R]] : $E to $B
-// CHECK-NEXT: strong_release [[C]]
+// CHECK-NEXT: strong_release [[R]]
 sil @alloc_ref_dynamic_upcast_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
   checked_cast_br [exact] %1 : $@thick B.Type to E.Type, bb1, bb2

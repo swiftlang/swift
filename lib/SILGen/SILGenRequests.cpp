@@ -30,23 +30,23 @@ namespace swift {
 } // end namespace swift
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const SILGenDescriptor &desc) {
+                           const ASTLoweringDescriptor &desc) {
   auto *MD = desc.context.dyn_cast<ModuleDecl *>();
   auto *unit = desc.context.dyn_cast<FileUnit *>();
   if (MD) {
-    out << "SIL Generation for module " << MD->getName();
+    out << "Lowering AST to SIL for module " << MD->getName();
   } else {
     assert(unit);
-    out << "SIL Generation for file ";
+    out << "Lowering AST to SIL for file ";
     simple_display(out, unit);
   }
 }
 
-SourceLoc swift::extractNearestSourceLoc(const SILGenDescriptor &desc) {
+SourceLoc swift::extractNearestSourceLoc(const ASTLoweringDescriptor &desc) {
   return SourceLoc();
 }
 
-evaluator::DependencySource SILGenerationRequest::readDependencySource(
+evaluator::DependencySource ASTLoweringRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   auto &desc = std::get<0>(getStorage());
 
@@ -60,7 +60,7 @@ evaluator::DependencySource SILGenerationRequest::readDependencySource(
   return {dyn_cast<SourceFile>(unit), evaluator::DependencyScope::Cascading};
 }
 
-ArrayRef<FileUnit *> SILGenDescriptor::getFiles() const {
+ArrayRef<FileUnit *> ASTLoweringDescriptor::getFiles() const {
   if (auto *mod = context.dyn_cast<ModuleDecl *>())
     return mod->getFiles();
 
@@ -69,7 +69,7 @@ ArrayRef<FileUnit *> SILGenDescriptor::getFiles() const {
   return llvm::makeArrayRef(*context.getAddrOfPtr1());
 }
 
-SourceFile *SILGenDescriptor::getSourceFileToParse() const {
+SourceFile *ASTLoweringDescriptor::getSourceFileToParse() const {
 #ifndef NDEBUG
   auto sfCount = llvm::count_if(getFiles(), [](FileUnit *file) {
     return isa<SourceFile>(file);

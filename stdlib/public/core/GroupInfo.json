@@ -64,6 +64,7 @@
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
     "CollectionAlgorithms.swift",
+    "EitherSequence.swift",
     "EmptyCollection.swift",
     "Stride.swift",
     "Repeat.swift",
