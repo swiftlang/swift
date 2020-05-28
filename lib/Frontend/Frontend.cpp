@@ -744,6 +744,10 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
   if (LimitStage > SourceFile::Unprocessed &&
       Invocation.getImplicitStdlibKind() == ImplicitStdlibKind::Stdlib
       && !loadStdlib()) {
+    // If we failed to load the stdlib, mark the main module as having
+    // "failed to load", as it will contain no files.
+    // FIXME: We need to better handle a missing stdlib.
+    mainModule->setFailedToLoad();
     return;
   }
 
