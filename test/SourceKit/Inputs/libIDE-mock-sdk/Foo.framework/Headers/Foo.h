@@ -143,14 +143,14 @@ int redeclaredInMultipleModulesFunc1(int a);
 
 @protocol FooProtocolDerived<FooProtocolBase>
 @end
-
+#define NS_REFINED_FOR_SWIFT __attribute__((swift_private))
 @interface FooClassBase
 - (void) fooBaseInstanceFunc0;
 - (FooClassBase *) fooBaseInstanceFunc1:(id)anObject;
 - (instancetype) init __attribute__((objc_designated_initializer));
 - (instancetype) initWithFloat:(float)f;
 - (void) fooBaseInstanceFuncOverridden;
-
+@property (readonly) int hiddenProp NS_REFINED_FOR_SWIFT;
 + (void) fooBaseClassFunc0;
 @end
 
