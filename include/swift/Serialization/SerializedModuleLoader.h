@@ -322,6 +322,8 @@ public:
   /// file.
   const version::Version &getLanguageVersionBuiltWith() const;
 
+  virtual bool hadLoadError() const override;
+
   virtual bool isSystemModule() const override;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,

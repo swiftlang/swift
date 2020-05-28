@@ -498,6 +498,10 @@ bool ModuleDecl::isClangModule() const {
 }
 
 void ModuleDecl::addFile(FileUnit &newFile) {
+  // If this is a LoadedFile, make sure it loaded without error.
+  assert(!(isa<LoadedFile>(newFile) &&
+           cast<LoadedFile>(newFile).hadLoadError()));
+
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
          !isa<SourceFile>(newFile) ||

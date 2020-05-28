@@ -1103,6 +1103,10 @@ bool SerializedASTFile::isSIB() const {
   return File.IsSIB;
 }
 
+bool SerializedASTFile::hadLoadError() const {
+  return File.hasError();
+}
+
 bool SerializedASTFile::isSystemModule() const {
   if (auto Mod = File.getUnderlyingModule()) {
     return Mod->isSystemModule();
