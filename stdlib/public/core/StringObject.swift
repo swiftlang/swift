@@ -876,13 +876,14 @@ extension _StringObject {
     }
     return object
 #else
-    if largeIsCocoa && isImmortal {
+    _internalInvariant(largeIsCocoa)
+    var bits = largeAddressBits
+    if isImmortal {
       // Object is a constant tagged pointer with bit 4 of the top nibble set
       // Clear the bit we set before trying to treat it as an object
-      return Builtin.reinterpretCast(largeAddressBits & ~0x1000_0000_0000_0000)
+      bits &= ~0x1000_0000_0000_0000
     }
-    _internalInvariant(largeIsCocoa)
-    return Builtin.reinterpretCast(largeAddressBits)
+    return Builtin.reinterpretCast(bits)
 #endif
   }
 
@@ -940,7 +941,7 @@ extension _StringObject {
     @_effects(releasenone) get {
       // Currently, all mortal objects can zero-cost bridge
       // as can immmortal bridged foreign objects
-      return !self.isImmortal || self.largeIsCocoa
+      return !isImmortal || (isLarge && largeIsCocoa)
     }
   }
 
