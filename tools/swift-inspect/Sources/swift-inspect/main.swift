@@ -82,7 +82,7 @@ func withReflectionContext(
   try body(context)
 }
 
-struct Swiftdt: ParsableCommand {
+struct SwiftInspect: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Swift runtime debug tool",
     subcommands: [
@@ -119,4 +119,4 @@ struct DumpMetadataAllocations: ParsableCommand {
   }
 }
 
-Swiftdt.main()
+SwiftInspect.main()

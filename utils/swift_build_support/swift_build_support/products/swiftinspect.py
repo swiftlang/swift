@@ -1,4 +1,4 @@
-# swift_build_support/products/swiftdt.py -----------------------*- python -*-
+# swift_build_support/products/swiftinspect.py --------------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -19,7 +19,7 @@ from .. import targets
 
 
 # Build against the current installed toolchain.
-class SwiftDT(product.Product):
+class SwiftInspect(product.Product):
     @classmethod
     def product_source_name(cls):
         return "swift-dt"
@@ -35,7 +35,7 @@ class SwiftDT(product.Product):
         run_build_script_helper(host_target, self, self.args)
 
     def should_test(self, host_target):
-        return self.args.test_swiftdt
+        return self.args.test_swift_inspect
 
     def test(self, host_target):
         """Just run a single instance of the command for both .debug and
@@ -61,7 +61,7 @@ def run_build_script_helper(host_target, product, args):
     # the assumption that each product is in its own build directory. This
     # product is not like that and has its package/tools instead in
     # ./$SOURCE_ROOT/swift/benchmark.
-    package_path = os.path.join(product.source_dir, '..', 'swift', 'tools', 'swiftdt')
+    package_path = os.path.join(product.source_dir, '..', 'swift', 'tools', 'swift-inspect')
     package_path = os.path.abspath(package_path)
 
     # We use a separate python helper to enable quicker iteration when working

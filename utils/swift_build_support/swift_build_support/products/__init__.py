@@ -26,7 +26,7 @@ from .pythonkit import PythonKit
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
-from .swiftdt import SwiftDT
+from .swiftinspect import SwiftInspect
 from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
@@ -48,7 +48,7 @@ __all__ = [
     'PlaygroundSupport',
     'PythonKit',
     'Swift',
-    'SwiftDT',
+    'SwiftInspect',
     'SwiftPM',
     'TensorFlowSwiftAPIs',
     'XCTest',
