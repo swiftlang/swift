@@ -1209,6 +1209,9 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 static void performEndOfPipelineActions(CompilerInstance &Instance) {
   assert(Instance.hasASTContext());
 
+  // Verify the AST for all the modules we've loaded.
+  Instance.getASTContext().verifyAllLoadedModules();
+
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitIndexData(Instance);
