@@ -1,6 +1,6 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
-// REQUIRES: rdar63546363
+// UNSUPPORTED: DARWIN_SIMULATOR=ios
 //
 // RUN: %empty-directory(%t)
 //
