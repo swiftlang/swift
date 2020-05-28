@@ -9,6 +9,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 
 
 // Test compilation of a module in multi-threaded compilation.
