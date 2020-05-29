@@ -196,7 +196,7 @@ SWIFT_REQUEST(TypeChecker, SuperclassTypeRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
               AccessorDecl *(AbstractStorageDecl *, AccessorKind),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyUntilRequest,
+SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
               bool(AbstractFunctionDecl *, SourceLoc),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),

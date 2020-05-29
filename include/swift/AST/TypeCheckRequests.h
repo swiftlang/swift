@@ -872,8 +872,8 @@ public:
 ///
 /// Produces true if an error occurred, false otherwise.
 /// FIXME: it would be far better to return the type-checked body.
-class TypeCheckFunctionBodyUntilRequest :
-    public SimpleRequest<TypeCheckFunctionBodyUntilRequest,
+class TypeCheckFunctionBodyRequest :
+    public SimpleRequest<TypeCheckFunctionBodyRequest,
                          bool(AbstractFunctionDecl *, SourceLoc),
                          RequestFlags::Cached|RequestFlags::DependencySource> {
 public:

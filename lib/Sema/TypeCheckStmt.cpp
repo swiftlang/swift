@@ -318,7 +318,7 @@ public:
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
   FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
 
-  SourceLoc EndTypeCheckLoc;
+  SourceLoc TargetTypeCheckLoc;
 
   /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
@@ -501,7 +501,7 @@ public:
     
     TypeCheckExprOptions options = {};
     
-    if (EndTypeCheckLoc.isValid()) {
+    if (TargetTypeCheckLoc.isValid()) {
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
       options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
@@ -1557,15 +1557,15 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   }
 
   for (auto &elem : BS->getElements()) {
-    if (EndTypeCheckLoc.isValid()) {
-      if (SM.isBeforeInBuffer(EndTypeCheckLoc, elem.getStartLoc()))
+    if (TargetTypeCheckLoc.isValid()) {
+      if (SM.isBeforeInBuffer(TargetTypeCheckLoc, elem.getStartLoc()))
         break;
 
       // NOTE: We need to check the character loc here because the target loc
       // can be inside the last token of the node. i.e. string interpolation.
       SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, elem.getEndLoc());
-      if (endLoc == EndTypeCheckLoc ||
-          SM.isBeforeInBuffer(endLoc, EndTypeCheckLoc))
+      if (endLoc == TargetTypeCheckLoc ||
+          SM.isBeforeInBuffer(endLoc, TargetTypeCheckLoc))
         continue;
     }
 
@@ -1577,7 +1577,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
 
-      if (EndTypeCheckLoc.isValid()) {
+      if (TargetTypeCheckLoc.isValid()) {
         assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
                "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
         options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
@@ -1635,7 +1635,9 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  auto res = TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  auto res =
+      evaluateOrDefault(AFD->getASTContext().evaluator,
+                        TypeCheckFunctionBodyRequest{AFD, SourceLoc()}, true);
   TypeChecker::checkFunctionErrorHandling(AFD);
   TypeChecker::computeCaptures(AFD);
   return res;
@@ -1835,9 +1837,9 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
 }
 
 bool
-TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
-                                            AbstractFunctionDecl *AFD,
-                                            SourceLoc endTypeCheckLoc) const {
+TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
+                                       AbstractFunctionDecl *AFD,
+                                       SourceLoc targetTypeCheckLoc) const {
   ASTContext &ctx = AFD->getASTContext();
 
   Optional<FunctionBodyTimer> timer;
@@ -1894,7 +1896,7 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   bool hadError = false;
   if (!alreadyTypeChecked) {
     StmtChecker SC(AFD);
-    SC.EndTypeCheckLoc = endTypeCheckLoc;
+    SC.TargetTypeCheckLoc = targetTypeCheckLoc;
     hadError = SC.typeCheckBody(body);
   }
 
@@ -1925,18 +1927,10 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
 
   // If nothing went wrong yet, perform extra checking.
-  if (!hadError && endTypeCheckLoc.isInvalid())
+  if (!hadError && targetTypeCheckLoc.isInvalid())
     performAbstractFuncDeclDiagnostics(AFD);
 
   return hadError;
-}
-
-bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                                     SourceLoc EndTypeCheckLoc) {
-  return evaluateOrDefault(
-             AFD->getASTContext().evaluator,
-             TypeCheckFunctionBodyUntilRequest{AFD, EndTypeCheckLoc},
-             true);
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {

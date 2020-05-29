@@ -540,11 +540,12 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   return !resultTy;
 }
 
-bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                               SourceLoc EndTypeCheckLoc) {
+bool swift::typeCheckAbstractFunctionBodyNodeAt(AbstractFunctionDecl *AFD,
+                                                SourceLoc TargetLoc) {
   auto &Ctx = AFD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  return !TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  return !evaluateOrDefault(Ctx.evaluator,
+                            TypeCheckFunctionBodyRequest{AFD, TargetLoc}, true);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
