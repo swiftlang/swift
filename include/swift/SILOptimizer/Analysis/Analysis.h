@@ -16,7 +16,6 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/Notifications.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
 
 namespace swift {
