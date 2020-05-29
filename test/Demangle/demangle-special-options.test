@@ -1,0 +1,4 @@
+RUN: swift-demangle -display-stdlib-module=true sSi | %FileCheck %s --check-prefix=SWIFT-INT
+SWIFT-INT: {{ Swift.Int$}}
+RUN: swift-demangle -display-stdlib-module=false sSi | %FileCheck %s --check-prefix=INT
+INT: {{ Int$}}

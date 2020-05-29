@@ -243,9 +243,11 @@ private:
     if (!Options.QualifyEntities)
       return false;
 
-    if (Context->getKind() == Node::Kind::Module &&
-        Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX)) {
-      return Options.DisplayDebuggerGeneratedModule;
+    if (Context->getKind() == Node::Kind::Module) {
+      if (Context->getText() == swift::STDLIB_NAME)
+        return Options.DisplayStdlibModule;
+      if (Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
+        return Options.DisplayDebuggerGeneratedModule;
     }
     return true;
   }
@@ -1945,8 +1947,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       printChildren(type_list, " & ");
       Printer << " & ";
     }
-    if (Options.QualifyEntities)
-      Printer << "Swift.";
+    if (Options.QualifyEntities && Options.DisplayStdlibModule)
+      Printer << swift::STDLIB_NAME << ".";
     Printer << "AnyObject";
     return nullptr;
   }
