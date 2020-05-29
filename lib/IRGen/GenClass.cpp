@@ -813,17 +813,6 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
                                              /*forBackwardDeployment=*/false);
 
-  llvm::Value *size, *alignMask;
-  if (classLayout.isFixedSize()) {
-    size = IGF.IGM.getSize(classLayout.getSize());
-    alignMask = IGF.IGM.getSize(classLayout.getAlignMask());
-  } else {
-    std::tie(size, alignMask)
-      = emitClassResilientInstanceSizeAndAlignMask(IGF,
-                                     selfType.getClassOrBoundGenericClass(),
-                                     metadata);
-  }
-
   llvm::Type *destType = classLayout.getType()->getPointerTo();
   llvm::Value *val = nullptr;
   if (llvm::Value *Promoted = stackPromote(IGF, classLayout, StackAllocSize,
@@ -831,6 +820,17 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     val = IGF.Builder.CreateBitCast(Promoted, IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
   } else {
+    llvm::Value *size, *alignMask;
+    if (classLayout.isFixedSize()) {
+      size = IGF.IGM.getSize(classLayout.getSize());
+      alignMask = IGF.IGM.getSize(classLayout.getAlignMask());
+    } else {
+      std::tie(size, alignMask)
+        = emitClassResilientInstanceSizeAndAlignMask(IGF,
+                                       selfType.getClassOrBoundGenericClass(),
+                                       metadata);
+    }
+
     // Allocate the object on the heap.
     std::tie(size, alignMask)
       = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
