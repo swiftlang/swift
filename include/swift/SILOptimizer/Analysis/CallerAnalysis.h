@@ -20,7 +20,6 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
