@@ -9,6 +9,7 @@ import differentiable_requirement_other_module
 extension Empty : Differentiable {
   public typealias TangentVector = Empty
   public typealias AllDifferentiableVariables = Empty
+  public var zeroTangentVectorInitializer: () -> TangentVector { { .zero } }
 }
 
 private struct PrivateConforming : DifferentiableRequirement {
