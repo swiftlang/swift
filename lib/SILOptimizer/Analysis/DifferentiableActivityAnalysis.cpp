@@ -193,12 +193,26 @@ void DifferentiableActivityInfo::propagateVaried(
       if (auto *destBBArg = cbi->getArgForOperand(operand))
         setVariedAndPropagateToUsers(destBBArg, i);
   }
-  // Handle `switch_enum`.
-  else if (auto *sei = dyn_cast<SwitchEnumInst>(inst)) {
-    if (isVaried(sei->getOperand(), i))
-      for (auto *succBB : sei->getSuccessorBlocks())
+  // Handle `checked_cast_addr_br`.
+  // Propagate variedness from source operand to destination operand, in
+  // addition to all successor block arguments.
+  else if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(inst)) {
+    if (isVaried(ccabi->getSrc(), i)) {
+      setVariedAndPropagateToUsers(ccabi->getDest(), i);
+      for (auto *succBB : ccabi->getSuccessorBlocks())
         for (auto *arg : succBB->getArguments())
           setVariedAndPropagateToUsers(arg, i);
+    }
+  }
+  // Handle all other terminators: if any operand is active, propagate
+  // variedness to all successor block arguments. This logic may be incorrect
+  // for some terminator instructions, so special cases must be defined above.
+  else if (auto *termInst = dyn_cast<TermInst>(inst)) {
+    for (auto &op : termInst->getAllOperands())
+      if (isVaried(op.get(), i))
+        for (auto *succBB : termInst->getSuccessorBlocks())
+          for (auto *arg : succBB->getArguments())
+            setVariedAndPropagateToUsers(arg, i);
   }
   // Handle everything else.
   else {
