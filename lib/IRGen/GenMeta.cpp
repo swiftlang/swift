@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "type-metadata-layout"
+
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/AST/ASTContext.h"
@@ -1520,6 +1522,15 @@ namespace {
     void addVTable() {
       if (VTableEntries.empty())
         return;
+      
+      LLVM_DEBUG(
+        llvm::dbgs() << "VTable entries for " << getType()->getName() << ":\n";
+        for (auto entry : VTableEntries) {
+          llvm::dbgs() << "  ";
+          entry.print(llvm::dbgs());
+          llvm::dbgs() << '\n';
+        }
+      );
 
       // Only emit a method lookup function if the class is resilient
       // and has a non-empty vtable.
