@@ -43,7 +43,7 @@ class DebugTypeInfo {
   /// the storage type for undefined variables.
   llvm::Type *StorageType = nullptr;
   Size size = Size(0);
-  Alignment align = Alignment(0);
+  Alignment align = Alignment();
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
 
@@ -123,7 +123,7 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
         llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
-        swift::irgen::Size(0), swift::irgen::Alignment(0), false, false);
+        swift::irgen::Size(0), swift::irgen::Alignment(), false, false);
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

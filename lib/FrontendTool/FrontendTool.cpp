@@ -1004,6 +1004,12 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
     return false;
   }
 
+  if (Invocation.getSILOptions().CrossModuleOptimization) {
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::tbd_not_supported_with_cmo);
+    return false;
+  }
+
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
   return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
@@ -1084,7 +1090,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
-    auto SM = performSILGeneration(mod, Instance.getSILTypes(), SILOpts);
+    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
@@ -1096,8 +1102,8 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   if (!Instance.getPrimarySourceFiles().empty()) {
     bool result = false;
     for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-      auto SM = performSILGeneration(*PrimaryFile, Instance.getSILTypes(),
-                                     SILOpts);
+      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                   SILOpts);
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
       result |= performCompileStepsPostSILGen(Instance, std::move(SM),
@@ -1114,7 +1120,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   for (FileUnit *fileUnit : mod->getFiles()) {
     if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (opts.InputsAndOutputs.isInputPrimary(SASTF->getFilename())) {
-        auto SM = performSILGeneration(*SASTF, Instance.getSILTypes(), SILOpts);
+        auto SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
@@ -1201,6 +1207,20 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   }
 
   return hadAnyError;
+}
+
+/// Perform any actions that must have access to the ASTContext, and need to be
+/// delayed until the Swift compile pipeline has finished. This may be called
+/// before or after LLVM depending on when the ASTContext gets freed.
+static void performEndOfPipelineActions(CompilerInstance &Instance) {
+  assert(Instance.hasASTContext());
+
+  // Verify the AST for all the modules we've loaded.
+  Instance.getASTContext().verifyAllLoadedModules();
+
+  // Emit dependencies and index data.
+  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  emitIndexData(Instance);
 }
 
 /// Performs the compile requested by the user.
@@ -1295,14 +1315,11 @@ static bool performCompile(CompilerInstance &Instance,
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 
   SWIFT_DEFER {
-    // We might have freed the ASTContext already, but in that case we must have
-    // emitted the dependencies and index first.
-    if (Instance.hasASTContext()) {
-      emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
-      emitIndexData(Instance);
-    }
+    // We might have freed the ASTContext already, but in that case we would
+    // have already performed these actions.
+    if (Instance.hasASTContext())
+      performEndOfPipelineActions(Instance);
   };
-
 
   if (Context.hadError())
     return true;
@@ -1404,7 +1421,7 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
       return false;
     }
 
-    // Cross-module optimization does not yet support TBD validation.
+    // Cross-module optimization does not support TBD.
     if (Invocation.getSILOptions().CrossModuleOptimization) {
       return false;
     }
@@ -1498,10 +1515,9 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
     return;
   }
 
-  // Make sure we emit dependencies and index now, because we can't do it after
-  // the context is gone.
-  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
-  emitIndexData(Instance);
+  // Make sure to perform the end of pipeline actions now, because they need
+  // access to the ASTContext.
+  performEndOfPipelineActions(Instance);
 
   Instance.freeASTContext();
 }
@@ -2124,10 +2140,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   PDC.setPrintEducationalNotes(
       Invocation.getDiagnosticOptions().PrintEducationalNotes);
 
-  // Temporarily stage the new diagnostic formatting style behind
-  // -enable-descriptive-diagnostics
-  if (Invocation.getDiagnosticOptions().EnableExperimentalFormatting)
-    PDC.enableExperimentalFormatting();
+  PDC.setFormattingStyle(
+      Invocation.getDiagnosticOptions().PrintedFormattingStyle);
 
   if (Invocation.getFrontendOptions().DebugTimeCompilation)
     SharedTimer::enableCompilationTimers();

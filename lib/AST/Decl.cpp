@@ -4094,6 +4094,14 @@ bool NominalTypeDecl::hasDefaultInitializer() const {
                            false);
 }
 
+bool NominalTypeDecl::isTypeErasedGenericClass() const {
+  // ObjC classes are type erased.
+  // TODO: Unless they have magic methods...
+  if (auto clas = dyn_cast<ClassDecl>(this))
+    return clas->hasClangNode() && clas->isGenericContext();
+  return false;
+}
+
 ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
   if (!hasDefaultInitializer())
     return nullptr;
@@ -6324,10 +6332,6 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
 }
 
 Type ValueDecl::getFunctionBuilderType() const {
-  // Fast path: most declarations (especially parameters, which is where
-  // this is hottest) do not have any custom attributes at all.
-  if (!getAttrs().hasAttribute<CustomAttr>()) return Type();
-
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
@@ -6336,10 +6340,6 @@ Type ValueDecl::getFunctionBuilderType() const {
 }
 
 CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
-  // Fast path: most declarations (especially parameters, which is where
-  // this is hottest) do not have any custom attributes at all.
-  if (!getAttrs().hasAttribute<CustomAttr>()) return nullptr;
-
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,

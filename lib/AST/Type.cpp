@@ -343,6 +343,12 @@ bool CanType::isObjCExistentialTypeImpl(CanType type) {
   return type.getExistentialLayout().isObjC();
 }
 
+bool CanType::isTypeErasedGenericClassTypeImpl(CanType type) {
+  if (auto nom = type->getAnyNominal())
+    return nom->isTypeErasedGenericClass();
+  return false;
+}
+
 bool TypeBase::isSpecialized() {
   Type t = getCanonicalType();
 
@@ -4280,9 +4286,13 @@ case TypeKind::Id:
       SmallVector<Type, 4> newReplacements;
       for (Type type : subs.getReplacementTypes()) {
         auto transformed = type.transformRec(fn);
-        assert((type->isEqual(transformed)
-                || (type->hasTypeParameter() && transformed->hasTypeParameter()))
-               && "Substituted SILFunctionType can't be transformed into a concrete type");
+        assert((type->isEqual(transformed) ||
+                (type->hasTypeParameter() && transformed->hasTypeParameter()) ||
+                (type->getCanonicalType().isTypeErasedGenericClassType() &&
+                 transformed->getCanonicalType()
+                     .isTypeErasedGenericClassType())) &&
+               "Substituted SILFunctionType can't be transformed into a "
+               "concrete type");
         newReplacements.push_back(transformed->getCanonicalType());
         if (!type->isEqual(transformed))
           changed = true;

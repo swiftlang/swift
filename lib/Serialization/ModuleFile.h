@@ -705,14 +705,10 @@ public:
   /// This does not include diagnostics about \e this file failing to load,
   /// but rather other things that might be imported as part of bringing the
   /// file into the AST.
-  /// \param treatAsPartialModule If true, processes implementation-only
-  /// information instead of assuming the client won't need it and shouldn't
-  /// see it.
   ///
   /// \returns any error that occurred during association, such as being
   /// compiled for a different OS.
-  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
-                                  bool treatAsPartialModule);
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
 
   /// Transfers ownership of a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to keep them

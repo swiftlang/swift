@@ -2,22 +2,33 @@
 
 Visual Studio 2017 or newer is needed to build Swift on Windows. The free Community edition is sufficient to build Swift.
 
-The following must take place in the **developer command prompt** (provided by Visual Studio). This shows up as "x64 Native Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu.
+The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
 
 ## Install dependencies
 
-- Install the latest version of [Visual Studio](https://www.visualstudio.com/downloads/)
-- Make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The following components are required:
+### Visual Studio
 
-1. Microsoft.VisualStudio.Component.Windows10SDK
-2. Microsoft.VisualStudio.Component.Windows10SDK.17763
-3. Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+An easy way to get most of the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). This command installs all needed Visual Studio components as well as Python and Git:
+
+```
+vs_community ^
+  --add Component.CPython2.x86 ^
+  --add Component.CPython3.x64 ^
+  --add Microsoft.VisualStudio.Component.Git ^
+  --add Microsoft.VisualStudio.Component.VC.ATL ^
+  --add Microsoft.VisualStudio.Component.VC.CMake.Project ^
+  --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
+  --add Microsoft.VisualStudio.Component.Windows10SDK ^
+  --add Microsoft.VisualStudio.Component.Windows10SDK.17763
+```
+
+If you prefer you can install everything by hand, but make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The components listed above are required.
 
 The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.
 
 ### Python
 
-In the Visual Studio installation program, under *Individual Components*
+The command above already installs Python 2 and 3. Alternatively, in the Visual Studio installation program, under *Individual Components*
 
 1. Install *Python 2*, either the 32-bit version (C:\Python27\\) or the 64-bit version (C:\Python27amd64\\)
 
