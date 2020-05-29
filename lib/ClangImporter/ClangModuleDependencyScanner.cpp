@@ -254,7 +254,7 @@ void ClangImporter::recordModuleDependencies(
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back("-Xclang");
       swiftArgs.push_back("-Xcc");
-      swiftArgs.push_back(arg);
+      swiftArgs.push_back(arg.str());
     };
     // Add all args inheritted from creating the importer.
     for (auto arg: cc1Args) {

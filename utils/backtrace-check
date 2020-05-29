@@ -72,6 +72,10 @@ def main():
     found_stack_trace_start = False
     found_stack_trace_entry = False
     for line in lines:
+        # In Python 2, string objects can contain Unicode characters.
+        if sys.version_info.major == 2:
+            line = line.decode('utf-8', 'replace')
+
         line = line.rstrip('\n')
 
         # First see if we found the start of our stack trace start. If so, set
