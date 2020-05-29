@@ -123,6 +123,116 @@ func TF_954(_ x: Float) -> Float {
 // CHECK: [ACTIVE]   %41 = load [trivial] %40 : $*Float
 
 //===----------------------------------------------------------------------===//
+// Branching cast instructions
+//===----------------------------------------------------------------------===//
+
+@differentiable
+func checked_cast_branch(_ x: Float) -> Float {
+  // expected-warning @+1 {{'is' test is always true}}
+  if Int.self is Any.Type {
+    return x + x
+  }
+  return x * x
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_branch{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [NONE]   %2 = metatype $@thin Int.Type
+// CHECK: [NONE]   %3 = metatype $@thick Int.Type
+// CHECK: bb1:
+// CHECK: [NONE] %5 = argument of bb1 : $@thick Any.Type
+// CHECK: [NONE]   %6 = integer_literal $Builtin.Int1, -1
+// CHECK: bb2:
+// CHECK: [NONE] %8 = argument of bb2 : $@thick Int.Type
+// CHECK: [NONE]   %9 = integer_literal $Builtin.Int1, 0
+// CHECK: bb3:
+// CHECK: [NONE] %11 = argument of bb3 : $Builtin.Int1
+// CHECK: [NONE]   %12 = metatype $@thin Bool.Type
+// CHECK: [NONE]   // function_ref Bool.init(_builtinBooleanLiteral:)
+// CHECK: [NONE]   %14 = apply %13(%11, %12) : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+// CHECK: [NONE]   %15 = struct_extract %14 : $Bool, #Bool._value
+// CHECK: bb4:
+// CHECK: [USEFUL]   %17 = metatype $@thin Float.Type
+// CHECK: [NONE]   // function_ref static Float.+ infix(_:_:)
+// CHECK: [ACTIVE]   %19 = apply %18(%0, %0, %17) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: bb5:
+// CHECK: [USEFUL]   %21 = metatype $@thin Float.Type
+// CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
+// CHECK: [ACTIVE]   %23 = apply %22(%0, %0, %21) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+
+// CHECK-LABEL: sil hidden [ossa] @${{.*}}checked_cast_branch{{.*}} : $@convention(thin) (Float) -> Float {
+// CHECK:   checked_cast_br %3 : $@thick Int.Type to Any.Type, bb1, bb2
+// CHECK: }
+
+@differentiable
+func checked_cast_addr_nonactive_result<T: Differentiable>(_ x: T) -> T {
+  if let _ = x as? Float {
+    // Do nothing with `y: Float?` value.
+  }
+  return x
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_addr_nonactive_result{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $*T
+// CHECK: [ACTIVE] %1 = argument of bb0 : $*T
+// CHECK: [VARIED]   %3 = alloc_stack $T
+// CHECK: [VARIED]   %5 = alloc_stack $Float
+// CHECK: bb1:
+// CHECK: [VARIED]   %7 = load [trivial] %5 : $*Float
+// CHECK: [VARIED]   %8 = enum $Optional<Float>, #Optional.some!enumelt, %7 : $Float
+// CHECK: bb2:
+// CHECK: [NONE]   %11 = enum $Optional<Float>, #Optional.none!enumelt
+// CHECK: bb3:
+// CHECK: [VARIED] %14 = argument of bb3 : $Optional<Float>
+// CHECK: bb4:
+// CHECK: bb5:
+// CHECK: [VARIED] %18 = argument of bb5 : $Float
+// CHECK: bb6:
+// CHECK: [NONE]   %22 = tuple ()
+
+// CHECK-LABEL: sil hidden [ossa] @${{.*}}checked_cast_addr_nonactive_result{{.*}} : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// CHECK:   checked_cast_addr_br take_always T in %3 : $*T to Float in %5 : $*Float, bb1, bb2
+// CHECK: }
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func checked_cast_addr_active_result<T: Differentiable>(x: T) -> T {
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  if let y = x as? Float {
+    // Use `y: Float?` value in an active way.
+    return y as! T
+  }
+  return x
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}checked_cast_addr_active_result{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $*T
+// CHECK: [ACTIVE] %1 = argument of bb0 : $*T
+// CHECK: [ACTIVE]   %3 = alloc_stack $T
+// CHECK: [ACTIVE]   %5 = alloc_stack $Float
+// CHECK: bb1:
+// CHECK: [ACTIVE]   %7 = load [trivial] %5 : $*Float
+// CHECK: [ACTIVE]   %8 = enum $Optional<Float>, #Optional.some!enumelt, %7 : $Float
+// CHECK: bb2:
+// CHECK: [USEFUL]   %11 = enum $Optional<Float>, #Optional.none!enumelt
+// CHECK: bb3:
+// CHECK: [ACTIVE] %14 = argument of bb3 : $Optional<Float>
+// CHECK: bb4:
+// CHECK: [ACTIVE] %16 = argument of bb4 : $Float
+// CHECK: [ACTIVE]   %19 = alloc_stack $Float
+// CHECK: bb5:
+// CHECK: bb6:
+// CHECK: [NONE]   %27 = tuple ()
+
+// CHECK-LABEL: sil hidden [ossa] @${{.*}}checked_cast_addr_active_result{{.*}} : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// CHECK:   checked_cast_addr_br take_always T in %3 : $*T to Float in %5 : $*Float, bb1, bb2
+// CHECK: }
+
+//===----------------------------------------------------------------------===//
 // Array literal differentiation
 //===----------------------------------------------------------------------===//
 
