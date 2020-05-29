@@ -168,8 +168,8 @@ extension Array: Differentiable where Element: Differentiable {
   /// A closure that produces a `TangentVector` of zeros with the same
   /// `count` as `self`.
   public var zeroTangentVectorInitializer: () -> TangentVector {
-    { [count = self.count] in
-      TangentVector(.init(repeating: .zero, count: count))
+    { [zeroInits = map(\.zeroTangentVectorInitializer)] in
+      TangentVector(zeroInits.map { $0() })
     }
   }
 }
