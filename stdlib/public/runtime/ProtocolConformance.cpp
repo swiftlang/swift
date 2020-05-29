@@ -162,7 +162,7 @@ template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
   // If needed, check the conditional requirements.
-  SmallVector<const void *, 8> conditionalArgs;
+  llvm::SmallVector<const void *, 8> conditionalArgs;
   if (hasConditionalRequirements()) {
     SubstGenericParametersFromMetadata substitutions(type);
     bool failed =
