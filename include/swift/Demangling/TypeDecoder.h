@@ -361,7 +361,7 @@ class TypeDecoder {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      SmallVector<BuiltType, 8> args;
+      llvm::SmallVector<BuiltType, 8> args;
 
       const auto &genericArgs = Node->getChild(1);
       if (genericArgs->getKind() != NodeKind::TypeList)
@@ -474,7 +474,7 @@ class TypeDecoder {
         return BuiltType();
 
       // Find the protocol list.
-      SmallVector<BuiltProtocolDecl, 8> Protocols;
+      llvm::SmallVector<BuiltProtocolDecl, 8> Protocols;
       auto TypeList = Node->getChild(0);
       if (TypeList->getKind() == NodeKind::ProtocolList &&
           TypeList->getNumChildren() >= 1) {
@@ -587,7 +587,7 @@ class TypeDecoder {
         return BuiltType();
 
       bool hasParamFlags = false;
-      SmallVector<FunctionParam<BuiltType>, 8> parameters;
+      llvm::SmallVector<FunctionParam<BuiltType>, 8> parameters;
       if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
                                           parameters, hasParamFlags))
         return BuiltType();
@@ -609,9 +609,9 @@ class TypeDecoder {
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;
-      SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
-      SmallVector<ImplFunctionResult<BuiltType>, 8> results;
-      SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
+      llvm::SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
+      llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> results;
+      llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
       ImplFunctionTypeFlags flags;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {
@@ -695,7 +695,7 @@ class TypeDecoder {
       return decodeMangledType(Node->getChild(0));
 
     case NodeKind::Tuple: {
-      SmallVector<BuiltType, 8> elements;
+      llvm::SmallVector<BuiltType, 8> elements;
       std::string labels;
       bool variadic = false;
       for (auto &element : *Node) {
