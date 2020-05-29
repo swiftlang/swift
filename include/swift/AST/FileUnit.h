@@ -384,6 +384,9 @@ public:
 
   virtual bool isSystemModule() const { return false; }
 
+  /// Checks whether an error was encountered while loading the file.
+  virtual bool hadLoadError() const { return false; }
+
   /// Retrieve the set of generic signatures stored within this module.
   ///
   /// \returns \c true if this module file supports retrieving all of the
