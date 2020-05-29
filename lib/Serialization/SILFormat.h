@@ -456,6 +456,8 @@ namespace sil_block {
   using SILInstDifferentiableFunctionLayout = BCRecordLayout<
     SIL_INST_DIFFERENTIABLE_FUNCTION,
     BCVBR<8>,             // number of function parameters
+    BCVBR<8>,   // number of function results
+    BCVBR<8>,   // number of differentiability parameters
     BCFixed<1>,           // has derivative functions?
     BCArray<ValueIDField> // parameter indices and operands
   >;

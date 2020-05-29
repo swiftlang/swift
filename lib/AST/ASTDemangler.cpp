@@ -471,6 +471,17 @@ static ResultConvention getResultConvention(ImplResultConvention conv) {
   llvm_unreachable("covered switch");
 }
 
+static SILResultDifferentiability
+getResultDifferentiability(ImplResultDifferentiability diffKind) {
+  switch (diffKind) {
+  case ImplResultDifferentiability::DifferentiableOrNotApplicable:
+    return SILResultDifferentiability::DifferentiableOrNotApplicable;
+  case ImplResultDifferentiability::NotDifferentiable:
+    return SILResultDifferentiability::NotDifferentiable;
+  }
+  llvm_unreachable("unknown differentiability kind");
+}
+
 Type ASTBuilder::createImplFunctionType(
     Demangle::ImplParameterConvention calleeConvention,
     ArrayRef<Demangle::ImplFunctionParam<Type>> params,
@@ -544,7 +555,8 @@ Type ASTBuilder::createImplFunctionType(
   for (const auto &result : results) {
     auto type = result.getType()->getCanonicalType();
     auto conv = getResultConvention(result.getConvention());
-    funcResults.emplace_back(type, conv);
+    auto diffKind = getResultDifferentiability(result.getDifferentiability());
+    funcResults.emplace_back(type, conv, diffKind);
   }
 
   if (errorResult) {

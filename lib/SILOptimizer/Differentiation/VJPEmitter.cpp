@@ -179,15 +179,17 @@ SILFunction *VJPEmitter::createEmptyPullback() {
         inoutParamTanConvention);
     pbParams.push_back(inoutParamTanParam);
   } else {
-    auto origResult = origTy->getResults()[indices.source];
-    origResult = origResult.getWithInterfaceType(
-        origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
-    pbParams.push_back(getTangentParameterInfoForOriginalResult(
-        origResult.getInterfaceType()
-            ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()
-            ->getCanonicalType(witnessCanGenSig),
-        origResult.getConvention()));
+    for (auto i : indices.results->getIndices()) {
+      auto origResult = origTy->getResults()[i];
+      origResult = origResult.getWithInterfaceType(
+          origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+      pbParams.push_back(getTangentParameterInfoForOriginalResult(
+          origResult.getInterfaceType()
+              ->getAutoDiffTangentSpace(lookupConformance)
+              ->getType()
+              ->getCanonicalType(witnessCanGenSig),
+          origResult.getConvention()));
+    }
   }
 
   // Accept a pullback struct in the pullback parameter list. This is the
@@ -585,12 +587,16 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     return;
   }
 
-  // Form expected indices, assuming there's only one result.
+  // Form expected indices.
+  auto numSemanticResults =
+      ai->getSubstCalleeType()->getNumResults() +
+      ai->getSubstCalleeType()->getNumIndirectMutatingParameters();
   SILAutoDiffIndices indices(
-      activeResultIndices.front(),
       IndexSubset::get(getASTContext(),
                        ai->getArgumentsWithoutIndirectResults().size(),
-                       activeParamIndices));
+                       activeParamIndices),
+      IndexSubset::get(getASTContext(), numSemanticResults,
+                       activeResultIndices));
 
   // Emit the VJP.
   SILValue vjpValue;
@@ -630,9 +636,8 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   auto diagnoseNondifferentiableOriginalFunctionType =
       [&](CanSILFunctionType origFnTy) {
         // Check and diagnose non-differentiable arguments.
-        for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
-          if (indices.isWrtParameter(paramIndex) &&
-              !originalFnTy->getParameters()[paramIndex]
+        for (auto paramIndex : indices.parameters->getIndices()) {
+          if (!originalFnTy->getParameters()[paramIndex]
                    .getSILStorageInterfaceType()
                    .isDifferentiable(getModule())) {
             context.emitNondifferentiabilityError(
@@ -643,21 +648,23 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
           }
         }
         // Check and diagnose non-differentiable results.
-        SILType remappedResultType;
-        if (indices.source >= originalFnTy->getNumResults()) {
-          auto inoutArgIdx = indices.source - originalFnTy->getNumResults();
-          auto inoutArg =
-              *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
-          remappedResultType = inoutArg->getType();
-        } else {
-          remappedResultType = originalFnTy->getResults()[indices.source]
-                                   .getSILStorageInterfaceType();
-        }
-        if (!remappedResultType.isDifferentiable(getModule())) {
-          context.emitNondifferentiabilityError(
-              origCallee, invoker, diag::autodiff_nondifferentiable_result);
-          errorOccurred = true;
-          return true;
+        for (auto resultIndex : indices.results->getIndices()) {
+          SILType remappedResultType;
+          if (resultIndex >= originalFnTy->getNumResults()) {
+            auto inoutArgIdx = resultIndex - originalFnTy->getNumResults();
+            auto inoutArg =
+                *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
+            remappedResultType = inoutArg->getType();
+          } else {
+            remappedResultType = originalFnTy->getResults()[resultIndex]
+                                     .getSILStorageInterfaceType();
+          }
+          if (!remappedResultType.isDifferentiable(getModule())) {
+            context.emitNondifferentiabilityError(
+                origCallee, invoker, diag::autodiff_nondifferentiable_result);
+            errorOccurred = true;
+            return true;
+          }
         }
         return false;
       };
@@ -701,13 +708,10 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     }
 
     auto *diffFuncInst = context.createDifferentiableFunction(
-        getBuilder(), loc, indices.parameters, origCallee);
+        getBuilder(), loc, indices.parameters, indices.results, origCallee);
 
     // Record the `differentiable_function` instruction.
     context.addDifferentiableFunctionInstToWorklist(diffFuncInst);
-    // TODO(TF-689): Make `differentiable_function` store result indices and
-    // remove `ADContext::resultIndices`.
-    context.setResultIndex(diffFuncInst, activeResultIndices.front());
 
     auto borrowedADFunc = builder.emitBeginBorrowOperation(loc, diffFuncInst);
     auto extractedVJP = getBuilder().createDifferentiableFunctionExtract(
