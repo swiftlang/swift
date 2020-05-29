@@ -7,10 +7,4 @@ struct IntBox {
 
 IntBox operator+(IntBox lhs, IntBox rhs);
 
-IntBox operator-(IntBox lhs, IntBox rhs);
-
-IntBox operator*(IntBox lhs, IntBox rhs);
-
-IntBox operator/(IntBox lhs, IntBox rhs);
-
 #endif

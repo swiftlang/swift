@@ -20,31 +20,4 @@ OperatorsTestSuite.test("plus") {
   expectEqual(65, result.value)
 }
 
-OperatorsTestSuite.test("minus") {
-  let lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
-
-  let result = lhs - rhs
-
-  expectEqual(19, result.value)
-}
-
-OperatorsTestSuite.test("star") {
-  let lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
-
-  let result = lhs * rhs
-
-  expectEqual(966, result.value)
-}
-
-OperatorsTestSuite.test("slash") {
-  let lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
-
-  let result = lhs / rhs
-
-  expectEqual(1, result.value)
-}
-
 runAllTests()
