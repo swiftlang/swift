@@ -371,10 +371,13 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
 
   auto Iter = End;
   while (Start != Iter) {
-    Projection AP(Iter);
-    if (!AP.isValid())
-      break;
-    P.Path.push_back(AP);
+    // end_cow_mutation is not a projection, but we want to "see through" it.
+    if (!isa<EndCOWMutationInst>(Iter)) {
+      Projection AP(Iter);
+      if (!AP.isValid())
+        break;
+      P.Path.push_back(AP);
+    }
     Iter = cast<SingleValueInstruction>(*Iter).getOperand(0);
   }
 

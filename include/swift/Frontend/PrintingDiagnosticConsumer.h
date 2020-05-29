@@ -18,8 +18,9 @@
 #ifndef SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 #define SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/Basic/DiagnosticOptions.h"
+#include "swift/Basic/LLVM.h"
 
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Process.h"
@@ -33,7 +34,8 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   bool ForceColors = false;
   bool PrintEducationalNotes = false;
   bool DidErrorOccur = false;
-  bool ExperimentalFormattingEnabled = false;
+  DiagnosticOptions::FormattingStyle FormattingStyle =
+      DiagnosticOptions::FormattingStyle::LLVM;
   // The current snippet used to display an error/warning/remark and the notes
   // implicitly associated with it. Uses `std::unique_ptr` so that
   // `AnnotatedSourceSnippet` can be forward declared.
@@ -65,7 +67,9 @@ public:
     PrintEducationalNotes = ShouldPrint;
   }
 
-  void enableExperimentalFormatting() { ExperimentalFormattingEnabled = true; }
+  void setFormattingStyle(DiagnosticOptions::FormattingStyle style) {
+    FormattingStyle = style;
+  }
 
   bool didErrorOccur() {
     return DidErrorOccur;

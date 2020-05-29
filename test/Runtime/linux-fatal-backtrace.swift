@@ -6,6 +6,8 @@
 // REQUIRES: lldb
 // XFAIL: CPU=s390x
 
+// REQUIRES: rdar63666780
+
 // NOTE: not.py is used above instead of "not --crash" because %target-run
 // doesn't pass through the crash, and `not` may not be available when running
 // on a remote host.

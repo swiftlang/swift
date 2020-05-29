@@ -1084,7 +1084,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
-    auto SM = performSILGeneration(mod, Instance.getSILTypes(), SILOpts);
+    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
@@ -1096,8 +1096,8 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   if (!Instance.getPrimarySourceFiles().empty()) {
     bool result = false;
     for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-      auto SM = performSILGeneration(*PrimaryFile, Instance.getSILTypes(),
-                                     SILOpts);
+      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                   SILOpts);
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
       result |= performCompileStepsPostSILGen(Instance, std::move(SM),
@@ -1114,7 +1114,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   for (FileUnit *fileUnit : mod->getFiles()) {
     if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (opts.InputsAndOutputs.isInputPrimary(SASTF->getFilename())) {
-        auto SM = performSILGeneration(*SASTF, Instance.getSILTypes(), SILOpts);
+        auto SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
@@ -2124,10 +2124,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   PDC.setPrintEducationalNotes(
       Invocation.getDiagnosticOptions().PrintEducationalNotes);
 
-  // Temporarily stage the new diagnostic formatting style behind
-  // -enable-descriptive-diagnostics
-  if (Invocation.getDiagnosticOptions().EnableExperimentalFormatting)
-    PDC.enableExperimentalFormatting();
+  PDC.setFormattingStyle(
+      Invocation.getDiagnosticOptions().PrintedFormattingStyle);
 
   if (Invocation.getFrontendOptions().DebugTimeCompilation)
     SharedTimer::enableCompilationTimers();

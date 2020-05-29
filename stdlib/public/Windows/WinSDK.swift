@@ -102,6 +102,9 @@ public let HKEY_CURRENT_CONFIG: HKEY = HKEY(bitPattern: 0x80000005)!
 public let HKEY_DYN_DATA: HKEY = HKEY(bitPattern: 0x80000006)!
 public let HKEY_CURRENT_USER_LOCAL_SETTINGS: HKEY = HKEY(bitPattern: 0x80000007)!
 
+// Richedit.h
+public let MSFTEDIT_CLASS: [WCHAR] = Array<WCHAR>("RICHEDIT50W".utf16)
+
 // Swift Convenience
 public extension FILETIME {
   var time_t: time_t {
