@@ -2810,7 +2810,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
   // implementation of the swift::conflicting overload that deals with
   // overload types, in order to account for cases where the overload types
   // don't match, but the decls differ and therefore always conflict.
-
+  assert(isa<TypeDecl>(this));
   return CanType();
 }
 

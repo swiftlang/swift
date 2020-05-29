@@ -244,12 +244,13 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
   return ConstructorComparison::Same;
 }
 
-/// Given a set of declarations whose names and signatures have matched,
+/// Given a set of declarations whose names and interface types have matched,
 /// figure out which of these declarations have been shadowed by others.
 template <typename T>
-static void
-recordShadowedDeclsAfterSignatureMatch(ArrayRef<T> decls, const DeclContext *dc,
-                                       llvm::SmallPtrSetImpl<T> &shadowed) {
+static void recordShadowedDeclsAfterTypeMatch(
+                              ArrayRef<T> decls,
+                              const DeclContext *dc,
+                              llvm::SmallPtrSetImpl<T> &shadowed) {
   assert(decls.size() > 1 && "Nothing collided");
 
   // Compare each declaration to every other declaration. This is
@@ -491,6 +492,48 @@ recordShadowedDeclsAfterSignatureMatch(ArrayRef<T> decls, const DeclContext *dc,
   }
 }
 
+/// Given a set of declarations whose names and generic signatures have matched,
+/// figure out which of these declarations have been shadowed by others.
+static void recordShadowedDeclsAfterSignatureMatch(
+                              ArrayRef<ValueDecl *> decls,
+                              const DeclContext *dc,
+                              llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
+  assert(decls.size() > 1 && "Nothing collided");
+
+  // Categorize all of the declarations based on their overload types.
+  llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
+  llvm::SmallVector<CanType, 2> collisionTypes;
+
+  for (auto decl : decls) {
+    assert(!isa<TypeDecl>(decl));
+
+    CanType type;
+
+    // FIXME: The type of a variable or subscript doesn't include
+    // enough context to distinguish entities from different
+    // constrained extensions, so use the overload signature's
+    // type. This is layering a partial fix upon a total hack.
+    if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+      type = asd->getOverloadSignatureType();
+    else
+      type = decl->getInterfaceType()->getCanonicalType();
+
+    // Record this declaration based on its signature.
+    auto &known = collisions[type];
+    if (known.size() == 1) {
+      collisionTypes.push_back(type);
+    }
+    known.push_back(decl);
+  }
+
+  // Check whether we have shadowing for signature collisions.
+  for (auto type : collisionTypes) {
+    ArrayRef<ValueDecl *> collidingDecls = collisions[type];
+    recordShadowedDeclsAfterTypeMatch(collidingDecls, dc,
+                                      shadowed);
+  }
+}
+
 /// Look through the given set of declarations (that all have the same name),
 /// recording those that are shadowed by another declaration in the
 /// \c shadowed set.
@@ -526,14 +569,23 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   if (decls.size() < 2)
     return;
 
+  llvm::TinyPtrVector<ValueDecl *> typeDecls;
+
   // Categorize all of the declarations based on their overload signatures.
-  llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
-  llvm::SmallVector<CanType, 2> collisionTypes;
-  llvm::SmallDenseMap<NominalTypeDecl *, llvm::TinyPtrVector<ConstructorDecl *>>
+  llvm::SmallDenseMap<const GenericSignatureImpl *,
+                      llvm::TinyPtrVector<ValueDecl *>> collisions;
+  llvm::SmallVector<const GenericSignatureImpl *, 2> collisionSignatures;
+  llvm::SmallDenseMap<NominalTypeDecl *,
+                      llvm::TinyPtrVector<ConstructorDecl *>>
     importedInitializerCollisions;
-  llvm::TinyPtrVector<NominalTypeDecl *> importedInitializerCollectionTypes;
+  llvm::TinyPtrVector<NominalTypeDecl *> importedInitializerCollisionTypes;
 
   for (auto decl : decls) {
+    if (auto *typeDecl = dyn_cast<TypeDecl>(decl)) {
+      typeDecls.push_back(typeDecl);
+      continue;
+    }
+
     // Specifically keep track of imported initializers, which can come from
     // Objective-C init methods, Objective-C factory methods, renamed C
     // functions, or be synthesized by the importer.
@@ -544,50 +596,47 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
         auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl();
         auto &knownInits = importedInitializerCollisions[nominal];
         if (knownInits.size() == 1) {
-          importedInitializerCollectionTypes.push_back(nominal);
+          importedInitializerCollisionTypes.push_back(nominal);
         }
         knownInits.push_back(ctor);
       }
     }
 
-    CanType signature;
+    // If the decl is currently being validated, this is likely a recursive
+    // reference and we'll want to skip ahead so as to avoid having its type
+    // attempt to desugar itself.
+    if (decl->isRecursiveValidation())
+      continue;
 
-    if (!isa<TypeDecl>(decl)) {
-      // If the decl is currently being validated, this is likely a recursive
-      // reference and we'll want to skip ahead so as to avoid having its type
-      // attempt to desugar itself.
-      if (decl->isRecursiveValidation())
-        continue;
-      auto ifaceType = decl->getInterfaceType();
+    CanGenericSignature signature;
 
-      // FIXME: the canonical type makes a poor signature, because we don't
-      // canonicalize away default arguments.
-      signature = ifaceType->getCanonicalType();
-
-      // FIXME: The type of a variable or subscript doesn't include
-      // enough context to distinguish entities from different
-      // constrained extensions, so use the overload signature's
-      // type. This is layering a partial fix upon a total hack.
-      if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
-        signature = asd->getOverloadSignatureType();
-    }
+    auto *dc = decl->getInnermostDeclContext();
+    if (auto genericSig = dc->getGenericSignatureOfContext())
+      signature = genericSig->getCanonicalSignature();
 
     // Record this declaration based on its signature.
-    auto &known = collisions[signature];
+    auto &known = collisions[signature.getPointer()];
     if (known.size() == 1) {
-      collisionTypes.push_back(signature);
+      collisionSignatures.push_back(signature.getPointer());
     }
+
     known.push_back(decl);
   }
 
+  // Check whether we have shadowing for type declarations.
+  if (typeDecls.size() > 1) {
+    ArrayRef<ValueDecl *> collidingDecls = typeDecls;
+    recordShadowedDeclsAfterTypeMatch(collidingDecls, dc, shadowed);
+  }
+
   // Check whether we have shadowing for signature collisions.
-  for (auto signature : collisionTypes) {
+  for (auto signature : collisionSignatures) {
     ArrayRef<ValueDecl *> collidingDecls = collisions[signature];
     recordShadowedDeclsAfterSignatureMatch(collidingDecls, dc, shadowed);
   }
 
   // Check whether we have shadowing for imported initializer collisions.
-  for (auto nominal : importedInitializerCollectionTypes) {
+  for (auto nominal : importedInitializerCollisionTypes) {
     recordShadowedDeclsForImportedInits(importedInitializerCollisions[nominal],
                                         shadowed);
   }
@@ -597,15 +646,15 @@ static void
 recordShadowedDecls(ArrayRef<OperatorDecl *> decls, const DeclContext *dc,
                     llvm::SmallPtrSetImpl<OperatorDecl *> &shadowed) {
   // Always considered to have the same signature.
-  recordShadowedDeclsAfterSignatureMatch(decls, dc, shadowed);
+  recordShadowedDeclsAfterTypeMatch(decls, dc, shadowed);
 }
 
 static void
 recordShadowedDecls(ArrayRef<PrecedenceGroupDecl *> decls,
                     const DeclContext *dc,
                     llvm::SmallPtrSetImpl<PrecedenceGroupDecl *> &shadowed) {
-  // Always considered to have the same signature.
-  recordShadowedDeclsAfterSignatureMatch(decls, dc, shadowed);
+  // Always considered to have the same type.
+  recordShadowedDeclsAfterTypeMatch(decls, dc, shadowed);
 }
 
 template <typename T, typename Container>
