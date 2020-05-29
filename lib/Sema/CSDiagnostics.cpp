@@ -2569,84 +2569,13 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     } else if (!fromTypeIsOptional) {
       diagnostic.fixItInsert(exprRange.Start, convWrapBefore);
       diagnostic.fixItInsertAfter(exprRange.End, convWrapAfter);
-    } else {
-      SmallString<16> fixItBefore(convWrapBefore);
-      SmallString<16> fixItAfter;
-
-      if (!expr->canAppendPostfixExpression(true)) {
-        fixItBefore += "(";
-        fixItAfter = ")";
-      }
-
-      fixItAfter += "!" + convWrapAfter.str();
-
-      diagnostic.flush();
-      emitDiagnostic(diag::construct_raw_representable_from_unwrapped_value,
-                     toType, fromType)
-          .highlight(exprRange)
-          .fixItInsert(exprRange.Start, fixItBefore)
-          .fixItInsertAfter(exprRange.End, fixItAfter);
     }
   };
-
-  if (conformsToKnownProtocol(fromType, rawRepresentableProtocol)) {
-    if (conformsToKnownProtocol(fromType, KnownProtocolKind::OptionSet) &&
-        isExpr<IntegerLiteralExpr>(anchor) &&
-        castToExpr<IntegerLiteralExpr>(anchor)->getDigitsText() == "0") {
-      diagnostic.fixItReplace(::getSourceRange(anchor), "[]");
-      return true;
-    }
-    if (auto rawTy = isRawRepresentable(toType, rawRepresentableProtocol)) {
-      // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
-      // or just 'Result(rawValue: <expr>)'.
-      std::string convWrapBefore = toType.getString();
-      convWrapBefore += "(rawValue: ";
-      std::string convWrapAfter = ")";
-      if (!isExpr<LiteralExpr>(anchor) &&
-          !TypeChecker::isConvertibleTo(fromType, rawTy, getDC())) {
-        // Only try to insert a converting construction if the protocol is a
-        // literal protocol and not some other known protocol.
-        switch (rawRepresentableProtocol) {
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
-  case KnownProtocolKind::name:                                                \
-    break;
-#define PROTOCOL_WITH_NAME(name, _)                                            \
-  case KnownProtocolKind::name:                                                \
-    return false;
-#include "swift/AST/KnownProtocols.def"
-        }
-        convWrapBefore += rawTy->getString();
-        convWrapBefore += "(";
-        convWrapAfter += ")";
-      }
-
-      if (auto *E = getAsExpr(anchor))
-        fixIt(convWrapBefore, convWrapAfter, E);
-      return true;
-    }
-  }
 
   if (auto rawTy = isRawRepresentable(fromType, rawRepresentableProtocol)) {
     if (conformsToKnownProtocol(toType, rawRepresentableProtocol)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
-      if (!TypeChecker::isConvertibleTo(rawTy, toType, getDC())) {
-        // Only try to insert a converting construction if the protocol is a
-        // literal protocol and not some other known protocol.
-        switch (rawRepresentableProtocol) {
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
-  case KnownProtocolKind::name:                                                \
-    break;
-#define PROTOCOL_WITH_NAME(name, _)                                            \
-  case KnownProtocolKind::name:                                                \
-    return false;
-#include "swift/AST/KnownProtocols.def"
-        }
-        convWrapBefore += toType->getString();
-        convWrapBefore += "(";
-        convWrapAfter += ")";
-      }
-
       if (auto *E = getAsExpr(anchor))
         fixIt(convWrapBefore, convWrapAfter, E);
       return true;
