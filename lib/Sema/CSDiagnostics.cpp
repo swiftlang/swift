@@ -6423,3 +6423,32 @@ bool MissingRawRepresentativeInitFailure::diagnoseAsNote() {
 
   return false;
 }
+
+void UseOfRawRepresentableInsteadOfItsRawValueFailure::fixIt(
+    InFlightDiagnostic &diagnostic) const {
+  auto *E = getAsExpr(getAnchor());
+  if (!E)
+    return;
+
+  std::string fix;
+
+  auto range = E->getSourceRange();
+  if (!E->canAppendPostfixExpression()) {
+    diagnostic.fixItInsert(range.Start, "(");
+    fix += ")";
+  }
+
+  // If raw representable is an optional we need to map its raw value out
+  // out first and then, if destination is not optional, allow to specify
+  // default value.
+  if (RawReprType->getOptionalObjectType()) {
+    fix += ".map { $0.rawValue } ";
+
+    if (!ValueType->getOptionalObjectType())
+      fix += "?? <#default value#>";
+  } else {
+    fix += ".rawValue";
+  }
+
+  diagnostic.fixItInsertAfter(range.End, fix);
+}

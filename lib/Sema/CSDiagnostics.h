@@ -2157,6 +2157,35 @@ protected:
   void fixIt(InFlightDiagnostic &diagnostic) const override;
 };
 
+/// Diagnose an attempt to pass raw representable type where its raw value
+/// is expected instead.
+///
+/// ```swift
+/// enum E : Int {
+///   case one = 1
+/// }
+///
+/// let _: Int = E.one
+/// ```
+///
+/// `E.one` has to use `.rawValue` to match `Int` expected by pattern binding.
+class UseOfRawRepresentableInsteadOfItsRawValueFailure final
+    : public AbstractRawRepresentableFailure {
+public:
+  UseOfRawRepresentableInsteadOfItsRawValueFailure(const Solution &solution,
+                                                   Type rawReprType,
+                                                   Type valueType,
+                                                   ConstraintLocator *locator)
+      : AbstractRawRepresentableFailure(solution, rawReprType, valueType,
+                                        locator) {}
+
+  Type getFromType() const override { return RawReprType; }
+  Type getToType() const override { return ValueType; }
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic) const override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
