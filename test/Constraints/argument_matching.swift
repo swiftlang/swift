@@ -71,7 +71,9 @@ secondArgumentNotLabeled(10, 20)
 // expected-error@-1 {{missing argument label 'a:' in call}}
 
 func f_31849281(x: Int, y: Int, z: Int) {}
-f_31849281(42, y: 10, x: 20) // expected-error {{incorrect argument labels in call (have '_:y:x:', expected 'x:y:z:')}} {{12-12=x: }} {{23-24=z}}
+// expected-note@-1 {{'f_31849281(x:y:z:)' declared here}}
+f_31849281(42, y: 10, x: 20) // expected-error {{extra argument in call}}
+// expected-error@-1 {{missing argument for parameter 'z' in call}}
 
 // -------------------------------------------
 // Extraneous keywords
@@ -84,31 +86,40 @@ nokeywords1(x: 1, y: 1) // expected-error{{extraneous argument labels 'x:y:' in 
 // Some missing, some extraneous keywords
 // -------------------------------------------
 func somekeywords1(_ x: Int, y: Int, z: Int) { }
+// expected-note@-1 {{'somekeywords1(_:y:z:)' declared here}}
 
 somekeywords1(x: 1, y: 2, z: 3) // expected-error{{extraneous argument label 'x:' in call}}{{15-18=}}
 somekeywords1(1, 2, 3) // expected-error{{missing argument labels 'y:z:' in call}}{{18-18=y: }}{{21-21=z: }}
-somekeywords1(x: 1, 2, z: 3) // expected-error{{incorrect argument labels in call (have 'x:_:z:', expected '_:y:z:')}}{{15-18=}}{{21-21=y: }}
+somekeywords1(x: 1, 2, z: 3) // expected-error{{extra argument in call}}
+// expected-error@-1 {{missing argument for parameter #1 in call}}
 
 // SR-2242: poor diagnostic when argument label is omitted
 
 func r27212391(x: Int, _ y: Int) {
+  // expected-note@-1 2 {{'r27212391(x:_:)' declared here}}
   let _: Int = x + y
 }
 
 func r27212391(a: Int, x: Int, _ y: Int) {
+  // expected-note@-1 3 {{'r27212391(a:x:_:)' declared here}}
   let _: Int = a + x + y
 }
 
 r27212391(3, 5)             // expected-error {{missing argument label 'x:' in call}}
-r27212391(3, y: 5)          // expected-error {{incorrect argument labels in call (have '_:y:', expected 'x:_:')}}
-r27212391(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}} {{11-11=x: 5, }} {{12-18=}}
-r27212391(y: 3, x: 5)       // expected-error {{incorrect argument labels in call (have 'y:x:', expected 'x:_:')}} {{11-12=x}} {{17-20=}}
+r27212391(3, y: 5)          // expected-error {{extra argument in call}}
+// expected-error@-1 {{missing argument for parameter #2 in call}}
+r27212391(3, x: 5)          // expected-error {{missing argument label 'a:' in call}} {{11-11=a: }}
+// expected-error@-1 {{missing argument for parameter #3 in call}}
+r27212391(y: 3, x: 5)       // expected-error {{extra argument 'y' in call}}
+// expected-error@-1 {{missing argument for parameter #2 in call}}
 r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call (have 'y:_:', expected 'x:_:')}}
 r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
-r27212391(a: 1, 3, y: 5)    // expected-error {{incorrect argument labels in call (have 'a:_:y:', expected 'a:x:_:')}}
-r27212391(1, x: 3, y: 5)    // expected-error {{incorrect argument labels in call (have '_:x:y:', expected 'a:x:_:')}}
-r27212391(a: 1, y: 3, x: 5) // expected-error {{incorrect argument labels in call (have 'a:y:x:', expected 'a:x:_:')}}
-r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}} {{17-17=x: 5, }} {{18-24=}}
+r27212391(a: 1, 3, y: 5)    // expected-error {{extra argument 'y' in call}}
+r27212391(1, x: 3, y: 5)    // expected-error {{extra argument in call}}
+r27212391(a: 1, y: 3, x: 5) // expected-error {{extra argument 'y' in call}}
+// expected-error@-1 {{missing argument for parameter #3 in call}}
+r27212391(a: 1, 3, x: 5)    // expected-error {{extra argument in call}}
+// expected-error@-1 {{missing argument for parameter #3 in call}}
 
 // -------------------------------------------
 // Out-of-order keywords
@@ -200,6 +211,7 @@ func testLabelErrorDefault() {
 // Variadics
 // -------------------------------------------
 func variadics1(x: Int, y: Int, _ z: Int...) { }
+// expected-note@-1 {{'variadics1(x:y:_:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics1(x: 1, y: 2)
@@ -208,7 +220,7 @@ variadics1(x: 1, y: 2, 1, 2)
 variadics1(x: 1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
-variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error {{incorrect argument labels in call (have '_:_:_:_:_:x:y:', expected 'x:y:_:')}} {{12-12=x: }} {{15-15=y: }} {{27-30=}} {{33-36=}}
+variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error {{extra arguments at positions #1, #2, #3, #4, #5 in call}}
 
 func variadics2(x: Int, y: Int = 2, z: Int...) { } // expected-note {{'variadics2(x:y:z:)' declared here}}
 
@@ -226,6 +238,7 @@ variadics2(z: 1, 2, 3, y: 2) // expected-error{{missing argument for parameter '
 variadics2(z: 1, 2, 3, x: 1) // expected-error{{argument 'x' must precede argument 'z'}} {{12-12=x: 1, }} {{22-28=}}
 
 func variadics3(_ x: Int..., y: Int = 2, z: Int = 3) { }
+// expected-note@-1 {{'variadics3(_:y:z:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics3(1, 2, 3, y: 0, z: 1)
@@ -246,8 +259,8 @@ variadics3(1)
 variadics3()
 
 // Using variadics (out-of-order)
-variadics3(y: 0, 1, 2, 3) // expected-error{{unnamed argument #2 must precede argument 'y'}} {{12-12=1, 2, 3, }} {{16-25=}}
-variadics3(z: 1, 1) // expected-error{{unnamed argument #2 must precede argument 'z'}} {{12-12=1, }} {{16-19=}}
+variadics3(y: 0, 1, 2, 3) // expected-error{{extra arguments at positions #3, #4 in call}}
+variadics3(z: 1, 1) // expected-error{{extra argument in call}}
 
 func variadics4(x: Int..., y: Int = 2, z: Int = 3) { }
 
@@ -274,6 +287,7 @@ variadics4(y: 0, x: 1, 2, 3) // expected-error{{argument 'x' must precede argume
 variadics4(z: 1, x: 1) // expected-error{{argument 'x' must precede argument 'z'}} {{12-12=x: 1, }} {{16-22=}}
 
 func variadics5(_ x: Int, y: Int, _ z: Int...) { } // expected-note {{declared here}}
+// expected-note@-1 {{'variadics5(_:y:_:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics5(1, y: 2)
@@ -282,7 +296,7 @@ variadics5(1, y: 2, 1, 2)
 variadics5(1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
-variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed argument #2}} {{15-15=y: 7, }} {{28-34=}}
+variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{extra arguments at positions #2, #3, #4, #5, #6 in call}}
 variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{missing argument for parameter #1 in call}}
 
 func variadics6(x: Int..., y: Int = 2, z: Int) { } // expected-note 4 {{'variadics6(x:y:z:)' declared here}}
@@ -306,12 +320,13 @@ variadics6(x: 1) // expected-error{{missing argument for parameter 'z' in call}}
 variadics6() // expected-error{{missing argument for parameter 'z' in call}}
 
 func outOfOrder(_ a : Int, b: Int) {
-  outOfOrder(b: 42, 52)  // expected-error {{unnamed argument #2 must precede argument 'b'}} {{14-14=52, }} {{19-23=}}
+  // expected-note@-1 {{'outOfOrder(_:b:)' declared here}}
+  outOfOrder(b: 42, 52)  // expected-error {{extra argument in call}}
+  // expected-error@-1 {{missing argument for parameter #1 in call}}
 }
 
 struct Variadics7 {
-  func f(alpha: Int..., bravo: Int) {} // expected-note {{'f(alpha:bravo:)' declared here}}
-  // expected-note@-1 {{'f(alpha:bravo:)' declared here}}
+  func f(alpha: Int..., bravo: Int) {}
 
   func test() {
     // no error
@@ -327,8 +342,8 @@ struct Variadics7 {
 
     // typo A
     f(alphax: 0, bravo: 3) // expected-error {{incorrect argument label in call (have 'alphax:bravo:', expected 'alpha:bravo:')}}
-    f(alphax: 0, 1, bravo: 3) // expected-error {{extra argument in call}}
-    f(alphax: 0, 1, 2, bravo: 3) // expected-error {{extra arguments at positions #2, #3 in call}}
+    f(alphax: 0, 1, bravo: 3) // expected-error {{incorrect argument label in call (have 'alphax:_:bravo:', expected 'alpha:_:bravo:')}}
+    f(alphax: 0, 1, 2, bravo: 3) // expected-error {{incorrect argument label in call (have 'alphax:_:_:bravo:', expected 'alpha:_:_:bravo:')}}
 
     // typo B
     f(bravox: 0) // expected-error {{incorrect argument label in call (have 'bravox:', expected 'bravo:')}}
@@ -338,13 +353,13 @@ struct Variadics7 {
 
     // OoO + typo A B
     f(bravox: 0, alphax: 1) // expected-error {{incorrect argument labels in call (have 'bravox:alphax:', expected 'alpha:bravo:')}}
-    f(bravox: 0, alphax: 1, 2) // expected-error {{extra argument in call}}
-    f(bravox: 0, alphax: 1, 2, 3) // expected-error {{extra arguments at positions #3, #4 in call}}
+    f(bravox: 0, alphax: 1, 2) // expected-error {{incorrect argument labels in call (have 'bravox:alphax:_:', expected 'alpha:bravo:')}}
+    f(bravox: 0, alphax: 1, 2, 3) // expected-error {{incorrect argument labels in call (have 'bravox:alphax:_:_:', expected 'alpha:bravo:')}}
   }
 }
 
 struct Variadics8 {
-  func f(alpha: Int..., bravo: Int, charlie: Int) {} // expected-note {{'f(alpha:bravo:charlie:)' declared here}}
+  func f(alpha: Int..., bravo: Int, charlie: Int) {}
 
   func test() {
     // no error
@@ -369,8 +384,8 @@ struct Variadics8 {
 
     // typo A
     f(alphax: 0, bravo: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alphax:bravo:charlie:', expected 'alpha:bravo:charlie:')}}
-    f(alphax: 0, 1, bravo: 3, charlie: 4) // expected-error {{extra argument in call}}
-    f(alphax: 0, 1, 2, bravo: 3, charlie: 4) // expected-error {{extra arguments at positions #2, #3 in call}}
+    f(alphax: 0, 1, bravo: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alphax:_:bravo:charlie:', expected 'alpha:_:bravo:charlie:')}}
+    f(alphax: 0, 1, 2, bravo: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alphax:_:_:bravo:charlie:', expected 'alpha:_:_:bravo:charlie:')}}
     // typo B
     f(bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'bravox:charlie:', expected 'bravo:charlie:')}}
     f(alpha: 0, bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alpha:bravox:charlie:', expected 'alpha:bravo:charlie:')}}
@@ -404,7 +419,9 @@ struct Variadics8 {
 }
 
 func var_31849281(_ a: Int, _ b: Int..., c: Int) {}
-var_31849281(1, c: 10, 3, 4, 5, 6, 7, 8, 9) // expected-error {{unnamed argument #3 must precede argument 'c'}} {{17-17=3, 4, 5, 6, 7, 8, 9, }} {{22-43=}}
+// expected-note@-1 {{'var_31849281(_:_:c:)' declared here}}
+
+var_31849281(1, c: 10, 3, 4, 5, 6, 7, 8, 9) // expected-error {{extra arguments at positions #3, #4, #5, #6, #7, #8, #9 in call}}
 
 func testLabelErrorVariadic() {
   func f(aa: Int, bb: Int, cc: Int...) {}
@@ -427,34 +444,36 @@ struct PositionsAroundDefaultsAndVariadics {
   func test_f1() {
     f1(true, 2, c: "3", [4])
 
-    f1(true, c: "3", 2, [4]) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+    f1(true, c: "3", 2, [4]) // expected-error {{extra argument in call}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
 
-    f1(true, c: "3", [4], 2) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+    f1(true, c: "3", [4], 2) // expected-error {{extra argument in call}}
 
     f1(true, c: "3", 2) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
 
     f1(true, c: "3", [4])
 
-    f1(c: "3", 2, [4]) // expected-error {{unnamed argument #3 must precede argument 'c'}}
+    f1(c: "3", 2, [4]) // expected-error {{extra argument in call}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
 
-    f1(c: "3", [4], 2) // expected-error {{unnamed argument #3 must precede argument 'c'}}
+    f1(c: "3", [4], 2) // expected-error {{extra argument in call}}
     
     f1(c: "3", 2) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
 
     f1(c: "3", [4])
 
-    f1(b: "2", [3]) // expected-error {{incorrect argument labels in call (have 'b:_:', expected '_:_:c:_:')}}
-    // expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+    f1(b: "2", [3])
+    // expected-error@-1 {{incorrect argument label in call (have 'b:_:', expected 'c:_:')}}
     
-    f1(b: "2", 1) // expected-error {{incorrect argument labels in call (have 'b:_:', expected '_:_:c:_:')}}
-    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f1(b: "2", 1) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+    // expected-error@-1 {{incorrect argument label in call (have 'b:_:', expected 'c:_:')}}
 
-    f1(b: "2", [3], 1) // expected-error {{incorrect argument labels in call (have 'b:_:_:', expected '_:_:c:_:')}}
-    // expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+    f1(b: "2", [3], 1)
+    // expected-error@-1 {{extra argument in call}}
 
-    f1(b: "2", 1, [3]) // expected-error {{incorrect argument labels in call (have 'b:_:_:', expected '_:_:c:_:')}}
-    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-    // expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'Int'}}
+    f1(b: "2", 1, [3])
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+    // expected-error@-2 {{extra argument in call}}
   }
 
   // unlabeled variadics before labeled parameter
@@ -475,11 +494,10 @@ struct PositionsAroundDefaultsAndVariadics {
 
     f2(true, c: "3", 21) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
 
-    f2(true, c: "3", 21, [4]) // expected-error {{unnamed argument #4 must precede argument 'c'}}
-    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
-    // expected-note@-2 {{remove brackets to pass array elements directly}}
+    f2(true, c: "3", 21, [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+    // expected-error@-1 {{extra argument in call}}
 
-    f2(true, c: "3", [4], 21) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+    f2(true, c: "3", [4], 21) // expected-error {{extra argument in call}}
 
     f2(true, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
     // expected-note@-1 {{remove brackets to pass array elements directly}}
@@ -502,12 +520,12 @@ struct PositionsAroundDefaultsAndVariadics {
 
     f2(c: "3", 21) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
     
-    f2(c: "3", 21, [4]) // expected-error {{incorrect argument labels in call (have 'c:_:_:', expected '_:_:c:_:')}}
+    f2(c: "3", 21, [4])
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
-    // expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+    // expected-error@-2 {{extra argument in call}}
 
-    f2(c: "3", [4], 21) // expected-error {{incorrect argument labels in call (have 'c:_:_:', expected '_:_:c:_:')}}
-    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f2(c: "3", [4], 21)
+    // expected-error@-1 {{extra argument in call}}
 
     f2([4]) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
 
@@ -581,9 +599,9 @@ struct PositionsAroundDefaultsAndVariadics {
     f4(true, b: "2", 31, d: [4])
     f4(true, b: "2", d: [4])
 
-    f4(true, 31, b: "2", d: [4]) // expected-error {{argument 'b' must precede unnamed argument #2}}
+    f4(true, 31, b: "2", d: [4]) // expected-error {{extra argument in call}}
 
-    f4(true, b: "2", d: [4], 31) // expected-error {{unnamed argument #4 must precede argument 'd'}}
+    f4(true, b: "2", d: [4], 31) // expected-error {{extra argument in call}}
 
     f4(true, b: "2", 31)
     f4(true, b: "2")
@@ -608,7 +626,7 @@ struct PositionsAroundDefaultsAndVariadics {
 
     f4(31, b: "2", d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 
-    f4(b: "2", d: [4], 31) // expected-error {{unnamed argument #3 must precede argument 'b'}}
+    f4(b: "2", d: [4], 31) // expected-error {{extra argument in call}}
 
     f4(b: "2", 31)
     f4(b: "2", 31, 32)
@@ -643,7 +661,7 @@ struct PositionsAroundDefaultsAndVariadics {
 
     f5(true, c: 31, b: "2", d: [4]) // expected-error {{argument 'b' must precede argument 'c'}}
 
-    f5(true, b: "2", d: [4], 31) // expected-error {{incorrect argument labels in call (have '_:b:d:_:', expected '_:b:c:d:')}}
+    f5(true, b: "2", d: [4], 31) // expected-error {{extra argument in call}}
 
     f5(true, b: "2", c: 31)
     f5(true, b: "2")
@@ -709,8 +727,7 @@ func testUnlabeledParameterBindingPosition() {
     // expected-error@-2:14 {{extra argument 'xx' in call}}
 
     f(xx: 0, 1)
-    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
-    // expected-error@-2:14 {{extra argument in call}}
+    // expected-error@-1:6 {{incorrect argument label in call (have 'xx:_:', expected 'aa:_:')}}
 
     f(0, 1, 9)
     // expected-error@-1:13 {{extra argument in call}}
@@ -719,15 +736,16 @@ func testUnlabeledParameterBindingPosition() {
     // expected-error@-1:17 {{extra argument 'xx' in call}}
 
     f(xx: 91, 1, 92)
-    // expected-error@-1 {{extra arguments at positions #2, #3 in call}}
-    // expected-error@-2 {{missing argument for parameter 'aa' in call}}
+    // expected-error@-1:11 {{extra argument 'xx' in call}}
   }
 
   do {
     func f(_ aa: Int, bb: Int, _ cc: Int) { }
+    // expected-note@-1 {{'f(_:bb:_:)' declared here}}
 
     f(bb: 1, 0, 2)
-    // expected-error@-1 {{unnamed argument #3 must precede argument 'bb'}}
+    // expected-error@-1 {{extra argument in call}}
+    // expected-error@-2 {{missing argument for parameter #1 in call}}
   }
 
   do {
@@ -771,7 +789,7 @@ func testUnlabeledParameterBindingPosition() {
     func f(aa: Int, bb: Int, _ cc: Int) {}
 
     f(0, 2)
-    // expected-error@-1:6 {{missing argument labels 'aa:bb:' in call}}
+    // expected-error@-1:6 {{missing argument label 'aa:' in call}}
     // expected-error@-2:8 {{missing argument for parameter 'bb' in call}}
 
     f(0, bb: 1, 2)
@@ -815,11 +833,11 @@ extraargs1(x: 1, 2, 3) // expected-error{{extra arguments at positions #2, #3 in
 // Argument name mismatch
 // -------------------------------------------
 
-func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { } // expected-note {{'mismatch1(thisFoo:bar:wibble:)' declared here}}
+func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
 
-mismatch1(foo: 5) // expected-error {{extra argument 'foo' in call}}
+mismatch1(foo: 5) // expected-error {{incorrect argument label in call (have 'foo:', expected 'thisFoo:')}}
 mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}} {{11-14=bar}} {{19-25=wibble}}
-mismatch1(food: 1, zap: 2) // expected-error{{extra arguments at positions #1, #2 in call}}
+mismatch1(food: 1, zap: 2) // expected-error{{incorrect argument labels in call (have 'food:zap:', expected 'thisFoo:bar:')}}
 
 // <rdar://problem/27891805> QoI: FailureDiagnosis doesn't look through 'try'
 struct rdar27891805 {
@@ -1159,7 +1177,7 @@ _ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'me
 // expected-error@-1 {{missing argument label 'b:' in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
-CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument labels in call (have 'c:', expected '_:b:')}}
+CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 // expected-error@-2 {{missing argument for parameter #1 in call}}
 

@@ -5514,11 +5514,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
-  bool failed = constraints::matchCallArguments(args, params,
-                                                paramInfo,
-                       arg->getUnlabeledTrailingClosureIndexOfPackedArgument(),
-                                                /*allowFixes=*/false, listener,
-                                                parameterBindings);
+  bool failed = constraints::matchCallArguments(
+      args, params, paramInfo,
+      arg->getUnlabeledTrailingClosureIndexOfPackedArgument(), listener,
+      parameterBindings);
 
   assert((matchCanFail || !failed) && "Call arguments did not match up?");
   (void)failed;

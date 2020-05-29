@@ -168,8 +168,7 @@ static bool areConservativelyCompatibleArgumentLabels(
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
   return !matchCallArguments(args, params, paramInfo,
-                             unlabeledTrailingClosureArgIndex,
-                             /*allow fixes*/ false, listener,
+                             unlabeledTrailingClosureArgIndex, listener,
                              unusedParamBindings);
 }
 
@@ -221,7 +220,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                    ArrayRef<AnyFunctionType::Param> params,
                    const ParameterListInfo &paramInfo,
                    Optional<unsigned> unlabeledTrailingClosureArgIndex,
-                   bool allowFixes,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
   assert(params.size() == paramInfo.size() && "Default map does not match");
@@ -238,11 +236,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   unsigned numArgs = args.size();
   SmallVector<bool, 4> claimedArgs(numArgs, false);
   SmallVector<Identifier, 4> actualArgNames;
-  unsigned numClaimedArgs = 0;
-
-  // Indicates whether any of the arguments are potentially out-of-order,
-  // requiring further checking at the end.
-  bool potentiallyOutOfOrder = false;
 
   // Local function that claims the argument at \c argNumber, returning the
   // index of the claimed argument. This is primarily a helper for
@@ -276,161 +269,36 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     }
 
     claimedArgs[argNumber] = true;
-    ++numClaimedArgs;
     return argNumber;
-  };
-
-  // Local function that skips over any claimed arguments.
-  auto skipClaimedArgs = [&](unsigned &nextArgIdx) {
-    while (nextArgIdx != numArgs && claimedArgs[nextArgIdx])
-      ++nextArgIdx;
-  };
-
-  // Local function that retrieves the next unclaimed argument with the given
-  // name (which may be empty). This routine claims the argument.
-  auto claimNextNamed = [&](unsigned &nextArgIdx, Identifier paramLabel,
-                            bool ignoreNameMismatch,
-                            bool forVariadic = false) -> Optional<unsigned> {
-    // Skip over any claimed arguments.
-    skipClaimedArgs(nextArgIdx);
-
-    // If we've claimed all of the arguments, there's nothing more to do.
-    if (numClaimedArgs == numArgs)
-      return None;
-
-    // Go hunting for an unclaimed argument whose name does match.
-    Optional<unsigned> claimedWithSameName;
-    for (unsigned i = nextArgIdx; i != numArgs; ++i) {
-      auto argLabel = args[i].getLabel();
-
-      if (argLabel != paramLabel) {
-        // If this is an attempt to claim additional unlabeled arguments
-        // for variadic parameter, we have to stop at first labeled argument.
-        if (forVariadic)
-          return None;
-
-        // Otherwise we can continue trying to find argument which
-        // matches parameter with or without label.
-        continue;
-      }
-
-      // Skip claimed arguments.
-      if (claimedArgs[i]) {
-        assert(!forVariadic && "Cannot be for a variadic claim");
-        // Note that we have already claimed an argument with the same name.
-        if (!claimedWithSameName)
-          claimedWithSameName = i;
-        continue;
-      }
-
-      // We found a match.  If the match wasn't the next one, we have
-      // potentially out of order arguments.
-      if (i != nextArgIdx) {
-        assert(!forVariadic && "Cannot be for a variadic claim");
-        // Avoid claiming un-labeled defaulted parameters
-        // by out-of-order un-labeled arguments or parts
-        // of variadic argument sequence, because that might
-        // be incorrect:
-        // ```swift
-        // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
-        // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
-        // ```
-        if (argLabel.empty())
-          continue;
-
-        potentiallyOutOfOrder = true;
-      }
-
-      // Claim it.
-      return claim(paramLabel, i);
-    }
-
-    // If we're not supposed to attempt any fixes, we're done.
-    if (!allowFixes)
-      return None;
-
-    // Several things could have gone wrong here, and we'll check for each
-    // of them at some point:
-    //   - The keyword argument might be redundant, in which case we can point
-    //     out the issue.
-    //   - The argument might be unnamed, in which case we try to fix the
-    //     problem by adding the name.
-    //   - The argument might have extraneous label, in which case we try to
-    //     fix the problem by removing such label.
-    //   - The keyword argument might be a typo for an actual argument name, in
-    //     which case we should find the closest match to correct to.
-
-    // Missing or extraneous label.
-    if (nextArgIdx != numArgs && ignoreNameMismatch) {
-      auto argLabel = args[nextArgIdx].getLabel();
-      // Claim this argument if we are asked to ignore labeling failure,
-      // only if argument doesn't have a label when parameter expected
-      // it to, or vice versa.
-      if (paramLabel.empty() || argLabel.empty())
-        return claim(paramLabel, nextArgIdx);
-    }
-
-    // Redundant keyword arguments.
-    if (claimedWithSameName) {
-      // FIXME: We can provide better diagnostics here.
-      return None;
-    }
-
-    // Typo correction is handled in a later pass.
-    return None;
   };
 
   // Local function that attempts to bind the given parameter to arguments in
   // the list.
-  bool haveUnfulfilledParams = false;
-  auto bindNextParameter = [&](unsigned paramIdx, unsigned &nextArgIdx,
-                               bool ignoreNameMismatch) {
+  // `ignoreNameMismatch` indicates whether it allows match labeled and
+  // unlabeled. It claims multiple arguments if parameter is variadic.
+  auto bindParameter = [&](unsigned paramIdx, unsigned argIdx) {
     const auto &param = params[paramIdx];
 
-    // Handle variadic parameters.
+    claim(param.getLabel(), argIdx);
+    parameterBindings[paramIdx].push_back(argIdx);
+    argIdx++;
+
+    // Claim variadic tails
     if (param.isVariadic()) {
-      // Claim the next argument with the name of this parameter.
-      auto claimed =
-          claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch);
-
-      // If there was no such argument, leave the parameter unfulfilled.
-      if (!claimed) {
-        haveUnfulfilledParams = true;
-        return;
-      }
-
-      // Record the first argument for the variadic.
-      parameterBindings[paramIdx].push_back(*claimed);
-
-      // If the argument is itself variadic, we're forwarding varargs
-      // with a VarargExpansionExpr; don't collect any more arguments.
-      if (args[*claimed].isVariadic()) {
-        return;
-      }
-
-      auto currentNextArgIdx = nextArgIdx;
-      {
-        nextArgIdx = *claimed;
-        // Claim any additional unnamed arguments.
-        while (
-            (claimed = claimNextNamed(nextArgIdx, Identifier(), false, true))) {
-          parameterBindings[paramIdx].push_back(*claimed);
+      for (; argIdx < args.size(); argIdx++) {
+        if (claimedArgs[argIdx]) {
+          break;
         }
+
+        const auto &arg = args[argIdx];
+        if (!arg.getLabel().empty()) {
+          break;
+        }
+
+        claim(/*expectedName=*/Identifier(), argIdx);
+        parameterBindings[paramIdx].push_back(argIdx);
       }
-
-      nextArgIdx = currentNextArgIdx;
-      return;
     }
-
-    // Try to claim an argument for this parameter.
-    if (auto claimed =
-            claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch)) {
-      parameterBindings[paramIdx].push_back(*claimed);
-      return;
-    }
-
-    // There was no argument to claim. Leave the argument unfulfilled.
-    haveUnfulfilledParams = true;
   };
 
   // If we have an unlabeled trailing closure, we match trailing closure
@@ -538,7 +406,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       if (isExtraClosure) {
         // Claim the unlabeled trailing closure without an associated
         // parameter to suppress further complaints about it.
-        claim(Identifier(), unlabeledArgIdx, /*ignoreNameClash=*/true);
+        claim(/*expectedName=*/Identifier(), unlabeledArgIdx,
+              /*ignoreNameClash=*/true);
       } else {
         unlabeledParamIdx = prevParamIdx - 1;
       }
@@ -552,20 +421,35 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     }
   }
 
-  {
-    unsigned nextArgIdx = 0;
-    // Mark through the parameters, binding them to their arguments.
-    for (auto paramIdx : indices(params)) {
-      if (parameterBindings[paramIdx].empty())
-        bindNextParameter(paramIdx, nextArgIdx, false);
+  // Step 1: Bind labeled parameters.
+
+  for (unsigned paramIdx : indices(params)) {
+    if (!parameterBindings[paramIdx].empty()) {
+      continue;
+    }
+    const auto &param = params[paramIdx];
+    if (param.getLabel().empty()) {
+      continue;
+    }
+
+    for (unsigned argIdx : indices(args)) {
+      if (claimedArgs[argIdx]) {
+        continue;
+      }
+      const auto &arg = args[argIdx];
+      if (param.getLabel() == arg.getLabel()) {
+        bindParameter(paramIdx, argIdx);
+        break;
+      }
     }
   }
 
-  // If we have any unclaimed arguments, complain about those.
-  if (numClaimedArgs != numArgs) {
+  // Step 2: Bind labeled parameters with typo correction.
+
+  {
     // Find all of the named, unclaimed arguments.
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
-    for (auto argIdx : indices(args)) {
+    for (unsigned argIdx : indices(args)) {
       if (claimedArgs[argIdx]) continue;
       if (!args[argIdx].getLabel().empty())
         unclaimedNamedArgs.push_back(argIdx);
@@ -574,12 +458,9 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     if (!unclaimedNamedArgs.empty()) {
       // Find all of the named, unfulfilled parameters.
       llvm::SmallVector<unsigned, 4> unfulfilledNamedParams;
-      bool hasUnfulfilledUnnamedParams = false;
       for (auto paramIdx : indices(params)) {
         if (parameterBindings[paramIdx].empty()) {
-          if (params[paramIdx].getLabel().empty())
-            hasUnfulfilledUnnamedParams = true;
-          else
+          if (!params[paramIdx].getLabel().empty())
             unfulfilledNamedParams.push_back(paramIdx);
         }
       }
@@ -612,9 +493,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
           if (bestScore > 0) {
             // Bind this parameter to the argument.
             auto paramIdx = unfulfilledNamedParams[best];
-            auto paramLabel = params[paramIdx].getLabel();
 
-            parameterBindings[paramIdx].push_back(claim(paramLabel, argIdx));
+            bindParameter(paramIdx, argIdx);
 
             // Erase this parameter from the list of unfulfilled named
             // parameters, so we don't try to fulfill it again.
@@ -623,98 +503,220 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
               break;
           }
         }
-
-        // Update haveUnfulfilledParams, because we may have fulfilled some
-        // parameters above.
-        haveUnfulfilledParams = hasUnfulfilledUnnamedParams ||
-                                !unfulfilledNamedParams.empty();
       }
     }
-
-    // Find all of the unfulfilled parameters, and match them up
-    // semi-positionally.
-    if (numClaimedArgs != numArgs) {
-      // Restart at the first argument/parameter.
-      unsigned nextArgIdx = 0;
-      haveUnfulfilledParams = false;
-      for (auto paramIdx : indices(params)) {
-        // Skip fulfilled parameters.
-        if (!parameterBindings[paramIdx].empty())
-          continue;
-
-        bindNextParameter(paramIdx, nextArgIdx, true);
-      }
-    }
-
-    // If there are as many arguments as parameters but we still
-    // haven't claimed all of the arguments, it could mean that
-    // labels don't line up, if so let's try to claim arguments
-    // with incorrect labels, and let OoO/re-labeling logic diagnose that.
-    if (numArgs == numParams && numClaimedArgs != numArgs) {
-      for (auto i : indices(args)) {
-        if (claimedArgs[i] || !parameterBindings[i].empty())
-          continue;
-
-        // If parameter has a default value, we don't really
-        // now if label doesn't match because it's incorrect
-        // or argument belongs to some other parameter, so
-        // we just leave this parameter unfulfilled.
-        if (paramInfo.hasDefaultArgument(i))
-          continue;
-
-        // Looks like there was no parameter claimed at the same
-        // position, it could only mean that label is completely
-        // different, because typo correction has been attempted already.
-        parameterBindings[i].push_back(claim(params[i].getLabel(), i));
-      }
-    }
-
-    // If we still haven't claimed all of the arguments,
-    // fail if there is no recovery.
-    if (numClaimedArgs != numArgs) {
-      for (auto index : indices(claimedArgs)) {
-        if (claimedArgs[index])
-          continue;
-
-        if (listener.extraArgument(index))
-          return true;
-      }
-    }
-
-    // FIXME: If we had the actual parameters and knew the body names, those
-    // matches would be best.
-    potentiallyOutOfOrder = true;
   }
 
-  // If we have any unfulfilled parameters, check them now.
-  if (haveUnfulfilledParams) {
-    for (auto paramIdx : indices(params)) {
-      // If we have a binding for this parameter, we're done.
-      if (!parameterBindings[paramIdx].empty())
-        continue;
+  auto bindUnlabeledParameters = [&](unsigned startParamIdx,
+                                     unsigned endParamIdx, unsigned startArgIdx,
+                                     unsigned endArgIdx) {
+    while (true) {
+      SmallVector<unsigned, 4> unclaimedUnlabeledParamIdxs;
+      unsigned numUnclaimedLabeledParamAtLeft = 0;
+      SmallVector<unsigned, 4> unclaimedUnlabeledArgIdxs;
+      unsigned numUnclaimedLabeledArgAtLeft = 0;
 
-      const auto &param = params[paramIdx];
+      for (unsigned paramIdx = startParamIdx; paramIdx < endParamIdx;
+           paramIdx++) {
+        if (!parameterBindings[paramIdx].empty()) {
+          continue;
+        }
 
-      // Variadic parameters can be unfulfilled.
-      if (param.isVariadic())
-        continue;
-
-      // Parameters with defaults can be unfulfilled.
-      if (paramInfo.hasDefaultArgument(paramIdx))
-        continue;
-
-      if (auto newArgIdx = listener.missingArgument(paramIdx)) {
-        parameterBindings[paramIdx].push_back(*newArgIdx);
-        continue;
+        const auto &param = params[paramIdx];
+        if (param.getLabel().empty()) {
+          unclaimedUnlabeledParamIdxs.push_back(paramIdx);
+        } else {
+          if (unclaimedUnlabeledParamIdxs.empty() && !param.isVariadic() &&
+              !paramInfo.hasDefaultArgument(paramIdx)) {
+            numUnclaimedLabeledParamAtLeft++;
+          }
+        }
       }
 
+      for (unsigned argIdx = startArgIdx; argIdx < endArgIdx; argIdx++) {
+        if (claimedArgs[argIdx]) {
+          continue;
+        }
+
+        const auto &arg = args[argIdx];
+        if (arg.getLabel().empty()) {
+          unclaimedUnlabeledArgIdxs.push_back(argIdx);
+        } else {
+          if (unclaimedUnlabeledArgIdxs.empty()) {
+            numUnclaimedLabeledArgAtLeft++;
+          }
+        }
+      }
+
+      if (unclaimedUnlabeledParamIdxs.empty() ||
+          unclaimedUnlabeledArgIdxs.empty()) {
+        break;
+      }
+
+      if (unclaimedUnlabeledParamIdxs.size() <=
+          unclaimedUnlabeledArgIdxs.size()) {
+        unsigned maxSkip = unclaimedUnlabeledArgIdxs.size() -
+                           unclaimedUnlabeledParamIdxs.size();
+        unsigned skip = std::min(maxSkip, numUnclaimedLabeledParamAtLeft);
+        bindParameter(unclaimedUnlabeledParamIdxs.front(),
+                      unclaimedUnlabeledArgIdxs[skip]);
+      } else {
+        unsigned maxSkip = unclaimedUnlabeledParamIdxs.size() -
+                           unclaimedUnlabeledArgIdxs.size();
+        unsigned skip = std::min(maxSkip, numUnclaimedLabeledArgAtLeft);
+        bindParameter(unclaimedUnlabeledParamIdxs[skip],
+                      unclaimedUnlabeledArgIdxs.front());
+      }
+    }
+  };
+
+  auto bindParametersPositionally =
+      [&](unsigned startParamIdx, unsigned endParamIdx, unsigned startArgIdx,
+          unsigned endArgIdx, bool ignoreLabel) {
+        for (unsigned paramIdx = startParamIdx; paramIdx < endParamIdx;
+             paramIdx++) {
+          if (!parameterBindings[paramIdx].empty()) {
+            continue;
+          }
+          const auto &param = params[paramIdx];
+
+          for (unsigned argIdx = startArgIdx; argIdx < endArgIdx; argIdx++) {
+            if (claimedArgs[argIdx]) {
+              continue;
+            }
+            const auto &arg = args[argIdx];
+
+            if (ignoreLabel || param.getLabel() == arg.getLabel() ||
+                param.getLabel().empty() || arg.getLabel().empty()) {
+              bindParameter(paramIdx, argIdx);
+              break;
+            }
+          }
+        }
+      };
+
+  auto iterateGroups =
+      [&](const std::function<void(unsigned, unsigned, unsigned, unsigned)>
+              &f) {
+        unsigned startParamIdx = 0;
+        unsigned startArgIdx = 0;
+
+        while (true) {
+          if (startParamIdx >= params.size()) {
+            break;
+          }
+
+          unsigned endParamIdx = params.size();
+          unsigned nextStartParamIdx = endParamIdx;
+          unsigned nextStartArgIdx = args.size();
+          for (unsigned paramIdx = startParamIdx; paramIdx < params.size();
+               paramIdx++) {
+            if (!parameterBindings[paramIdx].empty()) {
+              endParamIdx = paramIdx;
+              nextStartParamIdx = paramIdx + 1;
+              nextStartArgIdx = parameterBindings[paramIdx].back() + 1;
+              break;
+            }
+          }
+
+          unsigned endArgIdx = args.size();
+          for (unsigned argIdx = startArgIdx; argIdx < args.size(); argIdx++) {
+            if (claimedArgs[argIdx]) {
+              endArgIdx = argIdx;
+              break;
+            }
+          }
+
+          f(startParamIdx, endParamIdx, startArgIdx, endArgIdx);
+
+          startParamIdx = nextStartParamIdx;
+          startArgIdx = nextStartArgIdx;
+        }
+      };
+
+  // Step 3: Bind unlabeled parameters in group.
+
+  iterateGroups([&](unsigned startParamIdx, unsigned endParamIdx,
+                    unsigned startArgIdx, unsigned endArgIdx) {
+    bindUnlabeledParameters(startParamIdx, endParamIdx, startArgIdx, endArgIdx);
+    bindParametersPositionally(startParamIdx, endParamIdx, startArgIdx,
+                               endArgIdx,
+                               /*ignoreLabel=*/false);
+  });
+
+  // Step 4: Bind remaining parameters forcibly.
+
+  iterateGroups([&](unsigned startParamIdx, unsigned endParamIdx,
+                    unsigned startArgIdx, unsigned endArgIdx) {
+    bindParametersPositionally(startParamIdx, endParamIdx, startArgIdx,
+                               endArgIdx,
+                               /*ignoreLabel=*/true);
+  });
+
+  // Step 5: Report remaining arguments as extraneous.
+
+  for (unsigned argIdx : indices(args)) {
+    if (claimedArgs[argIdx]) {
+      continue;
+    }
+
+    if (unlabeledTrailingClosureArgIndex &&
+        *unlabeledTrailingClosureArgIndex <= argIdx) {
+      // extra trailing closures are already reported above.
+      continue;
+    }
+
+    if (listener.extraArgument(argIdx)) {
       return true;
     }
   }
 
-  // If any arguments were provided out-of-order, check whether we have
-  // violated any of the reordering rules.
+  // Step 6: Report remaining parameters as missing argument.
+
+  for (unsigned paramIdx : indices(params)) {
+    if (!parameterBindings[paramIdx].empty()) {
+      continue;
+    }
+
+    const auto &param = params[paramIdx];
+
+    if (param.isVariadic() || paramInfo.hasDefaultArgument(paramIdx)) {
+      continue;
+    }
+
+    if (auto newArgIdx = listener.missingArgument(paramIdx)) {
+      parameterBindings[paramIdx].push_back(*newArgIdx);
+    } else {
+      return true;
+    }
+  }
+
+  // Step 7: Report label errors
+
+  bool potentiallyOutOfOrder = false;
+  Optional<unsigned> prevArgIdx;
+  for (unsigned paramIdx : indices(params)) {
+    if (parameterBindings[paramIdx].empty()) {
+      continue;
+    }
+
+    const unsigned argIdx = parameterBindings[paramIdx].front();
+    if (numArgs <= argIdx) {
+      // missing argument
+      continue;
+    }
+
+    if (prevArgIdx && argIdx <= *prevArgIdx) {
+      potentiallyOutOfOrder = true;
+      break;
+    }
+    prevArgIdx = argIdx;
+  }
+
   if (potentiallyOutOfOrder) {
+    // If any arguments were provided out-of-order, check whether we have
+    // violated any of the reordering rules.
+
     // If we've seen label failures and now there is an out-of-order
     // parameter (or even worse - OoO parameter with label re-naming),
     // we most likely have no idea what would be the best
@@ -780,6 +782,12 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         // Does nothing for variadic tail.
         if (params[paramIdx].isVariadic() && paramBindIdx > 0) {
           assert(args[fromArgIdx].getLabel().empty());
+          continue;
+        }
+
+        // Allow label mismatch for unlabeled trailing closure.
+        if (unlabeledTrailingClosureArgIndex &&
+            *unlabeledTrailingClosureArgIndex == fromArgIdx) {
           continue;
         }
 
@@ -1105,10 +1113,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   {
     ArgumentFailureTracker listener(cs, argsWithLabels, params,
                                     parameterBindings, locator);
-    if (constraints::matchCallArguments(
-            argsWithLabels, params, paramInfo,
-            argInfo->UnlabeledTrailingClosureIndex,
-            cs.shouldAttemptFixes(), listener, parameterBindings))
+    if (constraints::matchCallArguments(argsWithLabels, params, paramInfo,
+                                        argInfo->UnlabeledTrailingClosureIndex,
+                                        listener, parameterBindings))
       return cs.getTypeMatchFailure(locator);
 
     auto extraArguments = listener.getExtraneousArguments();

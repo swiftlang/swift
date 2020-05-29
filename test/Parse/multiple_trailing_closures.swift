@@ -79,10 +79,12 @@ multiple_trailing_with_defaults(duration: 42) {} completion: {}
 
 func test_multiple_trailing_syntax_without_labels() {
   func fn(f: () -> Void, g: () -> Void) {}
+  // expected-note@-1 {{'fn(f:g:)' declared here}}
 
   fn {} g: {} // Ok
 
   fn {} _: {} // expected-error {{extra argument in call}}
+  // expected-error@-1 {{missing argument for parameter 'f' in call}}
 
   fn {} g: <#T##() -> Void#> // expected-error {{editor placeholder in source file}}
 

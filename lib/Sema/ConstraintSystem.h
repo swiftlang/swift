@@ -4924,7 +4924,6 @@ public:
 /// \param paramInfo Declaration-level information about the parameters.
 /// \param unlabeledTrailingClosureIndex The index of an unlabeled trailing closure,
 ///   if any.
-/// \param allowFixes Whether to allow fixes when matching arguments.
 ///
 /// \param listener Listener that will be notified when certain problems occur,
 /// e.g., to produce a diagnostic.
@@ -4936,7 +4935,6 @@ bool matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                         ArrayRef<AnyFunctionType::Param> params,
                         const ParameterListInfo &paramInfo,
                         Optional<unsigned> unlabeledTrailingClosureIndex,
-                        bool allowFixes,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
 
