@@ -2039,19 +2039,17 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
   return substType(type, /*result*/false);
 }
 
-/// Retrieve the kind of requirement described by the given declaration,
-/// for use in some diagnostics.
-static diag::RequirementKind getRequirementKind(ValueDecl *VD) {
-  if (isa<ConstructorDecl>(VD))
+diag::RequirementKind
+swift::getProtocolRequirementKind(ValueDecl *Requirement) {
+  assert(Requirement->isProtocolRequirement());
+
+  if (isa<ConstructorDecl>(Requirement))
     return diag::RequirementKind::Constructor;
-
-  if (isa<FuncDecl>(VD))
+  if (isa<FuncDecl>(Requirement))
     return diag::RequirementKind::Func;
-
-  if (isa<VarDecl>(VD))
+  if (isa<VarDecl>(Requirement))
     return diag::RequirementKind::Var;
-
-  assert(isa<SubscriptDecl>(VD) && "Unhandled requirement kind");
+  assert(isa<SubscriptDecl>(Requirement) && "Unhandled requirement kind");
   return diag::RequirementKind::Subscript;
 }
 
@@ -2254,7 +2252,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
   case MatchKind::KindConflict:
     diags.diagnose(match.Witness, diag::protocol_witness_kind_conflict,
-                   getRequirementKind(req));
+                   getProtocolRequirementKind(req));
     break;
 
   case MatchKind::WitnessInvalid:
@@ -3053,13 +3051,14 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           // If the protocol member decl is in the same file of the stub,
           // we can directly associate the fixit with the note issued to the
           // requirement.
-          Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
-                         VD->getName(), RequirementType, true)
+          Diags
+              .diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
+                        VD->getName(), RequirementType, true)
               .fixItInsertAfter(FixitLocation, FixIt);
         } else {
           // Otherwise, we have to issue another note to carry the fixit,
           // because editor may assume the fixit is in the same file with the note.
-          Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
+          Diags.diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
                          VD->getName(), RequirementType, false);
           if (EditorMode) {
             Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
@@ -3067,7 +3066,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           }
         }
       } else {
-        Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
+        Diags.diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
                        VD->getName(), RequirementType, true);
       }
     }
@@ -3425,11 +3424,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
         auto &diags = DC->getASTContext().Diags;
         diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
-                       diagKind,
-                       getRequirementKind(requirement),
-                       witness->getName(),
-                       isSetter,
-                       requiredAccess,
+                       diagKind, getProtocolRequirementKind(requirement),
+                       witness->getName(), isSetter, requiredAccess,
                        protoAccessScope.accessLevelForDiagnostics(),
                        proto->getName());
         if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness)) {
@@ -3619,9 +3615,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         diagnosticMessage = diag::ambiguous_witnesses_wrong_name;
       }
       diags.diagnose(requirement, diagnosticMessage,
-                     getRequirementKind(requirement),
-                     requirement->getName(),
-                     reqType);
+                     getProtocolRequirementKind(requirement),
+                     requirement->getName(), reqType);
 
       // Diagnose each of the matches.
       for (const auto &match : matches)

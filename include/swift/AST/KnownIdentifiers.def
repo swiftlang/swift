@@ -223,6 +223,7 @@ IDENTIFIER(move)
 IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
 IDENTIFIER(zero)
+IDENTIFIER(zeroTangentVectorInitializer)
 
 // SWIFT_ENABLE_TENSORFLOW
 IDENTIFIER(TensorFlow)

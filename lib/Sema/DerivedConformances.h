@@ -107,10 +107,12 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
 
-  /// Determine if a Differentiable requirement can be derived for a type.
+  /// Determine if a Differentiable requirement can be derived for a nominal
+  /// type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveDifferentiable(NominalTypeDecl *type, DeclContext *DC);
+  static bool canDeriveDifferentiable(NominalTypeDecl *type, DeclContext *DC,
+                                      ValueDecl *requirement);
 
   /// Derive a Differentiable requirement for a nominal type.
   ///

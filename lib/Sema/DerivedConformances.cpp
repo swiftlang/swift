@@ -74,8 +74,11 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
+  // Eagerly return true here. Actual synthesis conditions are checked in
+  // `DerivedConformance::deriveDifferentiable`: they are complicated and depend
+  // on the requirement being derived.
   if (*derivableKind == KnownDerivableProtocolKind::Differentiable)
-    return canDeriveDifferentiable(Nominal, DC);
+    return true;
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*derivableKind == KnownDerivableProtocolKind::PointwiseMultiplicative)
@@ -263,6 +266,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // CodingKey.intValue
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
+
+    // Differentiable.zeroTangentVectorInitializer
+    if (name.isSimpleName(ctx.Id_zeroTangentVectorInitializer))
+      return getRequirement(KnownProtocolKind::Differentiable);
 
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
