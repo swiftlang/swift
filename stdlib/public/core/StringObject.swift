@@ -228,6 +228,7 @@ extension _StringObject {
       countAndFlags: countAndFlags)
   }
 
+#if arch(arm64)
   // Initializer to use for constant ObjC tagged values
   @inline(__always)
   internal init(
@@ -241,6 +242,7 @@ extension _StringObject {
       bridgeObject: Builtin.valueToBridgeObject(builtinValueBits),
       countAndFlags: countAndFlags)
   }
+#endif
 
   @inlinable @inline(__always)
   internal init(rawUncheckedValue bits: RawBitPattern) {
@@ -1018,6 +1020,7 @@ extension _StringObject {
 #endif
   }
   
+#if arch(arm64)
   internal init(
     taggedConstantCocoa cocoa: AnyObject, length: Int
   ) {
@@ -1029,7 +1032,8 @@ extension _StringObject {
     _internalInvariant(self.cocoaObject == Builtin.reinterpretCast(cocoa))
     _internalInvariant(self.largeCount == length)
   }
-
+#endif
+  
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
