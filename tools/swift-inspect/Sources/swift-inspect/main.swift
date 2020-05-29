@@ -33,27 +33,29 @@ func dumpConformanceCache(context: SwiftReflectionContextRef) throws {
   }
 }
 
-func dumpMetadataAllocations(context: SwiftReflectionContextRef) throws {
-  var allocations = context.allocations
-  for allocation in allocations {
+func dumpRawMetadata(context: SwiftReflectionContextRef) throws {
+  for allocation in context.allocations {
     print("Metadata allocation at: \(hex: allocation.ptr) " +
           "size: \(allocation.size) tag: \(allocation.tag)")
   }
-  
-  allocations.sort()
-  let metadatas = allocations.compactMap { $0.metadata(in: context) }
+}
 
+func dumpGenericMetadata(context: SwiftReflectionContextRef) throws {
+  let allocations = context.allocations.sorted()
+  let metadatas = allocations.findGenericMetadata(in: context)
+
+  print("Address","Allocation","Size","Offset","Name", separator: "\t")
   for metadata in metadatas {
-    print("Metadata \(hex: metadata.ptr)")
-    print("    Name: \(metadata.name)")
+    print("\(hex: metadata.ptr)", terminator: "\t")
 
-    if let allocation = allocations.last(where: { metadata.ptr >= $0.ptr }) {
-      let offset = metadata.ptr - allocation.ptr
-      print("    In allocation \(hex: allocation.ptr) " +
-            "size \(allocation.size) at offset \(offset)")
+    if let allocation = metadata.allocation, let offset = metadata.offset {
+      print("\(hex: allocation.ptr)\t\(allocation.size)\t\(offset)",
+            terminator: "\t")
     } else {
-      print("    Not in any known metadata allocation. How strange.")
+      print("???\t???\t???", terminator: "\t")
+
     }
+    print(metadata.name)
   }
 }
 
@@ -99,7 +101,8 @@ struct SwiftInspect: ParsableCommand {
     abstract: "Swift runtime debug tool",
     subcommands: [
       DumpConformanceCache.self,
-      DumpMetadataAllocations.self,
+      DumpRawMetadata.self,
+      DumpGenericMetadata.self,
     ])
 }
 
@@ -117,7 +120,7 @@ struct DumpConformanceCache: ParsableCommand {
   }
 }
 
-struct DumpMetadataAllocations: ParsableCommand {
+struct DumpRawMetadata: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Print the target's metadata allocations.")
   @Argument(help: "The pid or partial name of the target process")
@@ -126,7 +129,21 @@ struct DumpMetadataAllocations: ParsableCommand {
 
   func run() throws {
     try withReflectionContext(nameOrPid: nameOrPid) {
-      try dumpMetadataAllocations(context: $0)
+      try dumpRawMetadata(context: $0)
+    }
+  }
+}
+
+struct DumpGenericMetadata: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print the target's metadata allocations.")
+  @Argument(help: "The pid or partial name of the target process")
+
+  var nameOrPid: String
+
+  func run() throws {
+    try withReflectionContext(nameOrPid: nameOrPid) {
+      try dumpGenericMetadata(context: $0)
     }
   }
 }

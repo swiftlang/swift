@@ -42,7 +42,23 @@ extension Allocation {
   }
 }
 
+extension BidirectionalCollection where Element == Allocation {
+  func findGenericMetadata(in context: SwiftReflectionContextRef) -> [Metadata] {
+    var metadatas = self.compactMap { $0.metadata(in: context) }
+    for i in metadatas.indices {
+      let metadata = metadatas[i]
+      if let allocation = self.last(where: { metadata.ptr >= $0.ptr }) {
+        metadatas[i].allocation = allocation
+      }
+    }
+    return metadatas
+  }
+}
+
 struct Metadata {
   let ptr: swift_reflection_ptr_t
+  var allocation: Allocation? = nil
   let name: String
+  
+  var offset: Int? { allocation.map { Int(self.ptr - $0.ptr) } }
 }
