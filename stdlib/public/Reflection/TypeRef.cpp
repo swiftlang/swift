@@ -491,7 +491,7 @@ public:
       break;
     }
 
-    SmallVector<std::pair<NodePointer, bool>, 8> inputs;
+    llvm::SmallVector<std::pair<NodePointer, bool>, 8> inputs;
     for (const auto &param : F->getParameters()) {
       auto flags = param.getFlags();
       auto input = visit(param.getType());
