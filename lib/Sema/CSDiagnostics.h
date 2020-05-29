@@ -2102,6 +2102,30 @@ public:
   bool diagnoseAsError() override;
 };
 
+class AbstractRawRepresentableFailure : public FailureDiagnostic {
+protected:
+  Type RawReprType;
+  Type ValueType;
+
+  AbstractRawRepresentableFailure(const Solution &solution, Type rawReprType,
+                                  Type valueType, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        RawReprType(resolveType(rawReprType)),
+        ValueType(resolveType(valueType)) {}
+
+public:
+  virtual Type getFromType() const = 0;
+  virtual Type getToType() const = 0;
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override { return false; }
+
+protected:
+  Optional<Diag<Type, Type>> getDiagnostic() const;
+
+  virtual void fixIt(InFlightDiagnostic &diagnostic) const = 0;
+};
+
 /// Diagnose an attempt to initialize raw representable type or convert to it
 /// a value of some other type that matches its `RawValue` type.
 ///
@@ -2115,23 +2139,22 @@ public:
 ///
 /// `0` has to be wrapped into `E(rawValue: 0)` and either defaulted via `??` or
 /// force unwrapped to constitute a valid binding.
-class MissingRawRepresentativeInitFailure final : public FailureDiagnostic {
-  Type RawReprType;
-  Type ValueType;
-
+class MissingRawRepresentativeInitFailure final
+    : public AbstractRawRepresentableFailure {
 public:
   MissingRawRepresentativeInitFailure(const Solution &solution,
                                       Type rawReprType, Type valueType,
                                       ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
-        RawReprType(resolveType(rawReprType)),
-        ValueType(resolveType(valueType)) {}
+      : AbstractRawRepresentableFailure(solution, rawReprType, valueType,
+                                        locator) {}
 
-  bool diagnoseAsError() override;
+  Type getFromType() const override { return ValueType; }
+  Type getToType() const override { return RawReprType; }
+
   bool diagnoseAsNote() override;
 
-private:
-  void fixIt(InFlightDiagnostic &diagnostic) const;
+protected:
+  void fixIt(InFlightDiagnostic &diagnostic) const override;
 };
 
 } // end namespace constraints

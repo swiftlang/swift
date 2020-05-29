@@ -6319,23 +6319,27 @@ bool UnableToInferKeyPathRootFailure::diagnoseAsError() {
   return true;
 }
 
-bool MissingRawRepresentativeInitFailure::diagnoseAsError() {
+Optional<Diag<Type, Type>>
+AbstractRawRepresentableFailure::getDiagnostic() const {
   auto *locator = getLocator();
 
-  Optional<Diag<Type, Type>> message;
-
   if (locator->isForContextualType()) {
-    message = diag::cannot_convert_initializer_value;
+    return diag::cannot_convert_initializer_value;
   } else if (locator->isForAssignment()) {
-    message = diag::cannot_convert_assign;
+    return diag::cannot_convert_assign;
   } else if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    message = diag::cannot_convert_argument_value;
+    return diag::cannot_convert_argument_value;
   }
 
+  return None;
+}
+
+bool AbstractRawRepresentableFailure::diagnoseAsError() {
+  auto message = getDiagnostic();
   if (!message)
     return false;
 
-  auto diagnostic = emitDiagnostic(*message, ValueType, RawReprType);
+  auto diagnostic = emitDiagnostic(*message, getFromType(), getToType());
   fixIt(diagnostic);
   return true;
 }
