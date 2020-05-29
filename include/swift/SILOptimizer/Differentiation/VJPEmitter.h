@@ -130,8 +130,9 @@ private:
                                             StructInst *pbStructVal,
                                             SILBasicBlock *succBB);
 
-  /// Build a pullback struct value for the given original block.
-  StructInst *buildPullbackValueStructValue(SILBasicBlock *bb);
+  /// Build a pullback struct value for the given original terminator
+  /// instruction.
+  StructInst *buildPullbackValueStructValue(TermInst *termInst);
 
   /// Build a predecessor enum instance using the given builder for the given
   /// original predecessor/successor blocks and pullback struct value.
