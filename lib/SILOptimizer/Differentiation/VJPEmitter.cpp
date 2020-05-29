@@ -265,6 +265,31 @@ SILBasicBlock *VJPEmitter::remapBasicBlock(SILBasicBlock *bb) {
   return vjpBB;
 }
 
+SILBasicBlock *VJPEmitter::createTrampolineBasicBlock(TermInst *termInst,
+                                                      StructInst *pbStructVal,
+                                                      SILBasicBlock *succBB) {
+  assert(llvm::find(termInst->getSuccessorBlocks(), succBB) !=
+             termInst->getSuccessorBlocks().end() &&
+         "Basic block is not a successor of terminator instruction");
+  // Create the trampoline block.
+  auto *vjpSuccBB = getOpBasicBlock(succBB);
+  auto *trampolineBB = vjp->createBasicBlockBefore(vjpSuccBB);
+  for (auto *arg : vjpSuccBB->getArguments().drop_back())
+    trampolineBB->createPhiArgument(arg->getType(), arg->getOwnershipKind());
+  // In the trampoline block, build predecessor enum value for VJP successor
+  // block and branch to it.
+  SILBuilder trampolineBuilder(trampolineBB);
+  auto *origBB = termInst->getParent();
+  auto *succEnumVal =
+      buildPredecessorEnumValue(trampolineBuilder, origBB, succBB, pbStructVal);
+  SmallVector<SILValue, 4> forwardedArguments(
+      trampolineBB->getArguments().begin(), trampolineBB->getArguments().end());
+  forwardedArguments.push_back(succEnumVal);
+  trampolineBuilder.createBranch(termInst->getLoc(), vjpSuccBB,
+                                 forwardedArguments);
+  return trampolineBB;
+}
+
 void VJPEmitter::visit(SILInstruction *inst) {
   if (errorOccurred)
     return;
@@ -290,10 +315,9 @@ SILType VJPEmitter::getNominalDeclLoweredType(NominalTypeDecl *nominal) {
   return getLoweredType(nominalType);
 }
 
-StructInst *VJPEmitter::buildPullbackValueStructValue(TermInst *termInst) {
-  assert(termInst->getFunction() == original);
-  auto loc = termInst->getFunction()->getLocation();
-  auto *origBB = termInst->getParent();
+StructInst *VJPEmitter::buildPullbackValueStructValue(SILBasicBlock *origBB) {
+  assert(origBB->getParent() == original);
+  auto loc = origBB->getParent()->getLocation();
   auto *vjpBB = BBMap[origBB];
   auto *pbStruct = pullbackInfo.getLinearMapStruct(origBB);
   auto structLoweredTy = getNominalDeclLoweredType(pbStruct);
@@ -333,9 +357,11 @@ EnumInst *VJPEmitter::buildPredecessorEnumValue(SILBuilder &builder,
 
 void VJPEmitter::visitReturnInst(ReturnInst *ri) {
   auto loc = ri->getOperand().getLoc();
-  auto *origExit = ri->getParent();
   auto &builder = getBuilder();
-  auto *pbStructVal = buildPullbackValueStructValue(ri);
+
+  // Build pullback struct value for original block.
+  auto *origExit = ri->getParent();
+  auto *pbStructVal = buildPullbackValueStructValue(origExit);
 
   // Get the value in the VJP corresponding to the original result.
   auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
@@ -390,7 +416,7 @@ void VJPEmitter::visitBranchInst(BranchInst *bi) {
   // Build pullback struct value for original block.
   // Build predecessor enum value for destination block.
   auto *origBB = bi->getParent();
-  auto *pbStructVal = buildPullbackValueStructValue(bi);
+  auto *pbStructVal = buildPullbackValueStructValue(origBB);
   auto *enumVal = buildPredecessorEnumValue(getBuilder(), origBB,
                                             bi->getDestBB(), pbStructVal);
 
@@ -407,85 +433,30 @@ void VJPEmitter::visitBranchInst(BranchInst *bi) {
 
 void VJPEmitter::visitCondBranchInst(CondBranchInst *cbi) {
   // Build pullback struct value for original block.
-  // Build predecessor enum values for true/false blocks.
-  auto *origBB = cbi->getParent();
-  auto *pbStructVal = buildPullbackValueStructValue(cbi);
-
-  // Creates a trampoline block for given original successor block. The
-  // trampoline block has the same arguments as the VJP successor block but
-  // drops the last predecessor enum argument. The generated `switch_enum`
-  // instruction branches to the trampoline block, and the trampoline block
-  // constructs a predecessor enum value and branches to the VJP successor
-  // block.
-  auto createTrampolineBasicBlock =
-      [&](SILBasicBlock *origSuccBB) -> SILBasicBlock * {
-    auto *vjpSuccBB = getOpBasicBlock(origSuccBB);
-    // Create the trampoline block.
-    auto *trampolineBB = vjp->createBasicBlockBefore(vjpSuccBB);
-    for (auto *arg : vjpSuccBB->getArguments().drop_back())
-      trampolineBB->createPhiArgument(arg->getType(), arg->getOwnershipKind());
-    // Build predecessor enum value for successor block and branch to it.
-    SILBuilder trampolineBuilder(trampolineBB);
-    auto *succEnumVal = buildPredecessorEnumValue(trampolineBuilder, origBB,
-                                                  origSuccBB, pbStructVal);
-    SmallVector<SILValue, 4> forwardedArguments(
-        trampolineBB->getArguments().begin(),
-        trampolineBB->getArguments().end());
-    forwardedArguments.push_back(succEnumVal);
-    trampolineBuilder.createBranch(cbi->getLoc(), vjpSuccBB,
-                                   forwardedArguments);
-    return trampolineBB;
-  };
-
+  auto *pbStructVal = buildPullbackValueStructValue(cbi->getParent());
   // Create a new `cond_br` instruction.
-  getBuilder().createCondBranch(cbi->getLoc(), getOpValue(cbi->getCondition()),
-                                createTrampolineBasicBlock(cbi->getTrueBB()),
-                                createTrampolineBasicBlock(cbi->getFalseBB()));
+  getBuilder().createCondBranch(
+      cbi->getLoc(), getOpValue(cbi->getCondition()),
+      createTrampolineBasicBlock(cbi, pbStructVal, cbi->getTrueBB()),
+      createTrampolineBasicBlock(cbi, pbStructVal, cbi->getFalseBB()));
 }
 
 void VJPEmitter::visitSwitchEnumInstBase(SwitchEnumInstBase *sei) {
   // Build pullback struct value for original block.
-  auto *origBB = sei->getParent();
-  auto *pbStructVal = buildPullbackValueStructValue(sei);
-
-  // Creates a trampoline block for given original successor block. The
-  // trampoline block has the same arguments as the VJP successor block but
-  // drops the last predecessor enum argument. The generated `switch_enum`
-  // instruction branches to the trampoline block, and the trampoline block
-  // constructs a predecessor enum value and branches to the VJP successor
-  // block.
-  auto createTrampolineBasicBlock =
-      [&](SILBasicBlock *origSuccBB) -> SILBasicBlock * {
-    auto *vjpSuccBB = getOpBasicBlock(origSuccBB);
-    // Create the trampoline block.
-    auto *trampolineBB = vjp->createBasicBlockBefore(vjpSuccBB);
-    for (auto *destArg : vjpSuccBB->getArguments().drop_back())
-      trampolineBB->createPhiArgument(destArg->getType(),
-                                      destArg->getOwnershipKind());
-    // Build predecessor enum value for successor block and branch to it.
-    SILBuilder trampolineBuilder(trampolineBB);
-    auto *succEnumVal = buildPredecessorEnumValue(trampolineBuilder, origBB,
-                                                  origSuccBB, pbStructVal);
-    SmallVector<SILValue, 4> forwardedArguments(
-        trampolineBB->getArguments().begin(),
-        trampolineBB->getArguments().end());
-    forwardedArguments.push_back(succEnumVal);
-    trampolineBuilder.createBranch(sei->getLoc(), vjpSuccBB,
-                                   forwardedArguments);
-    return trampolineBB;
-  };
+  auto *pbStructVal = buildPullbackValueStructValue(sei->getParent());
 
   // Create trampoline successor basic blocks.
   SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> caseBBs;
   for (unsigned i : range(sei->getNumCases())) {
     auto caseBB = sei->getCase(i);
-    auto *trampolineBB = createTrampolineBasicBlock(caseBB.second);
+    auto *trampolineBB =
+        createTrampolineBasicBlock(sei, pbStructVal, caseBB.second);
     caseBBs.push_back({caseBB.first, trampolineBB});
   }
   // Create trampoline default basic block.
   SILBasicBlock *newDefaultBB = nullptr;
   if (auto *defaultBB = sei->getDefaultBBOrNull().getPtrOrNull())
-    newDefaultBB = createTrampolineBasicBlock(defaultBB);
+    newDefaultBB = createTrampolineBasicBlock(sei, pbStructVal, defaultBB);
 
   // Create a new `switch_enum` instruction.
   switch (sei->getKind()) {
@@ -508,6 +479,47 @@ void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
 
 void VJPEmitter::visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
   visitSwitchEnumInstBase(seai);
+}
+
+void VJPEmitter::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
+  // Build pullback struct value for original block.
+  auto *pbStructVal = buildPullbackValueStructValue(ccbi->getParent());
+  // Create a new `checked_cast_branch` instruction.
+  getBuilder().createCheckedCastBranch(
+      ccbi->getLoc(), ccbi->isExact(), getOpValue(ccbi->getOperand()),
+      getOpType(ccbi->getTargetLoweredType()),
+      getOpASTType(ccbi->getTargetFormalType()),
+      createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getSuccessBB()),
+      createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getFailureBB()),
+      ccbi->getTrueBBCount(), ccbi->getFalseBBCount());
+}
+
+void VJPEmitter::visitCheckedCastValueBranchInst(
+    CheckedCastValueBranchInst *ccvbi) {
+  // Build pullback struct value for original block.
+  auto *pbStructVal = buildPullbackValueStructValue(ccvbi->getParent());
+  // Create a new `checked_cast_value_branch` instruction.
+  getBuilder().createCheckedCastValueBranch(
+      ccvbi->getLoc(), getOpValue(ccvbi->getOperand()),
+      getOpASTType(ccvbi->getSourceFormalType()),
+      getOpType(ccvbi->getTargetLoweredType()),
+      getOpASTType(ccvbi->getTargetFormalType()),
+      createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getSuccessBB()),
+      createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getFailureBB()));
+}
+
+void VJPEmitter::visitCheckedCastAddrBranchInst(
+    CheckedCastAddrBranchInst *ccabi) {
+  // Build pullback struct value for original block.
+  auto *pbStructVal = buildPullbackValueStructValue(ccabi->getParent());
+  // Create a new `checked_cast_addr_branch` instruction.
+  getBuilder().createCheckedCastAddrBranch(
+      ccabi->getLoc(), ccabi->getConsumptionKind(), getOpValue(ccabi->getSrc()),
+      getOpASTType(ccabi->getSourceFormalType()), getOpValue(ccabi->getDest()),
+      getOpASTType(ccabi->getTargetFormalType()),
+      createTrampolineBasicBlock(ccabi, pbStructVal, ccabi->getSuccessBB()),
+      createTrampolineBasicBlock(ccabi, pbStructVal, ccabi->getFailureBB()),
+      ccabi->getTrueBBCount(), ccabi->getFalseBBCount());
 }
 
 void VJPEmitter::visitApplyInst(ApplyInst *ai) {

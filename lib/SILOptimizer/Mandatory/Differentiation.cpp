@@ -152,10 +152,12 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
   // Diagnose unsupported branching terminators.
   for (auto &bb : *original) {
     auto *term = bb.getTerminator();
-    // Supported terminators are: `br`, `cond_br`, `switch_enum`,
-    // `switch_enum_addr`.
+    // Check supported branching terminators.
     if (isa<BranchInst>(term) || isa<CondBranchInst>(term) ||
-        isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term))
+        isa<SwitchEnumInst>(term) || isa<SwitchEnumAddrInst>(term) ||
+        isa<CheckedCastBranchInst>(term) ||
+        isa<CheckedCastValueBranchInst>(term) ||
+        isa<CheckedCastAddrBranchInst>(term))
       continue;
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
