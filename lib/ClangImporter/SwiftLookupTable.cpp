@@ -1881,8 +1881,10 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // struct names when relevant, not just pointer names. That way we can check
   // both CFDatabase.def and the objc_bridge attribute and cover all our bases.
   if (auto *tagDecl = dyn_cast<clang::TagDecl>(named)) {
-    if (!tagDecl->getDefinition())
-      return;
+    if (!dyn_cast<clang::ClassTemplateSpecializationDecl>(named)) {
+      if (!tagDecl->getDefinition())
+        return;
+    }
   }
 
   // If we have a name to import as, add this entry to the table.
@@ -2077,6 +2079,13 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
 
   // Add this entry to the lookup table.
   addEntryToLookupTable(table, named, nameImporter);
+  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
+    if (auto typedefType = dyn_cast<clang::TemplateSpecializationType>(typedefDecl->getUnderlyingType())) {
+      if (auto CTSD = dyn_cast<clang::ClassTemplateSpecializationDecl>(typedefType->getAsTagDecl())) {
+        addEntryToLookupTable(table, CTSD, nameImporter);
+      }
+    }
+  }
 }
 
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,

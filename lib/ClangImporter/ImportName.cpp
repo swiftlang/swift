@@ -1698,6 +1698,39 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
+  if (auto classTemplateSpecDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
+    if (!dyn_cast<clang::ClassTemplatePartialSpecializationDecl>(D)) {
+
+      std::string name = "__";
+      name.append(classTemplateSpecDecl->getQualifiedNameAsString());
+      name.append("__");
+      auto &args = classTemplateSpecDecl->getTemplateInstantiationArgs();
+      for (auto &arg : args.asArray()) {
+        switch (arg.getKind()) {
+        case clang::TemplateArgument::Null: {
+          llvm_unreachable("Cannot mangle NULL template argument");
+        }
+        case clang::TemplateArgument::Type: {
+          auto t = arg.getAsType();
+          auto id = t.getBaseTypeIdentifier();
+          if (id) {
+            name.append(id->getName());
+            name.append("__");
+          }
+          break;
+        }
+        default: {
+          llvm::errs() << "UNEXPECTED TEMPLATE ARGUMENT TYPE " << arg.getKind()
+                       << "\n";
+          break;
+        }
+        }
+      }
+      baseName = swiftCtx.getIdentifier(name).get();
+    }
+  }
+
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
   if (auto newtypeDecl = findSwiftNewtype(D, clangSema, version)) {

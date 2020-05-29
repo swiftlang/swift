@@ -3477,9 +3477,15 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      // FIXME: We could import specializations, but perhaps only as unnamed
-      // structural types.
-      return nullptr;
+      Impl.getClangSema().InstantiateClassTemplateSpecialization(
+          decl->getLocation(),
+          const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
+          decl->getTemplateSpecializationKind());
+      auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+          decl->getDefinition());
+      Impl.getClangSema().InstantiateClassTemplateSpecializationMembers(
+          def->getLocation(), def, clang::TSK_ExplicitInstantiationDefinition);
+      return VisitRecordDecl(decl);
     }
 
     Decl *VisitClassTemplatePartialSpecializationDecl(
