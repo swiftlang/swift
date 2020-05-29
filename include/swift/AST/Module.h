@@ -363,6 +363,7 @@ public:
   ArrayRef<ImplicitImport> getImplicitImports() const;
 
   ArrayRef<FileUnit *> getFiles() {
+    assert(!Files.empty() || failedToLoad());
     return Files;
   }
   ArrayRef<const FileUnit *> getFiles() const {
@@ -371,7 +372,6 @@ public:
 
   bool isClangModule() const;
   void addFile(FileUnit &newFile);
-  void removeFile(FileUnit &existingFile);
 
   /// Creates a map from \c #filePath strings to corresponding \c #file
   /// strings, diagnosing any conflicts.

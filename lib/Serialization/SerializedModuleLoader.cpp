@@ -652,7 +652,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-    bool isFramework, bool treatAsPartialModule) {
+    bool isFramework) {
   assert(moduleInputBuffer);
 
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -681,7 +681,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
-    M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
     if (extendedInfo.arePrivateImportsEnabled())
@@ -689,8 +688,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
-        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid,
-                                                   treatAsPartialModule);
+        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
 
     // FIXME: This seems wrong. Overlay for system Clang module doesn't
     // necessarily mean it's "system" module. User can make their own overlay
@@ -707,8 +705,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
       findOverlayFiles(diagLoc.getValueOr(SourceLoc()), &M, fileUnit);
       return fileUnit;
     }
-
-    M.removeFile(*fileUnit);
   }
 
   // From here on is the failure path.
@@ -962,13 +958,15 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   StringRef moduleInterfacePathStr =
     Ctx.AllocateCopy(moduleInterfacePath.str());
 
-  if (!loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
-               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
-               std::move(moduleSourceInfoInputBuffer),
-               isFramework, /*treatAsPartialModule*/false)) {
+  auto *file =
+      loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
+              std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
+              std::move(moduleSourceInfoInputBuffer), isFramework);
+  if (file) {
+    M->addFile(*file);
+  } else {
     M->setFailedToLoad();
   }
-
   return M;
 }
 
@@ -991,7 +989,6 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
     return nullptr;
 
   bool isFramework = false;
-  bool treatAsPartialModule = false;
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
   moduleInputBuffer = std::move(bufIter->second);
   MemoryBuffers.erase(bufIter);
@@ -1000,12 +997,12 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto *M = ModuleDecl::create(moduleID.Item, Ctx);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
-  if (!loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
-               std::move(moduleInputBuffer), {}, {},
-               isFramework, treatAsPartialModule)) {
+  auto *file = loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
+                       std::move(moduleInputBuffer), {}, {}, isFramework);
+  if (!file)
     return nullptr;
-  }
 
+  M->addFile(*file);
   Ctx.LoadedModules[moduleID.Item] = M;
   return M;
 }
@@ -1105,6 +1102,10 @@ void SerializedASTFile::collectLinkLibraries(
 
 bool SerializedASTFile::isSIB() const {
   return File.IsSIB;
+}
+
+bool SerializedASTFile::hadLoadError() const {
+  return File.hasError();
 }
 
 bool SerializedASTFile::isSystemModule() const {

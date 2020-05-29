@@ -1977,9 +1977,7 @@ ModuleFile::ModuleFile(
   }
 }
 
-Status ModuleFile::associateWithFileContext(FileUnit *file,
-                                            SourceLoc diagLoc,
-                                            bool treatAsPartialModule) {
+Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   assert(!hasError() && "error already detected; should not call this");
@@ -2033,8 +2031,12 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
+    // If this module file is being installed into the main module, it's treated
+    // as a partial module.
+    auto isPartialModule = M->isMainModule();
+
     if (dependency.isImplementationOnly() &&
-        !(treatAsPartialModule || ctx.LangOpts.DebuggerSupport)) {
+        !(isPartialModule || ctx.LangOpts.DebuggerSupport)) {
       // When building normally (and not merging partial modules), we don't
       // want to bring in the implementation-only module, because that might
       // change the set of visible declarations. However, when debugging we
