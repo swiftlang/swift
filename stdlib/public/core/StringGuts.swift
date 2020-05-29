@@ -74,12 +74,14 @@ extension _StringGuts {
       length: length))
   }
   
+#if arch(arm64)
   internal init(
     taggedConstantCocoa cocoa: AnyObject,
     length: Int
   ) {
     self.init(_StringObject(taggedConstantCocoa: cocoa, length: length))
   }
+#endif
 }
 
 // Queries
