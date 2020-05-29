@@ -1683,11 +1683,6 @@ void ASTContext::verifyAllLoadedModules() const {
   FrontendStatsTracer tracer(Stats, "verify-all-loaded-modules");
   for (auto &loader : getImpl().ModuleLoaders)
     loader->verifyAllModules();
-
-  for (auto &topLevelModulePair : LoadedModules) {
-    ModuleDecl *M = topLevelModulePair.second;
-    assert(!M->getFiles().empty() || M->failedToLoad());
-  }
 #endif
 }
 
