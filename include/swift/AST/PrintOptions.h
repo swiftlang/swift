@@ -232,8 +232,6 @@ struct PrintOptions {
   /// Whether to print unavailable parts of the AST.
   bool SkipUnavailable = false;
 
-  bool SkipSwiftPrivateClangDecls = false;
-
   /// Whether to skip internal stdlib declarations.
   bool SkipPrivateStdlibDecls = false;
 
@@ -517,7 +515,6 @@ struct PrintOptions {
     PrintOptions result = printForDiagnostics();
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
-    result.SkipSwiftPrivateClangDecls = true;
     result.SkipPrivateStdlibDecls = true;
     result.SkipUnderscoredStdlibProtocols = true;
     result.SkipDeinit = true;
