@@ -1617,20 +1617,26 @@ public:
          ConstraintLocator *locator);
 };
 
-class UseValueTypeOfRawRepresentative final : public AllowArgumentMismatch {
-  UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type argType,
-                                  Type paramType, ConstraintLocator *locator)
-      : AllowArgumentMismatch(cs, FixKind::UseValueTypeOfRawRepresentative,
-                              argType, paramType, locator) {}
+class UseValueTypeOfRawRepresentative final : public ConstraintFix {
+  Type RawReprType;
+  Type ValueType;
+
+  UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type rawReprType,
+                                  Type valueType, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseValueTypeOfRawRepresentative, locator),
+        RawReprType(rawReprType), ValueType(valueType) {}
 
 public:
   std::string getName() const override {
     return "use `.rawValue` of a raw representable type";
   }
 
-  static UseValueTypeOfRawRepresentative *
-  attempt(ConstraintSystem &cs, Type argType, Type paramType,
-          ConstraintLocatorBuilder locator);
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static UseValueTypeOfRawRepresentative *create(ConstraintSystem &cs,
+                                                 Type rawReprType,
+                                                 Type valueType,
+                                                 ConstraintLocator *locator);
 };
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').

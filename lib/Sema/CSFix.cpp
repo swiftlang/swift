@@ -1087,28 +1087,6 @@ AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
       AllowInOutConversion(cs, argType, paramType, locator);
 }
 
-/// Check whether given `value` type is indeed a the same type as a `RawValue`
-/// type of a given raw representable type.
-static bool isValueOfRawRepresentable(ConstraintSystem &cs,
-                                      Type rawRepresentableType,
-                                      Type valueType) {
-  auto rawType = isRawRepresentable(cs, rawRepresentableType);
-  if (!rawType)
-    return false;
-
-  KnownProtocolKind protocols[] = {
-      KnownProtocolKind::ExpressibleByStringLiteral,
-      KnownProtocolKind::ExpressibleByIntegerLiteral};
-
-  for (auto protocol : protocols) {
-    if (conformsToKnownProtocol(cs, valueType, protocol) &&
-        valueType->isEqual(rawType))
-      return true;
-  }
-
-  return false;
-}
-
 ExpandArrayIntoVarargs *
 ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
                                 Type paramType,
@@ -1159,18 +1137,19 @@ ExplicitlyConstructRawRepresentable::create(ConstraintSystem &cs,
       ExplicitlyConstructRawRepresentable(cs, rawReprType, valueType, locator);
 }
 
+bool UseValueTypeOfRawRepresentative::diagnose(const Solution &solution,
+                                               bool asNote) const {
+  ArgumentMismatchFailure failure(solution, RawReprType, ValueType,
+                                  getLocator());
+  return failure.diagnose(asNote);
+}
+
 UseValueTypeOfRawRepresentative *
-UseValueTypeOfRawRepresentative::attempt(ConstraintSystem &cs, Type argType,
-                                         Type paramType,
-                                         ConstraintLocatorBuilder locator) {
-  auto rawRepresentableType = argType->lookThroughAllOptionalTypes();
-  auto valueType = paramType->lookThroughAllOptionalTypes();
-
-  if (isValueOfRawRepresentable(cs, rawRepresentableType, valueType))
-    return new (cs.getAllocator()) UseValueTypeOfRawRepresentative(
-        cs, rawRepresentableType, valueType, cs.getConstraintLocator(locator));
-
-  return nullptr;
+UseValueTypeOfRawRepresentative::create(ConstraintSystem &cs, Type rawReprType,
+                                        Type valueType,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      UseValueTypeOfRawRepresentative(cs, rawReprType, valueType, locator);
 }
 
 unsigned AllowArgumentMismatch::getParamIdx() const {
