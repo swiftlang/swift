@@ -511,6 +511,60 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return _isUnique(&_storage)
   }
 
+  /// Creates and returns a new uniquely referenced buffer which is a copy of
+  /// this buffer.
+  ///
+  /// This buffer is consumed, i.e. it's released.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew() -> _ContiguousArrayBuffer {
+    return _consumeAndCreateNew(bufferIsUnique: false,
+                                minimumCapacity: count,
+                                growForAppend: false)
+  }
+
+  /// Creates and returns a new uniquely referenced buffer which is a copy of
+  /// this buffer.
+  ///
+  /// If `bufferIsUnique` is true, the buffer is assumed to be uniquely
+  /// referenced and the elements are moved - instead of copied - to the new
+  /// buffer.
+  /// The `minimumCapacity` is the lower bound for the new capacity.
+  /// If `growForAppend` is true, the new capacity is calculated using
+  /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
+  ///
+  /// This buffer is consumed, i.e. it's released.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) -> _ContiguousArrayBuffer {
+    let newCapacity = _growArrayCapacity(oldCapacity: capacity,
+                                         minimumCapacity: minimumCapacity,
+                                         growForAppend: growForAppend)
+    let c = count
+    _internalInvariant(newCapacity >= c)
+    
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: c, minimumCapacity: newCapacity)
+
+    if bufferIsUnique {
+      // As an optimization, if the original buffer is unique, we can just move
+      // the elements instead of copying.
+      let dest = newBuffer.firstElementAddress
+      dest.moveInitialize(from: firstElementAddress,
+                          count: c)
+      count = 0
+    } else {
+      _copyContents(
+        subRange: 0..<c,
+        initializing: newBuffer.firstElementAddress)
+    }
+    return newBuffer
+  }
+
 #if _runtime(_ObjC)
   
   /// Convert to an NSArray.
