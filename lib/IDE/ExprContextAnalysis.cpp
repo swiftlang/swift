@@ -104,22 +104,7 @@ void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
     DC = DC->getParent();
 
   if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
-    // Typecheck all 'TopLevelCodeDecl's up to the target one.
-    // In theory, this is not needed, but it fails to resolve the type of
-    // 'guard'ed variable. e.g.
-    //
-    //   guard value = something() else { fatalError() }
-    //   <complete>
-    // Here, 'value' is '<error type>' unless we explicitly typecheck the
-    // 'guard' statement.
-    SourceFile *SF = DC->getParentSourceFile();
-    for (auto *D : SF->getTopLevelDecls()) {
-      if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
-        typeCheckTopLevelCodeDecl(Code);
-        if (Code == TLCD)
-          break;
-      }
-    }
+    typeCheckTopLevelCodeDecl(TLCD);
   } else {
     typeCheckContextImpl(DC, Loc);
   }
