@@ -2564,6 +2564,29 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
   return false;
 }
 
+bool TypeChecker::typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
+                                                 DeclContext *dc) {
+  Diag<> diagnosticForAlwaysTrue = diag::invalid_diagnostic;
+  switch (stmt->getKind()) {
+  case StmtKind::If:
+    diagnosticForAlwaysTrue = diag::if_always_true;
+    break;
+  case StmtKind::While:
+    diagnosticForAlwaysTrue = diag::while_always_true;
+    break;
+  case StmtKind::Guard:
+    diagnosticForAlwaysTrue = diag::guard_always_succeeds;
+    break;
+  default:
+    llvm_unreachable("unknown LabeledConditionalStmt kind");
+  }
+
+  StmtCondition cond = stmt->getCond();
+  bool result = typeCheckStmtCondition(cond, dc, diagnosticForAlwaysTrue);
+  stmt->setCond(cond);
+  return result;
+}
+
 /// Find the '~=` operator that can compare an expression inside a pattern to a
 /// value of a given type.
 bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,

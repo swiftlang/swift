@@ -8,15 +8,25 @@ struct MyStruct {
   var y: Int { 1 }
 }
 
-func test(value: MyStruct) {
+func test(valueOptOpt: MyStruct??) {
 
   let FORBIDDEN_localVar = 1
   let unrelated = FORBIDDEN_Struct()
+
+  let valueOpt = valueOptOpt!
+
   guard let a = unrelated.FORBIDDEN_method() else {
     return
   }
 
-  _ = value.#^COMPLETE^#
+  guard let value = valueOpt else {
+    return
+  }
+
+  if (value.x == 1) {
+    let unrelated2 = FORBIDDEN_Struct()
+    _ = value.#^COMPLETE^#
+  }
 }
 
 // CHECK: Begin completions, 3 items

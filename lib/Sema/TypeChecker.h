@@ -756,7 +756,16 @@ void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
 /// \returns true if an error occurred, false otherwise.
 bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
-/// Type check the given 'if' or 'while' statement condition, which
+/// Type check the given 'if', 'while', or 'guard' statement condition.
+///
+/// \param stmt The conditional statement to type-check, which will be modified
+/// in place.
+///
+/// \returns true if an error occurred, false otherwise.
+bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
+                                    DeclContext *dc);
+
+/// Type check the given 'if', 'while', or 'guard' statement condition, which
 /// either converts an expression to a logic value or bind variables to the
 /// contents of an Optional.
 ///

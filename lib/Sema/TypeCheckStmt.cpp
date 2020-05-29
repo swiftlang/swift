@@ -625,9 +625,7 @@ public:
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    StmtCondition C = IS->getCond();
-    TypeChecker::typeCheckStmtCondition(C, DC, diag::if_always_true);
-    IS->setCond(C);
+    TypeChecker::typeCheckConditionForStatement(IS, DC);
 
     AddLabeledStmt ifNest(*this, IS);
 
@@ -644,10 +642,8 @@ public:
   }
   
   Stmt *visitGuardStmt(GuardStmt *GS) {
-    StmtCondition C = GS->getCond();
-    TypeChecker::typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
-    GS->setCond(C);
-    
+    TypeChecker::typeCheckConditionForStatement(GS, DC);
+
     AddLabeledStmt ifNest(*this, GS);
     
     Stmt *S = GS->getBody();
@@ -665,9 +661,7 @@ public:
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
-    StmtCondition C = WS->getCond();
-    TypeChecker::typeCheckStmtCondition(C, DC, diag::while_always_true);
-    WS->setCond(C);
+    TypeChecker::typeCheckConditionForStatement(WS, DC);
 
     AddLabeledStmt loopNest(*this, WS);
     Stmt *S = WS->getBody();
