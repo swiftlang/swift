@@ -15,6 +15,7 @@
 
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/SynthesizedFileUnit.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "swift/Basic/Debug.h"
 
 namespace swift {

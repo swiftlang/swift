@@ -23,6 +23,7 @@
 #include "swift/Migrator/Replacement.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallSet.h"
 
 namespace swift {
 
