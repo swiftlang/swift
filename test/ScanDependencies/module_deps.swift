@@ -126,10 +126,9 @@ import G
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
 // CHECK-NEXT: "clang": "G"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "G"
 // CHECK-NEXT: }
+// CHECK-NEXT: ],
+// CHECK-NEXT: "details": {
 
 // CHECK: "contextHash": "{{.*}}",
 // CHECK: "commandLine": [
