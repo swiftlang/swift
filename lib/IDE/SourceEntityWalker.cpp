@@ -511,6 +511,12 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
       return doSkipChildren();
     }
+  } else if (auto DMRE = dyn_cast<DynamicMemberRefExpr>(E)) {
+    if (!passReference(DMRE->getMember().getDecl(), DMRE->getType(),
+                       DMRE->getNameLoc(),
+                       ReferenceMetaData(SemaReferenceKind::DynamicMemberRef,
+                                         OpAccess)))
+        return stopTraversal;
   }
 
   return { true, E };
