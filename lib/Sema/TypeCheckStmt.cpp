@@ -1563,12 +1563,19 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   }
 
   for (auto &elem : BS->getElements()) {
-    if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
-      SourceLoc Loc = SubExpr->getStartLoc();
-      if (EndTypeCheckLoc.isValid() &&
-          (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
+    if (EndTypeCheckLoc.isValid()) {
+      if (SM.isBeforeInBuffer(EndTypeCheckLoc, elem.getStartLoc()))
         break;
 
+      // NOTE: We need to check the character loc here because the target loc
+      // can be inside the last token of the node. i.e. string interpolation.
+      SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, elem.getEndLoc());
+      if (endLoc == EndTypeCheckLoc ||
+          SM.isBeforeInBuffer(endLoc, EndTypeCheckLoc))
+        continue;
+    }
+
+    if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
       // Type check the expression.
       TypeCheckExprOptions options = TypeCheckExprFlags::IsExprStmt;
       bool isDiscarded = (!getASTContext().LangOpts.Playground &&
@@ -1607,22 +1614,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     }
 
     if (auto *SubStmt = elem.dyn_cast<Stmt*>()) {
-      SourceLoc Loc = SubStmt->getStartLoc();
-      if (EndTypeCheckLoc.isValid() &&
-          (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
-        break;
-
       typeCheckStmt(SubStmt);
       elem = SubStmt;
       continue;
     }
 
     Decl *SubDecl = elem.get<Decl *>();
-    SourceLoc Loc = SubDecl->getStartLoc();
-    if (EndTypeCheckLoc.isValid() &&
-        (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
-      break;
-
     TypeChecker::typeCheckDecl(SubDecl);
   }
 
