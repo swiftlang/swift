@@ -19,7 +19,6 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Driver/Job.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
