@@ -1250,6 +1250,17 @@ static bool performCompile(CompilerInstance &Instance,
   if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Instance);
 
+  // If we aren't in a parse-only context and expect an implicit stdlib import,
+  // load in the standard library. If we either fail to find it or encounter an
+  // error while loading it, bail early. Continuing the compilation will at best
+  // trigger a bunch of other errors due to the stdlib being missing, or at
+  // worst crash downstream as many call sites don't currently handle a missing
+  // stdlib.
+  if (!FrontendOptions::shouldActionOnlyParse(Action)) {
+    if (Instance.loadStdlibIfNeeded())
+      return true;
+  }
+
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
     // Disable delayed parsing of type and function bodies when we've been
     // asked to dump the resulting AST.
