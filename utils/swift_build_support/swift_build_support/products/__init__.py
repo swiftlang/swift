@@ -26,8 +26,8 @@ from .pythonkit import PythonKit
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
-from .swiftinspect import SwiftInspect
 from .swiftevolve import SwiftEvolve
+from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tensorflow import TensorFlowSwiftAPIs
