@@ -540,6 +540,8 @@ private:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
     case Node::Kind::OpaqueReturnTypeOf:
+    case Node::Kind::CanonicalSpecializedGenericMetaclass:
+    case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2417,6 +2419,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::AccessorFunctionReference:
     Printer << "accessor function at " << Node->getIndex();
+    return nullptr;
+  case Node::Kind::CanonicalSpecializedGenericMetaclass:
+    Printer << "specialized generic metaclass for ";
+    print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
+    Printer << "canonical specialized generic type metadata accessor for ";
+    print(Node->getChild(0));
     return nullptr;
   }
   printer_unreachable("bad node kind!");
