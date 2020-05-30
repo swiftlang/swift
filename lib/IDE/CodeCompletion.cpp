@@ -5734,7 +5734,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       CurDeclContext = DC;
   }
 
-  typeCheckContextUntil(
+  typeCheckContextAt(
       CurDeclContext,
       ParsedExpr
           ? ParsedExpr->getLoc()

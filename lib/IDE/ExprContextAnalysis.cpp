@@ -37,7 +37,7 @@ using namespace swift;
 using namespace ide;
 
 //===----------------------------------------------------------------------===//
-// typeCheckContextUntil(DeclContext, SourceLoc)
+// typeCheckContextAt(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -99,7 +99,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 }
 } // anonymous namespace
 
-void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
+void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
 
