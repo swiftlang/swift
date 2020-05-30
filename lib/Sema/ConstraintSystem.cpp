@@ -928,6 +928,59 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
   return *member;
 }
 
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getStorageWrapperInformation(SelectedOverload resolvedOverload) {
+  if (resolvedOverload.choice.isDecl()) {
+    if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
+      if (decl->hasAttachedPropertyWrapper()) {
+        if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
+          Type type = storageWrapper->getInterfaceType();
+          if (Type baseType = resolvedOverload.choice.getBaseType()) {
+            type = baseType->getTypeOfMember(DC->getParentModule(),
+                                             storageWrapper, type);
+          }
+          return std::make_pair(decl, type);
+        }
+      }
+    }
+  }
+  return None;
+}
+
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getPropertyWrapperInformation(SelectedOverload resolvedOverload) {
+  if (resolvedOverload.choice.isDecl()) {
+    if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
+      if (decl->hasAttachedPropertyWrapper()) {
+        auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
+        if (Type baseType = resolvedOverload.choice.getBaseType()) {
+          wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
+                                                decl, wrapperTy);
+        }
+        return std::make_pair(decl, wrapperTy);
+      }
+    }
+  }
+  return None;
+}
+
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getWrappedPropertyInformation(SelectedOverload resolvedOverload) {
+  if (resolvedOverload.choice.isDecl()) {
+    if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
+      if (auto wrapped = decl->getOriginalWrappedProperty()) {
+        Type type = wrapped->getInterfaceType();
+        if (Type baseType = resolvedOverload.choice.getBaseType()) {
+          type = baseType->getTypeOfMember(DC->getParentModule(),
+                                           wrapped, type);
+        }
+        return std::make_pair(decl, type);
+      }
+    }
+  }
+  return None;
+}
+
 /// Does a var or subscript produce an l-value?
 ///
 /// \param baseType - the type of the base on which this object
