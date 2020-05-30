@@ -1635,9 +1635,8 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  auto res =
-      evaluateOrDefault(AFD->getASTContext().evaluator,
-                        TypeCheckFunctionBodyRequest{AFD, SourceLoc()}, true);
+  auto res = evaluateOrDefault(AFD->getASTContext().evaluator,
+                               TypeCheckFunctionBodyRequest{AFD}, true);
   TypeChecker::checkFunctionErrorHandling(AFD);
   TypeChecker::computeCaptures(AFD);
   return res;
@@ -1836,10 +1835,41 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   }
 }
 
+bool TypeCheckFunctionBodyAtLocRequest::evaluate(Evaluator &evaluator,
+                                                 AbstractFunctionDecl *AFD,
+                                                 SourceLoc Loc) const {
+  ASTContext &ctx = AFD->getASTContext();
+
+  BraceStmt *body = AFD->getBody();
+  if (!body || AFD->isBodyTypeChecked())
+    return false;
+
+  // Function builder doesn't support partial type checking.
+  if (auto *func = dyn_cast<FuncDecl>(AFD)) {
+    if (Type builderType = getFunctionBuilderType(func)) {
+      auto optBody =
+          TypeChecker::applyFunctionBuilderBodyTransform(func, builderType);
+      if (!optBody || !*optBody)
+        return true;
+      // Wire up the function body now.
+      AFD->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
+      return false;
+    }
+  }
+
+  if (ctx.LangOpts.EnableASTScopeLookup)
+    ASTScope::expandFunctionBody(AFD);
+
+  StmtChecker SC(AFD);
+  SC.TargetTypeCheckLoc = Loc;
+  bool hadError = SC.typeCheckBody(body);
+  AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+  return hadError;
+}
+
 bool
 TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
-                                       AbstractFunctionDecl *AFD,
-                                       SourceLoc targetTypeCheckLoc) const {
+                                       AbstractFunctionDecl *AFD) const {
   ASTContext &ctx = AFD->getASTContext();
 
   Optional<FunctionBodyTimer> timer;
@@ -1896,7 +1926,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   bool hadError = false;
   if (!alreadyTypeChecked) {
     StmtChecker SC(AFD);
-    SC.TargetTypeCheckLoc = targetTypeCheckLoc;
     hadError = SC.typeCheckBody(body);
   }
 
@@ -1927,7 +1956,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
 
   // If nothing went wrong yet, perform extra checking.
-  if (!hadError && targetTypeCheckLoc.isInvalid())
+  if (!hadError)
     performAbstractFuncDeclDiagnostics(AFD);
 
   return hadError;

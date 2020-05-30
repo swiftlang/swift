@@ -79,7 +79,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     auto &SM = DC->getASTContext().SourceMgr;
     auto bodyRange = AFD->getBodySourceRange();
     if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
-      swift::typeCheckAbstractFunctionBodyNodeAt(AFD, Loc);
+      swift::typeCheckAbstractFunctionBodyAtLoc(AFD, Loc);
     } else {
       assert(bodyRange.isInvalid() && "The body should not be parsed if the "
                                       "completion happens in the signature");
@@ -866,10 +866,10 @@ class ExprContextAnalyzer {
       break;
     }
     default:
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-        assert(isSingleExpressionBodyForCodeCompletion(AFD->getBody()));
+      if (auto *FD = dyn_cast<FuncDecl>(D)) {
+        assert(isSingleExpressionBodyForCodeCompletion(FD->getBody()));
         singleExpressionBody = true;
-        recordPossibleType(getReturnTypeFromContext(AFD));
+        recordPossibleType(getReturnTypeFromContext(FD));
         break;
       }
       llvm_unreachable("Unhandled decl kind.");
@@ -1003,8 +1003,8 @@ public:
         case DeclKind::PatternBinding:
           return true;
         default:
-          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-            if (auto *body = AFD->getBody())
+          if (auto *FD = dyn_cast<FuncDecl>(D))
+            if (auto *body = FD->getBody())
               return isSingleExpressionBodyForCodeCompletion(body);
           return false;
         }

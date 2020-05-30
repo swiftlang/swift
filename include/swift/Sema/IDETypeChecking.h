@@ -133,9 +133,9 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Partially typecheck the specified function body.
-  bool typeCheckAbstractFunctionBodyNodeAt(AbstractFunctionDecl *AFD,
-                                           SourceLoc TargetLoc);
+  /// Type check a function body element which is at \p TagetLoc .
+  bool typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
+                                          SourceLoc TargetLoc);
 
   /// Typecheck top-level code parsed during code completion.
   ///

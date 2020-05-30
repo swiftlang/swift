@@ -867,14 +867,13 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request to type check the body of the given function up to the given
-/// source location.
+/// Request to type check the body of the given function.
 ///
 /// Produces true if an error occurred, false otherwise.
 /// FIXME: it would be far better to return the type-checked body.
 class TypeCheckFunctionBodyRequest :
     public SimpleRequest<TypeCheckFunctionBodyRequest,
-                         bool(AbstractFunctionDecl *, SourceLoc),
+                         bool(AbstractFunctionDecl *),
                          RequestFlags::Cached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -883,9 +882,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool
-  evaluate(Evaluator &evaluator, AbstractFunctionDecl *func,
-           SourceLoc endTypeCheckLoc) const;
+  bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
 
 public:
   bool isCached() const { return true; }
@@ -894,6 +891,24 @@ public:
   // Incremental dependencies.
   evaluator::DependencySource
   readDependencySource(const evaluator::DependencyRecorder &) const;
+};
+
+/// Request to typecheck a function body element at the given source location.
+///
+/// Produces true if an error occurred, false otherwise.
+class TypeCheckFunctionBodyAtLocRequest
+    : public SimpleRequest<TypeCheckFunctionBodyAtLocRequest,
+                           bool(AbstractFunctionDecl *, SourceLoc),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, AbstractFunctionDecl *func,
+                SourceLoc Loc) const;
 };
 
 /// Request to obtain a list of stored properties in a nominal type.
