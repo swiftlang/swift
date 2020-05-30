@@ -1,6 +1,6 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build Swift on Windows.
+Visual Studio 2017 or newer is needed to build Swift on Windows. The free Community edition is sufficient to build Swift.
 
 The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
 
@@ -32,7 +32,7 @@ The command above already installs Python 2 and 3. Alternatively, in the Visual 
 
 1. Install *Python 2*, either the 32-bit version (C:\Python27\\) or the 64-bit version (C:\Python27amd64\\)
 
-> If you install the 64-bit version only, you will need to adjust `PYTHON_EXECUTABLE` below to `C:\Python27amd64\python.exe`
+   **Note:** If you install the 64-bit version only, you will need to adjust `PYTHON_EXECUTABLE` below to `C:\Python27amd64\python.exe`
 
 2. Install *Python 3 64 bits (3.7.x)*
 
@@ -149,6 +149,9 @@ cmake -B "S:\b\toolchain" ^
 
 ninja -C S:\b\toolchain
 ```
+
+**Note:** If you installed only the 64-bit version of Python, you will need to adjust `PYTHON_EXECUTABLE` argument to `C:\Python27amd64\python.exe`
+
 
 ## Running Swift tests on Windows
 

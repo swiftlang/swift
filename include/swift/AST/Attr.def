@@ -126,7 +126,7 @@ DECL_ATTR(available, Available,
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
   OnClass | OnFunc | OnAccessor | OnVar | OnSubscript |
   DeclModifier |
-  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   2)
 DECL_ATTR(objc, ObjC,
   OnAbstractFunction | OnClass | OnProtocol | OnExtension | OnVar |

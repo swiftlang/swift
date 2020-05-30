@@ -68,8 +68,8 @@ public func mutateBaseArray(_ arr: inout [Base], _ x: Base) {
 
 // Check if all specializations from stdlib functions are created in the same LLVM module.
 
-// CHECK-MAINLL-DAG: define {{.*}} @"$sSa16_createNewBuffer14bufferIsUnique15minimumCapacity13growForAppendySb_SiSbtF4test8MyStructV_Tg5"
-// CHECK-MAINLL-DAG: define {{.*}} @"$sSa16_createNewBuffer14bufferIsUnique15minimumCapacity13growForAppendySb_SiSbtF4test4BaseC_Tg5"
+// CHECK-MAINLL-DAG: define {{.*}} @"$ss{{(12_|22_Contiguous)}}ArrayBufferV20_consumeAndCreateNew14bufferIsUnique15minimumCapacity13growForAppendAByxGSb_SiSbtF4test8MyStructV_Tg5"
+// CHECK-MAINLL-DAG: define {{.*}} @"$ss{{(12_|22_Contiguous)}}ArrayBufferV20_consumeAndCreateNew14bufferIsUnique15minimumCapacity13growForAppendAByxGSb_SiSbtF4test4BaseC_Tg5"
 
 // Check if the DI filename is correct and not "<unknown>".
 

@@ -113,6 +113,17 @@ IRGenModule::getAddrOfClangGlobalDecl(clang::GlobalDecl global,
 }
 
 void IRGenModule::finalizeClangCodeGen() {
+  // Ensure that code is emitted for any `PragmaCommentDecl`s. (These are
+  // always guaranteed to be directly below the TranslationUnitDecl.)
+  // In Clang, this happens automatically during the Sema phase, but here we
+  // need to take care of it manually because our Clang CodeGenerator is not
+  // attached to Clang Sema as an ASTConsumer.
+  for (const auto *D : ClangASTContext->getTranslationUnitDecl()->decls()) {
+    if (const auto *PCD = dyn_cast<clang::PragmaCommentDecl>(D)) {
+      emitClangDecl(PCD);
+    }
+  }
+
   ClangCodeGen->HandleTranslationUnit(
       *const_cast<clang::ASTContext *>(ClangASTContext));
 }
