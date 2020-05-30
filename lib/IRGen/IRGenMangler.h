@@ -97,6 +97,11 @@ public:
     return mangleTypeSymbol(type, "Ma");
   }
 
+  std::string
+  mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(Type type) {
+    return mangleTypeSymbol(type, "Mb");
+  }
+
   std::string mangleTypeMetadataLazyCacheVariable(Type type) {
     return mangleTypeSymbol(type, "ML");
   }
@@ -119,6 +124,10 @@ public:
 
   std::string mangleClassMetaClass(const ClassDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mm");
+  }
+
+  std::string mangleSpecializedGenericClassMetaClass(const CanType theType) {
+    return mangleTypeSymbol(theType, "MM");
   }
 
   std::string mangleObjCMetadataUpdateFunction(const ClassDecl *Decl) {
