@@ -3576,10 +3576,13 @@ public:
   bool generateConstraints(SolutionApplicationTarget &target,
                            FreeTypeVariableBinding allowFreeTypeVariables);
 
-  /// Generate constraints for the body of the given single-statement closure.
+  /// Generate constraints for the body of the given closure.
   ///
-  /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(ClosureExpr *closure);
+  /// \param closure the closure expression
+  /// \param resultType the closure's result type
+  ///
+  /// \returns \c true if constraint generation failed, \c false otherwise
+  bool generateConstraints(ClosureExpr *closure, Type resultType);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
