@@ -2,3 +2,8 @@ RUN: swift-demangle -display-stdlib-module=true sSi | %FileCheck %s --check-pref
 SWIFT-INT: {{ Swift.Int$}}
 RUN: swift-demangle -display-stdlib-module=false sSi | %FileCheck %s --check-prefix=INT
 INT: {{ Int$}}
+
+RUN: swift-demangle -display-objc-module=true sSo6CGRectVD | %FileCheck %s --check-prefix=OBJC-CGRECT
+OBJC-CGRECT: {{ __C.CGRect$}}
+RUN: swift-demangle -display-objc-module=false sSo6CGRectVD | %FileCheck %s --check-prefix=CGRECT
+CGRECT: {{ CGRect$}}

@@ -80,6 +80,11 @@ static llvm::cl::opt<bool> DisplayStdlibModule(
     "display-stdlib-module", llvm::cl::init(true),
     llvm::cl::desc("Qualify types originating from the Swift standard library"),
     llvm::cl::Hidden);
+
+static llvm::cl::opt<bool> DisplayObjCModule(
+    "display-objc-module", llvm::cl::init(true),
+    llvm::cl::desc("Qualify types originating from the __ObjC module"),
+    llvm::cl::Hidden);
 /// \}
 
 
@@ -243,6 +248,7 @@ int main(int argc, char **argv) {
   if (Simplified)
     options = swift::Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
   options.DisplayStdlibModule = DisplayStdlibModule;
+  options.DisplayObjCModule = DisplayObjCModule;
 
   if (InputNames.empty()) {
     CompactMode = true;

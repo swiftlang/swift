@@ -58,6 +58,7 @@ struct DemangleOptions {
   bool ShowFunctionArgumentTypes = true;
   bool DisplayDebuggerGeneratedModule = true;
   bool DisplayStdlibModule = true;
+  bool DisplayObjCModule = true;
   std::function<std::string(uint64_t, uint64_t)> GenericParameterName =
       genericParameterName;
 
