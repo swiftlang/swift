@@ -928,57 +928,80 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
   return *member;
 }
 
-Optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getStorageWrapperInformation(SelectedOverload resolvedOverload) {
+static Optional<std::pair<VarDecl *, Type>>
+getPropertyWrappersInformationFromOverload(
+    SelectedOverload resolvedOverload, DeclContext *DC,
+    llvm::function_ref<Optional<std::pair<VarDecl *, Type>>(VarDecl *)>
+        getInformation) {
   if (resolvedOverload.choice.isDecl()) {
     if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-      if (decl->hasAttachedPropertyWrapper()) {
-        if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
-          Type type = storageWrapper->getInterfaceType();
-          if (Type baseType = resolvedOverload.choice.getBaseType()) {
-            type = baseType->getTypeOfMember(DC->getParentModule(),
-                                             storageWrapper, type);
-          }
-          return std::make_pair(decl, type);
-        }
-      }
-    }
-  }
-  return None;
-}
-
-Optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperInformation(SelectedOverload resolvedOverload) {
-  if (resolvedOverload.choice.isDecl()) {
-    if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-      if (decl->hasAttachedPropertyWrapper()) {
-        auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
+      if (auto declInformation = getInformation(decl)) {
+        Type type;
+        VarDecl *memberDecl;
+        std::tie(memberDecl, type) = *declInformation;
         if (Type baseType = resolvedOverload.choice.getBaseType()) {
-          wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
-                                                decl, wrapperTy);
-        }
-        return std::make_pair(decl, wrapperTy);
-      }
-    }
-  }
-  return None;
-}
-
-Optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getWrappedPropertyInformation(SelectedOverload resolvedOverload) {
-  if (resolvedOverload.choice.isDecl()) {
-    if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-      if (auto wrapped = decl->getOriginalWrappedProperty()) {
-        Type type = wrapped->getInterfaceType();
-        if (Type baseType = resolvedOverload.choice.getBaseType()) {
-          type = baseType->getTypeOfMember(DC->getParentModule(),
-                                           wrapped, type);
+          type = baseType->getTypeOfMember(DC->getParentModule(), memberDecl,
+                                           type);
         }
         return std::make_pair(decl, type);
       }
     }
   }
   return None;
+}
+
+static Optional<std::pair<VarDecl *, Type>>
+getStorageWrapperInformationFromDecl(VarDecl *decl) {
+  if (!decl->hasAttachedPropertyWrapper())
+    return None;
+
+  auto storageWrapper = decl->getPropertyWrapperStorageWrapper();
+  if (!storageWrapper)
+    return None;
+
+  return std::make_pair(storageWrapper, storageWrapper->getInterfaceType());
+}
+
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getStorageWrapperInformation(
+    SelectedOverload resolvedOverload) {
+  return getPropertyWrappersInformationFromOverload(
+      resolvedOverload, DC,
+      [](VarDecl *decl) { return getStorageWrapperInformationFromDecl(decl); });
+}
+
+static Optional<std::pair<VarDecl *, Type>>
+getPropertyWrapperInformationFromDecl(VarDecl *decl) {
+  if (!decl->hasAttachedPropertyWrapper())
+    return None;
+
+  return std::make_pair(decl, decl->getPropertyWrapperBackingPropertyType());
+}
+
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getPropertyWrapperInformation(
+    SelectedOverload resolvedOverload) {
+  return getPropertyWrappersInformationFromOverload(
+      resolvedOverload, DC, [](VarDecl *decl) {
+        return getPropertyWrapperInformationFromDecl(decl);
+      });
+}
+
+static Optional<std::pair<VarDecl *, Type>>
+getWrappedPropertyInformationFromDecl(VarDecl *decl) {
+  if (auto wrapped = decl->getOriginalWrappedProperty())
+    return std::make_pair(decl, wrapped->getInterfaceType());
+
+  return None;
+}
+
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getWrappedPropertyInformation(
+    SelectedOverload resolvedOverload) {
+  return getPropertyWrappersInformationFromOverload(
+      resolvedOverload, DC, [](VarDecl *decl) {
+        return getWrappedPropertyInformationFromDecl(decl);
+      });
 }
 
 /// Does a var or subscript produce an l-value?
