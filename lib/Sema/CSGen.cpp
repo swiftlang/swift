@@ -4418,24 +4418,10 @@ bool ConstraintSystem::generateConstraints(
   llvm_unreachable("BOOM");
 }
 
-bool ConstraintSystem::generateConstraints(
-    ClosureExpr *closure, Type resultType) {
-  assert(closure->hasSingleExpressionBody());
-  auto closureBody = generateConstraintsFor(
-      *this, closure->getSingleExpressionBody(), closure);
-  if (!closureBody)
-    return true;
-
-  bool hasReturn = hasExplicitResult(closure);
-  addConstraint(
-      ConstraintKind::Conversion, getType(closureBody),
-      resultType,
-      getConstraintLocator(closure, LocatorPathElt::ClosureBody(hasReturn)));
-  return false;
-}
-
-Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
-  InputExprs.insert(expr);
+Expr *ConstraintSystem::generateConstraints(
+    Expr *expr, DeclContext *dc, bool isInputExpression) {
+  if (isInputExpression)
+    InputExprs.insert(expr);
   return generateConstraintsFor(*this, expr, dc);
 }
 

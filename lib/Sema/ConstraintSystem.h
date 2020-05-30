@@ -3587,7 +3587,8 @@ public:
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E, DeclContext *dc);
+  Expr *generateConstraints(Expr *E, DeclContext *dc,
+                            bool isInputExpression = true);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.
