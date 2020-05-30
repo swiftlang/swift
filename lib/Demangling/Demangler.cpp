@@ -1874,9 +1874,6 @@ NodePointer Demangler::demangleMetatype() {
     case 'A':
       return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
                              popProtocolConformance());
-    case 'b':
-      return createWithPoppedType(
-          Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction);
     case 'B':
       return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
                                popNode(Node::Kind::Type));
@@ -1920,9 +1917,6 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::TypeMetadataLazyCache);
     case 'm':
       return createWithPoppedType(Node::Kind::Metaclass);
-    case 'M':
-      return createWithPoppedType(
-          Node::Kind::CanonicalSpecializedGenericMetaclass);
     case 'n':
       return createWithPoppedType(Node::Kind::NominalTypeDescriptor);
     case 'o':

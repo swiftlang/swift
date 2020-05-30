@@ -48,7 +48,7 @@ extension Natural {
     )
         -> Invocation.Return
     {
-        if isCanonicalStaticallySpecializedGenericMetadata(ptr(to: Self.self)) {
+        if isCanonicalStaticallySpecializedGenericMetadata(ptr(to: Self.self)) != 0 {
             fatalError()
         }
         switch count {

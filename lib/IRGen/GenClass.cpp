@@ -32,7 +32,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTableVisitor.h"
-#include "llvm/ADT/None.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -41,29 +40,72 @@
 
 #include "Callee.h"
 #include "ClassLayout.h"
-#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenFunc.h"
-#include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
-#include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "GenHeap.h"
+#include "HeapTypeInfo.h"
 #include "MemberAccessStrategy.h"
 #include "MetadataLayout.h"
 #include "MetadataRequest.h"
 
+
 using namespace swift;
 using namespace irgen;
 
+namespace {
+  /// Layout information for class types.
+  class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
+    ClassDecl *TheClass;
+
+    // The resilient layout of the class, without making any assumptions
+    // that violate resilience boundaries. This is used to allocate
+    // and deallocate instances of the class, and to access fields.
+    mutable Optional<ClassLayout> ResilientLayout;
+
+    // A completely fragile layout, used for metadata emission.
+    mutable Optional<ClassLayout> FragileLayout;
+
+    /// Can we use swift reference-counting, or do we have to use
+    /// objc_retain/release?
+    const ReferenceCounting Refcount;
+    
+    ClassLayout generateLayout(IRGenModule &IGM, SILType classType,
+                               bool forBackwardDeployment) const;
+
+  public:
+    ClassTypeInfo(llvm::PointerType *irType, Size size,
+                  SpareBitVector spareBits, Alignment align,
+                  ClassDecl *theClass, ReferenceCounting refcount)
+      : HeapTypeInfo(irType, size, std::move(spareBits), align),
+        TheClass(theClass), Refcount(refcount) {}
+
+    ReferenceCounting getReferenceCounting() const {
+      return Refcount;
+    }
+
+    ClassDecl *getClass() const { return TheClass; }
+
+
+    const ClassLayout &getClassLayout(IRGenModule &IGM, SILType type,
+                                      bool forBackwardDeployment) const;
+
+    StructLayout *createLayoutWithTailElems(IRGenModule &IGM,
+                                            SILType classType,
+                                            ArrayRef<SILType> tailTypes) const;
+  };
+} // end anonymous namespace
+
 /// Return the lowered type for the class's 'self' type within its context.
-SILType irgen::getSelfType(const ClassDecl *base) {
+static SILType getSelfType(const ClassDecl *base) {
   auto loweredTy = base->getDeclaredTypeInContext()->getCanonicalType();
   return SILType::getPrimitiveObjectType(loweredTy);
 }
@@ -286,17 +328,12 @@ namespace {
         auto element = ElementLayout::getIncomplete(*eltType);
         bool isKnownEmpty = !addField(element, LayoutStrategy::Universal);
 
-        bool isSpecializedGeneric =
-            (theClass->isGenericContext() && !classType.getASTType()
-                                                  ->getRecursiveProperties()
-                                                  .hasUnboundGeneric());
-
         // The 'Elements' list only contains superclass fields when we're
         // building a layout for tail allocation.
-        if (!superclass || TailTypes || isSpecializedGeneric)
+        if (!superclass || TailTypes)
           Elements.push_back(element);
 
-        if (!superclass || isSpecializedGeneric) {
+        if (!superclass) {
           AllStoredProperties.push_back(var);
           AllFieldAccesses.push_back(getFieldAccess(isKnownEmpty));
         }
@@ -927,49 +964,26 @@ namespace {
   /// category data (category_t), or protocol data (protocol_t).
   class ClassDataBuilder : public ClassMemberVisitor<ClassDataBuilder> {
     IRGenModule &IGM;
-    using ClassPair = std::pair<ClassDecl *, CanType>;
-    using ClassUnion = TaggedUnion<ClassDecl *, ClassPair>;
-    TaggedUnion<ClassUnion, ProtocolDecl *> TheEntity;
+    PointerUnion<ClassDecl *, ProtocolDecl *> TheEntity;
     ExtensionDecl *TheExtension;
     const ClassLayout *FieldLayout;
     
     ClassDecl *getClass() const {
-      const ClassUnion *classUnion;
-      if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
-        return nullptr;
-      }
-      if (auto *const *theClass = classUnion->dyn_cast<ClassDecl *>()) {
-        return *theClass;
-      }
-      auto pair = classUnion->get<ClassPair>();
-      return pair.first;
+      return TheEntity.get<ClassDecl*>();
     }
     ProtocolDecl *getProtocol() const {
-      if (auto *const *theProtocol = TheEntity.dyn_cast<ProtocolDecl *>()) {
-        return *theProtocol;
-      }
-      return nullptr;
+      return TheEntity.get<ProtocolDecl*>();
     }
-    Optional<CanType> getSpecializedGenericType() const {
-      const ClassUnion *classUnion;
-      if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
-        return llvm::None;
-      }
-      const ClassPair *classPair;
-      if (!(classPair = classUnion->dyn_cast<ClassPair>())) {
-        return llvm::None;
-      }
-      auto &pair = *classPair;
-      return pair.second;
-    }
-
+    
     bool isBuildingClass() const {
-      return TheEntity.isa<ClassUnion>() && !TheExtension;
+      return TheEntity.is<ClassDecl*>() && !TheExtension;
     }
     bool isBuildingCategory() const {
-      return TheEntity.isa<ClassUnion>() && TheExtension;
+      return TheEntity.is<ClassDecl*>() && TheExtension;
     }
-    bool isBuildingProtocol() const { return TheEntity.isa<ProtocolDecl *>(); }
+    bool isBuildingProtocol() const {
+      return TheEntity.is<ProtocolDecl*>();
+    }
 
     bool HasNonTrivialDestructor = false;
     bool HasNonTrivialConstructor = false;
@@ -1049,27 +1063,23 @@ namespace {
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      const ClassLayout &fieldLayout)
-        : ClassDataBuilder(IGM, ClassUnion(theClass), fieldLayout) {}
+        : IGM(IGM), TheEntity(theClass), TheExtension(nullptr),
+          FieldLayout(&fieldLayout)
+    {
+      visitConformances(theClass);
+      visitMembers(theClass);
 
-    ClassDataBuilder(
-        IRGenModule &IGM,
-        TaggedUnion<ClassDecl *, std::pair<ClassDecl *, CanType>> theUnion,
-        const ClassLayout &fieldLayout)
-        : IGM(IGM), TheEntity(theUnion), TheExtension(nullptr),
-          FieldLayout(&fieldLayout) {
-      visitConformances(getClass());
-      visitMembers(getClass());
-
-      if (Lowering::usesObjCAllocator(getClass())) {
-        addIVarInitializer();
-        addIVarDestroyer();
+      if (Lowering::usesObjCAllocator(theClass)) {
+        addIVarInitializer(); 
+        addIVarDestroyer(); 
       }
     }
-
+    
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      ExtensionDecl *theExtension)
-        : IGM(IGM), TheEntity(ClassUnion(theClass)), TheExtension(theExtension),
-          FieldLayout(nullptr) {
+      : IGM(IGM), TheEntity(theClass), TheExtension(theExtension),
+        FieldLayout(nullptr)
+    {
       buildCategoryName(CategoryName);
 
       visitConformances(theExtension);
@@ -1077,7 +1087,7 @@ namespace {
       for (Decl *member : TheExtension->getMembers())
         visit(member);
     }
-
+    
     ClassDataBuilder(IRGenModule &IGM, ProtocolDecl *theProtocol)
       : IGM(IGM), TheEntity(theProtocol), TheExtension(nullptr)
     {
@@ -1133,12 +1143,7 @@ namespace {
       }
     }
 
-    llvm::Constant *getMetaclassRefOrNull(Type specializedGenericType,
-                                          ClassDecl *theClass) {
-      if (specializedGenericType) {
-        return IGM.getAddrOfCanonicalSpecializedGenericMetaclassObject(
-            specializedGenericType->getCanonicalType(), NotForDefinition);
-      }
+    llvm::Constant *getMetaclassRefOrNull(ClassDecl *theClass) {
       if (theClass->isGenericContext() && !theClass->hasClangNode()) {
         return llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
       } else {
@@ -1148,20 +1153,9 @@ namespace {
 
     void buildMetaclassStub() {
       assert(FieldLayout && "can't build a metaclass from a category");
-
-      auto specializedGenericType = getSpecializedGenericType().map(
-          [](auto canType) { return (Type)canType; });
-
       // The isa is the metaclass pointer for the root class.
-      auto rootClass = getRootClassForMetaclass(IGM, getClass());
-      Type rootType;
-      if (specializedGenericType && rootClass->isGenericContext()) {
-        rootType =
-            (*specializedGenericType)->getRootClass(/*useArchetypes=*/false);
-      } else {
-        rootType = Type();
-      }
-      auto rootPtr = getMetaclassRefOrNull(rootType, rootClass);
+      auto rootClass = getRootClassForMetaclass(IGM, TheEntity.get<ClassDecl *>());
+      auto rootPtr = getMetaclassRefOrNull(rootClass);
 
       // The superclass of the metaclass is the metaclass of the
       // superclass.  Note that for metaclass stubs, we can always
@@ -1172,16 +1166,10 @@ namespace {
       llvm::Constant *superPtr;
       if (getClass()->hasSuperclass()) {
         auto base = getClass()->getSuperclassDecl();
-        if (specializedGenericType && base->isGenericContext()) {
-          superPtr = getMetaclassRefOrNull(
-              (*specializedGenericType)->getSuperclass(/*useArchetypes=*/false),
-              base);
-        } else {
-          superPtr = getMetaclassRefOrNull(Type(), base);
-        }
+        superPtr = getMetaclassRefOrNull(base);
       } else {
         superPtr = getMetaclassRefOrNull(
-            Type(), IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()));
+          IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()));
       }
 
       auto dataPtr = emitROData(ForMetaClass, DoesNotHaveUpdateCallback);
@@ -1196,16 +1184,9 @@ namespace {
       };
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
                                             makeArrayRef(fields));
-      llvm::Constant *uncastMetaclass;
-      if (auto theType = getSpecializedGenericType()) {
-        uncastMetaclass =
-            IGM.getAddrOfCanonicalSpecializedGenericMetaclassObject(
-                *theType, ForDefinition);
-      } else {
-        uncastMetaclass =
-            IGM.getAddrOfMetaclassObject(getClass(), ForDefinition);
-      }
-      auto metaclass = cast<llvm::GlobalVariable>(uncastMetaclass);
+      auto metaclass =
+        cast<llvm::GlobalVariable>(
+                     IGM.getAddrOfMetaclassObject(getClass(), ForDefinition));
       metaclass->setInitializer(init);
     }
     
@@ -1368,20 +1349,9 @@ namespace {
         b.addInt32(0);
       }
 
-      // union {
-      //     const uint8_t *IvarLayout;
-      //     ClassMetadata *NonMetaClass;
-      // };
-      Optional<CanType> specializedGenericType;
-      if ((specializedGenericType = getSpecializedGenericType()) && forMeta) {
-        //     ClassMetadata *NonMetaClass;
-        b.addBitCast(IGM.getAddrOfTypeMetadata(*specializedGenericType),
-                     IGM.Int8PtrTy);
-      } else {
-        //     const uint8_t *IvarLayout;
-        // GC/ARC layout.  TODO.
-        b.addNullPointer(IGM.Int8PtrTy);
-      }
+      //   const uint8_t *ivarLayout;
+      // GC/ARC layout.  TODO.
+      b.addNullPointer(IGM.Int8PtrTy);
 
       //   const char *name;
       // It is correct to use the same name for both class and metaclass.
@@ -1413,8 +1383,9 @@ namespace {
       if (hasUpdater) {
         //   Class _Nullable (*metadataUpdateCallback)(Class _Nonnull cls,
         //                                             void * _Nullable arg);
-        auto *impl = IGM.getAddrOfObjCMetadataUpdateFunction(getClass(),
-                                                             NotForDefinition);
+        auto *impl = IGM.getAddrOfObjCMetadataUpdateFunction(
+                TheEntity.get<ClassDecl *>(),
+                NotForDefinition);
         const auto &schema =
           IGM.getOptions().PointerAuth.ObjCMethodListFunctionPointers;
         b.addSignedPointer(impl, schema, PointerAuthEntity());
@@ -2024,14 +1995,14 @@ namespace {
     /// Get the name of the class or protocol to mangle into the ObjC symbol
     /// name.
     StringRef getEntityName(llvm::SmallVectorImpl<char> &buffer) const {
-      if (auto theClass = getClass()) {
+      if (auto theClass = TheEntity.dyn_cast<ClassDecl*>()) {
         return theClass->getObjCRuntimeName(buffer);
       }
-
-      if (auto theProtocol = getProtocol()) {
+      
+      if (auto theProtocol = TheEntity.dyn_cast<ProtocolDecl*>()) {
         return theProtocol->getObjCRuntimeName(buffer);
       }
-
+      
       llvm_unreachable("not a class or protocol?!");
     }
 
@@ -2166,27 +2137,18 @@ void IRGenModule::emitObjCResilientClassStub(ClassDecl *D) {
   defineAlias(entity, objcStub);
 }
 
-static llvm::Constant *doEmitClassPrivateData(
-    IRGenModule &IGM,
-    TaggedUnion<ClassDecl *, std::pair<ClassDecl *, CanType>> classUnion) {
+/// Emit the private data (RO-data) associated with a class.
+llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
+                                            ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
-
-  ClassDecl *cls;
-
-  if (auto *theClass = classUnion.dyn_cast<ClassDecl *>()) {
-    cls = *theClass;
-  } else {
-    auto pair = classUnion.get<std::pair<ClassDecl *, CanType>>();
-    cls = pair.first;
-  }
-
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
 
   // FIXME: For now, always use the fragile layout when emitting metadata.
   auto &fieldLayout = classTI.getClassLayout(IGM, selfType,
                                              /*forBackwardDeployment=*/true);
-  ClassDataBuilder builder(IGM, classUnion, fieldLayout);
+  ClassDataBuilder builder(IGM, cls, fieldLayout);
 
   // First, build the metaclass object.
   builder.buildMetaclassStub();
@@ -2207,25 +2169,6 @@ static llvm::Constant *doEmitClassPrivateData(
 
   // Then build the class RO-data.
   return builder.emitROData(ForClass, hasUpdater);
-}
-
-llvm::Constant *irgen::emitSpecializedGenericClassPrivateData(
-    IRGenModule &IGM, ClassDecl *theClass, CanType theType) {
-  assert(theType->getClassOrBoundGenericClass() == theClass);
-  assert(theClass->getGenericEnvironment());
-  Type ty = theType;
-  PrettyStackTraceType stackTraceRAII(theClass->getASTContext(),
-                                      "emitting ObjC metadata for", ty);
-  return doEmitClassPrivateData(
-      IGM, TaggedUnion<ClassDecl *, std::pair<ClassDecl *, CanType>>(
-               std::make_pair(theClass, theType)));
-}
-
-/// Emit the private data (RO-data) associated with a class.
-llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM, ClassDecl *cls) {
-  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
-  return doEmitClassPrivateData(
-      IGM, TaggedUnion<ClassDecl *, std::pair<ClassDecl *, CanType>>(cls));
 }
 
 std::pair<Size, Size>

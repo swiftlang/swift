@@ -260,10 +260,7 @@ private:
   /// Maps every generic type that is specialized within the module to its
   /// specializations.
   llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
-      CanonicalSpecializationsForGenericTypes;
-
-  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
-      CanonicalSpecializedAccessorsForGenericTypes;
+      SpecializationsForGenericTypes;
 
   /// The queue of specialized generic types whose prespecialized metadata to
   /// emit.
@@ -274,9 +271,6 @@ private:
   /// The accessors must be emitted after everything else which might result in
   /// a statically-known-canonical prespecialization.
   llvm::SmallSetVector<NominalTypeDecl *, 4> LazyMetadataAccessors;
-
-  /// The queue of prespecialized metadata accessors to emit.
-  llvm::SmallSetVector<CanType, 4> LazyCanonicalSpecializedMetadataAccessors;
 
   struct LazyOpaqueInfo {
     bool IsDescriptorUsed = false;
@@ -418,9 +412,8 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
-  llvm::SmallVector<CanType, 4>
-  canonicalSpecializationsForType(NominalTypeDecl *type) {
-    return CanonicalSpecializationsForGenericTypes.lookup(type);
+  llvm::SmallVector<CanType, 4> specializationsForType(NominalTypeDecl *type) {
+    return SpecializationsForGenericTypes.lookup(type);
   }
 
   void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
@@ -434,7 +427,6 @@ public:
   }
 
   void noteUseOfSpecializedGenericTypeMetadata(CanType type);
-  void noteUseOfCanonicalSpecializedMetadataAccessor(CanType forType);
 
   void noteUseOfTypeMetadata(CanType type) {
     type.visit([&](Type t) {
@@ -1413,9 +1405,6 @@ public:
                                              NominalTypeDecl *nominal,
                                              ArrayRef<llvm::Type *> genericArgs,
                                              ForDefinition_t forDefinition);
-  llvm::Function *
-  getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
-      CanType theType, ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
   llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
                                                        ConstantInit definition);
@@ -1481,8 +1470,6 @@ public:
   Address getAddrOfObjCClassRef(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfCanonicalSpecializedGenericMetaclassObject(
-      CanType concreteType, ForDefinition_t forDefinition);
 
   llvm::Function *getAddrOfObjCMetadataUpdateFunction(ClassDecl *D,
                                                       ForDefinition_t forDefinition);
