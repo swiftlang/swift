@@ -16,6 +16,7 @@
 
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/BuiltinProtocolConformances.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
@@ -375,6 +376,38 @@ searchInConformanceCache(const Metadata *type,
   return {false, nullptr};
 }
 
+extern const ProtocolDescriptor EQUATABLE_PROTOCOL_DESCRIPTOR;
+
+static bool tupleConformsToProtocol(const Metadata *type,
+                                    const ProtocolDescriptor *protocol) {
+  auto tuple = cast<TupleTypeMetadata>(type);
+
+  // At the moment, tuples can only conform to Equatable, so reject all other
+  // protocols.
+  auto equatable = &EQUATABLE_PROTOCOL_DESCRIPTOR;
+  if (protocol != equatable)
+    return false;
+
+  for (size_t i = 0; i != tuple->NumElements; i += 1) {
+    auto elt = tuple->getElement(i);
+    if (!swift_conformsToProtocol(elt.Type, protocol))
+      return false;
+  }
+
+  return true;
+}
+
+extern const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
+
+static const ProtocolConformanceDescriptor *getTupleConformanceDescriptor(
+                                           const ProtocolDescriptor *protocol) {
+  if (protocol == &EQUATABLE_PROTOCOL_DESCRIPTOR) {
+    return &_swift_tupleEquatable_conf;
+  }
+
+  return nullptr;
+}
+
 namespace {
   /// Describes a protocol conformance "candidate" that can be checked
   /// against a type metadata.
@@ -491,6 +524,16 @@ swift_conformsToProtocolImpl(const Metadata *const type,
         auto witness = descriptor.getWitnessTable(matchingType);
         C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
       }
+    }
+  }
+
+  // If we're asking if a tuple conforms to a protocol, handle that here for
+  // builtin conformances.
+  if (auto tuple = dyn_cast<TupleTypeMetadata>(type)) {
+    if (tupleConformsToProtocol(tuple, protocol)) {
+      auto descriptor = getTupleConformanceDescriptor(protocol);
+      C.cacheResult(type, protocol, descriptor->getWitnessTable(type),
+                    /*always cache*/ 0);
     }
   }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1012,6 +1012,28 @@ LookupConformanceInModuleRequest::evaluate(
   // intended type might have.
   if (type->is<UnresolvedType>())
     return ProtocolConformanceRef(protocol);
+
+  // Tuples have builtin conformances implemented within the runtime.
+  // These conformances so far consist of Equatable.
+  if (auto tuple = type->getAs<TupleType>()) {
+    if (protocol == ctx.getProtocol(KnownProtocolKind::Equatable)) {
+      SmallVector<ProtocolConformanceRef, 4> elementConformances;
+
+      // Ensure that every element in this tuple conforms to Equatable.
+      for (auto eltTy : tuple->getElementTypes()) {
+        auto conformance = mod->lookupConformance(eltTy, protocol);
+
+        if (conformance.isInvalid())
+          return ProtocolConformanceRef::forInvalid();
+
+        elementConformances.push_back(conformance);
+      }
+
+      auto conformance = ctx.getBuiltinConformance(tuple, protocol,
+                                                   elementConformances);
+      return ProtocolConformanceRef(conformance);
+    }
+  }
 
   auto nominal = type->getAnyNominal();
 

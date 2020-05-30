@@ -20,6 +20,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Runtime/BuiltinProtocolConformances.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
@@ -4477,18 +4478,27 @@ public:
                              const Metadata *type,
                              const ProtocolConformanceDescriptor *conformance,
                              const void * const *instantiationArgs) {
-    return getWitnessTableSize(conformance);
+    return getWitnessTableSize(type, conformance);
   }
 
   size_t getExtraAllocationSize() const {
-    return getWitnessTableSize(Conformance);
+    return getWitnessTableSize(Type, Conformance);
   }
 
-  static size_t getWitnessTableSize(
+  static size_t getWitnessTableSize(const Metadata *type,
                             const ProtocolConformanceDescriptor *conformance) {
     auto protocol = conformance->getProtocol();
     auto genericTable = conformance->getGenericWitnessTable();
     size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
+
+    // Builtin conformance descriptors, namely tuple conformances at the moment,
+    // have their private size in words be determined via the number of elements
+    // the type has.
+    if (conformance->isBuiltin()) {
+      auto tuple = cast<TupleTypeMetadata>(type);
+      numPrivateWords = tuple->NumElements;
+    }
+
     size_t numRequirementWords =
       WitnessTableFirstRequirementOffset + protocol->NumRequirements;
     return (numPrivateWords + numRequirementWords) * sizeof(void*);
@@ -4744,6 +4754,14 @@ instantiateWitnessTable(const Metadata *Type,
   // Number of bytes for any private storage used by the conformance itself.
   size_t privateSizeInWords = genericTable->getWitnessTablePrivateSizeInWords();
 
+  // Builtin conformance descriptors, namely tuple conformances at the moment,
+  // have their private size in words be determined via the number of elements
+  // the type has.
+  if (conformance->isBuiltin()) {
+    auto tuple = cast<TupleTypeMetadata>(Type);
+    privateSizeInWords = tuple->NumElements;
+  }
+
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
@@ -4785,6 +4803,16 @@ instantiateWitnessTable(const Metadata *Type,
         copyNextInstantiationArg();
       if (conditionalRequirement.Flags.hasExtraArgument())
         copyNextInstantiationArg();
+    }
+
+    // Builtin conformance descriptors, namely tuple conformances at the moment,
+    // have instantiation arguments equal to the number of element conformances.
+    if (conformance->isBuiltin()) {
+      auto tuple = cast<TupleTypeMetadata>(Type);
+      
+      for (size_t i = 0; i != tuple->NumElements; i += 1) {
+        copyNextInstantiationArg();
+      }
     }
   }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -147,6 +147,26 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
+  // Builtin conformances are different because they don't use a mangled name
+  // for their conformance descriptors. For now, we use predefined symbol names
+  // just in case in the future we have some conflict between actual
+  // conformances and these builtin ones.
+  if (isa<BuiltinProtocolConformance>(conformance)) {
+    auto &ctx = conformance->getType()->getASTContext();
+
+    if (conformance->getType()->is<TupleType>()) {
+      auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
+
+      if (conformance->getProtocol() == equatable) {
+        return "_swift_tupleEquatable_conf";
+      }
+
+      llvm_unreachable("mangling unknown tuple witness table protocol");
+    }
+
+    llvm_unreachable("mangling unknown builtin witness table type");
+  }
+
   beginMangling();
   if (isa<NormalProtocolConformance>(conformance)) {
     appendProtocolConformance(conformance);
