@@ -35,13 +35,19 @@ func test(valueOptOpt: MyStruct??) {
 
   if (value.x == 1) {
     let unrelated2 = FORBIDDEN_Struct()
-    _ = value.#^FUNCTIONBODY^#
+    switch value.x {
+    case let x where x < 2:
+      let unrelated3 = FORBIDDEN_Struct()
+      if x == value.#^FUNCTIONBODY^# {}
+    default:
+      break
+    }
   }
 }
 
 let globalValue = globalValueOpt!
 
-let FORBIDDEN_localVar = 1
+let FORBIDDEN_globalVar = 1
 
 switch glovalValue.x {
 case let x where x < 2:
