@@ -512,11 +512,16 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return doSkipChildren();
     }
   } else if (auto DMRE = dyn_cast<DynamicMemberRefExpr>(E)) {
+    // Visit in source order.
+    if (!DMRE->getBase()->walk(*this))
+        return stopTraversal;
     if (!passReference(DMRE->getMember().getDecl(), DMRE->getType(),
                        DMRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DynamicMemberRef,
                                          OpAccess)))
         return stopTraversal;
+    // We already visited the children.
+    return doSkipChildren();
   }
 
   return { true, E };

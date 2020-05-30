@@ -17,10 +17,10 @@ class AClass {
 
     func doSomething() {
         objcDelegate?.dynamicMethod?()
-        // CHECK: [[@LINE-1]]:23 | instance-method/Swift | dynamicMethod() | [[DynamicMethod_USR]] | Ref
-        // CHECK: [[@LINE-2]]:9 | instance-property/Swift | objcDelegate | [[Delegate_USR]] | Ref
+        // CHECK: [[@LINE-1]]:9 | instance-property/Swift | objcDelegate | [[Delegate_USR]] | Ref
+        // CHECK: [[@LINE-2]]:23 | instance-method/Swift | dynamicMethod() | [[DynamicMethod_USR]] | Ref
         _ = objcDelegate?.property
-        // CHECK: [[@LINE-1]]:27 | instance-property/Swift | property | [[DynamicProperty_USR]] | Ref
-        // CHECK: [[@LINE-2]]:13 | instance-property/Swift | objcDelegate | [[Delegate_USR]] | Ref
+        // CHECK: [[@LINE-1]]:13 | instance-property/Swift | objcDelegate | [[Delegate_USR]] | Ref
+        // CHECK: [[@LINE-2]]:27 | instance-property/Swift | property | [[DynamicProperty_USR]] | Ref
     }
 }
