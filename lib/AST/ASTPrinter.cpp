@@ -3641,11 +3641,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return false;
 
     // Don't print qualifiers for imported types.
-    for (auto File : M->getFiles()) {
-      if (File->getKind() == FileUnitKind::ClangModule ||
-          File->getKind() == FileUnitKind::DWARFModule)
-        return false;
-    }
+    if (!Options.QualifyImportedTypes)
+      for (auto File : M->getFiles()) {
+        if (File->getKind() == FileUnitKind::ClangModule ||
+            File->getKind() == FileUnitKind::DWARFModule)
+          return false;
+      }
 
     return true;
   }
