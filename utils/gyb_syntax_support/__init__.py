@@ -7,6 +7,8 @@ from .DeclNodes import DECL_NODES  # noqa: I201
 from .ExprNodes import EXPR_NODES  # noqa: I201
 from .GenericNodes import GENERIC_NODES  # noqa: I201
 
+from . import Token
+
 from .NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
     get_serialization_code, \
     verify_syntax_node_serialization_codes
@@ -14,7 +16,6 @@ from .NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
 from .PatternNodes import PATTERN_NODES  # noqa: I201
 from .StmtNodes import STMT_NODES  # noqa: I201
 
-from . import Token
 from .Trivia import TRIVIAS  # noqa: I201
 from .TypeNodes import TYPE_NODES  # noqa: I201
 
