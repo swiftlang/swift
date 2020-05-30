@@ -2492,11 +2492,12 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   return !resultTy;
 }
 
-bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
-                                         Diag<> diagnosticForAlwaysTrue) {
+bool TypeChecker::typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
+                                                 DeclContext *dc) {
   auto &Context = dc->getASTContext();
   bool hadError = false;
   bool hadAnyFalsable = false;
+  auto cond = stmt->getCond();
   for (auto &elt : cond) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
       hadAnyFalsable = true;
@@ -2504,6 +2505,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     }
 
     if (auto E = elt.getBooleanOrNull()) {
+      assert(!E->getType() && "the bool condition is already type checked");
       hadError |= typeCheckCondition(E, dc);
       elt.setBoolean(E);
       hadAnyFalsable = true;
@@ -2528,8 +2530,10 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     };
 
     // Resolve the pattern.
+    assert(!elt.getPattern()->hasType() &&
+           "the pattern binding condition is already type checked");
     auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
-                                                /*isStmtCondition*/true);
+                                                /*isStmtCondition*/ true);
     if (!pattern) {
       typeCheckPatternFailed();
       continue;
@@ -2554,37 +2558,29 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     hadAnyFalsable |= pattern->isRefutablePattern();
   }
 
-  
   // If the binding is not refutable, and there *is* an else, reject it as
   // unreachable.
   if (!hadAnyFalsable && !hadError) {
     auto &diags = dc->getASTContext().Diags;
-    diags.diagnose(cond[0].getStartLoc(), diagnosticForAlwaysTrue);
-  }
-  return false;
-}
-
-bool TypeChecker::typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
-                                                 DeclContext *dc) {
-  Diag<> diagnosticForAlwaysTrue = diag::invalid_diagnostic;
-  switch (stmt->getKind()) {
-  case StmtKind::If:
-    diagnosticForAlwaysTrue = diag::if_always_true;
-    break;
-  case StmtKind::While:
-    diagnosticForAlwaysTrue = diag::while_always_true;
-    break;
-  case StmtKind::Guard:
-    diagnosticForAlwaysTrue = diag::guard_always_succeeds;
-    break;
-  default:
-    llvm_unreachable("unknown LabeledConditionalStmt kind");
+    Diag<> msg = diag::invalid_diagnostic;
+    switch (stmt->getKind()) {
+    case StmtKind::If:
+      msg = diag::if_always_true;
+      break;
+    case StmtKind::While:
+      msg = diag::while_always_true;
+      break;
+    case StmtKind::Guard:
+      msg = diag::guard_always_succeeds;
+      break;
+    default:
+      llvm_unreachable("unknown LabeledConditionalStmt kind");
+    }
+    diags.diagnose(cond[0].getStartLoc(), msg);
   }
 
-  StmtCondition cond = stmt->getCond();
-  bool result = typeCheckStmtCondition(cond, dc, diagnosticForAlwaysTrue);
   stmt->setCond(cond);
-  return result;
+  return false;
 }
 
 /// Find the '~=` operator that can compare an expression inside a pattern to a

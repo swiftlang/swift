@@ -763,16 +763,6 @@ bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
                                     DeclContext *dc);
 
-/// Type check the given 'if', 'while', or 'guard' statement condition, which
-/// either converts an expression to a logic value or bind variables to the
-/// contents of an Optional.
-///
-/// \param cond The condition to type-check, which will be modified in place.
-///
-/// \returns true if an error occurred, false otherwise.
-bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
-                            Diag<> diagnosticForAlwaysTrue);
-
 /// Determine the semantics of a checked cast operation.
 ///
 /// \param fromType       The source type of the cast.
