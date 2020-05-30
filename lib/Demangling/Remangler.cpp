@@ -2533,6 +2533,17 @@ void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
 }
 
+void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "MM";
+}
+
+void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mb";
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
