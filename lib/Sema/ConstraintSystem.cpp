@@ -929,22 +929,21 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
 }
 
 static Optional<std::pair<VarDecl *, Type>>
-getPropertyWrappersInformationFromOverload(
+getPropertyWrapperInformationFromOverload(
     SelectedOverload resolvedOverload, DeclContext *DC,
     llvm::function_ref<Optional<std::pair<VarDecl *, Type>>(VarDecl *)>
         getInformation) {
-  if (resolvedOverload.choice.isDecl()) {
-    if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-      if (auto declInformation = getInformation(decl)) {
-        Type type;
-        VarDecl *memberDecl;
-        std::tie(memberDecl, type) = *declInformation;
-        if (Type baseType = resolvedOverload.choice.getBaseType()) {
-          type = baseType->getTypeOfMember(DC->getParentModule(), memberDecl,
-                                           type);
-        }
-        return std::make_pair(decl, type);
+  if (auto *decl =
+        dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull())) {
+    if (auto declInformation = getInformation(decl)) {
+      Type type;
+      VarDecl *memberDecl;
+      std::tie(memberDecl, type) = *declInformation;
+      if (Type baseType = resolvedOverload.choice.getBaseType()) {
+        type = baseType->getTypeOfMember(DC->getParentModule(), memberDecl,
+                                         type);
       }
+      return std::make_pair(decl, type);
     }
   }
   return None;
@@ -965,7 +964,7 @@ getStorageWrapperInformationFromDecl(VarDecl *decl) {
 Optional<std::pair<VarDecl *, Type>>
 ConstraintSystem::getStorageWrapperInformation(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrappersInformationFromOverload(
+  return getPropertyWrapperInformationFromOverload(
       resolvedOverload, DC,
       [](VarDecl *decl) { return getStorageWrapperInformationFromDecl(decl); });
 }
@@ -981,7 +980,7 @@ getPropertyWrapperInformationFromDecl(VarDecl *decl) {
 Optional<std::pair<VarDecl *, Type>>
 ConstraintSystem::getPropertyWrapperInformation(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrappersInformationFromOverload(
+  return getPropertyWrapperInformationFromOverload(
       resolvedOverload, DC, [](VarDecl *decl) {
         return getPropertyWrapperInformationFromDecl(decl);
       });
@@ -998,7 +997,7 @@ getWrappedPropertyInformationFromDecl(VarDecl *decl) {
 Optional<std::pair<VarDecl *, Type>>
 ConstraintSystem::getWrappedPropertyInformation(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrappersInformationFromOverload(
+  return getPropertyWrapperInformationFromOverload(
       resolvedOverload, DC, [](VarDecl *decl) {
         return getWrappedPropertyInformationFromDecl(decl);
       });
