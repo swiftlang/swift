@@ -1085,72 +1085,75 @@ FrontendArgsReconstructor::FrontendArgsReconstructor(
      const SearchPathOptions &searchPathOpts,
      const LangOptions &langOpts,
      const FrontendOptions &FEOpts,
-     const ClangImporterOptions &ClangOpts,
-     StringRef moduleCachePath): ArgSaver(Allocator), subInvocation() {
+     const ClangImporterOptions &ClangOpts): ArgSaver(Allocator) {
   inheritOptionsForSearchPaths(searchPathOpts, langOpts);
   // Configure front-end input.
   auto &SubFEOpts = subInvocation.getFrontendOptions();
-  SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
-  if (!moduleCachePath.empty()) {
-    subInvocation.setClangModuleCachePath(moduleCachePath);
+  auto &SubClangOpts = subInvocation.getClangImporterOptions();
+  auto &SubLangOpts = subInvocation.getLangOptions();
+
+  // Copy over language version.
+  SubLangOpts.EffectiveLanguageVersion = langOpts.EffectiveLanguageVersion;
+  GenericArgs.push_back("-swift-version");
+  GenericArgs.push_back(SubLangOpts.EffectiveLanguageVersion.asAPINotesVersionString());
+
+  SubClangOpts.ModuleCachePath = ClangOpts.ModuleCachePath;
+  if (!ClangOpts.ModuleCachePath.empty()) {
     GenericArgs.push_back("-module-cache-path");
-    GenericArgs.push_back(moduleCachePath);
+    GenericArgs.push_back(ClangOpts.ModuleCachePath);
   }
   if (!FEOpts.PrebuiltModuleCachePath.empty()) {
-    subInvocation.getFrontendOptions().PrebuiltModuleCachePath =
-      FEOpts.PrebuiltModuleCachePath;
+    SubFEOpts.PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
     GenericArgs.push_back("-prebuilt-module-cache-path");
     GenericArgs.push_back(FEOpts.PrebuiltModuleCachePath);
   }
-  subInvocation.getFrontendOptions().TrackSystemDeps = FEOpts.TraceStats;
-  if (FEOpts.TraceStats) {
+  SubFEOpts.TrackSystemDeps = FEOpts.TrackSystemDeps;
+  if (SubFEOpts.TrackSystemDeps) {
     GenericArgs.push_back("-track-system-dependencies");
   }
   // Respect the detailed-record preprocessor setting of the parent context.
   // This, and the "raw" clang module format it implicitly enables, are
   // required by sourcekitd.
-  subInvocation.getClangImporterOptions().DetailedPreprocessingRecord =
-    ClangOpts.DetailedPreprocessingRecord;
+  SubClangOpts.DetailedPreprocessingRecord = ClangOpts.DetailedPreprocessingRecord;
 
   // Tell the subinvocation to serialize dependency hashes if asked to do so.
-  auto &frontendOpts = subInvocation.getFrontendOptions();
-  frontendOpts.SerializeModuleInterfaceDependencyHashes =
+  SubFEOpts.SerializeModuleInterfaceDependencyHashes =
     FEOpts.SerializeModuleInterfaceDependencyHashes;
-  if (FEOpts.SerializeModuleInterfaceDependencyHashes) {
+  if (SubFEOpts.SerializeModuleInterfaceDependencyHashes) {
     GenericArgs.push_back("-serialize-module-interface-dependency-hashes");
   }
 
   // Tell the subinvocation to remark on rebuilds from an interface if asked
   // to do so.
-  frontendOpts.RemarkOnRebuildFromModuleInterface =
+  SubFEOpts.RemarkOnRebuildFromModuleInterface =
     FEOpts.RemarkOnRebuildFromModuleInterface;
-  if (FEOpts.RemarkOnRebuildFromModuleInterface) {
+  if (SubFEOpts.RemarkOnRebuildFromModuleInterface) {
     GenericArgs.push_back("-Rmodule-interface-rebuild");
   }
 
   // Disable implicitly building dependencies if asked to.
   if (FEOpts.DisableImplicitModules) {
-    subInvocation.getFrontendOptions().DisableImplicitModules = true;
+    SubFEOpts.DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
   }
   if (ClangOpts.DisableImplicitPCMs) {
     GenericArgs.push_back("-disable-implicit-pcms");
-    subInvocation.getClangImporterOptions().DisableImplicitPCMs = true;
+    SubClangOpts.DisableImplicitPCMs = true;
   }
   // Disable interface file lock
   if (FEOpts.DisableInterfaceFileLock) {
-    subInvocation.getFrontendOptions().DisableInterfaceFileLock = true;
+    SubFEOpts.DisableInterfaceFileLock = true;
     GenericArgs.push_back("-disable-interface-lock");
   }
 
   // Ignore source info file
   if (FEOpts.IgnoreSwiftSourceInfo) {
-    subInvocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+    SubFEOpts.IgnoreSwiftSourceInfo = true;
     GenericArgs.push_back("-ignore-module-source-info");
   }
 
   // Add all extra clang arguments
-  subInvocation.getClangImporterOptions().ExtraArgs = ClangOpts.ExtraArgs;
+  SubClangOpts.ExtraArgs = ClangOpts.ExtraArgs;
   for (auto &EA : ClangOpts.ExtraArgs) {
     GenericArgs.push_back("-Xcc");
     GenericArgs.push_back(EA);
@@ -1243,8 +1246,8 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   assert(FlagMatches.size() == 2);
   // FIXME We should diagnose this at a location that makes sense:
   auto Vers = swift::version::Version(VersMatches[1], SourceLoc(), &Diags);
-  auto &ArgSaver = ArgReconstructor.getArgSaver();
-  auto &subInvocation = ArgReconstructor.getInvocation();
+  auto &ArgSaver = ArgReconstructor->getArgSaver();
+  auto &subInvocation = ArgReconstructor->getInvocation();
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
 
   if (CompRe.match(SB, &CompMatches)) {
@@ -1290,9 +1293,16 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     const FrontendOptions &FEOpts,
     const ClangImporterOptions &ClangOpts,
     bool buildModuleCacheDirIfAbsent,
-    StringRef moduleCachePath): SM(SM), Diags(Diags),
-    ArgReconstructor(searchPathOpts, langOpts, FEOpts, ClangOpts,
-                     moduleCachePath) {
+    StringRef moduleCachePath,
+    bool SerializeDependencyHashes): SM(SM), Diags(Diags) {
+  ClangImporterOptions newClangOpts = ClangOpts;
+  newClangOpts.ModuleCachePath = moduleCachePath.str();
+  FrontendOptions newFEOpts = FEOpts;
+  newFEOpts.SerializeModuleInterfaceDependencyHashes = SerializeDependencyHashes;
+  ArgReconstructor = std::make_unique<FrontendArgsReconstructor>(searchPathOpts,
+                                                                 langOpts,
+                                                                 newFEOpts,
+                                                                 newClangOpts);
   // Note that we don't assume cachePath is the same as the Clang
   // module cache path at this point.
   if (buildModuleCacheDirIfAbsent && !moduleCachePath.empty())
@@ -1306,7 +1316,7 @@ StringRef InterfaceSubContextDelegateImpl::computeCachedOutputPath(
                              StringRef useInterfacePath,
                              llvm::SmallString<256> &OutPath,
                              StringRef &CacheHash) {
-  OutPath.append(ArgReconstructor.getInvocation().getClangModuleCachePath());
+  OutPath.append(ArgReconstructor->getInvocation().getClangModuleCachePath());
   llvm::sys::path::append(OutPath, moduleName);
   OutPath.append("-");
   auto hashStart = OutPath.size();
@@ -1330,7 +1340,7 @@ StringRef InterfaceSubContextDelegateImpl::computeCachedOutputPath(
 /// the .swiftinterface input or its dependencies.
 std::string
 InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath) {
-  auto &subInvocation = ArgReconstructor.getInvocation();
+  auto &subInvocation = ArgReconstructor->getInvocation();
   auto normalizedTargetTriple =
       getTargetSpecificModuleTriple(subInvocation.getLangOptions().Target);
 
@@ -1378,7 +1388,7 @@ bool InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
 }
 
 FrontendOptions &InterfaceSubContextDelegateImpl::getFrontendOpts() {
-  return ArgReconstructor.getInvocation().getFrontendOptions();
+  return ArgReconstructor->getInvocation().getFrontendOptions();
 }
 
 bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
@@ -1386,10 +1396,13 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
                                                                StringRef outputPath,
                                                                SourceLoc diagLoc,
                   llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) {
-  auto &subInvocation = ArgReconstructor.getInvocation();
-  auto GenericArgs = ArgReconstructor.getArgs();
+  auto &subInvocation = ArgReconstructor->getInvocation();
+  auto GenericArgs = ArgReconstructor->getArgs();
   std::vector<StringRef> BuildArgs(GenericArgs.begin(), GenericArgs.end());
   assert(BuildArgs.size() == GenericArgs.size());
+  // This is for emitting module from interface.
+  subInvocation.getFrontendOptions().RequestedAction =
+    FrontendOptions::ActionType::EmitModuleOnly;
   // Configure inputs
   subInvocation.getFrontendOptions().InputsAndOutputs
     .addPrimaryInputFile(interfacePath);

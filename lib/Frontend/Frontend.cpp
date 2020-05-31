@@ -446,8 +446,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     ArgReconstructor(Invocation.getSearchPathOptions(),
                      Invocation.getLangOptions(),
                      Invocation.getFrontendOptions(),
-                     Invocation.getClangImporterOptions(),
-                     Invocation.getClangImporterOptions().ModuleCachePath);
+                     Invocation.getClangImporterOptions());
   std::unique_ptr<ClangImporter> clangImporter =
     ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
                           Invocation.getPCHHash(),
@@ -470,8 +469,9 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                         Invocation.getLangOptions(),
                                                         Invocation.getFrontendOptions(),
                                                         Invocation.getClangImporterOptions(),
-                                                        true,
-                                                        ModuleCachePath);
+                                                        /*buildModuleCacheDirIfAbsent*/true,
+                                                        ModuleCachePath,
+                                                        /*serializeDependencyHashes*/false);
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, std::move(astDelegate),

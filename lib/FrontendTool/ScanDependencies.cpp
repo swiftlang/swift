@@ -74,7 +74,8 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                               FEOpts,
                                               instance.getInvocation().getClangImporterOptions(),
                                               /*buildModuleCacheDirIfAbsent*/false,
-                                              ModuleCachePath);
+                                              ModuleCachePath,
+                                              FEOpts.SerializeModuleInterfaceDependencyHashes);
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {

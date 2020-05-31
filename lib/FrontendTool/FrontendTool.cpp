@@ -785,7 +785,9 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
                                               Invocation.getFrontendOptions(),
                                               Invocation.getClangImporterOptions(),
                                               /*CreateCacheDirIfAbsent*/true,
-                                              Invocation.getClangModuleCachePath());
+                                              Invocation.getClangModuleCachePath(),
+                                              Invocation.getFrontendOptions()
+                                                .SerializeModuleInterfaceDependencyHashes);
   return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),

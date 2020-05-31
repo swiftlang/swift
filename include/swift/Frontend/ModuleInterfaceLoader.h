@@ -197,8 +197,7 @@ public:
   FrontendArgsReconstructor(const SearchPathOptions &searchPathOpts,
                                   const LangOptions &langOpts,
                                   const FrontendOptions &FEOpts,
-                                  const ClangImporterOptions &ClangOpts,
-                                  StringRef moduleCachePath);
+                                  const ClangImporterOptions &ClangOpts);
   ArrayRef<StringRef> getArgs() const { return GenericArgs; }
   CompilerInvocation &getInvocation() { return subInvocation; }
   void inheritOptionsForSearchPaths(const SearchPathOptions &SearchPathOpts,
@@ -210,7 +209,7 @@ struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
 private:
   SourceManager &SM;
   DiagnosticEngine &Diags;
-  FrontendArgsReconstructor ArgReconstructor;
+  std::unique_ptr<FrontendArgsReconstructor> ArgReconstructor;
   std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
 
   template<typename ...ArgTypes>
@@ -237,7 +236,8 @@ public:
                                   const FrontendOptions &FEOpts,
                                   const ClangImporterOptions &ClangOpts,
                                   bool buildModuleCacheDirIfAbsent,
-                                  StringRef moduleCachePath);
+                                  StringRef moduleCachePath,
+                                  bool SerializeDependencyHashes);
   bool runInSubContext(StringRef moduleName,
                        StringRef interfacePath,
                        StringRef outputPath,
