@@ -2,6 +2,7 @@ add_swift_host_library(swiftSema STATIC
   BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
+  CSClosure.cpp
   CSGen.cpp
   CSRanking.cpp
   CSSimplify.cpp
