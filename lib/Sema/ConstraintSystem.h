@@ -1625,6 +1625,11 @@ public:
   SolutionApplicationTarget walk(ASTWalker &walker);
 };
 
+/// A function that rewrites a solution application target in the context
+/// of solution application.
+using RewriteTargetFn = std::function<
+    Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>;
+
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,

@@ -133,95 +133,160 @@ bool ConstraintSystem::generateConstraints(
 
 // MARK: Solution application
 
-/// Coerce the body of the given closure expression so that it returns
-/// Void rather than the value in it.
-static void coerceClosureExprToVoid(
-    Solution &solution, ClosureExpr *closure) {
-  auto &cs = solution.getConstraintSystem();
-  auto &ctx = cs.getASTContext();
+namespace {
 
-  // Re-write the single-expression closure to return '()'
-  assert(closure->hasSingleExpressionBody());
+/// Statement visitor that applies constraints for a given closure body.
+class ClosureConstraintApplication
+    : public StmtVisitor<ClosureConstraintApplication, ASTNode> {
+  friend StmtVisitor<ClosureConstraintApplication, ASTNode>;
 
-  // A single-expression body contains a single return statement
-  // prior to this transformation.
-  auto member = closure->getBody()->getFirstElement();
+  Solution &solution;
+  ClosureExpr *closure;
+  Type resultType;
+  RewriteTargetFn rewriteTarget;
+  bool isSingleExpression;
 
-  if (member.is<Stmt *>()) {
-    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
-    auto singleExpr = returnStmt->getResult();
-    auto voidExpr = cs.cacheType(TupleExpr::createEmpty(
-        ctx, singleExpr->getStartLoc(), singleExpr->getEndLoc(),
-        /*implicit*/ true));
-    returnStmt->setResult(voidExpr);
+public:
+  /// Whether an error was encountered while generating constraints.
+  bool hadError = false;
 
-    // For l-value types, reset to the object type. This might not be strictly
-    // necessary any more, but it's probably still a good idea.
-    if (cs.getType(singleExpr)->is<LValueType>())
-      cs.setType(singleExpr,
-                 cs.getType(singleExpr)->getWithoutSpecifierType());
+  ClosureConstraintApplication(
+      Solution &solution, ClosureExpr *closure, Type resultType,
+      RewriteTargetFn rewriteTarget)
+    : solution(solution), closure(closure), resultType(resultType),
+      rewriteTarget(rewriteTarget),
+      isSingleExpression(closure->hasSingleExpressionBody()) { }
 
-    solution.setExprTypes(singleExpr);
-    TypeChecker::checkIgnoredExpr(singleExpr);
+private:
+  /// Rewrite an expression without any particularly special context.
+  Expr *rewriteExpr(Expr *expr) {
+    auto result = rewriteTarget(
+      SolutionApplicationTarget(expr, closure, CTP_Unused, Type(),
+                                /*isDiscarded=*/false));
+    if (result)
+      return result->getAsExpr();
 
-    SmallVector<ASTNode, 2> elements;
-    elements.push_back(singleExpr);
-    elements.push_back(returnStmt);
-
-    auto braceStmt = BraceStmt::create(ctx, closure->getStartLoc(),
-                                       elements, closure->getEndLoc(),
-                                       /*implicit*/ true);
-
-    closure->setImplicit();
-    closure->setBody(braceStmt, /*isSingleExpression*/true);
+    return nullptr;
   }
 
-  // Finally, compute the proper type for the closure.
-  auto fnType = cs.getType(closure)->getAs<FunctionType>();
-  auto newClosureType = FunctionType::get(
-      fnType->getParams(), ctx.TheEmptyTupleType, fnType->getExtInfo());
-  cs.setType(closure, newClosureType);
-}
-
-/// Coerce a closure whose body produces \c Never into one that does not
-/// return its result.
-static void coerceClosureExprFromNever(
-    Solution &solution, ClosureExpr *closure) {
-  auto &cs = solution.getConstraintSystem();
-
-  // Re-write the single-expression closure to drop the 'return'.
-  assert(closure->hasSingleExpressionBody());
-
-  // A single-expression body contains a single return statement
-  // prior to this transformation.
-  auto member = closure->getBody()->getFirstElement();
-
-  if (member.is<Stmt *>()) {
-    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
-    auto singleExpr = returnStmt->getResult();
-
-    solution.setExprTypes(singleExpr);
-    TypeChecker::checkIgnoredExpr(singleExpr);
-
-    SmallVector<ASTNode, 1> elements;
-    elements.push_back(singleExpr);
-
-    auto braceStmt =
-        BraceStmt::create(cs.getASTContext(), closure->getStartLoc(),
-                          elements, closure->getEndLoc(),
-                          /*implicit*/ true);
-
-    closure->setImplicit();
-    closure->setBody(braceStmt, /*isSingleExpression*/true);
+  void visitDecl(Decl *decl) {
+    llvm_unreachable("Declarations not supported");
   }
+
+  ASTNode visitBraceStmt(BraceStmt *braceStmt) {
+    for (auto &node : braceStmt->getElements()) {
+      if (auto expr = node.dyn_cast<Expr *>()) {
+        // Rewrite the expression.
+        if (auto rewrittenExpr = rewriteExpr(expr))
+          node = expr;
+        else
+          hadError = true;
+      } else if (auto stmt = node.dyn_cast<Stmt *>()) {
+        node = visit(stmt);
+      } else {
+        visitDecl(node.get<Decl *>());
+      }
+    }
+
+    return braceStmt;
+  }
+
+  ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
+    auto resultExpr = returnStmt->getResult();
+    if (!resultExpr)
+      return returnStmt;
+
+    enum {
+      convertToResult,
+      coerceToVoid,
+      coerceFromNever,
+    } mode;
+
+    auto resultExprType =
+        solution.simplifyType(solution.getType(resultExpr))->getRValueType();
+    // A closure with a non-void return expression can coerce to a closure
+    // that returns Void.
+    if (resultType->isVoid() && !resultExprType->isVoid()) {
+      mode = coerceToVoid;
+
+      // A single-expression closure with a Never expression type
+      // coerces to any other function type.
+    } else if (isSingleExpression && resultExprType->isUninhabited()) {
+      mode = coerceFromNever;
+
+      // Normal rule is to coerce to the return expression to the closure type.
+    } else {
+      mode = convertToResult;
+    }
+
+    SolutionApplicationTarget resultTarget(
+        resultExpr, closure,
+        mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
+        mode == convertToResult ? resultType : Type(),
+        /*isDiscarded=*/false);
+    if (auto newResultTarget = rewriteTarget(resultTarget))
+      resultExpr = newResultTarget->getAsExpr();
+
+    switch (mode) {
+    case convertToResult:
+      // Record the coerced expression.
+      returnStmt->setResult(resultExpr);
+      return returnStmt;
+
+    case coerceToVoid: {
+      // Evaluate the expression, then produce a return statement that
+      // returns nothing.
+      TypeChecker::checkIgnoredExpr(resultExpr);
+      auto &ctx = solution.getConstraintSystem().getASTContext();
+      auto newReturnStmt =
+          new (ctx) ReturnStmt(
+            returnStmt->getStartLoc(), nullptr, /*implicit=*/true);
+      ASTNode elements[2] = { resultExpr, newReturnStmt };
+      return BraceStmt::create(ctx, returnStmt->getStartLoc(),
+                               elements, returnStmt->getEndLoc(),
+                               /*implicit*/ true);
+    }
+
+    case coerceFromNever:
+      // Replace the return statement with its expression, so that the
+      // expression is evaluated directly. This only works because coercion
+      // from never is limited to single-expression closures.
+      return resultExpr;
+    }
+
+    return returnStmt;
+  }
+
+#define UNSUPPORTED_STMT(STMT) ASTNode visit##STMT##Stmt(STMT##Stmt *) { \
+      llvm_unreachable("Unsupported statement kind " #STMT);          \
+  }
+  UNSUPPORTED_STMT(Yield)
+  UNSUPPORTED_STMT(Defer)
+  UNSUPPORTED_STMT(If)
+  UNSUPPORTED_STMT(Guard)
+  UNSUPPORTED_STMT(While)
+  UNSUPPORTED_STMT(Do)
+  UNSUPPORTED_STMT(DoCatch)
+  UNSUPPORTED_STMT(RepeatWhile)
+  UNSUPPORTED_STMT(ForEach)
+  UNSUPPORTED_STMT(Switch)
+  UNSUPPORTED_STMT(Case)
+  UNSUPPORTED_STMT(Break)
+  UNSUPPORTED_STMT(Continue)
+  UNSUPPORTED_STMT(Fallthrough)
+  UNSUPPORTED_STMT(Fail)
+  UNSUPPORTED_STMT(Throw)
+  UNSUPPORTED_STMT(PoundAssert)
+#undef UNSUPPORTED_STMT
+
+};
+
 }
 
 SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     Solution &solution, AnyFunctionRef fn,
     DeclContext *&currentDC,
-    std::function<
-      Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
-        rewriteTarget) {
+    RewriteTargetFn rewriteTarget) {
   auto &cs = solution.getConstraintSystem();
   auto closure = dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr());
   FunctionType *closureFnType = nullptr;
@@ -274,41 +339,9 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
   // If there is a single-expression body, transform that body now.
   if (fn.hasSingleExpressionBody()) {
-    // Rewrite the body.
-    SolutionApplicationTarget originalBody(
-        fn.getSingleExpressionBody(), fn.getAsDeclContext(), CTP_Unused,
-        Type(), /*isDiscarded=*/false);
-    auto rewrittenBody = rewriteTarget(originalBody);
-    if (!rewrittenBody)
-      return SolutionApplicationToFunctionResult::Failure;
-
-    auto body = rewrittenBody->getAsExpr();
-    fn.setSingleExpressionBody(body);
-
-    // Closures with a single-expression body have special rules regarding
-    // Void and Never returns. Handle them now.
-    if (closure && closure->hasSingleExpressionBody()) {
-      auto bodyType = body->getType();
-
-      // A single-expression closure with a non-Void expression type
-      // coerces to a Void-returning function type.
-      if (closureFnType->getResult()->isVoid() && !bodyType->isVoid()) {
-        coerceClosureExprToVoid(solution, closure);
-      // A single-expression closure with a Never expression type
-      // coerces to any other function type.
-      } else if (bodyType->isUninhabited()) {
-        coerceClosureExprFromNever(solution, closure);
-      } else {
-        body = solution.coerceToType(body, closureFnType->getResult(),
-                                     cs.getConstraintLocator(
-                                       closure,
-                                       ConstraintLocator::ClosureResult));
-        if (!body)
-          return SolutionApplicationToFunctionResult::Failure;
-
-        closure->setSingleExpressionBody(body);
-      }
-    }
+    ClosureConstraintApplication application(
+        solution, closure, closureFnType->getResult(), rewriteTarget);
+    application.visit(fn.getBody());
 
     return SolutionApplicationToFunctionResult::Success;
   }
@@ -317,4 +350,3 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   solution.setExprTypes(closure);
   return SolutionApplicationToFunctionResult::Delay;
 }
-
