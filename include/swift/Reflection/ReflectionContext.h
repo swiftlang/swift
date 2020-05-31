@@ -27,6 +27,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
+#include "swift/Reflection/RuntimeInternals.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
@@ -104,7 +105,10 @@ public:
   using super::readMetadataAndValueOpaqueExistential;
   using super::readMetadataFromInstance;
   using super::readTypeFromMetadata;
+  using super::stripSignedPointer;
   using typename super::StoredPointer;
+  using typename super::StoredSignedPointer;
+  using typename super::StoredSize;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader), *this)
@@ -766,6 +770,156 @@ public:
     } else {
       return getBuilder().getTypeConverter().getTypeInfo(TR);
     }
+  }
+
+  /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
+  /// Call with the type and protocol in each node.
+  void iterateConformanceTree(StoredPointer NodePtr,
+    std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
+    if (!NodePtr)
+      return;
+    auto NodeBytes = getReader().readBytes(RemoteAddress(NodePtr), sizeof(Node));
+    auto NodeData =
+      reinterpret_cast<const ConformanceNode<Runtime> *>(NodeBytes.get());
+    if (!NodeData)
+      return;
+    Call(NodeData->Type, NodeData->Proto);
+    iterateConformanceTree(NodeData->Left, Call);
+    iterateConformanceTree(NodeData->Right, Call);
+  }
+
+  /// Iterate the protocol conformance cache in the target process, calling Call
+  /// with the type and protocol of each conformance. Returns None on success,
+  /// and a string describing the error on failure.
+  llvm::Optional<std::string> iterateConformances(
+    std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
+    std::string ConformancesPointerName =
+      "__swift_debug_protocolConformanceStatePointer";
+    auto ConformancesAddrAddr =
+      getReader().getSymbolAddress(ConformancesPointerName);
+    if (!ConformancesAddrAddr)
+      return "unable to look up debug variable " + ConformancesPointerName;
+
+    auto ConformancesAddr =
+      getReader().readPointer(ConformancesAddrAddr, sizeof(StoredPointer));
+    if (!ConformancesAddr)
+      return "unable to read value of " + ConformancesPointerName;
+
+    auto Root = getReader().readPointer(ConformancesAddr->getResolvedAddress(),
+                                        sizeof(StoredPointer));
+    iterateConformanceTree(Root->getResolvedAddress().getAddressData(), Call);
+    return llvm::None;
+  }
+  
+  /// Fetch the metadata pointer from a metadata allocation, or 0 if this
+  /// allocation's tag is not handled or an error occurred.
+  StoredPointer allocationMetadataPointer(
+    MetadataAllocation<Runtime> Allocation) {
+    if (Allocation.Tag == GenericMetadataCacheTag) {
+        struct GenericMetadataCacheEntry {
+          StoredPointer Left, Right;
+          StoredPointer LockedStorage;
+          uint8_t LockedStorageKind;
+          uint8_t TrackingInfo;
+          uint16_t NumKeyParameters;
+          uint16_t NumWitnessTables;
+          uint32_t Hash;
+          StoredPointer Value;
+        };
+        auto AllocationBytes =
+          getReader().readBytes(RemoteAddress(Allocation.Ptr),
+                                              Allocation.Size);
+        auto Entry = reinterpret_cast<const GenericMetadataCacheEntry *>(
+          AllocationBytes.get());
+        if (!Entry)
+          return 0;
+        return Entry->Value;
+    }
+    return 0;
+  }
+
+  /// Iterate the metadata allocations in the target process, calling Call with
+  /// each allocation found. Returns None on success, and a string describing
+  /// the error on failure.
+  llvm::Optional<std::string> iterateMetadataAllocations(
+    std::function<void (MetadataAllocation<Runtime>)> Call) {
+    std::string IterationEnabledName =
+      "__swift_debug_metadataAllocationIterationEnabled";
+    std::string AllocationPoolPointerName =
+      "__swift_debug_allocationPoolPointer";
+
+    auto IterationEnabledAddr =
+      getReader().getSymbolAddress(IterationEnabledName);
+    if (!IterationEnabledAddr)
+      return "unable to look up debug variable " + IterationEnabledName;
+    char IterationEnabled;
+    if (!getReader().readInteger(IterationEnabledAddr, &IterationEnabled))
+      return "failed to read value of " + IterationEnabledName;
+    if (!IterationEnabled)
+      return std::string("remote process does not have metadata allocation "
+                         "iteration enabled");
+
+    auto AllocationPoolAddrAddr =
+      getReader().getSymbolAddress(AllocationPoolPointerName);
+    if (!AllocationPoolAddrAddr)
+      return "unable to look up debug variable " + AllocationPoolPointerName;
+    auto AllocationPoolAddr =
+      getReader().readPointer(AllocationPoolAddrAddr, sizeof(StoredPointer));
+    if (!AllocationPoolAddr)
+      return "failed to read value of " + AllocationPoolPointerName;
+    
+    struct PoolRange {
+      StoredPointer Begin;
+      StoredSize Remaining;
+    };
+    struct PoolTrailer {
+      StoredPointer PrevTrailer;
+      StoredSize PoolSize;
+    };
+    struct alignas(StoredPointer) AllocationHeader {
+      uint16_t Size;
+      uint16_t Tag;
+    };
+
+    auto PoolBytes = getReader()
+      .readBytes(AllocationPoolAddr->getResolvedAddress(), sizeof(PoolRange));
+    auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
+    if (!Pool)
+      return std::string("failure reading allocation pool contents");
+
+    auto TrailerPtr = Pool->Begin + Pool->Remaining;
+    while (TrailerPtr) {
+      auto TrailerBytes = getReader()
+        .readBytes(RemoteAddress(TrailerPtr), sizeof(PoolTrailer));
+      auto Trailer = reinterpret_cast<const PoolTrailer *>(TrailerBytes.get());
+      if (!Trailer)
+        break;
+      auto PoolStart = TrailerPtr - Trailer->PoolSize;
+      auto PoolBytes = getReader()
+        .readBytes(RemoteAddress(PoolStart), Trailer->PoolSize);
+      auto PoolPtr = (const char *)PoolBytes.get();
+      if (!PoolPtr)
+        break;
+
+      uintptr_t Offset = 0;
+      while (Offset < Trailer->PoolSize) {
+        auto AllocationPtr = PoolPtr + Offset;
+        auto Header = (const AllocationHeader *)AllocationPtr;
+        if (Header->Size == 0)
+          break;
+        auto RemoteAddr = PoolStart + Offset + sizeof(AllocationHeader);
+        MetadataAllocation<Runtime> Allocation;
+        Allocation.Tag = Header->Tag;
+        Allocation.Ptr = RemoteAddr;
+        Allocation.Size = Header->Size;
+        Call(Allocation);
+        
+        Offset += sizeof(AllocationHeader) + Header->Size;
+      }
+      
+      TrailerPtr = Trailer->PrevTrailer;
+    }
+    return llvm::None;
   }
 
 private:
