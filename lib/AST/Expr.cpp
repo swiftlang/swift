@@ -1889,16 +1889,23 @@ FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto body = getBody()->getFirstElement();
-  if (body.is<Stmt *>())
-    return cast<ReturnStmt>(body.get<Stmt *>())->getResult();
+  if (auto stmt = body.dyn_cast<Stmt *>()) {
+    if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
+      return braceStmt->getFirstElement().get<Expr *>();
+
+    return cast<ReturnStmt>(stmt)->getResult();
+  }
   return body.get<Expr *>();
 }
 
 void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto body = getBody()->getFirstElement();
-  if (body.is<Stmt *>()) {
-    cast<ReturnStmt>(body.get<Stmt *>())->setResult(NewBody);
+  if (auto stmt = body.dyn_cast<Stmt *>()) {
+    if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
+      braceStmt->getFirstElement() = NewBody;
+    else
+      cast<ReturnStmt>(stmt)->setResult(NewBody);
     return;
   }
   getBody()->setFirstElement(NewBody);
