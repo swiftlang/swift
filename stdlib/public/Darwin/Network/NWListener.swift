@@ -78,8 +78,8 @@ public final class NWListener: CustomDebugStringConvertible {
 			get {
 				let descriptor = nw_advertise_descriptor_create_bonjour_service(name, type, domain)
 				if let txtRecord = txtRecord {
-					txtRecord.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> Void in
-                        nw_advertise_descriptor_set_txt_record(descriptor!, ptr.baseAddress!, txtRecord.count)
+					txtRecord.withUnsafeBytes { buffer in
+						nw_advertise_descriptor_set_txt_record(descriptor!, buffer.baseAddress!, buffer.count)
 					}
 				}
 				return descriptor!
