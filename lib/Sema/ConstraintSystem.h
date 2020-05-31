@@ -1043,6 +1043,15 @@ public:
   Optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *) const;
 
+  /// Retrieve the builder transform that was applied to this function, if any.
+  const AppliedBuilderTransform *getAppliedBuilderTransform(
+     AnyFunctionRef fn) const {
+    auto known = functionBuilderTransformed.find(fn);
+    return known != functionBuilderTransformed.end()
+        ? &known->second
+        : nullptr;
+  }
+
   SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
@@ -1621,6 +1630,18 @@ enum class ConstraintSystemPhase {
   Solving,
   Diagnostics,
   Finalization
+};
+
+/// Describes the result of applying a solution to a given function.
+enum class SolutionApplicationToFunctionResult {
+  /// Application of the solution succeeded.
+  Success,
+  /// Application of the solution failed.
+  /// TODO: This should probably go away entirely.
+  Failure,
+  /// The solution could not be applied immediately, and type checking for
+  /// this function should be delayed until later.
+  Delay,
 };
 
 /// Describes a system of constraints on type variables, the
@@ -4680,6 +4701,23 @@ public:
   /// Apply the given solution to the given statement-condition.
   Optional<StmtCondition> applySolution(
       Solution &solution, StmtCondition condition, DeclContext *dc);
+
+  /// Apply the given solution to the given function's body and, for
+  /// closure expressions, the expression itself.
+  ///
+  /// \param solution The solution to apply.
+  /// \param fn The function to which the solution is being applied.
+  /// \param currentDC The declaration context in which transformations
+  /// will be applied.
+  /// \param rewriteTarget Function that performs a rewrite of any
+  /// solution application target within the context.
+  ///
+  SolutionApplicationToFunctionResult applySolution(
+      Solution &solution, AnyFunctionRef fn,
+      DeclContext *&currentDC,
+      std::function<
+        Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+          rewriteTarget);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
