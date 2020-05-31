@@ -1364,19 +1364,35 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     Identifier opName = getIdentifier(IID);
     pathTrace.addOperator(opName);
 
+    auto &ctx = getContext();
+    auto desc = OperatorLookupDescriptor::forModule(baseModule, opName);
     switch (rawOpKind) {
     case OperatorKind::Infix:
-      return baseModule->lookupInfixOperator(opName);
     case OperatorKind::Prefix:
-      return baseModule->lookupPrefixOperator(opName);
-    case OperatorKind::Postfix:
-      return baseModule->lookupPostfixOperator(opName);
-    case OperatorKind::PrecedenceGroup:
-      return baseModule->lookupPrecedenceGroup(opName);
+    case OperatorKind::Postfix: {
+      auto req = DirectOperatorLookupRequest{
+          desc, getASTOperatorFixity(static_cast<OperatorKind>(rawOpKind))};
+      auto results = evaluateOrDefault(ctx.evaluator, req, {});
+      if (results.size() != 1) {
+        return llvm::make_error<XRefError>("operator not found", pathTrace,
+                                           opName);
+      }
+      return results[0];
+    }
+    case OperatorKind::PrecedenceGroup: {
+      auto results = evaluateOrDefault(
+          ctx.evaluator, DirectPrecedenceGroupLookupRequest{desc}, {});
+      if (results.size() != 1) {
+        return llvm::make_error<XRefError>("precedencegroup not found",
+                                           pathTrace, opName);
+      }
+      return results[0];
+    }
     default:
       // Unknown operator kind.
       fatal();
     }
+    llvm_unreachable("Unhandled case in switch!");
   }
 
   case XREF_GENERIC_PARAM_PATH_PIECE:
@@ -4848,7 +4864,9 @@ public:
     auto substitutedType = substitutedTypeOrError.get();
 
     // Read the substitutions.
-    auto subMap = MF.getSubstitutionMap(substitutionsID);
+    auto subMapOrError = MF.getSubstitutionMapChecked(substitutionsID);
+    if (!subMapOrError)
+      return subMapOrError.takeError();
 
     auto parentTypeOrError = MF.getTypeChecked(parentTypeID);
     if (!parentTypeOrError)
@@ -4858,11 +4876,12 @@ public:
     if (alias &&
         alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingType().subst(subMap);
+      return alias->getUnderlyingType().subst(subMapOrError.get());
     }
 
     auto parentType = parentTypeOrError.get();
-    return TypeAliasType::get(alias, parentType, subMap, substitutedType);
+    return TypeAliasType::get(alias, parentType, subMapOrError.get(),
+                              substitutedType);
   }
 
   Expected<Type> deserializeNominalType(ArrayRef<uint64_t> scratch,
@@ -5180,9 +5199,11 @@ public:
       return opaqueTypeOrError.takeError();
 
     auto opaqueDecl = cast<OpaqueTypeDecl>(opaqueTypeOrError.get());
-    auto subs = MF.getSubstitutionMap(subsID);
+    auto subsOrError = MF.getSubstitutionMapChecked(subsID);
+    if (!subsOrError)
+      return subsOrError.takeError();
 
-    return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+    return OpaqueTypeArchetypeType::get(opaqueDecl, subsOrError.get());
   }
       
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
@@ -5317,8 +5338,11 @@ public:
     if (!layout)
       return nullptr;
 
-    auto subMap = MF.getSubstitutionMap(subMapID);
-    return SILBoxType::get(ctx, layout, subMap);
+    auto subMapOrError = MF.getSubstitutionMapChecked(subMapID);
+    if (!subMapOrError)
+      return subMapOrError.takeError();
+
+    return SILBoxType::get(ctx, layout, subMapOrError.get());
   }
 
   Expected<Type> deserializeSILFunctionType(ArrayRef<uint64_t> scratch,
@@ -5503,16 +5527,19 @@ public:
 
     GenericSignature invocationSig =
       MF.getGenericSignature(rawInvocationGenericSig);
-    SubstitutionMap invocationSubs =
-      MF.getSubstitutionMap(rawInvocationSubs).getCanonical();
-    SubstitutionMap patternSubs =
-      MF.getSubstitutionMap(rawPatternSubs).getCanonical();
+    auto invocationSubsOrErr = MF.getSubstitutionMapChecked(rawInvocationSubs);
+    if (!invocationSubsOrErr)
+      return invocationSubsOrErr.takeError();
+    auto patternSubsOrErr = MF.getSubstitutionMapChecked(rawPatternSubs);
+    if (!patternSubsOrErr)
+      return patternSubsOrErr.takeError();
 
     return SILFunctionType::get(invocationSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,
-                                patternSubs, invocationSubs,
+                                patternSubsOrErr.get().getCanonical(),
+                                invocationSubsOrErr.get().getCanonical(),
                                 ctx, witnessMethodConformance);
   }
 

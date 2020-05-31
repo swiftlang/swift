@@ -9,8 +9,6 @@ func footastic() {}
 
 // ===- Without a filter, we group.
 
-// XFAIL: broken_std_regex
-
 // RUN: %complete-test %s -group=stems -tok=TOP_LEVEL_NO_FILTER | %FileCheck %s -check-prefix=TOP_LEVEL_NO_FILTER
 // RUN: %complete-test %s -group=stems -fuzz -tok=TOP_LEVEL_NO_FILTER | %FileCheck %s -check-prefix=TOP_LEVEL_NO_FILTER
 func test1() {

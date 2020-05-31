@@ -785,6 +785,7 @@ void LifetimeChecker::doIt() {
       break;
     case DIUseKind::LoadForTypeOfSelf:
       handleLoadForTypeOfSelfUse(Use);
+      break;
     }
   }
 

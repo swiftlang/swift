@@ -1960,9 +1960,6 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   //     }
   //
   // Of course, this function's body does not type-check.
-  //
-  // FIXME: Stop using the legacy type checker here.  However, it will still be
-  //        necessary to type-check the function at that point.
   file->DelayedFunctions.push_back(func);
 
   // Register the func as the main decl in the module. If there are multiples
@@ -2977,9 +2974,11 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
         // Module interfaces don't print bodies for all getters, so allow getters
         // that don't have a body if we're compiling a module interface.
+        // Within a protocol definition, there will never be a body.
         SourceFile *parent = storage->getDeclContext()->getParentSourceFile();
         bool isInInterface = parent && parent->Kind == SourceFileKind::Interface;
-        if (!isInInterface && !getter->hasBody())
+        if (!isInInterface && !getter->hasBody() &&
+            !isa<ProtocolDecl>(storage->getDeclContext()))
           return true;
 
         return false;

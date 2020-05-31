@@ -370,6 +370,13 @@ def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
 def print_educational_notes : Flag<["-"], "print-educational-notes">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Include educational notes in printed diagnostic output, if available">;
+def diagnostic_style : Separate<["-"], "diagnostic-style">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  MetaVarName<"<style>">,
+  HelpText<"The formatting style used when printing diagnostics ('swift' or 'llvm')">;
+def diagnostic_style_EQ : Joined<["-"], "diagnostic-style=">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  MetaVarName<"<style>">, Alias<diagnostic_style>;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -1009,6 +1016,10 @@ def enable_testing : Flag<["-"], "enable-testing">,
 def enable_private_imports : Flag<["-"], "enable-private-imports">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allows this module's internal and private API to be accessed">;
+
+def disable_leaf_frame_pointer_elim : Flag<["-"], "no-omit-leaf-frame-pointer">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Don't omit the frame pointer for leaf functions">;
 
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,

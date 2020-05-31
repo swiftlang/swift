@@ -873,7 +873,7 @@ namespace {
         for (const auto &edge : cycleEdges) {
           if (unionSets(edge.first, edge.second)) {
             if (cs.isDebugMode()) {
-              auto &log = ctx.TypeCheckerDebug->getStream();
+              auto &log = llvm::errs();
               if (cs.solverState)
                 log.indent(cs.solverState->depth * 2);
 
@@ -1160,7 +1160,7 @@ bool ConstraintGraph::contractEdges() {
          // Allow l-value contractions when binding parameter types.
          isParamBindingConstraint)) {
       if (CS.isDebugMode()) {
-        auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+        auto &log = llvm::errs();
         if (CS.solverState)
           log.indent(CS.solverState->depth * 2);
 

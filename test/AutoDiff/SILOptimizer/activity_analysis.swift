@@ -289,7 +289,7 @@ extension Mut {
   mutating func mutatingMethod(_ x: Mut) {}
 }
 
-// CHECK-LABEL: [AD] Activity info for $s33differentiation_activity_analysis3MutV14mutatingMethodyyACF at (source=0 parameters=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}3MutV14mutatingMethodyyACF at (source=0 parameters=(0))
 // CHECK: [VARIED] %0 = argument of bb0 : $Mut
 // CHECK: [USEFUL] %1 = argument of bb0 : $*Mut
 
@@ -301,7 +301,7 @@ func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) {
   nonactive = x
 }
 
-// CHECK-LABEL: [AD] Activity info for $s33differentiation_activity_analysis17nonActiveInoutArgyyAA3MutVz_ADtF at (source=0 parameters=(1))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}17nonActiveInoutArgyyAA3MutVz_ADtF at (source=0 parameters=(1))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
 // CHECK: [ACTIVE]   %4 = begin_access [modify] [static] %0 : $*Mut
@@ -316,7 +316,7 @@ func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
   return result
 }
 
-// CHECK-LABEL: [AD] Activity info for $s33differentiation_activity_analysis28activeInoutArgMutatingMethodyAA3MutVADF at (source=0 parameters=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}28activeInoutArgMutatingMethodyAA3MutVADF at (source=0 parameters=(0))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Mut
 // CHECK: [ACTIVE]   %2 = alloc_stack $Mut, var, name "result"
 // CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*Mut
@@ -334,14 +334,14 @@ func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
   nonactive = result
 }
 
-// CHECK_LABEL: [AD] Activity info for $s33differentiation_activity_analysis31activeInoutArgMutatingMethodVaryyAA3MutVz_ADtF at (source=0 parameters=(1))
+// CHECK_LABEL: [AD] Activity info for ${{.*}}31activeInoutArgMutatingMethodVaryyAA3MutVz_ADtF at (source=0 parameters=(1))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
 // CHECK: [ACTIVE]   %4 = alloc_stack $Mut, var, name "result"
 // CHECK: [ACTIVE]   %5 = begin_access [read] [static] %0 : $*Mut
 // CHECK: [ACTIVE]   %8 = begin_access [modify] [static] %4 : $*Mut
 // CHECK: [NONE]   // function_ref Mut.mutatingMethod(_:)
-// CHECK:   %9 = function_ref @$s33differentiation_activity_analysis3MutV14mutatingMethodyyACF : $@convention(method) (Mut, @inout Mut) -> ()
+// CHECK:   %9 = function_ref @${{.*}}3MutV14mutatingMethodyyACF : $@convention(method) (Mut, @inout Mut) -> ()
 // CHECK: [NONE]   %10 = apply %9(%1, %8) : $@convention(method) (Mut, @inout Mut) -> ()
 // CHECK: [ACTIVE]   %12 = begin_access [read] [static] %4 : $*Mut
 // CHECK: [ACTIVE]   %13 = load [trivial] %12 : $*Mut
@@ -355,7 +355,7 @@ func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
   nonactive = result.0
 }
 
-// CHECK-LABEL: [AD] Activity info for $s33differentiation_activity_analysis33activeInoutArgMutatingMethodTupleyyAA3MutVz_ADtF at (source=0 parameters=(1))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}33activeInoutArgMutatingMethodTupleyyAA3MutVz_ADtF at (source=0 parameters=(1))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
 // CHECK: [ACTIVE]   %4 = alloc_stack $(Mut, Mut), var, name "result"
@@ -466,7 +466,7 @@ func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors
 // CHECK: [ACTIVE]   %11 = load [trivial] %9 : $*Float
 // CHECK: [ACTIVE]   %14 = begin_access [modify] [static] %2 : $*HasCoroutineAccessors
 // CHECK: [NONE]   // function_ref HasCoroutineAccessors.computed.modify
-// CHECK:   %15 = function_ref @$s33differentiation_activity_analysis21HasCoroutineAccessorsV8computedSfvM : $@yield_once @convention(method) (@inout HasCoroutineAccessors) -> @yields @inout Float
+// CHECK:   %15 = function_ref @${{.*}}21HasCoroutineAccessorsV8computedSfvM : $@yield_once @convention(method) (@inout HasCoroutineAccessors) -> @yields @inout Float
 // CHECK: [ACTIVE] (**%16**, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@inout HasCoroutineAccessors) -> @yields @inout Float
 // CHECK: [VARIED] (%16, **%17**) = begin_apply %15(%14) : $@yield_once @convention(method) (@inout HasCoroutineAccessors) -> @yields @inout Float
 // CHECK: [ACTIVE]   %22 = begin_access [read] [static] %2 : $*HasCoroutineAccessors

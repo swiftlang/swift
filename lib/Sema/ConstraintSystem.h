@@ -30,7 +30,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -2978,7 +2977,7 @@ public:
       failedConstraint = constraint;
 
     if (isDebugMode()) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      auto &log = llvm::errs();
       log.indent(solverState ? solverState->depth * 2 : 0)
           << "(failed constraint ";
       constraint->print(log, &getASTContext().SourceMgr);
@@ -3070,6 +3069,13 @@ public:
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) const {
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
+
+  /// Find if the given type variable is representative for a type
+  /// variable which last locator path element is of the specified kind.
+  /// If true returns the type variable which it is the representative for.
+  TypeVariableType *
+  isRepresentativeFor(TypeVariableType *typeVar,
+                      ConstraintLocator::PathElementKind kind) const;
 
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// storage wrapper if the decl has an associated storage wrapper.
@@ -4422,7 +4428,7 @@ private:
 
     void dump(ConstraintSystem *cs,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
-      dump(cs->getASTContext().TypeCheckerDebug->getStream());
+      dump(llvm::errs());
     }
 
     void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,

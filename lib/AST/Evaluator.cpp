@@ -21,6 +21,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 
@@ -60,12 +61,13 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-static evaluator::DependencyCollector::Mode
+static evaluator::DependencyRecorder::Mode
 computeDependencyModeFromFlags(bool enableExperimentalPrivateDeps) {
-  using Mode = evaluator::DependencyCollector::Mode;
+  using Mode = evaluator::DependencyRecorder::Mode;
   if (enableExperimentalPrivateDeps) {
     return Mode::ExperimentalPrivateDependencies;
   }
+
   return Mode::StatusQuo;
 }
 
@@ -74,8 +76,7 @@ Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles,
                      bool enableExperimentalPrivateDeps)
     : diags(diags), debugDumpCycles(debugDumpCycles),
       buildDependencyGraph(buildDependencyGraph),
-      collector{computeDependencyModeFromFlags(enableExperimentalPrivateDeps)} {
-}
+      recorder{computeDependencyModeFromFlags(enableExperimentalPrivateDeps)} {}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -378,24 +379,130 @@ void Evaluator::dumpDependenciesGraphviz() const {
   printDependenciesGraphviz(llvm::dbgs());
 }
 
+void evaluator::DependencyRecorder::realize(
+    const DependencyCollector::Reference &ref) {
+  auto *source = getActiveDependencySourceOrNull();
+  assert(source && "cannot realize dependency without associated file!");
+  if (!source->hasInterfaceHash()) {
+    return;
+  }
+  fileReferences[source].insert(ref);
+}
+
 void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
                                                    DeclBaseName name) {
-  if (auto *tracker = getActiveDependencyTracker())
-    tracker->addUsedMember({subject, name}, isActiveSourceCascading());
+  if (parent.mode ==
+      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+    scratch.insert(
+        Reference::usedMember(subject, name, parent.isActiveSourceCascading()));
+  }
+  return parent.realize(
+      Reference::usedMember(subject, name, parent.isActiveSourceCascading()));
 }
 
 void evaluator::DependencyCollector::addPotentialMember(
     NominalTypeDecl *subject) {
-  if (auto *tracker = getActiveDependencyTracker())
-    tracker->addUsedMember({subject, Identifier()}, isActiveSourceCascading());
+  if (parent.mode ==
+      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+    scratch.insert(
+        Reference::potentialMember(subject, parent.isActiveSourceCascading()));
+  }
+  return parent.realize(
+      Reference::potentialMember(subject, parent.isActiveSourceCascading()));
 }
 
 void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
-  if (auto *tracker = getActiveDependencyTracker())
-    tracker->addTopLevelName(name, isActiveSourceCascading());
+  if (parent.mode ==
+      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+    scratch.insert(Reference::topLevel(name, parent.isActiveSourceCascading()));
+  }
+  return parent.realize(
+      Reference::topLevel(name, parent.isActiveSourceCascading()));
 }
 
 void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
-  if (auto *tracker = getActiveDependencyTracker())
-    tracker->addDynamicLookupName(name, isActiveSourceCascading());
+  if (parent.mode ==
+      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+    scratch.insert(Reference::dynamic(name, parent.isActiveSourceCascading()));
+  }
+  return parent.realize(
+      Reference::dynamic(name, parent.isActiveSourceCascading()));
+}
+
+void evaluator::DependencyRecorder::record(
+    const llvm::SetVector<swift::ActiveRequest> &stack,
+    llvm::function_ref<void(DependencyCollector &)> rec) {
+  assert(!isRecording && "Probably not a good idea to allow nested recording");
+  auto *source = getActiveDependencySourceOrNull();
+  if (!source || !source->hasInterfaceHash()) {
+    return;
+  }
+
+  llvm::SaveAndRestore<bool> restore(isRecording, true);
+
+  DependencyCollector collector{*this};
+  rec(collector);
+  if (collector.empty()) {
+    return;
+  }
+
+  assert(mode != Mode::StatusQuo);
+  for (const auto &request : stack) {
+    if (!request.isCached()) {
+      continue;
+    }
+
+    auto entry = requestReferences.find_as(request);
+    if (entry == requestReferences.end()) {
+      requestReferences.insert({AnyRequest(request), collector.scratch});
+      continue;
+    }
+
+    entry->second.insert(collector.scratch.begin(), collector.scratch.end());
+  }
+}
+
+void evaluator::DependencyRecorder::replay(const swift::ActiveRequest &req) {
+  assert(!isRecording && "Probably not a good idea to allow nested recording");
+
+  auto *source = getActiveDependencySourceOrNull();
+  if (mode == Mode::StatusQuo || !source || !source->hasInterfaceHash()) {
+    return;
+  }
+
+  if (!req.isCached()) {
+    return;
+  }
+
+  auto entry = requestReferences.find_as(req);
+  if (entry == requestReferences.end()) {
+    return;
+  }
+
+  for (const auto &ref : entry->second) {
+    realize(ref);
+  }
+}
+
+using namespace swift;
+
+void evaluator::DependencyRecorder::enumerateReferencesInFile(
+    const SourceFile *SF, ReferenceEnumerator f) const {
+  auto entry = fileReferences.find(SF);
+  if (entry == fileReferences.end()) {
+    return;
+  }
+
+  for (const auto &ref : entry->getSecond()) {
+    switch (ref.kind) {
+    case DependencyCollector::Reference::Kind::Empty:
+    case DependencyCollector::Reference::Kind::Tombstone:
+      llvm_unreachable("Cannot enumerate dead reference!");
+    case DependencyCollector::Reference::Kind::UsedMember:
+    case DependencyCollector::Reference::Kind::PotentialMember:
+    case DependencyCollector::Reference::Kind::TopLevel:
+    case DependencyCollector::Reference::Kind::Dynamic:
+      f(ref);
+    }
+  }
 }

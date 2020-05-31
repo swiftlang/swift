@@ -906,16 +906,15 @@ func testKeyPathHole() {
   f(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
   f(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
 
-  // FIXME(SR-12827): Instead of "generic parameter 'T' could not be inferred",
-  // we should offer the same diagnostic as above.
-  func provideValueButNotRoot<T>(_ fn: (T) -> String) {} // expected-note 2{{in call to function 'provideValueButNotRoot'}}
-  provideValueButNotRoot(\.x) // expected-error {{generic parameter 'T' could not be inferred}}
-  provideValueButNotRoot(\.x.y) // expected-error {{generic parameter 'T' could not be inferred}}
+  func provideValueButNotRoot<T>(_ fn: (T) -> String) {} 
+  provideValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+  provideValueButNotRoot(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
   provideValueButNotRoot(\String.foo) // expected-error {{value of type 'String' has no member 'foo'}}
 
-  func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {} // expected-note 3{{in call to function 'provideKPValueButNotRoot'}}
-  provideKPValueButNotRoot(\.x) // expected-error {{generic parameter 'T' could not be inferred}}
-  provideKPValueButNotRoot(\.x.y) // expected-error {{generic parameter 'T' could not be inferred}}
+  func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {} // expected-note {{in call to function 'provideKPValueButNotRoot'}}
+  provideKPValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+  provideKPValueButNotRoot(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+
   provideKPValueButNotRoot(\String.foo)
   // expected-error@-1 {{value of type 'String' has no member 'foo'}}
   // expected-error@-2 {{generic parameter 'T' could not be inferred}}

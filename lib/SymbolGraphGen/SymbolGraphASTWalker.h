@@ -51,7 +51,7 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   SymbolGraph MainGraph;
 
   /// A map of modules whose types were extended by the main module of interest `M`.
-  llvm::DenseMap<ModuleDecl *, SymbolGraph *> ExtendedModuleGraphs;
+  llvm::StringMap<SymbolGraph *> ExtendedModuleGraphs;
 
   // MARK: - Initialization
   

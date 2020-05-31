@@ -409,6 +409,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
+  Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
+                                              OPT_disable_new_operator_lookup,
+                                              /*default*/ false);
   Opts.UseClangFunctionTypes |= Args.hasArg(OPT_use_clang_function_types);
 
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
@@ -632,6 +635,23 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::EmitSyntax) {
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
+  }
+
+  // If we are asked to emit a module documentation file, configure lexing and
+  // parsing to remember comments.
+  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath()) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
+  // If we are doing index-while-building, configure lexing and parsing to
+  // remember comments.
+  if (!FrontendOpts.IndexStorePath.empty()) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
+  // If we're parsing SIL, access control doesn't make sense to enforce.
+  if (FrontendOpts.InputKind == InputFileKind::SIL) {
+    Opts.EnableAccessControl = false;
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;
@@ -867,10 +887,26 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
+
   Opts.UseColor |=
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
+  // If no style options are specified, default to LLVM style.
+  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
+  if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
+    StringRef contents = arg->getValue();
+    if (contents == "llvm") {
+      Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
+    } else if (contents == "swift") {
+      Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                     arg->getOption().getPrefixedName(), arg->getValue());
+      return true;
+    }
+  }
+
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
@@ -878,8 +914,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                        false);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
-  Opts.EnableExperimentalFormatting |=
-      Args.hasArg(OPT_enable_experimental_diagnostic_formatting);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
   }
@@ -1496,6 +1530,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
         getRuntimeCompatVersion();
   }
+
+  if (Args.hasArg(OPT_disable_leaf_frame_pointer_elim))
+    Opts.DisableFPElimLeaf = true;
 
   return false;
 }

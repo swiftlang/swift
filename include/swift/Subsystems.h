@@ -58,7 +58,6 @@ namespace swift {
   class SerializationOptions;
   class SILOptions;
   class SILModule;
-  class SILParserTUState;
   class SourceFile;
   enum class SourceFileKind;
   class SourceManager;
@@ -73,17 +72,6 @@ namespace swift {
   namespace Lowering {
     class TypeConverter;
   }
-
-  /// Used to optionally maintain SIL parsing context for the parser.
-  ///
-  /// When not parsing SIL, this has no overhead.
-  class SILParserState {
-  public:
-    std::unique_ptr<SILParserTUState> Impl;
-
-    explicit SILParserState(SILModule *M);
-    ~SILParserState();
-  };
 
   /// @{
 
@@ -184,13 +172,13 @@ namespace swift {
   /// The module must contain source files. The optimizer will assume that the
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
-                       const SILOptions &options);
+  performASTLowering(ModuleDecl *M, Lowering::TypeConverter &TC,
+                     const SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
-                       const SILOptions &options);
+  performASTLowering(FileUnit &SF, Lowering::TypeConverter &TC,
+                     const SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 

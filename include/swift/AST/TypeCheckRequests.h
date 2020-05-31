@@ -123,7 +123,7 @@ public:
 public:
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &e) const;
+  readDependencySource(const evaluator::DependencyRecorder &e) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            Type t) const;
 };
@@ -893,7 +893,7 @@ public:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// Request to obtain a list of stored properties in a nominal type.
@@ -1531,7 +1531,8 @@ void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
 
 class ValidatePrecedenceGroupRequest
     : public SimpleRequest<ValidatePrecedenceGroupRequest,
-                           PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
+                           TinyPtrVector<PrecedenceGroupDecl *>(
+                               PrecedenceGroupDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1540,7 +1541,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  PrecedenceGroupDecl *
+  TinyPtrVector<PrecedenceGroupDecl *>
   evaluate(Evaluator &evaluator, PrecedenceGroupDescriptor descriptor) const;
 
 public:
@@ -2034,7 +2035,7 @@ public:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// Computes whether the specified type or a super-class/super-protocol has the
@@ -2239,7 +2240,7 @@ public:
   bool isCached() const { return true; }
 };
 
-using ProtocolConformanceLookupResult = SmallVector<ProtocolConformance *, 2>;
+using ProtocolConformanceLookupResult = std::vector<ProtocolConformance *>;
 void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 
 /// Lookup and expand all conformances in the given context.
@@ -2261,7 +2262,7 @@ class LookupAllConformancesInContextRequest
     : public SimpleRequest<LookupAllConformancesInContextRequest,
                            ProtocolConformanceLookupResult(
                                const IterableDeclContext *),
-                           RequestFlags::Uncached |
+                           RequestFlags::Cached |
                                RequestFlags::DependencySink |
                                RequestFlags::DependencySource> {
 public:
@@ -2275,9 +2276,11 @@ private:
   evaluate(Evaluator &evaluator, const IterableDeclContext *IDC) const;
 
 public:
+  bool isCached() const { return true; }
+
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  readDependencySource(const evaluator::DependencyRecorder &eval) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceLookupResult r) const;
 };
@@ -2305,7 +2308,7 @@ public:
 
 public:
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  readDependencySource(const evaluator::DependencyRecorder &eval) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            evaluator::SideEffect) const;
 };

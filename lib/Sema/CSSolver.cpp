@@ -379,9 +379,8 @@ ConstraintSystem::SolverState::SolverState(
   if (tyOpts.DebugConstraintSolverAttempt &&
       tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
     CS.Options |= ConstraintSystemFlags::DebugConstraints;
-    llvm::raw_ostream &dbgOut = ctx.TypeCheckerDebug->getStream();
-    dbgOut << "---Constraint system #" << SolutionAttempt << "---\n";
-    CS.print(dbgOut);
+    llvm::errs() << "---Constraint system #" << SolutionAttempt << "---\n";
+    CS.print(llvm::errs());
   }
 }
 
@@ -632,7 +631,7 @@ bool ConstraintSystem::Candidate::solve(
 
   auto &ctx = cs.getASTContext();
   if (cs.isDebugMode()) {
-    auto &log = ctx.TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     log << "--- Solving candidate for shrinking at ";
     auto R = E->getSourceRange();
     if (R.isValid()) {
@@ -669,7 +668,7 @@ bool ConstraintSystem::Candidate::solve(
   }
 
   if (cs.isDebugMode()) {
-    auto &log = ctx.TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     if (solutions.empty()) {
       log << "--- No Solutions ---\n";
     } else {
@@ -992,13 +991,8 @@ void ConstraintSystem::shrink(Expr *expr) {
           auto typeRepr = castTypeLoc.getTypeRepr();
 
           if (typeRepr && isSuitableCollection(typeRepr)) {
-            // Clone representative to avoid modifying in-place,
-            // FIXME: We should try and silently resolve the type here,
-            // instead of cloning representative.
-            auto coercionRepr = typeRepr->clone(CS.getASTContext());
-            // Let's try to resolve coercion type from cloned representative.
             auto resolution = TypeResolution::forContextual(CS.DC, None);
-            auto coercionType = resolution.resolveType(coercionRepr);
+            auto coercionType = resolution.resolveType(typeRepr);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())
@@ -1111,8 +1105,9 @@ static bool debugConstraintSolverForTarget(
   SourceRange range = target.getSourceRange();
   if (range.isValid()) {
     auto charRange = Lexer::getCharSourceRangeFromSourceRange(C.SourceMgr, range);
-    startLine = C.SourceMgr.getLineNumber(charRange.getStart());
-    endLine = C.SourceMgr.getLineNumber(charRange.getEnd());
+    startLine =
+        C.SourceMgr.getLineAndColumnInBuffer(charRange.getStart()).first;
+    endLine = C.SourceMgr.getLineAndColumnInBuffer(charRange.getEnd()).first;
   }
 
   assert(startLine <= endLine && "expr ends before it starts?");
@@ -1143,15 +1138,14 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
   auto dumpSolutions = [&](const SolutionResult &result) {
     // Debug-print the set of solutions.
     if (isDebugMode()) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
       if (result.getKind() == SolutionResult::Success) {
-        log << "---Solution---\n";
-        result.getSolution().dump(log);
+        llvm::errs() << "---Solution---\n";
+        result.getSolution().dump(llvm::errs());
       } else if (result.getKind() == SolutionResult::Ambiguous) {
         auto solutions = result.getAmbiguousSolutions();
         for (unsigned i : indices(solutions)) {
-          log << "--- Solution #" << i << " ---\n";
-          solutions[i].dump(log);
+          llvm::errs() << "--- Solution #" << i << " ---\n";
+          solutions[i].dump(llvm::errs());
         }
       }
     }
@@ -1230,7 +1224,7 @@ SolutionResult
 ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
   if (isDebugMode()) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     log << "---Constraint solving at ";
     auto R = target.getSourceRange();
     if (R.isValid()) {
@@ -1278,7 +1272,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   solveImpl(solutions);
 
   if (isDebugMode()) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     log << "---Solver statistics---\n";
     log << "Total number of scopes explored: " << solverState->NumStatesExplored << "\n";
     log << "Maximum depth reached while exploring solutions: " << solverState->maxDepth << "\n";
@@ -1415,11 +1409,10 @@ ConstraintSystem::filterDisjunction(
     }
 
     if (isDebugMode()) {
-      auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 : 0)
+      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
         << "(disabled disjunction term ";
-      constraint->print(log, &ctx.SourceMgr);
-      log << ")\n";
+      constraint->print(llvm::errs(), &ctx.SourceMgr);
+      llvm::errs() << ")\n";
     }
 
     if (restoreOnFail)
@@ -1476,11 +1469,10 @@ ConstraintSystem::filterDisjunction(
     }
 
     if (isDebugMode()) {
-      auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 : 0)
+      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
         << "(introducing single enabled disjunction term ";
-      choice->print(log, &ctx.SourceMgr);
-      log << ")\n";
+      choice->print(llvm::errs(), &ctx.SourceMgr);
+      llvm::errs() << ")\n";
     }
 
     simplifyDisjunctionChoice(choice);
@@ -1747,7 +1739,7 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
 }
 
 void ConstraintSystem::ArgumentInfoCollector::dump() const {
-  auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+  auto &log = llvm::errs();
   log << "types:\n";
   for (auto type : Types)
     type->print(log);

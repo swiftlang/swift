@@ -1603,13 +1603,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     spiGroups.push_back(Context.getIdentifier(text));
     consumeToken();
 
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
-    AttrRange = SourceRange(Loc, Tok.getLoc());
     Attributes.add(SPIAccessControlAttr::create(Context, AtLoc, AttrRange,
                                                 spiGroups));
     break;
@@ -4861,9 +4862,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
     diagnose(Tok.getLoc(), diag::extra_tokens_line_directive);
     return makeParserError();
   }
-  
-  int LineOffset = StartLine - SourceMgr.getLineNumber(nextLineStartLoc);
- 
+
+  int LineOffset =
+      StartLine - SourceMgr.getLineAndColumnInBuffer(nextLineStartLoc).first;
+
   // Create a new virtual file for the region started by the #line marker.
   bool isNewFile = SourceMgr.openVirtualFile(nextLineStartLoc,
                                              Filename.getValue(), LineOffset);

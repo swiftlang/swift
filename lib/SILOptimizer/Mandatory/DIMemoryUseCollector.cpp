@@ -1639,6 +1639,7 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
         }
 
         // A store of a load from the box is ignored.
+        //
         // SILGen emits these if delegation to another initializer was
         // interrupted before the initializer was called.
         SILValue src = SI->getSrc();
@@ -1778,14 +1779,30 @@ void ClassInitElementUseCollector::collectClassInitSelfLoadUses(
       }
     }
 
-    // If this load's value is being stored back into the delegating
-    // mark_uninitialized buffer and it is a self init use, skip the
-    // use. This is to handle situations where due to usage of a metatype to
-    // allocate, we do not actually consume self.
+    // If this load's value is being stored immediately back into the delegating
+    // mark_uninitialized buffer, skip the use.
+    //
+    // This is to handle situations where we do not actually consume self as a
+    // result of situations such as:
+    //
+    // 1. The usage of a metatype to allocate the object.
+    //
+    // 2. If our self init call has a throwing function as an argument that
+    //    actually throws.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
-      if (SI->getDest() == MUI &&
-          (isSelfInitUse(User) || isSuperInitUse(User))) {
-        continue;
+      if (SI->getDest() == MUI) {
+        SILValue src = SI->getSrc();
+
+        // Look through conversions.
+        while (auto *conversion = dyn_cast<ConversionInst>(src)) {
+          src = conversion->getConverted();
+        }
+
+        if (auto *li = dyn_cast<LoadInst>(src)) {
+          if (li->getOperand() == MUI) {
+            continue;
+          }
+        }
       }
     }
 

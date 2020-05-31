@@ -188,12 +188,48 @@ static ClangModuleDependenciesCacheImpl *getOrCreateClangImpl(
   return clangImpl;
 }
 
+static std::string getModuleFilePath(StringRef moduleCacheDir,
+                                     StringRef moduleName,
+                                     StringRef contextHash) {
+  SmallString<128> outputPath(moduleCacheDir);
+  llvm::sys::path::append(outputPath, (llvm::Twine(moduleName)
+    + "-" + contextHash + ".pcm").str());
+  return outputPath.str().str();
+}
+
+static std::string getModuleFilePath(StringRef moduleCacheDir,
+                                     const ModuleDeps &dep) {
+  return getModuleFilePath(moduleCacheDir, dep.ModuleName, dep.ContextHash);
+}
+
 /// Record the module dependencies we found by scanning Clang modules into
 /// the module dependencies cache.
-static void recordModuleDependencies(
+void ClangImporter::recordModuleDependencies(
     ModuleDependenciesCache &cache,
     const FullDependenciesResult &clangDependencies) {
+  struct ModuleInfo {
+    std::string PCMPath;
+    std::string ModuleMapPath;
+  };
+  auto ModuleCacheDir = swift::getModuleCachePathFromClang(getClangInstance());
+
+  // A map keyed by module name and context hash.
+  llvm::StringMap<llvm::StringMap<ModuleInfo>> moduleInfoMap;
+
+  // Traverse all Clang modules to populate moduleInfoMap for cross
+  // referencing later.
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
+    moduleInfoMap[clangModuleDep.ModuleName][clangModuleDep.ContextHash] =
+      {
+        // Keep track of pcm path for output.
+        getModuleFilePath(ModuleCacheDir, clangModuleDep),
+        // Keep track of modulemap file for input.
+        clangModuleDep.ClangModuleMapFile
+      };
+  }
+  for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
+    assert(moduleInfoMap[clangModuleDep.ModuleName]
+      .count(clangModuleDep.ContextHash));
     // If we've already cached this information, we're done.
     if (cache.hasDependencies(clangModuleDep.ModuleName,
                               ModuleDependenciesKind::Clang))
@@ -204,14 +240,58 @@ static void recordModuleDependencies(
     for (const auto &fileDep : clangModuleDep.FileDeps) {
       fileDeps.push_back(fileDep.getKey().str());
     }
+    // Inherit all Clang driver args when creating the clang importer.
+    std::vector<std::string> allArgs = Impl.ClangArgs;
+    ClangImporterOptions Opts;
+    std::vector<std::string> cc1Args;
 
+    // Calling this to convert driver args to CC1 args.
+    createClangInvocation(this, Opts, allArgs, &cc1Args);
+    std::vector<std::string> swiftArgs;
+    // We are using Swift frontend mode.
+    swiftArgs.push_back("-frontend");
+    auto addClangArg = [&](StringRef arg) {
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back("-Xclang");
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back(arg.str());
+    };
+    // Add all args inheritted from creating the importer.
+    for (auto arg: cc1Args) {
+      addClangArg(arg);
+    }
+    // Add all args reported from the Clang dependencies scanner.
+    for(auto arg: clangModuleDep.NonPathCommandLine) {
+      addClangArg(arg);
+    }
+
+    // Add -fmodule-map-file and -fmodule-file for direct dependencies.
+    for (auto &dep: clangModuleDep.ClangModuleDeps) {
+      assert(moduleInfoMap[dep.ModuleName].count(dep.ContextHash));
+      addClangArg((llvm::Twine("-fmodule-map-file=")
+        + moduleInfoMap[dep.ModuleName][dep.ContextHash].ModuleMapPath).str());
+      addClangArg((llvm::Twine("-fmodule-file=")
+        + moduleInfoMap[dep.ModuleName][dep.ContextHash].PCMPath).str());
+    }
+    // Swift frontend action: -emit-pcm
+    swiftArgs.push_back("-emit-pcm");
+    swiftArgs.push_back("-module-name");
+    swiftArgs.push_back(clangModuleDep.ModuleName);
+
+    // Swift frontend option for output file path (Foo.pcm).
+    swiftArgs.push_back("-o");
+    swiftArgs.push_back(moduleInfoMap[clangModuleDep.ModuleName]
+      [clangModuleDep.ContextHash].PCMPath);
+
+    // Swift frontend option for input file path (Foo.modulemap).
+    swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
         clangModuleDep.ImplicitModulePCMPath,
         clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ContextHash,
-        clangModuleDep.NonPathCommandLine,
+        swiftArgs,
         fileDeps);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleDependency(moduleName.ModuleName, alreadyAddedModules);

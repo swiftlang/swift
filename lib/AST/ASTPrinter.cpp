@@ -43,6 +43,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
@@ -1668,6 +1669,14 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     if (Options.AccessFilter > AccessLevel::Private &&
         VD->getFormalAccess() < Options.AccessFilter)
       return false;
+  }
+
+  // Skip clang decls marked with the swift_private attribute.
+  if (Options.SkipSwiftPrivateClangDecls) {
+    if (auto ClangD = D->getClangDecl()) {
+      if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+        return false;
+    }
   }
 
   if (Options.SkipPrivateStdlibDecls &&

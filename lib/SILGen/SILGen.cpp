@@ -1911,8 +1911,8 @@ public:
 } // end anonymous namespace
 
 std::unique_ptr<SILModule>
-SILGenerationRequest::evaluate(Evaluator &evaluator,
-                               SILGenDescriptor desc) const {
+ASTLoweringRequest::evaluate(Evaluator &evaluator,
+                             ASTLoweringDescriptor desc) const {
   // If we have a .sil file to parse, defer to the parsing request.
   if (desc.getSourceFileToParse()) {
     return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
@@ -1943,17 +1943,16 @@ SILGenerationRequest::evaluate(Evaluator &evaluator,
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
-                            const SILOptions &options) {
-  auto desc = SILGenDescriptor::forWholeModule(mod, tc, options);
+swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
+                          const SILOptions &options) {
+  auto desc = ASTLoweringDescriptor::forWholeModule(mod, tc, options);
   return llvm::cantFail(
-      mod->getASTContext().evaluator(SILGenerationRequest{desc}));
+      mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
-                            const SILOptions &options) {
-  auto desc = SILGenDescriptor::forFile(sf, tc, options);
-  return llvm::cantFail(
-      sf.getASTContext().evaluator(SILGenerationRequest{desc}));
+swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
+                          const SILOptions &options) {
+  auto desc = ASTLoweringDescriptor::forFile(sf, tc, options);
+  return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
 }

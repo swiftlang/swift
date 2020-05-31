@@ -135,13 +135,24 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
     }
 
     // Check array semantic calls.
-    if (auto apply = dyn_cast<ApplyInst>(User)) {
+    if (auto *apply = dyn_cast<ApplyInst>(User)) {
       ArraySemanticsCall ArrayOp(apply);
-      if (ArrayOp && ArrayOp.doesNotChangeArray()) {
-        if (ArrayOp.getKind() == ArrayCallKind::kGetCount)
+      switch (ArrayOp.getKind()) {
+        case ArrayCallKind::kNone:
+          return false;
+        case ArrayCallKind::kGetCount:
           CountCalls.insert(ArrayOp);
-        continue;
+          break;
+        case ArrayCallKind::kArrayFinalizeIntrinsic:
+          if (!recursivelyCollectUses(apply))
+            return false;
+          break;
+        default:
+          if (!ArrayOp.doesNotChangeArray())
+            return false;
+          break;
       }
+      continue;
     }
 
     // An operation that escapes or modifies the array value.

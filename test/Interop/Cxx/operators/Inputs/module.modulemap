@@ -1,0 +1,3 @@
+module NonMemberInline {
+  header "non-member-inline.h"
+}

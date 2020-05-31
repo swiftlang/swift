@@ -613,7 +613,7 @@ static unsigned getLineNumber(DCType *DC) {
     return 0;
 
   const ASTContext &ctx = static_cast<const DeclContext *>(DC)->getASTContext();
-  return ctx.SourceMgr.getLineAndColumn(loc).first;
+  return ctx.SourceMgr.getPresumedLineAndColumnForLoc(loc).first;
 }
 
 unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
@@ -773,7 +773,7 @@ IterableDeclContext::getDecl() const {
   llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
 }
 
-const GenericContext *IterableDeclContext::getAsGenericContext() const {
+GenericContext *IterableDeclContext::getAsGenericContext() {
   switch (getIterableContextKind()) {
   case IterableDeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(this);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -Xcc -mno-omit-leaf-frame-pointer | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -Xcc -mno-omit-leaf-frame-pointer | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 
 import c_layout
 
@@ -31,5 +31,23 @@ public func testCaptureGlobal() {
   }) // CHECK: {{^}$}}
 }
 
-// CHECK-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
-// CHECK-DAG: attributes [[SWIFT_FUNC_ATTR]] = { "frame-pointer"="all" {{.*}}"target-cpu"
+// CHECK-i386-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-i386-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-x86_64-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-x86_64-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-armv7-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-armv7s-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7s-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-armv7k-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7k-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-arm64-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="non-leaf"{{.*}}
+// CHECK-arm64-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="non-leaf" {{.*}}"target-cpu"
+
+// CHECK-arm64e-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="non-leaf"{{.*}}
+// CHECK-arm64e-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="non-leaf" {{.*}}"target-cpu"

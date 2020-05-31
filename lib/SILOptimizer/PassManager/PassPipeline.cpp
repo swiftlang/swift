@@ -351,6 +351,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Jump threading can expose opportunity for SILCombine (enum -> is_enum_tag->
   // cond_br).
   P.addJumpThreadSimplifyCFG();
+  P.addPhiExpansion();
   P.addSILCombine();
   // SILCombine can expose further opportunities for SimplifyCFG.
   P.addSimplifyCFG();
@@ -365,6 +366,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addRedundantLoadElimination();
   }
 
+  P.addCOWOpts();
   P.addPerformanceConstantPropagation();
   // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
   // can cleanup redundant and dead instructions.
@@ -513,6 +515,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.addLICM();
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
+  P.addLICM();
   P.addLoopUnroll();
 }
 
@@ -594,6 +597,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addLICM();
+  P.addCOWOpts();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
   // LICM might have added new merging potential by hoisting
@@ -601,6 +605,10 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   // potential of merging out of two loops
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
+
+  // Sometimes stack promotion can catch cases only at this late stage of the
+  // pipeline, after FunctionSignatureOpts.
+  P.addStackPromotion();
 
   // Optimize overflow checks.
   P.addRedundantOverflowCheckRemoval();

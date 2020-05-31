@@ -40,38 +40,39 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
-struct SILGenDescriptor {
+/// Describes a file or module to be lowered to SIL.
+struct ASTLoweringDescriptor {
   llvm::PointerUnion<FileUnit *, ModuleDecl *> context;
   Lowering::TypeConverter &conv;
   const SILOptions &opts;
 
-  friend llvm::hash_code hash_value(const SILGenDescriptor &owner) {
+  friend llvm::hash_code hash_value(const ASTLoweringDescriptor &owner) {
     return llvm::hash_combine(owner.context, (void *)&owner.conv,
                               (void *)&owner.opts);
   }
 
-  friend bool operator==(const SILGenDescriptor &lhs,
-                         const SILGenDescriptor &rhs) {
+  friend bool operator==(const ASTLoweringDescriptor &lhs,
+                         const ASTLoweringDescriptor &rhs) {
     return lhs.context == rhs.context &&
            &lhs.conv == &rhs.conv &&
            &lhs.opts == &rhs.opts;
   }
 
-  friend bool operator!=(const SILGenDescriptor &lhs,
-                         const SILGenDescriptor &rhs) {
+  friend bool operator!=(const ASTLoweringDescriptor &lhs,
+                         const ASTLoweringDescriptor &rhs) {
     return !(lhs == rhs);
   }
 
 public:
-  static SILGenDescriptor forFile(FileUnit &sf, Lowering::TypeConverter &conv,
-                                  const SILOptions &opts) {
-    return SILGenDescriptor{&sf, conv, opts};
+  static ASTLoweringDescriptor
+  forFile(FileUnit &sf, Lowering::TypeConverter &conv, const SILOptions &opts) {
+    return ASTLoweringDescriptor{&sf, conv, opts};
   }
 
-  static SILGenDescriptor forWholeModule(ModuleDecl *mod,
-                                         Lowering::TypeConverter &conv,
-                                         const SILOptions &opts) {
-    return SILGenDescriptor{mod, conv, opts};
+  static ASTLoweringDescriptor forWholeModule(ModuleDecl *mod,
+                                              Lowering::TypeConverter &conv,
+                                              const SILOptions &opts) {
+    return ASTLoweringDescriptor{mod, conv, opts};
   }
 
   /// For a single file input, returns a single element array containing that
@@ -83,13 +84,17 @@ public:
   SourceFile *getSourceFileToParse() const;
 };
 
-void simple_display(llvm::raw_ostream &out, const SILGenDescriptor &d);
+void simple_display(llvm::raw_ostream &out, const ASTLoweringDescriptor &d);
 
-SourceLoc extractNearestSourceLoc(const SILGenDescriptor &desc);
+SourceLoc extractNearestSourceLoc(const ASTLoweringDescriptor &desc);
 
-class SILGenerationRequest
+/// Lowers a file or module to SIL. In most cases this involves transforming
+/// a file's AST into SIL, through SILGen. However it can also handle files
+/// containing SIL in textual or binary form, which will be parsed or
+/// deserialized as needed.
+class ASTLoweringRequest
     : public SimpleRequest<
-          SILGenerationRequest, std::unique_ptr<SILModule>(SILGenDescriptor),
+          ASTLoweringRequest, std::unique_ptr<SILModule>(ASTLoweringDescriptor),
           RequestFlags::Uncached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -98,19 +103,19 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  std::unique_ptr<SILModule>
-  evaluate(Evaluator &evaluator, SILGenDescriptor desc) const;
+  std::unique_ptr<SILModule> evaluate(Evaluator &evaluator,
+                                      ASTLoweringDescriptor desc) const;
 
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// Parses a .sil file into a SILModule.
 class ParseSILModuleRequest
     : public SimpleRequest<ParseSILModuleRequest,
-                           std::unique_ptr<SILModule>(SILGenDescriptor),
+                           std::unique_ptr<SILModule>(ASTLoweringDescriptor),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -119,8 +124,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  std::unique_ptr<SILModule>
-  evaluate(Evaluator &evaluator, SILGenDescriptor desc) const;
+  std::unique_ptr<SILModule> evaluate(Evaluator &evaluator,
+                                      ASTLoweringDescriptor desc) const;
 };
 
 /// The zone number for SILGen.

@@ -60,7 +60,7 @@ struct StructWithSubobjectMoveConstructor {
 };
 
 struct StructWithCopyAssignment {
-  StructWithCopyAssignment &operator=(const StructWithCopyAssignment &) {}
+  StructWithCopyAssignment &operator=(const StructWithCopyAssignment &);
 };
 
 struct StructWithInheritedCopyAssignment : StructWithCopyAssignment {};
@@ -70,7 +70,7 @@ struct StructWithSubobjectCopyAssignment {
 };
 
 struct StructWithMoveAssignment {
-  StructWithMoveAssignment &operator=(StructWithMoveAssignment &&) {}
+  StructWithMoveAssignment &operator=(StructWithMoveAssignment &&);
 };
 
 struct StructWithInheritedMoveAssignment : StructWithMoveAssignment {};

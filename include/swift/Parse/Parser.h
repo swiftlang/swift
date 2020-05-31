@@ -50,7 +50,7 @@ namespace swift {
   class Lexer;
   class ParsedTypeSyntax;
   class PersistentParserState;
-  class SILParserTUStateBase;
+  class SILParserStateBase;
   class ScopeInfo;
   class SourceManager;
   class TupleType;
@@ -114,7 +114,7 @@ public:
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
-  SILParserTUStateBase *SIL; // Non-null when parsing SIL decls.
+  SILParserStateBase *SIL; // Non-null when parsing SIL decls.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
@@ -396,14 +396,13 @@ public:
 
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
-         SILParserTUStateBase *SIL,
-         PersistentParserState *PersistentState,
+         SILParserStateBase *SIL, PersistentParserState *PersistentState,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
-  Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
+  Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-         SILParserTUStateBase *SIL = nullptr,
+         SILParserStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   ~Parser();

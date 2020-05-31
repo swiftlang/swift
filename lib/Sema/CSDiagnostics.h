@@ -25,6 +25,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -813,7 +814,7 @@ private:
   bool exprNeedsParensBeforeAddingAs(const Expr *expr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
     if (!asPG)
       return true;
     return exprNeedsParensInsideFollowingOperator(DC, const_cast<Expr *>(expr),
@@ -823,7 +824,7 @@ private:
   bool exprNeedsParensAfterAddingAs(const Expr *expr, const Expr *rootExpr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
     if (!asPG)
       return true;
 
@@ -1519,6 +1520,25 @@ class InvalidStaticMemberRefInKeyPath final : public InvalidMemberRefInKeyPath {
 public:
   InvalidStaticMemberRefInKeyPath(const Solution &solution, ValueDecl *member,
                                   ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference an enum case as a key path component
+/// e.g.
+///
+/// ```swift
+/// enum E {
+///   case foo
+/// }
+///
+/// _ = \E.Type.foo
+/// ```
+class InvalidEnumCaseRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidEnumCaseRefInKeyPath(const Solution &solution, ValueDecl *member,
+                              ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(solution, member, locator) {}
 
   bool diagnoseAsError() override;

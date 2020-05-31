@@ -181,6 +181,14 @@ CUSTOM_LOCATOR_PATH_ELT(TernaryBranch)
 /// Performing a pattern patch.
 CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
 
+/// Points to a particular attribute associated with one of
+/// the arguments e.g. `inout` or its type e.g. `@escaping`.
+///
+/// This is very useful when dealing with argument-to-parameter
+/// failures because it allows to express in the locator kind
+/// of a problem.
+CUSTOM_LOCATOR_PATH_ELT(ArgumentAttribute)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

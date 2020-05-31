@@ -771,8 +771,8 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
 
     // Issue a warning when the returned expression is on a different line than
     // the return keyword, but both have the same indentation.
-    if (SourceMgr.getLineAndColumn(ReturnLoc).second ==
-        SourceMgr.getLineAndColumn(ExprLoc).second) {
+    if (SourceMgr.getLineAndColumnInBuffer(ReturnLoc).second ==
+        SourceMgr.getLineAndColumnInBuffer(ExprLoc).second) {
       diagnose(ExprLoc, diag::unindented_code_after_return);
       diagnose(ExprLoc, diag::indent_expression_to_silence);
     }

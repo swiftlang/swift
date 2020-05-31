@@ -113,7 +113,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS=" + deployment_version,
             ]
-            llvm_c_flags += " -miphoneos-version-min==" + deployment_version
+            llvm_c_flags += " -miphoneos-version-min=" + deployment_version
 
         elif self.host == "appletvsimulator":
             deployment_version = "10.0"

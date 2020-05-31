@@ -710,16 +710,6 @@ writer.write<uint32_t>(data.X.Column);
     return USRWriter.getNewUSRId(OS.str());
   }
 
-  LineColumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
-    LineColumn Result;
-    if (Loc.isValid()) {
-      auto LC = SM.getLineAndColumn(Loc);
-      Result.Line = LC.first;
-      Result.Column = LC.second;
-    }
-    return Result;
-  }
-
   Optional<DeclLocationsTableData> getLocData(Decl *D) {
     auto *File = D->getDeclContext()->getModuleScopeContext();
     auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
