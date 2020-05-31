@@ -338,7 +338,7 @@ public class InputFilter<D: DataProtocol> {
     // Allocate result
     var result = Data(count: count)
 
-    try result.withUnsafeMutableBytes { (buffer: UnsafeMutableRawBufferPointer) in
+    try result.withUnsafeMutableBytes { buffer in
 
       // Write to result until full, or end reached
       _stream.dst_size = count
