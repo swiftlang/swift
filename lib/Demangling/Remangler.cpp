@@ -268,8 +268,8 @@ class Remangler : public RemanglerBase {
   }
 
   void mangleChildNode(Node *node, unsigned index) {
-    assert(index < node->getNumChildren());
-    mangle(node->begin()[index]);
+    if (index < node->getNumChildren())
+      mangle(node->begin()[index]);
   }
 
   void manglePureProtocol(Node *Proto) {
