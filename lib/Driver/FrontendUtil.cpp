@@ -59,16 +59,11 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     return true;
 
   if (ForceNoOutputs) {
-    // Clear existing output modes.
+    // Clear existing output modes and supplementary outputs.
     ArgList->eraseArg(options::OPT_modes_Group);
-    // Disable other output options that conflict with -typecheck.
-    ArgList->eraseArg(options::OPT_emit_module);
-    ArgList->eraseArg(options::OPT_emit_module_path);
-    ArgList->eraseArg(options::OPT_emit_module_source_info_path);
-    ArgList->eraseArg(options::OPT_emit_module_interface);
-    ArgList->eraseArg(options::OPT_emit_module_interface_path);
-    ArgList->eraseArg(options::OPT_emit_objc_header);
-    ArgList->eraseArg(options::OPT_emit_objc_header_path);
+    ArgList->eraseArgIf([](const llvm::opt::Arg *A) {
+      return A && A->getOption().hasFlag(options::SupplementaryOutput);
+    });
 
     unsigned index = ArgList->MakeIndex("-typecheck");
     // Takes ownership of the Arg.
