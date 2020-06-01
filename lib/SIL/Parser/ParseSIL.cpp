@@ -6090,6 +6090,9 @@ bool SILParserState::parseSILVTable(Parser &P) {
         } else if (P.Tok.getText() == "inherited") {
           P.consumeToken();
           Kind = SILVTable::Entry::Kind::Inherited;
+        } else if (P.Tok.getText() == "nonoverridden") {
+          P.consumeToken();
+          Kind = SILVTable::Entry::Kind::NormalNonOverridden;
         } else {
           P.diagnose(P.Tok.getLoc(), diag::sil_vtable_bad_entry_kind);
           return true;

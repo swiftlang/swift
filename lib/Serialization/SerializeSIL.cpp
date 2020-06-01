@@ -73,6 +73,8 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
 static unsigned toStableVTableEntryKind(SILVTable::Entry::Kind kind) {
   switch (kind) {
   case SILVTable::Entry::Kind::Normal: return SIL_VTABLE_ENTRY_NORMAL;
+  case SILVTable::Entry::Kind::NormalNonOverridden:
+    return SIL_VTABLE_ENTRY_NORMAL_NON_OVERRIDDEN;
   case SILVTable::Entry::Kind::Inherited: return SIL_VTABLE_ENTRY_INHERITED;
   case SILVTable::Entry::Kind::Override: return SIL_VTABLE_ENTRY_OVERRIDE;
   }

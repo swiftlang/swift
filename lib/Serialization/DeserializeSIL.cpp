@@ -79,6 +79,8 @@ static Optional<SILVTable::Entry::Kind>
 fromStableVTableEntryKind(unsigned value) {
   switch (value) {
   case SIL_VTABLE_ENTRY_NORMAL: return SILVTable::Entry::Kind::Normal;
+  case SIL_VTABLE_ENTRY_NORMAL_NON_OVERRIDDEN:
+    return SILVTable::Entry::Kind::NormalNonOverridden;
   case SIL_VTABLE_ENTRY_INHERITED: return SILVTable::Entry::Kind::Inherited;
   case SIL_VTABLE_ENTRY_OVERRIDE: return SILVTable::Entry::Kind::Override;
   default: return None;
