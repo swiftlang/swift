@@ -285,7 +285,7 @@ doit()
 //      CHECK: }
 
 // CHECK:; Function Attrs: noinline nounwind readnone
-// CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CyAA9Argument1ACLLCySiGGMb"([[INT]] [[REQUEST:%[0-9]+]]) #4 {
+// CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CyAA9Argument1ACLLCySiGGMb"([[INT]] [[REQUEST:%[0-9]+]]) #{{[0-9]+}} {
 // CHECK: entry:
 // CHECK-unknown:    ret
 // CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call %objc_class* @objc_opt_self(
