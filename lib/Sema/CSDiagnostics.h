@@ -2118,7 +2118,7 @@ public:
   virtual Type getToType() const = 0;
 
   bool diagnoseAsError() override;
-  bool diagnoseAsNote() override { return false; }
+  bool diagnoseAsNote() override;
 
 protected:
   Optional<Diag<Type, Type>> getDiagnostic() const;
@@ -2150,8 +2150,6 @@ public:
 
   Type getFromType() const override { return ExpectedType; }
   Type getToType() const override { return RawReprType; }
-
-  bool diagnoseAsNote() override;
 
 protected:
   void fixIt(InFlightDiagnostic &diagnostic) const override;

@@ -6395,7 +6395,7 @@ void MissingRawRepresentativeInitFailure::fixIt(
   }
 }
 
-bool MissingRawRepresentativeInitFailure::diagnoseAsNote() {
+bool AbstractRawRepresentableFailure::diagnoseAsNote() {
   auto *locator = getLocator();
 
   Optional<InFlightDiagnostic> diagnostic;
@@ -6442,10 +6442,10 @@ void UseOfRawRepresentableInsteadOfItsRawValueFailure::fixIt(
   // out first and then, if destination is not optional, allow to specify
   // default value.
   if (RawReprType->getOptionalObjectType()) {
-    fix += ".map { $0.rawValue } ";
+    fix += ".map { $0.rawValue }";
 
     if (!ExpectedType->getOptionalObjectType())
-      fix += "?? <#default value#>";
+      fix += " ?? <#default value#>";
   } else {
     fix += ".rawValue";
   }
