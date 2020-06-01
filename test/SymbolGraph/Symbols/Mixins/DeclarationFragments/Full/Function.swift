@@ -6,7 +6,7 @@
 public func foo<S>(f: @escaping () -> (), ext int: Int = 2, s: S) where S: Sequence {}
 
 // CHECK-LABEL:{{^      }}"declarationFragments": [
-// CHECK-NEXT:        {
+// CHECK:        {
 // CHECK-NEXT:          "kind": "keyword",
 // CHECK-NEXT:          "spelling": "func"
 // CHECK-NEXT:        },
@@ -36,7 +36,15 @@ public func foo<S>(f: @escaping () -> (), ext int: Int = 2, s: S) where S: Seque
 // CHECK-NEXT:        },
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "kind": "text",
-// CHECK-NEXT:          "spelling": ": () -> (), "
+// CHECK-NEXT:          "spelling": ": "
+// CHECK-NEXT:        },
+// CHECK-NEXT:        {
+// CHECK-NEXT:          "kind": "keyword",
+// CHECK-NEXT:          "spelling": "@escaping"
+// CHECK-NEXT:        },
+// CHECK-NEXT:        {
+// CHECK-NEXT:          "kind": "text",
+// CHECK-NEXT:          "spelling": " () -> (), "
 // CHECK-NEXT:        },
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "kind": "externalParam",

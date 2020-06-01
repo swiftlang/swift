@@ -8,10 +8,18 @@
 
 public protocol P {}
 
-public struct S<T> : P where T: Sequence {}
+@frozen public struct S<T> : P where T: Sequence {}
 
 // STRUCT-LABEL: "precise": "s:12NominalTypes1SV",
 // STRUCT: "declarationFragments": [
+// STRUCT-NEXT:   {
+// STRUCT-NEXT:     "kind": "attribute",
+// STRUCT-NEXT:     "spelling": "@frozen"
+// STRUCT-NEXT:   },
+// STRUCT-NEXT:   {
+// STRUCT-NEXT:     "kind": "text",
+// STRUCT-NEXT:     "spelling": " "
+// STRUCT-NEXT:   },
 // STRUCT-NEXT:   {
 // STRUCT-NEXT:     "kind": "keyword",
 // STRUCT-NEXT:     "spelling": "struct"
