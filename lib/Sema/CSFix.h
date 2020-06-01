@@ -1596,14 +1596,14 @@ public:
 
 class ExplicitlyConstructRawRepresentable final : public ConstraintFix {
   Type RawReprType;
-  Type ValueType;
+  Type ExpectedType;
 
   ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type rawReprType,
-                                      Type valueType,
+                                      Type expectedType,
                                       ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::ExplicitlyConstructRawRepresentable,
                       locator),
-        RawReprType(rawReprType), ValueType(valueType) {}
+        RawReprType(rawReprType), ExpectedType(expectedType) {}
 
 public:
   std::string getName() const override {
@@ -1613,18 +1613,18 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static ExplicitlyConstructRawRepresentable *
-  create(ConstraintSystem &cs, Type rawTypeRepr, Type valueType,
+  create(ConstraintSystem &cs, Type rawTypeRepr, Type expectedType,
          ConstraintLocator *locator);
 };
 
 class UseValueTypeOfRawRepresentative final : public ConstraintFix {
   Type RawReprType;
-  Type ValueType;
+  Type ExpectedType;
 
   UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type rawReprType,
-                                  Type valueType, ConstraintLocator *locator)
+                                  Type expectedType, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UseValueTypeOfRawRepresentative, locator),
-        RawReprType(rawReprType), ValueType(valueType) {}
+        RawReprType(rawReprType), ExpectedType(expectedType) {}
 
 public:
   std::string getName() const override {
@@ -1635,7 +1635,7 @@ public:
 
   static UseValueTypeOfRawRepresentative *create(ConstraintSystem &cs,
                                                  Type rawReprType,
-                                                 Type valueType,
+                                                 Type expectedType,
                                                  ConstraintLocator *locator);
 };
 

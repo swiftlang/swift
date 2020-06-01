@@ -2105,13 +2105,13 @@ public:
 class AbstractRawRepresentableFailure : public FailureDiagnostic {
 protected:
   Type RawReprType;
-  Type ValueType;
+  Type ExpectedType;
 
   AbstractRawRepresentableFailure(const Solution &solution, Type rawReprType,
-                                  Type valueType, ConstraintLocator *locator)
+                                  Type expectedType, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator),
         RawReprType(resolveType(rawReprType)),
-        ValueType(resolveType(valueType)) {}
+        ExpectedType(resolveType(expectedType)) {}
 
 public:
   virtual Type getFromType() const = 0;
@@ -2143,12 +2143,12 @@ class MissingRawRepresentativeInitFailure final
     : public AbstractRawRepresentableFailure {
 public:
   MissingRawRepresentativeInitFailure(const Solution &solution,
-                                      Type rawReprType, Type valueType,
+                                      Type rawReprType, Type expectedType,
                                       ConstraintLocator *locator)
-      : AbstractRawRepresentableFailure(solution, rawReprType, valueType,
+      : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
                                         locator) {}
 
-  Type getFromType() const override { return ValueType; }
+  Type getFromType() const override { return ExpectedType; }
   Type getToType() const override { return RawReprType; }
 
   bool diagnoseAsNote() override;
@@ -2174,13 +2174,13 @@ class UseOfRawRepresentableInsteadOfItsRawValueFailure final
 public:
   UseOfRawRepresentableInsteadOfItsRawValueFailure(const Solution &solution,
                                                    Type rawReprType,
-                                                   Type valueType,
+                                                   Type expectedType,
                                                    ConstraintLocator *locator)
-      : AbstractRawRepresentableFailure(solution, rawReprType, valueType,
+      : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
                                         locator) {}
 
   Type getFromType() const override { return RawReprType; }
-  Type getToType() const override { return ValueType; }
+  Type getToType() const override { return ExpectedType; }
 
 private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;

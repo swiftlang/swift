@@ -1124,32 +1124,32 @@ bool ExpandArrayIntoVarargs::diagnose(const Solution &solution,
 
 bool ExplicitlyConstructRawRepresentable::diagnose(const Solution &solution,
                                                    bool asNote) const {
-  MissingRawRepresentativeInitFailure failure(solution, RawReprType, ValueType,
-                                              getLocator());
+  MissingRawRepresentativeInitFailure failure(solution, RawReprType,
+                                              ExpectedType, getLocator());
   return failure.diagnose(asNote);
 }
 
 ExplicitlyConstructRawRepresentable *
 ExplicitlyConstructRawRepresentable::create(ConstraintSystem &cs,
-                                            Type rawReprType, Type valueType,
+                                            Type rawReprType, Type expectedType,
                                             ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      ExplicitlyConstructRawRepresentable(cs, rawReprType, valueType, locator);
+  return new (cs.getAllocator()) ExplicitlyConstructRawRepresentable(
+      cs, rawReprType, expectedType, locator);
 }
 
 bool UseValueTypeOfRawRepresentative::diagnose(const Solution &solution,
                                                bool asNote) const {
-  ArgumentMismatchFailure failure(solution, RawReprType, ValueType,
+  ArgumentMismatchFailure failure(solution, RawReprType, ExpectedType,
                                   getLocator());
   return failure.diagnose(asNote);
 }
 
 UseValueTypeOfRawRepresentative *
 UseValueTypeOfRawRepresentative::create(ConstraintSystem &cs, Type rawReprType,
-                                        Type valueType,
+                                        Type expectedType,
                                         ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      UseValueTypeOfRawRepresentative(cs, rawReprType, valueType, locator);
+      UseValueTypeOfRawRepresentative(cs, rawReprType, expectedType, locator);
 }
 
 unsigned AllowArgumentMismatch::getParamIdx() const {

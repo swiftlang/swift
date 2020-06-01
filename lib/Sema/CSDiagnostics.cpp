@@ -6349,7 +6349,7 @@ void MissingRawRepresentativeInitFailure::fixIt(
   if (auto *E = getAsExpr(getAnchor())) {
     auto range = E->getSourceRange();
     auto rawReprObjType = RawReprType->getOptionalObjectType();
-    auto valueObjType = ValueType->getOptionalObjectType();
+    auto valueObjType = ExpectedType->getOptionalObjectType();
 
     if (rawReprObjType && valueObjType) {
       std::string mapCodeFix;
@@ -6407,7 +6407,7 @@ bool MissingRawRepresentativeInitFailure::diagnoseAsNote() {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       diagnostic.emplace(emitDiagnosticAt(
           decl, diag::cannot_convert_candidate_result_to_contextual_type,
-          decl->getName(), ValueType, RawReprType));
+          decl->getName(), ExpectedType, RawReprType));
     }
   } else if (auto argConv =
                  locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
@@ -6444,7 +6444,7 @@ void UseOfRawRepresentableInsteadOfItsRawValueFailure::fixIt(
   if (RawReprType->getOptionalObjectType()) {
     fix += ".map { $0.rawValue } ";
 
-    if (!ValueType->getOptionalObjectType())
+    if (!ExpectedType->getOptionalObjectType())
       fix += "?? <#default value#>";
   } else {
     fix += ".rawValue";
