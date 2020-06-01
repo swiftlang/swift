@@ -1139,8 +1139,8 @@ ExplicitlyConstructRawRepresentable::create(ConstraintSystem &cs,
 
 bool UseValueTypeOfRawRepresentative::diagnose(const Solution &solution,
                                                bool asNote) const {
-  ArgumentMismatchFailure failure(solution, RawReprType, ExpectedType,
-                                  getLocator());
+  UseOfRawRepresentableInsteadOfItsRawValueFailure failure(
+      solution, RawReprType, ExpectedType, getLocator());
   return failure.diagnose(asNote);
 }
 
