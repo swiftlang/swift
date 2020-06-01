@@ -460,7 +460,8 @@ bool CompilerInstance::setUpModuleLoaders() {
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
         FEOpts.RemarkOnRebuildFromModuleInterface,
         IgnoreSourceInfoFile,
-        FEOpts.DisableInterfaceFileLock);
+        FEOpts.DisableInterfaceFileLock,
+        FEOpts.DisableImplicitModules);
     Context->addModuleLoader(std::move(PIML));
   }
 

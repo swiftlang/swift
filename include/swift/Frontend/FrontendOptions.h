@@ -258,6 +258,13 @@ public:
   /// By default, we include ImplicitObjCHeaderPath directly.
   llvm::Optional<std::string> BridgingHeaderDirForPrint;
 
+  /// Disable implicitly built Swift modules because they are explicitly
+  /// built and given to the compiler invocation.
+  bool DisableImplicitModules = false;
+
+  /// The paths to a set of explicitly built modules from interfaces.
+  std::vector<std::string> ExplicitSwiftModules;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

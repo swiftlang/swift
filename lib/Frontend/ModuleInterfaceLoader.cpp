@@ -341,12 +341,13 @@ class ModuleInterfaceLoaderImpl {
   const ModuleLoadingMode loadMode;
   const bool remarkOnRebuildFromInterface;
   const bool disableInterfaceLock;
+  const bool disableImplicitSwiftModule;
 
   ModuleInterfaceLoaderImpl(
     ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
     StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
     SourceLoc diagLoc, bool remarkOnRebuildFromInterface,
-    bool disableInterfaceLock,
+    bool disableInterfaceLock, bool disableImplicitSwiftModule,
     DependencyTracker *dependencyTracker = nullptr,
     ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
@@ -355,7 +356,8 @@ class ModuleInterfaceLoaderImpl {
     cacheDir(cacheDir), diagnosticLoc(diagLoc),
     dependencyTracker(dependencyTracker), loadMode(loadMode),
     remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
-    disableInterfaceLock(disableInterfaceLock) {}
+    disableInterfaceLock(disableInterfaceLock),
+    disableImplicitSwiftModule(disableImplicitSwiftModule) {}
 
   /// Constructs the full path of the dependency \p dep by prepending the SDK
   /// path if necessary.
@@ -835,7 +837,8 @@ class ModuleInterfaceLoaderImpl {
                                                 /*serializeDependencyHashes*/false,
                                                 trackSystemDependencies,
                                                 remarkOnRebuildFromInterface,
-                                                disableInterfaceLock);
+                                                disableInterfaceLock,
+                                                disableImplicitSwiftModule);
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
     ModuleInterfaceBuilder builder(
@@ -965,6 +968,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
                 Ctx, ModPath, InPath, ModuleName,
                 CacheDir, PrebuiltCacheDir, ModuleID.Loc,
                 RemarkOnRebuildFromInterface, DisableInterfaceFileLock,
+                DisableImplicitSwiftModule,
                 dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?
@@ -1000,10 +1004,12 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    const ClangImporterOptions &ClangOpts,
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock) {
+    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock,
+    bool DisableImplicitSwiftModule) {
   InterfaceSubContextDelegateImpl astDelegate(SourceMgr, Diags,
                                               SearchPathOpts, LangOpts,
                                               /*clangImporter*/nullptr,
@@ -1012,7 +1018,15 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
                                               SerializeDependencyHashes,
                                               TrackSystemDependencies,
                                               RemarkOnRebuildFromInterface,
-                                              DisableInterfaceFileLock);
+                                              DisableInterfaceFileLock,
+                                              DisableImplicitSwiftModule);
+  // At this point we don't have an ClangImporter instance because the instance
+  // is created later when we create a new ASTContext to build the interface.
+  // Thus, we have to add these extra clang flags manually here to ensure explict
+  // module building works.
+  for (auto &Arg: ClangOpts.ExtraArgs) {
+    astDelegate.addExtraClangArg(Arg);
+  }
   ModuleInterfaceBuilder builder(SourceMgr, Diags, astDelegate, InPath,
                                  ModuleName, CacheDir, PrebuiltCacheDir,
                                  DisableInterfaceFileLock);
@@ -1158,6 +1172,12 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   return false;
 }
 
+void InterfaceSubContextDelegateImpl::addExtraClangArg(StringRef arg) {
+  subInvocation.getClangImporterOptions().ExtraArgs.push_back(arg);
+  GenericArgs.push_back("-Xcc");
+  GenericArgs.push_back(ArgSaver.save(arg));
+}
+
 InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     SourceManager &SM,
     DiagnosticEngine &Diags,
@@ -1170,7 +1190,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     bool serializeDependencyHashes,
     bool trackSystemDependencies,
     bool remarkOnRebuildFromInterface,
-    bool disableInterfaceFileLock): SM(SM), Diags(Diags), ArgSaver(Allocator) {
+    bool disableInterfaceFileLock,
+    bool disableImplicitSwiftModule): SM(SM), Diags(Diags), ArgSaver(Allocator) {
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts);
   // Configure front-end input.
   auto &SubFEOpts = subInvocation.getFrontendOptions();
@@ -1190,10 +1211,22 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (trackSystemDependencies) {
     GenericArgs.push_back("-track-system-dependencies");
   }
-  // Respect the detailed-record preprocessor setting of the parent context.
-  // This, and the "raw" clang module format it implicitly enables, are
-  // required by sourcekitd.
+  if (disableImplicitSwiftModule) {
+    subInvocation.getFrontendOptions().DisableImplicitModules = true;
+    GenericArgs.push_back("-disable-implicit-swift-modules");
+  }
   if (clangImporter) {
+    // We need to add these extra clang flags because explict module building
+    // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
+    // and -fmodule-file=.
+    // If we don't add these flags, the interface will be built with implicit
+    // PCMs.
+    for (auto arg: static_cast<ClangImporter*>(clangImporter)->getExtraClangArgs()) {
+      addExtraClangArg(arg);
+    }
+    // Respect the detailed-record preprocessor setting of the parent context.
+    // This, and the "raw" clang module format it implicitly enables, are
+    // required by sourcekitd.
     auto &Opts = clangImporter->getClangInstance().getPreprocessorOpts();
     if (Opts.DetailedRecord) {
       subInvocation.getClangImporterOptions().DetailedPreprocessingRecord = true;

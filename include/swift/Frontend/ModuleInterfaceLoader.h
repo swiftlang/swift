@@ -138,12 +138,13 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
       bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile,
-      bool DisableInterfaceFileLock)
+      bool DisableInterfaceFileLock, bool DisableImplicitSwiftModule)
   : SerializedModuleLoaderBase(ctx, tracker, loadMode,
                                IgnoreSwiftSourceInfoFile),
   CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
   RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
   DisableInterfaceFileLock(DisableInterfaceFileLock),
+  DisableImplicitSwiftModule(DisableImplicitSwiftModule),
   PreferInterfaceForModules(PreferInterfaceForModules)
   {}
 
@@ -151,6 +152,7 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   std::string PrebuiltCacheDir;
   bool RemarkOnRebuildFromInterface;
   bool DisableInterfaceFileLock;
+  bool DisableImplicitSwiftModule;
   ArrayRef<std::string> PreferInterfaceForModules;
 
   std::error_code findModuleFilesInDirectory(
@@ -170,14 +172,16 @@ public:
          ArrayRef<std::string> PreferInterfaceForModules = {},
          bool RemarkOnRebuildFromInterface = false,
          bool IgnoreSwiftSourceInfoFile = false,
-         bool DisableInterfaceFileLock = false) {
+         bool DisableInterfaceFileLock = false,
+         bool DisableImplicitSwiftModule = false) {
     return std::unique_ptr<ModuleInterfaceLoader>(
       new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
                                          tracker, loadMode,
                                          PreferInterfaceForModules,
                                          RemarkOnRebuildFromInterface,
                                          IgnoreSwiftSourceInfoFile,
-                                         DisableInterfaceFileLock));
+                                         DisableInterfaceFileLock,
+                                         DisableImplicitSwiftModule));
   }
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -192,10 +196,12 @@ public:
   static bool buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    const ClangImporterOptions &ClangOpts,
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock);
+    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock,
+    bool DisableImplicitSwiftModules);
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -238,7 +244,8 @@ public:
                                   bool serializeDependencyHashes,
                                   bool trackSystemDependencies,
                                   bool remarkOnRebuildFromInterface,
-                                  bool disableInterfaceFileLock);
+                                  bool disableInterfaceFileLock,
+                                  bool disableImplicitSwiftModule);
   bool runInSubContext(StringRef moduleName,
                        StringRef interfacePath,
                        StringRef outputPath,
@@ -258,6 +265,7 @@ public:
                                     llvm::SmallString<256> &OutPath,
                                     StringRef &CacheHash);
   std::string getCacheHash(StringRef useInterfacePath);
+  void addExtraClangArg(StringRef Arg);
 };
 }
 

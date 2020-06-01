@@ -781,12 +781,14 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
+      Invocation.getClangImporterOptions(),
       Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface,
-      FEOpts.DisableInterfaceFileLock);
+      FEOpts.DisableInterfaceFileLock,
+      FEOpts.DisableImplicitModules);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {
