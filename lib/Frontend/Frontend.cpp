@@ -455,13 +455,12 @@ bool CompilerInstance::setUpModuleLoaders() {
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
     auto &FEOpts = Invocation.getFrontendOptions();
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
+    ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface,
-        IgnoreSourceInfoFile,
-        FEOpts.DisableInterfaceFileLock,
-        FEOpts.DisableImplicitModules);
+        LoaderOpts,
+        IgnoreSourceInfoFile);
     Context->addModuleLoader(std::move(PIML));
   }
 

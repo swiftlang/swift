@@ -127,6 +127,16 @@ class LangOptions;
 class SearchPathOptions;
 class CompilerInvocation;
 
+struct ModuleInterfaceLoaderOptions {
+  bool remarkOnRebuildFromInterface = false;
+  bool disableInterfaceLock = false;
+  bool disableImplicitSwiftModule = false;
+  ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
+    remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
+    disableInterfaceLock(Opts.DisableInterfaceFileLock),
+    disableImplicitSwiftModule(Opts.DisableImplicitModules) {}
+  ModuleInterfaceLoaderOptions() = default;
+};
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
 /// files on the fly, caching the resulting .swiftmodules in the module cache
@@ -137,23 +147,17 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
-      bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile,
-      bool DisableInterfaceFileLock, bool DisableImplicitSwiftModule)
+      bool IgnoreSwiftSourceInfoFile, ModuleInterfaceLoaderOptions Opts)
   : SerializedModuleLoaderBase(ctx, tracker, loadMode,
                                IgnoreSwiftSourceInfoFile),
   CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
-  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
-  DisableInterfaceFileLock(DisableInterfaceFileLock),
-  DisableImplicitSwiftModule(DisableImplicitSwiftModule),
-  PreferInterfaceForModules(PreferInterfaceForModules)
-  {}
+  PreferInterfaceForModules(PreferInterfaceForModules),
+  Opts(Opts) {}
 
   std::string CacheDir;
   std::string PrebuiltCacheDir;
-  bool RemarkOnRebuildFromInterface;
-  bool DisableInterfaceFileLock;
-  bool DisableImplicitSwiftModule;
   ArrayRef<std::string> PreferInterfaceForModules;
+  ModuleInterfaceLoaderOptions Opts;
 
   std::error_code findModuleFilesInDirectory(
     AccessPathElem ModuleID,
@@ -170,18 +174,14 @@ public:
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          ArrayRef<std::string> PreferInterfaceForModules = {},
-         bool RemarkOnRebuildFromInterface = false,
-         bool IgnoreSwiftSourceInfoFile = false,
-         bool DisableInterfaceFileLock = false,
-         bool DisableImplicitSwiftModule = false) {
+         ModuleInterfaceLoaderOptions Opts = ModuleInterfaceLoaderOptions(),
+         bool IgnoreSwiftSourceInfoFile = false) {
     return std::unique_ptr<ModuleInterfaceLoader>(
       new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
                                          tracker, loadMode,
                                          PreferInterfaceForModules,
-                                         RemarkOnRebuildFromInterface,
                                          IgnoreSwiftSourceInfoFile,
-                                         DisableInterfaceFileLock,
-                                         DisableImplicitSwiftModule));
+                                         Opts));
   }
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -200,8 +200,7 @@ public:
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock,
-    bool DisableImplicitSwiftModules);
+    ModuleInterfaceLoaderOptions Opts);
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -237,15 +236,13 @@ public:
                                   DiagnosticEngine &Diags,
                                   const SearchPathOptions &searchPathOpts,
                                   const LangOptions &langOpts,
+                                  ModuleInterfaceLoaderOptions LoaderOpts,
                                   ClangModuleLoader *clangImporter,
                                   bool buildModuleCacheDirIfAbsent,
                                   StringRef moduleCachePath,
                                   StringRef prebuiltCachePath,
                                   bool serializeDependencyHashes,
-                                  bool trackSystemDependencies,
-                                  bool remarkOnRebuildFromInterface,
-                                  bool disableInterfaceFileLock,
-                                  bool disableImplicitSwiftModule);
+                                  bool trackSystemDependencies);
   bool runInSubContext(StringRef moduleName,
                        StringRef interfacePath,
                        StringRef outputPath,

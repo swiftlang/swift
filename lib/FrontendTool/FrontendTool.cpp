@@ -778,6 +778,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
@@ -786,9 +787,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface,
-      FEOpts.DisableInterfaceFileLock,
-      FEOpts.DisableImplicitModules);
+      FEOpts.TrackSystemDeps, LoaderOpts);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {

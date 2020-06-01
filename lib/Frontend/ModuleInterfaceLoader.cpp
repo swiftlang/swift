@@ -339,25 +339,19 @@ class ModuleInterfaceLoaderImpl {
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   const ModuleLoadingMode loadMode;
-  const bool remarkOnRebuildFromInterface;
-  const bool disableInterfaceLock;
-  const bool disableImplicitSwiftModule;
+  ModuleInterfaceLoaderOptions Opts;
 
   ModuleInterfaceLoaderImpl(
     ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
     StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
-    SourceLoc diagLoc, bool remarkOnRebuildFromInterface,
-    bool disableInterfaceLock, bool disableImplicitSwiftModule,
+    SourceLoc diagLoc, ModuleInterfaceLoaderOptions Opts,
     DependencyTracker *dependencyTracker = nullptr,
     ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
     modulePath(modulePath), interfacePath(interfacePath),
     moduleName(moduleName), prebuiltCacheDir(prebuiltCacheDir),
     cacheDir(cacheDir), diagnosticLoc(diagLoc),
-    dependencyTracker(dependencyTracker), loadMode(loadMode),
-    remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
-    disableInterfaceLock(disableInterfaceLock),
-    disableImplicitSwiftModule(disableImplicitSwiftModule) {}
+    dependencyTracker(dependencyTracker), loadMode(loadMode), Opts(Opts) {}
 
   /// Constructs the full path of the dependency \p dep by prepending the SDK
   /// path if necessary.
@@ -830,21 +824,19 @@ class ModuleInterfaceLoaderImpl {
     }
     InterfaceSubContextDelegateImpl astDelegate(ctx.SourceMgr, ctx.Diags,
                                                 ctx.SearchPathOpts, ctx.LangOpts,
+                                                Opts,
                                                 ctx.getClangModuleLoader(),
                                                 /*buildModuleCacheDirIfAbsent*/true,
                                                 cacheDir,
                                                 prebuiltCacheDir,
                                                 /*serializeDependencyHashes*/false,
-                                                trackSystemDependencies,
-                                                remarkOnRebuildFromInterface,
-                                                disableInterfaceLock,
-                                                disableImplicitSwiftModule);
+                                                trackSystemDependencies);
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
     ModuleInterfaceBuilder builder(
       ctx.SourceMgr, ctx.Diags, astDelegate, interfacePath, moduleName, cacheDir,
       prebuiltCacheDir,
-      disableInterfaceLock, diagnosticLoc,
+      Opts.disableInterfaceLock, diagnosticLoc,
       dependencyTracker);
 
     // Compute the output path if we're loading or emitting a cached module.
@@ -907,7 +899,7 @@ class ModuleInterfaceLoaderImpl {
 
     if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true,
                                  &moduleBuffer,
-                                 remarkOnRebuildFromInterface ? remarkRebuild:
+                                 Opts.remarkOnRebuildFromInterface ? remarkRebuild:
                                    llvm::function_ref<void()>()))
       return std::make_error_code(std::errc::invalid_argument);
 
@@ -967,8 +959,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   ModuleInterfaceLoaderImpl Impl(
                 Ctx, ModPath, InPath, ModuleName,
                 CacheDir, PrebuiltCacheDir, ModuleID.Loc,
-                RemarkOnRebuildFromInterface, DisableInterfaceFileLock,
-                DisableImplicitSwiftModule,
+                Opts,
                 dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?
@@ -1008,18 +999,15 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock,
-    bool DisableImplicitSwiftModule) {
+    ModuleInterfaceLoaderOptions LoaderOpts) {
   InterfaceSubContextDelegateImpl astDelegate(SourceMgr, Diags,
                                               SearchPathOpts, LangOpts,
+                                              LoaderOpts,
                                               /*clangImporter*/nullptr,
                                               /*CreateCacheDirIfAbsent*/true,
                                               CacheDir, PrebuiltCacheDir,
                                               SerializeDependencyHashes,
-                                              TrackSystemDependencies,
-                                              RemarkOnRebuildFromInterface,
-                                              DisableInterfaceFileLock,
-                                              DisableImplicitSwiftModule);
+                                              TrackSystemDependencies);
   // At this point we don't have an ClangImporter instance because the instance
   // is created later when we create a new ASTContext to build the interface.
   // Thus, we have to add these extra clang flags manually here to ensure explict
@@ -1029,7 +1017,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   }
   ModuleInterfaceBuilder builder(SourceMgr, Diags, astDelegate, InPath,
                                  ModuleName, CacheDir, PrebuiltCacheDir,
-                                 DisableInterfaceFileLock);
+                                 LoaderOpts.disableInterfaceLock);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
@@ -1183,15 +1171,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     DiagnosticEngine &Diags,
     const SearchPathOptions &searchPathOpts,
     const LangOptions &langOpts,
+    ModuleInterfaceLoaderOptions LoaderOpts,
     ClangModuleLoader *clangImporter,
     bool buildModuleCacheDirIfAbsent,
     StringRef moduleCachePath,
     StringRef prebuiltCachePath,
     bool serializeDependencyHashes,
-    bool trackSystemDependencies,
-    bool remarkOnRebuildFromInterface,
-    bool disableInterfaceFileLock,
-    bool disableImplicitSwiftModule): SM(SM), Diags(Diags), ArgSaver(Allocator) {
+    bool trackSystemDependencies): SM(SM), Diags(Diags), ArgSaver(Allocator) {
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts);
   // Configure front-end input.
   auto &SubFEOpts = subInvocation.getFrontendOptions();
@@ -1211,7 +1197,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (trackSystemDependencies) {
     GenericArgs.push_back("-track-system-dependencies");
   }
-  if (disableImplicitSwiftModule) {
+  if (LoaderOpts.disableImplicitSwiftModule) {
     subInvocation.getFrontendOptions().DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
   }
@@ -1244,8 +1230,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // Tell the subinvocation to remark on rebuilds from an interface if asked
   // to do so.
   frontendOpts.RemarkOnRebuildFromModuleInterface =
-    remarkOnRebuildFromInterface;
-  if (remarkOnRebuildFromInterface) {
+    LoaderOpts.remarkOnRebuildFromInterface;
+  if (LoaderOpts.remarkOnRebuildFromInterface) {
     GenericArgs.push_back("-Rmodule-interface-rebuild");
   }
 
