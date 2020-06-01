@@ -1201,6 +1201,14 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     subInvocation.getFrontendOptions().DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
   }
+  subInvocation.getFrontendOptions().ExplicitSwiftModules =
+    LoaderOpts.explicitSwiftModules;
+  // Dependencies scanner shouldn't know any explict Swift modules to use.
+  // Adding these argumnets may not be necessary.
+  // FIXME: remove it?
+  for (auto EM: LoaderOpts.explicitSwiftModules) {
+    GenericArgs.push_back(ArgSaver.save((llvm::Twine("-swift-module-file=") + EM).str()));
+  }
   if (clangImporter) {
     // We need to add these extra clang flags because explict module building
     // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,

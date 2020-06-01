@@ -131,10 +131,12 @@ struct ModuleInterfaceLoaderOptions {
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
+  std::vector<std::string> explicitSwiftModules;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
-    disableImplicitSwiftModule(Opts.DisableImplicitModules) {}
+    disableImplicitSwiftModule(Opts.DisableImplicitModules),
+    explicitSwiftModules(Opts.ExplicitSwiftModules) {}
   ModuleInterfaceLoaderOptions() = default;
 };
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
