@@ -243,7 +243,7 @@ public:
 
 } // end anonymous namespace
 
-static SimpleGlobalCache<BoxCacheEntry> Boxes;
+static SimpleGlobalCache<BoxCacheEntry, BoxesTag> Boxes;
 
 BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
                                     size_t alignMask) {
