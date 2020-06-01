@@ -107,8 +107,8 @@ public:
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
   virtual void lookupImportedSPIGroups(
-                               const ModuleDecl *importedModule,
-                               SmallVectorImpl<Identifier> &spiGroups) const {};
+                            const ModuleDecl *importedModule,
+                            SmallSetVector<Identifier, 4> &spiGroups) const {};
 
 protected:
   /// Look up an operator declaration. Do not call directly, use
