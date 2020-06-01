@@ -565,6 +565,9 @@ private:
     case Node::Kind::GlobalVariableOnceToken:
     case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
     case Node::Kind::AsyncFunctionPointer:
+    case Node::Kind::AutoDiffFunction:
+    case Node::Kind::AutoDiffFunctionKind:
+    case Node::Kind::IndexSubset:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1724,6 +1727,63 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(idx + 1));
     Printer << " self ";
     print(Node->getChild(idx));
+    return nullptr;
+  }
+  case Node::Kind::AutoDiffFunction: {
+    auto childIt = Node->begin();
+    auto original = *childIt++;
+    NodePointer optionalGenSig =
+        (*childIt)->getKind() == Node::Kind::DependentGenericSignature
+            ? *childIt++ : nullptr;
+    auto kind = *childIt++;
+    auto paramIndices = *childIt++;
+    auto resultIndices = *childIt++;
+    print(kind);
+    Printer << " of ";
+    print(original);
+    Printer << " with respect to parameters ";
+    print(paramIndices);
+    Printer << " and results ";
+    print(resultIndices);
+    if (optionalGenSig && Options.DisplayWhereClauses) {
+      Printer << " with ";
+      print(optionalGenSig);
+    }
+    return nullptr;
+  }
+  case Node::Kind::AutoDiffFunctionKind: {
+    auto kind = (AutoDiffFunctionKind)Node->getIndex();
+    switch (kind) {
+    case AutoDiffFunctionKind::JVP:
+      Printer << "forward-mode derivative";
+      break;
+    case AutoDiffFunctionKind::VJP:
+      Printer << "reverse-mode derivative";
+      break;
+    case AutoDiffFunctionKind::Differential:
+      Printer << "differential";
+      break;
+    case AutoDiffFunctionKind::Pullback:
+      Printer << "pullback";
+      break;
+    }
+    return nullptr;
+  }
+  case Node::Kind::IndexSubset: {
+    Printer << '{';
+        auto text = Node->getText();
+    bool printedAnyIndex = false;
+    for (unsigned i = 0, n = text.size(); i < n; ++i) {
+      if (text[i] != 'S') {
+        assert(text[i] == 'U');
+        continue;
+      }
+      if (printedAnyIndex)
+        Printer << ", ";
+      Printer << i;
+      printedAnyIndex = true;
+    }
+    Printer << '}';
     return nullptr;
   }
   case Node::Kind::MergedFunction:

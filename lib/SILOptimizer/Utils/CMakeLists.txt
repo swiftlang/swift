@@ -7,6 +7,7 @@ target_sources(swiftSILOptimizer PRIVATE
   ConstantFolding.cpp
   ConstExpr.cpp
   Devirtualize.cpp
+  DifferentiationMangler.cpp
   Existential.cpp
   GenericCloner.cpp
   Generics.cpp

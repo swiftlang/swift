@@ -559,7 +559,7 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
       autodiff::getDifferentiabilityWitnessGenericSignature(
           original->getGenericSignature(), config.derivativeGenericSignature)};
   std::string linearMapName =
-      mangler.mangleAutoDiffLinearMapHelper(declRef.mangle(), kind, silConfig);
+      mangler.mangleAutoDiffLinearMap(original, kind, silConfig);
   addSymbol(linearMapName, SymbolSource::forSILDeclRef(declRef));
 }
 

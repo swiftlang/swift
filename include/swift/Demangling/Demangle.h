@@ -117,6 +117,13 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   ExistentialToGeneric = 1 << 10,
 };
 
+enum class AutoDiffFunctionKind : char {
+  JVP = 'f',
+  VJP = 'r',
+  Differential = 'd',
+  Pullback = 'p',
+};
+
 /// The pass that caused the specialization to occur. We use this to make sure
 /// that two passes that generate similar changes do not yield the same
 /// mangling. This currently cannot happen, so this is just a safety measure

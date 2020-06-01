@@ -1200,7 +1200,7 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto setDerivativeInDifferentiabilityWitness =
       [&](AutoDiffDerivativeFunctionKind kind, SILFunction *derivative) {
         auto derivativeThunk = getOrCreateCustomDerivativeThunk(
-            derivative, originalFunction, silConfig, kind);
+            originalAFD, originalFunction, derivative, silConfig, kind);
         // Check for existing same derivative.
         // TODO(TF-835): Remove condition below and simplify assertion to
         // `!diffWitness->getDerivative(kind)` after `@derivative` attribute

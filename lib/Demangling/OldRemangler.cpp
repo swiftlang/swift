@@ -740,6 +740,18 @@ void Remangler::mangleReabstractionThunk(Node *node) {
   Buffer << "<reabstraction-thunk>";
 }
 
+void Remangler::mangleAutoDiffFunction(Node *node) {
+  Buffer << "<autodiff-function>";
+}
+
+void Remangler::mangleAutoDiffFunctionKind(Node *node) {
+  Buffer << "<autodiff-function-kind>";
+}
+
+void Remangler::mangleIndexSubset(Node *node) {
+  Buffer << "<index-subset>";
+}
+
 void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
   Buffer << "TS";
   mangleSingleChildNode(node); // entity
