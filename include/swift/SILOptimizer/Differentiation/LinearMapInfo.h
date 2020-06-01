@@ -78,13 +78,17 @@ private:
   /// corresponding linear map field declaration in the linear map struct.
   llvm::DenseMap<ApplyInst *, VarDecl *> linearMapFieldMap;
 
+  /// Mapping from `begin_apply` instructions in the original function to the
+  /// corresponding captured data field declaration in the linear map struct.
+  llvm::DenseMap<BeginApplyInst *, VarDecl *> coroutineDataMap;
+
+  /// Mapping from linear map structs to their branching trace enum fields.
+  llvm::DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
+
   /// Mapping from predecessor-succcessor basic block pairs in the original
   /// function to the corresponding branching trace enum case.
   llvm::DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
       branchingTraceEnumCases;
-
-  /// Mapping from linear map structs to their branching trace enum fields.
-  llvm::DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
 
   /// A synthesized file unit.
   SynthesizedFileUnit &synthesizedFile;
@@ -127,6 +131,13 @@ private:
   /// Given an `apply` instruction, conditionally adds a linear map struct field
   /// for its linear map function if it is active.
   void addLinearMapToStruct(ADContext &context, ApplyInst *ai);
+
+  /// Adds a coroutine data field to the linear map struct.
+  VarDecl *addCoroutineDataDecl(BeginApplyInst *bai, CanType dataType);
+
+  /// Given a `begin_apply` instruction, conditionally adds a linear map struct
+  /// field for its captured data if it is active.
+  void addCoroutineDataToStruct(ADContext &context, BeginApplyInst *bai);
 
   /// Generates linear map struct and branching enum declarations for the given
   /// function. Linear map structs are populated with linear map fields and a
@@ -212,6 +223,16 @@ public:
     auto lookup = linearMapFieldMap.find(ai);
     assert(lookup != linearMapFieldMap.end() &&
            "No linear map field corresponding to the given `apply`");
+    return lookup->getSecond();
+  }
+
+  /// Finds the linear map declaration in the pullback struct for the given
+  /// `begin_apply` instruction in the original function.
+  VarDecl *lookUpCoroutineDataDecl(BeginApplyInst *bai) {
+    assert(bai->getFunction() == original);
+    auto lookup = coroutineDataMap.find(bai);
+    assert(lookup != coroutineDataMap.end() &&
+           "No linear map field corresponding to the given `begin_apply`");
     return lookup->getSecond();
   }
 };

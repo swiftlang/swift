@@ -191,6 +191,35 @@ where Element: EuclideanDifferentiable {
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
+/*
+extension Array.DifferentiableView: Sequence where Element: Differentiable {
+  public typealias Element = Array.Element
+  public typealias Index = Array.Index
+  public typealias Iterator = IndexingIterator<Self>
+}
+
+extension Array.DifferentiableView: Collection where Element: Differentiable {
+  public var startIndex: Index { base.startIndex }
+  public var endIndex: Index { base.endIndex }
+  public func index(after i: Index) -> Index { base.index(after: i) }
+  public subscript(index: Index) -> Element {
+    get { base[index] }
+    set { base[index] = newValue }
+  }
+}
+
+extension Array.DifferentiableView: BidirectionalCollection
+where Element: Differentiable {
+   public func index(before i: Index) -> Index { base.index(before: i) }
+}
+
+extension Array.DifferentiableView: RandomAccessCollection
+where Element: Differentiable {}
+
+extension Array.DifferentiableView: MutableCollection
+where Element: Differentiable {}
+*/
+
 //===----------------------------------------------------------------------===//
 // Derivatives
 //===----------------------------------------------------------------------===//

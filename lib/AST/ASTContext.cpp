@@ -247,6 +247,9 @@ struct ASTContext::Implementation {
   /// func _hashValue<H: Hashable>(for: H) -> Int
   FuncDecl *HashValueForDecl = nullptr;
 
+  /// func subscript(Index) -> Element
+  SubscriptDecl *ArraySubscriptIndexDecl = nullptr;
+
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
@@ -1306,6 +1309,56 @@ FuncDecl *ASTContext::getHashValueForDecl() const {
       continue;
     getImpl().HashValueForDecl = fd;
     return fd;
+  }
+  return nullptr;
+}
+
+SubscriptDecl *ASTContext::getArraySubscriptIndexDecl() const {
+  if (getImpl().ArraySubscriptIndexDecl)
+    return getImpl().ArraySubscriptIndexDecl;
+
+  auto subscripts = getArrayDecl()->lookupDirect(DeclBaseName::createSubscript());
+
+  for (auto *candidate : subscripts) {
+    auto *subscriptDecl = dyn_cast<SubscriptDecl>(candidate);
+    for (auto *attr : subscriptDecl->getAttrs().getAttributes<SemanticsAttr, false>()) {
+      if (attr->Value != "array.subscript_element")
+        continue;
+
+#if 0
+      llvm::errs() << "subscriptDecl->getDeclaredInterfaceType()->dump()\n";
+      subscriptDecl->getDeclaredInterfaceType()->dump();
+      // subscriptDecl->getElementInterfaceType()
+      auto SelfDecl = subscriptDecl->getImplicitSelfDecl();
+      if (!SelfDecl->isInOut())
+        return nullptr;
+
+      auto SelfInOutTy = SelfDecl->getInterfaceType();
+      BoundGenericStructType *SelfGenericStructTy =
+        SelfInOutTy->getAs<BoundGenericStructType>();
+      if (!SelfGenericStructTy)
+        return nullptr;
+      if (SelfGenericStructTy->getDecl() != getArrayDecl())
+        return nullptr;
+
+      auto ParamList = subscriptDecl->getParameters();
+      if (ParamList->size() != 1)
+        return nullptr;
+
+      GenericTypeParamType *ElementType = ParamList->get(0)->
+                             getInterfaceType()->getAs<GenericTypeParamType>();
+      if (!ElementType)
+        return nullptr;
+      if (ElementType->getName() != getIdentifier("Element"))
+        return nullptr;
+
+      if (!subscriptDecl->getResultInterfaceType()->isVoid())
+        return nullptr;
+#endif
+
+      getImpl().ArraySubscriptIndexDecl = subscriptDecl;
+      return subscriptDecl;
+    }
   }
   return nullptr;
 }

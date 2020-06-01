@@ -90,6 +90,12 @@ bool isSemanticMemberAccessor(SILFunction *original);
 /// callee.
 bool hasSemanticMemberAccessorCallee(ApplySite applySite);
 
+/// If the given original function is a semantic
+/// `Collection.subscript(_:).modify` accessor, returns the accessor
+/// declaration.
+AccessorDecl *
+isSemanticCollectionSubscriptPositionModifyAccessor(SILFunction *original);
+
 /// Given a full apply site, apply the given callback to each of its
 /// "direct results".
 ///

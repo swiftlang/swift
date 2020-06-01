@@ -59,6 +59,8 @@
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(Sequence)
+PROTOCOL(Collection)
+PROTOCOL(MutableCollection)
 PROTOCOL(IteratorProtocol)
 PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)

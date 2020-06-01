@@ -694,6 +694,7 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///   bridged `NSArray` instance as its storage, in which case writing is
   ///   O(*n*), where *n* is the length of the array.
   @inlinable
+  @_semantics("autodiff.collection_subscript_index")
   public subscript(index: Int) -> Element {
     get {
       // This call may be hoisted or eliminated by the optimizer.  If

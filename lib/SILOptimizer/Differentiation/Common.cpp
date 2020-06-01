@@ -109,6 +109,24 @@ bool hasSemanticMemberAccessorCallee(ApplySite applySite) {
   return false;
 }
 
+AccessorDecl *isSemanticCollectionSubscriptPositionModifyAccessor(
+    SILFunction *original) {
+  if (!original->hasSemanticsAttr("autodiff.collection_subscript_index"))
+    return nullptr;
+  auto *dc = original->getDeclContext();
+  if (!dc)
+    return nullptr;
+  auto *decl = dc->getAsDecl();
+  if (!decl)
+    return nullptr;
+  auto *accessor = dyn_cast<AccessorDecl>(decl);
+  if (!accessor)
+    return nullptr;
+  if (accessor->getAccessorKind() != AccessorKind::Modify)
+    return nullptr;
+  return accessor;
+}
+
 void forEachApplyDirectResult(
     FullApplySite applySite,
     llvm::function_ref<void(SILValue)> resultCallback) {

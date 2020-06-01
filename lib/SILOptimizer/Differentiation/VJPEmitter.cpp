@@ -782,6 +782,21 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
           getOpValue(origCallee)->getDefiningInstruction());
 }
 
+void VJPEmitter::visitBeginApplyInst(BeginApplyInst *bai) {
+  TypeSubstCloner::visitBeginApplyInst(bai);
+  if (!pullbackInfo.shouldDifferentiateApplySite(bai))
+    return;
+  // Handle `Collection
+  auto *callee = bai->getCalleeFunction();
+  if (!callee)
+    return;
+  auto *accessor = isSemanticCollectionSubscriptPositionModifyAccessor(callee);
+  if (!accessor)
+    return;
+  auto indexArg = getOpValue(bai->getArgument(0));
+  pullbackValues[bai->getParent()].push_back(indexArg);
+}
+
 void VJPEmitter::visitDifferentiableFunctionInst(
     DifferentiableFunctionInst *dfi) {
   // Clone `differentiable_function` from original to VJP, then add the cloned
