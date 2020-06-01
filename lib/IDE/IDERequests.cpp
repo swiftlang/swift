@@ -577,7 +577,7 @@ private:
   }
 
   DeclContext *getImmediateContext() {
-    for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); It ++) {
+    for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); ++It) {
       if (auto *DC = It->Parent.getAsDeclContext())
         return DC;
     }
@@ -647,7 +647,7 @@ public:
     while(StartIt != AllTokens.end()) {
       if (StartIt->getKind() != tok::comment)
         break;
-      StartIt ++;
+      ++StartIt;
     }
 
     // Erroneous case.
@@ -740,7 +740,7 @@ public:
     for (auto N : Nodes) {
       if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
         if (S->getKind() == StmtKind::Case)
-          CaseCount++;
+          ++CaseCount;
       }
     }
     // If there are more than one case/default statements, there are more than

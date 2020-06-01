@@ -428,8 +428,8 @@ ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
     }
 
     // Continue if we are accessing the same field.
-    LHSIter++;
-    RHSIter++;
+    ++LHSIter;
+    ++RHSIter;
   }
 
   // All path elements are the same. The symmetric difference is empty.
@@ -442,12 +442,12 @@ ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
   for (unsigned li = i, e = size(); li != e; ++li) {
     if (LHSIter->isAliasingCast())
       return false;
-    LHSIter++;
+    ++LHSIter;
   }
   for (unsigned ri = i, e = RHS.size(); ri != e; ++ri) {
     if (RHSIter->isAliasingCast())
       return false;
-    RHSIter++;
+    ++RHSIter;
   }
 
   // If we don't have any casts in our symmetric difference (i.e. only typed
@@ -493,8 +493,8 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
       return SubSeqRelation_t::Unknown;
 
     // Otherwise increment reverse iterators.
-    LHSIter++;
-    RHSIter++;
+    ++LHSIter;
+    ++RHSIter;
   }
 
   // Ok, we now know that one of the paths is a subsequence of the other. If
@@ -533,7 +533,7 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
 
   // First make sure that the prefix matches.
   Optional<ProjectionPath> P = ProjectionPath(Path.BaseType);
-  for (unsigned i = 0; i < PrefixSize; i++) {
+  for (unsigned i = 0; i < PrefixSize; ++i) {
     if (Path.Path[i] != Prefix.Path[i]) {
       P.reset();
       return P;

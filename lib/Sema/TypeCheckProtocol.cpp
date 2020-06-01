@@ -1525,7 +1525,7 @@ isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req) {
 
 void MultiConformanceChecker::checkAllConformances() {
   bool anyInvalid = false;
-  for (unsigned I = 0, N = AllConformances.size(); I < N; I ++) {
+  for (unsigned I = 0, N = AllConformances.size(); I < N; ++I) {
     auto *conformance = AllConformances[I];
     // Check this conformance and emit fixits if this is the last one in the pool.
     checkIndividualConformance(conformance, I == N - 1);
@@ -1553,7 +1553,7 @@ void MultiConformanceChecker::checkAllConformances() {
   // Otherwise, backtrack to the last checker that has missing witnesses
   // and diagnose missing witnesses from there.
   for (auto It = AllUsedCheckers.rbegin(); It != AllUsedCheckers.rend();
-       It ++) {
+       ++It) {
     if (!It->getLocalMissingWitness().empty()) {
       It->diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::FixItOnly);
     }

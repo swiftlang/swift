@@ -875,7 +875,7 @@ namespace {
       child_iterator &operator++() { baseIter++; return *this; }
       child_iterator operator++(int) {
         auto tmp = *this;
-        baseIter++;
+        ++baseIter;
         return tmp;
       }
       Node *operator*() const { return baseIter->Child; }

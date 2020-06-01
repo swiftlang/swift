@@ -990,7 +990,7 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
             print(child);
           }
         }
-        argNum++;
+        ++argNum;
         break;
     }
   }
@@ -1583,13 +1583,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     bool isSerialized = false;
     if (lastChild->getKind() == Node::Kind::IsSerialized) {
       isSerialized = true;
-      lastChildIndex--;
+      --lastChildIndex;
       lastChild = Node->getChild(lastChildIndex - 1);
     }
 
     if (lastChild->getKind() == Node::Kind::DependentGenericSignature) {
       print(lastChild);
-      lastChildIndex--;
+      --lastChildIndex;
     }
 
     Printer << "(";
@@ -1880,7 +1880,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       NodePointer repr = Node->getChild(Idx);
       print(repr);
       Printer << " ";
-      Idx++;
+      ++Idx;
     }
     NodePointer type = Node->getChild(Idx)->getChild(0);
     printWithParens(type);
@@ -1897,7 +1897,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       NodePointer repr = Node->getChild(Idx);
       print(repr);
       Printer << " ";
-      Idx++;
+      ++Idx;
     }
 
     NodePointer type = Node->getChild(Idx);

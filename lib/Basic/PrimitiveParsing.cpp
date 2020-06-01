@@ -30,7 +30,7 @@ unsigned swift::measureNewline(const char *BufferPtr, const char *BufferEnd) {
   assert(*BufferPtr == '\r');
   unsigned Bytes = 1;
   if (BufferPtr != BufferEnd && *BufferPtr == '\n')
-    Bytes++;
+    ++Bytes;
   return Bytes;
 }
 

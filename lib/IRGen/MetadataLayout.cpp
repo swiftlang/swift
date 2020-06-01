@@ -317,7 +317,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     void addGenericWitnessTable(GenericRequirement requirement,
                                 ClassDecl *forClass) {
       if (forClass == Target) {
-        Layout.NumImmediateMembers++;
+        ++Layout.NumImmediateMembers;
       }
       super::addGenericWitnessTable(requirement, forClass);
     }
@@ -325,14 +325,14 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     void addGenericArgument(GenericRequirement requirement,
                             ClassDecl *forClass) {
       if (forClass == Target) {
-        Layout.NumImmediateMembers++;
+        ++Layout.NumImmediateMembers;
       }
       super::addGenericArgument(requirement, forClass);
     }
 
     void addMethod(SILDeclRef fn) {
       if (fn.getDecl()->getDeclContext() == Target) {
-        Layout.NumImmediateMembers++;
+        ++Layout.NumImmediateMembers;
         Layout.MethodInfos.try_emplace(fn, getNextOffset());
       }
       super::addMethod(fn);
@@ -346,7 +346,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
 
     void addFieldOffset(VarDecl *field) {
       if (field->getDeclContext() == Target) {
-        Layout.NumImmediateMembers++;
+        ++Layout.NumImmediateMembers;
         Layout.FieldOffsets.try_emplace(field, getNextOffset());
       }
       super::addFieldOffset(field);

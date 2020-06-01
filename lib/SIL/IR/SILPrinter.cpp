@@ -3569,7 +3569,7 @@ ID SILPrintContext::getID(const SILNode *node) {
     // If there are no results, make sure we don't reuse that ID.
     auto results = I.getResults();
     if (results.empty()) {
-      idx++;
+      ++idx;
       continue;
     }
 

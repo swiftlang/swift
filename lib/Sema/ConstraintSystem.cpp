@@ -87,15 +87,15 @@ ConstraintSystem::~ConstraintSystem() {
 }
 
 void ConstraintSystem::incrementScopeCounter() {
-  CountScopes++;
+  ++CountScopes;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = getASTContext().Stats)
-    Stats->getFrontendCounters().NumConstraintScopes++;
+    ++Stats->getFrontendCounters().NumConstraintScopes;
 }
 
 void ConstraintSystem::incrementLeafScopes() {
   if (auto *Stats = getASTContext().Stats)
-    Stats->getFrontendCounters().NumLeafScopes++;
+    ++Stats->getFrontendCounters().NumLeafScopes;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
@@ -599,12 +599,12 @@ static void extendDepthMap(
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       DepthMap[E] = {Depth, Parent.getAsExpr()};
-      Depth++;
+      ++Depth;
       return { true, E };
     }
 
     Expr *walkToExprPost(Expr *E) override {
-      Depth--;
+      --Depth;
       return E;
     }
   };
@@ -1911,7 +1911,7 @@ isInvalidPartialApplication(ConstraintSystem &cs,
   // application level already.
   unsigned level = 0;
   if (!baseTy->is<MetatypeType>())
-    level++;
+    ++level;
 
   if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(UDE))) {
     level += 1;
@@ -3191,7 +3191,7 @@ static void extendPreorderIndexMap(
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       IndexMap[E] = Index;
-      Index++;
+      ++Index;
       return { true, E };
     }
   };

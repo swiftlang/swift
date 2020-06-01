@@ -33,14 +33,14 @@ void ValueLifetimeAnalysis::propagateLiveness() {
 
     // A user in the defBB could potentially be located before the defValue.
     if (userBlock == defBB)
-      numUsersBeforeDef++;
+      ++numUsersBeforeDef;
   }
   // Don't count any users in the defBB which are actually located _after_
   // the defValue.
   auto instIter = defValue->getIterator();
   while (numUsersBeforeDef > 0 && ++instIter != defBB->end()) {
     if (userSet.count(&*instIter))
-      numUsersBeforeDef--;
+      --numUsersBeforeDef;
   }
 
   // Initialize the hasUsersBeforeDef field.

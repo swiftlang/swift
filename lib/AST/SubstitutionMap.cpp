@@ -333,7 +333,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
           reqt.getSecondType()->isEqual(proto->getDeclaredType()))
         return getConformances()[index];
 
-      index++;
+      ++index;
     }
   }
 

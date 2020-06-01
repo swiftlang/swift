@@ -3568,7 +3568,7 @@ public:
 
       fromCanTy = fromMetaty.getInstanceType();
       toCanTy = toMetaty.getInstanceType();
-      MetatyLevel++;
+      ++MetatyLevel;
     }
 
     if (isExact) {
@@ -5530,7 +5530,7 @@ void SILModule::verify() const {
                      << entry.Implementation->getName() << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
-      EntriesSZ++;
+      ++EntriesSZ;
     }
   }
   assert(EntriesSZ == VTableEntryCache.size() &&

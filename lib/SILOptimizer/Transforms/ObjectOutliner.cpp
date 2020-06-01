@@ -66,7 +66,7 @@ bool ObjectOutliner::run(SILFunction *F) {
 
     while (Iter != BB.end()) {
       SILInstruction *I = &*Iter;
-      Iter++;
+      ++Iter;
       if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
         unsigned GarbageSize = ToRemove.size();
 

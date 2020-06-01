@@ -363,7 +363,7 @@ swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 
 static bool swift_stringIsSignalingNaN(const char *nptr) {
   if (nptr[0] == '+' || nptr[0] == '-') {
-    nptr++;
+    ++nptr;
   }
 
   return strcasecmp(nptr, "snan") == 0;

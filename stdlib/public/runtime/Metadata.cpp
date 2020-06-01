@@ -2281,7 +2281,7 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
 
   uint32_t log2 = 0;
   while ((1 << log2) != (alignMask + 1))
-    log2++;
+    ++log2;
   return log2;
 }
 
@@ -4163,7 +4163,7 @@ template <> SWIFT_USED void Metadata::dump() const {
       auto genericCount = contextDescriptor->getFullGenericContextHeader().Base.getNumArguments();
       auto *args = getGenericArgs();
       printf("Generic Args: %u: [", genericCount);
-      for (uint32_t i = 0; i < genericCount; i++) {
+      for (uint32_t i = 0; i < genericCount; ++i) {
         if (i > 0)
           printf(", ");
         printf("%p", args[i]);

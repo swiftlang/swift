@@ -616,7 +616,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     auto &WitnessTables = Module->getWitnessTableList();
     for (auto WI = WitnessTables.begin(), EI = WitnessTables.end(); WI != EI;) {
       SILWitnessTable *WT = &*WI;
-      WI++;
+      ++WI;
       WT->clearMethods_if([this, &changedTable]
                           (const SILWitnessTable::MethodWitness &MW) -> bool {
         if (!isAlive(MW.Witness)) {
@@ -634,7 +634,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
               EI = DefaultWitnessTables.end();
          WI != EI;) {
       SILDefaultWitnessTable *WT = &*WI;
-      WI++;
+      ++WI;
       WT->clearMethods_if([this, &changedTable](SILFunction *MW) -> bool {
         if (!MW)
           return false;
@@ -691,7 +691,7 @@ public:
 
       LLVM_DEBUG(llvm::dbgs() << "  erase dead function " << F->getName()
                               << "\n");
-      NumDeadFunc++;
+      ++NumDeadFunc;
       DFEPass->notifyWillDeleteFunction(F);
       Module->eraseFunction(F);
     }

@@ -497,7 +497,7 @@ public:
   buildPatternAndVariable(Expr *InitExpr) {
     SmallString<16> NameBuf;
     (Twine("pctmp") + Twine(TmpNameIndex)).toVector(NameBuf);
-    TmpNameIndex++;
+    ++TmpNameIndex;
 
     Expr *MaybeLoadInitExpr = nullptr;
 

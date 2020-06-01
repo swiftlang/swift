@@ -554,7 +554,7 @@ void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupValue++;
+    ++stats->getFrontendCounters().NumModuleLookupValue;
 
   if (isParsedModule(this)) {
     getSourceLookupCache().lookupValue(Name, LookupKind, Result);
@@ -709,7 +709,7 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupClassMember++;
+    ++stats->getFrontendCounters().NumModuleLookupClassMember;
 
   if (isParsedModule(this)) {
     FrontendStatsTracer tracer(getASTContext().Stats,

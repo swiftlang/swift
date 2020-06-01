@@ -407,7 +407,7 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
     unsigned i = unsigned(index);
     if (i > unsigned(ValueWitness::Flags)) {
       if (IGF.IGM.getPointerSize() == Size(8)) {
-        i--; // one pointer width skips both flags and xiCount
+        --i; // one pointer width skips both flags and xiCount
       } else if (IGF.IGM.getPointerSize() == Size(4)) {
         // no adjustment required
       } else {
