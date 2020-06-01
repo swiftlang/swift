@@ -166,12 +166,6 @@ bool FailureDiagnostic::conformsToKnownProtocol(
   return constraints::conformsToKnownProtocol(cs, type, protocol);
 }
 
-Type FailureDiagnostic::isRawRepresentable(Type type,
-                                           KnownProtocolKind protocol) const {
-  auto &cs = getConstraintSystem();
-  return constraints::isRawRepresentable(cs, type, protocol);
-}
-
 Type RequirementFailure::getOwnerType() const {
   auto anchor = getRawAnchor();
 
@@ -2297,12 +2291,6 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
   if (trySequenceSubsequenceFixIts(diagnostic))
     return;
 
-  if (tryRawRepresentableFixIts(
-          diagnostic, KnownProtocolKind::ExpressibleByIntegerLiteral) ||
-      tryRawRepresentableFixIts(diagnostic,
-                                KnownProtocolKind::ExpressibleByStringLiteral))
-    return;
-
   if (tryIntegerCastFixIts(diagnostic))
     return;
 
@@ -2530,59 +2518,6 @@ bool ContextualFailure::diagnoseYieldByReferenceMismatch() const {
                    contextualType);
   }
   return true;
-}
-
-bool ContextualFailure::tryRawRepresentableFixIts(
-    InFlightDiagnostic &diagnostic,
-    KnownProtocolKind rawRepresentableProtocol) const {
-  auto anchor = getAnchor();
-  auto fromType = getFromType();
-  auto toType = getToType();
-
-  // The following fixes apply for optional destination types as well.
-  bool toTypeIsOptional = !toType->getOptionalObjectType().isNull();
-  toType = toType->lookThroughAllOptionalTypes();
-
-  Type fromTypeUnwrapped = fromType->getOptionalObjectType();
-  bool fromTypeIsOptional = !fromTypeUnwrapped.isNull();
-  if (fromTypeIsOptional)
-    fromType = fromTypeUnwrapped;
-
-  auto fixIt = [&](StringRef convWrapBefore, StringRef convWrapAfter,
-                   const Expr *expr) {
-    SourceRange exprRange = expr->getSourceRange();
-    if (fromTypeIsOptional && toTypeIsOptional) {
-      // Use optional's map function to convert conditionally, like so:
-      //   expr.map{ T(rawValue: $0) }
-      bool needsParens = !expr->canAppendPostfixExpression();
-      std::string mapCodeFix;
-      if (needsParens) {
-        diagnostic.fixItInsert(exprRange.Start, "(");
-        mapCodeFix += ")";
-      }
-      mapCodeFix += ".map { ";
-      mapCodeFix += convWrapBefore;
-      mapCodeFix += "$0";
-      mapCodeFix += convWrapAfter;
-      mapCodeFix += " }";
-      diagnostic.fixItInsertAfter(exprRange.End, mapCodeFix);
-    } else if (!fromTypeIsOptional) {
-      diagnostic.fixItInsert(exprRange.Start, convWrapBefore);
-      diagnostic.fixItInsertAfter(exprRange.End, convWrapAfter);
-    }
-  };
-
-  if (auto rawTy = isRawRepresentable(fromType, rawRepresentableProtocol)) {
-    if (conformsToKnownProtocol(toType, rawRepresentableProtocol)) {
-      std::string convWrapBefore;
-      std::string convWrapAfter = ".rawValue";
-      if (auto *E = getAsExpr(anchor))
-        fixIt(convWrapBefore, convWrapAfter, E);
-      return true;
-    }
-  }
-
-  return false;
 }
 
 bool ContextualFailure::tryIntegerCastFixIts(

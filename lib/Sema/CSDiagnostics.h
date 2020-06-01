@@ -219,7 +219,6 @@ protected:
   }
 
   bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
-  Type isRawRepresentable(Type type, KnownProtocolKind protocol) const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -620,23 +619,6 @@ public:
 
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
-
-  /// Attempts to add fix-its for these two mistakes:
-  ///
-  /// - Passing an integer where a type conforming to RawRepresentable is
-  ///   expected, by wrapping the expression in a call to the contextual
-  ///   type's initializer
-  ///
-  /// - Passing a type conforming to RawRepresentable where an integer is
-  ///   expected, by wrapping the expression in a call to the rawValue
-  ///   accessor
-  ///
-  /// - Return true on the fixit is added, false otherwise.
-  ///
-  /// This helps migration with SDK changes.
-  bool
-  tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
-                            KnownProtocolKind rawRepresentablePrococol) const;
 
   /// Attempts to add fix-its for these two mistakes:
   ///
