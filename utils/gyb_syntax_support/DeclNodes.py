@@ -1,6 +1,6 @@
 # flake8: noqa I201
-from Child import Child
-from Node import Node
+from .Child import Child
+from .Node import Node
 
 
 DECL_NODES = [
