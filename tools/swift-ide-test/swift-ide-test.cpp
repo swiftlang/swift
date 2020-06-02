@@ -794,8 +794,8 @@ static bool doCodeCompletionImpl(
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
       [&](CompilerInstance &CI, bool reusingASTContext) {
         assert(!reusingASTContext && "reusing AST context without enabling it");
-        auto SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        auto *SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF, *callbacksFactory);
       });
   return isSuccess ? 0 : 1;
 }

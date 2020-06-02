@@ -451,9 +451,6 @@ class CompilerInstance {
   /// considered primaries.
   llvm::SetVector<unsigned> PrimaryBufferIDs;
 
-  /// The file that has been registered for code completion.
-  NullablePtr<SourceFile> CodeCompletionFile;
-
   /// Return whether there is an entry in PrimaryInputs for buffer \p BufID.
   bool isPrimaryInput(unsigned BufID) const {
     return PrimaryBufferIDs.count(BufID) != 0;
@@ -509,7 +506,12 @@ public:
 
   UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
 
+  /// Retrieve the main module containing the files being compiled.
   ModuleDecl *getMainModule() const;
+
+  /// Replace the current main module with a new one. This is used for top-level
+  /// cached code completion.
+  void setMainModule(ModuleDecl *newMod);
 
   MemoryBufferSerializedModuleLoader *
   getMemoryBufferSerializedModuleLoader() const {
@@ -557,12 +559,7 @@ public:
 
   /// If a code completion buffer has been set, returns the corresponding source
   /// file.
-  NullablePtr<SourceFile> getCodeCompletionFile() { return CodeCompletionFile; }
-
-  /// Set a new file that we're performing code completion on.
-  void setCodeCompletionFile(SourceFile *file) {
-    CodeCompletionFile = file;
-  }
+  SourceFile *getCodeCompletionFile() const;
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML

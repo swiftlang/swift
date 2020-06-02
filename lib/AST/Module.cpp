@@ -532,6 +532,20 @@ ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
   return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
 }
 
+SourceFile *CodeCompletionFileRequest::evaluate(Evaluator &evaluator,
+                                                ModuleDecl *mod) const {
+  const auto &SM = mod->getASTContext().SourceMgr;
+  assert(mod->isMainModule() && "Can only do completion in the main module");
+  assert(SM.hasCodeCompletionBuffer() && "Not performing code completion?");
+
+  for (auto *file : mod->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (SF && SF->getBufferID() == SM.getCodeCompletionBufferID())
+      return SF;
+  }
+  llvm_unreachable("Couldn't find the completion file?");
+}
+
 #define FORWARD(name, args) \
   for (const FileUnit *file : getFiles()) \
     file->name args;
