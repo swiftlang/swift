@@ -344,6 +344,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::ARCUnbridgedCast:
     case clang::BuiltinType::BoundMember:
     case clang::BuiltinType::BuiltinFn:
+    case clang::BuiltinType::IncompleteMatrixIdx:
     case clang::BuiltinType::Overload:
     case clang::BuiltinType::PseudoObject:
     case clang::BuiltinType::UnknownAny:
