@@ -451,11 +451,6 @@ class CompilerInstance {
   /// considered primaries.
   llvm::SetVector<unsigned> PrimaryBufferIDs;
 
-  /// Identifies the set of SourceFiles that are considered primaries. An
-  /// invariant is that any SourceFile in this set with an associated
-  /// buffer will also have its buffer ID in PrimaryBufferIDs.
-  std::vector<SourceFile *> PrimarySourceFiles;
-
   /// The file that has been registered for code completion.
   NullablePtr<SourceFile> CodeCompletionFile;
 
@@ -536,7 +531,7 @@ public:
   /// Gets the set of SourceFiles which are the primary inputs for this
   /// CompilerInstance.
   ArrayRef<SourceFile *> getPrimarySourceFiles() const {
-    return PrimarySourceFiles;
+    return getMainModule()->getPrimarySourceFiles();
   }
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
@@ -546,11 +541,12 @@ public:
   /// FIXME: This should be removed eventually, once there are no longer any
   /// codepaths that rely on a single primary file.
   SourceFile *getPrimarySourceFile() const {
-    if (PrimarySourceFiles.empty()) {
+    auto primaries = getPrimarySourceFiles();
+    if (primaries.empty()) {
       return nullptr;
     } else {
-      assert(PrimarySourceFiles.size() == 1);
-      return *PrimarySourceFiles.begin();
+      assert(primaries.size() == 1);
+      return *primaries.begin();
     }
   }
 

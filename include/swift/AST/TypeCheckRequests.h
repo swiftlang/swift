@@ -2459,6 +2459,26 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Retrieves the primary source files in the main module.
+// FIXME: This isn't really a type-checking request, if we ever split off a
+// zone for more basic AST requests, this should be moved there.
+class PrimarySourceFilesRequest
+    : public SimpleRequest<PrimarySourceFilesRequest,
+                           ArrayRef<SourceFile *>(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<SourceFile *> evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

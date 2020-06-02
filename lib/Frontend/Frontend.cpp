@@ -870,7 +870,7 @@ void CompilerInstance::forEachFileToTypeCheck(
       fn(*SF);
     }
   } else {
-    for (auto *SF : PrimarySourceFiles) {
+    for (auto *SF : getPrimarySourceFiles()) {
       fn(*SF);
     }
   }
@@ -900,11 +900,10 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   SourceFile *inputFile = new (*Context)
       SourceFile(*mainModule, fileKind, bufferID,
                  Invocation.getLangOptions().CollectParsedToken,
-                 Invocation.getLangOptions().BuildSyntaxTree, opts);
+                 Invocation.getLangOptions().BuildSyntaxTree, opts, isPrimary);
   MainModule->addFile(*inputFile);
 
   if (isPrimary) {
-    PrimarySourceFiles.push_back(inputFile);
     inputFile->enableInterfaceHash();
   }
 
@@ -923,7 +922,6 @@ void CompilerInstance::freeASTContext() {
   SML = nullptr;
   MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
-  PrimarySourceFiles.clear();
 }
 
 /// Perform "stable" optimizations that are invariant across compiler versions.
