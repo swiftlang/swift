@@ -158,6 +158,9 @@ private:
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
 
+  /// Whether this is a primary source file which we'll be generating code for.
+  bool IsPrimary;
+
   /// The scope map that describes this source file.
   std::unique_ptr<ASTScope> Scope;
 
@@ -231,6 +234,10 @@ public:
 
   /// Retrieve the parsing options for the file.
   ParsingOptions getParsingOptions() const { return ParsingOpts; }
+
+  /// Whether this source file is a primary file, meaning that we're generating
+  /// code for it. Note this method returns \c false in WMO.
+  bool isPrimary() const { return IsPrimary; }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
@@ -307,7 +314,7 @@ public:
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              bool KeepParsedTokens = false, bool KeepSyntaxTree = false,
-             ParsingOptions parsingOpts = {});
+             ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
 
