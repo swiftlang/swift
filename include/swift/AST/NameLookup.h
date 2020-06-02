@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_NAME_LOOKUP_H
 #define SWIFT_AST_NAME_LOOKUP_H
 
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Identifier.h"

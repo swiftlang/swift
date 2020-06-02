@@ -20,7 +20,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/Scope.h"
-#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 

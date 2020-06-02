@@ -16,7 +16,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 class SILModule;

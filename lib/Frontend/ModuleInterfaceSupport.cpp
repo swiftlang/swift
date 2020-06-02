@@ -28,6 +28,7 @@
 #include "swift/Serialization/Validation.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"

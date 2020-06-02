@@ -15,7 +15,6 @@
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
 
 namespace swift {

@@ -25,7 +25,6 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {

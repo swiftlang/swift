@@ -47,6 +47,11 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/BreadthFirstIterator.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 using namespace swift::autodiff;

@@ -26,7 +26,6 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILPrintContext.h"
-#include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
 #define SWIFT_ENTRY_POINT_FUNCTION "main"
