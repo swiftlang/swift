@@ -486,7 +486,7 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
   LOAD(dumpInfoForTypeRef);
   
   Library->IsLegacy = IsLegacy;
-  Context->LibraryCount++;
+  ++Context->LibraryCount;
   
   return 1;
   

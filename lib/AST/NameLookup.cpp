@@ -78,7 +78,7 @@ void LookupResult::filter(
   Results.erase(std::remove_if(Results.begin(), Results.end(),
                                [&](LookupResultEntry result) -> bool {
                                  auto isInner = index < originalFirstOuter;
-                                 index++;
+                                 ++index;
                                  if (pred(result, !isInner))
                                    return false;
 
@@ -86,7 +86,7 @@ void LookupResult::filter(
                                  // an inner result, the outer results need to
                                  // shift down.
                                  if (isInner)
-                                   IndexOfFirstOuterResult--;
+                                   --IndexOfFirstOuterResult;
                                  return true;
                                }),
                 Results.end());

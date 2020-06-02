@@ -1186,7 +1186,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         if (!isABIIgnoredParameterWithoutStorage(IGM, subIGF, substType,
                                                  origParamI))
           break;
-        origParamI++;
+        ++origParamI;
       }
 
       if (origParamI < origType->getParameters().size()) {

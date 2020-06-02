@@ -623,7 +623,7 @@ void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
   for (auto *param : *PL) {
     if (param->isDefaultArgument())
       addSymbol(SILDeclRef::getDefaultArgGenerator(VD, index));
-    index++;
+    ++index;
   }
 }
 

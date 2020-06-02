@@ -193,7 +193,7 @@ public:
       return;
     auto &Parent = Parents.back();
     for (auto CIT = std::find(Parent->child_begin(), Parent->child_end(), C) + 1;
-         CIT != Parent->child_end(); CIT++) {
+         CIT != Parent->child_end(); ++CIT) {
       if (auto TC = dyn_cast<TextComment>(*CIT)) {
         auto Text = TC->getText();
         std::vector<StringRef> Subs;
@@ -330,7 +330,7 @@ std::string swift::ide::removeCodeCompletionTokens(
     }
     if (C == '#' && Ptr <= End - 2 && Ptr[1] == '^') {
       do {
-        Ptr++;
+        ++Ptr;
       } while (Ptr < End && *Ptr != '#');
       if (Ptr == End)
         break;
@@ -455,7 +455,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
   }
   while (PrevNestingLevel > 0) {
     OS << "#}";
-    PrevNestingLevel--;
+    --PrevNestingLevel;
   }
 }
 
@@ -795,10 +795,10 @@ static ArrayRef<std::pair<StringRef, StringRef>> copyStringPairArray(
 void CodeCompletionResultBuilder::withNestedGroup(
     CodeCompletionString::Chunk::ChunkKind Kind,
     llvm::function_ref<void()> body) {
-  CurrentNestingLevel++;
+  ++CurrentNestingLevel;
   addSimpleChunk(Kind);
   body();
-  CurrentNestingLevel--;
+  --CurrentNestingLevel;
 }
 
 void CodeCompletionResultBuilder::addChunkWithText(
@@ -907,7 +907,7 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
                                                    bool isAutoClosure,
                                                    bool useUnderscoreLabel,
                                                    bool isLabeledTrailingClosure) {
-  CurrentNestingLevel++;
+  ++CurrentNestingLevel;
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
   addSimpleChunk(ChunkKind::CallParameterBegin);
@@ -1059,7 +1059,7 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
 
   if (IsVarArg)
     addEllipsis();
-  CurrentNestingLevel--;
+  --CurrentNestingLevel;
 }
 
 void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
@@ -3646,7 +3646,7 @@ public:
         Builder.addBaseName(IndexStr.str());
       }
       addTypeAnnotation(Builder, TupleElt.getType());
-      Index++;
+      ++Index;
     }
     return true;
   }
@@ -6317,7 +6317,7 @@ void PrintingCodeCompletionConsumer::handleResults(
   for (auto Result : Results) {
     if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
       continue;
-    NumResults++;
+    ++NumResults;
   }
   if (NumResults == 0)
     return;

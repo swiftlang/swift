@@ -26,17 +26,6 @@
 
 namespace swift {
 
-// SWIFT_ENABLE_TENSORFLOW
-using llvm::DenseMap;
-using llvm::SmallDenseMap;
-using llvm::SmallDenseSet;
-using llvm::SmallMapVector;
-using llvm::SmallSet;
-
-class ApplyInst;
-class DifferentiableActivityInfo;
-// SWIFT_ENABLE_TENSORFLOW END
-
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//

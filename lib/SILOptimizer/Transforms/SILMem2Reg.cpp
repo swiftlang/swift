@@ -421,7 +421,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
         LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *Load);
         
         replaceLoad(Load, RunningVal, ASI);
-        NumInstRemoved++;
+        ++NumInstRemoved;
       } else if (Load->getOperand() == ASI) {
         // If we don't know the content of the AllocStack then the loaded
         // value *is* the new value;
@@ -442,7 +442,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
       // If we met a store before this one, delete it.
       if (LastStore) {
-        NumInstRemoved++;
+        ++NumInstRemoved;
         LLVM_DEBUG(llvm::dbgs() << "*** Removing redundant store: "
                                 << *LastStore);
         LastStore->eraseFromParent();
@@ -508,7 +508,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
         RunningVal = SILUndef::get(ASI->getElementType(), *ASI->getFunction());
       }
       replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
-      NumInstRemoved++;
+      ++NumInstRemoved;
       continue;
     }
 
@@ -518,7 +518,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       if (SI->getDest() == ASI) {
         RunningVal = SI->getSrc();
         Inst->eraseFromParent();
-        NumInstRemoved++;
+        ++NumInstRemoved;
         continue;
       }
     }
@@ -565,7 +565,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       if (!I->use_empty()) break;
       Node = I->getOperand(0);
       I->eraseFromParent();
-      NumInstRemoved++;
+      ++NumInstRemoved;
     }
   }
 }
@@ -652,7 +652,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
   SmallVector<LoadInst *, 4> collectedLoads;
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E;) {
     auto *Inst = UI->getUser();
-    UI++;
+    ++UI;
     bool removedUser = false;
 
     collectedLoads.clear();
@@ -672,7 +672,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
       // Replace the load with the definition that we found.
       replaceLoad(LI, Def, ASI);
       removedUser = true;
-      NumInstRemoved++;
+      ++NumInstRemoved;
     }
 
     if (removedUser)
@@ -687,7 +687,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
       // Replace DebugValueAddr with DebugValue.
       SILValue Def = getLiveInValue(PhiBlocks, BB);
       promoteDebugValueAddr(DVAI, Def, B);
-      NumInstRemoved++;
+      ++NumInstRemoved;
       continue;
     }
 
@@ -874,12 +874,12 @@ void StackAllocationPromoter::run() {
 bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
                                                 DomTreeLevelMap &DomTreeLevels){
   LLVM_DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
-  NumAllocStackFound++;
+  ++NumAllocStackFound;
 
   // Don't handle captured AllocStacks.
   bool inSingleBlock = false;
   if (isCaptured(alloc, inSingleBlock)) {
-    NumAllocStackCaptured++;
+    ++NumAllocStackCaptured;
     return false;
   }
 
@@ -946,7 +946,7 @@ bool MemoryToRegisters::run() {
       if (promoted) {
         if (ASI->use_empty())
           ASI->eraseFromParent();
-        NumInstRemoved++;
+        ++NumInstRemoved;
         Changed = true;
       }
     }

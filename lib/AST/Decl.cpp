@@ -5069,7 +5069,7 @@ ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
   ++NumLazyRequirementSignatures;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = getASTContext().Stats)
-    Stats->getFrontendCounters().NumLazyRequirementSignatures++;
+    ++Stats->getFrontendCounters().NumLazyRequirementSignatures;
 }
 
 ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
@@ -5248,7 +5248,7 @@ AbstractStorageDecl::AccessorRecord::create(ASTContext &ctx,
       case AccessorKind::ID:                  \
         if (!has##ID) {                       \
           has##ID = true;                     \
-          numMissingOpaque--;                 \
+          --numMissingOpaque;                 \
         }                                     \
         continue;
 #include "swift/AST/AccessorKinds.def"
@@ -6167,8 +6167,8 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
 
 ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
   auto *Clone = new (Ctx) ParamDecl(
-      PD->getSpecifierLoc(), PD->getArgumentNameLoc(), PD->getArgumentName(),
-      PD->getArgumentNameLoc(), PD->getParameterName(), PD->getDeclContext());
+      SourceLoc(), SourceLoc(), PD->getArgumentName(),
+      SourceLoc(), PD->getParameterName(), PD->getDeclContext());
   Clone->DefaultValueAndFlags.setPointerAndInt(
       nullptr, PD->DefaultValueAndFlags.getInt());
   Clone->Bits.ParamDecl.defaultArgumentKind =

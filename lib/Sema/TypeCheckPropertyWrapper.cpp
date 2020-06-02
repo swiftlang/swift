@@ -301,7 +301,7 @@ static bool isEscapingAutoclosureArgument(const ConstructorDecl *init,
 
   Optional<size_t> parameterIndex = None;
   auto params = init->getParameters();
-  for (size_t i = 0; i < params->size(); i++) {
+  for (size_t i = 0; i < params->size(); ++i) {
     if (params->get(i)->getArgumentName() == argumentLabel) {
       parameterIndex = i;
       break;

@@ -402,7 +402,7 @@ static bool tryRewriteToPartialApplyStack(
   // instruction from the memoized map.
   auto saveDeleteInst = [&](SILInstruction *i) {
     if (&*advanceIfDelete == i)
-      advanceIfDelete++;
+      ++advanceIfDelete;
     memoized.erase(i);
     i->eraseFromParent();
   };

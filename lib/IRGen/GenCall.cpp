@@ -447,7 +447,7 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
 
     // Remove the last component and add it as an overflow type.
     overflowTypes.push_back(components.pop_back_val());
-    numDirectComponents--;
+    --numDirectComponents;
 
     // Add a pointer to the end of components.
     components.push_back(IGM.Int8PtrTy);
