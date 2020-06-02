@@ -926,8 +926,7 @@ public:
 
   /// Constructs a Swift module for the given Clang module.
   ModuleDecl *finishLoadingClangModule(SourceLoc importLoc,
-                                       const clang::Module *clangModule,
-                                       bool preferOverlay);
+                                       const clang::Module *clangModule);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.

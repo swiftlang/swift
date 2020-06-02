@@ -1779,8 +1779,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   if (!clangModule)
     return nullptr;
 
-  return finishLoadingClangModule(importLoc, clangModule,
-                                  /*preferOverlay=*/false);
+  return finishLoadingClangModule(importLoc, clangModule);
 }
 
 ModuleDecl *
@@ -1800,7 +1799,7 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
-    SourceLoc importLoc, const clang::Module *clangModule, bool findOverlay) {
+    SourceLoc importLoc, const clang::Module *clangModule) {
   assert(clangModule);
 
   // Bump the generation count.
@@ -1842,16 +1841,12 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   }
 
   if (clangModule->isSubModule()) {
-    finishLoadingClangModule(importLoc, clangModule->getTopLevelModule(), true);
+    finishLoadingClangModule(importLoc, clangModule->getTopLevelModule());
   } else {
     ModuleDecl *&loaded = SwiftContext.LoadedModules[result->getName()];
     if (!loaded)
       loaded = result;
   }
-
-  if (findOverlay)
-    if (ModuleDecl *overlay = wrapperUnit->getOverlayModule())
-      result = overlay;
 
   return result;
 }
@@ -1876,8 +1871,7 @@ void ClangImporter::Implementation::handleDeferredImports(SourceLoc diagLoc) {
   // officially supported with bridging headers: app targets and unit tests
   // only. Unfortunately that's not enforced.
   for (size_t i = 0; i < ImportedHeaderExports.size(); ++i) {
-    (void)finishLoadingClangModule(diagLoc, ImportedHeaderExports[i],
-                                   /*preferOverlay=*/true);
+    (void)finishLoadingClangModule(diagLoc, ImportedHeaderExports[i]);
   }
 }
 
