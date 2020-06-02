@@ -2355,23 +2355,23 @@ bool TypeChecker::typeCheckBinding(
   if (!initializer->getType())
     initializer->setType(ErrorType::get(Context));
 
-  // If the type of the pattern is inferred, assign error types to the pattern
-  // and its variables, to prevent it from being referenced by the constraint
-  // system.
+  // Assign error types to the pattern and its variables, to prevent it from
+  // being referenced by the constraint system.
   if (patternType->hasUnresolvedType() ||
       patternType->hasUnboundGenericType()) {
     pattern->setType(ErrorType::get(Context));
-    pattern->forEachVariable([&](VarDecl *var) {
-      // Don't change the type of a variable that we've been able to
-      // compute a type for.
-      if (var->hasInterfaceType() &&
-          !var->getType()->hasUnboundGenericType() &&
-          !var->isInvalid())
-        return;
-
-      var->setInvalid();
-    });
   }
+
+  pattern->forEachVariable([&](VarDecl *var) {
+    // Don't change the type of a variable that we've been able to
+    // compute a type for.
+    if (var->hasInterfaceType() &&
+        !var->getType()->hasUnboundGenericType() &&
+        !var->isInvalid())
+      return;
+
+    var->setInvalid();
+  });
   return true;
 }
 
