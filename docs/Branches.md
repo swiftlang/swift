@@ -58,15 +58,18 @@ You can use any of the branch names as the argument to `--scheme`, such as `mast
 
 - LLVM Project: the destination branch depends on the kind of change that must be made:
 
-  1) LLVM Project changes that don't depend on Swift: New commits go to `master` in the upstream [llvm-project](https://github.com/llvm/llvm-project).
+  1) LLVM Project changes that don't depend on Swift
+  
+     - New commits go to `master` in the upstream [llvm-project](https://github.com/llvm/llvm-project).
 
-  ... then these commits can be cherry-picked to an appropriate, `swift/master` aligned `apple/stable/*` branch in Apple's fork of [llvm-project](https://github.com/apple/llvm-project). Please see
-  [Apple's branching scheme](https://github.com/apple/llvm-project/blob/apple/master/apple-docs/AppleBranchingScheme.md)
-  document to determine which `apple/stable/*` branch you should cherry-pick to.
+     - Then cherry-pick these commits to an appropriate, `swift/master` aligned `apple/stable/*` branch in Apple's fork of [llvm-project](https://github.com/apple/llvm-project). Please see [Apple's branching scheme](https://github.com/apple/llvm-project/blob/apple/master/apple-docs/AppleBranchingScheme.md) document to determine which `apple/stable/*` branch you should cherry-pick to.
 
-  2) Changes that depend on Swift (this only applies to LLDB): new commits go to `swift/master-next`
+  2) Changes that depend on Swift (this only applies to LLDB)
+     - New commits go to `swift/master-next`.
 
-  ...then cherry-pick to the release branch (`swift/swift-x.y-branch`) if necessary, following the appropriate release   process. (Usually this means filling out a standard template, finding someone to review your code if that hasn't already happened, and getting approval from that repo's *release manager.)*
+     - Then cherry-pick these commits to `swift/master` (_not_ an `apple/stable/*` branch, as these shouldn't contain changes that depend on Swift).
+
+     - If necessary, cherry-pick to the release branch (`swift/swift-x.y-branch`), following the appropriate release   process. (Usually this means filling out a standard template, finding someone to review your code if that hasn't already happened, and getting approval from that repo's *release manager.)*
 
 ## Automerging
 
