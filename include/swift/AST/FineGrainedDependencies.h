@@ -632,6 +632,11 @@ public:
 
   const DependencyKey &getKey() const { return key; }
 
+  /// Only used when the driver is reading a SourceFileDepGraphNode.
+  void setKey(const DependencyKey &key) {
+    this->key = key;
+  }
+
   const Optional<StringRef> getFingerprint() const {
     if (fingerprint) {
       return StringRef(fingerprint.getValue());
@@ -872,7 +877,6 @@ public:
 
   void emitDotFile(StringRef outputPath, DiagnosticEngine &diags);
 
-private:
   void addNode(SourceFileDepGraphNode *n) {
     n->setSequenceNumber(allNodes.size());
     allNodes.push_back(n);

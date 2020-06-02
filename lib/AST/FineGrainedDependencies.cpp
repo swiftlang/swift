@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/FineGrainedDependencyFormat.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"
@@ -28,6 +29,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLParser.h"
+
 
 // This file holds the definitions for the fine-grained dependency system
 // that are likely to be stable as it moves away from the status quo.
@@ -50,13 +52,21 @@ Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
 
 Optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
-  SourceFileDepGraph fg;
-  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), nullptr);
-  yamlReader >> fg;
-  if (yamlReader.error())
-    return None;
-  // return fg; compiles for Mac but not Linux, because it cannot be copied.
-  return Optional<SourceFileDepGraph>(std::move(fg));
+  if (false) {
+    SourceFileDepGraph fg;
+    llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), nullptr);
+    yamlReader >> fg;
+    if (yamlReader.error())
+      return None;
+    // return fg; compiles for Mac but not Linux, because it cannot be copied.
+    return Optional<SourceFileDepGraph>(std::move(fg));
+  } else {
+    SourceFileDepGraph fg;
+    if (swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
+        buffer, fg))
+      return None;
+    return Optional<SourceFileDepGraph>(std::move(fg));
+  }
 }
 
 //==============================================================================
