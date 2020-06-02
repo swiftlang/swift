@@ -383,7 +383,7 @@ void evaluator::DependencyRecorder::realize(
     const DependencyCollector::Reference &ref) {
   auto *source = getActiveDependencySourceOrNull();
   assert(source && "cannot realize dependency without associated file!");
-  if (!source->hasInterfaceHash()) {
+  if (!source->isPrimary()) {
     return;
   }
   fileReferences[source].insert(ref);
@@ -434,7 +434,7 @@ void evaluator::DependencyRecorder::record(
     llvm::function_ref<void(DependencyCollector &)> rec) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
   auto *source = getActiveDependencySourceOrNull();
-  if (!source || !source->hasInterfaceHash()) {
+  if (!source || !source->isPrimary()) {
     return;
   }
 
@@ -466,7 +466,7 @@ void evaluator::DependencyRecorder::replay(const swift::ActiveRequest &req) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
 
   auto *source = getActiveDependencySourceOrNull();
-  if (mode == Mode::StatusQuo || !source || !source->hasInterfaceHash()) {
+  if (mode == Mode::StatusQuo || !source || !source->isPrimary()) {
     return;
   }
 
