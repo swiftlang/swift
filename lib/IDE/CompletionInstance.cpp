@@ -527,15 +527,16 @@ bool CompletionInstance::performNewOperation(
     }
     registerIDERequestFunctions(CI.getASTContext().evaluator);
 
-    CI.performParseAndResolveImportsOnly();
-
-    // If we didn't create a source file for completion, bail. This can happen
-    // if for example we fail to load the stdlib.
-    auto completionFile = CI.getCodeCompletionFile();
-    if (!completionFile)
+    // If we're expecting a standard library, but there either isn't one, or it
+    // failed to load, let's bail early and hand back an empty completion
+    // result to avoid any downstream crashes.
+    if (CI.loadStdlibIfNeeded())
       return true;
 
+    CI.performParseAndResolveImportsOnly();
+
     // If we didn't find a code completion token, bail.
+    auto completionFile = CI.getCodeCompletionFile();
     auto *state = completionFile.get()->getDelayedParserState();
     if (!state->hasCodeCompletionDelayedDeclState())
       return true;
