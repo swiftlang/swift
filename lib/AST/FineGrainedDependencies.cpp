@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <stdio.h>
-
 #include "swift/AST/FineGrainedDependencies.h"
 
 // may not all be needed
