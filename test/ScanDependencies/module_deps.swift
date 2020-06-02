@@ -31,6 +31,12 @@
 // RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path C.pcm -o %t/clang-module-cache/C.pcm -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/B.pcm | %S/Inputs/CommandRunner.py
 // RUN: ls %t/clang-module-cache/C.pcm
 
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.swiftmodule -o %t/clang-module-cache/A.swiftmodule -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/A.pcm -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/SwiftShims.pcm | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/A.swiftmodule
+
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path E.swiftmodule -o %t/clang-module-cache/E.swiftmodule -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/SwiftShims.pcm | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/E.swiftmodule
+
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -100,11 +106,10 @@ import G
 
 // CHECK: "commandLine": [
 // CHECK-NEXT: "-frontend"
+// CHECK-NEXT: "-only-use-extra-clang-opts"
 // CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "-Xclang"
-// CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "-cc1"
-// CHECK: "-remove-preceeding-explicit-module-build-incompatible-options"
+// CHECK-NEXT: "clang"
+// CHECK: "-fno-implicit-modules"
 
 /// --------Swift module E
 // CHECK: "swift": "E"

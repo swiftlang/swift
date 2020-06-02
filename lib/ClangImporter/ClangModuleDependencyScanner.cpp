@@ -211,30 +211,27 @@ void ClangImporter::recordModuleDependencies(
       fileDeps.push_back(fileDep.getKey().str());
     }
     // Inherit all Clang driver args when creating the clang importer.
-    std::vector<std::string> allArgs = Impl.ClangArgs;
+    ArrayRef<std::string> allArgs = Impl.ClangArgs;
     ClangImporterOptions Opts;
-    std::vector<std::string> cc1Args;
 
-    // Calling this to convert driver args to CC1 args.
-    createClangInvocation(this, Opts, allArgs, &cc1Args);
+    // Ensure the arguments we collected is sufficient to create a Clang
+    // invocation.
+    assert(createClangInvocation(this, Opts, allArgs));
+
     std::vector<std::string> swiftArgs;
     // We are using Swift frontend mode.
     swiftArgs.push_back("-frontend");
+    // We pass the entire argument list via -Xcc, so the invocation should
+    // use extra clang options alone.
+    swiftArgs.push_back("-only-use-extra-clang-opts");
     auto addClangArg = [&](StringRef arg) {
-      swiftArgs.push_back("-Xcc");
-      swiftArgs.push_back("-Xclang");
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back(arg.str());
     };
     // Add all args inheritted from creating the importer.
-    for (auto arg: cc1Args) {
+    for (auto arg: allArgs) {
       addClangArg(arg);
     }
-    // Add all args reported from the Clang dependencies scanner.
-    for(auto arg: clangModuleDep.NonPathCommandLine) {
-      addClangArg(arg);
-    }
-
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");

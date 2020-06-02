@@ -717,4 +717,6 @@ def target_sdk_version : Separate<["-"], "target-sdk-version">,
 def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
   HelpText<"The version of target variant SDK used for compilation">;
 
+def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
+  HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

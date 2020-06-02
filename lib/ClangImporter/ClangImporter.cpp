@@ -908,6 +908,9 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
 std::vector<std::string>
 ClangImporter::getClangArguments(ASTContext &ctx,
                                  const ClangImporterOptions &importerOpts) {
+  if (importerOpts.ExtraArgsOnly) {
+    return importerOpts.ExtraArgs;
+  }
   std::vector<std::string> invocationArgStrs;
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
