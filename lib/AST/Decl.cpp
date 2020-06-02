@@ -6115,8 +6115,8 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
 
 ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
   auto *Clone = new (Ctx) ParamDecl(
-      SourceLoc(), SourceLoc(), PD->getArgumentName(),
-      SourceLoc(), PD->getParameterName(), PD->getDeclContext());
+      PD->getSpecifierLoc(), PD->getArgumentNameLoc(), PD->getArgumentName(),
+      PD->getArgumentNameLoc(), PD->getParameterName(), PD->getDeclContext());
   Clone->DefaultValueAndFlags.setPointerAndInt(
       nullptr, PD->DefaultValueAndFlags.getInt());
   Clone->Bits.ParamDecl.defaultArgumentKind =
