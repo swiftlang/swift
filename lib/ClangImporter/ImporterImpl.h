@@ -922,11 +922,12 @@ public:
 
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
-  ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
+  ClangModuleUnit *getWrapperForModule(const clang::Module *underlying,
+                                       SourceLoc importLoc = SourceLoc());
 
   /// Constructs a Swift module for the given Clang module.
-  ModuleDecl *finishLoadingClangModule(SourceLoc importLoc,
-                                       const clang::Module *clangModule);
+  ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
+                                       SourceLoc importLoc);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.

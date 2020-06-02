@@ -1779,7 +1779,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   if (!clangModule)
     return nullptr;
 
-  return finishLoadingClangModule(importLoc, clangModule);
+  return finishLoadingClangModule(clangModule, importLoc);
 }
 
 ModuleDecl *
@@ -1799,7 +1799,7 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
-    SourceLoc importLoc, const clang::Module *clangModule) {
+    const clang::Module *clangModule, SourceLoc importLoc) {
   assert(clangModule);
 
   // Bump the generation count.
@@ -1841,7 +1841,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   }
 
   if (clangModule->isSubModule()) {
-    finishLoadingClangModule(importLoc, clangModule->getTopLevelModule());
+    finishLoadingClangModule(clangModule->getTopLevelModule(), importLoc);
   } else {
     ModuleDecl *&loaded = SwiftContext.LoadedModules[result->getName()];
     if (!loaded)
@@ -1871,7 +1871,7 @@ void ClangImporter::Implementation::handleDeferredImports(SourceLoc diagLoc) {
   // officially supported with bridging headers: app targets and unit tests
   // only. Unfortunately that's not enforced.
   for (size_t i = 0; i < ImportedHeaderExports.size(); ++i) {
-    (void)finishLoadingClangModule(diagLoc, ImportedHeaderExports[i]);
+    (void)finishLoadingClangModule(ImportedHeaderExports[i], diagLoc);
   }
 }
 
@@ -2012,7 +2012,7 @@ ClangImporter::Implementation::~Implementation() {
 }
 
 ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
-    const clang::Module *underlying) {
+    const clang::Module *underlying, SourceLoc diagLoc) {
   auto &cacheEntry = ModuleWrappers[underlying];
   if (ClangModuleUnit *cached = cacheEntry.getPointer())
     return cached;
@@ -2027,7 +2027,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,
                                                  underlying);
   wrapper->addFile(*file);
-  SwiftContext.getClangModuleLoader()->findOverlayFiles(SourceLoc(), wrapper, file);
+  SwiftContext.getClangModuleLoader()->findOverlayFiles(diagLoc, wrapper, file);
   cacheEntry.setPointer(file);
 
   return file;
