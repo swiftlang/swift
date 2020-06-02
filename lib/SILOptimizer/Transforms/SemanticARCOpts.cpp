@@ -47,7 +47,25 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 
 namespace {
 
-class LiveRange {
+/// This class represents an "extended live range" of an owned value. Such a
+/// representation includes:
+///
+/// 1. The owned introducing value.
+/// 2. Any forwarding instructions that consume the introduced value
+///    (transitively) and then propagate a new owned value.
+/// 3. Transitive destroys on the forwarding instructions/destroys on the owned
+///    introducing value.
+/// 4. Any unknown consuming uses that are not understood by this code.
+///
+/// This allows for this to be used to convert such a set of uses from using
+/// owned ownership to using guaranteed ownership by converting the
+/// destroy_value -> end_borrow and "flipping" the ownership of individual
+/// forwarding instructions.
+///
+/// NOTE: We do not look through "phi nodes" in the ownership graph (e.x.: real
+/// phi arguments, struct, tuple). Instead we represent those as nodes in a
+/// larger phi ownership web, connected via individual OwnershipLiveRange.
+class OwnershipLiveRange {
   /// The value that we are computing the LiveRange for. Expected to be an owned
   /// introducer and not to be forwarding.
   OwnedValueIntroducer introducer;
@@ -71,9 +89,18 @@ class LiveRange {
   ArrayRef<Operand *> destroyingUses;
 
   /// A list of forwarding instructions that forward owned ownership, but that
-  /// are also able to be converted to guaranteed ownership. If we are able to
-  /// eliminate this LiveRange due to it being from a guaranteed value, we must
-  /// flip the ownership of all of these instructions to guaranteed from owned.
+  /// are also able to be converted to guaranteed ownership.
+  ///
+  /// If we are able to eliminate this LiveRange due to it being from a
+  /// guaranteed value, we must flip the ownership of all of these instructions
+  /// to guaranteed from owned.
+  ///
+  /// NOTE: Normally only destroying or consuming uses end the live range. We
+  /// copy these transitive uses as well into the consumingUses array since
+  /// transitive uses can extend a live range up to an unreachable block without
+  /// ultimately being consuming. In such a situation if we did not also store
+  /// this into consuming uses, we would not be able to ascertain just using the
+  /// "consumingUses" array the true lifetime of the OwnershipLiveRange.
   ///
   /// Corresponds to isOwnershipForwardingInst(...).
   ArrayRef<Operand *> ownershipForwardingUses;
@@ -84,9 +111,9 @@ class LiveRange {
   ArrayRef<Operand *> unknownConsumingUses;
 
 public:
-  LiveRange(SILValue value);
-  LiveRange(const LiveRange &) = delete;
-  LiveRange &operator=(const LiveRange &) = delete;
+  OwnershipLiveRange(SILValue value);
+  OwnershipLiveRange(const OwnershipLiveRange &) = delete;
+  OwnershipLiveRange &operator=(const OwnershipLiveRange &) = delete;
 
   enum class HasConsumingUse_t {
     No = 0,
@@ -194,7 +221,7 @@ public:
 
 } // end anonymous namespace
 
-struct LiveRange::OperandToUser {
+struct OwnershipLiveRange::OperandToUser {
   OperandToUser() {}
 
   SILInstruction *operator()(const Operand *use) const {
@@ -203,11 +230,12 @@ struct LiveRange::OperandToUser {
   }
 };
 
-LiveRange::DestroyingInstsRange LiveRange::getDestroyingInsts() const {
+OwnershipLiveRange::DestroyingInstsRange
+OwnershipLiveRange::getDestroyingInsts() const {
   return DestroyingInstsRange(getDestroyingUses(), OperandToUser());
 }
 
-LiveRange::LiveRange(SILValue value)
+OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     : introducer(*OwnedValueIntroducer::get(value)), destroyingUses(),
       ownershipForwardingUses(), unknownConsumingUses() {
   assert(introducer.value.getOwnershipKind() == ValueOwnershipKind::Owned);
@@ -324,7 +352,7 @@ LiveRange::LiveRange(SILValue value)
   unknownConsumingUses = cUseArrayRef.take_back(tmpUnknownConsumingUses.size());
 }
 
-void LiveRange::insertEndBorrowsAtDestroys(
+void OwnershipLiveRange::insertEndBorrowsAtDestroys(
     SILValue newGuaranteedValue, DeadEndBlocks &deadEndBlocks,
     ValueLifetimeAnalysis::Frontier &scratch) {
   assert(scratch.empty() && "Expected scratch to be initially empty?!");
@@ -377,7 +405,7 @@ void LiveRange::insertEndBorrowsAtDestroys(
   }
 }
 
-void LiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
+void OwnershipLiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
   while (!ownershipForwardingUses.empty()) {
     auto *i = ownershipForwardingUses.back()->getUser();
     ownershipForwardingUses = ownershipForwardingUses.drop_back();
@@ -437,8 +465,8 @@ void LiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
   }
 }
 
-void LiveRange::convertToGuaranteedAndRAUW(SILValue newGuaranteedValue,
-                                           InstModCallbacks callbacks) && {
+void OwnershipLiveRange::convertToGuaranteedAndRAUW(
+    SILValue newGuaranteedValue, InstModCallbacks callbacks) && {
   auto *value = cast<SingleValueInstruction>(introducer.value);
   while (!destroyingUses.empty()) {
     auto *d = destroyingUses.back();
@@ -455,9 +483,9 @@ void LiveRange::convertToGuaranteedAndRAUW(SILValue newGuaranteedValue,
   std::move(*this).convertOwnedGeneralForwardingUsesToGuaranteed();
 }
 
-void LiveRange::convertArgToGuaranteed(DeadEndBlocks &deadEndBlocks,
-                                       ValueLifetimeAnalysis::Frontier &scratch,
-                                       InstModCallbacks callbacks) && {
+void OwnershipLiveRange::convertArgToGuaranteed(
+    DeadEndBlocks &deadEndBlocks, ValueLifetimeAnalysis::Frontier &scratch,
+    InstModCallbacks callbacks) && {
   // First convert the phi argument to be guaranteed.
   auto *phiArg = cast<SILPhiArgument>(introducer.value);
   phiArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
@@ -481,8 +509,8 @@ void LiveRange::convertArgToGuaranteed(DeadEndBlocks &deadEndBlocks,
   std::move(*this).convertOwnedGeneralForwardingUsesToGuaranteed();
 }
 
-LiveRange::HasConsumingUse_t
-LiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
+OwnershipLiveRange::HasConsumingUse_t
+OwnershipLiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
   // First do a quick check if we have /any/ unknown consuming
   // uses. If we do not have any, return false early.
   if (unknownConsumingUses.empty()) {
@@ -853,7 +881,7 @@ struct SemanticARCOptVisitor
   FORWARDING_TERM(Branch)
 #undef FORWARDING_TERM
 
-  bool isWrittenTo(LoadInst *li, const LiveRange &lr);
+  bool isWrittenTo(LoadInst *li, const OwnershipLiveRange &lr);
 
   bool processWorklist();
   bool optimize();
@@ -963,7 +991,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     // only handle cases now where the result does not have any additional
     // ownershipPhi uses.
     SILValue joinedIntroducer = pair.first;
-    LiveRange joinedLiveRange(joinedIntroducer);
+    OwnershipLiveRange joinedLiveRange(joinedIntroducer);
     if (bool(joinedLiveRange.hasUnknownConsumingUse())) {
       continue;
     }
@@ -1014,7 +1042,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     SmallVector<std::pair<SILValue, unsigned>, 8> incomingValueUpdates;
     for (auto introducer : ownedValueIntroducers) {
       SILValue v = introducer.value;
-      LiveRange lr(v);
+      OwnershipLiveRange lr(v);
 
       // For now, we only handle copy_value for simplicity.
       //
@@ -1267,10 +1295,11 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // be some consuming use that we either do not understand is /actually/
   // forwarding or a user that truly represents a necessary consume of the value
   // (e.x. storing into memory).
-  LiveRange lr(cvi);
+  OwnershipLiveRange lr(cvi);
   auto hasUnknownConsumingUseState =
       lr.hasUnknownConsumingUse(assumingAtFixedPoint);
-  if (hasUnknownConsumingUseState == LiveRange::HasConsumingUse_t::Yes) {
+  if (hasUnknownConsumingUseState ==
+      OwnershipLiveRange::HasConsumingUse_t::Yes) {
     return false;
   }
 
@@ -1377,7 +1406,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // we need to handle the phi arg uses, we bail. After we reach a fixed point,
   // we will try to eliminate this value then.
   if (hasUnknownConsumingUseState ==
-      LiveRange::HasConsumingUse_t::YesButAllPhiArgs) {
+      OwnershipLiveRange::HasConsumingUse_t::YesButAllPhiArgs) {
     auto *op = lr.getSingleUnknownConsumingUse();
     assert(op);
     unsigned opNum = op->getOperandNumber();
@@ -1392,7 +1421,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
       };
 
       auto *arg = succBlock->getSILPhiArguments()[opNum];
-      LiveRange phiArgLR(arg);
+      OwnershipLiveRange phiArgLR(arg);
       if (bool(phiArgLR.hasUnknownConsumingUse())) {
         return false;
       }
@@ -1663,7 +1692,7 @@ class StorageGuaranteesLoadVisitor
   SemanticARCOptVisitor &ARCOpt;
 
   // The live range of the original load.
-  const LiveRange &liveRange;
+  const OwnershipLiveRange &liveRange;
 
   // The current address being visited.
   SILValue currentAddress;
@@ -1672,7 +1701,7 @@ class StorageGuaranteesLoadVisitor
 
 public:
   StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load,
-                               const LiveRange &liveRange)
+                               const OwnershipLiveRange &liveRange)
       : ARCOpt(arcOpt), liveRange(liveRange),
         currentAddress(load->getOperand()) {}
 
@@ -1920,7 +1949,8 @@ public:
 
 } // namespace
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load, const LiveRange &lr) {
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load,
+                                        const OwnershipLiveRange &lr) {
   StorageGuaranteesLoadVisitor visitor(*this, load, lr);
   return visitor.doIt();
 }
@@ -1938,7 +1968,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // FIXME: We should consider if it is worth promoting a load [copy]
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
-  LiveRange lr(li);
+  OwnershipLiveRange lr(li);
   if (bool(lr.hasUnknownConsumingUse()))
     return false;
 
