@@ -249,7 +249,7 @@ public:
 
 } // end anonymous namespace
 
-static SimpleGlobalCache<BoxCacheEntry> Boxes;
+static SimpleGlobalCache<BoxCacheEntry, BoxesTag> Boxes;
 
 SWIFT_CC(swift)
 BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,

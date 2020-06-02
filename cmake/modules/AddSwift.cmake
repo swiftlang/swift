@@ -519,7 +519,6 @@ function(add_swift_host_library name)
     endif()
 
     set_target_properties(${name} PROPERTIES
-      CXX_STANDARD 14
       NO_SONAME YES)
   endif()
 

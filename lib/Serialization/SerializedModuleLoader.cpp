@@ -1176,8 +1176,9 @@ void SerializedASTFile::lookupObjCMethods(
   File.lookupObjCMethods(selector, results);
 }
 
-void SerializedASTFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                           SmallVectorImpl<Identifier> &spiGroups) const {
+void SerializedASTFile::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   File.lookupImportedSPIGroups(importedModule, spiGroups);
 }
 

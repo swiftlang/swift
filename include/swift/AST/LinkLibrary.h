@@ -14,7 +14,7 @@
 #define SWIFT_AST_LINKLIBRARY_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include <string>
 
 namespace swift {

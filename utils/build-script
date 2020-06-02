@@ -226,6 +226,7 @@ def validate_arguments(toolchain, args):
         'build_sourcekitlsp',
         'build_tensorflow_swift_apis',
         'build_toolchainbenchmarks',
+        'build_swift_inspect',
         'tsan_libdispatch_test',
     ]
     has_target_needing_toolchain = \
@@ -855,6 +856,8 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SourceKitLSP)
         if self.args.build_toolchainbenchmarks:
             product_classes.append(products.Benchmarks)
+        if self.args.build_swift_inspect:
+            product_classes.append(products.SwiftInspect)
         if self.args.tsan_libdispatch_test:
             product_classes.append(products.TSanLibDispatch)
         return product_classes

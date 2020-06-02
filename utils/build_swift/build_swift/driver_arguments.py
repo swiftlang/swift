@@ -608,6 +608,10 @@ def create_argument_parser():
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
                 'toolchain')
+    option(['--swift-inspect'],
+           toggle_true('build_swift_inspect'),
+           help='build SwiftInspect using swiftpm against the just built '
+                'toolchain')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1038,6 +1042,9 @@ def create_argument_parser():
     option('--skip-test-toolchain-benchmarks',
            toggle_false('test_toolchainbenchmarks'),
            help='skip testing toolchain benchmarks')
+    option('--skip-test-swift-inspect',
+           toggle_false('test_swift_inspect'),
+           help='skip testing swift_inspect')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
