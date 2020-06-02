@@ -1354,7 +1354,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
                                          FunctionTypeRepresentation rep2,
                                          ConstraintKind kind,
-                                         ConstraintLocator *locator) {
+                                         ConstraintLocatorBuilder locator) {
   switch (kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
@@ -1363,25 +1363,14 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
     return rep1 != rep2;
       
   case ConstraintKind::Subtype: {
-    if (!locator->isLastElement<LocatorPathElt::FunctionArgument>()) 
+    auto last = locator.last();
+    if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
       return false;
     
-    auto isThin = [](FunctionTypeRepresentation rep) {
-      return rep == FunctionTypeRepresentation::CFunctionPointer ||
-          rep == FunctionTypeRepresentation::Thin;
-    };
-    
-    auto isThick = [](FunctionTypeRepresentation rep) {
-      return rep == FunctionTypeRepresentation::Swift ||
-          rep == swift::FunctionTypeRepresentation::Block;
-    };
-
-    // Allowing conventions "thin" (c, thin) to "thick" (swift, block)
-    if (isThin(rep1) && isThick(rep2))
-      return false;
-    
-    // Allowing conventions "thick" (swift, block) to "thick" (swift, block)
-    if (isThick(rep1) && isThick(rep2))
+    // Allowing all to "thick" (swift, block) conventions
+    // "thin" (c, thin) to "thick" or "thick" to "thick"
+    if (rep2 == FunctionTypeRepresentation::Swift ||
+        rep2 == FunctionTypeRepresentation::Block)
       return false;
     
     return rep1 != rep2;
@@ -1682,7 +1671,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   if (matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
                                    func2->getExtInfo().getRepresentation(),
-                                   kind, getConstraintLocator(locator))) {
+                                   kind, locator)) {
     return getTypeMatchFailure(locator);
   }
 
