@@ -376,7 +376,6 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   /// Finally the ExtInfo.
   auto ExtInfo = FTy->getExtInfo();
   ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrInvalid();
 
   /// Return the new signature.
   return SILFunctionType::get(
@@ -384,7 +383,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
       FTy->getCalleeConvention(), InterfaceParams, FTy->getYields(),
       FTy->getResults(), InterfaceErrorResult,
       SubstitutionMap(), SubstitutionMap(),
-      Ctx, witnessMethodConformance);
+      Ctx);
 }
 
 /// Create the Thunk Body with always_inline attribute.
