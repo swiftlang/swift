@@ -1,0 +1,3 @@
+extension Map {
+  func pin() {}
+}

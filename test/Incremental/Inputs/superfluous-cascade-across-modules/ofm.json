@@ -1,0 +1,22 @@
+{
+  "main.swift": {
+    "object": "./main.o",
+    "swift-dependencies": "./main.swiftdeps"
+  },
+  "usesLib.swift": {
+    "object": "./usesLib.o",
+    "swift-dependencies": "./usesLib.swiftdeps"
+  },
+  "usesLibTransitively.swift": {
+    "object": "./usesLib.o",
+    "swift-dependencies": "./usesLib.swiftdeps"
+  },
+  "doesNotUseLib.swift": {
+    "object": "./doesNotUseLib.o",
+    "swift-dependencies": "./doesNotUseLib.swiftdeps"
+  },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
+  }
+}
+
