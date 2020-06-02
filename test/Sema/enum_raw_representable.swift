@@ -195,11 +195,11 @@ func sr8150_mutable(obj: SR8150Box) {
 
   func test(_ opt: Bar?) {
     sr8150_helper1(opt)
-    // expected-error@-1 {{cannot convert value of type 'Bar?' to expected argument type 'Double'}} {{23-23=.map { $0.rawValue } ?? <#default value#>}}
+    // expected-error@-1 {{cannot convert value of type 'Bar?' to expected argument type 'Double'}} {{23-23=?.rawValue ?? <#default value#>}}
     sr8150_helper1(opt ?? Bar.a)
     // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{20-20=(}} {{32-32=).rawValue}}
     let _: Double? = opt
-    // expected-error@-1 {{cannot convert value of type 'Bar?' to specified type 'Double?'}} {{25-25=.map { $0.rawValue }}}
+    // expected-error@-1 {{cannot convert value of type 'Bar?' to specified type 'Double?'}} {{25-25=?.rawValue}}
   }
 }
 

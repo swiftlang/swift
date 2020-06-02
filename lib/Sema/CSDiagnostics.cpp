@@ -6377,7 +6377,7 @@ void UseOfRawRepresentableInsteadOfItsRawValueFailure::fixIt(
   // out first and then, if destination is not optional, allow to specify
   // default value.
   if (RawReprType->getOptionalObjectType()) {
-    fix += ".map { $0.rawValue }";
+    fix += "?.rawValue";
 
     if (!ExpectedType->getOptionalObjectType())
       fix += " ?? <#default value#>";
