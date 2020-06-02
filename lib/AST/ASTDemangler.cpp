@@ -304,7 +304,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   auto *aliasDecl = cast<TypeAliasDecl>(decl);
 
   auto genericSig = aliasDecl->getGenericSignature();
-  for (unsigned i = 0, e = args.size(); i < e; i++) {
+  for (unsigned i = 0, e = args.size(); i < e; ++i) {
     auto origTy = genericSig->getInnermostGenericParams()[i];
     auto substTy = args[i];
 

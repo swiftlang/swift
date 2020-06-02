@@ -1010,7 +1010,7 @@ ObjCMethodCall::outline(SILModule &M) {
         // Otherwise, use the original type convention.
         Args.push_back(Arg);
       }
-      OrigSigIdx++;
+      ++OrigSigIdx;
     }
     OutlinedCall = Builder.createApply(Loc, FunRef, SubstitutionMap(), Args);
     if (!BridgedCall->use_empty() && !BridgedReturn)
@@ -1059,7 +1059,7 @@ ObjCMethodCall::outline(SILModule &M) {
       BridgedCall->setArgument(OrigSigIdx, FunArg);
       LastArg = FunArg;
     }
-    OrigSigIdx++;
+    ++OrigSigIdx;
   }
 
   // Set the method lookup's target.
@@ -1173,7 +1173,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
       // Otherwise, use the original type convention.
       Parameters.push_back(ParamInfo);
     }
-    OrigSigIdx++;
+    ++OrigSigIdx;
   }
 
   auto ExtInfo = SILFunctionType::ExtInfo(

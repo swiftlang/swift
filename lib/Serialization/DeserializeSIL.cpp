@@ -739,7 +739,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     return fn;
   }
 
-  NumDeserializedFunc++;
+  ++NumDeserializedFunc;
 
   assert(!(fn->getGenericEnvironment() && !fn->empty())
          && "function already has context generic params?!");
@@ -1457,7 +1457,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(substConventions.getNumSILArguments() == ListOfValues.size()
            && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I)
       Args.push_back(getLocalValue(ListOfValues[I],
                                    substConventions.getSILArgumentType(
                                        I, Builder.getTypeExpansionContext())));
@@ -1494,7 +1494,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(substConventions.getNumSILArguments() == ListOfValues.size()
            && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I)
       Args.push_back(getLocalValue(ListOfValues[I],
                                    substConventions.getSILArgumentType(
                                        I, Builder.getTypeExpansionContext())));
@@ -1527,7 +1527,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue FnVal = getLocalValue(ValID, FnTy);
     SmallVector<SILValue, 4> Args;
     unsigned unappliedArgs = numArgs - ListOfValues.size();
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I)
       Args.push_back(getLocalValue(
           ListOfValues[I],
           fnConv.getSILArgumentType(I + unappliedArgs,
@@ -2084,7 +2084,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     TupleType *TT = Ty->castTo<TupleType>();
     assert(TT && "Type of a TupleInst should be TupleType");
     SmallVector<SILValue, 4> OpList;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++) {
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I) {
       Type EltTy = TT->getElement(I).getType();
       OpList.push_back(
         getLocalValue(ListOfValues[I],
@@ -3081,7 +3081,7 @@ void SILDeserializer::getAllVTables() {
   if (!VTableList)
     return;
 
-  for (unsigned I = 0, E = VTables.size(); I < E; I++)
+  for (unsigned I = 0, E = VTables.size(); I < E; ++I)
     readVTable(I+1);
 }
 
@@ -3361,7 +3361,7 @@ llvm::Expected<SILWitnessTable *>
 void SILDeserializer::getAllWitnessTables() {
   if (!WitnessTableList)
     return;
-  for (unsigned I = 0, E = WitnessTables.size(); I < E; I++) {
+  for (unsigned I = 0, E = WitnessTables.size(); I < E; ++I) {
     auto maybeTable = readWitnessTableChecked(I + 1, nullptr);
     if (!maybeTable) {
       if (maybeTable.errorIsA<XRefNonLoadedModuleError>()) {
@@ -3500,7 +3500,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
 void SILDeserializer::getAllDefaultWitnessTables() {
   if (!DefaultWitnessTableList)
     return;
-  for (unsigned I = 0, E = DefaultWitnessTables.size(); I < E; I++)
+  for (unsigned I = 0, E = DefaultWitnessTables.size(); I < E; ++I)
     readDefaultWitnessTable(I + 1, nullptr);
 }
 

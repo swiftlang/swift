@@ -1604,7 +1604,7 @@ private:
     // Assume the error parameter doesn't have interesting lowering.
     Inputs.push_back(SILParameterInfo(foreignErrorTy,
                                       ParameterConvention::Direct_Unowned));
-    NextOrigParamIndex++;
+    ++NextOrigParamIndex;
     return true;
   }
 
@@ -3302,7 +3302,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       auto derivedParams = derivedFunc.getParams();
       auto baseParams = baseFunc.getParams();
       assert(derivedParams.size() == baseParams.size());
-      for (unsigned i = 0, e = derivedParams.size(); i < e; i++) {
+      for (unsigned i = 0, e = derivedParams.size(); i < e; ++i) {
         assert(derivedParams[i].getParameterFlags() ==
                baseParams[i].getParameterFlags());
 

@@ -316,7 +316,7 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
   // Collect argument indices that are required to be constants.
   SmallVector<unsigned, 4> constantArgumentIndices;
   auto paramList = callee->getParameters();
-  for (unsigned i = 0; i < paramList->size(); i++) {
+  for (unsigned i = 0; i < paramList->size(); ++i) {
     ParamDecl *param = paramList->get(i);
     if (isParamRequiredToBeConstant(callee, param))
       constantArgumentIndices.push_back(i);

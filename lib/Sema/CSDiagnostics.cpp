@@ -651,7 +651,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
 
     // Disregard optional payload element to look at its source.
-    toDrop++;
+    ++toDrop;
   }
 
   path = path.drop_back(toDrop);
@@ -1103,7 +1103,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
   std::pair<bool, Expr *> walkToExprPre(Expr *E) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       if (DRE->getDecl() == varDecl)
-        count++;
+        ++count;
     }
     return { true, E };
   }

@@ -46,7 +46,7 @@ size_t swift::markup::measureIndentation(StringRef Text) {
   size_t Col = 0;
   for (size_t i = 0, e = Text.size(); i != e; ++i) {
     if (Text[i] == ' ' || Text[i] == '\v' || Text[i] == '\f') {
-      Col++;
+      ++Col;
       continue;
     }
 

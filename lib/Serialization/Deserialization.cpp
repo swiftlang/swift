@@ -478,7 +478,7 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
   if (auto *Stats = getContext().Stats)
-    Stats->getFrontendCounters().NumConformancesDeserialized++;
+    ++Stats->getFrontendCounters().NumConformancesDeserialized;
 
   unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
   switch (kind) {
@@ -4510,7 +4510,7 @@ DeclDeserializer::getDeclCheckedImpl(
   }
 
   if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumDeclsDeserialized++;
+    ++s->getFrontendCounters().NumDeclsDeserialized;
 
   // FIXME: @_dynamicReplacement(for:) includes a reference to another decl,
   // usually in the same type, and that can result in this decl being
@@ -5637,7 +5637,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumTypesDeserialized++;
+    ++s->getFrontendCounters().NumTypesDeserialized;
 
   llvm::BitstreamEntry entry =
       MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());

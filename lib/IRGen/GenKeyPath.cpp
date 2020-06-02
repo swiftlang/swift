@@ -688,7 +688,7 @@ static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
     for (auto *other : superDecl->getStoredProperties()) {
       if (other == property)
         return index;
-      index++;
+      ++index;
     }
   }
 

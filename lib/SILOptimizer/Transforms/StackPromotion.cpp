@@ -140,7 +140,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
     LLVM_DEBUG(llvm::dbgs() << "  uses don't post-dom allocation -> don't promote");
     return false;
   }
-  NumStackPromoted++;
+  ++NumStackPromoted;
 
   // We set the [stack] attribute in the alloc_ref.
   ARI->setStackAllocatable();

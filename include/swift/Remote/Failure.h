@@ -255,7 +255,7 @@ public:
       result.append(text, next - text);
 
       // Skip the '%'.
-      next++;
+      ++next;
 
       // Do something based on the character after '%'.
       char c = *next++;

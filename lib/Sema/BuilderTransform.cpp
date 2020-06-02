@@ -400,7 +400,7 @@ protected:
                                           unsigned &numPayloads,
                                           bool &isOptional) {
     // The 'then' clause contributes a payload.
-    numPayloads++;
+    ++numPayloads;
 
     // If there's an 'else' clause, it contributes payloads:
     if (auto elseStmt = ifStmt->getElseStmt()) {
@@ -410,7 +410,7 @@ protected:
                                            isOptional);
       // Otherwise it's just the one.
       } else {
-        numPayloads++;
+        ++numPayloads;
       }
 
     // If not, the chain result is at least optional.

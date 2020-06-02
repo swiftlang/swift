@@ -710,7 +710,7 @@ namespace {
             if (args != argEnd) {
               labelSpaces.push_back(
                   std::pair<Identifier, Space>(*args, param));
-              args++;
+              ++args;
             } else
               labelSpaces.push_back(
                   std::pair<Identifier, Space>(Identifier(), param));
@@ -1336,7 +1336,7 @@ namespace {
 
             for (size_t rowIdx = 0, colIdx = 0; rowIdx < matrix.size(); ++rowIdx) {
               if (rowIdx != 0 && (rowIdx % stride) == 0) {
-                colIdx++;
+                ++colIdx;
               }
 
               matrix[rowIdx].push_back(columnVect[colIdx]);

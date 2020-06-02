@@ -764,7 +764,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     ++NumLazyRequirementSignaturesLoaded;
     // FIXME: (transitional) increment the redundant "always-on" counter.
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded++;
+      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
 
     auto contextData = static_cast<LazyProtocolData *>(
         ctx.getOrCreateLazyContextData(proto, nullptr));

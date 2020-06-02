@@ -594,7 +594,7 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
     // element.
     elementTypeLowering.emitStore(builder, loc, elementSIL, currentStorageAddr,
                                   StoreOwnershipQualifier::Init);
-    elementIndex++;
+    ++elementIndex;
   }
   return arraySIL;
 }

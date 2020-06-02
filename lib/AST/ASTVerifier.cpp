@@ -1692,7 +1692,7 @@ public:
           // Look through optional evaluations.
           if (auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
             subExpr = optionalEval->getSubExpr();
-            optionalDepth++;
+            ++optionalDepth;
             continue;
           }
 
@@ -3165,7 +3165,7 @@ public:
         unsigned NumDestructors = 0;
         for (auto Member : CD->getMembers()) {
           if (isa<DestructorDecl>(Member)) {
-            NumDestructors++;
+            ++NumDestructors;
           }
         }
         if (NumDestructors > 1) {

@@ -3801,7 +3801,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     }
     // Convert direct result to indirect result.
     // Increment thunk argument iterator; reabstraction handled later.
-    toArgIter++;
+    ++toArgIter;
   }
 
   // Reabstract parameters.

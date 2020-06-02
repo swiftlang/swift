@@ -193,7 +193,7 @@ bool SILWitnessTable::enumerateWitnessTableConditionalConformances(
       if (fn(conformanceIndex, req.getFirstType()->getCanonicalType(), proto))
         return true;
 
-      conformanceIndex++;
+      ++conformanceIndex;
     }
   }
   return false;
