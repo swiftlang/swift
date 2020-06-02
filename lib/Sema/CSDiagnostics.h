@@ -2121,12 +2121,12 @@ protected:
 ///
 /// `0` has to be wrapped into `E(rawValue: 0)` and either defaulted via `??` or
 /// force unwrapped to constitute a valid binding.
-class MissingRawRepresentativeInitFailure final
+class MissingRawRepresentableInitFailure final
     : public AbstractRawRepresentableFailure {
 public:
-  MissingRawRepresentativeInitFailure(const Solution &solution,
-                                      Type rawReprType, Type expectedType,
-                                      ConstraintLocator *locator)
+  MissingRawRepresentableInitFailure(const Solution &solution, Type rawReprType,
+                                     Type expectedType,
+                                     ConstraintLocator *locator)
       : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
                                         locator) {}
 

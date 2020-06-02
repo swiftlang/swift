@@ -3164,8 +3164,8 @@ bool ConstraintSystem::repairFailures(
   // and if so check that given `expectedType` matches its `RawValue` type. If
   // that condition holds add a tailored fix which is going to suggest to
   // explicitly construct a raw representable type from a given value type.
-  auto repairByExplicitRawRepresentativeUse = [&](Type expectedType,
-                                                  Type rawReprType) -> bool {
+  auto repairByConstructingRawRepresentableType =
+      [&](Type expectedType, Type rawReprType) -> bool {
     if (!isValueOfRawRepresentable(expectedType, rawReprType))
       return false;
 
@@ -3406,7 +3406,7 @@ bool ConstraintSystem::repairFailures(
         return true;
 
       // `rhs` - is an assignment destination and `lhs` is its source.
-      if (repairByExplicitRawRepresentativeUse(lhs, rhs))
+      if (repairByConstructingRawRepresentableType(lhs, rhs))
         return true;
 
       if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
@@ -3674,7 +3674,7 @@ bool ConstraintSystem::repairFailures(
       return true;
 
     // `lhs` - is an argument and `rhs` is a parameter type.
-    if (repairByExplicitRawRepresentativeUse(lhs, rhs))
+    if (repairByConstructingRawRepresentableType(lhs, rhs))
       break;
 
     if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
@@ -3914,7 +3914,7 @@ bool ConstraintSystem::repairFailures(
       break;
 
     // `lhs` - is an result type and `rhs` is a contextual type.
-    if (repairByExplicitRawRepresentativeUse(lhs, rhs))
+    if (repairByConstructingRawRepresentableType(lhs, rhs))
       break;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(

@@ -6308,7 +6308,7 @@ bool AbstractRawRepresentableFailure::diagnoseAsNote() {
   return false;
 }
 
-void MissingRawRepresentativeInitFailure::fixIt(
+void MissingRawRepresentableInitFailure::fixIt(
     InFlightDiagnostic &diagnostic) const {
   if (auto *E = getAsExpr(getAnchor())) {
     auto range = E->getSourceRange();

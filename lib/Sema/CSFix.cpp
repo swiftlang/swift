@@ -1124,8 +1124,8 @@ bool ExpandArrayIntoVarargs::diagnose(const Solution &solution,
 
 bool ExplicitlyConstructRawRepresentable::diagnose(const Solution &solution,
                                                    bool asNote) const {
-  MissingRawRepresentativeInitFailure failure(solution, RawReprType,
-                                              ExpectedType, getLocator());
+  MissingRawRepresentableInitFailure failure(solution, RawReprType,
+                                             ExpectedType, getLocator());
   return failure.diagnose(asNote);
 }
 
