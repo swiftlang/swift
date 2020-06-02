@@ -1207,7 +1207,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // Adding these argumnets may not be necessary.
   // FIXME: remove it?
   for (auto EM: searchPathOpts.ExplicitSwiftModules) {
-    GenericArgs.push_back(ArgSaver.save((llvm::Twine("-swift-module-file=") + EM).str()));
+    GenericArgs.push_back("-swift-module-file");
+    GenericArgs.push_back(ArgSaver.save(EM));
   }
   if (clangImporter) {
     // We need to add these extra clang flags because explict module building

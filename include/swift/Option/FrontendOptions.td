@@ -217,8 +217,9 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules explicitly by the compiler">;
 
-def swift_module_file_EQ : Joined<["-"], "swift-module-file=">,
-  HelpText<"Specify Swift module explicitly built from textual interface">;
+def swift_module_file
+  : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module explicitly built from textual interface">;
 }
 
 
