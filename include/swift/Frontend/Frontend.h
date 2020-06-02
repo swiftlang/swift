@@ -642,10 +642,11 @@ private:
 public:
   void freeASTContext();
 
-private:
-  /// Load stdlib & return true if should continue, i.e. no error
-  bool loadStdlib();
+  /// If an implicit standard library import is expected, loads the standard
+  /// library, returning \c false if we should continue, i.e. no error.
+  bool loadStdlibIfNeeded();
 
+private:
   /// Retrieve a description of which modules should be implicitly imported.
   ImplicitImportInfo getImplicitImportInfo() const;
 
