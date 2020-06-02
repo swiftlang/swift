@@ -1,0 +1,10 @@
+{
+  "lib.swift": {
+    "object": "./lib.o",
+    "swift-dependencies": "./lib.swiftdeps"
+  },
+  "": {
+    "swift-dependencies": "./submodule~buildrecord.swiftdeps"
+  }
+}
+
