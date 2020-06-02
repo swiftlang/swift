@@ -3127,6 +3127,9 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     switch (entry.TheKind) {
     case SILVTable::Entry::Kind::Normal:
       break;
+    case SILVTable::Entry::Kind::NormalNonOverridden:
+      OS << " [nonoverridden]";
+      break;
     case SILVTable::Entry::Kind::Inherited:
       OS << " [inherited]";
       break;
