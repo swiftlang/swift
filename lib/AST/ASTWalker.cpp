@@ -898,7 +898,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->setSubExpr(Sub);
     }
 
-    if (doIt(E->getCastTypeLoc()))
+    if (doIt(E->getTypePattern()) == nullptr)
       return nullptr;
 
     return E;

@@ -1972,7 +1972,8 @@ static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
 }
 RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
-                         E->getCastTypeLoc().getType(), E->getCastKind());
+                         E->getTypePattern()->getType(),
+                         E->getCastKind());
   return emitBoolLiteral(SGF, E, isa, C);
 }
 

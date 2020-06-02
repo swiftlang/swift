@@ -987,8 +987,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         // let's allow collector discover it with assigned contextual type
         // of coercion, which allows collections to be solved in parts.
         if (auto collectionExpr = dyn_cast<CollectionExpr>(childExpr)) {
-          auto castTypeLoc = coerceExpr->getCastTypeLoc();
-          auto typeRepr = castTypeLoc.getTypeRepr();
+          auto *const typeRepr = coerceExpr->getTypePattern()->getTypeRepr();
 
           if (typeRepr && isSuitableCollection(typeRepr)) {
             auto resolution = TypeResolution::forContextual(CS.DC, None);

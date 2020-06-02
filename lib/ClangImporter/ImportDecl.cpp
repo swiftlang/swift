@@ -648,10 +648,7 @@ synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
     auto bridge = new (ctx) BridgeFromObjCExpr(storedRef, computedType);
     bridge->setType(computedType);
 
-    auto coerce = new (ctx) CoerceExpr(bridge, {}, {nullptr, computedType});
-    coerce->setType(computedType);
-
-    result = coerce;
+    result = CoerceExpr::createImplicit(ctx, bridge, computedType);;
   }
 
   auto ret = new (ctx) ReturnStmt(SourceLoc(), result);
@@ -1566,11 +1563,7 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
     auto bridge = new (ctx) BridgeToObjCExpr(paramRef, storedType);
     bridge->setType(storedType);
 
-    auto coerce = new (ctx) CoerceExpr(bridge, SourceLoc(),
-                                       {nullptr, storedType});
-    coerce->setType(storedType);
-
-    rhs = coerce;
+    rhs = CoerceExpr::createImplicit(ctx, bridge, storedType);
   }
 
   // Add assignment.

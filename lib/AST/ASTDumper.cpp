@@ -2609,9 +2609,12 @@ public:
     printCommon(E, name) << ' ';
     if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
       OS << getCheckedCastKindName(checkedCast->getCastKind()) << ' ';
-    OS << "writtenType='";
-    GetTypeOfTypeLoc(E->getCastTypeLoc()).print(OS);
-    OS << "'\n";
+
+    if (E->getTypePattern()->getTypeRepr()) {
+      OS << "writtenType='";
+      E->getTypePattern()->getTypeRepr()->print(OS);
+      OS << "'\n";
+    }
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

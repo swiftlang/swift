@@ -50,6 +50,7 @@ namespace swift {
   class OpenedArchetypeType;
   class ParamDecl;
   class Pattern;
+  class TypePattern;
   class SubscriptDecl;
   class Stmt;
   class BraceStmt;
@@ -4591,23 +4592,20 @@ public:
 class ExplicitCastExpr : public Expr {
   Expr *SubExpr;
   SourceLoc AsLoc;
-  TypeLoc CastTy;
+  TypePattern *const CastTyPattern;
 
 protected:
-  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc castTy)
-    : Expr(kind, /*Implicit=*/false), SubExpr(sub), AsLoc(AsLoc), CastTy(castTy)
-  {}
+  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc,
+                   TypePattern *tyPattern)
+      : Expr(kind, /*Implicit=*/false), SubExpr(sub), AsLoc(AsLoc),
+        CastTyPattern(tyPattern) {}
 
 public:
   Expr *getSubExpr() const { return SubExpr; }
-  
-  /// Get the type syntactically spelled in the cast. For some forms of checked
-  /// cast this is different from the result type of the expression.
-  TypeLoc &getCastTypeLoc() { return CastTy; }
 
   /// Get the type syntactically spelled in the cast. For some forms of checked
   /// cast this is different from the result type of the expression.
-  TypeLoc getCastTypeLoc() const { return CastTy; }
+  TypePattern *getTypePattern() const { return CastTyPattern; }
 
   void setSubExpr(Expr *E) { SubExpr = E; }
 
@@ -4622,16 +4620,7 @@ public:
     return AsLoc;
   }
 
-  SourceRange getSourceRange() const {
-    SourceRange castTyRange = CastTy.getSourceRange();
-    if (castTyRange.isInvalid())
-      return SubExpr->getSourceRange();
-    
-    auto startLoc = SubExpr ? SubExpr->getStartLoc() : AsLoc;
-    auto endLoc = castTyRange.End;
-    
-    return {startLoc, endLoc};
-  }
+  SourceRange getSourceRange() const;
   
   /// True if the node has been processed by SequenceExpr folding.
   bool isFolded() const { return SubExpr; }
@@ -4648,14 +4637,14 @@ StringRef getCheckedCastKindName(CheckedCastKind kind);
 /// Abstract base class for checked casts 'as' and 'is'. These represent
 /// casts that can dynamically fail.
 class CheckedCastExpr : public ExplicitCastExpr {
-public:
-  CheckedCastExpr(ExprKind kind,
-                  Expr *sub, SourceLoc asLoc, TypeLoc castTy)
-    : ExplicitCastExpr(kind, sub, asLoc, castTy)
-  {
+protected:
+  CheckedCastExpr(ExprKind kind, Expr *sub, SourceLoc asLoc,
+                  TypePattern *tyPattern)
+      : ExplicitCastExpr(kind, sub, asLoc, tyPattern) {
     Bits.CheckedCastExpr.CastKind = unsigned(CheckedCastKind::Unresolved);
   }
-  
+
+public:
   /// Return the semantic kind of cast performed.
   CheckedCastKind getCastKind() const {
     return CheckedCastKind(Bits.CheckedCastExpr.CastKind);
@@ -4679,22 +4668,20 @@ public:
 /// from a value of some type to some specified subtype and fails dynamically
 /// if the value does not have that type.
 /// Spelled 'a as! T' and produces a value of type 'T'.
-class ForcedCheckedCastExpr : public CheckedCastExpr {
+class ForcedCheckedCastExpr final : public CheckedCastExpr {
   SourceLoc ExclaimLoc;
 
-public:
   ForcedCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc exclaimLoc,
-                        TypeLoc type)
-    : CheckedCastExpr(ExprKind::ForcedCheckedCast,
-                      sub, asLoc, type),
-      ExclaimLoc(exclaimLoc)
-  {
-  }
+                        TypePattern *tyPattern)
+      : CheckedCastExpr(ExprKind::ForcedCheckedCast, sub, asLoc, tyPattern),
+        ExclaimLoc(exclaimLoc) {}
 
-  ForcedCheckedCastExpr(SourceLoc asLoc, SourceLoc exclaimLoc, TypeLoc type)
-    : ForcedCheckedCastExpr(nullptr, asLoc, exclaimLoc, type)
-  {
-  }
+public:
+  static ForcedCheckedCastExpr *create(ASTContext &ctx, SourceLoc asLoc,
+                                       SourceLoc exclaimLoc, TypeRepr *tyRepr);
+
+  static ForcedCheckedCastExpr *createImplicit(ASTContext &ctx, Expr *sub,
+                                               Type castTy);
 
   /// Retrieve the location of the '!' that follows 'as'.
   SourceLoc getExclaimLoc() const { return ExclaimLoc; }
@@ -4708,21 +4695,25 @@ public:
 /// from a type to some subtype and produces an Optional value, which will be
 /// .Some(x) if the cast succeeds, or .None if the cast fails.
 /// Spelled 'a as? T' and produces a value of type 'T?'.
-class ConditionalCheckedCastExpr : public CheckedCastExpr {
+class ConditionalCheckedCastExpr final : public CheckedCastExpr {
   SourceLoc QuestionLoc;
 
-public:
   ConditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc questionLoc,
-                             TypeLoc type)
-    : CheckedCastExpr(ExprKind::ConditionalCheckedCast,
-                      sub, asLoc, type),
-      QuestionLoc(questionLoc)
-  { }
-  
-  ConditionalCheckedCastExpr(SourceLoc asLoc, SourceLoc questionLoc,
-                             TypeLoc type)
-    : ConditionalCheckedCastExpr(nullptr, asLoc, questionLoc, type)
-  {}
+                             TypePattern *tyPattern)
+      : CheckedCastExpr(ExprKind::ConditionalCheckedCast, sub, asLoc,
+                        tyPattern),
+        QuestionLoc(questionLoc) {}
+
+public:
+  static ConditionalCheckedCastExpr *create(ASTContext &ctx, SourceLoc asLoc,
+                                            SourceLoc questionLoc,
+                                            TypeRepr *tyRepr);
+
+  static ConditionalCheckedCastExpr *createImplicit(ASTContext &ctx, Expr *sub,
+                                                    Type castTy);
+
+  static ConditionalCheckedCastExpr *createImplicit(ASTContext &ctx, Expr *sub,
+                                                    TypePattern *tyPattern);
 
   /// Retrieve the location of the '?' that follows 'as'.
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
@@ -4737,16 +4728,13 @@ public:
 /// of the type and 'a as T' would succeed, false otherwise.
 ///
 /// FIXME: We should support type queries with a runtime metatype value too.
-class IsExpr : public CheckedCastExpr {
+class IsExpr final : public CheckedCastExpr {
+  IsExpr(Expr *sub, SourceLoc isLoc, TypePattern *tyPattern)
+      : CheckedCastExpr(ExprKind::Is, sub, isLoc, tyPattern) {}
+
 public:
-  IsExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
-    : CheckedCastExpr(ExprKind::Is, sub, isLoc, type)
-  {}
-  
-  IsExpr(SourceLoc isLoc, TypeLoc type)
-    : IsExpr(nullptr, isLoc, type)
-  {}
-  
+  static IsExpr *create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr);
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Is;
   }
@@ -4755,35 +4743,29 @@ public:
 /// Represents an explicit coercion from a value to a specific type.
 ///
 /// Spelled 'a as T' and produces a value of type 'T'.
-class CoerceExpr : public ExplicitCastExpr {
+class CoerceExpr final : public ExplicitCastExpr {
   /// Since there is already `asLoc` location,
   /// we use it to store `start` of the initializer
   /// call source range to save some storage.
   SourceLoc InitRangeEnd;
 
-public:
-  CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
-    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type)
-  { }
+  CoerceExpr(Expr *sub, SourceLoc asLoc, TypePattern *tyPattern)
+      : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, tyPattern) {}
 
-  CoerceExpr(SourceLoc asLoc, TypeLoc type)
-    : CoerceExpr(nullptr, asLoc, type)
-  { }
-
-private:
-  CoerceExpr(SourceRange initRange, Expr *literal, TypeLoc type)
-    : ExplicitCastExpr(ExprKind::Coerce, literal, initRange.Start,
-                       type), InitRangeEnd(initRange.End)
-  { setImplicit(); }
+  CoerceExpr(SourceRange initRange, Expr *literal, TypePattern *tyPattern)
+      : ExplicitCastExpr(ExprKind::Coerce, literal, initRange.Start, tyPattern),
+        InitRangeEnd(initRange.End) {}
 
 public:
+  static CoerceExpr *create(ASTContext &ctx, SourceLoc asLoc, TypeRepr *tyRepr);
+
+  static CoerceExpr *createImplicit(ASTContext &ctx, Expr *sub, Type castTy);
+
   /// Create an implicit coercion expression for literal initialization
   /// preserving original source information, this way original call
   /// could be recreated if needed.
   static CoerceExpr *forLiteralInit(ASTContext &ctx, Expr *literal,
-                                    SourceRange range, TypeLoc literalType) {
-    return new (ctx) CoerceExpr(range, literal, literalType);
-  }
+                                    SourceRange range, TypeRepr *literalTyRepr);
 
   bool isLiteralInit() const { return InitRangeEnd.isValid(); }
 

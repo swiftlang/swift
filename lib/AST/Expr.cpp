@@ -1831,6 +1831,84 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
   return otherCtorRef;
 }
 
+SourceRange ExplicitCastExpr::getSourceRange() const {
+  const SourceRange castTyRange = CastTyPattern->getSourceRange();
+  if (castTyRange.isInvalid())
+    return SubExpr->getSourceRange();
+
+  const auto startLoc = SubExpr ? SubExpr->getStartLoc() : AsLoc;
+  const auto endLoc = castTyRange.End;
+
+  return {startLoc, endLoc};
+}
+
+ForcedCheckedCastExpr *ForcedCheckedCastExpr::create(ASTContext &ctx,
+                                                     SourceLoc asLoc,
+                                                     SourceLoc exclaimLoc,
+                                                     TypeRepr *tyRepr) {
+  return new (ctx) ForcedCheckedCastExpr(nullptr, asLoc, exclaimLoc,
+                                         new (ctx) TypePattern(tyRepr));
+}
+
+ForcedCheckedCastExpr *
+ForcedCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub, Type castTy) {
+  auto *const expr = new (ctx) ForcedCheckedCastExpr(
+      sub, SourceLoc(), SourceLoc(), TypePattern::createImplicit(ctx, castTy));
+  expr->setType(castTy);
+  expr->setImplicit();
+  return expr;
+}
+
+ConditionalCheckedCastExpr *
+ConditionalCheckedCastExpr::create(ASTContext &ctx, SourceLoc asLoc,
+                                   SourceLoc questionLoc, TypeRepr *tyRepr) {
+  return new (ctx) ConditionalCheckedCastExpr(nullptr, asLoc, questionLoc,
+                                              new (ctx) TypePattern(tyRepr));
+}
+
+ConditionalCheckedCastExpr *
+ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
+                                           Type castTy) {
+  return createImplicit(ctx, sub, TypePattern::createImplicit(ctx, castTy));
+}
+
+ConditionalCheckedCastExpr *
+ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
+                                           TypePattern *tyPattern) {
+  auto *const expr = new (ctx)
+      ConditionalCheckedCastExpr(sub, SourceLoc(), SourceLoc(), tyPattern);
+  expr->setType(OptionalType::get(tyPattern->getType()));
+  expr->setImplicit();
+  return expr;
+}
+
+IsExpr *IsExpr::create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr) {
+  return new (ctx) IsExpr(nullptr, isLoc, new (ctx) TypePattern(tyRepr));
+}
+
+CoerceExpr *CoerceExpr::create(ASTContext &ctx, SourceLoc asLoc,
+                               TypeRepr *tyRepr) {
+  return new (ctx) CoerceExpr(nullptr, asLoc, new (ctx) TypePattern(tyRepr));
+}
+
+CoerceExpr *CoerceExpr::createImplicit(ASTContext &ctx, Expr *sub,
+                                       Type castTy) {
+  auto *const expr = new (ctx)
+      CoerceExpr(sub, SourceLoc(), TypePattern::createImplicit(ctx, castTy));
+  expr->setType(castTy);
+  expr->setImplicit();
+  return expr;
+}
+
+CoerceExpr *CoerceExpr::forLiteralInit(ASTContext &ctx, Expr *literal,
+                                       SourceRange range,
+                                       TypeRepr *literalTyRepr) {
+  auto *const expr = new (ctx)
+      CoerceExpr(range, literal, new (ctx) TypePattern(literalTyRepr));
+  expr->setImplicit();
+  return expr;
+}
+
 void AbstractClosureExpr::setParameterList(ParameterList *P) {
   parameterList = P;
   // Change the DeclContext of any parameters to be this closure.

@@ -1043,29 +1043,19 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   Call->setType(copyMethodType->getResult());
   Call->setThrows(false);
 
-  TypeLoc ResultTy;
-  ResultTy.setType(VD->getType());
-
   // If we're working with non-optional types, we're forcing the cast.
   if (!isOptional) {
-    auto *Cast =
-      new (Ctx) ForcedCheckedCastExpr(Call, SourceLoc(), SourceLoc(),
-                                      TypeLoc::withoutLoc(underlyingType));
+    auto *const Cast =
+        ForcedCheckedCastExpr::createImplicit(Ctx, Call, underlyingType);
     Cast->setCastKind(CheckedCastKind::ValueCast);
-    Cast->setType(underlyingType);
-    Cast->setImplicit();
-
     return Cast;
   }
 
   // We're working with optional types, so perform a conditional checked
   // downcast.
-  auto *Cast =
-    new (Ctx) ConditionalCheckedCastExpr(Call, SourceLoc(), SourceLoc(),
-                                         TypeLoc::withoutLoc(underlyingType));
+  auto *const Cast =
+      ConditionalCheckedCastExpr::createImplicit(Ctx, Call, underlyingType);
   Cast->setCastKind(CheckedCastKind::ValueCast);
-  Cast->setType(OptionalType::get(underlyingType));
-  Cast->setImplicit();
 
   // Use OptionalEvaluationExpr to evaluate the "?".
   auto *Result = new (Ctx) OptionalEvaluationExpr(Cast);
