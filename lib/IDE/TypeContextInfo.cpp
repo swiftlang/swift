@@ -19,6 +19,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "llvm/ADT/SmallSet.h"
 
 using namespace swift;
 using namespace ide;

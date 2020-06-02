@@ -22,6 +22,7 @@
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include <string>
 
 namespace llvm {

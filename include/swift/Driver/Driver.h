@@ -25,7 +25,6 @@
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 
 #include <functional>

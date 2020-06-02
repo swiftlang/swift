@@ -35,7 +35,6 @@
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/References.h"
 #include "swift/Config.h"
-#include "llvm/ADT/SetVector.h"
 
 namespace llvm {
   template <typename...  PTs> class PointerUnion;

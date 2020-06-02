@@ -20,6 +20,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
