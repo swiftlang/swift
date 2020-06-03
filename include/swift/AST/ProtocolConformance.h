@@ -289,7 +289,7 @@ public:
 
   // Only allow allocation of protocol conformances using the allocator in
   // ASTContext or by doing a placement new.
-  void *operator new(size_t bytes, ASTContext &context,
+  void *operator new(size_t bytes, const ASTContext &context,
                      AllocationArena arena,
                      unsigned alignment = alignof(ProtocolConformance));
   void *operator new(size_t bytes, void *mem) {

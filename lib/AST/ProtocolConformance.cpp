@@ -185,11 +185,10 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   return getConcrete()->getWitnessDeclRef(requirement);
 }
 
-void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
+void *ProtocolConformance::operator new(size_t bytes, const ASTContext &context,
                                         AllocationArena arena,
                                         unsigned alignment) {
   return context.Allocate(bytes, alignment, arena);
-
 }
 
 #define CONFORMANCE_SUBCLASS_DISPATCH(Method, Args)                          \
