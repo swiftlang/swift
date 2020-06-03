@@ -4749,7 +4749,7 @@ IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
 
 AutoDiffDerivativeFunctionIdentifier *AutoDiffDerivativeFunctionIdentifier::get(
     AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
-    GenericSignature derivativeGenericSignature, ASTContext &C) {
+    GenericSignature derivativeGenericSignature, const ASTContext &C) {
   assert(parameterIndices);
   auto &foldingSet = C.getImpl().AutoDiffDerivativeFunctionIdentifiers;
   llvm::FoldingSetNodeID id;

@@ -134,7 +134,7 @@ public:
 
   static AutoDiffDerivativeFunctionIdentifier *
   get(AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
-      GenericSignature derivativeGenericSignature, ASTContext &C);
+      GenericSignature derivativeGenericSignature, const ASTContext &C);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     ID.AddInteger(kind);
