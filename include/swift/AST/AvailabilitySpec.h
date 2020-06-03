@@ -54,9 +54,8 @@ public:
 
   SourceRange getSourceRange() const;
 
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(AvailabilitySpec));
+  void *operator new(size_t Bytes, const ASTContext &C,
+                     unsigned Alignment = alignof(AvailabilitySpec));
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
 };
@@ -101,9 +100,9 @@ public:
     return Spec->getKind() == AvailabilitySpecKind::PlatformVersionConstraint;
   }
 
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(PlatformVersionConstraintAvailabilitySpec)){
+  void *operator new(
+      size_t Bytes, const ASTContext &C,
+      unsigned Alignment = alignof(PlatformVersionConstraintAvailabilitySpec)) {
     return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };
@@ -148,9 +147,9 @@ public:
       Spec->getKind() == AvailabilitySpecKind::PackageDescriptionVersionConstraint;
   }
 
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(PlatformAgnosticVersionConstraintAvailabilitySpec)){
+  void *operator new(size_t Bytes, const ASTContext &C,
+                     unsigned Alignment = alignof(
+                         PlatformAgnosticVersionConstraintAvailabilitySpec)) {
     return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };
@@ -181,7 +180,7 @@ public:
   }
 
   void *
-  operator new(size_t Bytes, ASTContext &C,
+  operator new(size_t Bytes, const ASTContext &C,
                unsigned Alignment = alignof(OtherPlatformAvailabilitySpec)) {
     return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }

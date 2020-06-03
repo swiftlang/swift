@@ -37,7 +37,7 @@ SourceRange AvailabilitySpec::getSourceRange() const {
 
 // Only allow allocation of AvailabilitySpecs using the
 // allocator in ASTContext.
-void *AvailabilitySpec::operator new(size_t Bytes, ASTContext &C,
+void *AvailabilitySpec::operator new(size_t Bytes, const ASTContext &C,
                                      unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
