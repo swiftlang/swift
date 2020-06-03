@@ -22,7 +22,7 @@ let moduleDependencyGraph = try! decoder.decode(
 
 func findModuleBuildingCommand(_ moduleName: String) -> [String]? {
   for (_, dep) in moduleDependencyGraph.modules {
-    if dep.modulePath.hasSuffix(moduleName) {
+    if URL(fileURLWithPath: dep.modulePath).lastPathComponent == moduleName {
       switch dep.details {
       case .swift(let details):
         return details.commandLine

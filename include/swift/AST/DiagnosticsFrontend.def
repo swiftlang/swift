@@ -326,6 +326,8 @@ ERROR(error_extracting_version_from_module_interface,none,
 ERROR(unsupported_version_of_module_interface,none,
       "unsupported version of module interface '%0': '%1'",
       (StringRef, llvm::VersionTuple))
+ERROR(error_opening_explicit_module_file,none,
+      "failed to open explicit Swift module: %0", (StringRef))
 ERROR(error_extracting_flags_from_module_interface,none,
       "error extracting flags from module interface", ())
 REMARK(rebuilding_module_from_interface,none,
