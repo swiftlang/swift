@@ -5740,9 +5740,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       CurDeclContext = DC;
   }
 
-  typeCheckContextUntil(
+  typeCheckContextAt(
       CurDeclContext,
-      CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
+      ParsedExpr
+          ? ParsedExpr->getLoc()
+          : CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
 
   // Add keywords even if type checking fails completely.
   addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
