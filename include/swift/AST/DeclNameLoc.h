@@ -67,7 +67,7 @@ public:
 
   /// Create declaration name location information for a compound
   /// name.
-  DeclNameLoc(ASTContext &ctx, SourceLoc baseNameLoc,
+  DeclNameLoc(const ASTContext &ctx, SourceLoc baseNameLoc,
               SourceLoc lParenLoc,
               ArrayRef<SourceLoc> argumentLabelLocs,
               SourceLoc rParenLoc);

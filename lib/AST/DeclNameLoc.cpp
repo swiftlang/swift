@@ -19,7 +19,7 @@
 
 using namespace swift;
 
-DeclNameLoc::DeclNameLoc(ASTContext &ctx, SourceLoc baseNameLoc,
+DeclNameLoc::DeclNameLoc(const ASTContext &ctx, SourceLoc baseNameLoc,
                          SourceLoc lParenLoc,
                          ArrayRef<SourceLoc> argumentLabelLocs,
                          SourceLoc rParenLoc)
