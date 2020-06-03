@@ -32,8 +32,6 @@ class SourceFile final : public FileUnit {
   friend class ParseSourceFileRequest;
 
 public:
-  struct SourceFileSyntaxInfo;
-
   /// Possible attributes for imports in source files.
   enum class ImportFlags {
     /// The imported module is exposed to anyone who imports the parent module.
@@ -110,11 +108,23 @@ public:
     /// and adjust the client call 'performParseOnly'.
     DisablePoundIfEvaluation = 1 << 1,
 
+    /// Whether to build a syntax tree.
+    BuildSyntaxTree = 1 << 2,
+
+    /// Whether to save the file's parsed tokens.
+    CollectParsedTokens = 1 << 3,
+
+    /// Whether to compute the interface hash of the file.
+    EnableInterfaceHash = 1 << 4,
+
     /// Whether to suppress warnings when parsing. This is set for secondary
     /// files, as they get parsed multiple times.
-    SuppressWarnings = 1 << 2
+    SuppressWarnings = 1 << 5,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
+
+  /// Retrieve the parsing options specified in the LangOptions.
+  static ParsingOptions getDefaultParsingOptions(const LangOptions &langOpts);
 
 private:
   std::unique_ptr<SourceLookupCache> Cache;
@@ -313,7 +323,6 @@ public:
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             bool KeepParsedTokens = false, bool KeepSyntaxTree = false,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
@@ -544,13 +553,9 @@ public:
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);
 
-  void enableInterfaceHash() {
-    assert(!hasInterfaceHash());
-    InterfaceHash.emplace();
-  }
-
+  /// Whether this file has an interface hash available.
   bool hasInterfaceHash() const {
-    return InterfaceHash.hasValue();
+    return ParsingOpts.contains(ParsingFlags::EnableInterfaceHash);
   }
 
   NullablePtr<llvm::MD5> getInterfaceHashPtr() {
@@ -608,7 +613,8 @@ private:
   /// source file.
   Optional<std::vector<Token>> AllCollectedTokens;
 
-  std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
+  /// The root of the syntax tree representing the source file.
+  std::unique_ptr<syntax::SourceFileSyntax> SyntaxRoot;
 };
 
 inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,

@@ -43,7 +43,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
   Ctx.LoadedModules[stdlibID] = module;
 
   FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
-                                        /*buffer*/ None, /*keeps token*/ false);
+                                        /*buffer*/ None);
   module->addFile(*FileForLookups);
 
   if (optionals == DeclareOptionalTypes) {

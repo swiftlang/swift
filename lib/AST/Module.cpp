@@ -1077,24 +1077,17 @@ LookupConformanceInModuleRequest::evaluate(
   return ProtocolConformanceRef(conformance);
 }
 
-struct SourceFile::SourceFileSyntaxInfo {
-  const bool Enable;
-  /// The root of the syntax tree representing the source file.
-  Optional<syntax::SourceFileSyntax> SyntaxRoot;
-  SourceFileSyntaxInfo(bool Enable): Enable(Enable) {}
-};
-
 bool SourceFile::hasSyntaxRoot() const {
-  return SyntaxInfo->SyntaxRoot.hasValue();
+  return ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
   assert(hasSyntaxRoot() && "no syntax root is set.");
-  return *SyntaxInfo->SyntaxRoot;
+  return *SyntaxRoot;
 }
 
 void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
-  SyntaxInfo->SyntaxRoot.emplace(Root);
+  SyntaxRoot = std::make_unique<syntax::SourceFileSyntax>(std::move(Root));
 }
 
 void DirectOperatorLookupRequest::writeDependencySink(
@@ -2216,11 +2209,9 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       bool KeepParsedTokens, bool BuildSyntaxTree,
                        ParsingOptions parsingOpts, bool isPrimary)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K),
-      SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
 
   assert(!IsPrimary || M.isMainModule() &&
@@ -2231,7 +2222,11 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
-  if (KeepParsedTokens) {
+
+  if (hasInterfaceHash()) {
+    InterfaceHash.emplace();
+  }
+  if (shouldCollectTokens()) {
     AllCollectedTokens = std::vector<Token>();
   }
 }
@@ -2241,25 +2236,29 @@ std::vector<Token> &SourceFile::getTokenVector() {
   return *AllCollectedTokens;
 }
 
+SourceFile::ParsingOptions
+SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
+  ParsingOptions opts;
+  if (langOpts.BuildSyntaxTree)
+    opts |= ParsingFlags::BuildSyntaxTree;
+  if (langOpts.CollectParsedToken)
+    opts |= ParsingFlags::CollectParsedTokens;
+  return opts;
+}
+
 ArrayRef<Token> SourceFile::getAllTokens() const {
   assert(shouldCollectTokens() && "Disabled");
   return *AllCollectedTokens;
 }
 
 bool SourceFile::shouldCollectTokens() const {
-  switch (Kind) {
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-    return (bool)AllCollectedTokens;
-  case SourceFileKind::SIL:
-    return false;
-  }
-  llvm_unreachable("unhandled kind");
+  return Kind != SourceFileKind::SIL &&
+         ParsingOpts.contains(ParsingFlags::CollectParsedTokens);
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
-  return Kind != SourceFileKind::SIL && SyntaxInfo->Enable;
+  return Kind != SourceFileKind::SIL &&
+         ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
 }
 
 bool SourceFile::hasDelayedBodyParsing() const {

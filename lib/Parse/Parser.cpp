@@ -109,6 +109,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
 
 using namespace swift;
 using namespace swift::syntax;
+using ParsingFlags = SourceFile::ParsingFlags;
 
 void SILParserStateBase::anchor() { }
 
@@ -1196,14 +1197,17 @@ struct ParserUnit::Implementation {
                  const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
                  StringRef ModuleName,
                  std::shared_ptr<SyntaxParseActions> spActions)
-      : SPActions(std::move(spActions)),
-        LangOpts(Opts), TypeCheckerOpts(TyOpts), Diags(SM),
-        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM, Diags)),
-        SF(new (Ctx) SourceFile(
-            *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
-            BufferID, Opts.CollectParsedToken, Opts.BuildSyntaxTree,
-            SourceFile::ParsingFlags::DisableDelayedBodies |
-                SourceFile::ParsingFlags::DisablePoundIfEvaluation)) {}
+      : SPActions(std::move(spActions)), LangOpts(Opts),
+        TypeCheckerOpts(TyOpts), Diags(SM),
+        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM,
+                             Diags)) {
+    auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
+    parsingOpts |= ParsingFlags::DisableDelayedBodies;
+    parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;
+
+    auto *M = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+    SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);
+  }
 
   ~Implementation() {
     // We need to delete the parser before the context so that it can finalize
