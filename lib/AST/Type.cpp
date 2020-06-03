@@ -3273,8 +3273,7 @@ ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
 }
 
 void ArchetypeType::setNestedTypes(
-                                 ASTContext &Ctx,
-                                 ArrayRef<std::pair<Identifier, Type>> Nested) {
+    const ASTContext &Ctx, ArrayRef<std::pair<Identifier, Type>> Nested) {
   assert(!Bits.ArchetypeType.ExpandedNestedTypes && "Already expanded");
   NestedTypes = Ctx.AllocateCopy(Nested);
   std::sort(NestedTypes.begin(), NestedTypes.end(), OrderArchetypeByName());
@@ -5009,7 +5008,7 @@ static RecursiveTypeProperties getBoxRecursiveProperties(
   return props;
 }
 
-SILBoxType::SILBoxType(ASTContext &C,
+SILBoxType::SILBoxType(const ASTContext &C,
                        SILLayout *Layout, SubstitutionMap Substitutions)
   : TypeBase(TypeKind::SILBox, &C,
              getBoxRecursiveProperties(Layout, Substitutions)),

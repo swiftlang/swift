@@ -2962,7 +2962,7 @@ void AnyFunctionType::decomposeInput(
 }
 
 Type AnyFunctionType::Param::getParameterType(bool forCanonical,
-                                              ASTContext *ctx) const {
+                                              const ASTContext *ctx) const {
   Type type = getPlainType();
   if (isVariadic()) {
     if (!ctx) ctx = &type->getASTContext();
@@ -2977,7 +2977,8 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
   return type;
 }
 
-Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
+Type AnyFunctionType::composeInput(const ASTContext &ctx,
+                                   ArrayRef<Param> params,
                                    bool canonicalVararg) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
@@ -4602,7 +4603,7 @@ SILLayout *SILLayout::get(const ASTContext &C,
   return newLayout;
 }
 
-CanSILBoxType SILBoxType::get(ASTContext &C,
+CanSILBoxType SILBoxType::get(const ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
   // Canonicalize substitutions.

@@ -1290,7 +1290,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 class ErrorType final : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType(ASTContext &C, Type originalType,
+  ErrorType(const ASTContext &C, Type originalType,
             RecursiveTypeProperties properties)
       : TypeBase(TypeKind::Error, &C, properties) {
     assert(properties.hasError());
@@ -1332,7 +1332,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
 class UnresolvedType : public TypeBase {
   friend class ASTContext;
   // The Unresolved type is always canonical.
-  UnresolvedType(ASTContext &C)
+  UnresolvedType(const ASTContext &C)
     : TypeBase(TypeKind::Unresolved, &C,
        RecursiveTypeProperties(RecursiveTypeProperties::HasUnresolvedType)) { }
 public:
@@ -2847,7 +2847,7 @@ public:
     ///
     /// For example, 'inout Int' => 'Int', 'Int...' => '[Int]'.
     Type getParameterType(bool forCanonical = false,
-                          ASTContext *ctx = nullptr) const;
+                          const ASTContext *ctx = nullptr) const;
 
     bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
@@ -3188,9 +3188,9 @@ public:
   ///
   /// The result type is only there as a way to extract the ASTContext when
   /// needed.
-  static Type composeInput(ASTContext &ctx, ArrayRef<Param> params,
+  static Type composeInput(const ASTContext &ctx, ArrayRef<Param> params,
                            bool canonicalVararg);
-  static Type composeInput(ASTContext &ctx, CanParamArrayRef params,
+  static Type composeInput(const ASTContext &ctx, CanParamArrayRef params,
                            bool canonicalVararg) {
     return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
   }
@@ -5012,11 +5012,11 @@ class SILBoxType final : public TypeBase, public llvm::FoldingSetNode
   SILLayout *Layout;
   SubstitutionMap Substitutions;
 
-  SILBoxType(ASTContext &C,
+  SILBoxType(const ASTContext &C,
              SILLayout *Layout, SubstitutionMap Substitutions);
 
 public:
-  static CanSILBoxType get(ASTContext &C,
+  static CanSILBoxType get(const ASTContext &C,
                            SILLayout *Layout,
                            SubstitutionMap Substitutions);
 
@@ -5550,7 +5550,7 @@ public:
 
   /// Set the nested types to a copy of the given array of
   /// archetypes.
-  void setNestedTypes(ASTContext &Ctx,
+  void setNestedTypes(const ASTContext &Ctx,
                       ArrayRef<std::pair<Identifier, Type>> Nested);
 
   /// Register a nested type with the given name.
