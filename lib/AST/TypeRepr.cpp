@@ -173,7 +173,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   }
 }
 
-IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
+IdentTypeRepr *IdentTypeRepr::create(const ASTContext &C,
                                 ArrayRef<ComponentIdentTypeRepr *> Components) {
   assert(!Components.empty());
   if (Components.size() == 1)
@@ -315,7 +315,7 @@ CompoundIdentTypeRepr *CompoundIdentTypeRepr::create(const ASTContext &C,
   return new (mem) CompoundIdentTypeRepr(Components);
 }
 
-SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
+SILBoxTypeRepr *SILBoxTypeRepr::create(const ASTContext &C,
                       GenericParamList *GenericParams,
                       SourceLoc LBraceLoc, ArrayRef<Field> Fields,
                       SourceLoc RBraceLoc,

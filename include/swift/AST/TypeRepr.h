@@ -239,9 +239,9 @@ protected:
 public:
   /// Copies the provided array and creates a CompoundIdentTypeRepr or just
   /// returns the single entry in the array if it contains only one.
-  static IdentTypeRepr *create(ASTContext &C,
+  static IdentTypeRepr *create(const ASTContext &C,
                                ArrayRef<ComponentIdentTypeRepr *> Components);
-  
+
   class ComponentRange;
   inline ComponentRange getComponentRange();
 
@@ -843,12 +843,12 @@ public:
                                      ArrayRef<TypeRepr*> Protocols,
                                      SourceLoc FirstTypeLoc,
                                      SourceRange CompositionRange);
-  
-  static CompositionTypeRepr *createEmptyComposition(ASTContext &C,
+
+  static CompositionTypeRepr *createEmptyComposition(const ASTContext &C,
                                                      SourceLoc AnyLoc) {
     return CompositionTypeRepr::create(C, {}, AnyLoc, {AnyLoc, AnyLoc});
   }
-  
+
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Composition;
   }
@@ -1123,14 +1123,14 @@ public:
     std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
                             getTrailingObjects<TypeRepr*>());
   }
-  
-  static SILBoxTypeRepr *create(ASTContext &C,
-                      GenericParamList *GenericParams,
-                      SourceLoc LBraceLoc, ArrayRef<Field> Fields,
-                      SourceLoc RBraceLoc,
-                      SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
-                      SourceLoc ArgRAngleLoc);
-  
+
+  static SILBoxTypeRepr *create(const ASTContext &C,
+                                GenericParamList *GenericParams,
+                                SourceLoc LBraceLoc, ArrayRef<Field> Fields,
+                                SourceLoc RBraceLoc, SourceLoc ArgLAngleLoc,
+                                ArrayRef<TypeRepr *> GenericArgs,
+                                SourceLoc ArgRAngleLoc);
+
   void setGenericEnvironment(GenericEnvironment *Env) {
     assert(!GenericEnv);
     GenericEnv = Env;
