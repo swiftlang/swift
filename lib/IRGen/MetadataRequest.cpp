@@ -1684,7 +1684,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   accessor->addAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::NoInline);
   // Accessor functions don't need frame pointers.
-  IGM.setHasFramePointer(accessor, false);
+  IGM.setHasNoFramePointer(accessor);
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
@@ -2094,8 +2094,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       thunkFn->setCallingConv(IGM.SwiftCC);
       thunkFn->addAttribute(llvm::AttributeList::FunctionIndex,
                             llvm::Attribute::NoInline);
-      IGM.setHasFramePointer(thunkFn, false);
-      
+      IGM.setHasNoFramePointer(thunkFn);
+
       [&IGM, thunkFn]{
         IRGenFunction subIGF(IGM, thunkFn);
     
@@ -2631,7 +2631,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     instantiationFn->setDoesNotThrow();
     instantiationFn->addAttribute(llvm::AttributeList::FunctionIndex,
                                   llvm::Attribute::NoInline);
-    IGM.setHasFramePointer(instantiationFn, false);
+    IGM.setHasNoFramePointer(instantiationFn);
 
     [&IGM, instantiationFn, request]{
       IRGenFunction subIGF(IGM, instantiationFn);

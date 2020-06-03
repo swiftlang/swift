@@ -65,7 +65,7 @@ GenericSignatureImpl::GenericSignatureImpl(
       count = 0;
     }
     assert(param->getIndex() == count && "Generic parameter index mismatch");
-    count++;
+    ++count;
   }
 #endif
 

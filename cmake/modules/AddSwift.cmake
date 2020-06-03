@@ -546,14 +546,10 @@ function(add_swift_host_library name)
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
 
-    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    # MSVC, clang-cl, gcc don't understand -target.
-    if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-      get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-        MACCATALYST_BUILD_FLAVOR ""
-        DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-      target_link_options(${name} PRIVATE -target;${target})
-    endif()
+    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
+      MACCATALYST_BUILD_FLAVOR ""
+      DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
+    target_link_options(${name} PRIVATE -target;${target})
   endif()
 
   add_dependencies(dev ${name})

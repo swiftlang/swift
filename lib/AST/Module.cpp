@@ -511,6 +511,41 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
+ArrayRef<SourceFile *>
+PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
+                                    ModuleDecl *mod) const {
+  assert(mod->isMainModule() && "Only the main module can have primaries");
+
+  SmallVector<SourceFile *, 8> primaries;
+  for (auto *file : mod->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file)) {
+      if (SF->isPrimary())
+        primaries.push_back(SF);
+    }
+  }
+  return mod->getASTContext().AllocateCopy(primaries);
+}
+
+ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<ModuleDecl *>(this);
+  return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
+}
+
+SourceFile *CodeCompletionFileRequest::evaluate(Evaluator &evaluator,
+                                                ModuleDecl *mod) const {
+  const auto &SM = mod->getASTContext().SourceMgr;
+  assert(mod->isMainModule() && "Can only do completion in the main module");
+  assert(SM.hasCodeCompletionBuffer() && "Not performing code completion?");
+
+  for (auto *file : mod->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (SF && SF->getBufferID() == SM.getCodeCompletionBufferID())
+      return SF;
+  }
+  llvm_unreachable("Couldn't find the completion file?");
+}
+
 #define FORWARD(name, args) \
   for (const FileUnit *file : getFiles()) \
     file->name args;
@@ -554,7 +589,7 @@ void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupValue++;
+    ++stats->getFrontendCounters().NumModuleLookupValue;
 
   if (isParsedModule(this)) {
     getSourceLookupCache().lookupValue(Name, LookupKind, Result);
@@ -710,7 +745,7 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupClassMember++;
+    ++stats->getFrontendCounters().NumModuleLookupClassMember;
 
   if (isParsedModule(this)) {
     FrontendStatsTracer tracer(getASTContext().Stats,
@@ -2182,11 +2217,14 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        bool KeepParsedTokens, bool BuildSyntaxTree,
-                       ParsingOptions parsingOpts)
+                       ParsingOptions parsingOpts, bool isPrimary)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), Kind(K),
+      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K),
       SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
+
+  assert(!IsPrimary || M.isMainModule() &&
+         "A primary cannot appear outside the main module");
 
   if (isScriptMode()) {
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);

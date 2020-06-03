@@ -1624,7 +1624,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
   SILInstruction *FirstNonAllocStack = &*BBIter;
   while (isa<AllocStackInst>(FirstNonAllocStack) &&
          BBIter != pass.F->begin()->end()) {
-    BBIter++;
+    ++BBIter;
     FirstNonAllocStack = &*BBIter;
   }
   SILBuilderWithScope allocBuilder(&*pass.F->begin()->begin(),

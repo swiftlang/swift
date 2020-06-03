@@ -1308,14 +1308,14 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
     values.clear();
     VD = lookupMember(P, ModuleType::get(Mod), FullName[1], Locs[1], values,
                       FullName.size() == 2/*ExpectMultipleResults*/);
-    for (unsigned I = 2, E = FullName.size(); I < E; I++) {
+    for (unsigned I = 2, E = FullName.size(); I < E; ++I) {
       values.clear();
       VD = lookupMember(P, VD->getInterfaceType(), FullName[I], Locs[I], values,
                         I == FullName.size() - 1/*ExpectMultipleResults*/);
     }
   } else {
     VD = Res.get<ValueDecl*>();
-    for (unsigned I = 1, E = FullName.size(); I < E; I++) {
+    for (unsigned I = 1, E = FullName.size(); I < E; ++I) {
       values.clear();
       VD = lookupMember(P, VD->getInterfaceType(), FullName[I], Locs[I], values,
                         I == FullName.size() - 1/*ExpectMultipleResults*/);
@@ -2115,7 +2115,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
     // Pick the ValueDecl that has the right type.
     ValueDecl *TheDecl = nullptr;
     auto declTy = Ty.getType()->getCanonicalType();
-    for (unsigned I = 0, E = values.size(); I < E; I++) {
+    for (unsigned I = 0, E = values.size(); I < E; ++I) {
       auto *decl = values[I];
 
       auto lookupTy =
@@ -6090,6 +6090,9 @@ bool SILParserState::parseSILVTable(Parser &P) {
         } else if (P.Tok.getText() == "inherited") {
           P.consumeToken();
           Kind = SILVTable::Entry::Kind::Inherited;
+        } else if (P.Tok.getText() == "nonoverridden") {
+          P.consumeToken();
+          Kind = SILVTable::Entry::Kind::NormalNonOverridden;
         } else {
           P.diagnose(P.Tok.getLoc(), diag::sil_vtable_bad_entry_kind);
           return true;

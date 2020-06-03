@@ -354,7 +354,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                      CaseLabelItem(litPat), SourceLoc(),
                                      SourceLoc(), body,
                                      /*case body var decls*/ None));
-    Idx++;
+    ++Idx;
   }
 
   auto anyPat = AnyPattern::createImplicit(C);

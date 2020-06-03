@@ -84,7 +84,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
       auto StoredProperties = NTD->getStoredProperties();
       Width += StoredProperties.size();
     }
-    Depth++;
+    ++Depth;
     unsigned MaxTypeDepth = 0;
     auto GenericArgs = BGT->getGenericArgs();
     for (auto Ty : GenericArgs) {
@@ -101,7 +101,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
 
   if (auto *TupleTy = t->getAs<TupleType>()) {
     Width += TupleTy->getNumElements();
-    Depth++;
+    ++Depth;
     unsigned MaxTypeDepth = 0;
     auto ElementTypes = TupleTy->getElementTypes();
     for (auto Ty : ElementTypes) {
@@ -117,7 +117,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   }
 
   if (auto *FnTy = t->getAs<SILFunctionType>()) {
-    Depth++;
+    ++Depth;
     unsigned MaxTypeDepth = 0;
     auto Params = FnTy->getParameters();
     Width += Params.size();
@@ -156,7 +156,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   }
 
   if (auto *FnTy = t->getAs<FunctionType>()) {
-    Depth++;
+    ++Depth;
     unsigned MaxTypeDepth = 0;
     auto Params = FnTy->getParams();
     Width += Params.size();
@@ -345,7 +345,7 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
         // contain small specialization cycles.
         if (numAcceptedCycles == 0)
           return true;
-        numAcceptedCycles--;
+        --numAcceptedCycles;
       }
     }
 
@@ -441,7 +441,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                << IndentDebug(4)
                << "Cannot specialize because the generic type is too deep";
       });
-      NumPreventedTooComplexGenericSpecializations++;
+      ++NumPreventedTooComplexGenericSpecializations;
       return false;
     }
   }
@@ -525,7 +525,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       llvm::errs() << "Detected and prevented an infinite "
                       "generic specialization loop for callee: "
                    << Callee->getName() << '\n';
-    NumPreventedGenericSpecializationLoops++;
+    ++NumPreventedGenericSpecializationLoops;
     return false;
   }
 

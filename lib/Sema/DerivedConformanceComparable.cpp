@@ -131,7 +131,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   // the same case, binding variables for the left- and right-hand associated
   // values.
   for (auto elt : enumDecl->getAllElements()) {
-    elementCount++;
+    ++elementCount;
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 4> lhsPayloadVars;
@@ -182,7 +182,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     // breaking out early if any pair is unequal. (same as Equatable synthesis.)
     // the else statement performs the lexicographic comparison.
     SmallVector<ASTNode, 8> statementsInCase;
-    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
+    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
                                          /*implicit*/true);

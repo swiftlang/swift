@@ -983,7 +983,7 @@ void JVPEmitter::prepareForDifferentialGeneration() {
   for (auto index : range(diffParamArgs.size())) {
     auto *diffArg = diffParamArgs[index];
     auto *origArg = origParamArgs[*diffParamsIt];
-    diffParamsIt++;
+    ++diffParamsIt;
     if (diffArg->getType().isAddress()) {
       setTangentBuffer(origEntry, origArg, diffArg);
     } else {

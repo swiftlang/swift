@@ -1416,7 +1416,7 @@ bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,
                                        const ASTNodeType& ASTNode) {
   SubStructureStack.emplace_back(Node, ASTNode);
   if (shouldTreatAsSingleToken(Node, SM))
-    AvoidPassingSyntaxToken ++;
+    ++AvoidPassingSyntaxToken;
 
   if (!passTokenNodesUntil(Node.Range.getStart(),
                            ExcludeNodeAtLocation).shouldContinue)
@@ -1552,12 +1552,12 @@ static CharSourceRange sanitizeUnpairedParenthesis(CharSourceRange Range) {
   unsigned TrimLen = 0;
   for (char C : Text) {
     if (C == '(') {
-      Pairs ++;
+      ++Pairs;
     } else if (C == ')') {
       if (Pairs == 0)
-        TrimLen ++;
+        ++TrimLen;
       else
-        Pairs --;
+        --Pairs;
     } else {
       TrimLen = 0;
     }

@@ -53,6 +53,9 @@ public:
     enum Kind : uint8_t {
       /// The vtable entry is for a method defined directly in this class.
       Normal,
+      /// The vtable entry is for a method defined directly in this class, and is never overridden
+      /// by subclasses.
+      NormalNonOverridden,
       /// The vtable entry is inherited from the superclass.
       Inherited,
       /// The vtable entry is inherited from the superclass, and overridden

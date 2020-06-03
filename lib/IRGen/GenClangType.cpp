@@ -354,7 +354,7 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
     return getClangASTContext().VoidTy;
 
   CanType eltTy = type.getElementType(0);
-  for (unsigned i = 1; i < e; i++) {
+  for (unsigned i = 1; i < e; ++i) {
     assert(eltTy == type.getElementType(i) &&
            "Only tuples where all element types are equal "
            "map to fixed-size arrays");

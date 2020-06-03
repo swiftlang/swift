@@ -449,7 +449,7 @@ static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
   C.NumIRComdatSymbols += Module.getComdatSymbolTable().size();
   for (auto const &Func : Module) {
     for (auto const &BB : Func) {
-      C.NumIRBasicBlocks++;
+      ++C.NumIRBasicBlocks;
       C.NumIRInsts += BB.size();
     }
   }

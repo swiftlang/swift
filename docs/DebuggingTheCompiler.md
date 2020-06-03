@@ -64,19 +64,19 @@ Here is how to dump the IR after the main phases of the Swift compiler
 
 * **Parser** To print the AST after parsing:
 
-```bash
+```sh
 swiftc -dump-ast -O file.swift
 ```
 
 * **SILGen** To print the SIL immediately after SILGen:
 
-```bash
+```sh
 swiftc -emit-silgen -O file.swift
 ```
 
 * **Mandatory SIL passes** To print the SIL after the mandatory passes:
 
-```bash
+```sh
 swiftc -emit-sil -Onone file.swift
 ```
 
@@ -87,25 +87,25 @@ swiftc -emit-sil -Onone file.swift
 * **Performance SIL passes** To print the SIL after the complete SIL
    optimization pipeline:
 
-```bash
+```sh
 swiftc -emit-sil -O file.swift
 ```
 
 * **IRGen** To print the LLVM IR after IR generation:
 
-```bash
+```sh
 swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
 ```
 
 * **LLVM passes** To print the LLVM IR after LLVM passes:
 
-```bash
+```sh
 swiftc -emit-ir -O file.swift
 ```
 
 * **Code generation** To print the final generated code:
 
-```bash
+```sh
 swiftc -S -O file.swift
 ```
 

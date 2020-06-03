@@ -864,7 +864,7 @@ public:
       if (DeclAndReason.D != Decls[index])
         continue;
 
-      index++;
+      ++index;
 
       auto *const VD = DeclAndReason.D;
       const auto Reason = DeclAndReason.Reason;

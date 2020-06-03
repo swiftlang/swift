@@ -1959,7 +1959,7 @@ bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange(
     return true;
   EditorConsumerInsertStream OS(EditConsumer, SM, RangeInfo.ContentRange);
   OS << "\"";
-  for (auto It = Expressions->begin(); It != Expressions->end(); It++) {
+  for (auto It = Expressions->begin(); It != Expressions->end(); ++It) {
     interpolatedExpressionForm(*It, SM, OS);
   }
   OS << "\"";
@@ -3586,7 +3586,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
 static std::string insertUnderscore(StringRef Text) {
   llvm::SmallString<64> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
-  for (auto It = Text.begin(); It != Text.end(); It++) {
+  for (auto It = Text.begin(); It != Text.end(); ++It) {
     unsigned Distance = It - Text.begin();
     if (Distance && !(Distance % 3)) {
       OS << '_';

@@ -63,6 +63,8 @@ You can use any of the branch names as the argument to `--scheme`, such as `mast
      - New commits go to `master` in the upstream [llvm-project](https://github.com/llvm/llvm-project).
 
      - Then cherry-pick these commits to an appropriate, `swift/master` aligned `apple/stable/*` branch in Apple's fork of [llvm-project](https://github.com/apple/llvm-project). Please see [Apple's branching scheme](https://github.com/apple/llvm-project/blob/apple/master/apple-docs/AppleBranchingScheme.md) document to determine which `apple/stable/*` branch you should cherry-pick to.
+  
+       Note that **no new changes should be submitted directly to `apple/master`**. We are actively working on eliminating the differences from upstream LLVM.
 
   2) Changes that depend on Swift (this only applies to LLDB)
      - New commits go to `swift/master` (_not_ an `apple/stable/*` branch, as these shouldn't contain changes that depend on Swift).
@@ -70,6 +72,8 @@ You can use any of the branch names as the argument to `--scheme`, such as `mast
      - Then cherry-pick these commits to `swift/master-next`.
 
      - If necessary, cherry-pick to the release branch (`swift/release/x.y`), following the appropriate release process. (Usually this means filling out a standard template, finding someone to review your code if that hasn't already happened, and getting approval from that repo's *release manager.)*
+
+  In the long term we want to eliminate the differences from upstream LLVM for these changes as well, but for now there is no concrete plan. So, submitting to `swift/master-next` continues to be allowed.
 
 ## Automerging
 

@@ -226,7 +226,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   }
 
   // Update the stats.
-  NumTargetsPredicted++;
+  ++NumTargetsPredicted;
 
   // Devirtualize the apply instruction on the identical path.
   auto NewInst =
@@ -502,7 +502,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
 
     // FIXME: Add support for generic subclasses.
     if (S->isGenericContext()) {
-      NotHandledSubsNum++;
+      ++NotHandledSubsNum;
       continue;
     }
 
@@ -517,7 +517,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     // Pass the metatype of the subclass.
     auto NewAI = speculateMonomorphicTarget(AI, ClassOrMetatypeType, S, LastCCBI);
     if (!NewAI) {
-      NotHandledSubsNum++;
+      ++NotHandledSubsNum;
       continue;
     }
     AI = NewAI;

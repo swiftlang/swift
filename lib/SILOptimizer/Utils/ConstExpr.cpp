@@ -852,7 +852,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
   switch (callee) {
   case WellKnownFunction::AssertionFailure: {
     SmallString<4> message;
-    for (unsigned i = 0; i < apply->getNumArguments(); i++) {
+    for (unsigned i = 0, e = apply->getNumArguments(); i < e; ++i) {
       SILValue argument = apply->getArgument(i);
       SymbolicValue argValue = getConstantValue(argument);
       Optional<StringRef> stringOpt =

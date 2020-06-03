@@ -109,12 +109,12 @@ ImportCache::getImportSet(ASTContext &ctx,
 
   if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos)) {
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().ImportSetFoldHit++;
+      ++ctx.Stats->getFrontendCounters().ImportSetFoldHit;
     return *result;
   }
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().ImportSetFoldMiss++;
+    ++ctx.Stats->getFrontendCounters().ImportSetFoldMiss;
 
   SmallVector<ModuleDecl::ImportedModule, 4> stack;
   for (auto next : topLevelImports) {
@@ -166,12 +166,12 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
   auto found = ImportSetForDC.find(dc);
   if (found != ImportSetForDC.end()) {
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().ImportSetCacheHit++;
+      ++ctx.Stats->getFrontendCounters().ImportSetCacheHit;
     return *found->second;
   }
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().ImportSetCacheMiss++;
+    ++ctx.Stats->getFrontendCounters().ImportSetCacheMiss;
 
   SmallVector<ModuleDecl::ImportedModule, 4> imports;
 
@@ -213,12 +213,12 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   auto found = VisibilityCache.find(key);
   if (found != VisibilityCache.end()) {
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().ModuleVisibilityCacheHit++;
+      ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheHit;
     return found->second;
   }
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().ModuleVisibilityCacheMiss++;
+    ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheMiss;
 
   SmallVector<ModuleDecl::AccessPathTy, 1> accessPaths;
   for (auto next : getImportSet(dc).getAllImports()) {
@@ -251,12 +251,12 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   auto found = ShadowCache.find(key);
   if (found != ShadowCache.end()) {
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().ModuleShadowCacheHit++;
+      ++ctx.Stats->getFrontendCounters().ModuleShadowCacheHit;
     return found->second;
   }
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().ModuleShadowCacheMiss++;
+    ++ctx.Stats->getFrontendCounters().ModuleShadowCacheMiss;
 
   SmallVector<ModuleDecl::ImportedModule, 4> stack;
   llvm::SmallDenseSet<ModuleDecl::ImportedModule, 32> visited;

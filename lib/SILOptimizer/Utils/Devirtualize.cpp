@@ -810,7 +810,7 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
                           *applySite.getInstruction())
              << "Devirtualized call to class method " << NV("Method", f);
     });
-  NumClassDevirt++;
+  ++NumClassDevirt;
 
   return {newAI, changedCFG};
 }
@@ -1045,7 +1045,7 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
                           *applySite.getInstruction())
              << "Devirtualized call to " << NV("Method", f);
     });
-  NumWitnessDevirt++;
+  ++NumWitnessDevirt;
   return {newApplySite, changedCFG};
 }
 
