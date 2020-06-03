@@ -213,9 +213,10 @@ enum class FixKind : uint8_t {
   /// via forming `Foo(rawValue:)` instead of using its `RawValue` directly.
   ExplicitlyConstructRawRepresentable,
 
-  /// Use raw value type associated with raw representative accessible
+  /// Use raw value type associated with raw representable, accessible
   /// using `.rawValue` member.
-  UseValueTypeOfRawRepresentative,
+  UseRawValue,
+
   /// If an array was passed to a variadic argument, give a specific diagnostic
   /// and offer to drop the brackets if it's a literal.
   ExpandArrayIntoVarargs,
@@ -264,7 +265,7 @@ enum class FixKind : uint8_t {
 
   /// Allow key path to be bound to a function type with more than 1 argument
   AllowMultiArgFuncKeyPathMismatch,
-  
+
   /// Specify key path root type when it cannot be infered from context.
   SpecifyKeyPathRootType,
 
@@ -1594,37 +1595,47 @@ public:
                                          ConstraintLocatorBuilder locator);
 };
 
-class ExplicitlyConstructRawRepresentable final : public AllowArgumentMismatch {
-  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type argType,
-                                      Type paramType,
+class ExplicitlyConstructRawRepresentable final : public ConstraintFix {
+  Type RawReprType;
+  Type ExpectedType;
+
+  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type rawReprType,
+                                      Type expectedType,
                                       ConstraintLocator *locator)
-      : AllowArgumentMismatch(cs, FixKind::ExplicitlyConstructRawRepresentable,
-                              argType, paramType, locator) {}
+      : ConstraintFix(cs, FixKind::ExplicitlyConstructRawRepresentable,
+                      locator),
+        RawReprType(rawReprType), ExpectedType(expectedType) {}
 
 public:
   std::string getName() const override {
     return "explicitly construct a raw representable type";
   }
 
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
   static ExplicitlyConstructRawRepresentable *
-  attempt(ConstraintSystem &cs, Type argType, Type paramType,
-          ConstraintLocatorBuilder locator);
+  create(ConstraintSystem &cs, Type rawTypeRepr, Type expectedType,
+         ConstraintLocator *locator);
 };
 
-class UseValueTypeOfRawRepresentative final : public AllowArgumentMismatch {
-  UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type argType,
-                                  Type paramType, ConstraintLocator *locator)
-      : AllowArgumentMismatch(cs, FixKind::UseValueTypeOfRawRepresentative,
-                              argType, paramType, locator) {}
+class UseRawValue final : public ConstraintFix {
+  Type RawReprType;
+  Type ExpectedType;
+
+  UseRawValue(ConstraintSystem &cs, Type rawReprType, Type expectedType,
+              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseRawValue, locator),
+        RawReprType(rawReprType), ExpectedType(expectedType) {}
 
 public:
   std::string getName() const override {
     return "use `.rawValue` of a raw representable type";
   }
 
-  static UseValueTypeOfRawRepresentative *
-  attempt(ConstraintSystem &cs, Type argType, Type paramType,
-          ConstraintLocatorBuilder locator);
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static UseRawValue *create(ConstraintSystem &cs, Type rawReprType,
+                             Type expectedType, ConstraintLocator *locator);
 };
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').
