@@ -46,7 +46,7 @@ bool BuiltinInfo::isReadNone() const {
 }
 
 const llvm::AttributeList &
-IntrinsicInfo::getOrCreateAttributes(ASTContext &Ctx) const {
+IntrinsicInfo::getOrCreateAttributes(const ASTContext &Ctx) const {
   using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeList>;
   if (DenseMapInfo::isEqual(Attrs, DenseMapInfo::getEmptyKey())) {
     Attrs = llvm::Intrinsic::getAttributes(Ctx.getIntrinsicScratchContext(), ID);
@@ -54,7 +54,7 @@ IntrinsicInfo::getOrCreateAttributes(ASTContext &Ctx) const {
   return Attrs;
 }
 
-Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
+Type swift::getBuiltinType(const ASTContext &Context, StringRef Name) {
   // Vectors are VecNxT, where "N" is the number of elements and
   // T is the element type.
   if (Name.startswith("Vec")) {
@@ -126,7 +126,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
 
 /// getBuiltinBaseName - Decode the type list of a builtin (e.g. mul_Int32) and
 /// return the base name (e.g. "mul").
-StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
+StringRef swift::getBuiltinBaseName(const ASTContext &C, StringRef Name,
                                     SmallVectorImpl<Type> &Types) {
   // builtin-id ::= operation-id ('_' type-id)*
   for (StringRef::size_type Underscore = Name.find_last_of('_');
@@ -279,7 +279,7 @@ static ValueDecl *getBinaryPredicate(Identifier Id, Type ArgType) {
 }
 
 /// Build a cast.  There is some custom type checking here.
-static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
+static ValueDecl *getCastOperation(const ASTContext &Context, Identifier Id,
                                    BuiltinValueKind VK,
                                    ArrayRef<Type> Types) {
   if (Types.empty() || Types.size() > 2) return nullptr;
@@ -420,7 +420,7 @@ static const char * const GenericParamNames[] = {
 };
 
 static GenericTypeParamDecl*
-createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
+createGenericParam(const ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
   auto genericParam =
@@ -430,7 +430,7 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
 }
 
 /// Create a generic parameter list with multiple generic parameters.
-static GenericParamList *getGenericParams(ASTContext &ctx,
+static GenericParamList *getGenericParams(const ASTContext &ctx,
                                           unsigned numParameters,
                                           bool isAnyObject) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
@@ -784,41 +784,44 @@ static ValueDecl *getIsOptionalOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getIsSameMetatypeOperation(ASTContext &Context, Identifier Id) {
+static ValueDecl *getIsSameMetatypeOperation(const ASTContext &Context,
+                                             Identifier Id) {
   CanType anyMetatype = CanExistentialMetatypeType::get(Context.TheAnyType);
   auto ResultTy = BuiltinIntegerType::get(1,Context);
   return getBuiltinFunction(Id, {anyMetatype, anyMetatype}, ResultTy);
 }
 
-static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
+static ValueDecl *getAllocOperation(const ASTContext &Context, Identifier Id) {
   Type PtrSizeTy = BuiltinIntegerType::getWordType(Context);
   Type ResultTy = Context.TheRawPointerType;
   return getBuiltinFunction(Id, { PtrSizeTy, PtrSizeTy }, ResultTy);
 }
 
-static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier Id) {
+static ValueDecl *getDeallocOperation(const ASTContext &Context,
+                                      Identifier Id) {
   auto PtrSizeTy = BuiltinIntegerType::getWordType(Context);
   Type ArgElts[] = { Context.TheRawPointerType, PtrSizeTy, PtrSizeTy };
   Type ResultTy = TupleType::getEmpty(Context);
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
-static ValueDecl *getFenceOperation(ASTContext &Context, Identifier Id) {
+static ValueDecl *getFenceOperation(const ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
 }
 
-static ValueDecl *getVoidErrorOperation(ASTContext &Context, Identifier Id) {
+static ValueDecl *getVoidErrorOperation(const ASTContext &Context,
+                                        Identifier Id) {
   return getBuiltinFunction(Id, {Context.getExceptionType()},
                             TupleType::getEmpty(Context));
 }
 
-static ValueDecl *getUnexpectedErrorOperation(ASTContext &Context,
+static ValueDecl *getUnexpectedErrorOperation(const ASTContext &Context,
                                               Identifier Id) {
   return getBuiltinFunction(Id, {Context.getExceptionType()},
                             Context.getNeverType());
 }
 
-static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
+static ValueDecl *getCmpXChgOperation(const ASTContext &Context, Identifier Id,
                                       Type T) {
   Type ArgElts[] = { Context.TheRawPointerType, T, T };
   Type BoolTy = BuiltinIntegerType::get(1, Context);
@@ -826,18 +829,18 @@ static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
-static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
-                                        Type T) {
+static ValueDecl *getAtomicRMWOperation(const ASTContext &Context,
+                                        Identifier Id, Type T) {
   return getBuiltinFunction(Id, { Context.TheRawPointerType, T }, T);
 }
 
-static ValueDecl *getAtomicLoadOperation(ASTContext &Context, Identifier Id,
-                                         Type T) {
+static ValueDecl *getAtomicLoadOperation(const ASTContext &Context,
+                                         Identifier Id, Type T) {
   return getBuiltinFunction(Id, { Type(Context.TheRawPointerType) }, T);
 }
 
-static ValueDecl *getAtomicStoreOperation(ASTContext &Context, Identifier Id,
-                                          Type T) {
+static ValueDecl *getAtomicStoreOperation(const ASTContext &Context,
+                                          Identifier Id, Type T) {
   return getBuiltinFunction(Id, { Context.TheRawPointerType, T },
                             Context.TheEmptyTupleType);
 }
@@ -913,7 +916,7 @@ static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
 
 /// ClassifyBridgeObject has type:
 ///      (Builtin.BridgeObject) -> (Builtin.Int1, Builtin.Int1).
-static ValueDecl *getClassifyBridgeObject(ASTContext &C, Identifier Id) {
+static ValueDecl *getClassifyBridgeObject(const ASTContext &C, Identifier Id) {
   Type int1Ty = BuiltinIntegerType::get(1, C);
   Type resultTy = TupleType::get({
     TupleTypeElt(int1Ty, C.getIdentifier("isObjCObject")),
@@ -951,7 +954,7 @@ static ValueDecl *getUnsafeGuaranteed(ASTContext &C, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getUnsafeGuaranteedEnd(ASTContext &C, Identifier Id) {
+static ValueDecl *getUnsafeGuaranteedEnd(const ASTContext &C, Identifier Id) {
   // Int8Ty -> ()
   Type Int8Ty = BuiltinIntegerType::get(8, C);
   return getBuiltinFunction(Id, { Int8Ty }, TupleType::getEmpty(C));
@@ -966,7 +969,7 @@ static ValueDecl *getTypePtrAuthDiscriminator(ASTContext &C, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getOnFastPath(ASTContext &Context, Identifier Id) {
+static ValueDecl *getOnFastPath(const ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
 }
 
@@ -1297,7 +1300,7 @@ static ValueDecl *getLinearFunctionConstructor(
 
 
 
-static ValueDecl *getGlobalStringTablePointer(ASTContext &Context,
+static ValueDecl *getGlobalStringTablePointer(const ASTContext &Context,
                                               Identifier Id) {
   // String -> Builtin.RawPointer
   auto stringType = NominalType::get(Context.getStringDecl(), Type(), Context);
@@ -1336,7 +1339,7 @@ static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
   return builder.build(id);
 }
 
-static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
+static ValueDecl *getPoundAssert(const ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
   auto optionalRawPointerType = BoundGenericEnumType::get(
       Context.getOptionalDecl(), Type(), {Context.TheRawPointerType});
@@ -1397,8 +1400,9 @@ static ValueDecl *getTypeJoinMetaOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getTriggerFallbackDiagnosticOperation(ASTContext &Context,
-                                                        Identifier Id) {
+static ValueDecl *
+getTriggerFallbackDiagnosticOperation(const ASTContext &Context,
+                                      Identifier Id) {
   // () -> Void
   return getBuiltinFunction(Id, {}, Context.TheEmptyTupleType);
 }
@@ -1412,14 +1416,15 @@ static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
-static ValueDecl *getLegacyCondFailOperation(ASTContext &C, Identifier Id) {
+static ValueDecl *getLegacyCondFailOperation(const ASTContext &C,
+                                             Identifier Id) {
   // Int1 -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
   auto VoidTy = TupleType::getEmpty(C);
   return getBuiltinFunction(Id, {CondTy}, VoidTy);
 }
 
-static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
+static ValueDecl *getCondFailOperation(const ASTContext &C, Identifier Id) {
   // Int1 -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
   auto MsgTy = C.TheRawPointerType;
@@ -1427,7 +1432,7 @@ static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
   return getBuiltinFunction(Id, {CondTy, MsgTy}, VoidTy);
 }
 
-static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {
+static ValueDecl *getAssertConfOperation(const ASTContext &C, Identifier Id) {
   // () -> Int32
   auto Int32Ty = BuiltinIntegerType::get(32, C);
   return getBuiltinFunction(Id, {}, Int32Ty);
@@ -1441,8 +1446,8 @@ static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
-                                             Type FirstTy, Type SecondTy) {
+static ValueDecl *getExtractElementOperation(Identifier Id, Type FirstTy,
+                                             Type SecondTy) {
   // (Vector<N, T>, Int32) -> T
   auto VecTy = FirstTy->getAs<BuiltinVectorType>();
   if (!VecTy)
@@ -1456,9 +1461,8 @@ static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, { VecTy, IndexTy }, ResultTy);
 }
 
-static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
-                                            Type FirstTy, Type SecondTy,
-                                            Type ThirdTy) {
+static ValueDecl *getInsertElementOperation(Identifier Id, Type FirstTy,
+                                            Type SecondTy, Type ThirdTy) {
   // (Vector<N, T>, T, Int32) -> Vector<N, T>
   auto VecTy = FirstTy->getAs<BuiltinVectorType>();
   if (!VecTy)
@@ -1476,7 +1480,8 @@ static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, VecTy);
 }
 
-static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
+static ValueDecl *getStaticReportOperation(const ASTContext &Context,
+                                           Identifier Id) {
   auto BoolTy = BuiltinIntegerType::get(1, Context);
   auto MessageTy = Context.TheRawPointerType;
 
@@ -1486,7 +1491,8 @@ static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
-static ValueDecl *getCheckedTruncOperation(ASTContext &Context, Identifier Id,
+static ValueDecl *getCheckedTruncOperation(const ASTContext &Context,
+                                           Identifier Id,
                                            Type InputTy, Type OutputTy,
                                            bool AllowLiteral) {
   auto InTy = InputTy->getAs<AnyBuiltinIntegerType>();
@@ -1507,8 +1513,7 @@ static ValueDecl *getCheckedTruncOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, { InTy }, ResultTy);
 }
 
-static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
-                                                  Identifier Id, Type InputTy,
+static ValueDecl *getIntToFPWithOverflowOperation(Identifier Id, Type InputTy,
                                                   Type OutputTy) {
   auto InTy = InputTy->getAs<BuiltinIntegerLiteralType>();
   auto OutTy = OutputTy->getAs<BuiltinFloatType>();
@@ -1518,7 +1523,7 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
   return getBuiltinFunction(Id, { InTy }, OutTy);
 }
 
-static ValueDecl *getUnreachableOperation(ASTContext &Context,
+static ValueDecl *getUnreachableOperation(const ASTContext &Context,
                                           Identifier Id) {
   auto NeverTy = Context.getNeverType();
   if (!NeverTy)
@@ -1528,7 +1533,7 @@ static ValueDecl *getUnreachableOperation(ASTContext &Context,
   return getBuiltinFunction(Id, {}, NeverTy);
 }
 
-static ValueDecl *getOnceOperation(ASTContext &Context,
+static ValueDecl *getOnceOperation(const ASTContext &Context,
                                    Identifier Id,
                                    bool withContext) {
   // (RawPointer, @convention(c) ([Context]) -> ()[, Context]) -> ()
@@ -1688,10 +1693,10 @@ namespace {
 class IntrinsicTypeDecoder {
   ArrayRef<llvm::Intrinsic::IITDescriptor> &Table;
   ArrayRef<Type> TypeArguments;
-  ASTContext &Context;
+  const ASTContext &Context;
 public:
   IntrinsicTypeDecoder(ArrayRef<llvm::Intrinsic::IITDescriptor> &table,
-                       ArrayRef<Type> typeArguments, ASTContext &ctx)
+                       ArrayRef<Type> typeArguments, const ASTContext &ctx)
     : Table(table), TypeArguments(typeArguments), Context(ctx) {}
 
   Type decodeImmediate();
@@ -1731,7 +1736,8 @@ public:
 } // end anonymous namespace
 
 static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &table,
-                                ArrayRef<Type> typeArguments, ASTContext &ctx) {
+                                ArrayRef<Type> typeArguments,
+                                const ASTContext &ctx) {
   return IntrinsicTypeDecoder(table, typeArguments, ctx).decodeImmediate();
 }
 
@@ -1834,7 +1840,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
 static bool
 getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
                                  ArrayRef<Type> TypeArgs,
-                                 ASTContext &Context,
+                                 const ASTContext &Context,
                                  SmallVectorImpl<Type> &ArgElts,
                                  Type &ResultTy) {
   typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
@@ -2392,11 +2398,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::ExtractElement:
     if (Types.size() != 2) return nullptr;
-    return getExtractElementOperation(Context, Id, Types[0], Types[1]);
+    return getExtractElementOperation(Id, Types[0], Types[1]);
 
   case BuiltinValueKind::InsertElement:
     if (Types.size() != 3) return nullptr;
-    return getInsertElementOperation(Context, Id, Types[0], Types[1], Types[2]);
+    return getInsertElementOperation(Id, Types[0], Types[1], Types[2]);
 
   case BuiltinValueKind::StaticReport:
     if (!Types.empty()) return nullptr;
@@ -2440,7 +2446,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;
-    return getIntToFPWithOverflowOperation(Context, Id, Types[0], Types[1]);
+    return getIntToFPWithOverflowOperation(Id, Types[0], Types[1]);
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);

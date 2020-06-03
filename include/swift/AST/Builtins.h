@@ -45,7 +45,7 @@ enum class BuiltinTypeKind : std::underlying_type<TypeKind>::type {
 /// Get the builtin type for the given name.
 ///
 /// Returns a null type if the name is not a known builtin type name.
-Type getBuiltinType(ASTContext &Context, StringRef Name);
+Type getBuiltinType(const ASTContext &Context, StringRef Name);
 
 /// OverloadedBuiltinKind - Whether and how a builtin is overloaded.
 enum class OverloadedBuiltinKind : uint8_t {
@@ -90,7 +90,7 @@ bool isPolymorphicBuiltin(BuiltinValueKind Id);
 
 /// Decode the type list of a builtin (e.g. mul_Int32) and return the base
 /// name (e.g. "mul").
-StringRef getBuiltinBaseName(ASTContext &C, StringRef Name,
+StringRef getBuiltinBaseName(const ASTContext &C, StringRef Name,
                              SmallVectorImpl<Type> &Types);
 
 /// Given an LLVM IR intrinsic name with argument types remove (e.g. like
@@ -126,7 +126,7 @@ class IntrinsicInfo {
 public:
   llvm::Intrinsic::ID ID;
   SmallVector<Type, 4> Types;
-  const llvm::AttributeList &getOrCreateAttributes(ASTContext &Ctx) const;
+  const llvm::AttributeList &getOrCreateAttributes(const ASTContext &Ctx) const;
 };
 
 /// Turn a string like "release" into the LLVM enum.
