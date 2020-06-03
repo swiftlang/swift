@@ -15,7 +15,7 @@
 using namespace swift;
 
 IndexSubset *
-IndexSubset::getFromString(ASTContext &ctx, StringRef string) {
+IndexSubset::getFromString(const ASTContext &ctx, StringRef string) {
   unsigned capacity = string.size();
   llvm::SmallBitVector indices(capacity);
   for (unsigned i : range(capacity)) {
@@ -51,7 +51,7 @@ bool IndexSubset::isSupersetOf(IndexSubset *other) const {
   return true;
 }
 
-IndexSubset *IndexSubset::adding(unsigned index, ASTContext &ctx) const {
+IndexSubset *IndexSubset::adding(unsigned index, const ASTContext &ctx) const {
   assert(index < getCapacity());
   if (contains(index))
     return const_cast<IndexSubset *>(this);
@@ -68,7 +68,7 @@ IndexSubset *IndexSubset::adding(unsigned index, ASTContext &ctx) const {
 }
 
 IndexSubset *IndexSubset::extendingCapacity(
-    ASTContext &ctx, unsigned newCapacity) const {
+    const ASTContext &ctx, unsigned newCapacity) const {
   assert(newCapacity >= capacity);
   if (newCapacity == capacity)
     return const_cast<IndexSubset *>(this);

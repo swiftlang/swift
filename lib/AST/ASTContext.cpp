@@ -4727,7 +4727,7 @@ void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
 }
 
 IndexSubset *
-IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
+IndexSubset::get(const ASTContext &ctx, const SmallBitVector &indices) {
   auto &foldingSet = ctx.getImpl().IndexSubsets;
   llvm::FoldingSetNodeID id;
   unsigned capacity = indices.size();
