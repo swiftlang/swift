@@ -625,7 +625,7 @@ public:
                         bool onlyAPartialLine = false) const;
 
   // Only allow allocation of DeclContext using the allocator in ASTContext.
-  void *operator new(size_t Bytes, ASTContext &C,
+  void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
   
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h

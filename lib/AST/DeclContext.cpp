@@ -40,7 +40,7 @@ STATISTIC(NumUnloadedLazyIterableDeclContexts,
           "# of serialized iterable declaration contexts never loaded");
 
 // Only allow allocation of DeclContext using the allocator in ASTContext.
-void *DeclContext::operator new(size_t Bytes, ASTContext &C,
+void *DeclContext::operator new(size_t Bytes, const ASTContext &C,
                                 unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
