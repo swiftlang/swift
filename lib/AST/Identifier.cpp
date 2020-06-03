@@ -216,7 +216,7 @@ llvm::raw_ostream &DeclNameRef::printPretty(llvm::raw_ostream &os) const {
   return FullName.printPretty(os);
 }
 
-ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
+ObjCSelector::ObjCSelector(const ASTContext &ctx, unsigned numArgs,
                            ArrayRef<Identifier> pieces) {
   if (numArgs == 0) {
     assert(pieces.size() == 1 && "No-argument selector requires one piece");

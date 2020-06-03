@@ -434,7 +434,7 @@ class DeclName {
     : BaseNameOrCompound(decltype(BaseNameOrCompound)::getFromOpaqueValue(Opaque))
   {}
 
-  void initialize(ASTContext &C, DeclBaseName baseName,
+  void initialize(const ASTContext &C, DeclBaseName baseName,
                   ArrayRef<Identifier> argumentNames);
 
 public:
@@ -449,14 +449,15 @@ public:
       : DeclName(DeclBaseName(simpleName)) {}
 
   /// Build a compound value name given a base name and a set of argument names.
-  DeclName(ASTContext &C, DeclBaseName baseName,
+  DeclName(const ASTContext &C, DeclBaseName baseName,
            ArrayRef<Identifier> argumentNames) {
     initialize(C, baseName, argumentNames);
   }
 
   /// Build a compound value name given a base name and a set of argument names
   /// extracted from a parameter list.
-  DeclName(ASTContext &C, DeclBaseName baseName, ParameterList *paramList);
+  DeclName(const ASTContext &C, DeclBaseName baseName,
+           ParameterList *paramList);
 
   /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
@@ -729,7 +730,7 @@ public:
   }
 
   DeclNameRef withoutArgumentLabels() const;
-  DeclNameRef withArgumentLabels(ASTContext &C,
+  DeclNameRef withArgumentLabels(const ASTContext &C,
                                  ArrayRef<Identifier> argumentNames) const;
 
   /// Get a string representation of the name,
@@ -767,7 +768,7 @@ inline DeclNameRef DeclNameRef::withoutArgumentLabels() const {
 }
 
 inline DeclNameRef DeclNameRef::withArgumentLabels(
-    ASTContext &C, ArrayRef<Identifier> argumentNames) const {
+    const ASTContext &C, ArrayRef<Identifier> argumentNames) const {
   return DeclNameRef(DeclName(C, getBaseName(), argumentNames));
 }
 
@@ -804,7 +805,8 @@ class ObjCSelector {
 public:
   /// Form a selector with the given number of arguments and the given selector
   /// pieces.
-  ObjCSelector(ASTContext &ctx, unsigned numArgs, ArrayRef<Identifier> pieces);
+  ObjCSelector(const ASTContext &ctx, unsigned numArgs,
+               ArrayRef<Identifier> pieces);
 
   /// Construct an invalid ObjCSelector.
   ObjCSelector() : Storage() {}

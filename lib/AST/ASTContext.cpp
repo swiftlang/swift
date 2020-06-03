@@ -3987,7 +3987,7 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
     id.AddPointer(arg.get());
 }
 
-void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
+void DeclName::initialize(const ASTContext &C, DeclBaseName baseName,
                           ArrayRef<Identifier> argumentNames) {
   llvm::FoldingSetNodeID id;
   CompoundDeclName::Profile(id, baseName, argumentNames);
@@ -4011,7 +4011,7 @@ void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
 
 /// Build a compound value name given a base name and a set of argument names
 /// extracted from a parameter list.
-DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
+DeclName::DeclName(const ASTContext &C, DeclBaseName baseName,
                    ParameterList *paramList) {
   SmallVector<Identifier, 4> names;
   
