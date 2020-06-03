@@ -33,7 +33,7 @@ class alignas(ParamDecl *) ParameterList final :
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
-  void *operator new(size_t Bytes, ASTContext &C,
+  void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = 8);
 
   SourceLoc LParenLoc, RParenLoc;
