@@ -1466,7 +1466,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       // If @objc was inferred based on the Swift 3 @objc inference rules, emit
       // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
       // logging of the uses of such entrypoints.
-      if (attr->isSwift3Inferred() && !decl->isObjCDynamic()) {
+      if (attr->isSwift3Inferred() && !decl->shouldUseObjCDispatch()) {
         // Get the starting source location of the declaration so we can say
         // exactly where to stick '@objc'.
         SourceLoc objcInsertionLoc =

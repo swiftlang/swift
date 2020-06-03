@@ -2583,7 +2583,7 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
     return;
   }
 
-  if (replacement->isNativeDynamic()) {
+  if (replacement->shouldUseNativeDynamicDispatch()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_must_not_be_dynamic,
              replacement->getBaseName());
     attr->setInvalid();

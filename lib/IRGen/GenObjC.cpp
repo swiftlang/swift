@@ -1430,12 +1430,22 @@ void irgen::emitObjCSetterDescriptor(IRGenModule &IGM,
   emitObjCDescriptor(IGM, descriptors, descriptor);
 }
 
+static bool isObjCGenericClassExtension(ValueDecl *decl) {
+  // Don't emit category entries for @objc methods in extensions they would
+  // normally be disallowed except for @_dynamicReplacement(for:) methods that
+  // use the native dynamic replacement mechanism instead of objc categories.
+  auto *DC = decl->getDeclContext();
+  if (!isa<ExtensionDecl>(DC))
+    return false;
+  return decl->isNativeMethodReplacement();
+}
+
 bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   // Property accessors should be generated alongside the property.
   if (isa<AccessorDecl>(method))
     return false;
 
-  return method->isObjC();
+  return method->isObjC() && !isObjCGenericClassExtension(method);
 }
 
 bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
@@ -1447,12 +1457,13 @@ bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
   // Don't generate a descriptor for a property without any accessors.
   // This is only possible in SIL files because Sema will normally
   // implicitly synthesize accessors for @objc properties.
-  return property->isObjC() && property->requiresOpaqueAccessors();
+  return property->isObjC() && property->requiresOpaqueAccessors() &&
+         !isObjCGenericClassExtension(property);
 }
 
 bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
                                             SubscriptDecl *subscript) {
-  return subscript->isObjC();
+  return subscript->isObjC() && !isObjCGenericClassExtension(subscript);
 }
 
 llvm::Value *IRGenFunction::emitBlockCopyCall(llvm::Value *value) {
