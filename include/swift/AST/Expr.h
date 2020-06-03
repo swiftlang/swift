@@ -564,7 +564,7 @@ public:
 
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
+  void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(Expr));
 
   // Make placement new and vanilla new/delete illegal for Exprs.
@@ -749,8 +749,8 @@ public:
   /// \p C The AST context.
   /// \p value The integer value.
   /// \return An implicit integer literal expression which evaluates to the value.
-  static IntegerLiteralExpr *
-  createFromUnsigned(ASTContext &C, unsigned value);
+  static IntegerLiteralExpr *createFromUnsigned(const ASTContext &C,
+                                                unsigned value);
 
   /// Returns the value of the literal, appropriately constructed in the
   /// target type.
@@ -1052,9 +1052,9 @@ public:
   }
 
   /// Call the \c callback with information about each segment in turn.
-  void forEachSegment(ASTContext &Ctx,
+  void forEachSegment(const ASTContext &Ctx,
                       llvm::function_ref<void(bool, CallExpr *)> callback);
-  
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InterpolatedStringLiteral;
   }
@@ -1200,12 +1200,12 @@ public:
   ///
   /// Note: prefer to use the second entry point, which separates out
   /// arguments/labels/etc.
-  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+  static ObjectLiteralExpr *create(const ASTContext &ctx, SourceLoc poundLoc,
                                    LiteralKind kind, Expr *arg, bool implicit,
                                    llvm::function_ref<Type(Expr *)> getType);
 
   /// Create a new object literal expression.
-  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+  static ObjectLiteralExpr *create(const ASTContext &ctx, SourceLoc poundLoc,
                                    LiteralKind kind,
                                    SourceLoc lParenLoc,
                                    ArrayRef<Expr *> args,
@@ -1377,7 +1377,7 @@ public:
   /// a \c MetatypeType as this function will wrap the given type in one.
   ///
   /// FIXME: This behavior is bizarre.
-  static TypeExpr *createImplicit(Type Ty, ASTContext &C);
+  static TypeExpr *createImplicit(Type Ty, const ASTContext &C);
 
   /// Create an implicit \c TypeExpr that has artificial
   /// location information attached.
@@ -1390,7 +1390,8 @@ public:
   /// Due to limitations in the modeling of certain AST elements, implicit
   /// \c TypeExpr nodes are often the only source of location information the
   /// expression checker has when it comes time to diagnose an error.
-  static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
+  static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty,
+                                      const ASTContext &C);
 
   /// Create an implicit \c TypeExpr for a given \c TypeDecl at the specified location.
   ///
@@ -1428,9 +1429,9 @@ public:
   /// Returns nullptr if the reference cannot be formed, which is a hack due
   /// to limitations in how we model generic typealiases.
   static TypeExpr *createForSpecializedDecl(IdentTypeRepr *ParentTR,
-                                            ArrayRef<TypeRepr*> Args,
+                                            ArrayRef<TypeRepr *> Args,
                                             SourceRange AngleLocs,
-                                            ASTContext &C);
+                                            const ASTContext &C);
 
   TypeRepr *getTypeRepr() const { return Repr; }
   // NOTE: TypeExpr::getType() returns the type of the expr node, which is the
@@ -1565,21 +1566,23 @@ public:
                                              : FunctionRefKind::Unapplied);
   }
 
-  static UnresolvedDeclRefExpr *createImplicit(
-      ASTContext &C, DeclName name,
-      DeclRefKind refKind = DeclRefKind::Ordinary) {
+  static UnresolvedDeclRefExpr *
+  createImplicit(const ASTContext &C, DeclName name,
+                 DeclRefKind refKind = DeclRefKind::Ordinary) {
     return new (C) UnresolvedDeclRefExpr(DeclNameRef(name), refKind,
                                          DeclNameLoc());
   }
 
-  static UnresolvedDeclRefExpr *createImplicit(
-      ASTContext &C, DeclBaseName baseName, ArrayRef<Identifier> argLabels) {
+  static UnresolvedDeclRefExpr *createImplicit(const ASTContext &C,
+                                               DeclBaseName baseName,
+                                               ArrayRef<Identifier> argLabels) {
     return UnresolvedDeclRefExpr::createImplicit(C,
         DeclName(C, baseName, argLabels));
   }
 
-  static UnresolvedDeclRefExpr *createImplicit(
-      ASTContext &C, DeclBaseName baseName, ParameterList *paramList) {
+  static UnresolvedDeclRefExpr *createImplicit(const ASTContext &C,
+                                               DeclBaseName baseName,
+                                               ParameterList *paramList) {
     return UnresolvedDeclRefExpr::createImplicit(C,
         DeclName(C, baseName, paramList));
   }
@@ -1801,7 +1804,7 @@ public:
   /// Note: do not create new callers to this entry point; use the entry point
   /// that takes separate index arguments.
   static DynamicSubscriptExpr *create(
-      ASTContext &ctx, Expr *base, Expr *index, ConcreteDeclRef decl,
+      const ASTContext &ctx, Expr *base, Expr *index, ConcreteDeclRef decl,
       bool implicit,
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
         return E->getType();
@@ -1860,12 +1863,12 @@ class UnresolvedMemberExpr final
 
 public:
   /// Create a new unresolved member expression with no arguments.
-  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
+  static UnresolvedMemberExpr *create(const ASTContext &ctx, SourceLoc dotLoc,
                                       DeclNameLoc nameLoc, DeclNameRef name,
                                       bool implicit);
 
   /// Create a new unresolved member expression.
-  static UnresolvedMemberExpr *create(ASTContext &ctx, SourceLoc dotLoc,
+  static UnresolvedMemberExpr *create(const ASTContext &ctx, SourceLoc dotLoc,
                                       DeclNameLoc nameLoc, DeclNameRef name,
                                       SourceLoc lParenLoc,
                                       ArrayRef<Expr *> args,
@@ -2139,29 +2142,27 @@ class TupleExpr final : public Expr,
 
 public:
   /// Create a tuple.
-  static TupleExpr *create(ASTContext &ctx,
-                           SourceLoc LParenLoc, 
+  static TupleExpr *create(const ASTContext &ctx, SourceLoc LParenLoc,
                            ArrayRef<Expr *> SubExprs,
-                           ArrayRef<Identifier> ElementNames, 
+                           ArrayRef<Identifier> ElementNames,
                            ArrayRef<SourceLoc> ElementNameLocs,
-                           SourceLoc RParenLoc, bool HasTrailingClosure, 
+                           SourceLoc RParenLoc, bool HasTrailingClosure,
                            bool Implicit, Type Ty = Type());
 
-  static TupleExpr *create(ASTContext &ctx,
-                           SourceLoc LParenLoc,
-                           SourceLoc RParenLoc,
-                           ArrayRef<Expr *> SubExprs,
+  static TupleExpr *create(const ASTContext &ctx, SourceLoc LParenLoc,
+                           SourceLoc RParenLoc, ArrayRef<Expr *> SubExprs,
                            ArrayRef<Identifier> ElementNames,
                            ArrayRef<SourceLoc> ElementNameLocs,
                            Optional<unsigned> FirstTrailingArgumentAt,
                            bool Implicit, Type Ty = Type());
 
   /// Create an empty tuple.
-  static TupleExpr *createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
+  static TupleExpr *createEmpty(const ASTContext &ctx, SourceLoc LParenLoc,
                                 SourceLoc RParenLoc, bool Implicit);
 
   /// Create an implicit tuple with no source information.
-  static TupleExpr *createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
+  static TupleExpr *createImplicit(const ASTContext &ctx,
+                                   ArrayRef<Expr *> SubExprs,
                                    ArrayRef<Identifier> ElementNames);
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
@@ -2367,10 +2368,9 @@ class ArrayExpr final : public CollectionExpr,
   : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, CommaLocs,
                    RBracketLoc, Ty) { }
 public:
-  static ArrayExpr *create(ASTContext &C, SourceLoc LBracketLoc,
-                           ArrayRef<Expr*> Elements,
-                           ArrayRef<SourceLoc> CommaLocs,
-                           SourceLoc RBracketLoc,
+  static ArrayExpr *create(const ASTContext &C, SourceLoc LBracketLoc,
+                           ArrayRef<Expr *> Elements,
+                           ArrayRef<SourceLoc> CommaLocs, SourceLoc RBracketLoc,
                            Type Ty = Type());
 
   static bool classof(const Expr *e) {
@@ -2399,12 +2399,10 @@ class DictionaryExpr final : public CollectionExpr,
     : CollectionExpr(ExprKind::Dictionary, LBracketLoc, Elements, CommaLocs,
                      RBracketLoc, Ty) { }
 public:
-
-  static DictionaryExpr *create(ASTContext &C, SourceLoc LBracketLoc,
-                                ArrayRef<Expr*> Elements,
+  static DictionaryExpr *create(const ASTContext &C, SourceLoc LBracketLoc,
+                                ArrayRef<Expr *> Elements,
                                 ArrayRef<SourceLoc> CommaLocs,
-                                SourceLoc RBracketLoc,
-                                Type Ty = Type());
+                                SourceLoc RBracketLoc, Type Ty = Type());
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Dictionary;
@@ -2436,7 +2434,7 @@ public:
   /// Note: do not create new callers to this entry point; use the entry point
   /// that takes separate index arguments.
   static SubscriptExpr *create(
-      ASTContext &ctx, Expr *base, Expr *index,
+      const ASTContext &ctx, Expr *base, Expr *index,
       ConcreteDeclRef decl = ConcreteDeclRef(), bool implicit = false,
       AccessSemantics semantics = AccessSemantics::Ordinary,
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
@@ -2444,7 +2442,7 @@ public:
       });
 
   /// Create a new subscript.
-  static SubscriptExpr *create(ASTContext &ctx, Expr *base,
+  static SubscriptExpr *create(const ASTContext &ctx, Expr *base,
                                SourceLoc lSquareLoc,
                                ArrayRef<Expr *> indexArgs,
                                ArrayRef<Identifier> indexArgLabels,
@@ -2545,23 +2543,23 @@ public:
                                                  : FunctionRefKind::Unapplied);
   }
 
-  static UnresolvedDotExpr *createImplicit(
-      ASTContext &C, Expr *base, DeclName name) {
+  static UnresolvedDotExpr *createImplicit(const ASTContext &C, Expr *base,
+                                           DeclName name) {
     return new (C) UnresolvedDotExpr(base, SourceLoc(),
                                      DeclNameRef(name), DeclNameLoc(),
                                      /*implicit=*/true);
   }
 
-  static UnresolvedDotExpr *createImplicit(
-      ASTContext &C, Expr *base,
-      DeclBaseName baseName, ArrayRef<Identifier> argLabels) {
+  static UnresolvedDotExpr *createImplicit(const ASTContext &C, Expr *base,
+                                           DeclBaseName baseName,
+                                           ArrayRef<Identifier> argLabels) {
     return UnresolvedDotExpr::createImplicit(C, base,
                                              DeclName(C, baseName, argLabels));
   }
 
-  static UnresolvedDotExpr *createImplicit(
-      ASTContext &C, Expr *base,
-      DeclBaseName baseName, ParameterList *paramList) {
+  static UnresolvedDotExpr *createImplicit(const ASTContext &C, Expr *base,
+                                           DeclBaseName baseName,
+                                           ParameterList *paramList) {
     return UnresolvedDotExpr::createImplicit(C, base,
                                              DeclName(C, baseName, paramList));
   }
@@ -3165,9 +3163,9 @@ public:
   /// Create a tuple destructuring. The type of srcExpr must be a tuple type,
   /// and the number of elements must equal the size of destructureElements.
   static DestructureTupleExpr *
-  create(ASTContext &ctx,
-         ArrayRef<OpaqueValueExpr *> destructuredElements,
-         Expr *srcExpr, Expr *dstExpr, Type ty);
+  create(const ASTContext &ctx,
+         ArrayRef<OpaqueValueExpr *> destructuredElements, Expr *srcExpr,
+         Expr *dstExpr, Type ty);
 
   ArrayRef<OpaqueValueExpr *> getDestructuredElements() const {
     return {getTrailingObjects<OpaqueValueExpr *>(),
@@ -3377,7 +3375,7 @@ class ErasureExpr final : public ImplicitConversionExpr,
   }
 
 public:
-  static ErasureExpr *create(ASTContext &ctx, Expr *subExpr, Type type,
+  static ErasureExpr *create(const ASTContext &ctx, Expr *subExpr, Type type,
                              ArrayRef<ProtocolConformanceRef> conformances);
 
   /// Retrieve the mapping specifying how the type of the subexpression
@@ -3491,10 +3489,11 @@ class UnresolvedSpecializeExpr final : public Expr,
   }
 
 public:
-  static UnresolvedSpecializeExpr *
-  create(ASTContext &ctx, Expr *SubExpr, SourceLoc LAngleLoc,
-         ArrayRef<TypeRepr *> UnresolvedParams, SourceLoc RAngleLoc);
-  
+  static UnresolvedSpecializeExpr *create(const ASTContext &ctx, Expr *SubExpr,
+                                          SourceLoc LAngleLoc,
+                                          ArrayRef<TypeRepr *> UnresolvedParams,
+                                          SourceLoc RAngleLoc);
+
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   
@@ -3599,7 +3598,7 @@ class SequenceExpr final : public Expr,
   }
 
 public:
-  static SequenceExpr *create(ASTContext &ctx, ArrayRef<Expr*> elements);
+  static SequenceExpr *create(const ASTContext &ctx, ArrayRef<Expr *> elements);
 
   SourceLoc getStartLoc() const {
     return getElement(0)->getStartLoc();
@@ -4051,7 +4050,7 @@ class CaptureListExpr final : public Expr,
   }
 
 public:
-  static CaptureListExpr *create(ASTContext &ctx,
+  static CaptureListExpr *create(const ASTContext &ctx,
                                  ArrayRef<CaptureListEntry> captureList,
                                  ClosureExpr *closureBody);
 
@@ -4169,7 +4168,7 @@ class PropertyWrapperValuePlaceholderExpr : public Expr {
 
 public:
   static PropertyWrapperValuePlaceholderExpr *
-  create(ASTContext &ctx, SourceRange range, Type ty, Expr *wrappedValue);
+  create(const ASTContext &ctx, SourceRange range, Type ty, Expr *wrappedValue);
 
   /// The original wrappedValue initialization expression provided via
   /// \c = on a proprety with attached property wrappers.
@@ -4349,9 +4348,9 @@ public:
   ///
   /// Note: prefer to use the entry points that separate out the arguments.
   static CallExpr *create(
-      ASTContext &ctx, Expr *fn, Expr *arg, ArrayRef<Identifier> argLabels,
-      ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure, bool implicit,
-      Type type = Type(),
+      const ASTContext &ctx, Expr *fn, Expr *arg,
+      ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
+      bool hasTrailingClosure, bool implicit, Type type = Type(),
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
         return E->getType();
       });
@@ -4364,7 +4363,7 @@ public:
   /// \param argLabels The argument labels, whose size must equal args.size(),
   /// or which must be empty.
   static CallExpr *createImplicit(
-      ASTContext &ctx, Expr *fn, ArrayRef<Expr *> args,
+      const ASTContext &ctx, Expr *fn, ArrayRef<Expr *> args,
       ArrayRef<Identifier> argLabels,
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
         return E->getType();
@@ -4383,10 +4382,10 @@ public:
   /// equal args.size() or which must be empty.
   /// \param trailingClosures The list of trailing closures, if any.
   static CallExpr *create(
-      ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
-      ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
-      SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures,
-      bool implicit,
+      const ASTContext &ctx, Expr *fn, SourceLoc lParenLoc,
+      ArrayRef<Expr *> args, ArrayRef<Identifier> argLabels,
+      ArrayRef<SourceLoc> argLabelLocs, SourceLoc rParenLoc,
+      ArrayRef<TrailingClosure> trailingClosures, bool implicit,
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
         return E->getType();
       });
@@ -4780,7 +4779,7 @@ public:
   /// Create an implicit coercion expression for literal initialization
   /// preserving original source information, this way original call
   /// could be recreated if needed.
-  static CoerceExpr *forLiteralInit(ASTContext &ctx, Expr *literal,
+  static CoerceExpr *forLiteralInit(const ASTContext &ctx, Expr *literal,
                                     SourceRange range, TypeLoc literalType) {
     return new (ctx) CoerceExpr(range, literal, literalType);
   }
@@ -5239,77 +5238,59 @@ public:
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
-    
-    explicit Component(ASTContext *ctxForCopyingLabels,
-                       DeclNameOrRef decl,
-                       Expr *indexExpr,
+
+    explicit Component(DeclNameOrRef decl, Expr *indexExpr,
                        ArrayRef<Identifier> subscriptLabels,
                        ArrayRef<ProtocolConformanceRef> indexHashables,
-                       Kind kind,
-                       Type type,
-                       SourceLoc loc);
+                       Kind kind, Type type, SourceLoc loc);
 
     // Private constructor for tuple element kind
     Component(unsigned tupleIndex, Type elementType, SourceLoc loc)
-      : Component(nullptr, {}, nullptr, {}, {}, Kind::TupleElement,
-        elementType, loc) {
+        : Component({}, nullptr, {}, {}, Kind::TupleElement, elementType, loc) {
       TupleIndex = tupleIndex;
     }
-    
+
   public:
     Component()
-      : Component(nullptr, {}, nullptr, {}, {}, Kind::Invalid,
-                  Type(), SourceLoc())
-    {}
-    
+        : Component({}, nullptr, {}, {}, Kind::Invalid, Type(), SourceLoc()) {}
+
     /// Create an unresolved component for a property.
     static Component forUnresolvedProperty(DeclNameRef UnresolvedName,
                                            SourceLoc Loc) {
-      return Component(nullptr,
-                       UnresolvedName, nullptr, {}, {},
-                       Kind::UnresolvedProperty,
-                       Type(),
-                       Loc);
+      return Component(UnresolvedName, nullptr, {}, {},
+                       Kind::UnresolvedProperty, Type(), Loc);
     }
     
     /// Create an unresolved component for a subscript.
-    static Component forUnresolvedSubscript(ASTContext &ctx,
+    static Component forUnresolvedSubscript(const ASTContext &ctx,
                                      SourceLoc lSquareLoc,
                                      ArrayRef<Expr *> indexArgs,
                                      ArrayRef<Identifier> indexArgLabels,
                                      ArrayRef<SourceLoc> indexArgLabelLocs,
                                      SourceLoc rSquareLoc,
                                      ArrayRef<TrailingClosure> trailingClosures);
-    
+
     /// Create an unresolved component for a subscript.
     ///
     /// You shouldn't add new uses of this overload; use the one that takes a
     /// list of index arguments.
     static Component forUnresolvedSubscriptWithPrebuiltIndexExpr(
-                                         ASTContext &context,
                                          Expr *index,
                                          ArrayRef<Identifier> subscriptLabels,
                                          SourceLoc loc) {
-      
-      return Component(&context,
-                       {}, index, subscriptLabels, {},
-                       Kind::UnresolvedSubscript,
-                       Type(), loc);
+      return Component({}, index, subscriptLabels, {},
+                       Kind::UnresolvedSubscript, Type(), loc);
     }
     
     /// Create an unresolved optional force `!` component.
     static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalForce,
-                       Type(),
+      return Component({}, nullptr, {}, {}, Kind::OptionalForce, Type(),
                        BangLoc);
     }
     
     /// Create an unresolved optional chain `?` component.
     static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalChain,
-                       Type(),
+      return Component({}, nullptr, {}, {}, Kind::OptionalChain, Type(),
                        QuestionLoc);
     }
     
@@ -5317,14 +5298,12 @@ public:
     static Component forProperty(ConcreteDeclRef property,
                                  Type propertyType,
                                  SourceLoc loc) {
-      return Component(nullptr, property, nullptr, {}, {},
-                       Kind::Property,
-                       propertyType,
+      return Component(property, nullptr, {}, {}, Kind::Property, propertyType,
                        loc);
     }
     
     /// Create a component for a subscript.
-    static Component forSubscript(ASTContext &ctx,
+    static Component forSubscript(const ASTContext &ctx,
                               ConcreteDeclRef subscript,
                               SourceLoc lSquareLoc,
                               ArrayRef<Expr *> indexArgs,
@@ -5346,16 +5325,14 @@ public:
     
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalForce, forcedType,
+      return Component({}, nullptr, {}, {}, Kind::OptionalForce, forcedType,
                        bangLoc);
     }
     
     /// Create an optional-chaining `?` component.
     static Component forOptionalChain(Type unwrappedType,
                                       SourceLoc questionLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalChain, unwrappedType,
+      return Component({}, nullptr, {}, {}, Kind::OptionalChain, unwrappedType,
                        questionLoc);
     }
     
@@ -5363,15 +5340,12 @@ public:
     /// syntax but may appear when the non-optional result of an optional chain
     /// is implicitly wrapped.
     static Component forOptionalWrap(Type wrappedType) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::OptionalWrap, wrappedType,
+      return Component({}, nullptr, {}, {}, Kind::OptionalWrap, wrappedType,
                        SourceLoc());
     }
     
     static Component forIdentity(SourceLoc selfLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
-                       Kind::Identity, Type(),
-                       selfLoc);
+      return Component({}, nullptr, {}, {}, Kind::Identity, Type(), selfLoc);
     }
     
     static Component forTupleElement(unsigned fieldNumber,
@@ -5549,10 +5523,8 @@ private:
 
 public:
   /// Create a new #keyPath expression.
-  KeyPathExpr(ASTContext &C,
-              SourceLoc keywordLoc, SourceLoc lParenLoc,
-              ArrayRef<Component> components,
-              SourceLoc rParenLoc,
+  KeyPathExpr(const ASTContext &C, SourceLoc keywordLoc, SourceLoc lParenLoc,
+              ArrayRef<Component> components, SourceLoc rParenLoc,
               bool isImplicit = false);
 
   KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot, Expr *parsedPath,
@@ -5579,9 +5551,9 @@ public:
   
   /// Resolve the components of an un-type-checked expr. This copies over the
   /// components from the argument array.
-  void resolveComponents(ASTContext &C,
+  void resolveComponents(const ASTContext &C,
                          ArrayRef<Component> resolvedComponents);
-  
+
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
   /// @objc key path.
@@ -5717,11 +5689,10 @@ inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
 /// \param argLabelLocs The argument label locations, which might be updated by
 /// this function.
 Expr *packSingleArgument(
-    ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
+    const ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
     ArrayRef<Identifier> &argLabels, ArrayRef<SourceLoc> &argLabelLocs,
     SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures,
-    bool implicit,
-    SmallVectorImpl<Identifier> &argLabelsScratch,
+    bool implicit, SmallVectorImpl<Identifier> &argLabelsScratch,
     SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
     llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
       return E->getType();

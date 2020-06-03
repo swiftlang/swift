@@ -1807,8 +1807,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
         // .[0] or just plain [0]
         components.push_back(
             KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
-                getASTContext(), SE->getIndex(), SE->getArgumentLabels(),
-                SE->getLoc()));
+                SE->getIndex(), SE->getArgumentLabels(), SE->getLoc()));
 
         expr = SE->getBase();
       } else if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
