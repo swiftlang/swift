@@ -198,9 +198,11 @@ SWIFT_REQUEST(TypeChecker, SuperclassTypeRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
               AccessorDecl *(AbstractStorageDecl *, AccessorKind),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyUntilRequest,
+SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
+              bool(AbstractFunctionDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyAtLocRequest,
               bool(AbstractFunctionDecl *, SourceLoc),
-              Cached, NoLocationInfo)
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),

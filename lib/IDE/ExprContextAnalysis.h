@@ -28,7 +28,7 @@ enum class SemanticContextKind;
 
 /// Type check parent contexts of the given decl context, and the body of the
 /// given context until \c Loc if the context is a function body.
-void typeCheckContextUntil(DeclContext *DC, SourceLoc Loc);
+void typeCheckContextAt(DeclContext *DC, SourceLoc Loc);
 
 /// From \p DC, find and returns the outer most expression which source range is
 /// exact the same as \p TargetRange. Returns \c nullptr if not found.
