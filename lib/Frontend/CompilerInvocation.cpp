@@ -1533,9 +1533,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         getRuntimeCompatVersion();
   }
 
-  if (Args.hasArg(OPT_disable_leaf_frame_pointer_elim))
-    Opts.DisableFPElimLeaf = true;
-
   return false;
 }
 

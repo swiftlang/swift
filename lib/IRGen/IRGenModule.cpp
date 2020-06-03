@@ -90,26 +90,11 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
   return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
 };
 
-static clang::CodeGenOptions::FramePointerKind
-shouldUseFramePointer(const IRGenOptions &Opts, const llvm::Triple &triple) {
-  if (Opts.DisableFPElim) {
-    // General frame pointer elimination is disabled.
-    // Should we at least eliminate in leaf functions?
-    // Currently we only do that on arm64 (this matches the behavior of clang).
-    return Opts.DisableFPElimLeaf
-               ? clang::CodeGenOptions::FramePointerKind::All
-               : triple.isAArch64()
-                     ? clang::CodeGenOptions::FramePointerKind::NonLeaf
-                     : clang::CodeGenOptions::FramePointerKind::All;
-  }
-
-  return clang::CodeGenOptions::FramePointerKind::None;
-}
-
-static clang::CodeGenerator *
-createClangCodeGenerator(ASTContext &Context, llvm::LLVMContext &LLVMContext,
-                         const IRGenOptions &Opts, StringRef ModuleName,
-                         StringRef PD, const llvm::Triple &triple) {
+static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
+                                                 llvm::LLVMContext &LLVMContext,
+                                                      const IRGenOptions &Opts,
+                                                      StringRef ModuleName,
+                                                      StringRef PD) {
   auto Loader = Context.getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter*>(&*Loader);
   assert(Importer && "No clang module loader!");
@@ -117,7 +102,7 @@ createClangCodeGenerator(ASTContext &Context, llvm::LLVMContext &LLVMContext,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
-  CGO.setFramePointer(shouldUseFramePointer(Opts, triple));
+
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -207,17 +192,17 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF, StringRef ModuleName,
-                         StringRef OutputFilename,
+                         SourceFile *SF,
+                         StringRef ModuleName, StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
                          StringRef PrivateDiscriminator)
-    : LLVMContext(new llvm::LLVMContext()), IRGen(irgen),
-      Context(irgen.SIL.getASTContext()),
+    : LLVMContext(new llvm::LLVMContext()),
+      IRGen(irgen), Context(irgen.SIL.getASTContext()),
       // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
       // as long as the IGM is registered with the IRGenerator.
-      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext, irgen.Opts,
-                                            ModuleName, PrivateDiscriminator,
-                                            irgen.getEffectiveClangTriple())),
+      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext,
+                                            irgen.Opts,
+                                            ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()),
       DataLayout(irgen.getClangDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
@@ -999,28 +984,13 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
-void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
-                                     bool HasFramePointer) {
-  if (!HasFramePointer) {
-    Attrs.addAttribute("frame-pointer", "none");
-    return;
-  }
-  if (IRGen.Opts.DisableFPElimLeaf) {
-    Attrs.addAttribute("frame-pointer", "all");
-    return;
-  }
-
-  // We omit frame pointers for leaf functions only for arm64 for now (matching
-  // clang's behavior).
-  auto framePointer =
-      IRGen.getEffectiveClangTriple().isAArch64() ? "non-leaf" : "all";
-  Attrs.addAttribute("frame-pointer", framePointer);
+void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
+  Attrs.addAttribute("frame-pointer", "none");
 }
 
-void IRGenModule::setHasFramePointer(llvm::Function *F,
-                                     bool HasFramePointer) {
+void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b;
-  setHasFramePointer(b, HasFramePointer);
+  setHasNoFramePointer(b);
   F->addAttributes(llvm::AttributeList::FunctionIndex, b);
 }
 
@@ -1030,10 +1000,6 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
   // Add the default attributes for the Clang configuration.
   clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
 
-  // Add frame pointer attributes.
-  // FIXME: why are we doing this?
-  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
-  
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
