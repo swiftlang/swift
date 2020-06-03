@@ -105,6 +105,10 @@ public:
   /// DWARFImporter delegate.
   bool DisableSourceImport = false;
 
+  /// When set, use ExtraArgs alone to configure clang instance because ExtraArgs
+  /// contains the full option set.
+  bool ExtraArgsOnly = false;
+
   // SWIFT_ENABLE_TENSORFLOW
   /// When set, clang writes its output files (module caches) to this instead
   /// of to the real filesystem.

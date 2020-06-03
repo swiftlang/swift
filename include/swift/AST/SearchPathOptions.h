@@ -82,6 +82,9 @@ public:
   /// would for a non-system header.
   bool DisableModulesValidateSystemDependencies = false;
 
+  /// The paths to a set of explicitly built modules from interfaces.
+  std::vector<std::string> ExplicitSwiftModules;
+
 private:
   static StringRef
   pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {
