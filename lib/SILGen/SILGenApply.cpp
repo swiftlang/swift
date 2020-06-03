@@ -1005,7 +1005,7 @@ public:
       // @objc dynamic initializers are statically dispatched (we're
       // calling the allocating entry point, which is a thunk that
       // does the dynamic dispatch for us).
-      if (ctor->isObjCDynamic())
+      if (ctor->shouldUseObjCDispatch())
         return false;
 
       // Required constructors are statically dispatched when the 'self'
