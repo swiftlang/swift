@@ -243,10 +243,7 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags,
-            bool debugDumpCycles,
-            bool buildDependencyGraph,
-            bool enableExperimentalPrivateDeps);
+  Evaluator(DiagnosticEngine &diags, const LangOptions &opts);
 
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
