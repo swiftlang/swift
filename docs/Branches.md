@@ -69,7 +69,7 @@ You can use any of the branch names as the argument to `--scheme`, such as `mast
 
      - Then cherry-pick these commits to `swift/master-next`.
 
-     - If necessary, cherry-pick to the release branch (`swift/swift-x.y-branch`), following the appropriate release   process. (Usually this means filling out a standard template, finding someone to review your code if that hasn't already happened, and getting approval from that repo's *release manager.)*
+     - If necessary, cherry-pick to the release branch (`swift/release/x.y`), following the appropriate release process. (Usually this means filling out a standard template, finding someone to review your code if that hasn't already happened, and getting approval from that repo's *release manager.)*
 
 ## Automerging
 
