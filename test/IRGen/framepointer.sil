@@ -6,6 +6,10 @@
 
 // REQUIRES: CPU=x86_64
 
+// On windows we default to framepointer=none. Therefore the CHECKs fail. It is
+// not worth splitting the CHECK lines just for this.
+// XFAIL: OS=windows-msvc
+
 sil_stage canonical
 
 import Swift

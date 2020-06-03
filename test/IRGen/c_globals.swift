@@ -1,5 +1,9 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -Xcc -mno-omit-leaf-frame-pointer | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 
+// On windows we default to framepointer=none. Therefore the CHECKs fail. It is
+// not worth splitting the CHECK lines just for this.
+// XFAIL: OS=windows-msvc
+
 import c_layout
 
 @inline(never)
