@@ -412,18 +412,17 @@ namespace {
 /// underlying corrected token stream.
 class TokenRecorder: public ConsumeTokenReceiver {
   ASTContext &Ctx;
-  SourceManager &SM;
+  unsigned BufferID;
 
   // Token list ordered by their appearance in the source file.
-  std::vector<Token> &Bag;
-  unsigned BufferID;
+  std::vector<Token> &Tokens;
 
   // Registered token kind change. These changes are regiestered before the
   // token is consumed, so we need to keep track of them here.
   llvm::DenseMap<const void*, tok> TokenKindChangeMap;
 
   std::vector<Token>::iterator lower_bound(SourceLoc Loc) {
-    return token_lower_bound(Bag, Loc);
+    return token_lower_bound(Tokens, Loc);
   }
 
   std::vector<Token>::iterator lower_bound(Token Tok) {
@@ -432,9 +431,9 @@ class TokenRecorder: public ConsumeTokenReceiver {
 
   void relexComment(CharSourceRange CommentRange,
                     llvm::SmallVectorImpl<Token> &Scratch) {
-    Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, LexerMode::Swift,
-            HashbangMode::Disallowed,
-            CommentRetentionMode::ReturnAsTokens,
+    auto &SM = Ctx.SourceMgr;
+    Lexer L(Ctx.LangOpts, SM, BufferID, nullptr, LexerMode::Swift,
+            HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
             TriviaRetentionMode::WithoutTrivia,
             SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
             SM.getLocOffsetInBuffer(CommentRange.getEnd(), BufferID));
@@ -449,19 +448,18 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
 public:
-  TokenRecorder(SourceFile &SF, unsigned BufferID):
-  Ctx(SF.getASTContext()),
-  SM(SF.getASTContext().SourceMgr),
-  Bag(SF.getTokenVector()),
-  BufferID(BufferID) {};
+  TokenRecorder(SourceFile &SF, unsigned BufferID)
+      : Ctx(SF.getASTContext()), BufferID(BufferID),
+        Tokens(SF.getTokenVector()) {}
 
   void finalize() override {
+    auto &SM = Ctx.SourceMgr;
 
     // We should consume the comments at the end of the file that don't attach
     // to any tokens.
     SourceLoc TokEndLoc;
-    if (!Bag.empty()) {
-      Token Last = Bag.back();
+    if (!Tokens.empty()) {
+      Token Last = Tokens.back();
       TokEndLoc = Last.getLoc().getAdvancedLoc(Last.getLength());
     } else {
 
@@ -473,14 +471,14 @@ public:
                                  SM.getRangeForBuffer(BufferID).getEnd()),
                  Scratch);
     // Accept these orphaned comments.
-    Bag.insert(Bag.end(), Scratch.begin(), Scratch.end());
+    Tokens.insert(Tokens.end(), Scratch.begin(), Scratch.end());
   }
 
   void registerTokenKindChange(SourceLoc Loc, tok NewKind) override {
     // If a token with the same location is already in the bag, update its kind.
     auto Pos = lower_bound(Loc);
-    if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
-        Loc.getOpaquePointerValue()) {
+    if (Pos != Tokens.end() &&
+        Pos->getLoc().getOpaquePointerValue() == Loc.getOpaquePointerValue()) {
       Pos->setKind(NewKind);
       return;
     }
@@ -496,8 +494,8 @@ public:
 
     // If a token with the same location is already in the bag, skip this token.
     auto Pos = lower_bound(Tok);
-    if (Pos != Bag.end() && Pos->getLoc().getOpaquePointerValue() ==
-        Tok.getLoc().getOpaquePointerValue()) {
+    if (Pos != Tokens.end() && Pos->getLoc().getOpaquePointerValue() ==
+                                   Tok.getLoc().getOpaquePointerValue()) {
       return;
     }
 
@@ -516,7 +514,7 @@ public:
     }
 
     TokensToConsume.push_back(Tok);
-    Bag.insert(Pos, TokensToConsume.begin(), TokensToConsume.end());
+    Tokens.insert(Pos, TokensToConsume.begin(), TokensToConsume.end());
   }
 };
 } // End of an anonymous namespace.
