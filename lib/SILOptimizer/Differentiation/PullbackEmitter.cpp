@@ -557,8 +557,7 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
   auto origResult = origFormalResults[getIndices().source];
 
   // TODO(TF-970): Emit diagnostic when `TangentVector` is not a struct.
-  auto tangentVectorSILTy = pullback.getConventions().getSingleSILResultType(
-      TypeExpansionContext::minimal());
+  auto tangentVectorSILTy = pullback.getConventions().getSingleSILResultType();
   auto tangentVectorTy = tangentVectorSILTy.getASTType();
   auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
 
