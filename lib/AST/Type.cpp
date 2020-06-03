@@ -717,7 +717,7 @@ bool ExistentialLayout::isErrorExistential() const {
           protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::Error));
 }
 
-bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
+bool ExistentialLayout::isExistentialWithError(const ASTContext &ctx) const {
   auto errorProto = ctx.getProtocol(KnownProtocolKind::Error);
   if (!errorProto) return false;
 

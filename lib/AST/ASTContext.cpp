@@ -3824,7 +3824,7 @@ CanType OpenedArchetypeType::getAny(Type existential) {
   return OpenedArchetypeType::get(existential);
 }
 
-void TypeLoc::setInvalidType(ASTContext &C) {
+void TypeLoc::setInvalidType(const ASTContext &C) {
   Ty = ErrorType::get(C);
 }
 
