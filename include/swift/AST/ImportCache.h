@@ -117,10 +117,10 @@ class alignas(ModuleDecl::ImportedModule) ImportCache {
   ModuleDecl::AccessPathTy EmptyAccessPath;
 
   ArrayRef<ModuleDecl::AccessPathTy> allocateArray(
-      ASTContext &ctx,
+      const ASTContext &ctx,
       SmallVectorImpl<ModuleDecl::AccessPathTy> &results);
 
-  ImportSet &getImportSet(ASTContext &ctx,
+  ImportSet &getImportSet(const ASTContext &ctx,
                           ArrayRef<ModuleDecl::ImportedModule> topLevelImports);
 
 public:

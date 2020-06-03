@@ -81,7 +81,7 @@ static void collectExports(ModuleDecl::ImportedModule next,
 }
 
 ImportSet &
-ImportCache::getImportSet(ASTContext &ctx,
+ImportCache::getImportSet(const ASTContext &ctx,
                           ArrayRef<ModuleDecl::ImportedModule> imports) {
   bool hasHeaderImportModule = false;
   ModuleDecl *headerImportModule = nullptr;
@@ -193,7 +193,7 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
 }
 
 ArrayRef<ModuleDecl::AccessPathTy> ImportCache::allocateArray(
-    ASTContext &ctx,
+    const ASTContext &ctx,
     SmallVectorImpl<ModuleDecl::AccessPathTy> &results) {
   if (results.empty())
     return ArrayRef<ModuleDecl::AccessPathTy>();
