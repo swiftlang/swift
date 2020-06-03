@@ -248,6 +248,8 @@ private:
         return Options.DisplayStdlibModule;
       if (Context->getText() == swift::MANGLING_MODULE_OBJC)
         return Options.DisplayObjCModule;
+      if (Context->getText() == Options.HidingCurrentModule)
+        return false;
       if (Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
         return Options.DisplayDebuggerGeneratedModule;
     }

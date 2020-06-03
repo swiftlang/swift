@@ -85,6 +85,11 @@ static llvm::cl::opt<bool> DisplayObjCModule(
     "display-objc-module", llvm::cl::init(true),
     llvm::cl::desc("Qualify types originating from the __ObjC module"),
     llvm::cl::Hidden);
+
+static llvm::cl::opt<std::string> HidingModule(
+    "hiding-module",
+    llvm::cl::desc("Don't qualify types originating from this module"),
+    llvm::cl::Hidden);
 /// \}
 
 
@@ -249,6 +254,7 @@ int main(int argc, char **argv) {
     options = swift::Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
   options.DisplayStdlibModule = DisplayStdlibModule;
   options.DisplayObjCModule = DisplayObjCModule;
+  options.HidingCurrentModule = HidingModule;
 
   if (InputNames.empty()) {
     CompactMode = true;
