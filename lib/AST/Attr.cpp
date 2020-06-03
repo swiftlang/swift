@@ -69,7 +69,7 @@ static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::
 #include "swift/AST/Attr.def"
 
 // Only allow allocation of attributes using the allocator in ASTContext.
-void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
+void *AttributeBase::operator new(size_t Bytes, const ASTContext &C,
                                   unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
@@ -1246,23 +1246,23 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
   Bits.ObjCAttr.Swift3Inferred = false;
 }
 
-ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name,
+ObjCAttr *ObjCAttr::create(const ASTContext &Ctx, Optional<ObjCSelector> name,
                            bool isNameImplicit) {
   return new (Ctx) ObjCAttr(name, isNameImplicit);
 }
 
-ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
+ObjCAttr *ObjCAttr::createUnnamed(const ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc ObjCLoc) {
   return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc), None,
                             SourceRange(), { });
 }
 
-ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
+ObjCAttr *ObjCAttr::createUnnamedImplicit(const ASTContext &Ctx) {
   return new (Ctx) ObjCAttr(None, false);
 }
 
-ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
-                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+ObjCAttr *ObjCAttr::createNullary(const ASTContext &Ctx, SourceLoc AtLoc,
+                                  SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                   SourceLoc NameLoc, Identifier Name,
                                   SourceLoc RParenLoc) {
   void *mem = Ctx.Allocate(totalSizeToAlloc<SourceLoc>(3), alignof(ObjCAttr));
@@ -1272,13 +1272,13 @@ ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc,
                             NameLoc);
 }
 
-ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, Identifier Name,
+ObjCAttr *ObjCAttr::createNullary(const ASTContext &Ctx, Identifier Name,
                                   bool isNameImplicit) {
   return new (Ctx) ObjCAttr(ObjCSelector(Ctx, 0, Name), isNameImplicit);
 }
 
-ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
-                                   SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+ObjCAttr *ObjCAttr::createSelector(const ASTContext &Ctx, SourceLoc AtLoc,
+                                   SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                    ArrayRef<SourceLoc> NameLocs,
                                    ArrayRef<Identifier> Names,
                                    SourceLoc RParenLoc) {
@@ -1291,7 +1291,7 @@ ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
                             NameLocs);
 }
 
-ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, 
+ObjCAttr *ObjCAttr::createSelector(const ASTContext &Ctx,
                                    ArrayRef<Identifier> Names,
                                    bool isNameImplicit) {
   return new (Ctx) ObjCAttr(ObjCSelector(Ctx, Names.size(), Names), 
@@ -1319,7 +1319,7 @@ SourceLoc ObjCAttr::getRParenLoc() const {
   return getTrailingLocations()[1];
 }
 
-ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
+ObjCAttr *ObjCAttr::clone(const ASTContext &context) const {
   auto attr = new (context) ObjCAttr(getName(), isNameImplicit());
   attr->setSwift3Inferred(isSwift3Inferred());
   return attr;
@@ -1331,11 +1331,10 @@ PrivateImportAttr::PrivateImportAttr(SourceLoc atLoc, SourceRange baseRange,
     : DeclAttribute(DAK_PrivateImport, atLoc, baseRange, /*Implicit=*/false),
       SourceFile(sourceFile) {}
 
-PrivateImportAttr *PrivateImportAttr::create(ASTContext &Ctxt, SourceLoc AtLoc,
-                                             SourceLoc PrivateLoc,
-                                             SourceLoc LParenLoc,
-                                             StringRef sourceFile,
-                                             SourceLoc RParenLoc) {
+PrivateImportAttr *
+PrivateImportAttr::create(const ASTContext &Ctxt, SourceLoc AtLoc,
+                          SourceLoc PrivateLoc, SourceLoc LParenLoc,
+                          StringRef sourceFile, SourceLoc RParenLoc) {
   return new (Ctxt)
       PrivateImportAttr(AtLoc, SourceRange(PrivateLoc, RParenLoc), sourceFile,
                         SourceRange(LParenLoc, RParenLoc));
@@ -1353,10 +1352,9 @@ DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
   getTrailingLocations()[1] = parenRange.End;
 }
 
-DynamicReplacementAttr *
-DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
-                               SourceLoc DynReplLoc, SourceLoc LParenLoc,
-                               DeclNameRef ReplacedFunction, SourceLoc RParenLoc) {
+DynamicReplacementAttr *DynamicReplacementAttr::create(
+    const ASTContext &Ctx, SourceLoc AtLoc, SourceLoc DynReplLoc,
+    SourceLoc LParenLoc, DeclNameRef ReplacedFunction, SourceLoc RParenLoc) {
   void *mem = Ctx.Allocate(totalSizeToAlloc<SourceLoc>(2),
                            alignof(DynamicReplacementAttr));
   return new (mem) DynamicReplacementAttr(
@@ -1365,13 +1363,13 @@ DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
 }
 
 DynamicReplacementAttr *
-DynamicReplacementAttr::create(ASTContext &Ctx, DeclNameRef name,
+DynamicReplacementAttr::create(const ASTContext &Ctx, DeclNameRef name,
                                AbstractFunctionDecl *f) {
   return new (Ctx) DynamicReplacementAttr(name, f);
 }
 
 DynamicReplacementAttr *
-DynamicReplacementAttr::create(ASTContext &Ctx, DeclNameRef name,
+DynamicReplacementAttr::create(const ASTContext &Ctx, DeclNameRef name,
                                LazyMemberLoader *Resolver, uint64_t Data) {
   return new (Ctx) DynamicReplacementAttr(name, Resolver, Data);
 }
@@ -1384,13 +1382,13 @@ SourceLoc DynamicReplacementAttr::getRParenLoc() const {
   return getTrailingLocations()[1];
 }
 
-TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
+TypeEraserAttr *TypeEraserAttr::create(const ASTContext &ctx,
                                        SourceLoc atLoc, SourceRange range,
                                        TypeLoc typeEraserLoc) {
   return new (ctx) TypeEraserAttr(atLoc, range, typeEraserLoc, nullptr, 0);
 }
 
-TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
+TypeEraserAttr *TypeEraserAttr::create(const ASTContext &ctx,
                                        LazyMemberLoader *Resolver,
                                        uint64_t Data) {
   return new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
@@ -1414,12 +1412,9 @@ Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
                            ErrorType::get(ctx));
 }
 
-AvailableAttr *
-AvailableAttr::createPlatformAgnostic(ASTContext &C,
-                                   StringRef Message,
-                                   StringRef Rename,
-                                   PlatformAgnosticAvailabilityKind Kind,
-                                   llvm::VersionTuple Obsoleted) {
+AvailableAttr *AvailableAttr::createPlatformAgnostic(
+    const ASTContext &C, StringRef Message, StringRef Rename,
+    PlatformAgnosticAvailabilityKind Kind, llvm::VersionTuple Obsoleted) {
   assert(Kind != PlatformAgnosticAvailabilityKind::None);
   llvm::VersionTuple NoVersion;
   if (Kind == PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
@@ -1517,7 +1512,8 @@ bool AvailableAttr::isUnconditionallyDeprecated() const {
   llvm_unreachable("Unhandled PlatformAgnosticAvailabilityKind in switch.");
 }
 
-llvm::VersionTuple AvailableAttr::getActiveVersion(const ASTContext &ctx) const {
+llvm::VersionTuple
+AvailableAttr::getActiveVersion(const ASTContext &ctx) const {
   if (isLanguageVersionSpecific()) {
     return ctx.LangOpts.EffectiveLanguageVersion;
   } else if (isPackageDescriptionVersionSpecific()) {
@@ -1593,7 +1589,7 @@ TrailingWhereClause *SpecializeAttr::getTrailingWhereClause() const {
   return trailingWhereClause;
 }
 
-SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
+SpecializeAttr *SpecializeAttr::create(const ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
                                        TrailingWhereClause *clause,
                                        bool exported,
@@ -1613,7 +1609,7 @@ SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
 }
 
 SPIAccessControlAttr *
-SPIAccessControlAttr::create(ASTContext &context,
+SPIAccessControlAttr::create(const ASTContext &context,
                              SourceLoc atLoc,
                              SourceRange range,
                              ArrayRef<Identifier> spiGroups) {
@@ -1644,7 +1640,7 @@ DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
 }
 
 DifferentiableAttr *
-DifferentiableAttr::create(ASTContext &context, bool implicit,
+DifferentiableAttr::create(const ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
                            bool linear,
                            ArrayRef<ParsedAutoDiffParameter> parameters,
@@ -1733,9 +1729,9 @@ DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
       ParameterIndices(parameterIndices) {}
 
 DerivativeAttr *
-DerivativeAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
-                       SourceRange baseRange, TypeRepr *baseTypeRepr,
-                       DeclNameRefWithLoc originalName,
+DerivativeAttr::create(const ASTContext &context, bool implicit,
+                       SourceLoc atLoc, SourceRange baseRange,
+                       TypeRepr *baseTypeRepr, DeclNameRefWithLoc originalName,
                        ArrayRef<ParsedAutoDiffParameter> params) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
   void *mem = context.Allocate(size, alignof(DerivativeAttr));
@@ -1743,7 +1739,7 @@ DerivativeAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
                                   std::move(originalName), params);
 }
 
-DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
+DerivativeAttr *DerivativeAttr::create(const ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        TypeRepr *baseTypeRepr,
                                        DeclNameRefWithLoc originalName,
@@ -1792,7 +1788,7 @@ TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       ParameterIndices(parameterIndices) {}
 
-TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
+TransposeAttr *TransposeAttr::create(const ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
                                      TypeRepr *baseType,
                                      DeclNameRefWithLoc originalName,
@@ -1803,7 +1799,7 @@ TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
                                  std::move(originalName), params);
 }
 
-TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
+TransposeAttr *TransposeAttr::create(const ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
                                      TypeRepr *baseType,
                                      DeclNameRefWithLoc originalName,
@@ -1824,7 +1820,7 @@ ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
 }
 
 
-ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
+ImplementsAttr *ImplementsAttr::create(const ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
                                        TypeLoc ProtocolType,
                                        DeclName MemberName,
@@ -1855,7 +1851,8 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
   initializeCallArguments(argLabels, argLabelLocs);
 }
 
-CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+CustomAttr *CustomAttr::create(const ASTContext &ctx, SourceLoc atLoc,
+                               TypeLoc type,
                                bool hasInitializer,
                                PatternBindingInitializer *initContext,
                                SourceLoc lParenLoc,

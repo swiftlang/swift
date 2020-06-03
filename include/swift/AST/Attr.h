@@ -213,7 +213,7 @@ public:
 
   // Only allow allocation of attributes using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
+  void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(AttributeBase));
 
   void operator delete(void *Data) throw() { }
@@ -840,11 +840,11 @@ public:
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
   static AvailableAttr *
-  createPlatformAgnostic(ASTContext &C, StringRef Message, StringRef Rename = "",
-                      PlatformAgnosticAvailabilityKind Reason
-                         = PlatformAgnosticAvailabilityKind::Unavailable,
-                         llvm::VersionTuple Obsoleted
-                         = llvm::VersionTuple());
+  createPlatformAgnostic(const ASTContext &C, StringRef Message,
+                         StringRef Rename = "",
+                         PlatformAgnosticAvailabilityKind Reason =
+                             PlatformAgnosticAvailabilityKind::Unavailable,
+                         llvm::VersionTuple Obsoleted = llvm::VersionTuple());
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;
@@ -903,14 +903,14 @@ class ObjCAttr final : public DeclAttribute,
 
 public:
   /// Create implicit ObjC attribute with a given (optional) name.
-  static ObjCAttr *create(ASTContext &Ctx, Optional<ObjCSelector> name,
+  static ObjCAttr *create(const ASTContext &Ctx, Optional<ObjCSelector> name,
                           bool implicitName);
 
   /// Create an unnamed Objective-C attribute, i.e., @objc.
-  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
+  static ObjCAttr *createUnnamed(const ASTContext &Ctx, SourceLoc AtLoc,
                                  SourceLoc ObjCLoc);
 
-  static ObjCAttr *createUnnamedImplicit(ASTContext &Ctx);
+  static ObjCAttr *createUnnamedImplicit(const ASTContext &Ctx);
 
   /// Create a nullary Objective-C attribute, which has a single name
   /// with no colon following it.
@@ -918,8 +918,8 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
-                                 SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+  static ObjCAttr *createNullary(const ASTContext &Ctx, SourceLoc AtLoc,
+                                 SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                  SourceLoc NameLoc, Identifier Name,
                                  SourceLoc RParenLoc);
 
@@ -929,20 +929,21 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name, 
+  static ObjCAttr *createNullary(const ASTContext &Ctx, Identifier Name,
                                  bool isNameImplicit);
 
   /// Create a "selector" Objective-C attribute, which has some number
   /// of identifiers followed by colons.
-  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
-                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+  static ObjCAttr *createSelector(const ASTContext &Ctx, SourceLoc AtLoc,
+                                  SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                   ArrayRef<SourceLoc> NameLocs,
                                   ArrayRef<Identifier> Names,
                                   SourceLoc RParenLoc);
 
   /// Create an implicit "selector" Objective-C attribute, which has
   /// some number of identifiers followed by colons.
-  static ObjCAttr *createSelector(ASTContext &Ctx, ArrayRef<Identifier> Names,
+  static ObjCAttr *createSelector(const ASTContext &Ctx,
+                                  ArrayRef<Identifier> Names,
                                   bool isNameImplicit);
 
   /// Determine whether this attribute has a name associated with it.
@@ -1004,7 +1005,7 @@ public:
 
   /// Clone the given attribute, producing an implicit copy of the
   /// original without source location information.
-  ObjCAttr *clone(ASTContext &context) const;
+  ObjCAttr *clone(const ASTContext &context) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjC;
@@ -1019,7 +1020,7 @@ class PrivateImportAttr final
                     StringRef sourceFile, SourceRange parentRange);
 
 public:
-  static PrivateImportAttr *create(ASTContext &Ctxt, SourceLoc AtLoc,
+  static PrivateImportAttr *create(const ASTContext &Ctxt, SourceLoc AtLoc,
                                    SourceLoc PrivateLoc, SourceLoc LParenLoc,
                                    StringRef sourceFile, SourceLoc RParenLoc);
 
@@ -1080,15 +1081,17 @@ class DynamicReplacementAttr final
   }
 
 public:
-  static DynamicReplacementAttr *
-  create(ASTContext &Context, SourceLoc AtLoc, SourceLoc DynReplLoc,
-         SourceLoc LParenLoc, DeclNameRef replacedFunction, SourceLoc RParenLoc);
+  static DynamicReplacementAttr *create(const ASTContext &Context,
+                                        SourceLoc AtLoc, SourceLoc DynReplLoc,
+                                        SourceLoc LParenLoc,
+                                        DeclNameRef replacedFunction,
+                                        SourceLoc RParenLoc);
 
-  static DynamicReplacementAttr *create(ASTContext &ctx,
+  static DynamicReplacementAttr *create(const ASTContext &ctx,
                                         DeclNameRef replacedFunction,
                                         AbstractFunctionDecl *replacedFuncDecl);
 
-  static DynamicReplacementAttr *create(ASTContext &ctx,
+  static DynamicReplacementAttr *create(const ASTContext &ctx,
                                         DeclNameRef replacedFunction,
                                         LazyMemberLoader *Resolver,
                                         uint64_t Data);
@@ -1123,11 +1126,11 @@ class TypeEraserAttr final : public DeclAttribute {
         Resolver(Resolver), ResolverContextData(Data) {}
 
 public:
-  static TypeEraserAttr *create(ASTContext &ctx,
+  static TypeEraserAttr *create(const ASTContext &ctx,
                                 SourceLoc atLoc, SourceRange range,
                                 TypeLoc typeEraserLoc);
 
-  static TypeEraserAttr *create(ASTContext &ctx,
+  static TypeEraserAttr *create(const ASTContext &ctx,
                                 LazyMemberLoader *Resolver,
                                 uint64_t Data);
 
@@ -1228,8 +1231,8 @@ class SPIAccessControlAttr final : public DeclAttribute,
   size_t numSPIGroups;
 
 public:
-  static SPIAccessControlAttr *create(ASTContext &context, SourceLoc atLoc,
-                                      SourceRange range,
+  static SPIAccessControlAttr *create(const ASTContext &context,
+                                      SourceLoc atLoc, SourceRange range,
                                       ArrayRef<Identifier> spiGroups);
 
   /// Name of SPIs declared by the attribute.
@@ -1318,7 +1321,7 @@ public:
   }
 
   /// Returns a copy of this attribute without any source information.
-  ReferenceOwnershipAttr *clone(ASTContext &context) const {
+  ReferenceOwnershipAttr *clone(const ASTContext &context) const {
     return new (context) ReferenceOwnershipAttr(get());
   }
 
@@ -1424,7 +1427,7 @@ private:
                  GenericSignature specializedSignature);
 
 public:
-  static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+  static SpecializeAttr *create(const ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range, TrailingWhereClause *clause,
                                 bool exported, SpecializationKind kind,
                                 GenericSignature specializedSignature
@@ -1475,7 +1478,7 @@ public:
                  DeclName MemberName,
                  DeclNameLoc MemberNameLoc);
 
-  static ImplementsAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+  static ImplementsAttr *create(const ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range,
                                 TypeLoc ProtocolType,
                                 DeclName MemberName,
@@ -1609,13 +1612,14 @@ class CustomAttr final : public DeclAttribute,
              bool implicit);
 
 public:
-  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
-                            bool implicit = false) {
+  static CustomAttr *create(const ASTContext &ctx, SourceLoc atLoc,
+                            TypeLoc type, bool implicit = false) {
     return create(ctx, atLoc, type, false, nullptr, SourceLoc(), { }, { }, { },
                   SourceLoc(), implicit);
   }
 
-  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+  static CustomAttr *create(const ASTContext &ctx, SourceLoc atLoc,
+                            TypeLoc type,
                             bool hasInitializer,
                             PatternBindingInitializer *initContext,
                             SourceLoc lParenLoc,
@@ -1770,7 +1774,7 @@ class DifferentiableAttr final
                               GenericSignature derivativeGenericSignature);
 
 public:
-  static DifferentiableAttr *create(ASTContext &context, bool implicit,
+  static DifferentiableAttr *create(const ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
                                     bool linear,
                                     ArrayRef<ParsedAutoDiffParameter> params,
@@ -1908,13 +1912,13 @@ class DerivativeAttr final
                           IndexSubset *parameterIndices);
 
 public:
-  static DerivativeAttr *create(ASTContext &context, bool implicit,
+  static DerivativeAttr *create(const ASTContext &context, bool implicit,
                                 SourceLoc atLoc, SourceRange baseRange,
                                 TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
                                 ArrayRef<ParsedAutoDiffParameter> params);
 
-  static DerivativeAttr *create(ASTContext &context, bool implicit,
+  static DerivativeAttr *create(const ASTContext &context, bool implicit,
                                 SourceLoc atLoc, SourceRange baseRange,
                                 TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
@@ -1998,12 +2002,12 @@ class TransposeAttr final
                          IndexSubset *parameterIndices);
 
 public:
-  static TransposeAttr *create(ASTContext &context, bool implicit,
+  static TransposeAttr *create(const ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
                                TypeRepr *baseType, DeclNameRefWithLoc original,
                                ArrayRef<ParsedAutoDiffParameter> params);
 
-  static TransposeAttr *create(ASTContext &context, bool implicit,
+  static TransposeAttr *create(const ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
                                TypeRepr *baseType, DeclNameRefWithLoc original,
                                IndexSubset *parameterIndices);
