@@ -65,9 +65,9 @@ You can use any of the branch names as the argument to `--scheme`, such as `mast
      - Then cherry-pick these commits to an appropriate, `swift/master` aligned `apple/stable/*` branch in Apple's fork of [llvm-project](https://github.com/apple/llvm-project). Please see [Apple's branching scheme](https://github.com/apple/llvm-project/blob/apple/master/apple-docs/AppleBranchingScheme.md) document to determine which `apple/stable/*` branch you should cherry-pick to.
 
   2) Changes that depend on Swift (this only applies to LLDB)
-     - New commits go to `swift/master-next`.
+     - New commits go to `swift/master` (_not_ an `apple/stable/*` branch, as these shouldn't contain changes that depend on Swift).
 
-     - Then cherry-pick these commits to `swift/master` (_not_ an `apple/stable/*` branch, as these shouldn't contain changes that depend on Swift).
+     - Then cherry-pick these commits to `swift/master-next`.
 
      - If necessary, cherry-pick to the release branch (`swift/swift-x.y-branch`), following the appropriate release   process. (Usually this means filling out a standard template, finding someone to review your code if that hasn't already happened, and getting approval from that repo's *release manager.)*
 
