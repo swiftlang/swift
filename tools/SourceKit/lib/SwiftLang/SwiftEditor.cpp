@@ -719,9 +719,7 @@ public:
   }
 
   void parse() {
-    auto root = Parser->parse();
-    if (SynTreeCreator)
-      SynTreeCreator->acceptSyntaxRoot(root, Parser->getSourceFile());
+    Parser->parse();
   }
 
   SourceFile &getSourceFile() {

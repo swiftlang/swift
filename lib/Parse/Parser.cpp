@@ -32,6 +32,7 @@
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/MD5.h"
@@ -148,8 +149,8 @@ void Parser::performCodeCompletionSecondPassImpl(
   SyntaxContext->disable();
 
   // Disable updating the interface hash
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> CurrentTokenHashSaver(
-      CurrentTokenHash, nullptr);
+  llvm::SaveAndRestore<Optional<llvm::MD5>> CurrentTokenHashSaver(
+      CurrentTokenHash, None);
 
   auto BufferID = L->getBufferID();
   auto startLoc = SourceMgr.getLocForOffset(BufferID, info.StartOffset);
@@ -415,7 +416,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   unsigned BufferID;
 
   // Token list ordered by their appearance in the source file.
-  std::vector<Token> &Tokens;
+  std::vector<Token> Tokens;
 
   // Registered token kind change. These changes are regiestered before the
   // token is consumed, so we need to keep track of them here.
@@ -448,11 +449,10 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
 public:
-  TokenRecorder(SourceFile &SF, unsigned BufferID)
-      : Ctx(SF.getASTContext()), BufferID(BufferID),
-        Tokens(SF.getTokenVector()) {}
+  TokenRecorder(ASTContext &ctx, unsigned BufferID)
+      : Ctx(ctx), BufferID(BufferID) {}
 
-  void finalize() override {
+  Optional<std::vector<Token>> finalize() override {
     auto &SM = Ctx.SourceMgr;
 
     // We should consume the comments at the end of the file that don't attach
@@ -472,6 +472,7 @@ public:
                  Scratch);
     // Accept these orphaned comments.
     Tokens.insert(Tokens.end(), Scratch.begin(), Scratch.end());
+    return std::move(Tokens);
   }
 
   void registerTokenKindChange(SourceLoc Loc, tok NewKind) override {
@@ -529,9 +530,8 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
-    CurrentTokenHash(SF.getInterfaceHashPtr()),
     TokReceiver(SF.shouldCollectTokens() ?
-                new TokenRecorder(SF, L->getBufferID()) :
+                new TokenRecorder(SF.getASTContext(), L->getBufferID()) :
                 new ConsumeTokenReceiver()),
     SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
                                            L->getBufferID(),
@@ -541,6 +541,10 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     OwnedState.reset(new PersistentParserState());
     State = OwnedState.get();
   }
+
+  // If the interface hash is enabled, set up the initial hash.
+  if (SF.hasInterfaceHash())
+    CurrentTokenHash.emplace();
 
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
@@ -565,7 +569,7 @@ bool Parser::isDelayedParsingEnabled() const {
 
 bool Parser::shouldEvaluatePoundIfDecls() const {
   auto opts = SF.getParsingOptions();
-  return !opts.contains(SourceFile::ParsingFlags::DisablePoundIfEvaluation);
+  return !opts.contains(ParsingFlags::DisablePoundIfEvaluation);
 }
 
 bool Parser::allowTopLevelCode() const {
@@ -589,11 +593,11 @@ SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
 
 void Parser::recordTokenHash(StringRef token) {
   assert(!token.empty());
-  if (llvm::MD5 *cth = CurrentTokenHash.getPtrOrNull()) {
-    cth->update(token);
+  if (CurrentTokenHash) {
+    CurrentTokenHash->update(token);
     // Add null byte to separate tokens.
     uint8_t a[1] = {0};
-    cth->update(a);
+    CurrentTokenHash->update(a);
   }
 }
 
@@ -1262,9 +1266,21 @@ OpaqueSyntaxNode ParserUnit::parse() {
   SmallVector<Decl *, 128> decls;
   P.parseTopLevel(decls);
 
-  ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF},
-                            ctx.AllocateCopy(decls));
-  return P.finalizeSyntaxTree();
+  Optional<ArrayRef<Token>> tokensRef;
+  if (auto tokens = P.takeTokenReceiver()->finalize())
+    tokensRef = ctx.AllocateCopy(*tokens);
+
+  auto rawNode = P.finalizeSyntaxTree();
+  Optional<SourceFileSyntax> syntaxRoot;
+  if (Impl.SPActions) {
+    if (auto root = Impl.SPActions->realizeSyntaxRoot(rawNode, *Impl.SF))
+      syntaxRoot.emplace(*root);
+  }
+
+  auto result = SourceFileParsingResult{ctx.AllocateCopy(decls), tokensRef,
+                                        P.CurrentTokenHash, syntaxRoot};
+  ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF}, std::move(result));
+  return rawNode;
 }
 
 Parser &ParserUnit::getParser() {

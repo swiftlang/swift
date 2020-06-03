@@ -1077,17 +1077,27 @@ LookupConformanceInModuleRequest::evaluate(
   return ProtocolConformanceRef(conformance);
 }
 
+void SourceFile::getInterfaceHash(llvm::SmallString<32> &str) const {
+  assert(hasInterfaceHash() && "Interface hash not enabled");
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  auto md5 = *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+                  .InterfaceHash;
+  llvm::MD5::MD5Result result;
+  md5.final(result);
+  llvm::MD5::stringifyResult(result, str);
+}
+
 bool SourceFile::hasSyntaxRoot() const {
   return ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
-  assert(hasSyntaxRoot() && "no syntax root is set.");
-  return *SyntaxRoot;
-}
-
-void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
-  SyntaxRoot = std::make_unique<syntax::SourceFileSyntax>(std::move(Root));
+  assert(hasSyntaxRoot() && "has no syntax root");
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+              .SyntaxRoot;
 }
 
 void DirectOperatorLookupRequest::writeDependencySink(
@@ -2222,18 +2232,6 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
-
-  if (hasInterfaceHash()) {
-    InterfaceHash.emplace();
-  }
-  if (shouldCollectTokens()) {
-    AllCollectedTokens = std::vector<Token>();
-  }
-}
-
-std::vector<Token> &SourceFile::getTokenVector() {
-  assert(shouldCollectTokens() && "Disabled");
-  return *AllCollectedTokens;
 }
 
 SourceFile::ParsingOptions
@@ -2248,7 +2246,10 @@ SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
 
 ArrayRef<Token> SourceFile::getAllTokens() const {
   assert(shouldCollectTokens() && "Disabled");
-  return *AllCollectedTokens;
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+              .CollectedTokens;
 }
 
 bool SourceFile::shouldCollectTokens() const {
@@ -2282,7 +2283,7 @@ ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
-                           {});
+                           {}).TopLevelDecls;
 }
 
 bool FileUnit::walk(ASTWalker &walker) {

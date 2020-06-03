@@ -558,25 +558,14 @@ public:
     return ParsingOpts.contains(ParsingFlags::EnableInterfaceHash);
   }
 
-  NullablePtr<llvm::MD5> getInterfaceHashPtr() {
-    return InterfaceHash ? InterfaceHash.getPointer() : nullptr;
-  }
-
-  void getInterfaceHash(llvm::SmallString<32> &str) const {
-    // Copy to preserve idempotence.
-    llvm::MD5 md5 = *InterfaceHash;
-    llvm::MD5::MD5Result result;
-    md5.final(result);
-    llvm::MD5::stringifyResult(result, str);
-  }
+  /// Output this file's interface hash into the provided string buffer.
+  void getInterfaceHash(llvm::SmallString<32> &str) const;
 
   void dumpInterfaceHash(llvm::raw_ostream &out) {
     llvm::SmallString<32> str;
     getInterfaceHash(str);
     out << str << '\n';
   }
-
-  std::vector<Token> &getTokenVector();
 
   /// If this source file has been told to collect its parsed tokens, retrieve
   /// those tokens.
@@ -593,7 +582,6 @@ public:
   bool hasDelayedBodyParsing() const;
 
   syntax::SourceFileSyntax getSyntaxRoot() const;
-  void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
 
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
@@ -611,7 +599,7 @@ private:
 
   /// If not \c None, the underlying vector contains the parsed tokens of this
   /// source file.
-  Optional<std::vector<Token>> AllCollectedTokens;
+  Optional<ArrayRef<Token>> AllCollectedTokens;
 
   /// The root of the syntax tree representing the source file.
   std::unique_ptr<syntax::SourceFileSyntax> SyntaxRoot;

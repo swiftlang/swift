@@ -22,6 +22,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/SyntaxArena.h"
+#include "swift/Syntax/SyntaxNodes.h"
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
 
 using namespace swift;
@@ -116,8 +117,8 @@ static void deletePersistentParserState(PersistentParserState *state) {
   delete state;
 }
 
-ArrayRef<Decl *> ParseSourceFileRequest::evaluate(Evaluator &evaluator,
-                                                  SourceFile *SF) const {
+SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
+                                                         SourceFile *SF) const {
   assert(SF);
   auto &ctx = SF->getASTContext();
   auto bufferID = SF->getBufferID();
@@ -155,11 +156,18 @@ ArrayRef<Decl *> ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   SmallVector<Decl *, 128> decls;
   parser.parseTopLevel(decls);
 
+  Optional<SourceFileSyntax> syntaxRoot;
   if (sTreeCreator) {
     auto rawNode = parser.finalizeSyntaxTree();
-    sTreeCreator->acceptSyntaxRoot(rawNode, *SF);
+    syntaxRoot.emplace(*sTreeCreator->realizeSyntaxRoot(rawNode, *SF));
   }
-  return ctx.AllocateCopy(decls);
+
+  Optional<ArrayRef<Token>> tokensRef;
+  if (auto tokens = parser.takeTokenReceiver()->finalize())
+    tokensRef = ctx.AllocateCopy(*tokens);
+
+  return SourceFileParsingResult{ctx.AllocateCopy(decls), tokensRef,
+                                 parser.CurrentTokenHash, syntaxRoot};
 }
 
 evaluator::DependencySource ParseSourceFileRequest::readDependencySource(
@@ -167,15 +175,30 @@ evaluator::DependencySource ParseSourceFileRequest::readDependencySource(
   return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
 }
 
-Optional<ArrayRef<Decl *>> ParseSourceFileRequest::getCachedResult() const {
+Optional<SourceFileParsingResult>
+ParseSourceFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
-  return SF->getCachedTopLevelDecls();
+  auto decls = SF->getCachedTopLevelDecls();
+  if (!decls)
+    return None;
+
+  Optional<SourceFileSyntax> syntaxRoot;
+  if (auto &rootPtr = SF->SyntaxRoot)
+    syntaxRoot.emplace(*rootPtr);
+
+  return SourceFileParsingResult{*decls, SF->AllCollectedTokens,
+                                 SF->InterfaceHash, syntaxRoot};
 }
 
-void ParseSourceFileRequest::cacheResult(ArrayRef<Decl *> decls) const {
+void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
   auto *SF = std::get<0>(getStorage());
   assert(!SF->Decls);
-  SF->Decls = decls;
+  SF->Decls = result.TopLevelDecls;
+  SF->AllCollectedTokens = result.CollectedTokens;
+  SF->InterfaceHash = result.InterfaceHash;
+
+  if (auto &root = result.SyntaxRoot)
+    SF->SyntaxRoot = std::make_unique<SourceFileSyntax>(std::move(*root));
 
   // Verify the parsed source file.
   verify(*SF);
