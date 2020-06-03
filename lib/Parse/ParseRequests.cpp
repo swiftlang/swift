@@ -149,12 +149,8 @@ ArrayRef<Decl *> ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     SF->setDelayedParserState({state, &deletePersistentParserState});
   }
 
-  FrontendStatsTracer tracer(ctx.Stats, "Parsing");
   Parser parser(*bufferID, *SF, /*SIL*/ nullptr, state, sTreeCreator);
   PrettyStackTraceParser StackTrace(parser);
-
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(parser.CurrentTokenHash,
-                                                 SF->getInterfaceHashPtr());
 
   SmallVector<Decl *, 128> decls;
   parser.parseTopLevel(decls);
