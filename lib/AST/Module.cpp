@@ -2259,19 +2259,7 @@ bool SourceFile::shouldCollectTokens() const {
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
-  return canBeParsedInFull() && SyntaxInfo->Enable;
-}
-
-bool SourceFile::canBeParsedInFull() const {
-  switch (Kind) {
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-    return true;
-  case SourceFileKind::SIL:
-    return false;
-  }
-  llvm_unreachable("unhandled kind");
+  return Kind != SourceFileKind::SIL && SyntaxInfo->Enable;
 }
 
 bool SourceFile::hasDelayedBodyParsing() const {

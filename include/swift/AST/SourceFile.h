@@ -583,8 +583,6 @@ public:
 
   bool shouldBuildSyntaxTree() const;
 
-  bool canBeParsedInFull() const;
-
   /// Whether the bodies of types and functions within this file can be lazily
   /// parsed.
   bool hasDelayedBodyParsing() const;
