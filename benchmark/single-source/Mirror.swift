@@ -37,7 +37,7 @@ struct G<T> { var t: T }
 class H<T>: C { var t: T; init(_ t: T) { self.t = t }}
 
 public func run_MirrorDefault(scale: Int) {
-  let N = 1_000*scale
+  let N = 100*scale
   
   let s1 = S1(s: "foo", d: 3.14)
   let s2 = S2(i: 42, a: [0..<4])
