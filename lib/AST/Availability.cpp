@@ -25,7 +25,7 @@
 
 using namespace swift;
 
-AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &Ctx) {
+AvailabilityContext AvailabilityContext::forDeploymentTarget(const ASTContext &Ctx) {
   return AvailabilityContext(
       VersionRange::allGTE(Ctx.LangOpts.getMinPlatformVersion()));
 }
@@ -86,8 +86,8 @@ static void mergeWithInferredAvailability(const AvailableAttr *Attr,
 /// and with the inferred availability.
 static AvailableAttr *
 createAvailableAttr(PlatformKind Platform,
-                       const InferredAvailability &Inferred,
-                       ASTContext &Context) {
+                    const InferredAvailability &Inferred,
+                    const ASTContext &Context) {
 
   llvm::VersionTuple Introduced =
       Inferred.Introduced.getValueOr(llvm::VersionTuple());
@@ -108,7 +108,7 @@ createAvailableAttr(PlatformKind Platform,
 
 void AvailabilityInference::applyInferredAvailableAttrs(
     Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls,
-    ASTContext &Context) {
+    const ASTContext &Context) {
 
   // Iterate over the declarations and infer required availability on
   // a per-platform basis.
@@ -153,7 +153,8 @@ static bool isBetterThan(const AvailableAttr *newAttr,
 }
 
 Optional<AvailabilityContext>
-AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
+AvailabilityInference::annotatedAvailableRange(const Decl *D,
+                                               const ASTContext &Ctx) {
   const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto Attr : D->getAttrs()) {
@@ -176,8 +177,8 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
     VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
 }
 
-AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
-                                                          ASTContext &Ctx) {
+AvailabilityContext
+AvailabilityInference::availableRange(const Decl *D, const ASTContext &Ctx) {
   Optional<AvailabilityContext> AnnotatedRange =
       annotatedAvailableRange(D, Ctx);
   if (AnnotatedRange.hasValue()) {

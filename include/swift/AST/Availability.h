@@ -242,7 +242,7 @@ public:
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// deployment target.
-  static AvailabilityContext forDeploymentTarget(ASTContext &Ctx);
+  static AvailabilityContext forDeploymentTarget(const ASTContext &Ctx);
 
   /// Creates a context that imposes no constraints.
   ///
@@ -328,20 +328,20 @@ public:
   /// to ToDecl.
   static void
   applyInferredAvailableAttrs(Decl *ToDecl,
-                                 ArrayRef<const Decl *> InferredFromDecls,
-                                 ASTContext &Context);
+                              ArrayRef<const Decl *> InferredFromDecls,
+                              const ASTContext &Context);
 
   static AvailabilityContext inferForType(Type t);
 
   /// Returns the context where a declaration is available
   ///  We assume a declaration without an annotation is always available.
-  static AvailabilityContext availableRange(const Decl *D, ASTContext &C);
+  static AvailabilityContext availableRange(const Decl *D, const ASTContext &C);
 
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
-  static Optional<AvailabilityContext> annotatedAvailableRange(const Decl *D,
-                                                               ASTContext &C);
+  static Optional<AvailabilityContext>
+  annotatedAvailableRange(const Decl *D, const ASTContext &C);
 
 };
 
