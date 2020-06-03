@@ -17,7 +17,8 @@
 
 using namespace swift;
 
-CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
+CaptureInfo::CaptureInfo(const ASTContext &ctx,
+                         ArrayRef<CapturedValue> captures,
                          DynamicSelfType *dynamicSelf,
                          OpaqueValueExpr *opaqueValue,
                          bool genericParamCaptures) {

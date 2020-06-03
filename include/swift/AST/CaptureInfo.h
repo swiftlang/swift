@@ -152,7 +152,7 @@ class CaptureInfo {
 public:
   /// The default-constructed CaptureInfo is "not yet computed".
   CaptureInfo() = default;
-  CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
+  CaptureInfo(const ASTContext &ctx, ArrayRef<CapturedValue> captures,
               DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
               bool genericParamCaptures);
 
