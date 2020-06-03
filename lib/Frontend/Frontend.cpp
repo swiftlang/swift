@@ -489,6 +489,12 @@ Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
   return codeCompletionBufferID;
 }
 
+SourceFile *CompilerInstance::getCodeCompletionFile() const {
+  auto *mod = getMainModule();
+  auto &eval = mod->getASTContext().evaluator;
+  return evaluateOrDefault(eval, CodeCompletionFileRequest{mod}, nullptr);
+}
+
 static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
   switch (inputKind) {
   case InputFileKind::Swift:
@@ -707,6 +713,12 @@ ModuleDecl *CompilerInstance::getMainModule() const {
   return MainModule;
 }
 
+void CompilerInstance::setMainModule(ModuleDecl *newMod) {
+  assert(newMod->isMainModule());
+  MainModule = newMod;
+  Context->LoadedModules[newMod->getName()] = newMod;
+}
+
 void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                         bool CanDelayBodies) {
   const InputFileKind Kind = Invocation.getInputKind();
@@ -899,12 +911,6 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   if (isPrimary) {
     inputFile->enableInterfaceHash();
   }
-
-  if (bufferID == SourceMgr.getCodeCompletionBufferID()) {
-    assert(!CodeCompletionFile && "Multiple code completion files?");
-    CodeCompletionFile = inputFile;
-  }
-
   return inputFile;
 }
 
