@@ -395,17 +395,31 @@ extension _StringGuts {
         startingAt: String.Index(_encodedOffset: start)
       ).0))
     }
+    let range = start..<end
+    let from = self._object.cocoaObject
 
-    // TODO(String performance): Stack buffer if small enough
-    var cus = Array<UInt16>(repeating: 0, count: count)
-    cus.withUnsafeMutableBufferPointer {
-      _cocoaStringCopyCharacters(
-        from: self._object.cocoaObject,
-        range: start..<end,
-        into: $0.baseAddress._unsafelyUnwrappedUnchecked)
+    let fixedArrayCodeUnitCount = 16 * 4
+    if _fastPath(count <= fixedArrayCodeUnitCount) {
+      var cusFixedArray = _FixedArray16<UInt64>(allZeros: ())
+      return cusFixedArray.withUnsafeMutableBufferPointer { buffer in
+        let baseAddress = buffer.baseAddress._unsafelyUnwrappedUnchecked
+        let into = UnsafeMutableRawPointer(baseAddress)
+          .bindMemory(to: UInt16.self, capacity: fixedArrayCodeUnitCount)
+        _cocoaStringCopyCharacters(from: from, range: range, into: into)
+        let intoBuffer = UnsafeBufferPointer(start: UnsafePointer<UInt16>(into),
+                                             count: range.count)
+        return Character(String._uncheckedFromUTF16(intoBuffer))
+      }
+    }
+
+    let cus = Array<UInt16>(unsafeUninitializedCapacity: count) {
+      buffer, initializedCount in
+      let baseAddress = buffer.baseAddress._unsafelyUnwrappedUnchecked
+      _cocoaStringCopyCharacters(from: from, range: range, into: baseAddress)
+      initializedCount = buffer.count
     }
     return cus.withUnsafeBufferPointer {
-      return Character(String._uncheckedFromUTF16($0))
+      Character(String._uncheckedFromUTF16($0))
     }
 #else
     fatalError("No foreign strings on Linux in this version of Swift")
