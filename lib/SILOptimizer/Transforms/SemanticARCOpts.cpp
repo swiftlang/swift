@@ -54,6 +54,7 @@ class OwnershipPhiOperand {
 public:
   enum Kind {
     Branch,
+    Struct,
   };
 
 private:
@@ -65,6 +66,7 @@ public:
   static Optional<OwnershipPhiOperand> get(const Operand *op) {
     switch (op->getUser()->getKind()) {
     case SILInstructionKind::BranchInst:
+    case SILInstructionKind::StructInst:
       return {{const_cast<Operand *>(op)}};
     default:
       return None;
@@ -75,6 +77,8 @@ public:
     switch (op->getUser()->getKind()) {
     case SILInstructionKind::BranchInst:
       return Kind::Branch;
+    case SILInstructionKind::StructInst:
+      return Kind::Struct;
     default:
       llvm_unreachable("unhandled case?!");
     }
@@ -100,6 +104,8 @@ public:
     switch (getKind()) {
     case Kind::Branch:
       return true;
+    case Kind::Struct:
+      return false;
     }
   }
 
@@ -113,6 +119,8 @@ public:
 
   bool visitResults(function_ref<bool(SILValue)> visitor) const {
     switch (getKind()) {
+    case Kind::Struct:
+      return visitor(cast<StructInst>(getInst()));
     case Kind::Branch: {
       auto *br = cast<BranchInst>(getInst());
       unsigned opNum = getOperandNumber();
@@ -575,6 +583,11 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
     auto *phiArg = cast<SILPhiArgument>(introducer.value);
     phiArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
     return phiArg;
+  }
+  case OwnedValueIntroducerKind::Struct: {
+    auto *si = cast<StructInst>(introducer.value);
+    si->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+    return si;
   }
   case OwnedValueIntroducerKind::Copy:
   case OwnedValueIntroducerKind::LoadCopy:
@@ -1081,6 +1094,20 @@ static bool getIncomingJoinedLiveRangeOperands(
         return true;
       }
       return false;
+    });
+  }
+
+  if (auto *svi = dyn_cast<SingleValueInstruction>(joinedLiveRange)) {
+    return llvm::all_of(svi->getAllOperands(), [&](const Operand &op) {
+      // skip type dependent operands.
+      if (op.isTypeDependent())
+        return true;
+
+      auto phiOp = OwnershipPhiOperand::get(&op);
+      if (!phiOp)
+        return false;
+      resultingOperands.push_back(*phiOp);
+      return true;
     });
   }
 
