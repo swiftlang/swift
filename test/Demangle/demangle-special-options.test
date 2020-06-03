@@ -7,3 +7,6 @@ RUN: swift-demangle -display-objc-module=true sSo6CGRectVD | %FileCheck %s --che
 OBJC-CGRECT: {{ __C.CGRect$}}
 RUN: swift-demangle -display-objc-module=false sSo6CGRectVD | %FileCheck %s --check-prefix=CGRECT
 CGRECT: {{ CGRect$}}
+
+RUN: swift-demangle -hiding-module=foo _TtC3foo3bar | %FileCheck %s --check-prefix=BAR
+BAR: {{ bar$}}
