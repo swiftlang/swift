@@ -22,7 +22,7 @@ namespace swift {
 
 /// This helper function is typically used by the parser to
 /// map a type name to a corresponding layout constraint if possible.
-LayoutConstraint getLayoutConstraint(Identifier ID, ASTContext &Ctx) {
+LayoutConstraint getLayoutConstraint(Identifier ID, const ASTContext &Ctx) {
   if (ID == Ctx.Id_TrivialLayout)
     return LayoutConstraint::getLayoutConstraint(
         LayoutConstraintKind::TrivialOfExactSize, 0, 0, Ctx);

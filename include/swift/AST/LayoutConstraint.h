@@ -257,18 +257,15 @@ class LayoutConstraint {
   public:
   /*implicit*/ LayoutConstraint(LayoutConstraintInfo *P = 0) : Ptr(P) {}
 
-  static LayoutConstraint getLayoutConstraint(const LayoutConstraint &Layout,
-                                              ASTContext &C);
-
   static LayoutConstraint getLayoutConstraint(LayoutConstraintKind Kind,
-                                              ASTContext &C);
+                                              const ASTContext &C);
 
   static LayoutConstraint getLayoutConstraint(LayoutConstraintKind Kind);
 
   static LayoutConstraint getLayoutConstraint(LayoutConstraintKind Kind,
                                               unsigned SizeInBits,
                                               unsigned Alignment,
-                                              ASTContext &C);
+                                              const ASTContext &C);
 
   static LayoutConstraint getUnknownLayout();
 
@@ -355,14 +352,12 @@ public:
   }
 
   bool isNull() const { return Layout.isNull(); }
-
-  LayoutConstraintLoc clone(ASTContext &ctx) const { return *this; }
 };
 
 /// Checks if ID is a name of a layout constraint and returns this
 /// constraint. If ID does not match any known layout constraint names,
 /// returns UnknownLayout.
-LayoutConstraint getLayoutConstraint(Identifier ID, ASTContext &Ctx);
+LayoutConstraint getLayoutConstraint(Identifier ID, const ASTContext &Ctx);
 
 } // end namespace swift
 

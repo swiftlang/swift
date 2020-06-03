@@ -4646,14 +4646,14 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
 
 LayoutConstraint
 LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind,
-                                      ASTContext &C) {
+                                      const ASTContext &C) {
   return getLayoutConstraint(Kind, 0, 0, C);
 }
 
 LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind,
                                                       unsigned SizeInBits,
                                                       unsigned Alignment,
-                                                      ASTContext &C) {
+                                                      const ASTContext &C) {
   if (!LayoutConstraintInfo::isKnownSizeTrivial(Kind)) {
     assert(SizeInBits == 0);
     assert(Alignment == 0);
