@@ -115,7 +115,7 @@ class SILLayout final : public llvm::FoldingSetNode,
   SILLayout &operator=(const SILLayout &) = delete;
 public:
   /// Get or create a layout.
-  static SILLayout *get(ASTContext &C,
+  static SILLayout *get(const ASTContext &C,
                         CanGenericSignature Generics,
                         ArrayRef<SILField> Fields);
   

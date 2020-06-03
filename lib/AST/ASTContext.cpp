@@ -4579,7 +4579,7 @@ ASTContext::SILTransformCtors ASTContext::getIRGenSILTransforms() const {
   return passes;
 }
 
-SILLayout *SILLayout::get(ASTContext &C,
+SILLayout *SILLayout::get(const ASTContext &C,
                           CanGenericSignature Generics,
                           ArrayRef<SILField> Fields) {
   // Profile the layout parameters.
