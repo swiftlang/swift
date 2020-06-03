@@ -814,7 +814,12 @@ bool SILDeclRef::requiresNewVTableEntry() const {
   if (derivativeFunctionIdentifier)
     if (derivativeFunctionRequiresNewVTableEntry(*this))
       return true;
-  if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
+  if (!hasDecl())
+    return false;
+  auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
+  if (!fnDecl)
+    return false;
+  if (fnDecl->needsNewVTableEntry())
     return true;
   return false;
 }
