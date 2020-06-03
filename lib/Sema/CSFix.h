@@ -213,9 +213,10 @@ enum class FixKind : uint8_t {
   /// via forming `Foo(rawValue:)` instead of using its `RawValue` directly.
   ExplicitlyConstructRawRepresentable,
 
-  /// Use raw value type associated with raw representative accessible
+  /// Use raw value type associated with raw representable, accessible
   /// using `.rawValue` member.
-  UseValueTypeOfRawRepresentative,
+  UseRawValue,
+
   /// If an array was passed to a variadic argument, give a specific diagnostic
   /// and offer to drop the brackets if it's a literal.
   ExpandArrayIntoVarargs,
@@ -264,7 +265,7 @@ enum class FixKind : uint8_t {
 
   /// Allow key path to be bound to a function type with more than 1 argument
   AllowMultiArgFuncKeyPathMismatch,
-  
+
   /// Specify key path root type when it cannot be infered from context.
   SpecifyKeyPathRootType,
 
@@ -1617,13 +1618,13 @@ public:
          ConstraintLocator *locator);
 };
 
-class UseValueTypeOfRawRepresentative final : public ConstraintFix {
+class UseRawValue final : public ConstraintFix {
   Type RawReprType;
   Type ExpectedType;
 
-  UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type rawReprType,
-                                  Type expectedType, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::UseValueTypeOfRawRepresentative, locator),
+  UseRawValue(ConstraintSystem &cs, Type rawReprType, Type expectedType,
+              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseRawValue, locator),
         RawReprType(rawReprType), ExpectedType(expectedType) {}
 
 public:
@@ -1633,10 +1634,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static UseValueTypeOfRawRepresentative *create(ConstraintSystem &cs,
-                                                 Type rawReprType,
-                                                 Type expectedType,
-                                                 ConstraintLocator *locator);
+  static UseRawValue *create(ConstraintSystem &cs, Type rawReprType,
+                             Type expectedType, ConstraintLocator *locator);
 };
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').

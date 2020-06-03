@@ -2149,13 +2149,10 @@ protected:
 /// ```
 ///
 /// `E.one` has to use `.rawValue` to match `Int` expected by pattern binding.
-class UseOfRawRepresentableInsteadOfItsRawValueFailure final
-    : public AbstractRawRepresentableFailure {
+class MissingRawValueFailure final : public AbstractRawRepresentableFailure {
 public:
-  UseOfRawRepresentableInsteadOfItsRawValueFailure(const Solution &solution,
-                                                   Type rawReprType,
-                                                   Type expectedType,
-                                                   ConstraintLocator *locator)
+  MissingRawValueFailure(const Solution &solution, Type rawReprType,
+                         Type expectedType, ConstraintLocator *locator)
       : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
                                         locator) {}
 

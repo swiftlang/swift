@@ -1137,19 +1137,17 @@ ExplicitlyConstructRawRepresentable::create(ConstraintSystem &cs,
       cs, rawReprType, expectedType, locator);
 }
 
-bool UseValueTypeOfRawRepresentative::diagnose(const Solution &solution,
-                                               bool asNote) const {
-  UseOfRawRepresentableInsteadOfItsRawValueFailure failure(
-      solution, RawReprType, ExpectedType, getLocator());
+bool UseRawValue::diagnose(const Solution &solution, bool asNote) const {
+  MissingRawValueFailure failure(solution, RawReprType, ExpectedType,
+                                 getLocator());
   return failure.diagnose(asNote);
 }
 
-UseValueTypeOfRawRepresentative *
-UseValueTypeOfRawRepresentative::create(ConstraintSystem &cs, Type rawReprType,
-                                        Type expectedType,
-                                        ConstraintLocator *locator) {
+UseRawValue *UseRawValue::create(ConstraintSystem &cs, Type rawReprType,
+                                 Type expectedType,
+                                 ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      UseValueTypeOfRawRepresentative(cs, rawReprType, expectedType, locator);
+      UseRawValue(cs, rawReprType, expectedType, locator);
 }
 
 unsigned AllowArgumentMismatch::getParamIdx() const {

@@ -3184,7 +3184,7 @@ bool ConstraintSystem::repairFailures(
     if (!isValueOfRawRepresentable(expectedType, rawReprType))
       return false;
 
-    conversionsOrFixes.push_back(UseValueTypeOfRawRepresentative::create(
+    conversionsOrFixes.push_back(UseRawValue::create(
         *this, rawReprType, expectedType, getConstraintLocator(locator)));
     return true;
   };
@@ -9578,7 +9578,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
   case FixKind::ExpandArrayIntoVarargs:
-  case FixKind::UseValueTypeOfRawRepresentative:
+  case FixKind::UseRawValue:
   case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:

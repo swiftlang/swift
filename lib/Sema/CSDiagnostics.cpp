@@ -6359,8 +6359,7 @@ void MissingRawRepresentableInitFailure::fixIt(
   }
 }
 
-void UseOfRawRepresentableInsteadOfItsRawValueFailure::fixIt(
-    InFlightDiagnostic &diagnostic) const {
+void MissingRawValueFailure::fixIt(InFlightDiagnostic &diagnostic) const {
   auto *E = getAsExpr(getAnchor());
   if (!E)
     return;
