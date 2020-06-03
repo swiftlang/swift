@@ -366,7 +366,7 @@ Identifier NamedPattern::getBoundName() const {
 
 
 /// Allocate a new pattern that matches a tuple.
-TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
+TuplePattern *TuplePattern::create(const ASTContext &C, SourceLoc lp,
                                    ArrayRef<TuplePatternElt> elts,
                                    SourceLoc rp) {
   unsigned n = elts.size();
@@ -378,7 +378,7 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
   return pattern;
 }
 
-Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
+Pattern *TuplePattern::createSimple(const ASTContext &C, SourceLoc lp,
                                     ArrayRef<TuplePatternElt> elements,
                                     SourceLoc rp) {
   assert(lp.isValid() == rp.isValid());

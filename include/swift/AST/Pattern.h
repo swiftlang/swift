@@ -243,7 +243,8 @@ public:
     assert(lp.isValid() == rp.isValid());
   }
 
-  static ParenPattern *createImplicit(ASTContext &Context, Pattern *sub) {
+  static ParenPattern *createImplicit(const ASTContext &Context,
+                                      Pattern *sub) {
     auto *PP = new (Context) ParenPattern(SourceLoc(), sub, SourceLoc());
     PP->setImplicit();
     return PP;
@@ -311,10 +312,10 @@ class TuplePattern final : public Pattern,
   }
 
 public:
-  static TuplePattern *create(ASTContext &C, SourceLoc lp,
+  static TuplePattern *create(const ASTContext &C, SourceLoc lp,
                               ArrayRef<TuplePatternElt> elements, SourceLoc rp);
 
-  static TuplePattern *createImplicit(ASTContext &C,
+  static TuplePattern *createImplicit(const ASTContext &C,
                                       ArrayRef<TuplePatternElt> elements) {
     auto *TP = create(C, SourceLoc(), elements, SourceLoc());
     TP->setImplicit();
@@ -323,7 +324,7 @@ public:
 
   /// Create either a tuple pattern or a paren pattern, depending
   /// on the elements.
-  static Pattern *createSimple(ASTContext &C, SourceLoc lp,
+  static Pattern *createSimple(const ASTContext &C, SourceLoc lp,
                                ArrayRef<TuplePatternElt> elements,
                                SourceLoc rp);
 
@@ -358,7 +359,7 @@ public:
   explicit NamedPattern(VarDecl *Var)
       : Pattern(PatternKind::Named), Var(Var) { }
 
-  static NamedPattern *createImplicit(ASTContext &Ctx, VarDecl *Var) {
+  static NamedPattern *createImplicit(const ASTContext &Ctx, VarDecl *Var) {
     auto *NP = new (Ctx) NamedPattern(Var);
     NP->setImplicit();
     return NP;
@@ -385,7 +386,7 @@ public:
   explicit AnyPattern(SourceLoc Loc)
       : Pattern(PatternKind::Any), Loc(Loc) { }
 
-  static AnyPattern *createImplicit(ASTContext &Context) {
+  static AnyPattern *createImplicit(const ASTContext &Context) {
     auto *AP = new (Context) AnyPattern(SourceLoc());
     AP->setImplicit();
     return AP;
@@ -418,7 +419,7 @@ public:
   /// Creates an implicit typed pattern annotating the provided sub-pattern
   /// with a given type.
   static TypedPattern *
-  createImplicit(ASTContext &ctx, Pattern *pattern, Type type) {
+  createImplicit(const ASTContext &ctx, Pattern *pattern, Type type) {
     auto tp = new (ctx) TypedPattern(pattern, /*typeRepr*/nullptr);
     if (!type.isNull())
       tp->setType(type);
@@ -726,7 +727,8 @@ public:
     Bits.VarPattern.IsLet = isLet;
   }
 
-  static VarPattern *createImplicit(ASTContext &Ctx, bool isLet, Pattern *sub) {
+  static VarPattern *createImplicit(const ASTContext &Ctx,
+                                    bool isLet, Pattern *sub) {
     auto *VP = new (Ctx) VarPattern(SourceLoc(), isLet, sub);
     VP->setImplicit();
     return VP;
