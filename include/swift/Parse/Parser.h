@@ -487,6 +487,9 @@ public:
       void receive(Token tok) override {
         delayedTokens.push_back(tok);
       }
+      Optional<std::vector<Token>> finalize() override {
+        llvm_unreachable("Cannot finalize a DelayedTokenReciever");
+      }
       ~DelayedTokenReceiver() {
         if (!shouldTransfer)
           return;
