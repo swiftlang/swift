@@ -2232,26 +2232,26 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     (void)problem;
   }
   if (KeepParsedTokens) {
-    AllCorrectedTokens = std::vector<Token>();
+    AllCollectedTokens = std::vector<Token>();
   }
 }
 
 std::vector<Token> &SourceFile::getTokenVector() {
-  assert(shouldCollectToken() && "Disabled");
-  return *AllCorrectedTokens;
+  assert(shouldCollectTokens() && "Disabled");
+  return *AllCollectedTokens;
 }
 
 ArrayRef<Token> SourceFile::getAllTokens() const {
-  assert(shouldCollectToken() && "Disabled");
-  return *AllCorrectedTokens;
+  assert(shouldCollectTokens() && "Disabled");
+  return *AllCollectedTokens;
 }
 
-bool SourceFile::shouldCollectToken() const {
+bool SourceFile::shouldCollectTokens() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
-    return (bool)AllCorrectedTokens;
+    return (bool)AllCollectedTokens;
   case SourceFileKind::SIL:
     return false;
   }
@@ -2283,7 +2283,7 @@ bool SourceFile::hasDelayedBodyParsing() const {
     return false;
   if (hasInterfaceHash())
     return false;
-  if (shouldCollectToken())
+  if (shouldCollectTokens())
     return false;
   if (shouldBuildSyntaxTree())
     return false;

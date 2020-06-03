@@ -573,9 +573,13 @@ public:
 
   std::vector<Token> &getTokenVector();
 
+  /// If this source file has been told to collect its parsed tokens, retrieve
+  /// those tokens.
   ArrayRef<Token> getAllTokens() const;
 
-  bool shouldCollectToken() const;
+  /// Whether the parsed tokens of this source file should be saved, allowing
+  /// them to be accessed from \c getAllTokens.
+  bool shouldCollectTokens() const;
 
   bool shouldBuildSyntaxTree() const;
 
@@ -602,8 +606,9 @@ public:
 
 private:
 
-  /// If not None, the underlying vector should contain tokens of this source file.
-  Optional<std::vector<Token>> AllCorrectedTokens;
+  /// If not \c None, the underlying vector contains the parsed tokens of this
+  /// source file.
+  Optional<std::vector<Token>> AllCollectedTokens;
 
   std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
