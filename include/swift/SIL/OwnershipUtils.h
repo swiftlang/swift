@@ -598,8 +598,12 @@ struct OwnedValueIntroducer {
   }
 
   /// Returns true if this owned introducer is able to be converted into a
-  /// guaranteed form if none of its uses are consuming uses (looking through
-  /// forwarding uses).
+  /// guaranteed form if none of its direct uses are consuming uses (looking
+  /// through forwarding uses).
+  ///
+  /// NOTE: Since the direct uses must be non-consuming, this means that any
+  /// "ownership phis" (e.x. branch, struct) must return false here since we can
+  /// not analyze them without analyzing their operands/incoming values.
   bool isConvertableToGuaranteed() const {
     switch (kind) {
     case OwnedValueIntroducerKind::Copy:
@@ -617,6 +621,28 @@ struct OwnedValueIntroducer {
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  /// Returns true if this introducer when converted to guaranteed is expected
+  /// to have guaranteed operands that are consumed by the instruction.
+  ///
+  /// E.x.: phi, struct.
+  bool hasConsumingGuaranteedOperands() const {
+    switch (kind) {
+    case OwnedValueIntroducerKind::Phi:
+      return true;
+    case OwnedValueIntroducerKind::Copy:
+    case OwnedValueIntroducerKind::LoadCopy:
+    case OwnedValueIntroducerKind::Apply:
+    case OwnedValueIntroducerKind::BeginApply:
+    case OwnedValueIntroducerKind::TryApply:
+    case OwnedValueIntroducerKind::LoadTake:
+    case OwnedValueIntroducerKind::FunctionArgument:
+    case OwnedValueIntroducerKind::PartialApplyInit:
+    case OwnedValueIntroducerKind::AllocBoxInit:
+    case OwnedValueIntroducerKind::AllocRefInit:
+      return false;
+    }
   }
 
   bool operator==(const OwnedValueIntroducer &other) const {
