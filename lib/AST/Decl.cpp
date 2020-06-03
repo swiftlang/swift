@@ -888,7 +888,7 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
 }
 
 GenericParamList *
-GenericParamList::create(ASTContext &Context,
+GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc RAngleLoc) {
@@ -935,7 +935,7 @@ GenericParamList::clone(DeclContext *dc) const {
 }
 
 void GenericParamList::addTrailingWhereClause(
-       ASTContext &ctx,
+       const ASTContext &ctx,
        SourceLoc trailingWhereLoc,
        ArrayRef<RequirementRepr> trailingRequirements) {
   assert(TrailingWhereLoc.isInvalid() &&
@@ -971,7 +971,7 @@ TrailingWhereClause::TrailingWhereClause(
 }
 
 TrailingWhereClause *TrailingWhereClause::create(
-                       ASTContext &ctx,
+                       const ASTContext &ctx,
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements) {
   unsigned size = totalSizeToAlloc<RequirementRepr>(requirements.size());
@@ -1048,7 +1048,7 @@ SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
   return SourceRange();
 }
 
-ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
+ImportDecl *ImportDecl::create(const ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
                                SourceLoc KindLoc,
                                ArrayRef<AccessPathElement> Path,
@@ -1202,7 +1202,8 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
   setTrailingWhereClause(trailingWhereClause);
 }
 
-ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
+ExtensionDecl *ExtensionDecl::create(const ASTContext &ctx,
+                                     SourceLoc extensionLoc,
                                      TypeRepr *extendedType,
                                      MutableArrayRef<TypeLoc> inherited,
                                      DeclContext *parent,
@@ -1436,7 +1437,7 @@ PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
 }
 
 PatternBindingDecl *
-PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
+PatternBindingDecl::create(const ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling, SourceLoc VarLoc,
                            Pattern *Pat, SourceLoc EqualLoc, Expr *E,
                            DeclContext *Parent) {
@@ -1454,8 +1455,8 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
 }
 
 PatternBindingDecl *PatternBindingDecl::createImplicit(
-    ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
-    DeclContext *Parent, SourceLoc VarLoc) {
+    const ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat,
+    Expr *E, DeclContext *Parent, SourceLoc VarLoc) {
   auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
                         Pat, /*EqualLoc*/ SourceLoc(), nullptr, Parent);
   Result->setImplicit();
@@ -1464,7 +1465,7 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
 }
 
 PatternBindingDecl *
-PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
+PatternBindingDecl::create(const ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc VarLoc,
                            ArrayRef<PatternBindingEntry> PatternList,
@@ -1495,7 +1496,7 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
 }
 
 PatternBindingDecl *PatternBindingDecl::createDeserialized(
-                      ASTContext &Ctx, SourceLoc StaticLoc,
+                      const ASTContext &Ctx, SourceLoc StaticLoc,
                       StaticSpellingKind StaticSpelling,
                       SourceLoc VarLoc,
                       unsigned NumPatternEntries,
@@ -2536,7 +2537,7 @@ bool swift::conflicting(const OverloadSignature& sig1,
   return sig1.Name == sig2.Name;
 }
 
-bool swift::conflicting(ASTContext &ctx,
+bool swift::conflicting(const ASTContext &ctx,
                         const OverloadSignature& sig1, CanType sig1Type,
                         const OverloadSignature& sig2, CanType sig2Type,
                         bool *wouldConflictInSwift5,
@@ -5166,7 +5167,7 @@ const size_t NumOpaqueAccessors =
 ;
 
 AbstractStorageDecl::AccessorRecord *
-AbstractStorageDecl::AccessorRecord::create(ASTContext &ctx,
+AbstractStorageDecl::AccessorRecord::create(const ASTContext &ctx,
                                             SourceRange braces,
                                             ArrayRef<AccessorDecl*> accessors) {
   // Silently cap the number of accessors we store at a number that should
@@ -6022,13 +6023,13 @@ Identifier VarDecl::getObjCPropertyName() const {
   return getName();
 }
 
-ObjCSelector VarDecl::getDefaultObjCGetterSelector(ASTContext &ctx,
+ObjCSelector VarDecl::getDefaultObjCGetterSelector(const ASTContext &ctx,
                                                    Identifier propertyName) {
   return ObjCSelector(ctx, 0, propertyName);
 }
 
 
-ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
+ObjCSelector VarDecl::getDefaultObjCSetterSelector(const ASTContext &ctx,
                                                    Identifier propertyName) {
   llvm::SmallString<16> scratch;
   scratch += "set";
@@ -7114,7 +7115,7 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   DerivativeFunctionConfigs->insert(config);
 }
 
-FuncDecl *FuncDecl::createImpl(ASTContext &Context,
+FuncDecl *FuncDecl::createImpl(const ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
                                SourceLoc FuncLoc,
@@ -7141,7 +7142,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
   return D;
 }
 
-FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
+FuncDecl *FuncDecl::createDeserialized(const ASTContext &Context,
                                        SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc FuncLoc,
@@ -7155,7 +7156,7 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                     ClangNode());
 }
 
-FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
+FuncDecl *FuncDecl::create(const ASTContext &Context, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc FuncLoc,
                            DeclName Name, SourceLoc NameLoc,
@@ -7192,7 +7193,7 @@ bool FuncDecl::isStatic() const {
     false);
 }
 
-AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
+AccessorDecl *AccessorDecl::createImpl(const ASTContext &ctx,
                                        SourceLoc declLoc,
                                        SourceLoc accessorKeywordLoc,
                                        AccessorKind accessorKind,
@@ -7221,7 +7222,7 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
   return D;
 }
 
-AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
+AccessorDecl *AccessorDecl::createDeserialized(const ASTContext &ctx,
                                                SourceLoc declLoc,
                                                SourceLoc accessorKeywordLoc,
                                                AccessorKind accessorKind,
@@ -7237,7 +7238,7 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
                     ClangNode());
 }
 
-AccessorDecl *AccessorDecl::create(ASTContext &ctx,
+AccessorDecl *AccessorDecl::create(const ASTContext &ctx,
                                    SourceLoc declLoc,
                                    SourceLoc accessorKeywordLoc,
                                    AccessorKind accessorKind,

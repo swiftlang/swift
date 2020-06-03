@@ -266,7 +266,7 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
 ///        Swift, but the given overloads will conflict in Swift 5 mode.
 /// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
 ///        will be allowed to conflict with members of protocol declarations.
-bool conflicting(ASTContext &ctx,
+bool conflicting(const ASTContext &ctx,
                  const OverloadSignature& sig1, CanType sig1Type,
                  const OverloadSignature& sig2, CanType sig2Type,
                  bool *wouldConflictInSwift5 = nullptr,
@@ -1285,7 +1285,7 @@ public:
   /// \param Params The list of generic parameters, which will be copied into
   /// ASTContext-allocated memory.
   /// \param RAngleLoc The location of the closing angle bracket ('>')
-  static GenericParamList *create(ASTContext &Context,
+  static GenericParamList *create(const ASTContext &Context,
                                   SourceLoc LAngleLoc,
                                   ArrayRef<GenericTypeParamDecl *> Params,
                                   SourceLoc RAngleLoc);
@@ -1368,7 +1368,7 @@ public:
   ///
   /// Trailing where clauses are written outside the angle brackets, after the
   /// main part of a declaration's signature.
-  void addTrailingWhereClause(ASTContext &ctx, SourceLoc trailingWhereLoc,
+  void addTrailingWhereClause(const ASTContext &ctx, SourceLoc trailingWhereLoc,
                               ArrayRef<RequirementRepr> trailingRequirements);
   
   /// Retrieve the outer generic parameter list.
@@ -1432,7 +1432,7 @@ class alignas(RequirementRepr) TrailingWhereClause final :
 
 public:
   /// Create a new trailing where clause with the given set of requirements.
-  static TrailingWhereClause *create(ASTContext &ctx, SourceLoc whereLoc,
+  static TrailingWhereClause *create(const ASTContext &ctx, SourceLoc whereLoc,
                                      ArrayRef<RequirementRepr> requirements);
 
   /// Retrieve the location of the 'where' keyword.
@@ -1571,7 +1571,7 @@ private:
              SourceLoc KindLoc, ArrayRef<AccessPathElement> Path);
 
 public:
-  static ImportDecl *create(ASTContext &C, DeclContext *DC,
+  static ImportDecl *create(const ASTContext &C, DeclContext *DC,
                             SourceLoc ImportLoc, ImportKind Kind,
                             SourceLoc KindLoc,
                             ArrayRef<AccessPathElement> Path,
@@ -1698,7 +1698,7 @@ public:
   using Decl::getASTContext;
 
   /// Create a new extension declaration.
-  static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
+  static ExtensionDecl *create(const ASTContext &ctx, SourceLoc extensionLoc,
                                TypeRepr *extendedType,
                                MutableArrayRef<TypeLoc> inherited,
                                DeclContext *parent,
@@ -2082,26 +2082,26 @@ class PatternBindingDecl final : public Decl,
                      DeclContext *Parent);
   SourceLoc getLocFromSource() const { return VarLoc; }
 public:
-  static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
+  static PatternBindingDecl *create(const ASTContext &Ctx, SourceLoc StaticLoc,
                                     StaticSpellingKind StaticSpelling,
                                     SourceLoc VarLoc,
                                     ArrayRef<PatternBindingEntry> PatternList,
                                     DeclContext *Parent);
 
-  static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
+  static PatternBindingDecl *create(const ASTContext &Ctx, SourceLoc StaticLoc,
                                     StaticSpellingKind StaticSpelling,
                                     SourceLoc VarLoc, Pattern *Pat,
                                     SourceLoc EqualLoc, Expr *E,
                                     DeclContext *Parent);
 
-  static PatternBindingDecl *createImplicit(ASTContext &Ctx,
+  static PatternBindingDecl *createImplicit(const ASTContext &Ctx,
                                             StaticSpellingKind StaticSpelling,
                                             Pattern *Pat, Expr *E,
                                             DeclContext *Parent,
                                             SourceLoc VarLoc = SourceLoc());
 
   static PatternBindingDecl *createDeserialized(
-                               ASTContext &Ctx, SourceLoc StaticLoc,
+                               const ASTContext &Ctx, SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
                                SourceLoc VarLoc,
                                unsigned NumPatternEntries,
@@ -4595,7 +4595,7 @@ private:
                    ArrayRef<AccessorDecl*> accessors,
                    AccessorIndex accessorsCapacity);
   public:
-    static AccessorRecord *create(ASTContext &ctx, SourceRange braces,
+    static AccessorRecord *create(const ASTContext &ctx, SourceRange braces,
                                   ArrayRef<AccessorDecl*> accessors);
 
     SourceRange getBracesRange() const { return Braces; }
@@ -5299,12 +5299,12 @@ public:
 
   /// Retrieve the default Objective-C selector for the getter of a
   /// property of the given name.
-  static ObjCSelector getDefaultObjCGetterSelector(ASTContext &ctx,
+  static ObjCSelector getDefaultObjCGetterSelector(const ASTContext &ctx,
                                                    Identifier propertyName);
 
   /// Retrieve the default Objective-C selector for the setter of a
   /// property of the given name.
-  static ObjCSelector getDefaultObjCSetterSelector(ASTContext &ctx,
+  static ObjCSelector getDefaultObjCSetterSelector(const ASTContext &ctx,
                                                    Identifier propertyName);
 
   /// If this is a simple 'let' constant, emit a note with a fixit indicating
@@ -6247,7 +6247,7 @@ protected:
   }
 
 private:
-  static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
+  static FuncDecl *createImpl(const ASTContext &Context, SourceLoc StaticLoc,
                               StaticSpellingKind StaticSpelling,
                               SourceLoc FuncLoc,
                               DeclName Name, SourceLoc NameLoc,
@@ -6272,7 +6272,8 @@ private:
 
 public:
   /// Factory function only for use by deserialization.
-  static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
+  static FuncDecl *createDeserialized(const ASTContext &Context,
+                                      SourceLoc StaticLoc,
                                       StaticSpellingKind StaticSpelling,
                                       SourceLoc FuncLoc,
                                       DeclName Name, SourceLoc NameLoc,
@@ -6280,7 +6281,7 @@ public:
                                       GenericParamList *GenericParams,
                                       DeclContext *Parent);
 
-  static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
+  static FuncDecl *create(const ASTContext &Context, SourceLoc StaticLoc,
                           StaticSpellingKind StaticSpelling,
                           SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc,
@@ -6431,7 +6432,7 @@ class AccessorDecl final : public FuncDecl {
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
   }
 
-  static AccessorDecl *createImpl(ASTContext &ctx,
+  static AccessorDecl *createImpl(const ASTContext &ctx,
                                   SourceLoc declLoc,
                                   SourceLoc accessorKeywordLoc,
                                   AccessorKind accessorKind,
@@ -6452,18 +6453,18 @@ class AccessorDecl final : public FuncDecl {
   friend class IsAccessorTransparentRequest;
 
 public:
-  static AccessorDecl *createDeserialized(ASTContext &ctx,
-                              SourceLoc declLoc,
-                              SourceLoc accessorKeywordLoc,
-                              AccessorKind accessorKind,
-                              AbstractStorageDecl *storage,
-                              SourceLoc staticLoc,
-                              StaticSpellingKind staticSpelling,
-                              bool throws, SourceLoc throwsLoc,
-                              GenericParamList *genericParams,
-                              DeclContext *parent);
+  static AccessorDecl *createDeserialized(const ASTContext &ctx,
+                                          SourceLoc declLoc,
+                                          SourceLoc accessorKeywordLoc,
+                                          AccessorKind accessorKind,
+                                          AbstractStorageDecl *storage,
+                                          SourceLoc staticLoc,
+                                          StaticSpellingKind staticSpelling,
+                                          bool throws, SourceLoc throwsLoc,
+                                          GenericParamList *genericParams,
+                                          DeclContext *parent);
 
-  static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
+  static AccessorDecl *create(const ASTContext &ctx, SourceLoc declLoc,
                               SourceLoc accessorKeywordLoc,
                               AccessorKind accessorKind,
                               AbstractStorageDecl *storage,
@@ -7366,7 +7367,7 @@ class MissingMemberDecl : public Decl {
   }
 public:
   static MissingMemberDecl *
-  create(ASTContext &ctx, DeclContext *DC, DeclName name,
+  create(const ASTContext &ctx, DeclContext *DC, DeclName name,
          unsigned numVTableEntries, bool hasStorage) {
     assert(!numVTableEntries || isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC) &&
            "Only classes and protocols have vtable/witness table entries");
