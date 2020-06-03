@@ -140,7 +140,7 @@ public:
 
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
+  void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(Stmt));
   
   // Make vanilla new/delete illegal for Stmts.
@@ -162,7 +162,7 @@ class BraceStmt final : public Stmt,
             Optional<bool> implicit);
 
 public:
-  static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
+  static BraceStmt *create(const ASTContext &ctx, SourceLoc lbloc,
                            ArrayRef<ASTNode> elements,
                            SourceLoc rbloc,
                            Optional<bool> implicit = None);
@@ -349,7 +349,7 @@ class alignas(8) PoundAvailableInfo final :
   }
   
 public:
-  static PoundAvailableInfo *create(ASTContext &ctx, SourceLoc PoundLoc,
+  static PoundAvailableInfo *create(const ASTContext &ctx, SourceLoc PoundLoc,
                                     SourceLoc LParenLoc,
                                     ArrayRef<AvailabilitySpec *> queries,
                                     SourceLoc RParenLoc);
@@ -603,7 +603,7 @@ public:
     IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {}
 
   IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
-         Stmt *Else, Optional<bool> implicit, ASTContext &Ctx);
+         Stmt *Else, Optional<bool> implicit, const ASTContext &Ctx);
 
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
@@ -642,7 +642,7 @@ public:
     GuardLoc(GuardLoc), Body(Body) {}
   
   GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
-            Optional<bool> implicit, ASTContext &Ctx);
+            Optional<bool> implicit, const ASTContext &Ctx);
   
   SourceLoc getGuardLoc() const { return GuardLoc; }
   
@@ -946,9 +946,9 @@ class CaseStmt final
 
 public:
   static CaseStmt *
-  create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
-         ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
-         SourceLoc ItemTerminatorLoc, Stmt *Body,
+  create(const ASTContext &C, CaseParentKind ParentKind,
+         SourceLoc ItemIntroducerLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
+         SourceLoc UnknownAttrLoc, SourceLoc ItemTerminatorLoc, Stmt *Body,
          Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
          Optional<bool> Implicit = None,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
@@ -1099,7 +1099,7 @@ public:
                             SourceLoc LBraceLoc,
                             ArrayRef<ASTNode> Cases,
                             SourceLoc RBraceLoc,
-                            ASTContext &C);
+                            const ASTContext &C);
   
   /// Get the source location of the 'switch' keyword.
   SourceLoc getSwitchLoc() const { return SwitchLoc; }
@@ -1165,7 +1165,7 @@ class DoCatchStmt final
   }
 
 public:
-  static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
+  static DoCatchStmt *create(const ASTContext &ctx, LabeledStmtInfo labelInfo,
                              SourceLoc doLoc, Stmt *body,
                              ArrayRef<CaseStmt *> catches,
                              Optional<bool> implicit = None);

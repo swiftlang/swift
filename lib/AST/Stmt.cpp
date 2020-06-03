@@ -34,7 +34,7 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 // Only allow allocation of Stmts using the allocator in ASTContext.
-void *Stmt::operator new(size_t Bytes, ASTContext &C,
+void *Stmt::operator new(size_t Bytes, const ASTContext &C,
                          unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
@@ -149,7 +149,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
 #endif
 }
 
-BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
+BraceStmt *BraceStmt::create(const ASTContext &ctx, SourceLoc lbloc,
                              ArrayRef<ASTNode> elts, SourceLoc rbloc,
                              Optional<bool> implicit) {
   assert(std::none_of(elts.begin(), elts.end(),
@@ -262,9 +262,9 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
-DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                                 SourceLoc doLoc, Stmt *body,
-                                 ArrayRef<CaseStmt *> catches,
+DoCatchStmt *DoCatchStmt::create(const ASTContext &ctx,
+                                 LabeledStmtInfo labelInfo, SourceLoc doLoc,
+                                 Stmt *body, ArrayRef<CaseStmt *> catches,
                                  Optional<bool> implicit) {
   void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
@@ -296,11 +296,9 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   Cond = e;
 }
 
-PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
-                                               SourceLoc PoundLoc,
-                                               SourceLoc LParenLoc,
-                                       ArrayRef<AvailabilitySpec *> queries,
-                                                     SourceLoc RParenLoc) {
+PoundAvailableInfo *PoundAvailableInfo::create(
+    const ASTContext &ctx, SourceLoc PoundLoc, SourceLoc LParenLoc,
+    ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc) {
   unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
@@ -369,24 +367,19 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
-static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
+static StmtCondition exprToCond(Expr *C, const ASTContext &Ctx) {
   StmtConditionElement Arr[] = { StmtConditionElement(C) };
   return Ctx.AllocateCopy(Arr);
 }
 
 IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
-               Stmt *Else, Optional<bool> implicit, ASTContext &Ctx)
-  : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc, Else,
-           implicit) {
-}
+               Stmt *Else, Optional<bool> implicit, const ASTContext &Ctx)
+    : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc,
+             Else, implicit) {}
 
 GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
-                     Optional<bool> implicit, ASTContext &Ctx)
-  : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {
-    
-}
-  
-
+                     Optional<bool> implicit, const ASTContext &Ctx)
+    : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {}
 
 SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
@@ -441,7 +434,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   }
 }
 
-CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
+CaseStmt *CaseStmt::create(const ASTContext &ctx, CaseParentKind ParentKind,
                            SourceLoc caseLoc,
                            ArrayRef<CaseLabelItem> caseLabelItems,
                            SourceLoc unknownAttrLoc, SourceLoc colonLoc,
@@ -463,7 +456,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                SourceLoc LBraceLoc,
                                ArrayRef<ASTNode> Cases,
                                SourceLoc RBraceLoc,
-                               ASTContext &C) {
+                               const ASTContext &C) {
 #ifndef NDEBUG
   for (auto N : Cases)
     assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
