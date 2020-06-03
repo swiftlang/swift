@@ -2496,7 +2496,8 @@ void SynthesizedFileUnit::getTopLevelDecls(
 //===----------------------------------------------------------------------===//
 
 void FileUnit::anchor() {}
-void *FileUnit::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
+void *FileUnit::operator new(size_t Bytes, const ASTContext &C,
+                             unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 

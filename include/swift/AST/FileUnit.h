@@ -313,7 +313,7 @@ private:
 public:
   // Only allow allocation of FileUnits using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
+  void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignOfFileUnit());
 };
 
