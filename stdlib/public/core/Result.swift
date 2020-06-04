@@ -89,14 +89,18 @@ public enum Result<Success, Failure: Error> {
   /// Returns a new result, mapping any success value using the given
   /// transformation and unwrapping the produced result.
   ///
-  /// Use this method when you need to transform the value of a `Result`
-  /// instance eventhough it produces a nested result type.
+  /// Use this method to avoid a nested result when your transformation
+  /// produces another `Result` type.
   ///
   /// In this example, note the difference in the result of using `map` and
   /// `flatMap` with a transformation that returns an result type.
   ///
-  ///     func getNextInteger() -> Result<Int, Error> { /* ... */ }
-  ///     func getNextAfterInteger() -> Result<Int, Error> { /* ... */ }
+  ///     func getNextInteger() -> Result<Int, Error> {
+  ///         .success(4)
+  ///     }
+  ///     func getNextAfterInteger(_ n: Int) -> Result<Int, Error> {
+  ///         .success(n + 1)
+  ///     }
   ///
   ///     let result = getNextInteger().map({ getNextAfterInteger($0) })
   ///     // result == .success(.success(5))
