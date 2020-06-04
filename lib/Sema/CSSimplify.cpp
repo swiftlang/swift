@@ -7220,14 +7220,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
-  bool hasReturn = hasExplicitResult(closure);
+  // If this closure should be type-checked as part of this expression,
+  // generate constraints for it now.
   auto &ctx = getASTContext();
-  // If this is a multi-statement closure its body doesn't participate
-  // in type-checking.
-  if (closure->hasSingleExpressionBody()) {
+  if (shouldTypeCheckInEnclosingExpression(closure)) {
     if (generateConstraints(closure, closureType->getResult()))
       return false;
-  } else if (!hasReturn) {
+  } else if (!hasExplicitResult(closure)) {
     // If this closure has an empty body and no explicit result type
     // let's bind result type to `Void` since that's the only type empty body
     // can produce. Otherwise, if (multi-statement) closure doesn't have

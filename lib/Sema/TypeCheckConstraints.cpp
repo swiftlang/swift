@@ -1320,9 +1320,8 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   if (hadParameterError)
     return false;
 
-  // If the closure has a multi-statement body, we don't walk into it
-  // here.
-  if (!closure->hasSingleExpressionBody())
+  // If we won't be checking the body of the closure, don't walk into it here.
+  if (!shouldTypeCheckInEnclosingExpression(closure))
     return false;
 
   // Update the current DeclContext to be the closure we're about to
@@ -4057,4 +4056,8 @@ HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
   return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {
     return type->hasDynamicCallableAttribute();
   });
+}
+
+bool swift::shouldTypeCheckInEnclosingExpression(ClosureExpr *expr) {
+  return expr->hasSingleExpressionBody();
 }
