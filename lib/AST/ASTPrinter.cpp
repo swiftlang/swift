@@ -2073,6 +2073,9 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
 }
 
 void PrintAST::printInherited(const Decl *decl) {
+  if (!Options.PrintInherited) {
+    return;
+  }
   SmallVector<TypeLoc, 6> TypesToPrint;
   getInheritedForPrinting(decl, Options, TypesToPrint);
   if (TypesToPrint.empty())
