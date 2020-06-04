@@ -377,3 +377,20 @@ bb6(%45 : @owned $Error):
   br bb4(%45 : $Error)
 }
 
+sil [ossa] @test_memory_lifetime_select_enum : $@convention(thin) (@in_guaranteed Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, 1
+  %4 = select_enum_addr %0 : $*Optional<T>, case #Optional.none!enumelt: %2, case #Optional.some!enumelt: %3 : $Builtin.Int1
+  cond_br %4, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
