@@ -42,6 +42,92 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
           "number of load_copy converted to load_borrow");
 
 //===----------------------------------------------------------------------===//
+//                           Ownership Phi Operand
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// The operand of a "phi" in the induced ownership graph of a def-use graph.
+///
+/// Some examples: br, struct, tuple.
+class OwnershipPhiOperand {
+public:
+  enum Kind {
+    Branch,
+  };
+
+private:
+  Operand *op;
+
+  OwnershipPhiOperand(Operand *op) : op(op) {}
+
+public:
+  static Optional<OwnershipPhiOperand> get(const Operand *op) {
+    switch (op->getUser()->getKind()) {
+    case SILInstructionKind::BranchInst:
+      return {{const_cast<Operand *>(op)}};
+    default:
+      return None;
+    }
+  }
+
+  Kind getKind() const {
+    switch (op->getUser()->getKind()) {
+    case SILInstructionKind::BranchInst:
+      return Kind::Branch;
+    default:
+      llvm_unreachable("unhandled case?!");
+    }
+  }
+
+  Operand *getOperand() const { return op; }
+  SILValue getValue() const { return op->get(); }
+  SILType getType() const { return op->get()->getType(); }
+
+  unsigned getOperandNumber() const { return op->getOperandNumber(); }
+
+  void markUndef() & {
+    op->set(SILUndef::get(getType(), *op->getUser()->getFunction()));
+  }
+
+  SILInstruction *getInst() const { return op->getUser(); }
+
+  /// Return true if this phi consumes a borrow.
+  ///
+  /// If so, we may need to insert an extra begin_borrow to balance the +1 when
+  /// converting owned ownership phis to guaranteed ownership phis.
+  bool isGuaranteedConsuming() const {
+    switch (getKind()) {
+    case Kind::Branch:
+      return true;
+    }
+  }
+
+  bool operator<(const OwnershipPhiOperand &other) const {
+    return op < other.op;
+  }
+
+  bool operator==(const OwnershipPhiOperand &other) const {
+    return op == other.op;
+  }
+
+  bool visitResults(function_ref<bool(SILValue)> visitor) const {
+    switch (getKind()) {
+    case Kind::Branch: {
+      auto *br = cast<BranchInst>(getInst());
+      unsigned opNum = getOperandNumber();
+      return llvm::all_of(
+          br->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
+            return visitor(succBlock->getSILPhiArguments()[opNum]);
+          });
+    }
+    }
+  }
+};
+
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
 //                            Live Range Modeling
 //===----------------------------------------------------------------------===//
 
@@ -189,9 +275,10 @@ public:
 
   /// A consuming operation that in order:
   ///
-  /// 1. Converts the phi argument to be guaranteed.
+  /// 1. Converts the phi argument to be guaranteed via setOwnership.
   ///
-  /// 2. Inserts end_borrows at the relevant destroy_values.
+  /// 2. If this consumes a borrow, insert end_borrows at the relevant
+  /// destroy_values.
   ///
   /// 3. Deletes all destroy_values.
   ///
@@ -203,11 +290,9 @@ public:
   ///
   /// NOTE: This routine leaves inserting begin_borrows for the incoming values
   /// to the caller since those are not part of the LiveRange itself.
-  ///
-  /// NOTE: Asserts that value is a phi argument.
-  void convertArgToGuaranteed(DeadEndBlocks &deadEndBlocks,
-                              ValueLifetimeAnalysis::Frontier &scratch,
-                              InstModCallbacks callbacks) &&;
+  void convertJoinedLiveRangePhiToGuaranteed(
+      DeadEndBlocks &deadEndBlocks, ValueLifetimeAnalysis::Frontier &scratch,
+      InstModCallbacks callbacks) &&;
 
   /// Given a new guaranteed value, insert end_borrow for the newGuaranteedValue
   /// at all of our destroy_values in prepration for converting from owned to
@@ -483,17 +568,41 @@ void OwnershipLiveRange::convertToGuaranteedAndRAUW(
   std::move(*this).convertOwnedGeneralForwardingUsesToGuaranteed();
 }
 
-void OwnershipLiveRange::convertArgToGuaranteed(
+// TODO: If this is useful, move onto OwnedValueIntroducer itself?
+static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
+  switch (introducer.kind) {
+  case OwnedValueIntroducerKind::Phi: {
+    auto *phiArg = cast<SILPhiArgument>(introducer.value);
+    phiArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+    return phiArg;
+  }
+  case OwnedValueIntroducerKind::Copy:
+  case OwnedValueIntroducerKind::LoadCopy:
+  case OwnedValueIntroducerKind::Apply:
+  case OwnedValueIntroducerKind::BeginApply:
+  case OwnedValueIntroducerKind::TryApply:
+  case OwnedValueIntroducerKind::LoadTake:
+  case OwnedValueIntroducerKind::FunctionArgument:
+  case OwnedValueIntroducerKind::PartialApplyInit:
+  case OwnedValueIntroducerKind::AllocBoxInit:
+  case OwnedValueIntroducerKind::AllocRefInit:
+    return SILValue();
+  }
+}
+
+void OwnershipLiveRange::convertJoinedLiveRangePhiToGuaranteed(
     DeadEndBlocks &deadEndBlocks, ValueLifetimeAnalysis::Frontier &scratch,
     InstModCallbacks callbacks) && {
-  // First convert the phi argument to be guaranteed.
-  auto *phiArg = cast<SILPhiArgument>(introducer.value);
-  phiArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
 
-  // Then insert end_borrows at each of our destroys. We have to convert the phi
-  // to guaranteed first since otherwise, the ownership check when we create the
-  // end_borrows will trigger.
-  insertEndBorrowsAtDestroys(phiArg, deadEndBlocks, scratch);
+  // First convert the phi value itself to be guaranteed.
+  SILValue phiValue = convertIntroducerToGuaranteed(introducer);
+
+  // Then insert end_borrows at each of our destroys if we are consuming. We
+  // have to convert the phi to guaranteed first since otherwise, the ownership
+  // check when we create the end_borrows will trigger.
+  if (introducer.hasConsumingGuaranteedOperands()) {
+    insertEndBorrowsAtDestroys(phiValue, deadEndBlocks, scratch);
+  }
 
   // Then eliminate all of the destroys...
   while (!destroyingUses.empty()) {
@@ -534,7 +643,7 @@ OwnershipLiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
 
   // Make sure our single unknown consuming use is a branch inst. If not, bail,
   // this is a /real/ unknown consuming use.
-  if (!isa<BranchInst>(op->getUser())) {
+  if (!OwnershipPhiOperand::get(op)) {
     return HasConsumingUse_t::Yes;
   }
 
@@ -900,10 +1009,10 @@ VerifyAfterTransform("sil-semantic-arc-opts-verify-after-transform",
 
 static bool canEliminatePhi(
     SemanticARCOptVisitor::FrozenMultiMapRange optimizableIntroducerRange,
-    ArrayRef<Operand *> incomingValueOperandList,
+    ArrayRef<OwnershipPhiOperand> incomingValueOperandList,
     SmallVectorImpl<OwnedValueIntroducer> &ownedValueIntroducerAccumulator) {
-  for (Operand *incomingValueOperand : incomingValueOperandList) {
-    SILValue incomingValue = incomingValueOperand->get();
+  for (auto incomingValueOperand : incomingValueOperandList) {
+    SILValue incomingValue = incomingValueOperand.getValue();
 
     // Before we do anything, see if we have an incoming value with trivial
     // ownership. This can occur in the case where we are working with enums due
@@ -918,7 +1027,8 @@ static bool canEliminatePhi(
     // NOTE: If this linear search is too slow, we can change the multimap to
     // sort the mapped to list by pointer instead of insertion order. In such a
     // case, we could then bisect.
-    if (llvm::find(optimizableIntroducerRange, incomingValueOperand) ==
+    if (llvm::find(optimizableIntroducerRange,
+                   incomingValueOperand.getOperand()) ==
         optimizableIntroducerRange.end()) {
       return false;
     }
@@ -962,9 +1072,16 @@ static bool canEliminatePhi(
 }
 
 static bool getIncomingJoinedLiveRangeOperands(
-    SILValue joinedLiveRange, SmallVectorImpl<Operand *> &resultingOperands) {
+    SILValue joinedLiveRange,
+    SmallVectorImpl<OwnershipPhiOperand> &resultingOperands) {
   if (auto *phi = dyn_cast<SILPhiArgument>(joinedLiveRange)) {
-    return phi->getIncomingPhiOperands(resultingOperands);
+    return phi->visitIncomingPhiOperands([&](Operand *op) {
+      if (auto phiOp = OwnershipPhiOperand::get(op)) {
+        resultingOperands.push_back(*phiOp);
+        return true;
+      }
+      return false;
+    });
   }
 
   llvm_unreachable("Unhandled joined live range?!");
@@ -979,7 +1096,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
   SWIFT_DEFER { joinedOwnedIntroducerToConsumedOperands.reset(); };
 
   // Now for each phi argument that we have in our multi-map...
-  SmallVector<Operand *, 4> incomingValueOperandList;
+  SmallVector<OwnershipPhiOperand, 4> incomingValueOperandList;
   SmallVector<OwnedValueIntroducer, 4> ownedValueIntroducers;
   for (auto pair : joinedOwnedIntroducerToConsumedOperands.getRange()) {
     SWIFT_DEFER {
@@ -1021,11 +1138,9 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
     // through the list of incomingValueOperandList and stash the value/set the
     // operand's stored value to undef. We will hook them back up later.
     SmallVector<SILValue, 8> originalIncomingValues;
-    for (Operand *incomingValueOperand : incomingValueOperandList) {
-      originalIncomingValues.push_back(incomingValueOperand->get());
-      SILType type = incomingValueOperand->get()->getType();
-      auto *undef = SILUndef::get(type, F);
-      incomingValueOperand->set(undef);
+    for (auto &incomingValueOperand : incomingValueOperandList) {
+      originalIncomingValues.push_back(incomingValueOperand.getValue());
+      incomingValueOperand.markUndef();
     }
 
     // Then go through all of our owned value introducers, compute their live
@@ -1078,25 +1193,25 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
 
     // Then convert the phi's live range to be guaranteed.
     std::move(joinedLiveRange)
-        .convertArgToGuaranteed(getDeadEndBlocks(), lifetimeFrontier,
-                                getCallbacks());
+        .convertJoinedLiveRangePhiToGuaranteed(
+            getDeadEndBlocks(), lifetimeFrontier, getCallbacks());
 
-    // Now insert a begin_borrow along the incoming value edges and We have to
-    // do this after converting the incoming values to be guaranteed since
-    // SILBuilder checks simple ownership invariants (namely that def/use line
-    // up) when creating instructions.
+    // Now if our phi operand consumes/forwards its guaranteed input, insert a
+    // begin_borrow along the incoming value edges. We have to do this after
+    // converting the incoming values to be guaranteed to avoid tripping
+    // SILBuilder checks around simple ownership invariants (namely that def/use
+    // line up) when creating instructions.
     assert(incomingValueOperandList.size() == originalIncomingValues.size());
     while (!incomingValueOperandList.empty()) {
-      auto *incomingValueOperand = incomingValueOperandList.pop_back_val();
+      auto incomingValueOperand = incomingValueOperandList.pop_back_val();
       SILValue originalValue = originalIncomingValues.pop_back_val();
-
-      auto *br = cast<BranchInst>(incomingValueOperand->getUser());
-      if (originalValue.getOwnershipKind() != ValueOwnershipKind::None) {
+      if (incomingValueOperand.isGuaranteedConsuming() &&
+          originalValue.getOwnershipKind() != ValueOwnershipKind::None) {
         auto loc = RegularLocation::getAutoGeneratedLocation();
-        SILBuilderWithScope builder(br);
+        SILBuilderWithScope builder(incomingValueOperand.getInst());
         originalValue = builder.createBeginBorrow(loc, originalValue);
       }
-      incomingValueOperand->set(originalValue);
+      incomingValueOperand.getOperand()->set(originalValue);
     }
 
     madeChange = true;
@@ -1404,24 +1519,21 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // within the guaranteed value scope. So we /could/ optimize it. Now check if
   // we were truly dead or if we are dead if we can eliminate phi arg uses. If
   // we need to handle the phi arg uses, we bail. After we reach a fixed point,
-  // we will try to eliminate this value then.
+  // we will try to eliminate this value then if we can find a complete set of
+  // all incoming values to our phi argument.
   if (hasUnknownConsumingUseState ==
       OwnershipLiveRange::HasConsumingUse_t::YesButAllPhiArgs) {
-    auto *op = lr.getSingleUnknownConsumingUse();
-    assert(op);
-    unsigned opNum = op->getOperandNumber();
-    auto *br = cast<BranchInst>(op->getUser());
+    auto opPhi = *OwnershipPhiOperand::get(lr.getSingleUnknownConsumingUse());
     SmallVector<Operand *, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
 
-    for (auto *succBlock : br->getSuccessorBlocks()) {
+    bool canOptimizePhi = opPhi.visitResults([&](SILValue value) {
       SWIFT_DEFER {
         scratchSpace.clear();
         visitedBlocks.clear();
       };
 
-      auto *arg = succBlock->getSILPhiArguments()[opNum];
-      OwnershipLiveRange phiArgLR(arg);
+      OwnershipLiveRange phiArgLR(value);
       if (bool(phiArgLR.hasUnknownConsumingUse())) {
         return false;
       }
@@ -1433,11 +1545,16 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
           })) {
         return false;
       }
-    }
 
-    for (auto *succBlock : br->getSuccessorBlocks()) {
-      auto *arg = succBlock->getSILPhiArguments()[opNum];
-      joinedOwnedIntroducerToConsumedOperands.insert(arg, op);
+      return true;
+    });
+
+    if (canOptimizePhi) {
+      opPhi.visitResults([&](SILValue value) {
+        joinedOwnedIntroducerToConsumedOperands.insert(value,
+                                                       opPhi.getOperand());
+        return true;
+      });
     }
 
     return false;
