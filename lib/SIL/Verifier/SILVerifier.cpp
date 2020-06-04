@@ -536,6 +536,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::KeyPathInst:
       case SILInstructionKind::SwitchEnumAddrInst:
+      case SILInstructionKind::SelectEnumAddrInst:
         break;
       case SILInstructionKind::AddressToPointerInst:
         // We assume that the user is attempting to do something unsafe since we
