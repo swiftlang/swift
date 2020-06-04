@@ -450,6 +450,16 @@ bool CompilerInstance::setUpModuleLoaders() {
     return true;
   }
 
+  // If implicit modules are disabled, we need to install an explicit module
+  // loader.
+  if (Invocation.getFrontendOptions().DisableImplicitModules) {
+    auto ESML = ExplicitSwiftModuleLoader::create(
+        *Context,
+        getDependencyTracker(), MLM,
+        Invocation.getSearchPathOptions().ExplicitSwiftModules,
+        IgnoreSourceInfoFile);
+    Context->addModuleLoader(std::move(ESML));
+  }
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
