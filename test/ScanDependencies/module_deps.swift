@@ -37,6 +37,8 @@
 // RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path E.swiftmodule -o %t/clang-module-cache/E.swiftmodule -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/SwiftShims.pcm | %S/Inputs/CommandRunner.py
 // RUN: ls %t/clang-module-cache/E.swiftmodule
 
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path SubE.swiftmodule -o %t/clang-module-cache/SubE.swiftmodule -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/SwiftShims.pcm -swift-module-file %t/clang-module-cache/E.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/SubE.swiftmodule
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -44,6 +46,7 @@
 import C
 import E
 import G
+import SubE
 
 // CHECK: "mainModuleName": "deps"
 
@@ -61,6 +64,9 @@ import G
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "G"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT: "swift": "SubE"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "Swift"

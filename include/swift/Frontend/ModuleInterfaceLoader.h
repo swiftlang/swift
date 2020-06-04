@@ -127,6 +127,38 @@ class LangOptions;
 class SearchPathOptions;
 class CompilerInvocation;
 
+/// A ModuleLoader that loads explicitly built Swift modules specified via
+/// -swift-module-file
+class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
+  explicit ExplicitSwiftModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
+                                     ModuleLoadingMode loadMode,
+                                     bool IgnoreSwiftSourceInfoFile);
+  std::error_code findModuleFilesInDirectory(
+    AccessPathElem ModuleID,
+    const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+
+  bool isCached(StringRef DepPath) override { return false; };
+
+  struct Implementation;
+  Implementation &Impl;
+public:
+  static std::unique_ptr<ExplicitSwiftModuleLoader>
+  create(ASTContext &ctx,
+         DependencyTracker *tracker, ModuleLoadingMode loadMode,
+         ArrayRef<std::string> ExplicitModulePaths,
+         bool IgnoreSwiftSourceInfoFile);
+
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+  ~ExplicitSwiftModuleLoader();
+};
+
 struct ModuleInterfaceLoaderOptions {
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
@@ -137,6 +169,7 @@ struct ModuleInterfaceLoaderOptions {
     disableImplicitSwiftModule(Opts.DisableImplicitModules) {}
   ModuleInterfaceLoaderOptions() = default;
 };
+
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
 /// files on the fly, caching the resulting .swiftmodules in the module cache

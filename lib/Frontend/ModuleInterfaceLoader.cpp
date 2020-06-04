@@ -880,6 +880,10 @@ class ModuleInterfaceLoaderImpl {
 
       return std::move(module.moduleBuffer);
     }
+    // If implicit module is disabled, we are done.
+    if (Opts.disableImplicitSwiftModule) {
+      return std::make_error_code(std::errc::not_supported);
+    }
 
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 
@@ -1407,4 +1411,82 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   info.Hash = CacheHash;
   // Run the action under the sub compiler instance.
   return action(info);
+}
+
+struct ExplicitSwiftModuleLoader::Implementation {
+  // Information about explicitly specified Swift module files.
+  struct ExplicitModuleInfo {
+    // Path of the module file.
+    StringRef path;
+    // Buffer of the module content.
+    std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+  };
+  llvm::StringMap<ExplicitModuleInfo> ExplicitModuleMap;
+};
+
+ExplicitSwiftModuleLoader::ExplicitSwiftModuleLoader(
+      ASTContext &ctx,
+      DependencyTracker *tracker,
+      ModuleLoadingMode loadMode,
+      bool IgnoreSwiftSourceInfoFile):
+        SerializedModuleLoaderBase(ctx, tracker, loadMode,
+                                   IgnoreSwiftSourceInfoFile),
+        Impl(*new Implementation()) {}
+
+ExplicitSwiftModuleLoader::~ExplicitSwiftModuleLoader() { delete &Impl; }
+
+std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
+    AccessPathElem ModuleID,
+    const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+  StringRef moduleName = ModuleID.Item.str();
+  auto it = Impl.ExplicitModuleMap.find(moduleName);
+  // If no explicit module path is given matches the name, return with an
+  // error code.
+  if (it == Impl.ExplicitModuleMap.end()) {
+    return std::make_error_code(std::errc::not_supported);
+  }
+  // We found an explicit module matches the given name, give the buffer
+  // back to the caller side.
+  *ModuleBuffer = std::move(it->getValue().moduleBuffer);
+  return std::error_code();
+}
+
+void ExplicitSwiftModuleLoader::collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const {
+  for (auto &entry: Impl.ExplicitModuleMap) {
+    names.push_back(Ctx.getIdentifier(entry.getKey()));
+  }
+}
+
+std::unique_ptr<ExplicitSwiftModuleLoader>
+ExplicitSwiftModuleLoader::create(ASTContext &ctx,
+    DependencyTracker *tracker, ModuleLoadingMode loadMode,
+    ArrayRef<std::string> ExplicitModulePaths,
+    bool IgnoreSwiftSourceInfoFile) {
+  auto result = std::unique_ptr<ExplicitSwiftModuleLoader>(
+    new ExplicitSwiftModuleLoader(ctx, tracker, loadMode,
+                                  IgnoreSwiftSourceInfoFile));
+  auto &Impl = result->Impl;
+  for (auto path: ExplicitModulePaths) {
+    std::string name;
+    // Load the explicit module into a buffer and get its name.
+    std::unique_ptr<llvm::MemoryBuffer> buffer = getModuleName(ctx, path, name);
+    if (buffer) {
+      // Register this module for future loading.
+      auto &entry = Impl.ExplicitModuleMap[name];
+      entry.path = path;
+      entry.moduleBuffer = std::move(buffer);
+    } else {
+      // We cannot read the module content, diagnose.
+      ctx.Diags.diagnose(SourceLoc(),
+                         diag::error_opening_explicit_module_file,
+                         path);
+    }
+  }
+
+  return result;
 }
