@@ -929,9 +929,8 @@ public:
   std::pair<std::vector<Decl *>, Optional<std::string>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
-  bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                           SourceLoc PosBeforeLB,
-                           Diag<> ErrorDiag,
+  bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
+                           Diag<> LBraceDiag, Diag<> RBraceDiag,
                            IterableDeclContext *IDC);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
