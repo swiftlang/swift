@@ -25,7 +25,6 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -539,11 +538,11 @@ public:
 /// DoStmt - do statement, without any trailing clauses.
 class DoStmt : public LabeledStmt {
   SourceLoc DoLoc;
-  Stmt *Body;
+  BraceStmt *Body;
   
 public:
   DoStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
-         Stmt *body, Optional<bool> implicit = None)
+         BraceStmt *body, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::Do, getDefaultImplicitFlag(implicit, doLoc),
                   labelInfo),
       DoLoc(doLoc), Body(body) {}
@@ -553,8 +552,8 @@ public:
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
   
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *s) { Body = s; }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *s) { Body = s; }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Do; }
 };

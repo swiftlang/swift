@@ -26,7 +26,6 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_PASSPIPELINE_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/Hashing.h"
 #include <vector>

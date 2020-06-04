@@ -353,7 +353,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     auto ArgumentLoc = Tok.getLoc();
     AnyAnnotations = true;
     StringRef ArgumentKindStr = Tok.getText();
-    ParamIndex++;
+    ++ParamIndex;
 
     enum {
       IsMessage, IsRenamed,
@@ -3279,13 +3279,13 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
     HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
       tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
     if (P.consumeIf(tok::l_brace)) {
-      OpenBraces++;
+      ++OpenBraces;
       continue;
     }
     if (OpenBraces == 1 && P.Tok.is(tok::r_brace))
       break;
     if (P.consumeIf(tok::r_brace)) {
-      OpenBraces--;
+      --OpenBraces;
       continue;
     }
     P.consumeToken();
@@ -4509,7 +4509,7 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
 
   // Increase counter.
   if (auto *stat = Context.Stats) {
-    stat->getFrontendCounters().NumIterableDeclContextParsed ++;
+    ++stat->getFrontendCounters().NumIterableDeclContextParsed;
   }
   // If we found the closing brace, then the caller should not care if there
   // were errors while parsing inner decls, because we recovered.
@@ -5254,7 +5254,7 @@ bool Parser::skipBracedBlock() {
                                                 HasOperatorDeclarations,
                                                 HasNestedClassDeclarations);
   if (consumeIf(tok::r_brace))
-    OpenBraces--;
+    --OpenBraces;
   return OpenBraces != 0;
 }
 
@@ -6383,7 +6383,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
   if (auto *Stats = Context.Stats)
-    Stats->getFrontendCounters().NumFunctionsParsed++;
+    ++Stats->getFrontendCounters().NumFunctionsParsed;
 
   // In implicit getter, if a CC token is the first token after '{', it might
   // be a start of an accessor block. Perform special completion for that.

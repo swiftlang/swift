@@ -19,9 +19,12 @@
 #ifndef SWIFT_BASIC_TYPEID_H
 #define SWIFT_BASIC_TYPEID_H
 
-#include "llvm/ADT/StringRef.h"
+// NOTE: Most of these includes are for CTypeIDZone.def and DefineTypeIDZone.h.
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/StringRef.h"
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 

@@ -628,7 +628,7 @@ namespace {
       // equal to its parent expression's base.
       Expr *prev = ExprStack.back();
 
-      for (argCount = 1; argCount < maxArgCount && argCount < e; argCount++) {
+      for (argCount = 1; argCount < maxArgCount && argCount < e; ++argCount) {
         Expr *result = ExprStack[e - argCount - 1];
         Expr *base = getBaseExpr(result);
         if (base != prev)
@@ -1504,30 +1504,6 @@ namespace {
     }
 
   public:
-
-
-    /// Coerce a closure expression with a non-Void return type to a
-    /// contextual function type with a Void return type.
-    ///
-    /// This operation cannot fail.
-    ///
-    /// \param expr The closure expression to coerce.
-    ///
-    /// \returns The coerced closure expression.
-    ///
-    ClosureExpr *coerceClosureExprToVoid(ClosureExpr *expr);
-
-    /// Coerce a closure expression with a Never return type to a
-    /// contextual function type with some other return type.
-    ///
-    /// This operation cannot fail.
-    ///
-    /// \param expr The closure expression to coerce.
-    ///
-    /// \returns The coerced closure expression.
-    ///
-    ClosureExpr *coerceClosureExprFromNever(ClosureExpr *expr);
-    
     /// Coerce the given expression to the given type.
     ///
     /// This operation cannot fail.
@@ -4994,14 +4970,6 @@ namespace {
       return result;
     }
 
-    const AppliedBuilderTransform *getAppliedBuilderTransform(
-       AnyFunctionRef fn) {
-      auto known = solution.functionBuilderTransformed.find(fn);
-      return known != solution.functionBuilderTransformed.end()
-          ? &known->second
-          : nullptr;
-    }
-
     void finalize() {
       assert(ExprStack.empty());
       assert(OpenedExistentials.empty());
@@ -5325,7 +5293,7 @@ static unsigned getOptionalEvaluationDepth(Expr *expr, Expr *target) {
 
     // If we see an optional evaluation, the depth goes up.
     if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)) {
-      depth++;
+      ++depth;
       expr = optEval->getSubExpr();
 
     // We have to handle any other expressions that can be introduced by
@@ -5829,83 +5797,6 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
 
   // Otherwise fail.
   return false;
-}
-
-ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
-  auto &ctx = cs.getASTContext();
-
-  // Re-write the single-expression closure to return '()'
-  assert(closureExpr->hasSingleExpressionBody());
-
-  // A single-expression body contains a single return statement
-  // prior to this transformation.
-  auto member = closureExpr->getBody()->getFirstElement();
- 
-  if (member.is<Stmt *>()) {
-    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
-    auto singleExpr = returnStmt->getResult();
-    auto voidExpr = cs.cacheType(TupleExpr::createEmpty(
-        ctx, singleExpr->getStartLoc(), singleExpr->getEndLoc(),
-        /*implicit*/ true));
-    returnStmt->setResult(voidExpr);
-
-    // For l-value types, reset to the object type. This might not be strictly
-    // necessary any more, but it's probably still a good idea.
-    if (cs.getType(singleExpr)->is<LValueType>())
-      cs.setType(singleExpr,
-                 cs.getType(singleExpr)->getWithoutSpecifierType());
-
-    solution.setExprTypes(singleExpr);
-    TypeChecker::checkIgnoredExpr(singleExpr);
-
-    SmallVector<ASTNode, 2> elements;
-    elements.push_back(singleExpr);
-    elements.push_back(returnStmt);
-
-    auto braceStmt = BraceStmt::create(ctx, closureExpr->getStartLoc(),
-                                       elements, closureExpr->getEndLoc(),
-                                       /*implicit*/ true);
-
-    closureExpr->setImplicit();
-    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
-  }
-  
-  // Finally, compute the proper type for the closure.
-  auto fnType = cs.getType(closureExpr)->getAs<FunctionType>();
-  auto newClosureType = FunctionType::get(
-      fnType->getParams(), ctx.TheEmptyTupleType, fnType->getExtInfo());
-  cs.setType(closureExpr, newClosureType);
-  return closureExpr;
-}
-
-ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) {
-  // Re-write the single-expression closure to drop the 'return'.
-  assert(closureExpr->hasSingleExpressionBody());
-
-  // A single-expression body contains a single return statement
-  // prior to this transformation.
-  auto member = closureExpr->getBody()->getFirstElement();
-
-  if (member.is<Stmt *>()) {
-    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
-    auto singleExpr = returnStmt->getResult();
-
-    solution.setExprTypes(singleExpr);
-    TypeChecker::checkIgnoredExpr(singleExpr);
-
-    SmallVector<ASTNode, 1> elements;
-    elements.push_back(singleExpr);
-
-    auto braceStmt =
-        BraceStmt::create(cs.getASTContext(), closureExpr->getStartLoc(),
-                          elements, closureExpr->getEndLoc(),
-                          /*implicit*/ true);
-
-    closureExpr->setImplicit();
-    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
-  }
-
-  return closureExpr;
 }
 
 // Look through sugar and DotSyntaxBaseIgnoredExprs.
@@ -7172,7 +7063,7 @@ ExprRewriter::buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
         conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
-    for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
+    for (unsigned i = 0, n = arg->getNumElements(); i < n; ++i) {
       Expr *labelExpr =
         new (ctx) StringLiteralExpr(arg->getElementName(i).get(),
                                     arg->getElementNameLoc(i),
@@ -7721,80 +7612,7 @@ namespace {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        Rewriter.simplifyExprType(expr);
-        auto &cs = Rewriter.getConstraintSystem();
-
-        // Coerce the pattern, in case we resolved something.
-        auto fnType = cs.getType(closure)->castTo<FunctionType>();
-        auto *params = closure->getParameters();
-        TypeChecker::coerceParameterListToType(params, closure, fnType);
-
-        if (closure->hasExplicitResultType()) {
-          closure->setExplicitResultType(fnType->getResult());
-        }
-
-        if (auto transform =
-                       Rewriter.getAppliedBuilderTransform(closure)) {
-          // Apply the function builder to the closure. We want to be in the
-          // context of the closure for subsequent transforms.
-          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
-          auto newBody = applyFunctionBuilderTransform(
-              Rewriter.solution, *transform, closure->getBody(), closure,
-              [&](SolutionApplicationTarget target) {
-                auto resultTarget = rewriteTarget(target);
-                if (resultTarget) {
-                  if (auto expr = resultTarget->getAsExpr())
-                    Rewriter.solution.setExprTypes(expr);
-                }
-
-                return resultTarget;
-              });
-          closure->setBody(newBody, /*isSingleExpression=*/false);
-          closure->setAppliedFunctionBuilder();
-
-          Rewriter.solution.setExprTypes(closure);
-        } else if (closure->hasSingleExpressionBody()) {
-          // If this is a single-expression closure, convert the expression
-          // in the body to the result type of the closure.
-
-          // Enter the context of the closure when type-checking the body.
-          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
-          Expr *body = closure->getSingleExpressionBody()->walk(*this);
-          if (!body)
-            return { false, nullptr };
-          
-          if (body != closure->getSingleExpressionBody())
-            closure->setSingleExpressionBody(body);
-          
-          if (body) {
-            // A single-expression closure with a non-Void expression type
-            // coerces to a Void-returning function type.
-            if (fnType->getResult()->isVoid() && !cs.getType(body)->isVoid()) {
-              closure = Rewriter.coerceClosureExprToVoid(closure);
-            // A single-expression closure with a Never expression type
-            // coerces to any other function type.
-            } else if (cs.getType(body)->isUninhabited()) {
-              closure = Rewriter.coerceClosureExprFromNever(closure);
-            } else {
-            
-              body = Rewriter.coerceToType(body,
-                                           fnType->getResult(),
-                                           cs.getConstraintLocator(
-                                             closure,
-                                             ConstraintLocator::ClosureResult));
-              if (!body)
-                return { false, nullptr };
-
-              closure->setSingleExpressionBody(body);
-            }
-          }
-        } else {
-          // For other closures, type-check the body once we've finished with
-          // the expression.
-          Rewriter.solution.setExprTypes(closure);
-          ClosuresToTypeCheck.push_back(closure);
-        }
-
+        rewriteFunction(closure);
         return { false, closure };
       }
 
@@ -7823,6 +7641,37 @@ namespace {
     /// Rewrite the target, producing a new target.
     Optional<SolutionApplicationTarget>
     rewriteTarget(SolutionApplicationTarget target);
+
+    /// Rewrite the function for the given solution.
+    ///
+    /// \returns true if an error occurred.
+    bool rewriteFunction(AnyFunctionRef fn) {
+      auto result = Rewriter.cs.applySolution(
+          Rewriter.solution, fn, Rewriter.dc,
+          [&](SolutionApplicationTarget target) {
+            auto resultTarget = rewriteTarget(target);
+            if (resultTarget) {
+              if (auto expr = resultTarget->getAsExpr())
+                Rewriter.solution.setExprTypes(expr);
+            }
+
+            return resultTarget;
+          });
+
+      switch (result) {
+      case SolutionApplicationToFunctionResult::Success:
+        return false;
+
+      case SolutionApplicationToFunctionResult::Failure:
+        return true;
+
+      case SolutionApplicationToFunctionResult::Delay: {
+        auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
+        ClosuresToTypeCheck.push_back(closure);
+        return false;
+      }
+      }
+    }
   };
 } // end anonymous namespace
 
@@ -8256,28 +8105,10 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     return target;
   } else {
     auto fn = *target.getAsFunction();
-
-    // Dig out the function builder transformation we applied.
-    auto transform = Rewriter.getAppliedBuilderTransform(fn);
-    assert(transform);
-
-    auto newBody = applyFunctionBuilderTransform(
-        solution, *transform, fn.getBody(), fn.getAsDeclContext(),
-        [&](SolutionApplicationTarget target) {
-          auto resultTarget = rewriteTarget(target);
-          if (resultTarget) {
-            if (auto expr = resultTarget->getAsExpr())
-              solution.setExprTypes(expr);
-          }
-
-          return resultTarget;
-        });
-
-    if (!newBody)
+    if (rewriteFunction(fn))
       return None;
 
-    result.setFunctionBody(newBody);
-    fn.getAbstractFunctionDecl()->setHasSingleExpressionBody(false);
+    result.setFunctionBody(fn.getBody());
   }
 
   // Follow-up tasks.

@@ -524,7 +524,7 @@ private:
           Context, Query, LastElement, CurrentTRC, NewConstraint);
 
       pushContext(TRC, ParentTy());
-      NestedCount++;
+      ++NestedCount;
     }
 
 
@@ -1834,7 +1834,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
           ++I;
 
           // Two or more arguments: Insert empty labels after the first one.
-          variadicArgsNum--;
+          --variadicArgsNum;
           I = argumentLabelIDs.insert(I, variadicArgsNum, Identifier());
           I += variadicArgsNum;
         }

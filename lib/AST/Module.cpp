@@ -498,25 +498,16 @@ bool ModuleDecl::isClangModule() const {
 }
 
 void ModuleDecl::addFile(FileUnit &newFile) {
+  // If this is a LoadedFile, make sure it loaded without error.
+  assert(!(isa<LoadedFile>(newFile) &&
+           cast<LoadedFile>(newFile).hadLoadError()));
+
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
          !isa<SourceFile>(newFile) ||
          cast<SourceFile>(newFile).Kind == SourceFileKind::Library ||
          cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
   Files.push_back(&newFile);
-  clearLookupCache();
-}
-
-void ModuleDecl::removeFile(FileUnit &existingFile) {
-  // Do a reverse search; usually the file to be deleted will be at the end.
-  std::reverse_iterator<decltype(Files)::iterator> I(Files.end()),
-  E(Files.begin());
-  I = std::find(I, E, &existingFile);
-  assert(I != E);
-
-  // Adjust for the std::reverse_iterator offset.
-  ++I;
-  Files.erase(I.base());
   clearLookupCache();
 }
 
@@ -563,7 +554,7 @@ void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupValue++;
+    ++stats->getFrontendCounters().NumModuleLookupValue;
 
   if (isParsedModule(this)) {
     getSourceLookupCache().lookupValue(Name, LookupKind, Result);
@@ -657,8 +648,9 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
-void ModuleDecl::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void ModuleDecl::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
 }
 
@@ -718,7 +710,7 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupClassMember++;
+    ++stats->getFrontendCounters().NumModuleLookupClassMember;
 
   if (isParsedModule(this)) {
     FrontendStatsTracer tracer(getASTContext().Stats,
@@ -1942,31 +1934,29 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
-void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void SourceFile::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &import : *Imports) {
     if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
         importedModule == import.module.importedModule) {
       auto importedSpis = import.spiGroups;
-      spiGroups.append(importedSpis.begin(), importedSpis.end());
+      spiGroups.insert(importedSpis.begin(), importedSpis.end());
     }
   }
 }
 
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
-  SmallVector<Identifier, 4> importedSPIGroups;
+  llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty()) return false;
 
   auto declSPIGroups = targetDecl->getSPIGroups();
 
-  // Note: If we reach a point where there are many SPI imports or SPI groups
-  // on decls we could optimize this further by using a set.
-  for (auto importedSPI : importedSPIGroups)
-    for (auto declSPI : declSPIGroups)
-      if (importedSPI == declSPI)
-        return true;
+  for (auto declSPI : declSPIGroups)
+    if (importedSPIGroups.count(declSPI))
+      return true;
 
   return false;
 }

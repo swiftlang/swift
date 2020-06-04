@@ -1093,7 +1093,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     else
       stableImportControl = ImportControl::ImplementationOnly;
 
-    SmallVector<Identifier, 4> spis;
+    llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(import.importedModule, spis);
 
     ImportedModule.emit(ScratchRecord,

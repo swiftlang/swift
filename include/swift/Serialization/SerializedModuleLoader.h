@@ -149,12 +149,13 @@ public:
   ///
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
-  FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
-                    StringRef moduleInterfacePath,
-                    std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
-                    std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-                    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-                    bool isFramework, bool treatAsPartialModule);
+  FileUnit *
+  loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
+          StringRef moduleInterfacePath,
+          std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+          std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+          std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
+          bool isFramework);
 
   /// Check whether the module with a given name can be imported without
   /// importing it.
@@ -321,6 +322,8 @@ public:
   /// file.
   const version::Version &getLanguageVersionBuiltWith() const;
 
+  virtual bool hadLoadError() const override;
+
   virtual bool isSystemModule() const override;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
@@ -365,8 +368,9 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   virtual void
-  lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                         SmallVectorImpl<Identifier> &spiGroups) const override;
+  lookupImportedSPIGroups(
+                const ModuleDecl *importedModule,
+                llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 

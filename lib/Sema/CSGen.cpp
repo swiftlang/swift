@@ -28,6 +28,7 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <utility>
@@ -669,7 +670,7 @@ namespace {
       assert(!AFD->hasImplicitSelfDecl());
       for (auto param : *AFD->getParameters()) {
         if (!param->isDefaultArgument())
-          nNoDefault++;
+          ++nNoDefault;
       }
     } else {
       nNoDefault = nOperands;
@@ -4418,14 +4419,10 @@ bool ConstraintSystem::generateConstraints(
   llvm_unreachable("BOOM");
 }
 
-Expr *ConstraintSystem::generateConstraints(ClosureExpr *closure) {
-  assert(closure->hasSingleExpressionBody());
-  return generateConstraintsFor(*this, closure->getSingleExpressionBody(),
-                                closure);
-}
-
-Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
-  InputExprs.insert(expr);
+Expr *ConstraintSystem::generateConstraints(
+    Expr *expr, DeclContext *dc, bool isInputExpression) {
+  if (isInputExpression)
+    InputExprs.insert(expr);
   return generateConstraintsFor(*this, expr, dc);
 }
 

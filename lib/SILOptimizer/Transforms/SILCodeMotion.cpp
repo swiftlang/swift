@@ -1044,7 +1044,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
     if (InstToSink == BB->begin())
       return nullptr;
 
-    SkipBudget--;
+    --SkipBudget;
     InstToSink = std::prev(InstToSink);
     LLVM_DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
   }
@@ -1384,7 +1384,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
   for (auto P : BB->getPredecessorBlocks()) {
     if (auto *BI = dyn_cast<BranchInst>(P->getTerminator())) {
       auto Args = BI->getArgs();
-      for (size_t idx = 0, size = Args.size(); idx < size; idx++) {
+      for (size_t idx = 0, size = Args.size(); idx < size; ++idx) {
         valueToArgIdxMap[{Args[idx], P}] = idx;
       }
     }
@@ -1431,7 +1431,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
           // Replace operand values (which are passed to the successor block)
           // with corresponding block arguments.
           for (size_t idx = 0, numOps = InstToSink->getNumOperands();
-               idx < numOps; idx++) {
+               idx < numOps; ++idx) {
             ValueInBlock OpInFirstPred(InstToSink->getOperand(idx), FirstPred);
             assert(valueToArgIdxMap.count(OpInFirstPred) != 0);
             int argIdx = valueToArgIdxMap[OpInFirstPred];
@@ -1445,7 +1445,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
             Context.blotValue(Result);
           }
           I->eraseFromParent();
-          NumSunk++;
+          ++NumSunk;
         }
 
         // Restart the scan.
@@ -1468,7 +1468,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
       return Changed;
     }
 
-    SkipBudget--;
+    --SkipBudget;
     InstToSink = std::prev(InstToSink);
     LLVM_DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
   }
@@ -1530,7 +1530,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
   }
 
   RV->eraseFromParent();
-  NumSunk++;
+  ++NumSunk;
   return true;
 }
 
@@ -1616,7 +1616,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   }
 
   I->eraseFromParent();
-  NumSunk++;
+  ++NumSunk;
   return true;
 }
 

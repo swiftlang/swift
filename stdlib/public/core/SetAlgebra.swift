@@ -409,6 +409,8 @@ extension SetAlgebra {
   public init<S: Sequence>(_ sequence: __owned S)
     where S.Element == Element {
     self.init()
+    // Needed to fully optimize OptionSet literals.
+    _onFastPath()
     for e in sequence { insert(e) }
   }
 

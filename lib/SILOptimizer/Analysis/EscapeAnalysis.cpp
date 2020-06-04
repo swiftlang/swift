@@ -2488,7 +2488,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
         }
       }
     }
-    Iteration++;
+    ++Iteration;
   } while (NeedAnotherIteration);
 
   for (FunctionInfo *FInfo : BottomUpOrder) {

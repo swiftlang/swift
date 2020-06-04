@@ -293,6 +293,10 @@ protected:
   }
 
   VarDecl *visitBraceStmt(BraceStmt *braceStmt) {
+    return visitBraceStmt(braceStmt, ctx.Id_buildBlock);
+  }
+
+  VarDecl *visitBraceStmt(BraceStmt *braceStmt, Identifier builderFunction) {
     SmallVector<Expr *, 4> expressions;
     auto addChild = [&](VarDecl *childVar) {
       if (!childVar)
@@ -359,7 +363,7 @@ protected:
 
     // Call Builder.buildBlock(... args ...)
     auto call = buildCallIfWanted(braceStmt->getStartLoc(),
-                                  ctx.Id_buildBlock, expressions,
+                                  builderFunction, expressions,
                                   /*argLabels=*/{ });
     if (!call)
       return nullptr;
@@ -380,17 +384,13 @@ protected:
       return nullptr;
     }
 
-    auto childVar = visit(doStmt->getBody());
+    auto childVar = visitBraceStmt(doStmt->getBody(), ctx.Id_buildDo);
     if (!childVar)
       return nullptr;
 
     auto childRef = buildVarRef(childVar, doStmt->getEndLoc());
-    auto call = buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo,
-                                  childRef, /*argLabels=*/{ });
-    if (!call)
-      return nullptr;
 
-    return captureExpr(call, /*oneWay=*/true, doStmt);
+    return captureExpr(childRef, /*oneWay=*/true, doStmt);
   }
 
   CONTROL_FLOW_STMT(Yield)
@@ -400,7 +400,7 @@ protected:
                                           unsigned &numPayloads,
                                           bool &isOptional) {
     // The 'then' clause contributes a payload.
-    numPayloads++;
+    ++numPayloads;
 
     // If there's an 'else' clause, it contributes payloads:
     if (auto elseStmt = ifStmt->getElseStmt()) {
@@ -410,7 +410,7 @@ protected:
                                            isOptional);
       // Otherwise it's just the one.
       } else {
-        numPayloads++;
+        ++numPayloads;
       }
 
     // If not, the chain result is at least optional.

@@ -658,7 +658,7 @@ public:
 
   Stmt *visitDoStmt(DoStmt *DS) {
     AddLabeledStmt loopNest(*this, DS);
-    Stmt *S = DS->getBody();
+    BraceStmt *S = DS->getBody();
     typeCheckStmt(S);
     DS->setBody(S);
     return DS;

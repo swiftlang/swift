@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -Xllvm '-sil-inline-never-functions=$sSa6append' %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -Xllvm '-sil-inline-never-functions=$sSa6appendyy' %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // This is an end-to-end test of the Array.append(contentsOf:) ->
@@ -24,7 +24,7 @@ public func testInt(_ a: inout [Int]) {
 }
 
 // CHECK-LABEL: sil @{{.*}}testThreeInts
-// CHECK-DAG:    [[FR:%[0-9]+]] = function_ref @${{(sSa15reserveCapacityyySiFSi_Tg5|sSa16_createNewBuffer)}}
+// CHECK-DAG:    [[FR:%[0-9]+]] = function_ref @${{.*(reserveCapacity|_createNewBuffer)}}
 // CHECK-DAG:    apply [[FR]]
 // CHECK-DAG:    [[F:%[0-9]+]] = function_ref @$sSa6appendyyxnFSi_Tg5
 // CHECK-DAG:    apply [[F]]
@@ -37,7 +37,7 @@ public func testThreeInts(_ a: inout [Int]) {
 
 // CHECK-LABEL: sil @{{.*}}testTooManyInts
 // CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref  @$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
+// CHECK:        [[F:%[0-9]+]] = function_ref  @${{.*append.*contentsOf.*}}
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
 // CHECK-NOT: apply
@@ -65,12 +65,12 @@ public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
 
 // Check if the specialized Array.append<A>(contentsOf:) is reasonably optimized for Array<Int>.
 
-// CHECK-LABEL: sil shared {{.*}}@$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5Tf4gn_n
+// CHECK-LABEL: sil shared {{.*}}@$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
 
 // There should only be a single call to _createNewBuffer or reserveCapacityForAppend/reserveCapacityImpl.
 
 // CHECK-NOT: apply
-// CHECK: [[F:%[0-9]+]] = function_ref @{{.*(_createNewBuffer|reserveCapacity).*}}
+// CHECK: [[F:%[0-9]+]] = function_ref @{{.*(_consumeAndCreateNew|reserveCapacity).*}}
 // CHECK-NEXT: apply [[F]]
 // CHECK-NOT: apply
 

@@ -1503,8 +1503,13 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   }
 
   ThePattern = parseOptionalPatternTypeAnnotation(ThePattern);
-  if (ThePattern.hasCodeCompletion())
+  if (ThePattern.hasCodeCompletion()) {
     Status.setHasCodeCompletion();
+
+    // Skip to '=' so that the completion can see the expected type of the
+    // pattern which is determined by the initializer. 
+    skipUntilDeclStmtRBrace(tok::equal, tok::l_brace);
+  }
     
   if (ThePattern.isNull()) {
     // Recover by creating AnyPattern.

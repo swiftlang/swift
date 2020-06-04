@@ -46,11 +46,11 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
         break;
       }
 
-      for (bool done = false; !done; percent++) {
+      for (bool done = false; !done; ++percent) {
         switch (ch = percent[0]) {
           /* type of types or other */
-          case 'l': type++; break; // longer
-          case 'h': type--; break; // shorter
+          case 'l': ++type; break; // longer
+          case 'h': --type; break; // shorter
           case 'z': type = T_SIZE; break;
           case 'j': type = T_INTMAX; break;
           case 't': type = T_PTRDIFF; break;
@@ -62,16 +62,16 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
             if (percent[1] != '.') {
               break;
             }
-            percent++;
+            ++percent;
             // FALLTHROUGH
           case '.': // precision
             if ((percent[1]) == '*') {
               prect = T_C_DYNAMIC;
-              percent++;
+              ++percent;
             } else {
               while (isdigit(percent[1])) {
                 precision = 10 * precision + (percent[1] - '0');
-                percent++;
+                ++percent;
               }
               if (precision > 1024) precision = 1024;
               prect = T_C_STATIC;
@@ -86,7 +86,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
             break;
 
           case '{': // annotated symbols
-            for (const char *curr2 = percent + 1; (ch = (*curr2)) != 0; curr2++) {
+            for (const char *curr2 = percent + 1; (ch = (*curr2)) != 0; ++curr2) {
               if (ch == '}') {
                 if (strncmp(percent + 1, "private", MIN(curr2 - percent - 1, 7)) == 0) {
                   hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_PRIVATE;
@@ -121,7 +121,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
         precision = va_arg(args, int);                                         \
       }                                                                        \
       _os_log_encode_arg(ob, &cmd, &precision);                                \
-      hdr.hdr_cmd_cnt++;                                                       \
+      ++hdr.hdr_cmd_cnt;                                                       \
       prect = T_C_NONE;                                                        \
     }                                                                          \
   } while (0)
@@ -148,7 +148,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
     cmd.cmd_flags = flags;                                                     \
     cmd.cmd_size = sizeof(__var);                                              \
     _os_log_encode_arg(ob, &cmd, &__var);                                      \
-    hdr.hdr_cmd_cnt++;                                                         \
+    ++hdr.hdr_cmd_cnt;                                                         \
   } while (0)
 
 #define encode_smallint(ty, flags)                                             \
@@ -157,7 +157,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
     cmd.cmd_flags = flags;                                                     \
     cmd.cmd_size = sizeof(__var);                                              \
     _os_log_encode_arg(ob, &cmd, &__var);                                      \
-    hdr.hdr_cmd_cnt++;                                                         \
+    ++hdr.hdr_cmd_cnt;                                                         \
   } while (0)
 
 #define encode(ty, flags)                                                      \
@@ -166,7 +166,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
     cmd.cmd_flags = flags;                                                     \
     cmd.cmd_size = sizeof(__var);                                              \
     _os_log_encode_arg(ob, &cmd, &__var);                                      \
-    hdr.hdr_cmd_cnt++;                                                         \
+    ++hdr.hdr_cmd_cnt;                                                         \
   } while (0)
 
         /* fixed types */
@@ -276,7 +276,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
           cmd.cmd_size = sizeof(int);
           cmd.cmd_flags = flags;
           _os_log_encode_arg(ob, &cmd, &saved_errno);
-          hdr.hdr_cmd_cnt++;
+          ++hdr.hdr_cmd_cnt;
           done = true;
           break;
 

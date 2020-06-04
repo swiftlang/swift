@@ -658,7 +658,8 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
     llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
     SILBuilderContext &BuilderCtx,
     SILOpenedArchetypesTracker &OpenedArchetypesTracker) {
-  for (unsigned ArgIdx = 0; ArgIdx < Apply.getNumArguments(); ArgIdx++) {
+  for (unsigned ArgIdx = 0, e = Apply.getNumArguments(); ArgIdx < e;
+       ++ArgIdx) {
     auto ArgASTType = Apply.getArgument(ArgIdx)->getType().getASTType();
     if (!ArgASTType->hasArchetype())
       continue;
@@ -770,7 +771,7 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
 
   // This bailout check is also needed for non-Self arguments [including Self].
   unsigned NumApplyArgs = Apply.getNumArguments();
-  for (unsigned Idx = 0; Idx < NumApplyArgs; Idx++) {
+  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
     if (Idx == ArgIdx)
       continue;
     if (Apply.getArgument(Idx)->getType().getASTType().findIf(
@@ -1416,7 +1417,7 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
          "mismatching number of arguments for the same destination block");
 
   // Check if both blocks pass the same arguments to the common destination.
-  for (unsigned Idx = 0, End = NormalBr->getNumArgs(); Idx < End; Idx++) {
+  for (unsigned Idx = 0, End = NormalBr->getNumArgs(); Idx < End; ++Idx) {
     if (NormalBr->getArg(Idx) != ErrorBr->getArg(Idx))
       return false;
   }

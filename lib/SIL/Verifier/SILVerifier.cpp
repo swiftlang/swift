@@ -42,6 +42,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -3581,7 +3582,7 @@ public:
 
       fromCanTy = fromMetaty.getInstanceType();
       toCanTy = toMetaty.getInstanceType();
-      MetatyLevel++;
+      ++MetatyLevel;
     }
 
     if (isExact) {
@@ -5607,7 +5608,7 @@ void SILModule::verify() const {
                      << entry.Implementation->getName() << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
-      EntriesSZ++;
+      ++EntriesSZ;
     }
   }
   assert(EntriesSZ == VTableEntryCache.size() &&

@@ -7162,14 +7162,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   // If this is a multi-statement closure its body doesn't participate
   // in type-checking.
   if (closure->hasSingleExpressionBody()) {
-    auto *closureBody = generateConstraints(closure);
-    if (!closureBody)
+    if (generateConstraints(closure, closureType->getResult()))
       return false;
-
-    addConstraint(
-        ConstraintKind::Conversion, getType(closureBody),
-        closureType->getResult(),
-        getConstraintLocator(closure, LocatorPathElt::ClosureBody(hasReturn)));
   } else if (!hasReturn) {
     // If this closure has an empty body and no explicit result type
     // let's bind result type to `Void` since that's the only type empty body

@@ -127,7 +127,7 @@ bool Punycode::decodePunycode(StringRef InputPunycode,
       return true;
     // insert n into output at position i
     OutCodePoints.insert(OutCodePoints.begin() + i, n);
-    i++;
+    ++i;
   }
   
   return true;

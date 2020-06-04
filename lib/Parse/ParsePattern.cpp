@@ -443,7 +443,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     if (Tok.getLoc() == StartLoc) {
       // If we took a default argument index for this parameter, but didn't add
       // one, then give it back.
-      if (defaultArgs) defaultArgs->NextIndex--;
+      if (defaultArgs) --defaultArgs->NextIndex;
       return status;
     }
 

@@ -28,15 +28,12 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
+#include <set>
 
 namespace clang {
   class Module;
@@ -363,6 +360,7 @@ public:
   ArrayRef<ImplicitImport> getImplicitImports() const;
 
   ArrayRef<FileUnit *> getFiles() {
+    assert(!Files.empty() || failedToLoad());
     return Files;
   }
   ArrayRef<const FileUnit *> getFiles() const {
@@ -371,7 +369,6 @@ public:
 
   bool isClangModule() const;
   void addFile(FileUnit &newFile);
-  void removeFile(FileUnit &existingFile);
 
   /// Creates a map from \c #filePath strings to corresponding \c #file
   /// strings, diagnosing any conflicts.
@@ -646,8 +643,9 @@ public:
 
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
-  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                          SmallVectorImpl<Identifier> &spiGroups) const;
+  void lookupImportedSPIGroups(
+                         const ModuleDecl *importedModule,
+                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
   /// \sa getImportedModules
   enum class ImportFilterKind {

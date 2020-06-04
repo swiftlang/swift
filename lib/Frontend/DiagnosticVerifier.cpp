@@ -688,7 +688,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         ///                           ^ remove
         /// @endcode
         if (replStartLoc[-1] == ' ') {
-          replStartLoc--;
+          --replStartLoc;
         }
       } else {
         auto phrase = makeActualFixitsPhrase(FoundDiagnostic.FixIts);
@@ -796,7 +796,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     }
 
     if (I == CapturedDiagnostics.end()) {
-      expectedDiagIter++;
+      ++expectedDiagIter;
       continue;
     }
 
@@ -877,7 +877,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   auto CapturedDiagIter = CapturedDiagnostics.begin();
   while (CapturedDiagIter != CapturedDiagnostics.end()) {
     if (CapturedDiagIter->FileName != BufferName) {
-      CapturedDiagIter++;
+      ++CapturedDiagIter;
       continue;
     }
 

@@ -1,7 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// REQUIRES: SR12741
+// FIXME(SR-12741): Enable test for all platforms after debugging
+// iphonesimulator-i386-specific failures.
+// REQUIRES: CPU=x86_64
 
 import _Differentiation
 import StdlibUnittest
@@ -711,6 +713,27 @@ ControlFlowTests.test("Loops") {
   expectEqual((20, 22), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 2) }))
   expectEqual((52, 80), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 3) }))
   expectEqual((24, 28), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 4) }))
+}
+
+ControlFlowTests.test("BranchingCastInstructions") {
+  // checked_cast_br
+  func typeCheckOperator<T>(_ x: Float, _ metatype: T.Type) -> Float {
+    if metatype is Int.Type {
+      return x + x
+    }
+    return x * x
+  }
+  expectEqual((6, 2), valueWithGradient(at: 3, in: { typeCheckOperator($0, Int.self) }))
+  expectEqual((9, 6), valueWithGradient(at: 3, in: { typeCheckOperator($0, Float.self) }))
+
+  // checked_cast_addr_br
+  func conditionalCast<T: Differentiable>(_ x: T) -> T {
+    if let _ = x as? Float {
+      // Do nothing with `y: Float?` value.
+    }
+    return x
+  }
+  expectEqual((3, 1), valueWithGradient(at: Float(3), in: conditionalCast))
 }
 
 runAllTests()

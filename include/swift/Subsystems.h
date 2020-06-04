@@ -22,7 +22,6 @@
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Mutex.h"
