@@ -1128,7 +1128,8 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
       [](ASTNode Node, ASTWalker::ParentTy Parent) {
         if (Expr *ParentExpr = Parent.getAsExpr()) {
           auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
-          if (!ParentClosure || !ParentClosure->hasSingleExpressionBody()) {
+          if (!ParentClosure ||
+              !ParentClosure->wasTypeCheckedInEnclosingContext()) {
             return false;
           }
         } else if (auto *ParentStmt = Parent.getAsStmt()) {

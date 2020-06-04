@@ -5487,6 +5487,12 @@ BraceStmt *applyFunctionBuilderTransform(
           constraints::SolutionApplicationTarget)>
             rewriteTarget);
 
+/// Determine whether the given closure expression should be type-checked
+/// within the context of its enclosing expression. Otherwise, it will be
+/// separately type-checked once its enclosing expression has determined all
+/// of the parameter and result types without looking at the body.
+bool shouldTypeCheckInEnclosingExpression(ClosureExpr *expr);
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
