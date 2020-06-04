@@ -1077,12 +1077,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
                                           const PrimarySpecificPaths &PSPs,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer);
+                                          int &ReturnValue);
 
 static bool performCompileStepsPostSema(CompilerInstance &Instance,
-                                        int &ReturnValue,
-                                        FrontendObserver *observer) {
+                                        int &ReturnValue) {
   const auto &Invocation = Instance.getInvocation();
   const SILOptions &SILOpts = Invocation.getSILOptions();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
@@ -1095,7 +1093,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
-                                         ReturnValue, observer);
+                                         ReturnValue);
   }
   // If there are primary source files, build a separate SILModule for
   // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
@@ -1108,8 +1106,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
       result |= performCompileStepsPostSILGen(Instance, std::move(SM),
-                                              PrimaryFile, PSPs, ReturnValue,
-                                              observer);
+                                              PrimaryFile, PSPs, ReturnValue);
     }
 
     return result;
@@ -1125,7 +1122,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
-                                                PSPs, ReturnValue, observer);
+                                                PSPs, ReturnValue);
       }
   }
 
@@ -1229,9 +1226,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 ///                 mode is NoVerify and there were no errors.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
-                           ArrayRef<const char *> Args,
-                           int &ReturnValue,
-                           FrontendObserver *observer) {
+                           ArrayRef<const char *> Args, int &ReturnValue) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -1291,9 +1286,6 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::ResolveImports ||
       Action == FrontendOptions::ActionType::ScanDependencies)
     return Context.hadError();
-
-  if (observer)
-    observer->performedSemanticAnalysis(Instance);
 
   if (auto *Stats = Context.Stats) {
     countStatsPostSema(*Stats, Instance);
@@ -1360,7 +1352,7 @@ static bool performCompile(CompilerInstance &Instance,
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
 
-  return performCompileStepsPostSema(Instance, ReturnValue, observer);
+  return performCompileStepsPostSema(Instance, ReturnValue);
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
@@ -1403,7 +1395,6 @@ generateIR(const IRGenOptions &IRGenOpts,
 static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
                                                 std::unique_ptr<SILModule> &&SM,
                                                 ModuleOrSourceFile MSF,
-                                                FrontendObserver *observer,
                                                 int &ReturnValue) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
@@ -1567,8 +1558,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
                                           const PrimarySpecificPaths &PSPs,
-                                          int &ReturnValue,
-                                          FrontendObserver *observer) {
+                                          int &ReturnValue) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -1578,9 +1568,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
-
-  if (observer)
-    observer->performedSILGeneration(*SM);
 
   auto *Stats = Instance.getASTContext().Stats;
   if (Stats)
@@ -1621,9 +1608,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   // Perform optimizations and mandatory/diagnostic passes.
   if (Instance.performSILProcessing(SM.get()))
     return true;
-
-  if (observer)
-    observer->performedSILProcessing(*SM);
 
   emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
 
@@ -1669,8 +1653,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return performDumpTypeInfo(IRGenOpts, *SM);
 
   if (Action == FrontendOptions::ActionType::Immediate)
-    return processCommandLineAndRunImmediately(
-        Instance, std::move(SM), MSF, observer, ReturnValue);
+    return processCommandLineAndRunImmediately(Instance, std::move(SM), MSF,
+                                               ReturnValue);
 
   llvm::StringSet<> LinkerDirectives;
   collectLinkerDirectives(Invocation, MSF, LinkerDirectives);
@@ -1986,9 +1970,9 @@ static void printTargetInfo(const CompilerInvocation &invocation,
   out << "}\n";
 }
 
-int swift::performFrontend(ArrayRef<const char *> Args,
-                           const char *Argv0, void *MainAddr,
-                           FrontendObserver *observer) {
+int swift::performFrontend(
+    ArrayRef<const char *> Args, const char *Argv0, void *MainAddr,
+    llvm::function_ref<void(CompilerInstance &)> configuredCompilerCallback) {
   INITIALIZE_LLVM();
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
@@ -2099,11 +2083,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   IRGenOpts.DWARFVersion = swift::DWARFVersion;
 
-  // The compiler invocation is now fully configured; notify our observer.
-  if (observer) {
-    observer->parsedArgs(Invocation);
-  }
-
   if (Invocation.getFrontendOptions().PrintHelp ||
       Invocation.getFrontendOptions().PrintHelpHidden) {
     unsigned IncludedFlagsBitmask = options::FrontendOption;
@@ -2181,10 +2160,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
-  // The compiler instance has been configured; notify our observer.
-  if (observer) {
-    observer->configuredCompiler(*Instance);
-  }
+  // The compiler instance has been configured; notify our callback.
+  configuredCompilerCallback(*Instance);
 
   if (verifierEnabled) {
     // Suppress printed diagnostic output during the compile if the verifier is
@@ -2193,7 +2170,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, Args, ReturnValue, observer);
+  bool HadError = performCompile(*Instance, Args, ReturnValue);
   if (!HadError) {
     Mangle::printManglingStats();
   }

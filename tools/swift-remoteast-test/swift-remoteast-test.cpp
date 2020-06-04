@@ -198,16 +198,6 @@ stopRemoteAST() {
     remoteContext.reset();
 }
 
-namespace {
-
-struct Observer : public FrontendObserver {
-  void configuredCompiler(CompilerInstance &instance) override {
-    context = &instance.getASTContext();
-  }
-};
-
-} // end anonymous namespace
-
 int main(int argc, const char *argv[]) {
   PROGRAM_START(argc, argv);
 
@@ -221,7 +211,10 @@ int main(int argc, const char *argv[]) {
   forwardedArgs.push_back("-interpret");
   assert(forwardedArgs.size() == numForwardedArgs);
 
-  Observer observer;
-  return performFrontend(forwardedArgs, argv[0], (void*) &printMetadataType,
-                         &observer);
+  // FIXME: Once the compiler pipeline has been sufficiently inverted, we
+  // should be able to call into immediate mode directly rather than calling
+  // performFrontend with a callback to register the ASTContext.
+  return performFrontend(
+      forwardedArgs, argv[0], (void *)&printMetadataType,
+      [](CompilerInstance &instance) { context = &instance.getASTContext(); });
 }

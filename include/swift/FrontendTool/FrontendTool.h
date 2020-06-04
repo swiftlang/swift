@@ -19,6 +19,7 @@
 #define SWIFT_FRONTENDTOOL_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace llvm {
 class Module;
@@ -69,15 +70,16 @@ StringRef escapeForMake(StringRef raw, llvm::SmallVectorImpl<char> &buffer);
 /// \param args the arguments to use as the arguments to the frontend
 /// \param argv0 the name used as the frontend executable
 /// \param mainAddr an address from the main executable
+/// \param configuredCompilerCallback A callback that will be invoked after the
+/// CompilerInstance has been successfully setup.
 ///
 /// \return the exit value of the frontend: 0 or 1 on success unless
 ///   the frontend executes in immediate mode, in which case this will be
 ///   the exit value of the script, assuming it exits normally
-int performFrontend(ArrayRef<const char *> args,
-                    const char *argv0,
-                    void *mainAddr,
-                    FrontendObserver *observer = nullptr);
-
+int performFrontend(
+    ArrayRef<const char *> args, const char *argv0, void *mainAddr,
+    llvm::function_ref<void(CompilerInstance &)> configuredCompilerCallback =
+        [](CompilerInstance &) {});
 
 } // namespace swift
 
