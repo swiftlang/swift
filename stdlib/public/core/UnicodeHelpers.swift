@@ -398,13 +398,13 @@ extension _StringGuts {
     let range = start..<end
     let from = self._object.cocoaObject
 
-    let fixedArrayCodeUnitCount = 16 * 4
-    if _fastPath(count <= fixedArrayCodeUnitCount) {
-      var cusFixedArray = _FixedArray16<UInt64>(allZeros: ())
-      return cusFixedArray.withUnsafeMutableBufferPointer { buffer in
+    let capacity = 16 * 4
+    if _fastPath(count <= capacity) {
+      var cus = _FixedArray16<UInt64>(allZeros: ())
+      return cus.withUnsafeMutableBufferPointer { buffer in
         let baseAddress = buffer.baseAddress._unsafelyUnwrappedUnchecked
         let into = UnsafeMutableRawPointer(baseAddress)
-          .bindMemory(to: UInt16.self, capacity: fixedArrayCodeUnitCount)
+          .bindMemory(to: UInt16.self, capacity: capacity)
         _cocoaStringCopyCharacters(from: from, range: range, into: into)
         let intoBuffer = UnsafeBufferPointer(start: UnsafePointer<UInt16>(into),
                                              count: range.count)
