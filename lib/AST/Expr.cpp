@@ -2365,11 +2365,7 @@ void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
     return;
   }
 
-  if (CE->hasSingleExpressionBody()) {
-    out << "single expression closure";
-  } else {
-    out << "closure";
-  }
+  out << "closure";
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
