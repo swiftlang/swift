@@ -2897,8 +2897,8 @@ public:
       break;
 
     case SolutionKind::Error:
-      if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(Constraint::createTypeMember(
+      if (shouldRecordFailedConstraint()) {
+        recordFailedConstraint(Constraint::createTypeMember(
             *this, baseTy, memberTy, assocType, getConstraintLocator(locator)));
       }
       break;
