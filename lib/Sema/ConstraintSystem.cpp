@@ -791,7 +791,7 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
 
         // FIXME: Need a special locator element to represent
         // this associated type.
-        auto *locator = getConstraintLocator(nullptr);
+        auto *locator = getConstraintLocator(DP->getAssocType());
 
         auto *memberType = createTypeVariable(locator, TVO_CanBindToNoEscape);
         addTypeMemberConstraint(openType(DP->getBase(), replacements),
@@ -4522,10 +4522,11 @@ SourceRange constraints::getSourceRange(ASTNode anchor) {
 Type ConstraintSystem::replaceDependentTypes(Type origType) {
   return origType.transform([&](Type type) -> Type {
     if (auto *DMT = type->getAs<DependentMemberType>()) {
-      auto *memberType = createTypeVariable(getConstraintLocator(nullptr),
+      auto *assocType = DMT->getAssocType();
+      auto *memberType = createTypeVariable(getConstraintLocator(assocType),
                                             TVO_CanBindToNoEscape);
-      addTypeMemberConstraint(DMT->getBase(), DMT->getAssocType(), memberType,
-                              getConstraintLocator(nullptr));
+      addTypeMemberConstraint(DMT->getBase(), assocType, memberType,
+                              getConstraintLocator(assocType));
       return memberType;
     }
 
