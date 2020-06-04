@@ -2209,9 +2209,3 @@ int swift::performFrontend(
     StatsReporter->noteCurrentProcessExitStatus(r);
   return r;
 }
-
-void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
-void FrontendObserver::configuredCompiler(CompilerInstance &instance) {}
-void FrontendObserver::performedSemanticAnalysis(CompilerInstance &instance) {}
-void FrontendObserver::performedSILGeneration(SILModule &module) {}
-void FrontendObserver::performedSILProcessing(SILModule &module) {}

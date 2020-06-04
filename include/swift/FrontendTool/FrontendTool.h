@@ -21,42 +21,8 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
 
-namespace llvm {
-class Module;
-}
-
 namespace swift {
-class CompilerInvocation;
 class CompilerInstance;
-class SILModule;
-
-/// A simple observer of frontend activity.
-///
-/// Don't let this interface block enhancements to the frontend pipeline.
-class FrontendObserver {
-public:
-  FrontendObserver() = default;
-  virtual ~FrontendObserver() = default;
-
-  /// The frontend has parsed the command line.
-  virtual void parsedArgs(CompilerInvocation &invocation);
-
-  /// The frontend has configured the compiler instance.
-  virtual void configuredCompiler(CompilerInstance &instance);
-
-  /// The frontend has performed semantic analysis.
-  virtual void performedSemanticAnalysis(CompilerInstance &instance);
-
-  /// The frontend has performed basic SIL generation.
-  /// SIL diagnostic passes have not yet been applied.
-  virtual void performedSILGeneration(SILModule &module);
-
-  /// The frontend has executed the SIL optimization and diagnostics pipelines.
-  virtual void performedSILProcessing(SILModule &module);
-
-  // TODO: maybe enhance this interface to hear about IRGen and LLVM
-  // progress.
-};
 
 namespace frontend {
 namespace utils {
