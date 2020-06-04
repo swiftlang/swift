@@ -830,6 +830,10 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   if (!isa<ClassDecl>(dc))
     return true;
 
+  // Destructors always use a fixed vtable entry.
+  if (isa<DestructorDecl>(decl))
+    return false;
+  
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
 
   // Final members are always be called directly.
