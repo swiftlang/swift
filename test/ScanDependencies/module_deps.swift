@@ -125,7 +125,10 @@ import G
 // CHECK-LABEL: "modulePath": "G.swiftmodule"
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
-// CHECK-NEXT: "clang": "G"
+// CHECK-NEXT:   "swift": "Swift"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "clang": "G"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 // CHECK-NEXT: "details": {
@@ -153,7 +156,10 @@ import G
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "clang": "A"
+// CHECK-NEXT:   "swift": "Swift"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "clang": "A"
 // CHECK-NEXT: }
 
 /// --------Clang module B
