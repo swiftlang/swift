@@ -289,6 +289,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       arguments.push_back("-enable-anonymous-context-mangled-names");
   }
 
+  inputArgs.AddLastArg(arguments, options::OPT_disable_leaf_frame_pointer_elim);
+
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);

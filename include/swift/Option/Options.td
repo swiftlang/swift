@@ -1012,6 +1012,10 @@ def enable_private_imports : Flag<["-"], "enable-private-imports">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allows this module's internal and private API to be accessed">;
 
+def disable_leaf_frame_pointer_elim : Flag<["-"], "no-omit-leaf-frame-pointer">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Don't omit the frame pointer for leaf functions">;
+
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;
