@@ -162,6 +162,25 @@ written "dupe". Pronounced the same way as the first syllable of
 A value whose type is a protocol composition (including a single protocol
 and *zero* protocols; the latter is the `Any` type).
 
+## explicit module build
+
+A module build where all dependency modules (including Clang modules) are
+passed to the compiler explicitly by an external build system, including
+any modules in caches. See also: [implicit module build](#implicit-module-build)
+and [fast dependency scanner](#fast-dependency-scanner).
+
+## fast dependency scanner
+
+A Swift compiler mode that scans a Swift module for import declarations and
+resolves which modules will be loaded. It is based on the
+[clang-scan-deps](https://llvm.org/devmtg/2019-04/slides/TechTalk-Lorenz-clang-scan-deps_Fast_dependency_scanning_for_explicit_modules.pdf)
+library within Clang, for (Objective-)C modules, but is extended to also
+understand textual Swift modules (.swiftinterface files).
+
+The fast dependency scanner outputs a graph of compilation steps which can be
+used by a build system to schedule
+[explicit module builds](#explicit-module-builds).
+
 ## fragile
 
 Describes a type or function where making changes will break binary
@@ -192,6 +211,17 @@ compared directly.
 ## iff
 
 ["if and only if"](https://en.wikipedia.org/wiki/If_and_only_if). This term comes from mathematics.
+
+## implicit module build
+
+A module build where the compiler is free to transparently build dependent
+modules (including Clang modules), and access modules in different caches as
+necessary. For example, if a textual Swift module (.swiftinterface file) for
+a dependency does not have a corresponding binary Swift module (.swiftmodulea
+file), the compiler may transparently build a binary Swift module from the
+textual one as a cache for future compiler jobs, without involving any external
+build system that invoked the compiler. See also:
+[explicit module build](#explicit-module-build).
 
 ## interface type
 
