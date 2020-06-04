@@ -1701,6 +1701,13 @@ public:
 FunctionBuilderBodyPreCheck
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
+  // We don't want to do the precheck if it will already have happened in
+  // the enclosing expression.
+  bool skipPrecheck = false;
+  if (auto closure = dyn_cast_or_null<ClosureExpr>(
+          fn.getAbstractClosureExpr()))
+    skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
+
   return PreCheckFunctionBuilderApplication(fn, false).run();
 }
 

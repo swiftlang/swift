@@ -140,10 +140,10 @@ namespace {
           }
         }
 
-        // If the closure has a single expression body or has had a function
-        // builder applied to it, we need to walk into it with a new sequence.
+        // If the closure was type checked within its enclosing context,
+        // we need to walk into it with a new sequence.
         // Otherwise, it'll have been separately type-checked.
-        if (CE->hasSingleExpressionBody() || CE->hasAppliedFunctionBuilder())
+        if (CE->wasTypeCheckedInEnclosingContext())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
         TypeChecker::computeCaptures(CE);

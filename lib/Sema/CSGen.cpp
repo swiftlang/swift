@@ -2248,7 +2248,8 @@ namespace {
           // as potential hole right away.
           resultTy = CS.createTypeVariable(
               resultLoc,
-              closure->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
+              shouldTypeCheckInEnclosingExpression(closure)
+                ? 0 : TVO_CanBindToHole);
         }
       }
 

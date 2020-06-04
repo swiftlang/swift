@@ -1923,7 +1923,8 @@ bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
 
 void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable());
-  ExplicitResultType->setType(MetatypeType::get(ty));
+  ExplicitResultTypeAndEnclosingChecked.getPointer()
+      ->setType(MetatypeType::get(ty));
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -2364,11 +2365,7 @@ void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
     return;
   }
 
-  if (CE->hasSingleExpressionBody()) {
-    out << "single expression closure";
-  } else {
-    out << "closure";
-  }
+  out << "closure";
 }
 
 void swift::simple_display(llvm::raw_ostream &out,

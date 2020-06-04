@@ -5787,9 +5787,9 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
   if (auto CE = dyn_cast<ClosureExpr>(expr)) {
     cs.setType(CE, toType);
 
-    // If this is not a single-expression closure, write the type into the
-    // ClosureExpr directly here, since the visitor won't.
-    if (!CE->hasSingleExpressionBody())
+    // If this closure isn't type-checked in its enclosing expression, write
+    // theg type into the ClosureExpr directly here, since the visitor won't.
+    if (!shouldTypeCheckInEnclosingExpression(CE))
       CE->setType(toType);
 
     return true;
