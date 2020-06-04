@@ -27,8 +27,8 @@ public func make(type: Cat.Type, cats: Int) {
 // CHECK: bb1:
 // CHECK:   return
 // CHECK: bb2({{%.*}} : $@thick Cat.Type):
-// CHECK:   alloc_ref $Cat
+// CHECK:   alloc_ref [stack] $Cat
 // CHECK:   br bb1
 // CHECK: bb3:
-// CHECK:   alloc_ref $BigCat
+// CHECK:   alloc_ref [stack] $BigCat
 // CHECK:   br bb1

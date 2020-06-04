@@ -120,6 +120,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_7 | %FileCheck %s -check-prefix=FOOSTRUCT_LOCALVAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_8 | %FileCheck %s -check-prefix=FOOSTRUCT_LOCALVAL
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_CASE_PATTERN_1| %FileCheck %s -check-prefix=OPTIONAL_FOOSTRUCT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_CASE_PATTERN_2| %FileCheck %s -check-prefix=OPTIONAL_FOOSTRUCT
+
 struct FooStruct {
   var instanceVar : Int
   init(_: Int = 0) { }
@@ -612,7 +615,12 @@ func testGuardLetBinding7(x: FooStruct?) {
 func testGuardLetBinding8(_ x: FooStruct?) {
   guard let boundVal = x, let other = testGuardLetBinding8(#^GUARD_LET_BIND_8^#) else {}
 }
-
+func testGuardCase(x:FooStruct?) {
+  guard case .#^GUARD_CASE_PATTERN_1^# = x {}
+}
+func testGuardCase(x:FooStruct?) {
+  guard case .#^GUARD_CASE_PATTERN_2^#some() = x {}
+}
 
 // FOOSTRUCT_DOT: Begin completions
 // FOOSTRUCT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#];
@@ -635,3 +643,12 @@ func testGuardLetBinding8(_ x: FooStruct?) {
 // FOOSTRUCT_LOCALVAL: Begin completions
 // FOOSTRUCT_LOCALVAL-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Convertible\])?}}: boundVal[#FooStruct#];
 // FOOSTRUCT_LOCALVAL: End completions
+
+// OPTIONAL_FOOSTRUCT: Begin completions, 5 items
+// OPTIONAL_FOOSTRUCT-DAG: Keyword[nil]/None/Erase[1]:         nil[#FooStruct?#]; name=nil
+// OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<FooStruct>#]; name=none
+// OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#FooStruct#})[#Optional<FooStruct>#]; name=some(FooStruct)
+// FIXME: 'FooStruct' members should not be shown.
+// OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#FooStruct#]; name=init()
+// OPTIONAL_FOOSTRUCT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#Int#})[#FooStruct#]; name=init(Int)
+// OPTIONAL_FOOSTRUCT: End completions

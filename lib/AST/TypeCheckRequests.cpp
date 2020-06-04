@@ -1455,11 +1455,11 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
 }
 
 //----------------------------------------------------------------------------//
-// TypeCheckFunctionBodyUntilRequest computation.
+// TypeCheckFunctionBodyRequest computation.
 //----------------------------------------------------------------------------//
 
 evaluator::DependencySource
-TypeCheckFunctionBodyUntilRequest::readDependencySource(
+TypeCheckFunctionBodyRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   // We're going under a function body scope, unconditionally flip the scope
   // to private.

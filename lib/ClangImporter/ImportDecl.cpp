@@ -1330,10 +1330,10 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
   // To keep DI happy, initialize stored properties before computed.
   auto parameters = constructor->getParameters();
-  for (unsigned pass = 0; pass < 2; pass++) {
+  for (unsigned pass = 0; pass < 2; ++pass) {
     unsigned paramPos = 0;
 
-    for (unsigned i = 0, e = members.size(); i < e; i++) {
+    for (unsigned i = 0, e = members.size(); i < e; ++i) {
       auto var = members[i];
 
       if (var->hasClangNode() &&
@@ -1341,7 +1341,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
         continue;
 
       if (var->hasStorage() == (pass != 0)) {
-        paramPos++;
+        ++paramPos;
         continue;
       }
 
@@ -1369,7 +1369,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
       assign->setType(TupleType::getEmpty(ctx));
 
       stmts.push_back(assign);
-      paramPos++;
+      ++paramPos;
     }
   }
 
@@ -7928,7 +7928,7 @@ void ClangImporter::Implementation::startedImportingEntity() {
   ++NumTotalImportedEntities;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = SwiftContext.Stats)
-    Stats->getFrontendCounters().NumTotalClangImportedEntities++;
+    ++Stats->getFrontendCounters().NumTotalClangImportedEntities;
 }
 
 /// Look up associated type requirements in the conforming type.

@@ -41,6 +41,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/Support/Debug.h"
@@ -441,26 +442,12 @@ static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
   return emitObjCMetadataRefForMetadata(IGF, classPtr);
 }
 
-static bool isTypeErasedGenericClass(NominalTypeDecl *ntd) {
-  // ObjC classes are type erased.
-  // TODO: Unless they have magic methods...
-  if (auto clas = dyn_cast<ClassDecl>(ntd))
-    return clas->hasClangNode() && clas->isGenericContext();
-  return false;
-}
-
-static bool isTypeErasedGenericClassType(CanType type) {
-  if (auto nom = type->getAnyNominal())
-    return isTypeErasedGenericClass(nom);
-  return false;
-}
-
 // Get the type that exists at runtime to represent a compile-time type.
 CanType IRGenModule::getRuntimeReifiedType(CanType type) {
   // Leave type-erased ObjC generics with their generic arguments unbound, since
   // the arguments do not exist at runtime.
   return CanType(type.transform([&](Type t) -> Type {
-    if (isTypeErasedGenericClassType(CanType(t))) {
+    if (CanType(t).isTypeErasedGenericClassType()) {
       return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
     }
     return t;
@@ -596,8 +583,8 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
 static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
     IRGenFunction &IGF, NominalTypeDecl *theDecl, CanType theType,
     DynamicMetadataRequest request) {
-  assert(isNominalGenericContextTypeMetadataAccessTrivial(IGF.IGM, *theDecl,
-                                                          theType));
+  assert(isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+      IGF.IGM, *theDecl, theType));
   // We are applying generic parameters to a generic type.
   assert(theType->getAnyNominal() == theDecl);
 
@@ -676,28 +663,43 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
           theDecl->getGenericSignature()->areAllParamsConcrete()) &&
          "no generic args?!");
 
-  if (isNominalGenericContextTypeMetadataAccessTrivial(IGF.IGM, *theDecl,
-                                                       theType)) {
-    return emitNominalPrespecializedGenericMetadataRef(IGF, theDecl, theType,
-                                                       request);
+  MetadataResponse response;
+
+  if (isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+          IGF.IGM, *theDecl, theType)) {
+    response = emitNominalPrespecializedGenericMetadataRef(IGF, theDecl,
+                                                           theType, request);
+  } else if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
+    if (isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+            IGF.IGM, *theClass, theType,
+            /*usingCanonicalSpecializedAccessor=*/true)) {
+      llvm::Function *accessor =
+          IGF.IGM
+              .getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
+                  theType, NotForDefinition);
+
+      response =
+          IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, {}, request);
+    }
   }
 
-  // Call the generic metadata accessor function.
-  llvm::Function *accessor =
-      IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(theDecl,
-                                                         genericArgs.Types,
-                                                         NotForDefinition);
+  if (!response.isValid()) {
+    // Call the generic metadata accessor function.
+    llvm::Function *accessor =
+        IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(
+            theDecl, genericArgs.Types, NotForDefinition);
 
-  auto response =
-    IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, genericArgs.Values,
-                                                  request);
+    response = IGF.emitGenericTypeMetadataAccessFunctionCall(
+        accessor, genericArgs.Values, request);
+  }
 
   IGF.setScopedLocalTypeMetadata(theType, response);
   return response;
 }
 
-bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
-    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type) {
+bool irgen::isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    bool usingCanonicalSpecializedAccessor) {
   assert(nominal.isGenericContext());
 
   if (!IGM.shouldPrespecializeGenericMetadata()) {
@@ -734,9 +736,24 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     return false;
   }
 
-  if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
-    // TODO: Support classes.
-    return false;
+  if (auto *theClass = dyn_cast<ClassDecl>(&nominal)) {
+    if (theClass->hasResilientMetadata(IGM.getSwiftModule(),
+                                       ResilienceExpansion::Maximal)) {
+      return false;
+    }
+    AncestryOptions flags = theClass->checkAncestry();
+    if (flags & (AncestryOptions(AncestryFlags::ResilientOther) |
+                 AncestryOptions(AncestryFlags::ClangImported))) {
+      return false;
+    }
+    if (auto *theSuperclass = theClass->getSuperclassDecl()) {
+      auto superclassType =
+          type->getSuperclass(/*useArchetypes=*/false)->getCanonicalType();
+      if (!isInitializableTypeMetadataStaticallyAddressable(IGM,
+                                                            superclassType)) {
+        return false;
+      }
+    }
   }
 
   auto *generic = type.getAnyGeneric();
@@ -770,16 +787,64 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
       return genericArgument && genericArgument->isGenericContext() && 
         (protocols.size() > 0);
     };
-    auto isExistential = [&]() { return argument->isExistentialType(); };
     auto metadataAccessIsTrivial = [&]() {
-      return irgen::isCompleteTypeMetadataStaticallyAddressable(IGM,
-                                                argument->getCanonicalType());
+      if (usingCanonicalSpecializedAccessor) {
+        // If an accessor is being used, then the accessor will be able to
+        // initialize the arguments, i.e. register classes with the ObjC
+        // runtime.
+        return irgen::isInitializableTypeMetadataStaticallyAddressable(
+            IGM, argument->getCanonicalType());
+      } else {
+        return irgen::isCompleteTypeMetadataStaticallyAddressable(
+            IGM, argument->getCanonicalType());
+      }
     };
-    return !isGenericWithoutPrespecializedConformance() && !isExistential() && 
+    return !isGenericWithoutPrespecializedConformance() &&
            metadataAccessIsTrivial() && witnessTablesAreReferenceable();
   });
   return allWitnessTablesAreReferenceable
   && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
+}
+
+bool irgen::
+    isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+        IRGenModule &IGM, NominalTypeDecl &nominal, CanType type) {
+  if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
+    // TODO: On platforms without ObjC interop, we can do direct access to
+    // class metadata.
+    return false;
+  }
+  // Prespecialized struct/enum metadata gets no dedicated accessor yet and so
+  // cannot do the work of registering the generic arguments which are classes
+  // with the ObjC runtime.  Concretely, the following cannot be prespecialized
+  // yet:
+  //   Struct<Klass<Int>>
+  //   Enum<Klass<Int>>
+  return isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+      IGM, nominal, type, /*usingCanonicalSpecializedAccessor=*/false);
+}
+
+/// Is there a known address for canonical specialized metadata?  The metadata
+/// there may need initialization before it is complete.
+bool irgen::isInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
+                                                             CanType type) {
+  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type)) {
+    // The address of the complete metadata is the address of the abstract
+    // metadata.
+    return true;
+  }
+
+  NominalTypeDecl *nominal;
+  if ((nominal = type->getAnyNominal()) && nominal->isGenericContext()) {
+    // Prespecialized class metadata gets a dedicated accessor which can do
+    // the work of registering the class and its arguments with the ObjC
+    // runtime.
+    // Concretely, Clazz<Klass<Int>> can be prespecialized.
+    return isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+        IGM, *nominal, type, /*usingCanonicalSpecializedAccessor=*/true);
+  }
+
+  return false;
 }
 
 /// Is complete metadata for the given type available at a fixed address?
@@ -798,8 +863,8 @@ bool irgen::isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
       return false;
 
     if (nominalDecl->isGenericContext())
-      return isNominalGenericContextTypeMetadataAccessTrivial(IGM, *nominalDecl,
-                                                              type);
+      return isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+          IGM, *nominalDecl, type);
 
     auto expansion = ResilienceExpansion::Maximal;
 
@@ -833,8 +898,8 @@ bool irgen::isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
     if (isa<ClangModuleUnit>(nominalDecl->getModuleScopeContext()))
       return false;
 
-    return isNominalGenericContextTypeMetadataAccessTrivial(IGM, *nominalDecl,
-                                                            type);
+    return isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+        IGM, *nominalDecl, type);
   }
 
   return false;
@@ -853,13 +918,17 @@ bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
   //
   // TODO: On platforms without ObjC interop, we can do direct access to
   // Swift metadata without a runtime call at all.
-  if (auto clas = dyn_cast<ClassType>(type)) {
-    if (!hasKnownSwiftMetadata(IGM, clas))
+  if (auto classDecl = type.getClassOrBoundGenericClass()) {
+    if (!hasKnownSwiftMetadata(IGM, classDecl))
       return true;
-    auto strategy = IGM.getClassMetadataStrategy(clas->getDecl());
+    if (classDecl->isGenericContext() &&
+        isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+            IGM, *classDecl, type, /*usingCanonicalSpecializedAccessor=*/true))
+      return false;
+    auto strategy = IGM.getClassMetadataStrategy(classDecl);
     return strategy != ClassMetadataStrategy::Fixed;
   }
-  
+
   // Trivially accessible metadata does not need a cache.
   if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
     return false;
@@ -1615,7 +1684,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   accessor->addAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::NoInline);
   // Accessor functions don't need frame pointers.
-  IGM.setHasFramePointer(accessor, false);
+  IGM.setHasNoFramePointer(accessor);
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
@@ -1845,11 +1914,11 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
 }
 
 static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
-    IRGenFunction &IGF, Explosion &params, NominalTypeDecl *nominal,
+    IRGenFunction &IGF, llvm::Value *request, NominalTypeDecl *nominal,
     GenericArguments &genericArgs,
     std::function<llvm::Value *(int)> valueAtIndex) {
   auto &IGM = IGF.IGM;
-  auto specializations = IGF.IGM.IRGen.specializationsForType(nominal);
+  auto specializations = IGF.IGM.IRGen.canonicalSpecializationsForType(nominal);
   if (specializations.size() > 0) {
     SmallVector<llvm::BasicBlock *, 4> conditionBlocks;
     for (size_t index = 0; index < specializations.size(); ++index) {
@@ -1858,7 +1927,11 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
 
     IGF.Builder.CreateBr(conditionBlocks[0]);
 
-    SmallVector<std::pair<llvm::BasicBlock *, llvm::Value *>, 4>
+    SmallVector<std::tuple<llvm::BasicBlock *, CanType,
+                           std::function<llvm::Value *(llvm::Value *, CanType,
+                                                       IRGenFunction &,
+                                                       IRGenModule &)>>,
+                4>
         specializationBlocks;
     auto switchDestination = llvm::BasicBlock::Create(IGM.getLLVMContext());
     unsigned long blockIndex = 0;
@@ -1891,27 +1964,51 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
       }
       IGF.Builder.CreateCondBr(condition, specializationBlock, successorBlock);
 
-      auto specializedMetadataAddress =
-          IGM.getAddrOfTypeMetadata(specialization);
-      // Construct a MetadataResponse.  It has three fields in the following
-      // order:
-      //        - const Metadata *Metadata;
-      //        - MetadataState (i32) StaticState;
-      llvm::Value *response = llvm::UndefValue::get(IGM.TypeMetadataResponseTy);
-      response = IGF.Builder.CreateInsertValue(
-          response, specializedMetadataAddress, 0,
-          "insert metadata address into response");
-      auto state =
-          llvm::ConstantInt::get(IGM.SizeTy, (uint32_t)MetadataState::Complete);
-      response = IGF.Builder.CreateInsertValue(
-          response, state, 1, "insert metadata state into response");
-      specializationBlocks.push_back({specializationBlock, response});
+      auto responseBuilder = [](llvm::Value *request, CanType specialization,
+                                IRGenFunction &IGF, IRGenModule &IGM) {
+        auto nominal = specialization->getAnyNominal();
+        llvm::Value *specializedMetadata;
+        if (isa<ClassDecl>(nominal)) {
+          llvm::Function *accessor =
+              IGF.IGM
+                  .getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
+                      specialization, NotForDefinition);
+
+          specializedMetadata =
+              IGF.emitGenericTypeMetadataAccessFunctionCall(
+                     accessor, {}, DynamicMetadataRequest(request))
+                  .getMetadata();
+        } else {
+          specializedMetadata = IGM.getAddrOfTypeMetadata(specialization);
+        }
+        // Construct a MetadataResponse.  It has three fields in the following
+        // order:
+        //        - const Metadata *Metadata;
+        //        - MetadataState (i32) StaticState;
+        llvm::Value *response =
+            llvm::UndefValue::get(IGM.TypeMetadataResponseTy);
+        response = IGF.Builder.CreateInsertValue(
+            response, specializedMetadata, 0,
+            "insert metadata address into response");
+        auto state = MetadataResponse::getCompletedState(IGM);
+        response = IGF.Builder.CreateInsertValue(
+            response, state, 1, "insert metadata state into response");
+        return response;
+      };
+      specializationBlocks.push_back(std::make_tuple(
+          specializationBlock, specialization, responseBuilder));
       ++blockIndex;
     }
 
-    for (auto pair : specializationBlocks) {
-      IGF.Builder.emitBlock(pair.first);
-      IGF.Builder.CreateRet(pair.second);
+    for (auto tuple : specializationBlocks) {
+      llvm::BasicBlock *block;
+      CanType type;
+      std::function<llvm::Value *(llvm::Value *, CanType, IRGenFunction &,
+                                  IRGenModule &)>
+          builder;
+      std::tie(block, type, builder) = tuple;
+      IGF.Builder.emitBlock(block);
+      IGF.Builder.CreateRet(builder(request, type, IGF, IGM));
     }
     IGF.Builder.emitBlock(switchDestination);
   }
@@ -1951,7 +2048,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
         IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrPtrTy);
 
     emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
-        IGF, params, nominal, genericArgs, [&](int index) {
+        IGF, request, nominal, genericArgs, [&](int index) {
           llvm::Value *indexValue = llvm::ConstantInt::get(IGM.Int64Ty, index);
           llvm::SmallVector<llvm::Value *, 1> indices{indexValue};
           llvm::Value *elementPointer =
@@ -1997,8 +2094,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       thunkFn->setCallingConv(IGM.SwiftCC);
       thunkFn->addAttribute(llvm::AttributeList::FunctionIndex,
                             llvm::Attribute::NoInline);
-      IGM.setHasFramePointer(thunkFn, false);
-      
+      IGM.setHasNoFramePointer(thunkFn);
+
       [&IGM, thunkFn]{
         IRGenFunction subIGF(IGM, thunkFn);
     
@@ -2052,7 +2149,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     std::array<llvm::Value *, 3> argValues = {arg0, arg1, arg2};
 
     emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
-        IGF, params, nominal, genericArgs,
+        IGF, request, nominal, genericArgs,
         [&](int index) { return argValues[index]; });
 
     auto call = IGF.Builder.CreateCall(thunkFn,
@@ -2065,6 +2162,71 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
   }
   
   return MetadataResponse::handle(IGF, DynamicMetadataRequest(request), result);
+}
+
+static void
+emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
+    IRGenFunction &IGF, CanType theType,
+    llvm::SmallSet<CanType, 16> &initializedTypes) {
+  if (initializedTypes.count(theType) > 0) {
+    return;
+  }
+  initializedTypes.insert(theType);
+  llvm::Function *accessor =
+      IGF.IGM.getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
+          theType, NotForDefinition);
+
+  auto request = DynamicMetadataRequest(MetadataState::Complete);
+  IGF.emitGenericTypeMetadataAccessFunctionCall(accessor, {}, request);
+}
+
+MetadataResponse
+irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    IRGenFunction &IGF, Explosion &params, CanType theType) {
+  assert(isa<ClassDecl>(theType->getAnyNominal()));
+
+  auto request = params.claimNext();
+  // The metadata request that is passed to a canonical specialized generic
+  // metadata accessor is ignored because complete metadata is always returned.
+  (void)request;
+  llvm::SmallSet<CanType, 16> initializedTypes;
+
+  auto *nominal = theType->getAnyNominal();
+  assert(nominal);
+  assert(isa<ClassDecl>(nominal));
+  assert(nominal->isGenericContext());
+  assert(!theType->hasUnboundGenericType());
+
+  auto *uninitializedMetadata = IGF.IGM.getAddrOfTypeMetadata(theType);
+  initializedTypes.insert(theType);
+  auto *initializedMetadata =
+      emitIdempotentClassMetadataInitialization(IGF, uninitializedMetadata);
+  auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
+  auto substitutions =
+      theType->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), nominal);
+  for (auto requirement : requirements.getRequirements()) {
+    if (requirement.Protocol) {
+      continue;
+    }
+    auto parameter = requirement.TypeParameter;
+    auto noncanonicalArgument = parameter.subst(substitutions);
+    auto argument = noncanonicalArgument->getCanonicalType();
+    if (auto *classDecl = argument->getClassOrBoundGenericClass()) {
+      emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
+          IGF, argument, initializedTypes);
+    }
+  }
+  Type superclassType = theType->getSuperclass(/*useArchetypes=*/false);
+  if (superclassType) {
+    auto superclass = superclassType->getCanonicalType();
+    auto *superclassNominal = superclass->getAnyNominal();
+    if (superclassNominal->isGenericContext()) {
+      emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
+          IGF, superclassType->getCanonicalType(), initializedTypes);
+    }
+  }
+
+  return MetadataResponse::forComplete(initializedMetadata);
 }
 
 /// Emit the body of a metadata accessor function for the given type.
@@ -2133,7 +2295,7 @@ static llvm::Function *getAccessFunctionPrototype(IRGenModule &IGM,
                                                ForDefinition_t forDefinition) {
   assert(!type->hasArchetype());
   // Type should be bound unless it's type erased.
-  assert(isTypeErasedGenericClassType(type)
+  assert(type.isTypeErasedGenericClassType()
            ? !isa<BoundGenericType>(type)
            : !isa<UnboundGenericType>(type));
 
@@ -2221,7 +2383,7 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
                                             NominalTypeDecl *nominal,
                                             ForDefinition_t shouldDefine) {
   assert(nominal->isGenericContext());
-  assert(!isTypeErasedGenericClass(nominal));
+  assert(!nominal->isTypeErasedGenericClass());
 
   GenericArguments genericArgs;
   genericArgs.collectTypes(IGM, nominal);
@@ -2469,7 +2631,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     instantiationFn->setDoesNotThrow();
     instantiationFn->addAttribute(llvm::AttributeList::FunctionIndex,
                                   llvm::Attribute::NoInline);
-    IGM.setHasFramePointer(instantiationFn, false);
+    IGM.setHasNoFramePointer(instantiationFn);
 
     [&IGM, instantiationFn, request]{
       IRGenFunction subIGF(IGM, instantiationFn);

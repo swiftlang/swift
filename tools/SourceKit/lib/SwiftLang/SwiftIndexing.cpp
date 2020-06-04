@@ -186,8 +186,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
     // correct filename here.
     auto FUnit = Loader->loadAST(*Mod, None, /*moduleInterfacePath*/"",
                                  std::move(Buf), nullptr, nullptr,
-                                 /*isFramework*/false,
-                                 /*treatAsPartialModule*/false);
+                                 /*isFramework*/false);
 
     // FIXME: Not knowing what went wrong is pretty bad. loadModule() should be
     // more modular, rather than emitting diagnostics itself.
@@ -196,6 +195,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
       return;
     }
 
+    Mod->addFile(*FUnit);
     Mod->setHasResolvedImports();
   }
 

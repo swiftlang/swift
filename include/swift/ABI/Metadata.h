@@ -1025,7 +1025,7 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   using TargetMetadata<Runtime>::setClassISA;
 #endif
 
-  // Note that ObjC classes does not have a metadata header.
+  // Note that ObjC classes do not have a metadata header.
 
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> Superclass;
@@ -2660,7 +2660,7 @@ private:
 
 using ContextDescriptor = TargetContextDescriptor<InProcess>;
 
-inline bool isCImportedModuleName(StringRef name) {
+inline bool isCImportedModuleName(llvm::StringRef name) {
   // This does not include MANGLING_MODULE_CLANG_IMPORTER because that's
   // used only for synthesized declarations and not actual imported
   // declarations.
@@ -2757,7 +2757,7 @@ public:
 
   /// Retrieve the generic parameter that is the subject of this requirement,
   /// as a mangled type name.
-  StringRef getParam() const {
+  llvm::StringRef getParam() const {
     return swift::Demangle::makeSymbolicMangledNameStringRef(Param.get());
   }
 
@@ -2768,7 +2768,7 @@ public:
   }
 
   /// Retrieve the right-hand type for a SameType or BaseClass requirement.
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     assert(getKind() == GenericRequirementKind::SameType ||
            getKind() == GenericRequirementKind::BaseClass);
     return swift::Demangle::makeSymbolicMangledNameStringRef(Type.get());
@@ -2999,7 +2999,7 @@ public:
 
   using TrailingGenericContextObjects::getGenericContext;
 
-  StringRef getMangledExtendedContext() const {
+  llvm::StringRef getMangledExtendedContext() const {
     return Demangle::makeSymbolicMangledNameStringRef(ExtendedContext.get());
   }
   
@@ -3223,13 +3223,13 @@ public:
     return (this
          ->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
   }
-  
-  StringRef getUnderlyingTypeArgument(unsigned i) const {
+
+  llvm::StringRef getUnderlyingTypeArgument(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
     const char *ptr = getUnderlyingTypeArgumentMangledName(i);    
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
   }
-  
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::OpaqueType;
   }

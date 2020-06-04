@@ -416,14 +416,16 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
           StringRef moduleName = mod->getNameStr();
           bool withoutUnitName = true;
           if (FU->getKind() == FileUnitKind::ClangModule) {
-            withoutUnitName = false;
             auto clangModUnit = cast<ClangModuleUnit>(LFU);
-            if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
-              moduleName = clangMod->getTopLevelModuleName();
-              // FIXME: clang's -Rremarks do not seem to go through Swift's
-              // diagnostic emitter.
-              clang::index::emitIndexDataForModuleFile(clangMod,
-                                                       clangCI, unitWriter);
+            if (!clangModUnit->isSystemModule() || indexSystemModules) {
+              withoutUnitName = false;
+              if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
+                moduleName = clangMod->getTopLevelModuleName();
+                // FIXME: clang's -Rremarks do not seem to go through Swift's
+                // diagnostic emitter.
+                clang::index::emitIndexDataForModuleFile(clangMod,
+                                                         clangCI, unitWriter);
+              }
             }
           } else {
             // Serialized AST file.

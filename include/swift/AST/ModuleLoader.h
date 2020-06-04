@@ -22,8 +22,6 @@
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "swift/AST/ModuleDependencies.h"
 

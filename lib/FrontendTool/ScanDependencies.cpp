@@ -69,16 +69,16 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
   auto ModuleCachePath = getModuleCachePathFromClang(ctx
     .getClangModuleLoader()->getClangInstance());
   auto &FEOpts = instance.getInvocation().getFrontendOptions();
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
                                               ctx.SearchPathOpts, ctx.LangOpts,
+                                              LoaderOpts,
                                               ctx.getClangModuleLoader(),
                                               /*buildModuleCacheDirIfAbsent*/false,
                                               ModuleCachePath,
                                               FEOpts.PrebuiltModuleCachePath,
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                              FEOpts.TrackSystemDeps,
-                                              FEOpts.RemarkOnRebuildFromModuleInterface,
-                                              FEOpts.DisableInterfaceFileLock);
+                                              FEOpts.TrackSystemDeps);
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
@@ -130,7 +130,10 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
     for (const auto &clangDep : allClangModules) {
       if (auto found = ctx.getModuleDependencies(
               clangDep, /*onlyClangModule=*/false, cache, ASTDelegate)) {
-        if (found->getKind() == ModuleDependenciesKind::Swift)
+        // ASTContext::getModuleDependencies returns dependencies for a module with a given name.
+        // This Clang module may have the same name as the Swift module we are resolving, so we
+        // need to make sure we don't add a dependency from a Swift module to itself.
+        if (found->getKind() == ModuleDependenciesKind::Swift && clangDep != module.first)
           result.push_back({clangDep, found->getKind()});
       }
     }

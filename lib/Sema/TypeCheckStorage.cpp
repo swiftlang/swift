@@ -1821,7 +1821,7 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto &ctx = accessor->getASTContext();
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumAccessorBodiesSynthesized++;
+    ++ctx.Stats->getFrontendCounters().NumAccessorBodiesSynthesized;
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
@@ -1850,7 +1850,7 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
   accessor->setImplicit();
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
+    ++ctx.Stats->getFrontendCounters().NumAccessorsSynthesized;
 
   if (doesAccessorHaveBody(accessor))
     accessor->setBodySynthesizer(&synthesizeAccessorBody);

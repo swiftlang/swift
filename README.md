@@ -9,7 +9,7 @@
 | **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
 | **Ubuntu 18.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04)|
 | **Ubuntu 20.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04)|
-| **CentOS 8** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-centos-8/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|
+| **CentOS 8** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-centos-8/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|[![Build Status](https://ci.swift.org/job/oss-swift-package-centos-8/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|
 | **Amazon Linux 2** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|
 
 **Swift Community-Hosted CI Platforms**
@@ -85,6 +85,9 @@ Once you are able to build things successfully and have a compile-test-debug
 loop going, check out the [development tips](docs/DevelopmentTips.md) for
 better productivity while working on the compiler.
 
+You can also skim [docs/README.md](/docs/README.md) to understand what
+high-level documentation is available.
+
 ### System Requirements
 
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are currently
@@ -150,8 +153,6 @@ sudo apt-get install    \
 with version 2 shipped with Ubuntu.
 
 **Note:** For Ubuntu 20.04, use `libpython2-dev` in place of the libpython-dev package above.
-
-Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md).
 
 ### Getting Sources for Swift and Related Projects
 

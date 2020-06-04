@@ -2,6 +2,20 @@
 include(AddSwift)
 include(SwiftSource)
 
+function(is_darwin_based_sdk sdk_name out_var)
+  if ("${sdk_name}" STREQUAL "OSX" OR
+      "${sdk_name}" STREQUAL "IOS" OR
+      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
+      "${sdk_name}" STREQUAL "TVOS" OR
+      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
+      "${sdk_name}" STREQUAL "WATCHOS" OR
+      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
       ADMT # prefix
@@ -93,7 +107,7 @@ function(_add_target_variant_c_compile_link_flags)
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     # lld can handle targeting the android build.  However, if lld is not
     # enabled, then fallback to the linker included in the android NDK.
-    if(NOT SWIFT_ENABLE_LLD_LINKER)
+    if(NOT SWIFT_USE_LINKER STREQUAL "lld")
       swift_android_tools_path(${CFLAGS_ARCH} tools_path)
       list(APPEND result "-B" "${tools_path}")
     endif()
@@ -351,6 +365,8 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
+  elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
+    list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
   elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
@@ -414,20 +430,11 @@ function(_add_target_variant_link_flags)
     list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR}")
   endif()
 
-  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
-    find_program(LDLLD_PATH "ld.lld")
-    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
-       ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
-        NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
-      list(APPEND result "-fuse-ld=lld")
-    elseif(SWIFT_ENABLE_GOLD_LINKER AND
-        "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-      if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-        list(APPEND result "-fuse-ld=gold.exe")
-      else()
-        list(APPEND result "-fuse-ld=gold")
-      endif()
+  if(SWIFT_USE_LINKER AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+      list(APPEND result "-fuse-ld=${SWIFT_USE_LINKER}.exe")
+    else()
+      list(APPEND result "-fuse-ld=${SWIFT_USE_LINKER}")
     endif()
   endif()
 

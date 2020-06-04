@@ -5,6 +5,9 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
+// TODO: fix test for unoptimized stdlib with asserts
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+
 
 import Foundation
 

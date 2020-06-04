@@ -934,7 +934,8 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   if (Info.IsChildNote)
     return;
 
-  if (ExperimentalFormattingEnabled) {
+  switch (FormattingStyle) {
+  case DiagnosticOptions::FormattingStyle::Swift:
     if (Info.Kind == DiagnosticKind::Note && currentSnippet) {
       // If this is a note and we have an in-flight message, add it to that
       // instead of emitting it separately.
@@ -952,7 +953,9 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
           BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
       }
     }
-  } else {
+    break;
+
+  case DiagnosticOptions::FormattingStyle::LLVM:
     printDiagnostic(SM, Info);
 
     if (PrintEducationalNotes) {
@@ -967,6 +970,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     for (auto ChildInfo : Info.ChildDiagnosticInfo) {
       printDiagnostic(SM, *ChildInfo);
     }
+    break;
   }
 }
 

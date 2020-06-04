@@ -28,6 +28,7 @@
 #include "swift/Serialization/Validation.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
@@ -130,7 +131,7 @@ static void printImports(raw_ostream &out,
 
     // SPI attribute on imports
     if (Opts.PrintSPIs) {
-      SmallVector<Identifier, 4> spis;
+      llvm::SmallSetVector<Identifier, 4> spis;
       M->lookupImportedSPIGroups(importedModule, spis);
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";

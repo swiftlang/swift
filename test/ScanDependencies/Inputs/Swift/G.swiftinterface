@@ -2,7 +2,7 @@
 // swift-module-flags: -module-name G -swift-version 5
 
 #if swift(>=5.0)
-
+import Swift
 @_exported import G
 public func overlayFuncG() { }
 

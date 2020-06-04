@@ -1043,6 +1043,15 @@ public:
   Optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *) const;
 
+  /// Retrieve the builder transform that was applied to this function, if any.
+  const AppliedBuilderTransform *getAppliedBuilderTransform(
+     AnyFunctionRef fn) const {
+    auto known = functionBuilderTransformed.find(fn);
+    return known != functionBuilderTransformed.end()
+        ? &known->second
+        : nullptr;
+  }
+
   SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
@@ -1616,11 +1625,28 @@ public:
   SolutionApplicationTarget walk(ASTWalker &walker);
 };
 
+/// A function that rewrites a solution application target in the context
+/// of solution application.
+using RewriteTargetFn = std::function<
+    Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>;
+
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,
   Diagnostics,
   Finalization
+};
+
+/// Describes the result of applying a solution to a given function.
+enum class SolutionApplicationToFunctionResult {
+  /// Application of the solution succeeded.
+  Success,
+  /// Application of the solution failed.
+  /// TODO: This should probably go away entirely.
+  Failure,
+  /// The solution could not be applied immediately, and type checking for
+  /// this function should be delayed until later.
+  Delay,
 };
 
 /// Describes a system of constraints on type variables, the
@@ -3576,15 +3602,19 @@ public:
   bool generateConstraints(SolutionApplicationTarget &target,
                            FreeTypeVariableBinding allowFreeTypeVariables);
 
-  /// Generate constraints for the body of the given single-statement closure.
+  /// Generate constraints for the body of the given closure.
   ///
-  /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(ClosureExpr *closure);
+  /// \param closure the closure expression
+  /// \param resultType the closure's result type
+  ///
+  /// \returns \c true if constraint generation failed, \c false otherwise
+  bool generateConstraints(ClosureExpr *closure, Type resultType);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E, DeclContext *dc);
+  Expr *generateConstraints(Expr *E, DeclContext *dc,
+                            bool isInputExpression = true);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.
@@ -4677,6 +4707,23 @@ public:
   Optional<StmtCondition> applySolution(
       Solution &solution, StmtCondition condition, DeclContext *dc);
 
+  /// Apply the given solution to the given function's body and, for
+  /// closure expressions, the expression itself.
+  ///
+  /// \param solution The solution to apply.
+  /// \param fn The function to which the solution is being applied.
+  /// \param currentDC The declaration context in which transformations
+  /// will be applied.
+  /// \param rewriteTarget Function that performs a rewrite of any
+  /// solution application target within the context.
+  ///
+  SolutionApplicationToFunctionResult applySolution(
+      Solution &solution, AnyFunctionRef fn,
+      DeclContext *&currentDC,
+      std::function<
+        Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+          rewriteTarget);
+
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
@@ -5439,6 +5486,12 @@ BraceStmt *applyFunctionBuilderTransform(
         Optional<constraints::SolutionApplicationTarget> (
           constraints::SolutionApplicationTarget)>
             rewriteTarget);
+
+/// Determine whether the given closure expression should be type-checked
+/// within the context of its enclosing expression. Otherwise, it will be
+/// separately type-checked once its enclosing expression has determined all
+/// of the parameter and result types without looking at the body.
+bool shouldTypeCheckInEnclosingExpression(ClosureExpr *expr);
 
 } // end namespace swift
 

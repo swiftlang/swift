@@ -75,25 +75,10 @@ function(_set_target_prefix_and_suffix target kind sdk)
   endif()
 endfunction()
 
-function(is_darwin_based_sdk sdk_name out_var)
-  if ("${sdk_name}" STREQUAL "OSX" OR
-      "${sdk_name}" STREQUAL "IOS" OR
-      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "TVOS" OR
-      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "WATCHOS" OR
-      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
-    set(${out_var} TRUE PARENT_SCOPE)
-  else()
-    set(${out_var} FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
 # Usage:
 # _add_host_variant_c_compile_link_flags(name)
 function(_add_host_variant_c_compile_link_flags name)
-  is_darwin_based_sdk("${SWIFT_HOST_VARIANT_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
   endif()
 
@@ -107,7 +92,7 @@ function(_add_host_variant_c_compile_link_flags name)
 
   set(_sysroot
     "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
-  if(IS_DARWIN)
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     target_compile_options(${name} PRIVATE -isysroot;${_sysroot})
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
     target_compile_options(${name} PRIVATE --sysroot=${_sysroot})
@@ -116,13 +101,13 @@ function(_add_host_variant_c_compile_link_flags name)
   if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
     # lld can handle targeting the android build.  However, if lld is not
     # enabled, then fallback to the linker included in the android NDK.
-    if(NOT SWIFT_ENABLE_LLD_LINKER)
+    if(NOT SWIFT_USE_LINKER STREQUAL "lld")
       swift_android_tools_path(${SWIFT_HOST_VARIANT_ARCH} tools_path)
       target_compile_options(${name} PRIVATE -B${tools_path})
     endif()
   endif()
 
-  if(IS_DARWIN)
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -368,12 +353,9 @@ function(_add_host_variant_link_flags target)
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    if(SWIFT_ENABLE_LLD_LINKER)
+    if(SWIFT_USE_LINKER)
       target_link_options(${target} PRIVATE
-        -fuse-ld=lld$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>)
-    elseif(SWIFT_ENABLE_GOLD_LINKER)
-      target_link_options(${target} PRIVATE
-        -fuse-ld=gold$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>)
+        -fuse-ld=${SWIFT_USE_LINKER}$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>)
     endif()
   endif()
 
@@ -520,7 +502,6 @@ function(add_swift_host_library name)
     endif()
 
     set_target_properties(${name} PROPERTIES
-      CXX_STANDARD 14
       NO_SONAME YES)
   endif()
 
@@ -550,14 +531,10 @@ function(add_swift_host_library name)
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
 
-    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    # MSVC, clang-cl, gcc don't understand -target.
-    if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-      get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-        MACCATALYST_BUILD_FLAVOR ""
-        DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-      target_link_options(${name} PRIVATE -target;${target})
-    endif()
+    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
+      MACCATALYST_BUILD_FLAVOR ""
+      DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
+    target_link_options(${name} PRIVATE -target;${target})
   endif()
 
   add_dependencies(dev ${name})

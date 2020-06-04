@@ -40,6 +40,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
@@ -3431,7 +3432,7 @@ EquivalenceClass::EquivalenceClass(PotentialArchetype *representative)
 }
 
 void EquivalenceClass::modified(GenericSignatureBuilder &builder) {
-  builder.Impl->Generation++;
+  ++builder.Impl->Generation;
 
   // Transfer any delayed requirements to the primary queue, because they
   // might be resolvable now.
@@ -3444,7 +3445,7 @@ GenericSignatureBuilder::GenericSignatureBuilder(
                                ASTContext &ctx)
   : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
   if (auto *Stats = Context.Stats)
-    Stats->getFrontendCounters().NumGenericSignatureBuilders++;
+    ++Stats->getFrontendCounters().NumGenericSignatureBuilders;
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
@@ -3822,7 +3823,7 @@ static ConstraintResult visitInherited(
         unsigned index = 0;
         for (auto memberType : compositionType->getMembers()) {
           visitInherited(memberType, composition->getTypes()[index]);
-          index++;
+          ++index;
         }
 
         return;

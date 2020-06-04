@@ -17,7 +17,6 @@
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
 
 #include <string>
 #include <vector>

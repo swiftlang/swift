@@ -142,8 +142,8 @@ static bool swiftCodeCompleteImpl(
         SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
                                  &CompletionContext);
 
-        auto SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        auto *SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF, *callbacksFactory);
         SwiftConsumer.clearContext();
       });
 }

@@ -96,6 +96,7 @@ import LuhnAlgoEager
 import LuhnAlgoLazy
 import MapReduce
 import Memset
+import Mirror
 import MonteCarloE
 import MonteCarloPi
 import NibbleSort
@@ -281,6 +282,7 @@ registerBenchmark(LuhnAlgoEager)
 registerBenchmark(LuhnAlgoLazy)
 registerBenchmark(MapReduce)
 registerBenchmark(Memset)
+registerBenchmark(MirrorDefault)
 registerBenchmark(MonteCarloE)
 registerBenchmark(MonteCarloPi)
 registerBenchmark(NSDictionaryCastToSwift)
@@ -366,6 +368,7 @@ registerBenchmark(Suffix)
 registerBenchmark(SuperChars)
 registerBenchmark(TwoSum)
 registerBenchmark(TypeFlood)
+registerBenchmark(TypeName)
 registerBenchmark(UTF8Decode)
 registerBenchmark(Walsh)
 registerBenchmark(WordCount)

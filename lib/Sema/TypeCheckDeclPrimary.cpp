@@ -1290,7 +1290,7 @@ public:
 
   void visit(Decl *decl) {
     if (auto *Stats = getASTContext().Stats)
-      Stats->getFrontendCounters().NumDeclsTypechecked++;
+      ++Stats->getFrontendCounters().NumDeclsTypechecked;
 
     FrontendStatsTracer StatsTracer(getASTContext().Stats,
                                     "typecheck-decl", decl);

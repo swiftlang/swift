@@ -21,7 +21,6 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/TreeScopedHashTable.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
   class ValueDecl;

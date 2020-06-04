@@ -14,6 +14,7 @@ public struct TestOptions: OptionSet {
 
 // CHECK:      sil @{{.*}}returnTestOptions{{.*}}
 // CHECK-NEXT: bb0:
+// CHECK-NEXT:   builtin
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
 // CHECK-NEXT:   struct $TestOptions
@@ -22,18 +23,19 @@ public func returnTestOptions() -> TestOptions {
     return [.first, .second, .third, .fourth]
 }
 
-// CHECK:      sil @{{.*}}returnEmptyTestOptions{{.*}}
-// CHECK-NEXT: bb0:
-// CHECK-NEXT:   integer_literal {{.*}}, 0
-// CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   struct $TestOptions
-// CHECK-NEXT:   return
+// CHECK: sil @{{.*}}returnEmptyTestOptions{{.*}}
+// CHECK:   [[ZERO:%[0-9]+]] = integer_literal {{.*}}, 0
+// CHECK:   [[ZEROINT:%[0-9]+]] = struct $Int ([[ZERO]]
+// CHECK:   [[TO:%[0-9]+]] = struct $TestOptions ([[ZEROINT]]
+// CHECK:   return [[TO]]
+// CHECK: } // end sil function {{.*}}returnEmptyTestOptions{{.*}}
 public func returnEmptyTestOptions() -> TestOptions {
     return []
 }
 
 // CHECK:        alloc_global @{{.*}}globalTestOptions{{.*}}
 // CHECK-NEXT:   global_addr
+// CHECK-NEXT:   builtin
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
 // CHECK-NEXT:   struct $TestOptions

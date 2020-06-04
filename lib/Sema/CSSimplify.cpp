@@ -3135,6 +3135,60 @@ bool ConstraintSystem::repairFailures(
     return false;
   };
 
+  // Check whether given `value` type matches a `RawValue` type of
+  // a given raw representable type.
+  auto isValueOfRawRepresentable = [&](Type valueType,
+                                       Type rawReprType) -> bool {
+    // diagnostic is going to suggest failable initializer anyway.
+    if (auto objType = rawReprType->getOptionalObjectType())
+      rawReprType = objType;
+
+    // If value is optional diagnostic would suggest using `Optional.map` in
+    // combination with `<Type>(rawValue: ...)` initializer.
+    if (auto objType = valueType->getOptionalObjectType())
+      valueType = objType;
+
+    if (rawReprType->isTypeVariableOrMember())
+      return false;
+
+    auto rawValue = isRawRepresentable(*this, rawReprType);
+    if (!rawValue)
+      return false;
+
+    auto result = matchTypes(valueType, rawValue, ConstraintKind::Conversion,
+                             TMF_ApplyingFix, locator);
+    return !result.isFailure();
+  };
+
+  // Check whether given `rawReprType` does indeed conform to `RawRepresentable`
+  // and if so check that given `expectedType` matches its `RawValue` type. If
+  // that condition holds add a tailored fix which is going to suggest to
+  // explicitly construct a raw representable type from a given value type.
+  auto repairByConstructingRawRepresentableType =
+      [&](Type expectedType, Type rawReprType) -> bool {
+    if (!isValueOfRawRepresentable(expectedType, rawReprType))
+      return false;
+
+    conversionsOrFixes.push_back(ExplicitlyConstructRawRepresentable::create(
+        *this, rawReprType, expectedType, getConstraintLocator(locator)));
+    return true;
+  };
+
+  // Check whether given `rawReprType` does indeed conform to `RawRepresentable`
+  // and if so check that given `expectedType` matches its `RawValue` type. If
+  // that condition holds add a tailored fix which is going to suggest to
+  // use `.rawValue` associated with given raw representable type to match
+  // given expected type.
+  auto repairByUsingRawValueOfRawRepresentableType =
+      [&](Type rawReprType, Type expectedType) -> bool {
+    if (!isValueOfRawRepresentable(expectedType, rawReprType))
+      return false;
+
+    conversionsOrFixes.push_back(UseRawValue::create(
+        *this, rawReprType, expectedType, getConstraintLocator(locator)));
+    return true;
+  };
+
   auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
     return llvm::any_of(conversionsOrFixes,
                         [kind](const RestrictionOrFix correction) {
@@ -3349,6 +3403,13 @@ bool ConstraintSystem::repairFailures(
 
       if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                   conversionsOrFixes, locator))
+        return true;
+
+      // `rhs` - is an assignment destination and `lhs` is its source.
+      if (repairByConstructingRawRepresentableType(lhs, rhs))
+        return true;
+
+      if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
         return true;
 
       // Let's try to match source and destination types one more
@@ -3583,18 +3644,6 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (auto *fix = ExplicitlyConstructRawRepresentable::attempt(
-            *this, lhs, rhs, locator)) {
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
-    if (auto *fix = UseValueTypeOfRawRepresentative::attempt(*this, lhs, rhs,
-                                                             locator)) {
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
     // If parameter is a collection but argument is not, let's try
     // to try and match collection element type to the argument to
     // produce better diagnostics e.g.:
@@ -3623,6 +3672,13 @@ bool ConstraintSystem::repairFailures(
     // If either type has a hole, consider this fixed.
     if (lhs->hasHole() || rhs->hasHole())
       return true;
+
+    // `lhs` - is an argument and `rhs` is a parameter type.
+    if (repairByConstructingRawRepresentableType(lhs, rhs))
+      break;
+
+    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
+      break;
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
@@ -3842,6 +3898,9 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
+    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
+      break;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       break;
@@ -3852,6 +3911,10 @@ bool ConstraintSystem::repairFailures(
                      [](const RestrictionOrFix &correction) {
                        return bool(correction.getRestriction());
                      }))
+      break;
+
+    // `lhs` - is an result type and `rhs` is a contextual type.
+    if (repairByConstructingRawRepresentableType(lhs, rhs))
       break;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
@@ -7157,20 +7220,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
-  bool hasReturn = hasExplicitResult(closure);
+  // If this closure should be type-checked as part of this expression,
+  // generate constraints for it now.
   auto &ctx = getASTContext();
-  // If this is a multi-statement closure its body doesn't participate
-  // in type-checking.
-  if (closure->hasSingleExpressionBody()) {
-    auto *closureBody = generateConstraints(closure);
-    if (!closureBody)
+  if (shouldTypeCheckInEnclosingExpression(closure)) {
+    if (generateConstraints(closure, closureType->getResult()))
       return false;
-
-    addConstraint(
-        ConstraintKind::Conversion, getType(closureBody),
-        closureType->getResult(),
-        getConstraintLocator(closure, LocatorPathElt::ClosureBody(hasReturn)));
-  } else if (!hasReturn) {
+  } else if (!hasExplicitResult(closure)) {
     // If this closure has an empty body and no explicit result type
     // let's bind result type to `Void` since that's the only type empty body
     // can produce. Otherwise, if (multi-statement) closure doesn't have
@@ -8817,14 +8873,15 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  auto matchPointerBaseTypes = [&](Type baseType1,
-                                   Type baseType2) -> SolutionKind {
+  auto matchPointerBaseTypes =
+      [&](llvm::PointerIntPair<Type, 3, unsigned> baseType1,
+          llvm::PointerIntPair<Type, 3, unsigned> baseType2) -> SolutionKind {
     if (restriction != ConversionRestrictionKind::PointerToPointer)
       increaseScore(ScoreKind::SK_ValueToPointerConversion);
 
     auto result =
-        matchTypes(baseType1, baseType2, ConstraintKind::BindToPointerType,
-                   subflags, locator);
+        matchTypes(baseType1.getPointer(), baseType2.getPointer(),
+                   ConstraintKind::BindToPointerType, subflags, locator);
 
     if (!(result.isFailure() && shouldAttemptFixes()))
       return result;
@@ -8837,13 +8894,14 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     case ConversionRestrictionKind::InoutToPointer: {
       ptr2 = type2->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
       ptr1 = BoundGenericType::get(ptr2->getDecl(), ptr2->getParent(),
-                                   {baseType1});
+                                   {baseType1.getPointer()});
       break;
     }
 
     case ConversionRestrictionKind::PointerToPointer:
-      ptr1 = type1->castTo<BoundGenericType>();
-      ptr2 = type2->castTo<BoundGenericType>();
+      // Original types could be wrapped into a different number of optional.
+      ptr1 = type1->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
+      ptr2 = type2->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
       break;
 
     default:
@@ -8852,7 +8910,15 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     auto *fix = GenericArgumentsMismatch::create(*this, ptr1, ptr2, {0},
                                                  getConstraintLocator(locator));
-    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+
+    // It's possible to implicitly promote pointer into an optional
+    // before matching base types if other side is an optional, so
+    // score needs to account for number of such promotions.
+    int optionalWraps = baseType2.getInt() - baseType1.getInt();
+    return recordFix(fix,
+                     /*impact=*/1 + abs(optionalWraps))
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   };
 
   auto fixContextualFailure = [&](Type fromType, Type toType,
@@ -9040,7 +9106,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     increaseScore(SK_ValueToOptional, ptr2.getInt());
 
-    return matchPointerBaseTypes(baseType1, ptr2.getPointer());
+    return matchPointerBaseTypes({baseType1, 0}, ptr2);
   }
 
   // String ===> UnsafePointer<[U]Int8>
@@ -9101,7 +9167,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     increaseScore(SK_ValueToOptional, ptr2.getInt());
 
-    return matchPointerBaseTypes(baseType1, ptr2.getPointer());
+    return matchPointerBaseTypes({baseType1, 0}, ptr2);
   }
       
   // T <p U ===> UnsafeMutablePointer<T> <a UnsafeMutablePointer<U>
@@ -9112,7 +9178,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto ptr1 = getBaseTypeForPointer(t1);
     auto ptr2 = getBaseTypeForPointer(t2);
 
-    return matchPointerBaseTypes(ptr1.getPointer(), ptr2.getPointer());
+    return matchPointerBaseTypes(ptr1, ptr2);
   }
     
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
@@ -9505,7 +9571,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
   case FixKind::ExpandArrayIntoVarargs:
-  case FixKind::UseValueTypeOfRawRepresentative:
+  case FixKind::UseRawValue:
   case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:

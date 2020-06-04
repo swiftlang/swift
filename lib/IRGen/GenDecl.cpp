@@ -38,6 +38,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/GlobalDecl.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Module.h"
@@ -1164,7 +1165,8 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyOpaqueTypeDescriptors.empty() ||
          !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() ||
-         !LazyWitnessTables.empty()) {
+         !LazyWitnessTables.empty() ||
+         !LazyCanonicalSpecializedMetadataAccessors.empty()) {
 
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
@@ -1219,6 +1221,15 @@ void IRGenerator::emitLazyDefinitions() {
       assert(!f->isPossiblyUsedExternally()
              && "function with externally-visible linkage emitted lazily?");
       IGM->emitSILFunction(f);
+    }
+
+    while (!LazyCanonicalSpecializedMetadataAccessors.empty()) {
+      CanType theType =
+          LazyCanonicalSpecializedMetadataAccessors.pop_back_val();
+      auto *nominal = theType->getAnyNominal();
+      assert(nominal);
+      CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
+      emitLazyCanonicalSpecializedMetadataAccessor(*IGM.get(), theType);
     }
   }
 
@@ -1394,14 +1405,30 @@ void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
   LazyFieldDescriptors.push_back(type);
 }
 
+void IRGenerator::noteUseOfCanonicalSpecializedMetadataAccessor(
+    CanType forType) {
+  auto key = forType->getAnyNominal();
+  assert(key);
+  assert(key->isGenericContext());
+  auto &enqueuedSpecializedAccessors =
+      CanonicalSpecializedAccessorsForGenericTypes[key];
+  if (llvm::all_of(enqueuedSpecializedAccessors,
+                   [&](CanType enqueued) { return enqueued != forType; })) {
+    assert(!FinishedEmittingLazyDefinitions);
+    LazyCanonicalSpecializedMetadataAccessors.insert(forType);
+    enqueuedSpecializedAccessors.push_back(forType);
+  }
+}
+
 void IRGenerator::noteUseOfSpecializedGenericTypeMetadata(CanType type) {
   auto key = type->getAnyNominal();
   assert(key);
-  auto &enqueuedSpecializedTypes = this->SpecializationsForGenericTypes[key];
+  assert(key->isGenericContext());
+  auto &enqueuedSpecializedTypes = CanonicalSpecializationsForGenericTypes[key];
   if (llvm::all_of(enqueuedSpecializedTypes,
                    [&](CanType enqueued) { return enqueued != type; })) {
     assert(!FinishedEmittingLazyDefinitions);
-    this->LazySpecializedTypeMetadataRecords.push_back(type);
+    LazySpecializedTypeMetadataRecords.push_back(type);
     enqueuedSpecializedTypes.push_back(type);
   }
 }
@@ -2802,7 +2829,7 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
   }
 
   if (auto *Stats = Context.Stats)
-    Stats->getFrontendCounters().NumGOTEntries++;
+    ++Stats->getFrontendCounters().NumGOTEntries;
 
   // Use the global as the initializer for an anonymous constant. LLVM can treat
   // this as equivalent to the global's GOT entry.
@@ -3516,6 +3543,22 @@ IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
   return addr;
 }
 
+llvm::Constant *
+IRGenModule::getAddrOfCanonicalSpecializedGenericMetaclassObject(
+    CanType concreteType, ForDefinition_t forDefinition) {
+  auto *theClass = concreteType->getClassOrBoundGenericClass();
+  assert(theClass && "only classes have metaclasses");
+  assert(concreteType->getClassOrBoundGenericClass()->isGenericContext());
+
+  auto entity =
+      LinkEntity::forSpecializedGenericSwiftMetaclassStub(concreteType);
+
+  auto DbgTy = DebugTypeInfo::getObjCClass(
+      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
+  auto addr = getAddrOfLLVMVariable(entity, forDefinition, DbgTy);
+  return addr;
+}
+
 /// Fetch the declaration of an Objective-C metadata update callback.
 llvm::Function *
 IRGenModule::getAddrOfObjCMetadataUpdateFunction(ClassDecl *classDecl,
@@ -3624,7 +3667,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
   size_t numGenericArgs = genericArgs.size();
   if (numGenericArgs > NumDirectGenericTypeMetadataAccessFunctionArgs) {
     paramTypesArray[1] = Int8PtrPtrTy;
-    numParams++;
+    ++numParams;
   } else {
     for (size_t i : indices(genericArgs))
       paramTypesArray[i + 1] = genericArgs[i];
@@ -3635,6 +3678,38 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
   auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
                                         paramTypes, false);
   Signature signature(fnType, llvm::AttributeList(), SwiftCC);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    CanType theType, ForDefinition_t forDefinition) {
+  assert(shouldPrespecializeGenericMetadata());
+  assert(!theType->hasUnboundGenericType());
+  auto *nominal = theType->getAnyNominal();
+  assert(nominal);
+  assert(nominal->isGenericContext());
+
+  IRGen.noteUseOfCanonicalSpecializedMetadataAccessor(theType);
+
+  LinkEntity entity =
+      LinkEntity::forPrespecializedTypeMetadataAccessFunction(theType);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition)
+      updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  llvm::Type *paramTypesArray[1];
+  paramTypesArray[0] = SizeTy; // MetadataRequest
+
+  auto paramTypes = llvm::makeArrayRef(paramTypesArray, 1);
+  auto functionType =
+      llvm::FunctionType::get(TypeMetadataResponseTy, paramTypes, false);
+  Signature signature(functionType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
@@ -3826,14 +3901,19 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
 
-  bool fullMetadata = (nominal && requiresForeignTypeMetadata(nominal)) ||
-                      (concreteType->getAnyGeneric() &&
-                       concreteType->getAnyGeneric()->isGenericContext());
+  bool foreign = nominal && requiresForeignTypeMetadata(nominal);
+  bool fullMetadata =
+      foreign || (concreteType->getAnyGeneric() &&
+                  concreteType->getAnyGeneric()->isGenericContext());
 
   // Foreign classes reference the full metadata with a GEP.
   if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
-    adjustmentIndex = MetadataAdjustmentIndex::ValueType;
+    if (concreteType->getClassOrBoundGenericClass() && !foreign) {
+      adjustmentIndex = MetadataAdjustmentIndex::Class;
+    } else {
+      adjustmentIndex = MetadataAdjustmentIndex::ValueType;
+    }
   // The symbol for other nominal type metadata is generated at the address
   // point.
   } else if (nominal) {
@@ -3870,19 +3950,24 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   if (fullMetadata) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::FullMetadata);
-    DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
-                                       defaultVarTy->getPointerTo(), Size(0),
-                                       Alignment(1));;
   } else {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::AddressPoint);
-    DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
-                                       defaultVarTy->getPointerTo(), Size(0),
-                                       Alignment(1));;
+  }
+  DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
+                                     defaultVarTy->getPointerTo(), Size(0),
+                                     Alignment(1));
+
+  ConstantReference addr;
+
+  if (fullMetadata && !foreign) {
+    addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
+                                 /*overrideDeclType=*/nullptr);
+  } else {
+    addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
+                                 /*overrideDeclType=*/defaultVarTy);
   }
 
-  auto addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
-                                    defaultVarTy);
   if (auto *GV = dyn_cast<llvm::GlobalVariable>(addr.getValue()))
     GV->setComdat(nullptr);
 

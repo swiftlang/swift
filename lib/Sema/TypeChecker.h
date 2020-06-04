@@ -547,8 +547,6 @@ bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
 /// of the function, set the result type of the expression to that sugar type.
 Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
-bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                        SourceLoc EndTypeCheckLoc);
 bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
 /// Try to apply the function builder transform of the given builder type
@@ -756,15 +754,14 @@ void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
 /// \returns true if an error occurred, false otherwise.
 bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
-/// Type check the given 'if' or 'while' statement condition, which
-/// either converts an expression to a logic value or bind variables to the
-/// contents of an Optional.
+/// Type check the given 'if', 'while', or 'guard' statement condition.
 ///
-/// \param cond The condition to type-check, which will be modified in place.
+/// \param stmt The conditional statement to type-check, which will be modified
+/// in place.
 ///
 /// \returns true if an error occurred, false otherwise.
-bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
-                            Diag<> diagnosticForAlwaysTrue);
+bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
+                                    DeclContext *dc);
 
 /// Determine the semantics of a checked cast operation.
 ///
@@ -1318,6 +1315,12 @@ public:
   /// The unescaped message to display to the user.
   const StringRef Message;
 };
+
+/// Returns the protocol requirement kind of the given declaration.
+/// Used in diagnostics.
+///
+/// Asserts that the given declaration is a protocol requirement.
+diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
 
 /// Returns true if the given method is an valid implementation of a
 /// @dynamicCallable attribute requirement. The method is given to be defined

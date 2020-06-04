@@ -253,7 +253,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // the same case, binding variables for the left- and right-hand associated
   // values.
   for (auto elt : enumDecl->getAllElements()) {
-    elementCount++;
+    ++elementCount;
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
@@ -305,7 +305,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     // constructing long lists of autoclosure-wrapped conditions connected by
     // &&, which the type checker has more difficulty processing.)
     SmallVector<ASTNode, 6> statementsInCase;
-    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
+    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
                                          /*implicit*/true);

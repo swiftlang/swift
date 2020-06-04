@@ -195,7 +195,7 @@ getBuiltinGenericFunction(Identifier Id,
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
   SmallVector<ParamDecl*, 4> params;
-  for (unsigned i = 0, e = ArgParamTypes.size(); i < e; i++) {
+  for (unsigned i = 0, e = ArgParamTypes.size(); i < e; ++i) {
     auto paramIfaceType = ArgParamTypes[i].getPlainType();
     auto specifier =
       ParamDecl::getParameterSpecifierForValueOwnership(
@@ -2004,11 +2004,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
     // Accept weak, volatile, and singlethread if present.
     if (NextPart != Parts.end() && *NextPart == "weak")
-      NextPart++;
+      ++NextPart;
     if (NextPart != Parts.end() && *NextPart == "volatile")
-      NextPart++;
+      ++NextPart;
     if (NextPart != Parts.end() && *NextPart == "singlethread")
-      NextPart++;
+      ++NextPart;
     // Nothing else is allowed in the name.
     if (NextPart != Parts.end())
       return nullptr;

@@ -1201,7 +1201,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
   auto i = node->begin(), e = node->end();
   if (i != e && (*i)->getKind() == Node::Kind::ImplConvention) {
     StringRef text = (*i)->getText();
-    i++;
+    ++i;
     if (text == "@callee_unowned") {
       Buffer << 'd';
     } else if (text == "@callee_guaranteed") {
@@ -1224,7 +1224,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
     Buffer << ((*i)->getKind() == Node::Kind::DependentGenericSignature
               ? 'G' : 'g');
     mangleDependentGenericSignature((*i));
-    i++;
+    ++i;
   }
   Buffer << '_';
   for (; i != e && (*i)->getKind() == Node::Kind::ImplParameter; ++i) {
@@ -2131,6 +2131,17 @@ void Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node) {
 }
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
+}
+
+void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
+  Buffer << "MM";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mb";
 }
 
 /// The top-level interface to the remangler.

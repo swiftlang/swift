@@ -147,6 +147,10 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::TypeMetadataAccessFunction:
     return mangler.mangleTypeMetadataAccessFunction(getType());
 
+  case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
+    return mangler.mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
+        getType());
+
   case Kind::TypeMetadataLazyCacheVariable:
     return mangler.mangleTypeMetadataLazyCacheVariable(getType());
 
@@ -184,6 +188,9 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::SwiftMetaclassStub:
     return mangler.mangleClassMetaClass(cast<ClassDecl>(getDecl()));
+
+  case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
+    return mangler.mangleSpecializedGenericClassMetaClass(getType());
 
   case Kind::ObjCMetadataUpdateFunction:
     return mangler.mangleObjCMetadataUpdateFunction(cast<ClassDecl>(getDecl()));
@@ -526,6 +533,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     }
     llvm_unreachable("bad metadata access kind");
 
+  case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
+    return SILLinkage::Shared;
+
   case Kind::ObjCClassRef:
     return SILLinkage::Private;
 
@@ -596,6 +606,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+
+  case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
+    // Prespecialization of the same generic class' metaclass may be requested
+    // multiple times within the same module, so it needs to be uniqued.
+    return SILLinkage::Shared;
 
   case Kind::AssociatedTypeDescriptor:
     return getSILLinkage(getDeclLinkage(getAssociatedType()->getProtocol()),
@@ -721,6 +736,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction:
+  case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
   case Kind::ReflectionBuiltinDescriptor:
@@ -736,6 +752,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::DifferentiabilityWitness:
+  case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -765,6 +782,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
+  case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
     return IGM.ObjCClassStructTy;
   case Kind::TypeMetadataLazyCacheVariable:
     return IGM.TypeMetadataPtrTy;
@@ -882,6 +900,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::ProtocolWitnessTablePattern:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
+  case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::OpaqueTypeDescriptorAccessorKey:
@@ -925,7 +944,8 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
 
   case Kind::TypeMetadata:
-  case Kind::TypeMetadataAccessFunction: {
+  case Kind::TypeMetadataAccessFunction:
+  case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction: {
     if (auto *nominalDecl = getType()->getAnyNominal())
       return nominalDecl->isWeakImported(module);
     return false;
@@ -960,6 +980,9 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
     return getDecl()->isWeakImported(module);
+
+  case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
+    return getType()->getClassOrBoundGenericClass()->isWeakImported(module);
 
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
@@ -1035,7 +1058,10 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
     return getDecl()->getDeclContext();
-  
+
+  case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
+    return getType()->getClassOrBoundGenericClass()->getDeclContext();
+
   case Kind::SILFunction:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::DynamicallyReplaceableFunctionKey:
@@ -1075,6 +1101,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::AnonymousDescriptor:
   case Kind::ObjCClassRef:
   case Kind::TypeMetadataAccessFunction:
+  case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
     assert(isAlwaysSharedLinkage() && "kind should always be shared linkage");
@@ -1099,6 +1126,7 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
   case Kind::AnonymousDescriptor:
   case Kind::ObjCClassRef:
   case Kind::TypeMetadataAccessFunction:
+  case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
     return true;

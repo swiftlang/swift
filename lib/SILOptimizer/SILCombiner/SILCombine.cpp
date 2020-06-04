@@ -229,7 +229,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   // Perform iterations until we do not make any changes.
   while (doOneIteration(F, Iteration)) {
     Changed = true;
-    Iteration++;
+    ++Iteration;
   }
 
   if (invalidatedStackNesting) {

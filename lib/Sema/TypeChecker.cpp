@@ -379,20 +379,6 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   diagnoseObjCMethodConflicts(SF);
   diagnoseObjCUnsatisfiedOptReqConflicts(SF);
   diagnoseUnintendedObjCMethodOverrides(SF);
-
-  // In whole-module mode, import verification is deferred until all files have
-  // been type checked. This avoids caching imported declarations when a valid
-  // type checker is not present. The same declaration may need to be fully
-  // imported by subsequent files.
-  //
-  // FIXME: some playgrounds tests (playground_lvalues.swift) fail with
-  // verification enabled.
-#if 0
-  if (SF.Kind != SourceFileKind::SIL &&
-      !Ctx.LangOpts.DebuggerSupport) {
-    Ctx.verifyAllLoadedModules();
-  }
-#endif
 }
 
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
@@ -554,11 +540,13 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   return !resultTy;
 }
 
-bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                               SourceLoc EndTypeCheckLoc) {
+bool swift::typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
+                                               SourceLoc TargetLoc) {
   auto &Ctx = AFD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  return !TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  return !evaluateOrDefault(Ctx.evaluator,
+                            TypeCheckFunctionBodyAtLocRequest{AFD, TargetLoc},
+                            true);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

@@ -45,6 +45,8 @@ enum class WellKnownFunction {
   ArrayInitEmpty,
   // Array._allocateUninitializedArray
   AllocateUninitializedArray,
+  // Array._endMutation
+  EndArrayMutation,
   // Array.append(_:)
   ArrayAppendElement,
   // String.init()
@@ -71,6 +73,8 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
     return WellKnownFunction::ArrayInitEmpty;
   if (fn->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED_INTRINSIC))
     return WellKnownFunction::AllocateUninitializedArray;
+  if (fn->hasSemanticsAttr(semantics::ARRAY_END_MUTATION))
+    return WellKnownFunction::EndArrayMutation;
   if (fn->hasSemanticsAttr(semantics::ARRAY_APPEND_ELEMENT))
     return WellKnownFunction::ArrayAppendElement;
   if (fn->hasSemanticsAttr(semantics::STRING_INIT_EMPTY))
@@ -848,7 +852,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
   switch (callee) {
   case WellKnownFunction::AssertionFailure: {
     SmallString<4> message;
-    for (unsigned i = 0; i < apply->getNumArguments(); i++) {
+    for (unsigned i = 0, e = apply->getNumArguments(); i < e; ++i) {
       SILValue argument = apply->getArgument(i);
       SymbolicValue argValue = getConstantValue(argument);
       Optional<StringRef> stringOpt =
@@ -944,6 +948,17 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     SymbolicValue storageAddress = array.getAddressOfArrayElement(allocator, 0);
     setValue(apply, SymbolicValue::getAggregate({array, storageAddress},
                                                 resultType, allocator));
+    return None;
+  }
+  case WellKnownFunction::EndArrayMutation: {
+    // This function has the following signature in SIL:
+    //    (@inout Array<Element>) -> ()
+    assert(conventions.getNumParameters() == 1 &&
+           conventions.getNumDirectSILResults() == 0 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected Array._endMutation() signature");
+
+    // _endMutation is a no-op.
     return None;
   }
   case WellKnownFunction::ArrayAppendElement: {

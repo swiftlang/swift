@@ -794,8 +794,8 @@ extension Sequence {
     return try _compactMap(transform)
   }
 
-  // The implementation of flatMap accepting a closure with an optional result.
-  // Factored out into a separate functions in order to be used in multiple
+  // The implementation of compactMap accepting a closure with an optional result.
+  // Factored out into a separate function in order to be used in multiple
   // overloads.
   @inlinable // protocol-only
   @inline(__always)

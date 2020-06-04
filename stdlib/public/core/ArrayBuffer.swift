@@ -125,6 +125,60 @@ extension _ArrayBuffer {
     return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative.buffer
   }
 
+  /// Creates and returns a new uniquely referenced buffer which is a copy of
+  /// this buffer.
+  ///
+  /// This buffer is consumed, i.e. it's released.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew() -> _ArrayBuffer {
+    return _consumeAndCreateNew(bufferIsUnique: false,
+                                minimumCapacity: count,
+                                growForAppend: false)
+  }
+
+  /// Creates and returns a new uniquely referenced buffer which is a copy of
+  /// this buffer.
+  ///
+  /// If `bufferIsUnique` is true, the buffer is assumed to be uniquely
+  /// referenced and the elements are moved - instead of copied - to the new
+  /// buffer.
+  /// The `minimumCapacity` is the lower bound for the new capacity.
+  /// If `growForAppend` is true, the new capacity is calculated using
+  /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
+  ///
+  /// This buffer is consumed, i.e. it's released.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) -> _ArrayBuffer {
+    let newCapacity = _growArrayCapacity(oldCapacity: capacity,
+                                         minimumCapacity: minimumCapacity,
+                                         growForAppend: growForAppend)
+    let c = count
+    _internalInvariant(newCapacity >= c)
+    
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: c, minimumCapacity: newCapacity)
+
+    if bufferIsUnique {
+      // As an optimization, if the original buffer is unique, we can just move
+      // the elements instead of copying.
+      let dest = newBuffer.firstElementAddress
+      dest.moveInitialize(from: firstElementAddress,
+                          count: c)
+      _native.count = 0
+    } else {
+      _copyContents(
+        subRange: 0..<c,
+        initializing: newBuffer.firstElementAddress)
+    }
+    return _ArrayBuffer(_buffer: newBuffer, shiftedToStartIndex: 0)
+  }
+
   /// If this buffer is backed by a uniquely-referenced mutable
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.

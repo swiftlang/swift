@@ -1079,11 +1079,6 @@ public extension Differentiable where Self == TangentVector {
     mutating func move(along direction: TangentVector) {
         self += direction
     }
-
-    @noDerivative
-    var zeroTangentVectorInitializer: () -> TangentVector {
-        { .zero }
-    }
 }
 ```
 
@@ -1144,8 +1139,8 @@ extension Array: Differentiable where Element: Differentiable {
 
     @noDerivative
     public var zeroTangentVectorInitializer: () -> TangentVector {
-        { [count = self.count] in
-            TangentVector(Array(repeating: .zero, count: count))
+        { [zeroInits = map(\.zeroTangentVectorInitializer)] in
+            TangentVector(zeroInits.map { $0() })
         }
     }
 }
@@ -1238,8 +1233,15 @@ the same effective access level as their corresponding original properties.
 
 A `move(along:)` method is synthesized with a body that calls `move(along:)` for
 each pair of the original property and its corresponding property in
-`TangentVector`. Similarly, `zeroTangentVector` is synthesized to return a
-tangent vector that consists of each stored property's `zeroTangentVector`.
+`TangentVector`.
+
+Similarly, when memberwise derivation is possible,
+`zeroTangentVectorInitializer` is synthesized to return a closure that captures
+and calls each stored property's `zeroTangentVectorInitializer` closure.
+When memberwise derivation is not possible (e.g. for custom user-defined
+`TangentVector` types), `zeroTangentVectorInitializer` is synthesized as a
+`{ TangentVector.zero }` closure.
+
 Here's an example:
 
 ```swift
@@ -1251,14 +1253,17 @@ struct Foo<T: Differentiable, U: Differentiable>: @memberwise Differentiable {
     @noDerivative let helperVariable: T
 
     // The compiler synthesizes:
+    //
     //     struct TangentVector: Differentiable, AdditiveArithmetic {
     //         var x: T.TangentVector
     //         var y: U.TangentVector
     //     }
+    //
     //     mutating func move(along direction: TangentVector) {
     //         x.move(along: direction.x)
     //         y.move(along: direction.y)
     //     }
+    //
     //     @noDerivative
     //     var zeroTangentVectorInitializer: () -> TangentVector {
     //         { [xTanInit = x.zeroTangentVectorInitializer,
@@ -1278,8 +1283,8 @@ properties are declared to conform to `AdditiveArithmetic`. There are no
 `@noDerivative` stored properties.
 
 In these cases, the compiler will make `TangentVector` be a type alias for Self.
-Method `move(along:)` and property `zeroTangentVector` will not be synthesized
-because a default implementation already exists.
+Method `move(along:)` will not be synthesized because a default implementation
+already exists.
 
 ```swift
 struct Point<T: Real>: @memberwise Differentiable, @memberwise AdditiveArithmetic {
@@ -1287,7 +1292,16 @@ struct Point<T: Real>: @memberwise Differentiable, @memberwise AdditiveArithmeti
     var x, y: T
 
     // The compiler synthesizes:
+    //
     //     typealias TangentVector = Self
+    //
+    //     @noDerivative
+    //     var zeroTangentVectorInitializer: () -> TangentVector {
+    //         { [xTanInit = x.zeroTangentVectorInitializer,
+    //            yTanInit = y.zeroTangentVectorInitializer] in
+    //             TangentVector(x: xTanInit(), y: yTanInit())
+    //         }
+    //     }
 }
 ```
 

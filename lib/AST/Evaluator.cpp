@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/StringExtras.h"
@@ -62,21 +63,20 @@ void Evaluator::registerRequestFunctions(
 }
 
 static evaluator::DependencyRecorder::Mode
-computeDependencyModeFromFlags(bool enableExperimentalPrivateDeps) {
+computeDependencyModeFromFlags(const LangOptions &opts) {
   using Mode = evaluator::DependencyRecorder::Mode;
-  if (enableExperimentalPrivateDeps) {
+  if (opts.EnableExperientalPrivateIntransitiveDependencies) {
     return Mode::ExperimentalPrivateDependencies;
   }
 
   return Mode::StatusQuo;
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles,
-                     bool buildDependencyGraph,
-                     bool enableExperimentalPrivateDeps)
-    : diags(diags), debugDumpCycles(debugDumpCycles),
-      buildDependencyGraph(buildDependencyGraph),
-      recorder{computeDependencyModeFromFlags(enableExperimentalPrivateDeps)} {}
+Evaluator::Evaluator(DiagnosticEngine &diags, const LangOptions &opts)
+    : diags(diags),
+      debugDumpCycles(opts.DebugDumpCycles),
+      buildDependencyGraph(opts.BuildRequestDependencyGraph),
+      recorder{computeDependencyModeFromFlags(opts)} {}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -383,7 +383,7 @@ void evaluator::DependencyRecorder::realize(
     const DependencyCollector::Reference &ref) {
   auto *source = getActiveDependencySourceOrNull();
   assert(source && "cannot realize dependency without associated file!");
-  if (!source->hasInterfaceHash()) {
+  if (!source->isPrimary()) {
     return;
   }
   fileReferences[source].insert(ref);
@@ -434,7 +434,7 @@ void evaluator::DependencyRecorder::record(
     llvm::function_ref<void(DependencyCollector &)> rec) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
   auto *source = getActiveDependencySourceOrNull();
-  if (!source || !source->hasInterfaceHash()) {
+  if (!source || !source->isPrimary()) {
     return;
   }
 
@@ -466,7 +466,7 @@ void evaluator::DependencyRecorder::replay(const swift::ActiveRequest &req) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
 
   auto *source = getActiveDependencySourceOrNull();
-  if (mode == Mode::StatusQuo || !source || !source->hasInterfaceHash()) {
+  if (mode == Mode::StatusQuo || !source || !source->isPrimary()) {
     return;
   }
 

@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -module-name SubheadingDeclarationFragmentsTypes -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name SubheadingDeclarationFragmentsTypes -I %t -pretty-print -output-dir %t
-// RUN: %FileCheck %s --input-file %t/SubheadingDeclarationFragmentsTypes.symbols.json --check-prefix=STRUCT
-// RUN: %FileCheck %s --input-file %t/SubheadingDeclarationFragmentsTypes.symbols.json --check-prefix=ENUM
-// RUN: %FileCheck %s --input-file %t/SubheadingDeclarationFragmentsTypes.symbols.json --check-prefix=PROTOCOL
-// RUN: %FileCheck %s --input-file %t/SubheadingDeclarationFragmentsTypes.symbols.json --check-prefix=CLASS
-// RUN: %FileCheck %s --input-file %t/SubheadingDeclarationFragmentsTypes.symbols.json --check-prefix=TYPEALIAS
+// RUN: %target-build-swift %s -module-name NominalTypes -emit-module -emit-module-path %t/
+// RUN: %target-swift-symbolgraph-extract -module-name NominalTypes -I %t -pretty-print -output-dir %t
+// RUN: %FileCheck %s --input-file %t/NominalTypes.symbols.json --check-prefix=STRUCT
+// RUN: %FileCheck %s --input-file %t/NominalTypes.symbols.json --check-prefix=ENUM
+// RUN: %FileCheck %s --input-file %t/NominalTypes.symbols.json --check-prefix=PROTOCOL
+// RUN: %FileCheck %s --input-file %t/NominalTypes.symbols.json --check-prefix=CLASS
+// RUN: %FileCheck %s --input-file %t/NominalTypes.symbols.json --check-prefix=TYPEALIAS
 
-// STRUCT-LABEL: "precise": "s:35SubheadingDeclarationFragmentsTypes6StructV"
+// STRUCT-LABEL: "precise": "s:12NominalTypes6StructV"
 // STRUCT: subHeading
 // STRUCT-NEXT {
 // STRUCT-NEXT   "kind": "keyword",
@@ -23,7 +23,7 @@
 // STRUCT-NEXT }
 public struct Struct<T> where T: Sequence {}
 
-// ENUM-LABEL: "precise": "s:35SubheadingDeclarationFragmentsTypes4EnumO"
+// ENUM-LABEL: "precise": "s:12NominalTypes4EnumO"
 // ENUM: subHeading
 // ENUM-NEXT: {
 // ENUM-NEXT:   "kind": "keyword",
@@ -39,7 +39,7 @@ public struct Struct<T> where T: Sequence {}
 // ENUM-NEXT: }
 public enum Enum<T> where T: Sequence {}
 
-// PROTOCOL-LABEL: "precise": "s:35SubheadingDeclarationFragmentsTypes8ProtocolP"
+// PROTOCOL-LABEL: "precise": "s:12NominalTypes8ProtocolP"
 // PROTOCOL: subHeading
 // PROTOCOL-NEXT: {
 // PROTOCOL-NEXT:   "kind": "keyword",
@@ -57,7 +57,7 @@ public protocol Protocol where T: Sequence {
   associatedtype T
 }
 
-// CLASS-LABEL: "precise": "s:35SubheadingDeclarationFragmentsTypes5ClassC"
+// CLASS-LABEL: "precise": "s:12NominalTypes5ClassC"
 // CLASS: subHeading
 // CLASS-NEXT {
 // CLASS-NEXT   "kind": "keyword",
@@ -73,7 +73,7 @@ public protocol Protocol where T: Sequence {
 // CLASS-NEXT }
 public class Class<T> where T: Sequence {}
 
-// TYPEALIAS-LABEL: "precise": "s:35SubheadingDeclarationFragmentsTypes9TypeAliasa"
+// TYPEALIAS-LABEL: "precise": "s:12NominalTypes9TypeAliasa"
 // TYPEALIAS: subHeading
 // TYPEALIAS-NEXT: {
 // TYPEALIAS-NEXT:   "kind": "keyword",

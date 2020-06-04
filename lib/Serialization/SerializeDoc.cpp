@@ -344,6 +344,11 @@ static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
     if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
       return false;
   }
+
+  // Skip SPI decls.
+  if (D->isSPI())
+    return false;
+
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     return shouldIncludeDecl(ED->getExtendedNominal(), ExcludeDoubleUnderscore);
   }
@@ -710,16 +715,6 @@ writer.write<uint32_t>(data.X.Column);
     return USRWriter.getNewUSRId(OS.str());
   }
 
-  LineColumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
-    LineColumn Result;
-    if (Loc.isValid()) {
-      auto LC = SM.getPresumedLineAndColumnForLoc(Loc);
-      Result.Line = LC.first;
-      Result.Column = LC.second;
-    }
-    return Result;
-  }
-
   Optional<DeclLocationsTableData> getLocData(Decl *D) {
     auto *File = D->getDeclContext()->getModuleScopeContext();
     auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
@@ -755,7 +750,7 @@ Result.X.Column = Locs->X.Column;
     };
     // .swiftdoc doesn't include comments for double underscored symbols, but
     // for .swiftsourceinfo, having the source location for these symbols isn't
-    // a concern becuase these symbols are in .swiftinterface anyway.
+    // a concern because these symbols are in .swiftinterface anyway.
     if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/false))
       return false;
     if (!shouldSerializeSourceLoc(D))

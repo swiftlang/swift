@@ -1414,3 +1414,22 @@ void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
   // Add `@_fixed_layout` to the nominal.
   nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
 }
+
+Expr *DiscriminatorFinder::walkToExprPost(Expr *E) {
+  auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+  if (!ACE)
+    return E;
+
+  unsigned Discriminator = ACE->getDiscriminator();
+  assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
+         "Existing closures should have valid discriminators");
+  if (Discriminator >= NextDiscriminator)
+    NextDiscriminator = Discriminator + 1;
+  return E;
+}
+
+unsigned DiscriminatorFinder::getNextDiscriminator() {
+  if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
+    llvm::report_fatal_error("Out of valid closure discriminators");
+  return NextDiscriminator++;
+}

@@ -76,7 +76,7 @@ int SILBasicBlock::getDebugID() const {
   for (const SILBasicBlock &B : *getParent()) {
     if (&B == this)
       return idx;
-    idx++;
+    ++idx;
   }
   llvm_unreachable("block not in function's block list");
 }

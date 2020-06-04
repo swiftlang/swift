@@ -498,6 +498,10 @@ bool ModuleDecl::isClangModule() const {
 }
 
 void ModuleDecl::addFile(FileUnit &newFile) {
+  // If this is a LoadedFile, make sure it loaded without error.
+  assert(!(isa<LoadedFile>(newFile) &&
+           cast<LoadedFile>(newFile).hadLoadError()));
+
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
          !isa<SourceFile>(newFile) ||
@@ -507,17 +511,39 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
-void ModuleDecl::removeFile(FileUnit &existingFile) {
-  // Do a reverse search; usually the file to be deleted will be at the end.
-  std::reverse_iterator<decltype(Files)::iterator> I(Files.end()),
-  E(Files.begin());
-  I = std::find(I, E, &existingFile);
-  assert(I != E);
+ArrayRef<SourceFile *>
+PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
+                                    ModuleDecl *mod) const {
+  assert(mod->isMainModule() && "Only the main module can have primaries");
 
-  // Adjust for the std::reverse_iterator offset.
-  ++I;
-  Files.erase(I.base());
-  clearLookupCache();
+  SmallVector<SourceFile *, 8> primaries;
+  for (auto *file : mod->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file)) {
+      if (SF->isPrimary())
+        primaries.push_back(SF);
+    }
+  }
+  return mod->getASTContext().AllocateCopy(primaries);
+}
+
+ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<ModuleDecl *>(this);
+  return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
+}
+
+SourceFile *CodeCompletionFileRequest::evaluate(Evaluator &evaluator,
+                                                ModuleDecl *mod) const {
+  const auto &SM = mod->getASTContext().SourceMgr;
+  assert(mod->isMainModule() && "Can only do completion in the main module");
+  assert(SM.hasCodeCompletionBuffer() && "Not performing code completion?");
+
+  for (auto *file : mod->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (SF && SF->getBufferID() == SM.getCodeCompletionBufferID())
+      return SF;
+  }
+  llvm_unreachable("Couldn't find the completion file?");
 }
 
 #define FORWARD(name, args) \
@@ -563,7 +589,7 @@ void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupValue++;
+    ++stats->getFrontendCounters().NumModuleLookupValue;
 
   if (isParsedModule(this)) {
     getSourceLookupCache().lookupValue(Name, LookupKind, Result);
@@ -657,8 +683,9 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
-void ModuleDecl::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void ModuleDecl::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
 }
 
@@ -718,7 +745,7 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupClassMember++;
+    ++stats->getFrontendCounters().NumModuleLookupClassMember;
 
   if (isParsedModule(this)) {
     FrontendStatsTracer tracer(getASTContext().Stats,
@@ -1942,31 +1969,29 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
-void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void SourceFile::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &import : *Imports) {
     if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
         importedModule == import.module.importedModule) {
       auto importedSpis = import.spiGroups;
-      spiGroups.append(importedSpis.begin(), importedSpis.end());
+      spiGroups.insert(importedSpis.begin(), importedSpis.end());
     }
   }
 }
 
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
-  SmallVector<Identifier, 4> importedSPIGroups;
+  llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty()) return false;
 
   auto declSPIGroups = targetDecl->getSPIGroups();
 
-  // Note: If we reach a point where there are many SPI imports or SPI groups
-  // on decls we could optimize this further by using a set.
-  for (auto importedSPI : importedSPIGroups)
-    for (auto declSPI : declSPIGroups)
-      if (importedSPI == declSPI)
-        return true;
+  for (auto declSPI : declSPIGroups)
+    if (importedSPIGroups.count(declSPI))
+      return true;
 
   return false;
 }
@@ -2192,11 +2217,14 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        bool KeepParsedTokens, bool BuildSyntaxTree,
-                       ParsingOptions parsingOpts)
+                       ParsingOptions parsingOpts, bool isPrimary)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), Kind(K),
+      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K),
       SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
+
+  assert(!IsPrimary || M.isMainModule() &&
+         "A primary cannot appear outside the main module");
 
   if (isScriptMode()) {
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);

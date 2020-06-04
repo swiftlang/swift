@@ -2496,11 +2496,7 @@ public:
     }
 
     OS << '\n';
-    if (E->hasSingleExpressionBody()) {
-      printRec(E->getSingleExpressionBody());
-    } else {
-      printRec(E->getBody(), E->getASTContext());
-    }
+    printRec(E->getBody(), E->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitAutoClosureExpr(AutoClosureExpr *E) {

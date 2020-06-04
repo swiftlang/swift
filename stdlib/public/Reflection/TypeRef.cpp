@@ -491,7 +491,7 @@ public:
       break;
     }
 
-    SmallVector<std::pair<NodePointer, bool>, 8> inputs;
+    llvm::SmallVector<std::pair<NodePointer, bool>, 8> inputs;
     for (const auto &param : F->getParameters()) {
       auto flags = param.getFlags();
       auto input = visit(param.getType());
@@ -1121,7 +1121,7 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
                                S->getParent()))
         return false;
 
-      for (unsigned i = 0, e = O->getGenericParams().size(); i < e; i++) {
+      for (unsigned i = 0, e = O->getGenericParams().size(); i < e; ++i) {
         if (!deriveSubstitutions(Subs,
                                  O->getGenericParams()[i],
                                  S->getGenericParams()[i]))
@@ -1138,7 +1138,7 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
       if (O->getElements().size() != S->getElements().size())
         return false;
 
-      for (unsigned i = 0, e = O->getElements().size(); i < e; i++) {
+      for (unsigned i = 0, e = O->getElements().size(); i < e; ++i) {
         if (!deriveSubstitutions(Subs,
                                  O->getElements()[i],
                                  S->getElements()[i]))

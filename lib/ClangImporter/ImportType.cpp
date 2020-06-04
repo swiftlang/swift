@@ -2082,7 +2082,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
   auto argNames = importedName.getDeclName().getArgumentNames();
   unsigned nameIndex = 0;
-  for (size_t paramIndex = 0; paramIndex != params.size(); paramIndex++) {
+  for (size_t paramIndex = 0, e = params.size(); paramIndex != e;
+       ++paramIndex) {
     auto param = params[paramIndex];
     auto paramTy = param->getType();
     auto paramIsError = errorInfo && paramIndex == errorInfo->ErrorParameterIndex;

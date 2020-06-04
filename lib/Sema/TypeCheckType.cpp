@@ -902,7 +902,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Realize the types of the generic arguments and add them to the
   // substitution map.
-  for (unsigned i = 0, e = genericArgs.size(); i < e; i++) {
+  for (unsigned i = 0, e = genericArgs.size(); i < e; ++i) {
     auto origTy = genericSig->getInnermostGenericParams()[i];
     auto substTy = genericArgs[i];
 
@@ -1694,7 +1694,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution) {
     return Loc.isError();
 
   if (auto *Stats = resolution.getASTContext().Stats)
-    Stats->getFrontendCounters().NumTypesValidated++;
+    ++Stats->getFrontendCounters().NumTypesValidated;
 
   auto type = resolution.resolveType(Loc.getTypeRepr());
   Loc.setType(type);
