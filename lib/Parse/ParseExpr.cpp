@@ -1132,10 +1132,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         if (CodeCompletion) {
           CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
         }
-        // Eat the code completion token because we handled it.
-        consumeToken(tok::code_complete);
-        Result.setHasCodeCompletion();
-        return Result;
+        auto CCExpr = new (Context) CodeCompletionExpr(Result.get(),
+                                                       consumeToken(tok::code_complete));
+        return makeParserCodeCompletionResult(CCExpr);
       }
 
       DeclNameLoc NameLoc;

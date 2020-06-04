@@ -49,7 +49,7 @@ let globalValue = globalValueOpt!
 
 let FORBIDDEN_globalVar = 1
 
-switch glovalValue.x {
+switch globalValue.x {
 case let x where x < 2:
   if x == globalValue.#^TOPLEVEL^# {}
 default:
@@ -58,6 +58,6 @@ default:
 
 // CHECK: Begin completions, 3 items
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#MyStruct#]; name=self
-// CHECK-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#]; name=x
-// CHECK-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#]; name=y
+// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:      x[#Int#]; name=x
+// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:      y[#Int#]; name=y
 // CHECK: End completions
