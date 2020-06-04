@@ -331,6 +331,8 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
+  elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
+    list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
   elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
