@@ -2062,7 +2062,7 @@ void ConstraintSystem::bindOverloadType(
 
     // If this is used inside of the keypath expression, we need to make
     // sure that argument is Hashable.
-    if (isa<KeyPathExpr>(locator->getAnchor()))
+    if (llvm::isa_and_nonnull<KeyPathExpr>(locator->getAnchor()))
       verifyThatArgumentIsHashable(0, argType, locator);
 
     // The resolved decl is for subscript(dynamicMember:), however the original
@@ -2184,7 +2184,7 @@ void ConstraintSystem::bindOverloadType(
       addConstraint(ConstraintKind::Equal, memberTy, leafTy, keyPathLoc);
     }
 
-    if (isa<KeyPathExpr>(locator->getAnchor()))
+    if (llvm::isa_and_nonnull<KeyPathExpr>(locator->getAnchor()))
       verifyThatArgumentIsHashable(0, keyPathTy, locator);
 
     // The resolved decl is for subscript(dynamicMember:), however the
