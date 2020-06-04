@@ -103,7 +103,7 @@ inline MetadataKind getEnumeratedMetadataKind(uint64_t kind) {
   return MetadataKind(kind);
 }
 
-StringRef getStringForMetadataKind(MetadataKind kind);
+swift::runtime::llvm::StringRef getStringForMetadataKind(MetadataKind kind);
 
 /// Kinds of Swift nominal type descriptor records.
 enum class NominalTypeKind : uint32_t {

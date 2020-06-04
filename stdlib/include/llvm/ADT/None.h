@@ -15,7 +15,7 @@
 #ifndef LLVM_ADT_NONE_H
 #define LLVM_ADT_NONE_H
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 /// A simple null object to allow implicit construction of Optional<T>
 /// and similar types without having to spell out the specialization's name.

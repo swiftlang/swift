@@ -39,11 +39,11 @@ enum class ImplMetatypeRepresentation {
 /// representation.
 template <typename BuiltType>
 class FunctionParam {
-  StringRef Label;
+  swift::runtime::llvm::StringRef Label;
   BuiltType Type;
   ParameterFlags Flags;
 
-  FunctionParam(StringRef label, BuiltType type, ParameterFlags flags)
+  FunctionParam(swift::runtime::llvm::StringRef label, BuiltType type, ParameterFlags flags)
       : Label(label), Type(type), Flags(flags) {}
 
 public:
@@ -51,11 +51,11 @@ public:
 
   FunctionParam(BuiltType type) : Type(type) {}
 
-  StringRef getLabel() const { return Label; }
+  swift::runtime::llvm::StringRef getLabel() const { return Label; }
   BuiltType getType() const { return Type; }
   ParameterFlags getFlags() const { return Flags; }
 
-  void setLabel(StringRef label) { Label = label; }
+  void setLabel(swift::runtime::llvm::StringRef label) { Label = label; }
   void setType(BuiltType type) { Type = type; }
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
@@ -65,7 +65,7 @@ public:
   }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
-  FunctionParam withLabel(StringRef label) const {
+  FunctionParam withLabel(swift::runtime::llvm::StringRef label) const {
     return FunctionParam(label, Type, Flags);
   }
 
@@ -94,13 +94,13 @@ enum class ImplParameterDifferentiability {
   NotDifferentiable
 };
 
-static inline llvm::Optional<ImplParameterDifferentiability>
-getDifferentiabilityFromString(StringRef string) {
+static inline swift::runtime::llvm::Optional<ImplParameterDifferentiability>
+getDifferentiabilityFromString(swift::runtime::llvm::StringRef string) {
   if (string.empty())
     return ImplParameterDifferentiability::DifferentiableOrNotApplicable;
   if (string == "@noDerivative")
     return ImplParameterDifferentiability::NotDifferentiable;
-  return None;
+  return swift::runtime::llvm::None;
 }
 
 /// Describe a lowered function parameter, parameterized on the type
@@ -115,8 +115,8 @@ public:
   using ConventionType = ImplParameterConvention;
   using DifferentiabilityType = ImplParameterDifferentiability;
 
-  static llvm::Optional<ConventionType>
-  getConventionFromString(StringRef conventionString) {
+  static swift::runtime::llvm::Optional<ConventionType>
+  getConventionFromString(swift::runtime::llvm::StringRef conventionString) {
     if (conventionString == "@in")
       return ConventionType::Indirect_In;
     if (conventionString == "@in_constant")
@@ -134,7 +134,7 @@ public:
     if (conventionString == "@guaranteed")
       return ConventionType::Direct_Guaranteed;
 
-    return None;
+    return swift::runtime::llvm::None;
   }
 
   ImplFunctionParam(ImplParameterConvention convention,
@@ -168,8 +168,8 @@ class ImplFunctionResult {
 public:
   using ConventionType = ImplResultConvention;
 
-  static llvm::Optional<ConventionType>
-  getConventionFromString(StringRef conventionString) {
+  static swift::runtime::llvm::Optional<ConventionType>
+  getConventionFromString(swift::runtime::llvm::StringRef conventionString) {
     if (conventionString == "@out")
       return ConventionType::Indirect;
     if (conventionString == "@owned")
@@ -181,7 +181,7 @@ public:
     if (conventionString == "@autoreleased")
       return ConventionType::Autoreleased;
 
-    return None;
+    return swift::runtime::llvm::None;
   }
 
   ImplFunctionResult(ImplResultConvention convention, BuiltType type)
@@ -268,7 +268,7 @@ public:
 #if SWIFT_OBJC_INTEROP
 /// For a mangled node that refers to an Objective-C class or protocol,
 /// return the class or protocol name.
-static inline llvm::Optional<StringRef>
+static inline swift::runtime::llvm::Optional<swift::runtime::llvm::StringRef>
 getObjCClassOrProtocolName(NodePointer node) {
   if (node->getKind() != Demangle::Node::Kind::Class &&
       node->getKind() != Demangle::Node::Kind::Protocol)
@@ -361,7 +361,7 @@ class TypeDecoder {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      llvm::SmallVector<BuiltType, 8> args;
+      swift::runtime::llvm::SmallVector<BuiltType, 8> args;
 
       const auto &genericArgs = Node->getChild(1);
       if (genericArgs->getKind() != NodeKind::TypeList)
@@ -435,7 +435,7 @@ class TypeDecoder {
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
       unsigned i = 0;
-      llvm::Optional<ImplMetatypeRepresentation> repr;
+      swift::runtime::llvm::Optional<ImplMetatypeRepresentation> repr;
 
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
@@ -474,7 +474,7 @@ class TypeDecoder {
         return BuiltType();
 
       // Find the protocol list.
-      llvm::SmallVector<BuiltProtocolDecl, 8> Protocols;
+      swift::runtime::llvm::SmallVector<BuiltProtocolDecl, 8> Protocols;
       auto TypeList = Node->getChild(0);
       if (TypeList->getKind() == NodeKind::ProtocolList &&
           TypeList->getNumChildren() >= 1) {
@@ -576,7 +576,7 @@ class TypeDecoder {
         return BuiltType();
 
       bool hasParamFlags = false;
-      llvm::SmallVector<FunctionParam<BuiltType>, 8> parameters;
+      swift::runtime::llvm::SmallVector<FunctionParam<BuiltType>, 8> parameters;
       if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
                                           parameters, hasParamFlags))
         return BuiltType();
@@ -598,9 +598,9 @@ class TypeDecoder {
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;
-      llvm::SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
-      llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> results;
-      llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
+      swift::runtime::llvm::SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
+      swift::runtime::llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> results;
+      swift::runtime::llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
       ImplFunctionTypeFlags flags;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {
@@ -620,7 +620,7 @@ class TypeDecoder {
           if (!child->hasText())
             return BuiltType();
 
-          StringRef text = child->getText();
+          swift::runtime::llvm::StringRef text = child->getText();
           if (text == "@convention(c)") {
             flags =
               flags.withRepresentation(ImplFunctionRepresentation::CFunctionPointer);
@@ -650,7 +650,7 @@ class TypeDecoder {
         }
       }
 
-      llvm::Optional<ImplFunctionResult<BuiltType>> errorResult;
+      swift::runtime::llvm::Optional<ImplFunctionResult<BuiltType>> errorResult;
       switch (errorResults.size()) {
       case 0:
         break;
@@ -684,7 +684,7 @@ class TypeDecoder {
       return decodeMangledType(Node->getChild(0));
 
     case NodeKind::Tuple: {
-      llvm::SmallVector<BuiltType, 8> elements;
+      swift::runtime::llvm::SmallVector<BuiltType, 8> elements;
       std::string labels;
       bool variadic = false;
       for (auto &element : *Node) {
@@ -877,7 +877,7 @@ class TypeDecoder {
         }
       }
       genericArgsLevels.push_back(genericArgsBuf.size());
-      std::vector<llvm::ArrayRef<BuiltType>> genericArgs;
+      std::vector<swift::runtime::llvm::ArrayRef<BuiltType>> genericArgs;
       for (unsigned i = 0; i < genericArgsLevels.size() - 1; ++i) {
         auto start = genericArgsLevels[i], end = genericArgsLevels[i+1];
         genericArgs.emplace_back(genericArgsBuf.data() + start,
@@ -896,7 +896,7 @@ class TypeDecoder {
 private:
   template <typename T>
   bool decodeImplFunctionPart(Demangle::NodePointer node,
-                              llvm::SmallVectorImpl<T> &results) {
+                              swift::runtime::llvm::SmallVectorImpl<T> &results) {
     if (node->getNumChildren() != 2)
       return true;
     
@@ -904,8 +904,8 @@ private:
         node->getChild(1)->getKind() != Node::Kind::Type)
       return true;
 
-    StringRef conventionString = node->getChild(0)->getText();
-    llvm::Optional<typename T::ConventionType> convention =
+    swift::runtime::llvm::StringRef conventionString = node->getChild(0)->getText();
+    swift::runtime::llvm::Optional<typename T::ConventionType> convention =
         T::getConventionFromString(conventionString);
     if (!convention)
       return true;
@@ -919,7 +919,7 @@ private:
 
   bool decodeImplFunctionParam(
       Demangle::NodePointer node,
-      llvm::SmallVectorImpl<ImplFunctionParam<BuiltType>> &results) {
+      swift::runtime::llvm::SmallVectorImpl<ImplFunctionParam<BuiltType>> &results) {
     // Children: `convention, differentiability?, type`
     if (node->getNumChildren() != 2 && node->getNumChildren() != 3)
       return true;
@@ -930,7 +930,7 @@ private:
         typeNode->getKind() != Node::Kind::Type)
       return true;
 
-    StringRef conventionString = conventionNode->getText();
+    swift::runtime::llvm::StringRef conventionString = conventionNode->getText();
     auto convention =
         ImplFunctionParam<BuiltType>::getConventionFromString(conventionString);
     if (!convention)
@@ -1021,7 +1021,7 @@ private:
 
   bool decodeMangledFunctionInputType(
       Demangle::NodePointer node,
-      llvm::SmallVectorImpl<FunctionParam<BuiltType>> &params,
+      swift::runtime::llvm::SmallVectorImpl<FunctionParam<BuiltType>> &params,
       bool &hasParamFlags) {
     // Look through a couple of sugar nodes.
     if (node->getKind() == NodeKind::Type ||
@@ -1073,9 +1073,9 @@ private:
     };
 
     auto decodeParam =
-        [&](NodePointer paramNode) -> llvm::Optional<FunctionParam<BuiltType>> {
+        [&](NodePointer paramNode) -> swift::runtime::llvm::Optional<FunctionParam<BuiltType>> {
       if (paramNode->getKind() != NodeKind::TupleElement)
-        return None;
+        return swift::runtime::llvm::None;
 
       FunctionParam<BuiltType> param;
       for (const auto &child : *paramNode) {
@@ -1091,11 +1091,11 @@ private:
 
         case NodeKind::Type:
           if (!decodeParamTypeAndFlags(child->getFirstChild(), param))
-            return None;
+            return swift::runtime::llvm::None;
           break;
 
         default:
-          return None;
+          return swift::runtime::llvm::None;
         }
       }
 

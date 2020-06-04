@@ -23,9 +23,13 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
+#include <limits.h>
 #include <stdint.h>
 #include <assert.h>
+
+namespace llvm {
+class raw_ostream;
+}
 
 namespace swift {
 
@@ -44,7 +48,7 @@ enum class ReferenceOwnership : uint8_t {
 enum : unsigned { NumReferenceOwnershipBits =
   countBitsUsed(static_cast<unsigned>(ReferenceOwnership::Last_Kind)) };
 
-static inline llvm::StringRef keywordOf(ReferenceOwnership ownership) {
+static inline runtime::llvm::StringRef keywordOf(ReferenceOwnership ownership) {
   switch (ownership) {
   case ReferenceOwnership::Strong:
     break;
@@ -57,7 +61,7 @@ static inline llvm::StringRef keywordOf(ReferenceOwnership ownership) {
   LLVM_BUILTIN_UNREACHABLE;
 }
 
-static inline llvm::StringRef manglingOf(ReferenceOwnership ownership) {
+static inline runtime::llvm::StringRef manglingOf(ReferenceOwnership ownership) {
   switch (ownership) {
   case ReferenceOwnership::Strong:
     break;

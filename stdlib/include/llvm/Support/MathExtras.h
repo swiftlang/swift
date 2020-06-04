@@ -39,7 +39,7 @@ unsigned char _BitScanReverse64(unsigned long *_Index, unsigned __int64 _Mask);
 }
 #endif
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 /// The behavior an operation has on an input of 0.

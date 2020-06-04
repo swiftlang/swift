@@ -138,7 +138,7 @@ OVERRIDE_PROTOCOLCONFORMANCE(conformsToSwiftProtocol,
                              const ProtocolConformanceDescriptor *, , , swift::,
                              (const Metadata * const type,
                               const ProtocolDescriptor *protocol,
-                              StringRef moduleName),
+                              swift::runtime::llvm::StringRef moduleName),
                              (type, protocol, moduleName))
 
 OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , , swift::,
@@ -155,7 +155,7 @@ OVERRIDE_METADATALOOKUP(getTypeByMangledNode, TypeInfo, , SWIFT_CC(swift), swift
                         (request, demangler, node, arguments, substGenericParam, substWitnessTable))
 OVERRIDE_METADATALOOKUP(getTypeByMangledName, TypeInfo, , SWIFT_CC(swift), swift::,
                         (MetadataRequest request,
-                         StringRef typeName,
+                         swift::runtime::llvm::StringRef typeName,
                          const void * const *arguments,
                          SubstGenericParameterFn substGenericParam,
                          SubstDependentWitnessTableFn substWitnessTable),

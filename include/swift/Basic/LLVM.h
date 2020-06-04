@@ -29,8 +29,10 @@
 // Forward declarations.
 namespace llvm {
   // Containers.
+#if !defined(swiftCore_EXPORTS)
   class StringRef;
   class StringLiteral;
+#endif
   class Twine;
   template <typename T> class SmallPtrSetImpl;
   template <typename T, unsigned N> class SmallPtrSet;
@@ -64,20 +66,20 @@ namespace llvm {
 
 namespace swift {
   // Casting operators.
+#if !defined(swiftCore_EXPORTS)
   using llvm::isa;
   using llvm::cast;
   using llvm::dyn_cast;
   using llvm::dyn_cast_or_null;
   using llvm::cast_or_null;
+#endif
 
   // Containers.
 #if !defined(swiftCore_EXPORTS)
   using llvm::ArrayRef;
   using llvm::MutableArrayRef;
-#endif
   using llvm::iterator_range;
   using llvm::None;
-#if !defined(swiftCore_EXPORTS)
   using llvm::Optional;
 #endif
   using llvm::PointerUnion;
@@ -89,9 +91,9 @@ namespace swift {
 #if !defined(swiftCore_EXPORTS)
   using llvm::SmallVector;
   using llvm::SmallVectorImpl;
-#endif
   using llvm::StringLiteral;
   using llvm::StringRef;
+#endif
   using llvm::TinyPtrVector;
   using llvm::Twine;
 
@@ -100,8 +102,8 @@ namespace swift {
   using llvm::APInt;
 #if !defined(swiftCore_EXPORTS)
   using llvm::function_ref;
-#endif
   using llvm::NoneType;
+#endif
   using llvm::raw_ostream;
 } // end namespace swift
 

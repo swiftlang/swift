@@ -34,7 +34,7 @@
 #include <type_traits>
 #include <utility>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 namespace detail {
@@ -435,21 +435,20 @@ template <typename AllocatorT, size_t SlabSize, size_t SizeThreshold,
           size_t GrowthDelay>
 void *
 operator new(size_t Size,
-             __swift::__runtime::llvm::BumpPtrAllocatorImpl<AllocatorT,
-                                                            SlabSize,
-                                                            SizeThreshold,
-                                                            GrowthDelay> &Allocator) {
-  return Allocator.Allocate(Size, std::min((size_t)llvm::NextPowerOf2(Size),
+             swift::runtime::llvm::BumpPtrAllocatorImpl<AllocatorT, SlabSize,
+                                                        SizeThreshold,
+                                                        GrowthDelay> &Allocator) {
+  return Allocator.Allocate(Size, std::min((size_t)swift::runtime::llvm::NextPowerOf2(Size),
                                            alignof(std::max_align_t)));
 }
 
 template <typename AllocatorT, size_t SlabSize, size_t SizeThreshold,
           size_t GrowthDelay>
 void operator delete(void *,
-                     __swift::__runtime::llvm::BumpPtrAllocatorImpl<AllocatorT,
-                                                                    SlabSize,
-                                                                    SizeThreshold,
-                                                                    GrowthDelay> &) {
+                     swift::runtime::llvm::BumpPtrAllocatorImpl<AllocatorT,
+                                                                SlabSize,
+                                                                SizeThreshold,
+                                                                GrowthDelay> &) {
 }
 
 #endif // LLVM_SUPPORT_ALLOCATOR_H

@@ -114,7 +114,7 @@ public:
   ///
   /// \return true if collection was successful.
   template <bool Asserting>
-  bool collect(llvm::StringRef value) {
+  bool collect(swift::runtime::llvm::StringRef value) {
 #define check(CONDITION, COMMENT)            \
     do {                                     \
       if (!Asserting) {                      \
@@ -177,17 +177,17 @@ public:
 class ParsedTypeIdentity {
 public:
   /// The user-facing name of the type.
-  llvm::StringRef UserFacingName;
+  swift::runtime::llvm::StringRef UserFacingName;
 
   /// The full identity of the type.
   /// Note that this may include interior '\0' characters.
-  llvm::StringRef FullIdentity;
+  swift::runtime::llvm::StringRef FullIdentity;
 
   /// Any extended information that type might have.
-  llvm::Optional<TypeImportInfo<llvm::StringRef>> ImportInfo;
+  swift::runtime::llvm::Optional<TypeImportInfo<swift::runtime::llvm::StringRef>> ImportInfo;
 
   /// The ABI name of the type.
-  llvm::StringRef getABIName() const {
+  swift::runtime::llvm::StringRef getABIName() const {
     if (ImportInfo && !ImportInfo->ABIName.empty())
       return ImportInfo->ABIName;
     return UserFacingName;
@@ -202,11 +202,11 @@ public:
     return ImportInfo && !ImportInfo->RelatedEntityName.empty();
   }
 
-  bool isRelatedEntity(llvm::StringRef entityName) const {
+  bool isRelatedEntity(swift::runtime::llvm::StringRef entityName) const {
     return ImportInfo && ImportInfo->RelatedEntityName == entityName;
   }
 
-  llvm::StringRef getRelatedEntityName() const {
+  swift::runtime::llvm::StringRef getRelatedEntityName() const {
     assert(isAnyRelatedEntity());
     return ImportInfo->RelatedEntityName;
   }

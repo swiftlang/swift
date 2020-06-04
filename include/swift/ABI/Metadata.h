@@ -1434,7 +1434,7 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   using TargetValueMetadata<Runtime>::TargetValueMetadata;
 
   const TargetStructDescriptor<Runtime> *getDescription() const {
-    return llvm::cast<TargetStructDescriptor<Runtime>>(this->Description);
+    return swift::runtime::llvm::cast<TargetStructDescriptor<Runtime>>(this->Description);
   }
 
   // The first trailing field of struct metadata is always the generic
@@ -1495,7 +1495,7 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
   using TargetValueMetadata<Runtime>::TargetValueMetadata;
 
   const TargetEnumDescriptor<Runtime> *getDescription() const {
-    return llvm::cast<TargetEnumDescriptor<Runtime>>(this->Description);
+    return swift::runtime::llvm::cast<TargetEnumDescriptor<Runtime>>(this->Description);
   }
 
   // The first trailing field of enum metadata is always the generic
@@ -2009,7 +2009,7 @@ public:
   }
 
   /// Retrieve the set of protocols required by the existential.
-  llvm::ArrayRef<ProtocolDescriptorRef> getProtocols() const {
+  swift::runtime::llvm::ArrayRef<ProtocolDescriptorRef> getProtocols() const {
     return { this->template getTrailingObjects<ProtocolDescriptorRef>(),
              NumProtocols };
   }
@@ -2022,7 +2022,7 @@ public:
   }
 
   /// Retrieve the set of protocols required by the existential.
-  llvm::MutableArrayRef<ProtocolDescriptorRef> getMutableProtocols() {
+  swift::runtime::llvm::MutableArrayRef<ProtocolDescriptorRef> getMutableProtocols() {
     return { this->template getTrailingObjects<ProtocolDescriptorRef>(),
              NumProtocols };
   }
@@ -2184,7 +2184,7 @@ struct TargetResilientWitnessTable final
     return NumWitnesses;
   }
 
-  llvm::ArrayRef<TargetResilientWitness<Runtime>>
+  swift::runtime::llvm::ArrayRef<TargetResilientWitness<Runtime>>
   getWitnesses() const {
     return {this->template getTrailingObjects<TargetResilientWitness<Runtime>>(),
             NumWitnesses};
@@ -2521,7 +2521,7 @@ public:
 
   /// Retrieve the conditional requirements that must also be
   /// satisfied
-  llvm::ArrayRef<GenericRequirementDescriptor>
+  swift::runtime::llvm::ArrayRef<GenericRequirementDescriptor>
   getConditionalRequirements() const {
     return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
             Flags.getNumConditionalRequirements()};
@@ -2544,11 +2544,11 @@ public:
   getWitnessTable(const TargetMetadata<Runtime> *type) const;
 
   /// Retrieve the resilient witnesses.
-  llvm::ArrayRef<ResilientWitness> getResilientWitnesses() const {
+  swift::runtime::llvm::ArrayRef<ResilientWitness> getResilientWitnesses() const {
     if (!Flags.hasResilientWitnesses())
       return { };
 
-    return llvm::ArrayRef<ResilientWitness>(
+    return swift::runtime::llvm::ArrayRef<ResilientWitness>(
         this->template getTrailingObjects<ResilientWitness>(),
         numTrailingObjects(OverloadToken<ResilientWitness>()));
   }
@@ -2660,7 +2660,7 @@ private:
 
 using ContextDescriptor = TargetContextDescriptor<InProcess>;
 
-inline bool isCImportedModuleName(llvm::StringRef name) {
+inline bool isCImportedModuleName(swift::runtime::llvm::StringRef name) {
   // This does not include MANGLING_MODULE_CLANG_IMPORTER because that's
   // used only for synthesized declarations and not actual imported
   // declarations.
@@ -2695,7 +2695,7 @@ inline const TargetModuleContextDescriptor<Runtime> *
 TargetContextDescriptor<Runtime>::getModuleContext() const {
   // All context chains should eventually find a module.
   for (auto cur = this; true; cur = cur->Parent.get()) {
-    if (auto module = dyn_cast<TargetModuleContextDescriptor<Runtime>>(cur))
+    if (auto module = swift::runtime::llvm::dyn_cast<TargetModuleContextDescriptor<Runtime>>(cur))
       return module;
   }
 }
@@ -2757,7 +2757,7 @@ public:
 
   /// Retrieve the generic parameter that is the subject of this requirement,
   /// as a mangled type name.
-  llvm::StringRef getParam() const {
+  swift::runtime::llvm::StringRef getParam() const {
     return swift::Demangle::makeSymbolicMangledNameStringRef(Param.get());
   }
 
@@ -2768,7 +2768,7 @@ public:
   }
 
   /// Retrieve the right-hand type for a SameType or BaseClass requirement.
-  llvm::StringRef getMangledTypeName() const {
+  swift::runtime::llvm::StringRef getMangledTypeName() const {
     assert(getKind() == GenericRequirementKind::SameType ||
            getKind() == GenericRequirementKind::BaseClass);
     return swift::Demangle::makeSymbolicMangledNameStringRef(Type.get());
@@ -2837,21 +2837,21 @@ class TargetGenericEnvironment
 
 public:
   /// Retrieve the cumulative generic parameter counts at each level of genericity.
-  llvm::ArrayRef<uint16_t> getGenericParameterCounts() const {
-    return llvm::makeArrayRef(this->template getTrailingObjects<uint16_t>(),
+  swift::runtime::llvm::ArrayRef<uint16_t> getGenericParameterCounts() const {
+    return swift::runtime::llvm::makeArrayRef(this->template getTrailingObjects<uint16_t>(),
                               Flags.getNumGenericParameterLevels());
   }
 
   /// Retrieve the generic parameters descriptors.
-  llvm::ArrayRef<GenericParamDescriptor> getGenericParameters() const {
-    return llvm::makeArrayRef(
+  swift::runtime::llvm::ArrayRef<GenericParamDescriptor> getGenericParameters() const {
+    return swift::runtime::llvm::makeArrayRef(
         this->template getTrailingObjects<GenericParamDescriptor>(),
         getGenericParameterCounts().back());
   }
 
   /// Retrieve the generic requirements.
-  llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
-    return llvm::makeArrayRef(
+  swift::runtime::llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
+    return swift::runtime::llvm::makeArrayRef(
         this->template getTrailingObjects<GenericRequirementDescriptor>(),
         Flags.getNumGenericRequirements());
   }
@@ -2925,7 +2925,7 @@ public:
       header - sizeof(TargetGenericContext<Runtime>));
   }
 
-  llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const {
+  swift::runtime::llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const {
     if (!asSelf()->isGeneric())
       return {};
 
@@ -2933,7 +2933,7 @@ public:
             getGenericContextHeader().NumParams};
   }
   
-  llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
+  swift::runtime::llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
     if (!asSelf()->isGeneric())
       return {};
     return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
@@ -2999,7 +2999,7 @@ public:
 
   using TrailingGenericContextObjects::getGenericContext;
 
-  llvm::StringRef getMangledExtendedContext() const {
+  swift::runtime::llvm::StringRef getMangledExtendedContext() const {
     return Demangle::makeSymbolicMangledNameStringRef(ExtendedContext.get());
   }
   
@@ -3149,7 +3149,7 @@ public:
 
   /// Retrieve the requirements that make up the requirement signature of
   /// this protocol.
-  llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>>
+  swift::runtime::llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>>
   getRequirementSignature() const {
     return {this->template getTrailingObjects<
                              TargetGenericRequirementDescriptor<Runtime>>(),
@@ -3157,7 +3157,7 @@ public:
   }
 
   /// Retrieve the requirements of this protocol.
-  llvm::ArrayRef<TargetProtocolRequirement<Runtime>>
+  swift::runtime::llvm::ArrayRef<TargetProtocolRequirement<Runtime>>
   getRequirements() const {
     return {this->template getTrailingObjects<
                              TargetProtocolRequirement<Runtime>>(),
@@ -3224,7 +3224,7 @@ public:
          ->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
   }
 
-  llvm::StringRef getUnderlyingTypeArgument(unsigned i) const {
+  swift::runtime::llvm::StringRef getUnderlyingTypeArgument(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
     const char *ptr = getUnderlyingTypeArgumentMangledName(i);    
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
@@ -3542,7 +3542,7 @@ public:
   
   /// Invoke with an array of arguments of dynamic size.
   MetadataResponse operator()(MetadataRequest request,
-                              llvm::ArrayRef<const void *> args) const {
+                              swift::runtime::llvm::ArrayRef<const void *> args) const {
     switch (args.size()) {
     case 0:
       return operator()(request);
@@ -3722,7 +3722,7 @@ struct TargetSingletonMetadataInitialization {
   bool hasResilientClassPattern(
       const TargetTypeContextDescriptor<Runtime> *description) const {
     auto *classDescription =
-      dyn_cast<TargetClassDescriptor<Runtime>>(description);
+      swift::runtime::llvm::dyn_cast<TargetClassDescriptor<Runtime>>(description);
     return (classDescription != nullptr &&
             classDescription->hasResilientSuperclass());
   }
@@ -3798,7 +3798,7 @@ public:
     return getFullGenericContextHeader();
   }
 
-  llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const;
+  swift::runtime::llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const;
 
   /// Return the offset of the start of generic arguments in the nominal
   /// type's metadata. The returned value is measured in sizeof(StoredPointer).
@@ -4151,7 +4151,7 @@ public:
     return this->template getTrailingObjects<VTableDescriptorHeader>();
   }
 
-  llvm::ArrayRef<MethodDescriptor> getMethodDescriptors() const {
+  swift::runtime::llvm::ArrayRef<MethodDescriptor> getMethodDescriptors() const {
     if (!hasVTable())
       return {};
     return {this->template getTrailingObjects<MethodDescriptor>(),
@@ -4164,7 +4164,7 @@ public:
     return this->template getTrailingObjects<OverrideTableHeader>();
   }
 
-  llvm::ArrayRef<MethodOverrideDescriptor> getMethodOverrideDescriptors() const {
+  swift::runtime::llvm::ArrayRef<MethodOverrideDescriptor> getMethodOverrideDescriptors() const {
     if (!hasOverrideTable())
       return {};
     return {this->template getTrailingObjects<MethodOverrideDescriptor>(),
@@ -4439,22 +4439,22 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
     // Never generic.
     return nullptr;
   case ContextDescriptorKind::Extension:
-    return llvm::cast<TargetExtensionContextDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetExtensionContextDescriptor<Runtime>>(this)
       ->getGenericContext();
   case ContextDescriptorKind::Anonymous:
-    return llvm::cast<TargetAnonymousContextDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetAnonymousContextDescriptor<Runtime>>(this)
       ->getGenericContext();
   case ContextDescriptorKind::Class:
-    return llvm::cast<TargetClassDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetClassDescriptor<Runtime>>(this)
         ->getGenericContext();
   case ContextDescriptorKind::Enum:
-    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetEnumDescriptor<Runtime>>(this)
         ->getGenericContext();
   case ContextDescriptorKind::Struct:
-    return llvm::cast<TargetStructDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getGenericContext();
   case ContextDescriptorKind::OpaqueType:
-    return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
         ->getGenericContext();
   default:    
     // We don't know about this kind of descriptor.
@@ -4466,13 +4466,13 @@ template <typename Runtime>
 int32_t TargetTypeContextDescriptor<Runtime>::getGenericArgumentOffset() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Class:
-    return llvm::cast<TargetClassDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetClassDescriptor<Runtime>>(this)
         ->getGenericArgumentOffset();
   case ContextDescriptorKind::Enum:
-    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetEnumDescriptor<Runtime>>(this)
         ->getGenericArgumentOffset();
   case ContextDescriptorKind::Struct:
-    return llvm::cast<TargetStructDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getGenericArgumentOffset();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
@@ -4484,13 +4484,13 @@ const TargetTypeGenericContextDescriptorHeader<Runtime> &
 TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Class:
-    return llvm::cast<TargetClassDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetClassDescriptor<Runtime>>(this)
         ->getFullGenericContextHeader();
   case ContextDescriptorKind::Enum:
-    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetEnumDescriptor<Runtime>>(this)
         ->getFullGenericContextHeader();
   case ContextDescriptorKind::Struct:
-    return llvm::cast<TargetStructDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getFullGenericContextHeader();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
@@ -4498,17 +4498,17 @@ TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
 }
 
 template <typename Runtime>
-llvm::ArrayRef<GenericParamDescriptor> 
+swift::runtime::llvm::ArrayRef<GenericParamDescriptor> 
 TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Class:
-    return llvm::cast<TargetClassDescriptor<Runtime>>(this)->getGenericParams();
+    return swift::runtime::llvm::cast<TargetClassDescriptor<Runtime>>(this)->getGenericParams();
   case ContextDescriptorKind::Enum:
-    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)->getGenericParams();
+    return swift::runtime::llvm::cast<TargetEnumDescriptor<Runtime>>(this)->getGenericParams();
   case ContextDescriptorKind::Struct:
-    return llvm::cast<TargetStructDescriptor<Runtime>>(this)->getGenericParams();
+    return swift::runtime::llvm::cast<TargetStructDescriptor<Runtime>>(this)->getGenericParams();
   case ContextDescriptorKind::OpaqueType:
-    return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)->getGenericParams();
+    return swift::runtime::llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)->getGenericParams();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
   }
@@ -4519,13 +4519,13 @@ const TargetForeignMetadataInitialization<Runtime> &
 TargetTypeContextDescriptor<Runtime>::getForeignMetadataInitialization() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Class:
-    return llvm::cast<TargetClassDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetClassDescriptor<Runtime>>(this)
         ->getForeignMetadataInitialization();
   case ContextDescriptorKind::Enum:
-    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetEnumDescriptor<Runtime>>(this)
         ->getForeignMetadataInitialization();
   case ContextDescriptorKind::Struct:
-    return llvm::cast<TargetStructDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getForeignMetadataInitialization();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
@@ -4537,13 +4537,13 @@ inline const TargetSingletonMetadataInitialization<Runtime> &
 TargetTypeContextDescriptor<Runtime>::getSingletonMetadataInitialization() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Enum:
-    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetEnumDescriptor<Runtime>>(this)
         ->getSingletonMetadataInitialization();
   case ContextDescriptorKind::Struct:
-    return llvm::cast<TargetStructDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getSingletonMetadataInitialization();
   case ContextDescriptorKind::Class:
-    return llvm::cast<TargetClassDescriptor<Runtime>>(this)
+    return swift::runtime::llvm::cast<TargetClassDescriptor<Runtime>>(this)
         ->getSingletonMetadataInitialization();
   default:
     swift_runtime_unreachable("Not a enum, struct or class type descriptor.");
@@ -4613,7 +4613,7 @@ class DynamicReplacementScope
                                   DynamicReplacementDescriptor>;
   friend TrailingObjects;
 
-  llvm::ArrayRef<DynamicReplacementDescriptor>
+  swift::runtime::llvm::ArrayRef<DynamicReplacementDescriptor>
   getReplacementDescriptors() const {
     return {this->template getTrailingObjects<DynamicReplacementDescriptor>(),
             numReplacements};

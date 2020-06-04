@@ -16,7 +16,7 @@
 #include "llvm/Support/Compiler.h"
 #include <cstddef>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 namespace detail {
@@ -47,7 +47,7 @@ template <typename T> union SizerImpl<T> { char arr[sizeof(T)]; };
 /// `buffer` member which can be used as suitable storage for a placement new of
 /// any of these types.
 template <typename T, typename... Ts> struct AlignedCharArrayUnion {
-  alignas(__swift::__runtime::llvm::detail::AlignerImpl<T, Ts...>)
+  alignas(swift::runtime::llvm::detail::AlignerImpl<T, Ts...>)
   char buffer[sizeof(llvm::detail::SizerImpl<T, Ts...>)];
 };
 

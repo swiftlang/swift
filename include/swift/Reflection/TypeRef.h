@@ -27,9 +27,6 @@
 namespace swift {
 namespace reflection {
 
-using llvm::cast;
-using llvm::dyn_cast;
-
 enum class TypeRefKind {
 #define TYPEREF(Id, Parent) Id,
 #include "swift/Reflection/TypeRefs.def"
@@ -135,7 +132,7 @@ public:
 class TypeRef;
 class TypeRefBuilder;
 using DepthAndIndex = std::pair<unsigned, unsigned>;
-using GenericArgumentMap = llvm::DenseMap<DepthAndIndex, const TypeRef *>;
+using GenericArgumentMap = swift::runtime::llvm::DenseMap<DepthAndIndex, const TypeRef *>;
 
 class alignas(void *) TypeRef {
   TypeRefKind Kind;
@@ -159,7 +156,7 @@ public:
   const TypeRef *
   subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const;
 
-  llvm::Optional<GenericArgumentMap> getSubstMap() const;
+  swift::runtime::llvm::Optional<GenericArgumentMap> getSubstMap() const;
 
   virtual ~TypeRef() = default;
 
@@ -346,11 +343,11 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
   // Each ArrayRef in ArgumentLists references into the buffer owned by this
   // vector, which must not be modified after construction.
   std::vector<const TypeRef *> AllArgumentsBuf;
-  std::vector<llvm::ArrayRef<const TypeRef *>> ArgumentLists;
+  std::vector<swift::runtime::llvm::ArrayRef<const TypeRef *>> ArgumentLists;
 
   static TypeRefID
-  Profile(StringRef idString, StringRef description, unsigned ordinal,
-          llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> argumentLists) {
+  Profile(swift::runtime::llvm::StringRef idString, swift::runtime::llvm::StringRef description, unsigned ordinal,
+          swift::runtime::llvm::ArrayRef<swift::runtime::llvm::ArrayRef<const TypeRef *>> argumentLists) {
     TypeRefID ID;
     ID.addString(idString.str());
     ID.addInteger(ordinal);
@@ -365,8 +362,8 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
 
 public:
   OpaqueArchetypeTypeRef(
-      StringRef id, StringRef description, unsigned ordinal,
-      llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> argumentLists)
+      swift::runtime::llvm::StringRef id, swift::runtime::llvm::StringRef description, unsigned ordinal,
+      swift::runtime::llvm::ArrayRef<swift::runtime::llvm::ArrayRef<const TypeRef *>> argumentLists)
       : TypeRef(TypeRefKind::OpaqueArchetype), ID(id), Description(description),
         Ordinal(ordinal) {
     std::vector<unsigned> argumentListLengths;
@@ -378,7 +375,7 @@ public:
     }
     auto *data = AllArgumentsBuf.data();
     for (auto length : argumentListLengths) {
-      ArgumentLists.push_back(llvm::ArrayRef<const TypeRef *>(data, length));
+      ArgumentLists.push_back(swift::runtime::llvm::ArrayRef<const TypeRef *>(data, length));
       data += length;
     }
     assert(data == AllArgumentsBuf.data() + AllArgumentsBuf.size());
@@ -386,13 +383,13 @@ public:
 
   template <typename Allocator>
   static const OpaqueArchetypeTypeRef *
-  create(Allocator &A, StringRef id, StringRef description, unsigned ordinal,
-         llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> arguments) {
+  create(Allocator &A, swift::runtime::llvm::StringRef id, swift::runtime::llvm::StringRef description, unsigned ordinal,
+         swift::runtime::llvm::ArrayRef<swift::runtime::llvm::ArrayRef<const TypeRef *>> arguments) {
     FIND_OR_CREATE_TYPEREF(A, OpaqueArchetypeTypeRef,
                            id, description, ordinal, arguments);
   }
 
-  llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> getArgumentLists() const {
+  swift::runtime::llvm::ArrayRef<swift::runtime::llvm::ArrayRef<const TypeRef *>> getArgumentLists() const {
     return ArgumentLists;
   }
 
@@ -401,12 +398,12 @@ public:
   }
   
   /// A stable identifier for the opaque type.
-  StringRef getID() const {
+  swift::runtime::llvm::StringRef getID() const {
     return ID;
   }
   
   /// A human-digestible, but not necessarily stable, description of the opaque type.
-  StringRef getDescription() const {
+  swift::runtime::llvm::StringRef getDescription() const {
     return Description;
   }
   
@@ -840,7 +837,7 @@ public:
 #define TYPEREF(Id, Parent) \
     case TypeRefKind::Id: \
       return static_cast<ImplClass*>(this) \
-        ->visit##Id##TypeRef(cast<Id##TypeRef>(typeRef), \
+        ->visit##Id##TypeRef(swift::runtime::llvm::cast<Id##TypeRef>(typeRef), \
                            ::std::forward<Args>(args)...);
 #include "swift/Reflection/TypeRefs.def"
     }

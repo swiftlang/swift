@@ -12,7 +12,6 @@
 
 #include "Private.h"
 #include "swift/ABI/TypeIdentity.h"
-#include "swift/Basic/Range.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
@@ -28,13 +27,13 @@ using namespace swift;
 
 Demangle::NodePointer
 swift::_buildDemanglingForContext(const ContextDescriptor *context,
-                                  llvm::ArrayRef<NodePointer> demangledGenerics,
+                                  swift::runtime::llvm::ArrayRef<NodePointer> demangledGenerics,
                                   Demangle::Demangler &Dem) {
   unsigned usedDemangledGenerics = 0;
   NodePointer node = nullptr;
 
   // Walk up the context tree.
-  llvm::SmallVector<const ContextDescriptor *, 8> descriptorPath;
+  swift::runtime::llvm::SmallVector<const ContextDescriptor *, 8> descriptorPath;
   {
     const ContextDescriptor *parent = context;
     while (parent) {
@@ -69,17 +68,17 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       return genericArgsList;
     };
   
-  for (auto component : llvm::reverse(descriptorPath)) {
+  for (auto component : swift::runtime::llvm::reverse(descriptorPath)) {
     switch (auto kind = component->getKind()) {
     case ContextDescriptorKind::Module: {
       assert(node == nullptr && "module should be top level");
-      auto name = llvm::cast<ModuleContextDescriptor>(component)->Name.get();
+      auto name = swift::runtime::llvm::cast<ModuleContextDescriptor>(component)->Name.get();
       node = Dem.createNode(Node::Kind::Module, name);
       break;
     }
     
     case ContextDescriptorKind::Extension: {
-      auto extension = llvm::cast<ExtensionContextDescriptor>(component);
+      auto extension = swift::runtime::llvm::cast<ExtensionContextDescriptor>(component);
       // Demangle the extension self type.
       auto selfType = Dem.demangleType(extension->getMangledExtendedContext(),
                                        ResolveToDemanglingForContext(Dem));
@@ -117,7 +116,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
     }
 
     case ContextDescriptorKind::Protocol: {
-      auto protocol = llvm::cast<ProtocolDescriptor>(component);
+      auto protocol = swift::runtime::llvm::cast<ProtocolDescriptor>(component);
       auto name = protocol->Name.get();
 
       auto protocolNode = Dem.createNode(Node::Kind::Protocol);
@@ -131,7 +130,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
 
     default:
       // Form a type context demangling for type contexts.
-      if (auto type = llvm::dyn_cast<TypeContextDescriptor>(component)) {
+      if (auto type = swift::runtime::llvm::dyn_cast<TypeContextDescriptor>(component)) {
         auto identity = ParsedTypeIdentity::parse(type);
 
         Node::Kind nodeKind;
@@ -285,11 +284,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 
   // Gather the complete set of generic arguments that must be written to
   // form this type.
-  llvm::SmallVector<const Metadata *, 8> allGenericArgs;
+  swift::runtime::llvm::SmallVector<const Metadata *, 8> allGenericArgs;
   gatherWrittenGenericArgs(type, description, allGenericArgs, Dem);
 
   // Demangle the generic arguments.
-  llvm::SmallVector<NodePointer, 8> demangledGenerics;
+  swift::runtime::llvm::SmallVector<NodePointer, 8> demangledGenerics;
   for (auto genericArg : allGenericArgs) {
     // When there is no generic argument, put in a placeholder.
     if (!genericArg) {
@@ -337,7 +336,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto node = Dem.createNode(Node::Kind::Class);
     node->addChild(module, Dem);
     node->addChild(Dem.createNode(Node::Kind::Identifier,
-                                       llvm::StringRef(className)), Dem);
+                                       swift::runtime::llvm::StringRef(className)), Dem);
     
     return node;
 #else
@@ -361,7 +360,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 #if SWIFT_OBJC_INTEROP
       if (protocol.isObjC()) {
         // The protocol name is mangled as a type symbol, with the _Tt prefix.
-        StringRef ProtoName(protocol.getName());
+        swift::runtime::llvm::StringRef ProtoName(protocol.getName());
         NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
 
         // ObjC protocol names aren't mangled.
@@ -470,7 +469,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       break;
     }
 
-    llvm::SmallVector<std::pair<NodePointer, bool>, 8> inputs;
+    swift::runtime::llvm::SmallVector<std::pair<NodePointer, bool>, 8> inputs;
     for (unsigned i = 0, e = func->getNumParameters(); i < e; ++i) {
       auto param = func->getParameter(i);
       auto flags = func->getParameterFlags(i);
@@ -591,7 +590,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
           if (labels != space) {
             auto eltName =
               Dem.createNode(Node::Kind::TupleElementName,
-                                  llvm::StringRef(labels, space - labels));
+                                  swift::runtime::llvm::StringRef(labels, space - labels));
             elt->addChild(eltName, Dem);
           }
 

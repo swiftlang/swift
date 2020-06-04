@@ -17,7 +17,7 @@
 #include "llvm/Support/Compiler.h"
 #include <string>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 class StringRef;
 /// An error handler callback.
@@ -73,11 +73,11 @@ llvm_unreachable_internal(const char *msg = nullptr, const char *file = nullptr,
 /// allows compilers to omit some unnecessary code.
 #ifndef NDEBUG
 #define llvm_unreachable(msg) \
-  __swift::__runtime::llvm::llvm_unreachable_internal(msg, __FILE__, __LINE__)
+  swift::runtime::llvm::llvm_unreachable_internal(msg, __FILE__, __LINE__)
 #elif defined(LLVM_BUILTIN_UNREACHABLE)
 #define llvm_unreachable(msg) LLVM_BUILTIN_UNREACHABLE
 #else
-#define llvm_unreachable(msg) __swift::__runtime::llvm::llvm_unreachable_internal()
+#define llvm_unreachable(msg) swift::runtime::llvm::llvm_unreachable_internal()
 #endif
 
 #endif

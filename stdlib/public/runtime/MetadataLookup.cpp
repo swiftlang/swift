@@ -59,10 +59,10 @@ public:
 
   // Force callers to explicitly pass `nullptr` to demangleSymbol or
   // demangleType if they don't want to demangle symbolic references.
-  NodePointer demangleSymbol(StringRef symbolName) = delete;
-  NodePointer demangleType(StringRef typeName) = delete;
+  NodePointer demangleSymbol(swift::runtime::llvm::StringRef symbolName) = delete;
+  NodePointer demangleType(swift::runtime::llvm::StringRef typeName) = delete;
 
-  NodePointer demangleTypeRef(StringRef symbolName) {
+  NodePointer demangleTypeRef(swift::runtime::llvm::StringRef symbolName) {
     // Resolve symbolic references to type contexts into the absolute address of
     // the type context descriptor, so that if we see a symbolic reference in
     // the mangled name we can immediately find the associated metadata.
@@ -123,7 +123,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       break;
         
     default:
-      if (auto typeContext = dyn_cast<TypeContextDescriptor>(descriptor)) {
+      if (auto typeContext = swift::runtime::llvm::dyn_cast<TypeContextDescriptor>(descriptor)) {
         nodeKind = Node::Kind::TypeSymbolicReference;
         isType = true;
         break;
@@ -215,7 +215,7 @@ namespace {
     const ContextDescriptor *Description;
 
   public:
-    NominalTypeDescriptorCacheEntry(const llvm::StringRef name,
+    NominalTypeDescriptorCacheEntry(const swift::runtime::llvm::StringRef name,
                                     const ContextDescriptor *description)
       : Name(name.str()), Description(description) {}
 
@@ -223,7 +223,7 @@ namespace {
       return Description;
     }
 
-    int compareWithKey(llvm::StringRef aName) const {
+    int compareWithKey(swift::runtime::llvm::StringRef aName) const {
       return aName.compare(Name);
     }
 
@@ -298,7 +298,7 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
                                    Demangler &demangler,
                                    Demangle::NodePointer *demangledNode
                                      = nullptr) {
-  auto extension = dyn_cast<ExtensionContextDescriptor>(maybeExtension);
+  auto extension = swift::runtime::llvm::dyn_cast<ExtensionContextDescriptor>(maybeExtension);
   if (!extension)
     return nullptr;
 
@@ -351,7 +351,7 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
 
   // The first component is the user-facing name and (unless overridden)
   // the ABI name.
-  StringRef component = type->Name.get();
+  swift::runtime::llvm::StringRef component = type->Name.get();
   result.UserFacingName = component;
 
   // If we don't have import info, we're done.
@@ -379,7 +379,7 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
 
   while (true) {
     // Parse the next component.  If it's empty, we're done.
-    component = StringRef(component.end() + 1);
+    component = swift::runtime::llvm::StringRef(component.end() + 1);
     if (component.empty()) break;
 
     // Update the identity bounds and assert that the identity
@@ -421,7 +421,7 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
 
   // Record the full identity.
   result.FullIdentity =
-    StringRef(startOfIdentity, endOfIdentity - startOfIdentity);
+    swift::runtime::llvm::StringRef(startOfIdentity, endOfIdentity - startOfIdentity);
 
   return result;
 }
@@ -465,7 +465,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
     switch (context->getKind()) {
     case ContextDescriptorKind::Module: {
-      auto module = cast<ModuleContextDescriptor>(context);
+      auto module = swift::runtime::llvm::cast<ModuleContextDescriptor>(context);
       // Match to a mangled module name.
       if (node->getKind() != Demangle::Node::Kind::Module)
         return false;
@@ -477,7 +477,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
     }
     
     case ContextDescriptorKind::Extension: {
-      auto extension = cast<ExtensionContextDescriptor>(context);
+      auto extension = swift::runtime::llvm::cast<ExtensionContextDescriptor>(context);
       
       // Check whether the extension context matches the mangled context.
       if (node->getKind() != Demangle::Node::Kind::Extension)
@@ -537,7 +537,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
     case ContextDescriptorKind::Protocol:
       // Match a protocol context.
       if (node->getKind() == Demangle::Node::Kind::Protocol) {
-        auto proto = llvm::cast<ProtocolDescriptor>(context);
+        auto proto = swift::runtime::llvm::cast<ProtocolDescriptor>(context);
         auto nameNode = node->getChild(1);
         if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
           return false;
@@ -549,8 +549,8 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       return false;
 
     default:
-      if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
-        llvm::Optional<ParsedTypeIdentity> _identity;
+      if (auto type = swift::runtime::llvm::dyn_cast<TypeContextDescriptor>(context)) {
+        swift::runtime::llvm::Optional<ParsedTypeIdentity> _identity;
         auto getIdentity = [&]() -> const ParsedTypeIdentity & {
           if (_identity) return *_identity;
           _identity = ParsedTypeIdentity::parse(type);
@@ -679,7 +679,7 @@ _findContextDescriptor(Demangle::NodePointer node,
 
   // If we have a symbolic reference to a context, resolve it immediately.
   if (symbolicNode->getKind() == Node::Kind::TypeSymbolicReference) {
-    return cast<TypeContextDescriptor>(
+    return swift::runtime::llvm::cast<TypeContextDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
   }
 
@@ -708,7 +708,7 @@ _findContextDescriptor(Demangle::NodePointer node,
   if (symbolicNode->getKind() == Node::Kind::DependentGenericParamType)
     return nullptr;
 
-  StringRef mangledName =
+  swift::runtime::llvm::StringRef mangledName =
     Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
 
   // Look for an existing entry.
@@ -750,13 +750,13 @@ namespace {
     const ProtocolDescriptor *Description;
 
   public:
-    ProtocolDescriptorCacheEntry(const llvm::StringRef name,
+    ProtocolDescriptorCacheEntry(const swift::runtime::llvm::StringRef name,
                                  const ProtocolDescriptor *description)
         : Name(name.str()), Description(description) {}
 
     const ProtocolDescriptor *getDescription() { return Description; }
 
-    int compareWithKey(llvm::StringRef aName) const {
+    int compareWithKey(swift::runtime::llvm::StringRef aName) const {
       return aName.compare(Name);
     }
 
@@ -841,7 +841,7 @@ _findProtocolDescriptor(NodePointer node,
   if (symbolicNode->getKind() == Node::Kind::Type)
     symbolicNode = symbolicNode->getChild(0);
   if (symbolicNode->getKind() == Node::Kind::ProtocolSymbolicReference)
-    return cast<ProtocolDescriptor>(
+    return swift::runtime::llvm::cast<ProtocolDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
   mangledName =
@@ -892,17 +892,17 @@ public:
 
 #pragma mark Metadata lookup via mangled name
 
-llvm::Optional<unsigned>
+swift::runtime::llvm::Optional<unsigned>
 swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
-                              llvm::ArrayRef<unsigned> paramCounts) {
+                              swift::runtime::llvm::ArrayRef<unsigned> paramCounts) {
   // Out-of-bounds depth.
-  if (depth >= paramCounts.size()) return None;
+  if (depth >= paramCounts.size()) return swift::runtime::llvm::None;
 
   // Compute the flat index.
   unsigned flatIndex = index + (depth == 0 ? 0 : paramCounts[depth - 1]);
 
   // Out-of-bounds index.
-  if (flatIndex >= paramCounts[depth]) return None;
+  if (flatIndex >= paramCounts[depth]) return swift::runtime::llvm::None;
 
   return flatIndex;
 }
@@ -912,7 +912,7 @@ swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
 /// \returns true if the innermost descriptor is generic.
 bool swift::_gatherGenericParameterCounts(
     const ContextDescriptor *descriptor,
-    llvm::SmallVectorImpl<unsigned> &genericParamCounts,
+    swift::runtime::llvm::SmallVectorImpl<unsigned> &genericParamCounts,
     Demangler &BorrowFrom) {
   DemanglerForRuntimeTypeResolution<> demangler;
   demangler.providePreallocatedMemory(BorrowFrom);
@@ -945,7 +945,7 @@ bool swift::_gatherGenericParameterCounts(
 }
 
 /// Retrieve the generic parameters introduced in this context.
-static llvm::ArrayRef<GenericParamDescriptor>
+static swift::runtime::llvm::ArrayRef<GenericParamDescriptor>
 getLocalGenericParams(const ContextDescriptor *context) {
   if (!context->isGeneric())
     return { };
@@ -963,10 +963,10 @@ getLocalGenericParams(const ContextDescriptor *context) {
 
 static bool
 _gatherGenericParameters(const ContextDescriptor *context,
-                         llvm::ArrayRef<const Metadata *> genericArgs,
+                         swift::runtime::llvm::ArrayRef<const Metadata *> genericArgs,
                          const Metadata *parent,
-                         llvm::SmallVectorImpl<unsigned> &genericParamCounts,
-                         llvm::SmallVectorImpl<const void *> &allGenericArgsVec,
+                         swift::runtime::llvm::SmallVectorImpl<unsigned> &genericParamCounts,
+                         swift::runtime::llvm::SmallVectorImpl<const void *> &allGenericArgsVec,
                          Demangler &demangler) {
   // Figure out the various levels of generic parameters we have in
   // this type.
@@ -988,7 +988,7 @@ _gatherGenericParameters(const ContextDescriptor *context,
   // requirements and fill in the generic arguments vector.
   if (!genericParamCounts.empty()) {
     // Compute the set of generic arguments "as written".
-    llvm::SmallVector<const Metadata *, 8> allGenericArgs;
+    swift::runtime::llvm::SmallVector<const Metadata *, 8> allGenericArgs;
 
     // If we have a parent, gather it's generic arguments "as written".
     if (parent) {
@@ -1054,14 +1054,14 @@ namespace {
 
 /// Find the offset of the protocol requirement for an associated type with
 /// the given name in the given protocol descriptor.
-llvm::Optional<const ProtocolRequirement *>
-findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
+swift::runtime::llvm::Optional<const ProtocolRequirement *>
+findAssociatedTypeByName(const ProtocolDescriptor *protocol, swift::runtime::llvm::StringRef name) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
-  if (!associatedTypeNamesPtr) return None;
+  if (!associatedTypeNamesPtr) return swift::runtime::llvm::None;
 
   // Look through the list of associated type names.
-  StringRef associatedTypeNames(associatedTypeNamesPtr);
+  swift::runtime::llvm::StringRef associatedTypeNames(associatedTypeNamesPtr);
   unsigned matchingAssocTypeIdx = 0;
   bool found = false;
   while (!associatedTypeNames.empty()) {
@@ -1077,7 +1077,7 @@ findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
     associatedTypeNames = associatedTypeNames.substr(splitIdx).substr(1);
   }
 
-  if (!found) return None;
+  if (!found) return swift::runtime::llvm::None;
 
   // We have a match on the Nth associated type; go find the Nth associated
   // type requirement.
@@ -1104,7 +1104,7 @@ namespace {
 
 namespace {
 struct OpaqueTypeMappings {
-  llvm::DenseMap<const OpaqueTypeDescriptor *, const OpaqueTypeDescriptor *>
+  swift::runtime::llvm::DenseMap<const OpaqueTypeDescriptor *, const OpaqueTypeDescriptor *>
       descriptorMapping;
   const OpaqueTypeDescriptor* find(const OpaqueTypeDescriptor *orig) {
     const OpaqueTypeDescriptor *replacement = nullptr;
@@ -1134,7 +1134,7 @@ _findOpaqueTypeDescriptor(NodePointer demangleNode,
   if (demangleNode->getKind()
         == Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
     auto context = (const ContextDescriptor *)demangleNode->getIndex();
-    auto *orig = cast<OpaqueTypeDescriptor>(context);
+    auto *orig = swift::runtime::llvm::cast<OpaqueTypeDescriptor>(context);
     if (auto *entry = opaqueTypeMappings.get().find(orig)) {
       return entry;
     }
@@ -1177,21 +1177,21 @@ public:
 
   BuiltType
   resolveOpaqueType(NodePointer opaqueDecl,
-                    llvm::ArrayRef<llvm::ArrayRef<BuiltType>> genericArgs,
+                    swift::runtime::llvm::ArrayRef<swift::runtime::llvm::ArrayRef<BuiltType>> genericArgs,
                     unsigned ordinal) {
     auto descriptor = _findOpaqueTypeDescriptor(opaqueDecl, demangler);
     if (!descriptor)
       return BuiltType();
     auto outerContext = descriptor->Parent.get();
 
-    llvm::SmallVector<BuiltType, 8> allGenericArgs;
+    swift::runtime::llvm::SmallVector<BuiltType, 8> allGenericArgs;
     for (auto argSet : genericArgs) {
       allGenericArgs.append(argSet.begin(), argSet.end());
     }
     
     // Gather the generic parameters we need to parameterize the opaque decl.
-    llvm::SmallVector<unsigned, 8> genericParamCounts;
-    llvm::SmallVector<const void *, 8> allGenericArgsVec;
+    swift::runtime::llvm::SmallVector<unsigned, 8> genericParamCounts;
+    swift::runtime::llvm::SmallVector<const void *, 8> allGenericArgsVec;
 
     if (!_gatherGenericParameters(outerContext,
                                   allGenericArgs,
@@ -1257,7 +1257,7 @@ public:
 
   BuiltType
   createBoundGenericObjCClassType(const std::string &mangledName,
-                                  llvm::ArrayRef<BuiltType> args) const {
+                                  swift::runtime::llvm::ArrayRef<BuiltType> args) const {
     // Generic arguments of lightweight Objective-C generic classes are not
     // reified in the metadata.
     return createObjCClassType(mangledName);
@@ -1279,11 +1279,11 @@ public:
   }
 
   BuiltType createBoundGenericType(BuiltTypeDecl anyTypeDecl,
-                                   llvm::ArrayRef<BuiltType> genericArgs,
+                                   swift::runtime::llvm::ArrayRef<BuiltType> genericArgs,
                                    BuiltType parent) const {
-    auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);
+    auto typeDecl = swift::runtime::llvm::dyn_cast<TypeContextDescriptor>(anyTypeDecl);
     if (!typeDecl) {
-      if (auto protocol = dyn_cast<ProtocolDescriptor>(anyTypeDecl))
+      if (auto protocol = swift::runtime::llvm::dyn_cast<ProtocolDescriptor>(anyTypeDecl))
         return _getSimpleProtocolTypeMetadata(protocol);
 
       return BuiltType();
@@ -1291,8 +1291,8 @@ public:
 
     // Figure out the various levels of generic parameters we have in
     // this type.
-    llvm::SmallVector<unsigned, 8> genericParamCounts;
-    llvm::SmallVector<const void *, 8> allGenericArgsVec;
+    swift::runtime::llvm::SmallVector<unsigned, 8> genericParamCounts;
+    swift::runtime::llvm::SmallVector<const void *, 8> allGenericArgsVec;
 
     if (!_gatherGenericParameters(typeDecl,
                                   genericArgs,
@@ -1308,8 +1308,8 @@ public:
     return accessFunction(MetadataState::Abstract, allGenericArgsVec).Value;
   }
 
-  BuiltType createBuiltinType(StringRef builtinName,
-                              StringRef mangledName) const {
+  BuiltType createBuiltinType(swift::runtime::llvm::StringRef builtinName,
+                              swift::runtime::llvm::StringRef mangledName) const {
 #define BUILTIN_TYPE(Symbol, _) \
     if (mangledName.equals(#Symbol)) \
       return &METADATA_SYM(Symbol).base;
@@ -1319,18 +1319,18 @@ public:
 
   BuiltType createMetatypeType(
       BuiltType instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
+      swift::runtime::llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = swift::runtime::llvm::None) const {
     return swift_getMetatypeMetadata(instance);
   }
 
   BuiltType createExistentialMetatypeType(
       BuiltType instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
+      swift::runtime::llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = swift::runtime::llvm::None) const {
     return swift_getExistentialMetatypeMetadata(instance);
   }
 
   BuiltType
-  createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
+  createProtocolCompositionType(swift::runtime::llvm::ArrayRef<BuiltProtocolDecl> protocols,
                                 BuiltType superclass, bool isClassBound) const {
     // Determine whether we have a class bound.
     ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
@@ -1364,10 +1364,10 @@ public:
   }
 
   BuiltType
-  createFunctionType(llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
+  createFunctionType(swift::runtime::llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
                      BuiltType result, FunctionTypeFlags flags) const {
-    llvm::SmallVector<BuiltType, 8> paramTypes;
-    llvm::SmallVector<uint32_t, 8> paramFlags;
+    swift::runtime::llvm::SmallVector<BuiltType, 8> paramTypes;
+    swift::runtime::llvm::SmallVector<uint32_t, 8> paramFlags;
 
     // Fill in the parameters.
     paramTypes.reserve(params.size());
@@ -1388,15 +1388,15 @@ public:
 
   BuiltType createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,
-      llvm::ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
-      llvm::ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
-      llvm::Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
+      swift::runtime::llvm::ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
+      swift::runtime::llvm::ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
+      swift::runtime::llvm::Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
       ImplFunctionTypeFlags flags) {
     // We can't realize the metadata for a SILFunctionType.
     return BuiltType();
   }
 
-  BuiltType createTupleType(llvm::ArrayRef<BuiltType> elements,
+  BuiltType createTupleType(swift::runtime::llvm::ArrayRef<BuiltType> elements,
                             std::string labels, bool variadic) const {
     // TODO: 'variadic' should no longer exist
     auto flags = TupleTypeFlags().withNumElements(elements.size());
@@ -1409,12 +1409,12 @@ public:
         .Value;
   }
 
-  BuiltType createDependentMemberType(StringRef name, BuiltType base) const {
+  BuiltType createDependentMemberType(swift::runtime::llvm::StringRef name, BuiltType base) const {
     // Should not have unresolved dependent member types here.
     return BuiltType();
   }
 
-  BuiltType createDependentMemberType(StringRef name, BuiltType base,
+  BuiltType createDependentMemberType(swift::runtime::llvm::StringRef name, BuiltType base,
                                       BuiltProtocolDecl protocol) const {
 #if SWIFT_OBJC_INTEROP
     if (protocol.isObjC())
@@ -1517,7 +1517,7 @@ static TypeInfo swift_getTypeByMangledNodeImpl(
 SWIFT_CC(swift)
 static TypeInfo swift_getTypeByMangledNameImpl(
                               MetadataRequest request,
-                              StringRef typeName,
+                              swift::runtime::llvm::StringRef typeName,
                               const void * const *origArgumentVector,
                               SubstGenericParameterFn substGenericParam,
                               SubstDependentWitnessTableFn substWitnessTable) {
@@ -1527,28 +1527,28 @@ static TypeInfo swift_getTypeByMangledNameImpl(
 
   // Check whether this is the convenience syntax "ModuleName.ClassName".
   auto getDotPosForConvenienceSyntax = [&]() -> size_t {
-    size_t dotPos = llvm::StringRef::npos;
+    size_t dotPos = swift::runtime::llvm::StringRef::npos;
     for (unsigned i = 0; i < typeName.size(); ++i) {
       // Should only contain one dot.
       if (typeName[i] == '.') {
-        if (dotPos == llvm::StringRef::npos) {
+        if (dotPos == swift::runtime::llvm::StringRef::npos) {
           dotPos = i;
           continue;
         } else {
-          return llvm::StringRef::npos;
+          return swift::runtime::llvm::StringRef::npos;
         }
       }
       
       // Should not contain symbolic references.
       if ((unsigned char)typeName[i] <= '\x1F') {
-        return llvm::StringRef::npos;
+        return swift::runtime::llvm::StringRef::npos;
       }
     }
     return dotPos;
   };
 
   auto dotPos = getDotPosForConvenienceSyntax();
-  if (dotPos != llvm::StringRef::npos) {
+  if (dotPos != swift::runtime::llvm::StringRef::npos) {
     // Form a demangle tree for this class.
     NodePointer classNode = demangler.createNode(Node::Kind::Class);
     NodePointer moduleNode = demangler.createNode(Node::Kind::Module,
@@ -1578,7 +1578,7 @@ swift_getTypeByMangledNameInEnvironment(
                         size_t typeNameLength,
                         const TargetGenericEnvironment<InProcess> *environment,
                         const void * const *genericArgs) {
-  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  swift::runtime::llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
   return swift_getTypeByMangledName(MetadataState::Complete, typeName,
     genericArgs,
@@ -1598,7 +1598,7 @@ swift_getTypeByMangledNameInEnvironmentInMetadataState(
                         size_t typeNameLength,
                         const TargetGenericEnvironment<InProcess> *environment,
                         const void * const *genericArgs) {
-  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  swift::runtime::llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
   return swift_getTypeByMangledName((MetadataState)metadataState, typeName,
     genericArgs,
@@ -1617,7 +1617,7 @@ swift_getTypeByMangledNameInContext(
                         size_t typeNameLength,
                         const TargetContextDescriptor<InProcess> *context,
                         const void * const *genericArgs) {
-  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  swift::runtime::llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
   return swift_getTypeByMangledName(MetadataState::Complete, typeName,
     genericArgs,
@@ -1637,7 +1637,7 @@ swift_getTypeByMangledNameInContextInMetadataState(
                         size_t typeNameLength,
                         const TargetContextDescriptor<InProcess> *context,
                         const void * const *genericArgs) {
-  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  swift::runtime::llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
   return swift_getTypeByMangledName((MetadataState)metadataState, typeName,
     genericArgs,
@@ -1654,7 +1654,7 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *_Nullable
 swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
                                            size_t typeNameLength) {
-  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  swift::runtime::llvm::StringRef typeName(typeNameStart, typeNameLength);
   for (char c : typeName) {
     if (c >= '\x01' && c <= '\x1F')
       return nullptr;
@@ -1712,7 +1712,7 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
                           Class _Nullable * _Nonnull outClass) {
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
-  StringRef typeStr(typeName);
+  swift::runtime::llvm::StringRef typeStr(typeName);
   const Metadata *metadata = nullptr;
   if (typeStr.startswith("_Tt")) {
     Demangler demangler;
@@ -1957,18 +1957,18 @@ SubstGenericParametersFromWrittenArgs::getWitnessTable(const Metadata *type,
 
 /// Demangle the given type name to a generic parameter reference, which
 /// will be returned as (depth, index).
-static llvm::Optional<std::pair<unsigned, unsigned>>
-demangleToGenericParamRef(StringRef typeName) {
+static swift::runtime::llvm::Optional<std::pair<unsigned, unsigned>>
+demangleToGenericParamRef(swift::runtime::llvm::StringRef typeName) {
   StackAllocatedDemangler<1024> demangler;
   NodePointer node = demangler.demangleType(typeName);
   if (!node)
-    return None;
+    return swift::runtime::llvm::None;
 
   // Find the flat index that the right-hand side refers to.
   if (node->getKind() == Demangle::Node::Kind::Type)
     node = node->getChild(0);
   if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-    return None;
+    return swift::runtime::llvm::None;
 
   return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
                                        node->getChild(1)->getIndex());
@@ -1976,7 +1976,7 @@ demangleToGenericParamRef(StringRef typeName) {
 
 void swift::gatherWrittenGenericArgs(
     const Metadata *metadata, const TypeContextDescriptor *description,
-    llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+    swift::runtime::llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
     Demangler &BorrowFrom) {
   if (!description)
     return;
@@ -2032,7 +2032,7 @@ void swift::gatherWrittenGenericArgs(
   // canonicalized away. Use same-type requirements to reconstitute them.
 
   // Retrieve the mapping information needed for depth/index -> flat index.
-  llvm::SmallVector<unsigned, 8> genericParamCounts;
+  swift::runtime::llvm::SmallVector<unsigned, 8> genericParamCounts;
   (void)_gatherGenericParameterCounts(description, genericParamCounts,
                                       BorrowFrom);
 
@@ -2196,7 +2196,7 @@ class AutomaticDynamicReplacements
                                   AutomaticDynamicReplacementEntry>;
   friend TrailingObjects;
 
-  llvm::ArrayRef<AutomaticDynamicReplacementEntry>
+  swift::runtime::llvm::ArrayRef<AutomaticDynamicReplacementEntry>
   getReplacementEntries() const {
     return {
         this->template getTrailingObjects<AutomaticDynamicReplacementEntry>(),
@@ -2240,7 +2240,7 @@ class AutomaticDynamicReplacementsSome
                                   DynamicReplacementSomeDescriptor>;
   friend TrailingObjects;
 
-  llvm::ArrayRef<DynamicReplacementSomeDescriptor>
+  swift::runtime::llvm::ArrayRef<DynamicReplacementSomeDescriptor>
   getReplacementEntries() const {
     return {
         this->template getTrailingObjects<DynamicReplacementSomeDescriptor>(),

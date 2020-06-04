@@ -25,7 +25,7 @@
 #include <string>
 #include <utility>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 template<typename T> class SmallVectorImpl;

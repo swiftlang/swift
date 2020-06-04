@@ -41,7 +41,7 @@
 #endif
 #endif
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 /// ByteSwap_16 - This function returns a byte-swapped representation of

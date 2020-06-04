@@ -24,7 +24,6 @@
 //#define NODE_FACTORY_DEBUGGING
 
 using namespace swift::Demangle;
-using llvm::StringRef;
 
 namespace swift {
 namespace Demangle {
@@ -214,12 +213,12 @@ public:
   ///
   /// The \p Text string must be already allocated with the Factory and therefore
   /// it is _not_ copied.
-  NodePointer createNodeWithAllocatedText(Node::Kind K, llvm::StringRef Text);
+  NodePointer createNodeWithAllocatedText(Node::Kind K, swift::runtime::llvm::StringRef Text);
 
   /// Creates a node of kind \p K with a \p Text payload.
   ///
   /// The \p Text string is copied.
-  NodePointer createNode(Node::Kind K, llvm::StringRef Text) {
+  NodePointer createNode(Node::Kind K, swift::runtime::llvm::StringRef Text) {
     return createNodeWithAllocatedText(K, Text.copy(*this));
   }
 
@@ -320,7 +319,7 @@ public:
 class CharVector : public Vector<char> {
 public:
   // Append another string.
-  void append(StringRef Rhs, NodeFactory &Factory);
+  void append(swift::runtime::llvm::StringRef Rhs, NodeFactory &Factory);
 
   // Append an integer as readable number.
   void append(int Number, NodeFactory &Factory);
@@ -328,8 +327,8 @@ public:
   // Append an unsigned 64 bit integer as readable number.
   void append(unsigned long long Number, NodeFactory &Factory);
 
-  StringRef str() const {
-    return StringRef(Elems, NumElems);
+  swift::runtime::llvm::StringRef str() const {
+    return swift::runtime::llvm::StringRef(Elems, NumElems);
   }
 };
 
@@ -353,7 +352,7 @@ using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
 /// The nodes of the tree only live as long as the Demangler itself.
 class Demangler : public NodeFactory {
 protected:
-  StringRef Text;
+  swift::runtime::llvm::StringRef Text;
   size_t Pos = 0;
 
   /// Mangling style where function type would have
@@ -365,12 +364,12 @@ protected:
   Vector<NodePointer> Substitutions;
 
   static const int MaxNumWords = 26;
-  StringRef Words[MaxNumWords];
+  swift::runtime::llvm::StringRef Words[MaxNumWords];
   int NumWords = 0;
   
   std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
 
-  bool nextIf(StringRef str) {
+  bool nextIf(swift::runtime::llvm::StringRef str) {
     if (!Text.substr(Pos).startswith(str)) return false;
     Pos += str.size();
     return true;
@@ -400,8 +399,8 @@ protected:
     Pos--;
   }
 
-  StringRef consumeAll() {
-    StringRef str = Text.drop_front(Pos);
+  swift::runtime::llvm::StringRef consumeAll() {
+    swift::runtime::llvm::StringRef str = Text.drop_front(Pos);
     Pos = Text.size();
     return str;
   }
@@ -443,12 +442,12 @@ protected:
     Vector<NodePointer> NodeStack;
     Vector<NodePointer> Substitutions;
     int NumWords;
-    StringRef Text;
+    swift::runtime::llvm::StringRef Text;
     size_t Pos;
     std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
     
   public:
-    DemangleInitRAII(Demangler &Dem, StringRef MangledName,
+    DemangleInitRAII(Demangler &Dem, swift::runtime::llvm::StringRef MangledName,
          std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver);
     ~DemangleInitRAII();
   };
@@ -588,7 +587,7 @@ public:
   /// on failure.
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// Demangler or with a call of clear().
-  NodePointer demangleSymbol(StringRef MangledName,
+  NodePointer demangleSymbol(swift::runtime::llvm::StringRef MangledName,
             std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver
                = nullptr);
 
@@ -603,7 +602,7 @@ public:
   /// on failure.
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// Demangler or with a call of clear().
-  NodePointer demangleType(StringRef MangledName,
+  NodePointer demangleType(swift::runtime::llvm::StringRef MangledName,
             std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver
               = nullptr);
 };
@@ -620,7 +619,7 @@ public:
   }
 };
 
-NodePointer demangleOldSymbolAsNode(StringRef MangledName,
+NodePointer demangleOldSymbolAsNode(swift::runtime::llvm::StringRef MangledName,
                                     NodeFactory &Factory);
 } // end namespace Demangle
 } // end namespace swift

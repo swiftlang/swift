@@ -44,8 +44,8 @@ public:
   /// Return the chunks of data making up this value, arranged starting from
   /// the least-significant chunk.  The value is sign-extended to fill the
   /// final chunk.
-  llvm::ArrayRef<UnsignedChunk> getData() const {
-    return llvm::makeArrayRef(Data, (Flags.getBitWidth() + BitsPerChunk - 1) /
+  swift::runtime::llvm::ArrayRef<UnsignedChunk> getData() const {
+    return swift::runtime::llvm::makeArrayRef(Data, (Flags.getBitWidth() + BitsPerChunk - 1) /
                                         BitsPerChunk);
   }
 

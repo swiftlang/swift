@@ -241,7 +241,7 @@ public:
                                    ValueWitnessTable *vwtable);
 
   const Metadata *
-  _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
+  _matchMetadataByMangledTypeName(const swift::runtime::llvm::StringRef metadataNameRef,
                                   const Metadata *metadata,
                                   const TypeContextDescriptor *ntd);
 
@@ -286,7 +286,7 @@ public:
     /// An element in the descriptor path.
     struct PathElement {
       /// The generic parameters local to this element.
-      llvm::ArrayRef<GenericParamDescriptor> localGenericParams;
+      swift::runtime::llvm::ArrayRef<GenericParamDescriptor> localGenericParams;
 
       /// The total number of generic parameters.
       unsigned numTotalGenericParams;
@@ -303,7 +303,7 @@ public:
 
     /// Information about the generic context descriptors that make up \c
     /// descriptor, from the outermost to the innermost.
-    mutable llvm::SmallVector<PathElement, 8> descriptorPath;
+    mutable swift::runtime::llvm::SmallVector<PathElement, 8> descriptorPath;
 
     /// The number of key generic parameters.
     mutable unsigned numKeyGenericParameters = 0;
@@ -375,7 +375,7 @@ public:
   SWIFT_CC(swift)
   TypeInfo swift_getTypeByMangledName(
                                MetadataRequest request,
-                               StringRef typeName,
+                               swift::runtime::llvm::StringRef typeName,
                                const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
@@ -387,10 +387,10 @@ public:
   /// Use with \c _getTypeByMangledName to decode potentially-generic types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
     /// The complete set of generic arguments.
-    const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
+    const swift::runtime::llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
 
     /// The counts of generic parameters at each level.
-    const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
+    const swift::runtime::llvm::SmallVectorImpl<unsigned> &genericParamCounts;
 
   public:
     /// Initialize a new function object to handle substitutions. Both
@@ -404,8 +404,8 @@ public:
     /// \param genericParamCounts The count of generic parameters at each
     /// generic level, typically gathered by _gatherGenericParameterCounts.
     explicit SubstGenericParametersFromWrittenArgs(
-        const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
-        const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
+        const swift::runtime::llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+        const swift::runtime::llvm::SmallVectorImpl<unsigned> &genericParamCounts)
         : allGenericArgs(allGenericArgs),
           genericParamCounts(genericParamCounts) {}
 
@@ -418,13 +418,13 @@ public:
   ///
   /// \returns true if the innermost descriptor is generic.
   bool _gatherGenericParameterCounts(const ContextDescriptor *descriptor,
-                                     llvm::SmallVectorImpl<unsigned> &genericParamCounts,
+                                     swift::runtime::llvm::SmallVectorImpl<unsigned> &genericParamCounts,
                                      Demangler &BorrowFrom);
 
   /// Map depth/index to a flat index.
-  llvm::Optional<unsigned> _depthIndexToFlatIndex(
+swift::runtime::llvm::Optional<unsigned> _depthIndexToFlatIndex(
                                           unsigned depth, unsigned index,
-                                          llvm::ArrayRef<unsigned> paramCounts);
+                                          swift::runtime::llvm::ArrayRef<unsigned> paramCounts);
 
   /// Check the given generic requirements using the given set of generic
   /// arguments, collecting the key arguments (e.g., witness tables) for
@@ -438,8 +438,8 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool _checkGenericRequirements(
-                    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                    llvm::SmallVectorImpl<const void *> &extraArguments,
+                    swift::runtime::llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+                    swift::runtime::llvm::SmallVectorImpl<const void *> &extraArguments,
                     SubstGenericParameterFn substGenericParam,
                     SubstDependentWitnessTableFn substWitnessTable);
 
@@ -502,12 +502,12 @@ public:
   /// \endcode
   void gatherWrittenGenericArgs(const Metadata *metadata,
                                 const TypeContextDescriptor *description,
-                                llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+                                swift::runtime::llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
                                 Demangler &BorrowFrom);
 
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
-                             llvm::ArrayRef<NodePointer> demangledGenerics,
+                             swift::runtime::llvm::ArrayRef<NodePointer> demangledGenerics,
                              Demangle::Demangler &Dem);
   
   /// Symbolic reference resolver that produces the demangling tree for the
@@ -581,7 +581,7 @@ public:
   const ProtocolConformanceDescriptor *
   swift_conformsToSwiftProtocol(const Metadata * const type,
                                 const ProtocolDescriptor *protocol,
-                                StringRef module);
+                                swift::runtime::llvm::StringRef module);
 
   /// Retrieve an associated type witness from the given witness table.
   ///

@@ -77,12 +77,12 @@ public:
     : RemoteAbsolutePointer()
   {}
   
-  RemoteAbsolutePointer(llvm::StringRef Symbol, int64_t Offset)
+  RemoteAbsolutePointer(swift::runtime::llvm::StringRef Symbol, int64_t Offset)
     : Symbol(Symbol), Offset(Offset)
   {}
   
   bool isResolved() const { return Symbol.empty(); }
-  llvm::StringRef getSymbol() const { return Symbol; }
+  swift::runtime::llvm::StringRef getSymbol() const { return Symbol; }
   int64_t getOffset() const { return Offset; }
   
   RemoteAddress getResolvedAddress() const {

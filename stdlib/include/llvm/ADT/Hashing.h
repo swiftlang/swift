@@ -54,7 +54,7 @@
 #include <string>
 #include <utility>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 /// An opaque object representing a hash code.
@@ -370,7 +370,7 @@ get_hashable_data(const T &value) {
 template <typename T>
 std::enable_if_t<!is_hashable_data<T>::value, size_t>
 get_hashable_data(const T &value) {
-  using ::llvm::hash_value;
+  using swift::runtime::llvm::hash_value;
   return hash_value(value);
 }
 
@@ -476,7 +476,7 @@ hash_combine_range_impl(ValueT *first, ValueT *last) {
 /// a sequence of bytes.
 template <typename InputIteratorT>
 hash_code hash_combine_range(InputIteratorT first, InputIteratorT last) {
-  return ::llvm::hashing::detail::hash_combine_range_impl(first, last);
+  return swift::runtime::llvm::hashing::detail::hash_combine_range_impl(first, last);
 }
 
 
@@ -599,7 +599,7 @@ public:
 /// *not* call this routine, they should instead call 'hash_value'.
 template <typename ...Ts> hash_code hash_combine(const Ts &...args) {
   // Recursively hash each argument using a helper class.
-  ::llvm::hashing::detail::hash_combine_recursive_helper helper;
+  swift::runtime::llvm::hashing::detail::hash_combine_recursive_helper helper;
   return helper.combine(0, helper.buffer, helper.buffer + 64, args...);
 }
 
@@ -628,14 +628,14 @@ inline hash_code hash_integer_value(uint64_t value) {
 // infrastructure is available.
 template <typename T>
 std::enable_if_t<is_integral_or_enum<T>::value, hash_code> hash_value(T value) {
-  return ::llvm::hashing::detail::hash_integer_value(
+  return swift::runtime::llvm::hashing::detail::hash_integer_value(
       static_cast<uint64_t>(value));
 }
 
 // Declared and documented above, but defined here so that any of the hashing
 // infrastructure is available.
 template <typename T> hash_code hash_value(const T *ptr) {
-  return ::llvm::hashing::detail::hash_integer_value(
+  return swift::runtime::llvm::hashing::detail::hash_integer_value(
     reinterpret_cast<uintptr_t>(ptr));
 }
 

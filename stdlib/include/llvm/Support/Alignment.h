@@ -28,7 +28,7 @@
 #include <string>
 #endif // NDEBUG
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 #define ALIGN_CHECK_ISPOSITIVE(decl)                                           \

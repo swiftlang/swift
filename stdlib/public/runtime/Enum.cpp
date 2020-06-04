@@ -92,7 +92,7 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
           .withInlineStorage(
               ValueWitnessTable::isValueInline(isBT, size, align));
   layout.extraInhabitantCount = unusedExtraInhabitants;
-  auto rawStride = llvm::alignTo(size, align);
+  auto rawStride = swift::runtime::llvm::alignTo(size, align);
   layout.stride = rawStride == 0 ? 1 : rawStride;
   
   // Substitute in better common value witnesses if we have them.
@@ -270,7 +270,7 @@ SWIFT_CC(swift)
 static unsigned getMultiPayloadExtraInhabitantTag(const OpaqueValue *value,
                                                   unsigned enumNumXI,
                                                   const Metadata *enumType) {
-  auto layout = getMultiPayloadLayout(cast<EnumMetadata>(enumType));
+  auto layout = getMultiPayloadLayout(swift::runtime::llvm::cast<EnumMetadata>(enumType));
   unsigned index = ~loadMultiPayloadTag(value, layout, ~0u);
   
   if (index >= enumType->getValueWitnesses()->getNumExtraInhabitants())
@@ -283,7 +283,7 @@ static void storeMultiPayloadExtraInhabitantTag(OpaqueValue *value,
                                                 unsigned tag,
                                                 unsigned enumNumXI,
                                                 const Metadata *enumType) {
-  auto layout = getMultiPayloadLayout(cast<EnumMetadata>(enumType));
+  auto layout = getMultiPayloadLayout(swift::runtime::llvm::cast<EnumMetadata>(enumType));
   storeMultiPayloadTag(value, layout, ~(tag - 1));
 }
 

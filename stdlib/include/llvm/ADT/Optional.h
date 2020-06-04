@@ -23,7 +23,7 @@
 #include <new>
 #include <utility>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 class raw_ostream;

@@ -24,7 +24,7 @@
 #undef MemoryFence
 #endif
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
   namespace sys {
     void MemoryFence();

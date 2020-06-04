@@ -132,7 +132,7 @@ enum class TypeNameKind {
   Mangled,
 };
 
-using TypeNameCacheKey = llvm::PointerIntPair<const Metadata *, 2, TypeNameKind>;
+using TypeNameCacheKey = swift::runtime::llvm::PointerIntPair<const Metadata *, 2, TypeNameKind>;
 
 #if SWIFT_CASTING_SUPPORTS_MUTEX
 static StaticReadWriteLock TypeNameCacheLock;
@@ -140,7 +140,7 @@ static StaticReadWriteLock TypeNameCacheLock;
 
 /// Cache containing rendered names for Metadata.
 /// Access MUST be protected using `TypeNameCacheLock`.
-static Lazy<llvm::DenseMap<TypeNameCacheKey, std::pair<const char *, size_t>>>
+static Lazy<swift::runtime::llvm::DenseMap<TypeNameCacheKey, std::pair<const char *, size_t>>>
   TypeNameCache;
 
 TypeNamePair
@@ -412,7 +412,7 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
       return _unknownClassConformsToObjCProtocol(value,
                                                  protocol.getObjCProtocol());
     } else {
-      auto wrapper = cast<ObjCClassWrapperMetadata>(type);
+      auto wrapper = swift::runtime::llvm::cast<ObjCClassWrapperMetadata>(type);
       return classConformsToObjCProtocol(wrapper->Class, protocol);
     }
 #endif
@@ -434,7 +434,7 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
 #if SWIFT_OBJC_INTEROP
     // If all protocols are @objc and at least one of them conforms to the
     // protocol, succeed.
-    auto existential = cast<ExistentialTypeMetadata>(type);
+    auto existential = swift::runtime::llvm::cast<ExistentialTypeMetadata>(type);
     if (!existential->isObjC())
       return false;
     for (auto existentialProto : existential->getProtocols()) {
@@ -516,7 +516,7 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
   }
 
   case MetadataKind::Existential: {
-    auto existentialType = cast<ExistentialTypeMetadata>(type);
+    auto existentialType = swift::runtime::llvm::cast<ExistentialTypeMetadata>(type);
     inoutCanTake &= existentialType->mayTakeValue(value);
 
     // We can't drill through existential containers unless the result is an
@@ -594,7 +594,7 @@ swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self,
 static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
   switch (type->getKind()) {
   case MetadataKind::Existential: {
-    auto existentialType = cast<ExistentialTypeMetadata>(type);
+    auto existentialType = swift::runtime::llvm::cast<ExistentialTypeMetadata>(type);
     
     switch (existentialType->getRepresentation()) {
     case ExistentialTypeRepresentation::Class:
@@ -672,7 +672,7 @@ static bool isAnyHashableType(const StructMetadata *type) {
 }
 
 static bool isAnyHashableType(const Metadata *type) {
-  if (auto structType = dyn_cast<StructMetadata>(type)) {
+  if (auto structType = swift::runtime::llvm::dyn_cast<StructMetadata>(type)) {
     return isAnyHashableType(structType);
   }
   return false;
@@ -885,7 +885,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 
     case MetadataKind::Struct:
       // If the source type is AnyHashable, cast from that.
-      if (isAnyHashableType(cast<StructMetadata>(srcDynamicType))) {
+      if (isAnyHashableType(swift::runtime::llvm::cast<StructMetadata>(srcDynamicType))) {
         bool result =
           _dynamicCastFromAnyHashable(dest, srcDynamicValue, srcDynamicType,
                                       targetType, dynamicFlags);
@@ -1572,7 +1572,7 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
   }
 
   case MetadataKind::Existential: {
-    auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
+    auto srcExistentialType = swift::runtime::llvm::cast<ExistentialTypeMetadata>(srcType);
     switch (srcExistentialType->getRepresentation()) {
     case ExistentialTypeRepresentation::Class: {
       auto srcExistential = (ClassExistentialContainer*) src;
@@ -1649,7 +1649,7 @@ static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
   // If it's an existential, we need to check for conformances.
   auto targetInstanceType = targetType->InstanceType;
   if (auto targetInstanceTypeAsExistential =
-        dyn_cast<ExistentialTypeMetadata>(targetInstanceType)) {
+        swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(targetInstanceType)) {
     // Check for conformance to all the protocols.
     // TODO: collect the witness tables.
     const WitnessTable **conformance
@@ -1669,10 +1669,10 @@ static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
 
   // Otherwise, we're casting to SomeProtocol.Type.Type.
   auto targetInstanceTypeAsMetatype =
-    cast<ExistentialMetatypeMetadata>(targetInstanceType);
+    swift::runtime::llvm::cast<ExistentialMetatypeMetadata>(targetInstanceType);
 
   // If the source type isn't a metatype, the cast fails.
-  auto srcMetatypeMetatype = dyn_cast<MetatypeMetadata>(srcMetatype);
+  auto srcMetatypeMetatype = swift::runtime::llvm::dyn_cast<MetatypeMetadata>(srcMetatype);
   if (!srcMetatypeMetatype) {
     if (flags & DynamicCastFlags::Unconditional)
       swift_dynamicCastFailure(srcMetatype, targetType);
@@ -1738,7 +1738,7 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   }
 
   case MetadataKind::Existential: {
-    auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
+    auto srcExistentialType = swift::runtime::llvm::cast<ExistentialTypeMetadata>(srcType);
     switch (srcExistentialType->getRepresentation()) {
     case ExistentialTypeRepresentation::Class: {
       auto srcExistential = (ClassExistentialContainer*) src;
@@ -1902,13 +1902,13 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
     assert((checkCastFlags - DynamicCastFlags::TakeOnSuccess)
            == DynamicCastFlags::Default && "Unhandled DynamicCastFlag");
     if (_dynamicCastToExistential(dest, src, srcType,
-                                  cast<ExistentialTypeMetadata>(targetType),
+                                  swift::runtime::llvm::cast<ExistentialTypeMetadata>(targetType),
                                   checkCastFlags)) {
       return {true, nullptr};
     }
   }
   const Metadata *payloadType =
-    cast<EnumMetadata>(srcType)->getGenericArgs()[0];
+    swift::runtime::llvm::cast<EnumMetadata>(srcType)->getGenericArgs()[0];
   unsigned enumCase =
     payloadType->vw_getEnumTagSinglePayload(src, /*emptyCases=*/1);
   if (enumCase != 0) {
@@ -1920,7 +1920,7 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
 
     // Get the destination payload type
     const Metadata *targetPayloadType =
-      cast<EnumMetadata>(targetType)->getGenericArgs()[0];
+      swift::runtime::llvm::cast<EnumMetadata>(targetType)->getGenericArgs()[0];
 
     // Inject the .none tag
     targetPayloadType->vw_storeEnumTagSinglePayload(dest, enumCase, 
@@ -1964,7 +1964,7 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
     if (srcType->isAnyClass()) {
       break;
     }
-    auto existentialType = dyn_cast<ExistentialTypeMetadata>(srcType);
+    auto existentialType = swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(srcType);
     if (!existentialType)
       return false;
     switch (existentialType->getRepresentation()) {
@@ -2357,7 +2357,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
     // If the source is an existential, attempt to cast it first without
     // unwrapping the target. This handles an optional source wrapped within an
     // existential that Optional conforms to (Any).
-    if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+    if (auto srcExistentialType = swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(srcType)) {
       // If coming from AnyObject, we may want to bridge.
       if (isAnyObjectExistentialType(srcExistentialType)) {
         if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
@@ -2372,7 +2372,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
     }
     // Recursively cast into the layout compatible payload area.
     const Metadata *payloadType =
-      cast<EnumMetadata>(targetType)->getGenericArgs()[0];
+      swift::runtime::llvm::cast<EnumMetadata>(targetType)->getGenericArgs()[0];
     if (swift_dynamicCast(dest, src, srcType, payloadType, flags)) {
       payloadType->vw_storeEnumTagSinglePayload(dest, /*case*/ 0,
                                                 /*emptyCases*/ 1);
@@ -2396,7 +2396,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
     }
 
     case MetadataKind::Existential: {
-      auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
+      auto srcExistentialType = swift::runtime::llvm::cast<ExistentialTypeMetadata>(srcType);
       return _dynamicCastToUnknownClassFromExistential(dest, src,
                                                        srcExistentialType,
                                                        targetType, flags);
@@ -2404,7 +2404,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
 
     case MetadataKind::Struct:
       // If the source type is AnyHashable, cast from that.
-      if (isAnyHashableType(cast<StructMetadata>(srcType))) {
+      if (isAnyHashableType(swift::runtime::llvm::cast<StructMetadata>(srcType))) {
         return _dynamicCastFromAnyHashable(dest, src, srcType,
                                            targetType, flags);
       }
@@ -2444,23 +2444,23 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
 
   case MetadataKind::Existential:
     return _dynamicCastToExistential(dest, src, srcType,
-                                     cast<ExistentialTypeMetadata>(targetType),
+                                     swift::runtime::llvm::cast<ExistentialTypeMetadata>(targetType),
                                      flags);
 
   case MetadataKind::Metatype:
     return _dynamicCastToMetatype(dest, src, srcType,
-                                  cast<MetatypeMetadata>(targetType),
+                                  swift::runtime::llvm::cast<MetatypeMetadata>(targetType),
                                   flags);
     
   case MetadataKind::ExistentialMetatype:
     return _dynamicCastToExistentialMetatype(dest, src, srcType,
-                                 cast<ExistentialMetatypeMetadata>(targetType),
+                                 swift::runtime::llvm::cast<ExistentialMetatypeMetadata>(targetType),
                                              flags);
 
   // Function types.
   case MetadataKind::Function: {
     return _dynamicCastToFunction(dest, src, srcType,
-                                  cast<FunctionTypeMetadata>(targetType),
+                                  swift::runtime::llvm::cast<FunctionTypeMetadata>(targetType),
                                   flags);
   }
 
@@ -2501,8 +2501,8 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
       // Collection and AnyHashable casts.
       if (targetType->getKind() == MetadataKind::Struct) {
         return _dynamicCastStructToStruct(dest, src,
-                                          cast<StructMetadata>(srcType),
-                                          cast<StructMetadata>(targetType),
+                                          swift::runtime::llvm::cast<StructMetadata>(srcType),
+                                          swift::runtime::llvm::cast<StructMetadata>(targetType),
                                           flags);
       } else if (isAnyHashableType(srcType)) {
         // AnyHashable casts for enums.
@@ -2532,7 +2532,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
       return _succeed(dest, src, srcType, flags);
 
     // If we have an existential, look at its dynamic type.
-    if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+    if (auto srcExistentialType = swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(srcType)) {
       return _dynamicCastFromExistential(dest, src, srcExistentialType,
                                          targetType, flags);
     }
@@ -2541,8 +2541,8 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
     if (srcType->getKind() == MetadataKind::Tuple &&
         targetType->getKind() == MetadataKind::Tuple) {
       return _dynamicCastTupleToTuple(dest, src,
-                                      cast<TupleTypeMetadata>(srcType),
-                                      cast<TupleTypeMetadata>(targetType),
+                                      swift::runtime::llvm::cast<TupleTypeMetadata>(srcType),
+                                      swift::runtime::llvm::cast<TupleTypeMetadata>(targetType),
                                       flags);
     }
 
@@ -2833,7 +2833,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
   }
   
   // Dig through existential types.
-  if (auto srcExistentialTy = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+  if (auto srcExistentialTy = swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(srcType)) {
     OpaqueValue *srcInnerValue;
     const Metadata *srcInnerType;
     bool isOutOfLine;
@@ -2876,7 +2876,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     
     // ObjC protocols bridge to their Protocol object.
     } else if (auto existential
-               = dyn_cast<ExistentialTypeMetadata>(srcMetatypeValue)) {
+               = swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(srcMetatypeValue)) {
       if (existential->isObjC() && existential->NumProtocols == 1) {
         // Though they're statically-allocated globals, Protocol inherits
         // NSObject's default refcounting behavior so must be retained.
@@ -2951,7 +2951,7 @@ findBridgeWitness(const Metadata *T) {
   // string-keyed dictionaries in Obj-C.  It's worth burning a few words of static
   // storage to avoid repeatedly looking up this conformance.
   if (T->getKind() == MetadataKind::Struct) {
-    auto structDescription = cast<StructMetadata>(T)->Description;
+    auto structDescription = swift::runtime::llvm::cast<StructMetadata>(T)->Description;
     if (structDescription == &NOMINAL_TYPE_DESCR_SYM(SS)) {
       static auto *Swift_String_ObjectiveCBridgeable = swift_conformsToObjectiveCBridgeable(T);
       return Swift_String_ObjectiveCBridgeable;
@@ -3041,7 +3041,7 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
 ) {
   // If the type is the Any type, we can bridge by "upcasting" the object
   // to Any.
-  if (auto nativeExistential = dyn_cast<ExistentialTypeMetadata>(nativeType)) {
+  if (auto nativeExistential = swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(nativeType)) {
     if (nativeExistential->NumProtocols == 0 &&
         !nativeExistential->isClassBounded()) {
       _bridgeNonVerbatimFromObjectiveCToAny(sourceValue, destValue);
@@ -3197,7 +3197,7 @@ const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   }
 
   if (const ForeignClassMetadata *foreignClassType
-        = dyn_cast<ForeignClassMetadata>(theClass)) {
+        = swift::runtime::llvm::dyn_cast<ForeignClassMetadata>(theClass)) {
     if (const Metadata *superclass = foreignClassType->Superclass)
       return superclass;
   }

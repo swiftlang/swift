@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <limits>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 template <typename T> struct DenseMapInfo;

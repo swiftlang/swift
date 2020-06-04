@@ -16,7 +16,7 @@
 #include <type_traits>
 #include <utility>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 /// CRTP base class which implements the entire standard iterator facade

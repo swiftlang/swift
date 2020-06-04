@@ -56,7 +56,7 @@ static RuntimeFunctionCountersStateSentinel RuntimeGlobalFunctionCountersState;
 /// The object state cache mapping objects to the collected state associated with
 /// them.
 struct RuntimeObjectCacheSentinel {
-  llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> Cache;
+  swift::runtime::llvm::DenseMap<HeapObject *, RuntimeFunctionCountersState> Cache;
   StaticReadWriteLock Lock;
 };
 static Lazy<RuntimeObjectCacheSentinel> RuntimeObjectStateCache;

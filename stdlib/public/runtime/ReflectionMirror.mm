@@ -324,13 +324,13 @@ missing_reflection_metadata_warning(const char *fmt, ...) {
   warningv(0, fmt, args);
 }
 
-static std::pair<StringRef /*name*/, FieldType /*fieldInfo*/>
+static std::pair<swift::runtime::llvm::StringRef /*name*/, FieldType /*fieldInfo*/>
 getFieldAt(const Metadata *base, unsigned index) {
   using namespace reflection;
   
   // If we failed to find the field descriptor metadata for the type, fall
   // back to returning an empty tuple as a standin.
-  auto failedToFindMetadata = [&]() -> std::pair<StringRef, FieldType> {
+  auto failedToFindMetadata = [&]() -> std::pair<swift::runtime::llvm::StringRef, FieldType> {
     auto typeName = swift_getTypeName(base, /*qualified*/ true);
     missing_reflection_metadata_warning(
       "warning: the Swift runtime found no field metadata for "
@@ -419,7 +419,7 @@ struct StructImpl : ReflectionMirrorImpl {
     // Load the offset from its respective vector.
     auto fieldOffset = Struct->getFieldOffsets()[i];
 
-    StringRef name;
+    swift::runtime::llvm::StringRef name;
     FieldType fieldInfo;
     std::tie(name, fieldInfo) = getFieldAt(type, i);
     assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
@@ -449,7 +449,7 @@ struct EnumImpl : ReflectionMirrorImpl {
     // 'tag' is in the range [0..NumElements-1].
     unsigned tag = type->vw_getEnumTag(value);
 
-    StringRef name;
+    swift::runtime::llvm::StringRef name;
     FieldType info;
     std::tie(name, info) = getFieldAt(type, tag);
     const Metadata *payloadType = info.getType();
@@ -579,7 +579,7 @@ struct ClassImpl : ReflectionMirrorImpl {
   #endif
     }
 
-    StringRef name;
+    swift::runtime::llvm::StringRef name;
     FieldType fieldInfo;
     std::tie(name, fieldInfo) = getFieldAt(type, i);
     assert(!fieldInfo.isIndirect() && "class indirect properties not implemented");

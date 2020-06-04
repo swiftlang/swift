@@ -266,7 +266,7 @@ private:
 /// If ProvideDestructor is false, the destructor will be trivial.  This
 /// can be appropriate when the object is declared at global scope.
 template <class EntryTy, bool ProvideDestructor = true,
-          class Allocator = llvm::MallocAllocator>
+          class Allocator = swift::runtime::llvm::MallocAllocator>
 class ConcurrentMap
       : private ConcurrentMapBase<EntryTy, ProvideDestructor, Allocator> {
   using super = ConcurrentMapBase<EntryTy, ProvideDestructor, Allocator>;

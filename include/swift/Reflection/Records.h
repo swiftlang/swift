@@ -81,11 +81,11 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  swift::runtime::llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
-  StringRef getFieldName() const {
+  swift::runtime::llvm::StringRef getFieldName() const {
     return FieldName.get();
   }
 
@@ -204,7 +204,7 @@ public:
     return const_iterator { End, End };
   }
 
-  llvm::ArrayRef<FieldRecord> getFields() const {
+  swift::runtime::llvm::ArrayRef<FieldRecord> getFields() const {
     return {getFieldRecordBuffer(), NumFields};
   }
 
@@ -212,7 +212,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  swift::runtime::llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
@@ -220,7 +220,7 @@ public:
     return Superclass;
   }
 
-  StringRef getSuperclass() const {
+  swift::runtime::llvm::StringRef getSuperclass() const {
     return Demangle::makeSymbolicMangledNameStringRef(Superclass.get());
   }
 };
@@ -232,11 +232,11 @@ public:
   const RelativeDirectPointer<const char> Name;
   const RelativeDirectPointer<const char> SubstitutedTypeName;
 
-  StringRef getName() const {
+  swift::runtime::llvm::StringRef getName() const {
     return Name.get();
   }
 
-  StringRef getMangledSubstitutedTypeName() const {
+  swift::runtime::llvm::StringRef getMangledSubstitutedTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(
                                                     SubstitutedTypeName.get());
   }
@@ -314,11 +314,11 @@ public:
     return const_iterator { End, End };
   }
 
-  StringRef getMangledProtocolTypeName() const {
+  swift::runtime::llvm::StringRef getMangledProtocolTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(ProtocolTypeName.get());
   }
 
-  StringRef getMangledConformingTypeName() const {
+  swift::runtime::llvm::StringRef getMangledConformingTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(ConformingTypeName.get());
   }
 };
@@ -351,7 +351,7 @@ public:
     return TypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  swift::runtime::llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(TypeName.get());
   }
 };
@@ -366,7 +366,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  swift::runtime::llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 };
@@ -412,7 +412,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  swift::runtime::llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
@@ -420,7 +420,7 @@ public:
     return MangledMetadataSource;
   }
 
-  StringRef getMangledMetadataSource() const {
+  swift::runtime::llvm::StringRef getMangledMetadataSource() const {
     return Demangle::makeSymbolicMangledNameStringRef(
                                                    MangledMetadataSource.get());
   }

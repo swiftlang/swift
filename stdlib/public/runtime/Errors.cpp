@@ -73,7 +73,7 @@ enum: uint32_t {
 using namespace swift;
 
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
-static bool getSymbolNameAddr(llvm::StringRef libraryName,
+static bool getSymbolNameAddr(swift::runtime::llvm::StringRef libraryName,
                               const SymbolInfo &syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
@@ -149,7 +149,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // library name here. Avoid using StringRef::rsplit because its definition
   // is not provided in the header so that it requires linking with
   // libSupport.a.
-  llvm::StringRef libraryName{syminfo.fileName};
+  swift::runtime::llvm::StringRef libraryName{syminfo.fileName};
   libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.

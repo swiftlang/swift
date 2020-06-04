@@ -26,7 +26,7 @@
 
 namespace swift {
 
-class MetadataAllocator : public llvm::AllocatorBase<MetadataAllocator> {
+class MetadataAllocator : public swift::runtime::llvm::AllocatorBase<MetadataAllocator> {
 private:
   uint16_t Tag;
 
@@ -249,9 +249,9 @@ public:
 
   /// If an entry already exists, await it; otherwise report failure.
   template <class KeyType, class... ArgTys>
-  llvm::Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
+  swift::runtime::llvm::Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
     EntryType *entry = Storage.find(key);
-    if (!entry) return None;
+    if (!entry) return swift::runtime::llvm::None;
     return entry->await(Storage.getConcurrency(),
                         std::forward<ArgTys>(args)...);
   }
@@ -343,7 +343,7 @@ public:
   }
 
   template <class... ArgTys>
-  llvm::Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
+  swift::runtime::llvm::Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
                                          ArgTys &&... args) {
     // Delegate to the implementation class.
     ValueType origValue = asImpl().allocate(std::forward<ArgTys>(args)...);
@@ -868,7 +868,7 @@ public:
 
   /// Perform the allocation operation.
   template <class... Args>
-  llvm::Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
+  swift::runtime::llvm::Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
                                          MetadataRequest request,
                                          Args &&... args) {
     // Returning a non-None value here will preempt initialization, so we
@@ -891,7 +891,7 @@ public:
 
         // Otherwise go directly to the initialization phase.
         } else {
-          return None;
+          return swift::runtime::llvm::None;
         }
       }
     }
@@ -910,7 +910,7 @@ public:
       return Status{allocationResult.Value, MetadataState::Complete};
     }
 
-    return None;
+    return swift::runtime::llvm::None;
   }
 
   enum : bool { MayFlagAllocatedDuringConstruction = false };

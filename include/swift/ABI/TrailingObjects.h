@@ -176,7 +176,7 @@ protected:
 
     if (requiresRealignment())
       return reinterpret_cast<const NextTy *>(
-          llvm::alignAddr(Ptr, llvm::Align(alignof(NextTy))));
+          swift::runtime::llvm::alignAddr(Ptr, swift::runtime::llvm::Align(alignof(NextTy))));
     else
       return reinterpret_cast<const NextTy *>(Ptr);
   }
@@ -191,7 +191,7 @@ protected:
 
     if (requiresRealignment())
       return reinterpret_cast<NextTy *>(
-          llvm::alignAddr(Ptr, llvm::Align(alignof(NextTy))));
+          swift::runtime::llvm::alignAddr(Ptr, swift::runtime::llvm::Align(alignof(NextTy))));
     else
       return reinterpret_cast<NextTy *>(Ptr);
   }
@@ -203,7 +203,7 @@ protected:
       size_t SizeSoFar, size_t Count1,
       typename ExtractSecondType<MoreTys, size_t>::type... MoreCounts) {
     return ParentType::additionalSizeToAllocImpl(
-        (requiresRealignment() ? llvm::alignTo<alignof(NextTy)>(SizeSoFar)
+        (requiresRealignment() ? swift::runtime::llvm::alignTo<alignof(NextTy)>(SizeSoFar)
                                : SizeSoFar) +
             sizeof(NextTy) * Count1,
         MoreCounts...);

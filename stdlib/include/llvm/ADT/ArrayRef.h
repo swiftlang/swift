@@ -24,7 +24,7 @@
 #include <type_traits>
 #include <vector>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
   /// ArrayRef - Represent a constant reference to an array (0 or more elements

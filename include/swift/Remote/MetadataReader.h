@@ -23,7 +23,6 @@
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ExternalUnion.h"
-#include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/ExistentialContainer.h"
@@ -195,7 +194,7 @@ private:
     ExternalUnion<bool, Payloads, getPayloadIndex> Payload;
     
   public:
-    explicit ParentContextDescriptorRef(StringRef Symbol)
+    explicit ParentContextDescriptorRef(swift::runtime::llvm::StringRef Symbol)
       : IsResolved(false)
     {
       Payload.template emplace<std::string>(IsResolved, Symbol);
@@ -240,7 +239,7 @@ private:
 
     bool isResolved() const { return IsResolved; }
     
-    StringRef getSymbol() const {
+    swift::runtime::llvm::StringRef getSymbol() const {
       return Payload.template get<std::string>(IsResolved);
     }
     
@@ -466,24 +465,24 @@ public:
   }
 
   /// Get the remote process's swift_isaMask.
-  llvm::Optional<StoredPointer> readIsaMask() {
+  swift::runtime::llvm::Optional<StoredPointer> readIsaMask() {
     auto encoding = getIsaEncoding();
     if (encoding != IsaEncodingKind::Masked) {
       // Still return success if there's no isa encoding at all.
       if (encoding == IsaEncodingKind::None)
         return 0;
       else
-        return None;
+        return swift::runtime::llvm::None;
     }
 
     return IsaMask;
   }
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
-  llvm::Optional<MetadataKind>
+  swift::runtime::llvm::Optional<MetadataKind>
   readKindFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
-    if (!meta) return None;
+    if (!meta) return swift::runtime::llvm::None;
 
     return meta->getKind();
   }
@@ -495,31 +494,31 @@ public:
     if (!meta || meta->getKind() != MetadataKind::Class)
       return StoredPointer();
 
-    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    auto classMeta = swift::runtime::llvm::cast<TargetClassMetadata<Runtime>>(meta);
     return classMeta->Superclass;
   }
 
   /// Given a remote pointer to class metadata, attempt to discover its class
   /// instance size and whether fields should use the resilient layout strategy.
-  llvm::Optional<unsigned> readInstanceStartAndAlignmentFromClassMetadata(
+  swift::runtime::llvm::Optional<unsigned> readInstanceStartAndAlignmentFromClassMetadata(
       StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::Class)
-      return None;
+      return swift::runtime::llvm::None;
 
     // The following algorithm only works on the non-fragile Apple runtime.
 
     // Grab the RO-data pointer.  This part is not ABI.
     StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
     if (!roDataPtr)
-      return None;
+      return swift::runtime::llvm::None;
 
     // Get the address of the InstanceStart field.
     auto address = roDataPtr + sizeof(uint32_t) * 1;
 
     unsigned start;
     if (!Reader->readInteger(RemoteAddress(address), &start))
-      return None;
+      return swift::runtime::llvm::None;
 
     return start;
   }
@@ -527,7 +526,7 @@ public:
   /// Given a pointer to the metadata, attempt to read the value
   /// witness table. Note that it's not safe to access any non-mandatory
   /// members of the value witness table, like extra inhabitants or enum members.
-  llvm::Optional<TargetValueWitnessTable<Runtime>>
+  swift::runtime::llvm::Optional<TargetValueWitnessTable<Runtime>>
   readValueWitnessTable(StoredPointer MetadataAddress) {
     // The value witness table pointer is at offset -1 from the metadata
     // pointer, that is, the pointer-sized word immediately before the
@@ -537,10 +536,10 @@ public:
     StoredPointer ValueWitnessTableAddr;
     if (!Reader->readInteger(RemoteAddress(ValueWitnessTableAddrAddr),
                              &ValueWitnessTableAddr))
-      return None;
+      return swift::runtime::llvm::None;
     if (!Reader->readBytes(RemoteAddress(ValueWitnessTableAddr),
                            (uint8_t *)&VWT, sizeof(VWT)))
-      return None;
+      return swift::runtime::llvm::None;
     return VWT;
   }
 
@@ -548,22 +547,22 @@ public:
   /// pointer to its metadata address, its value address, and whether this
   /// is a toll-free-bridged NSError or an actual Error existential wrapper
   /// around a native Swift value.
-  llvm::Optional<RemoteExistential>
+  swift::runtime::llvm::Optional<RemoteExistential>
   readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
     // An pointer to an error existential is always an heap object.
     auto MetadataAddress =
         readMetadataFromInstance(ExistentialAddress.getAddressData());
     if (!MetadataAddress)
-      return None;
+      return swift::runtime::llvm::None;
 
     bool isObjC = false;
     bool isBridged = false;
 
     auto Meta = readMetadata(*MetadataAddress);
     if (!Meta)
-      return None;
+      return swift::runtime::llvm::None;
 
-    if (auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
+    if (auto ClassMeta = swift::runtime::llvm::dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
       if (ClassMeta->isPureObjC()) {
         // If we can determine the Objective-C class name, this is probably an
         // error existential with NSError-compatible layout.
@@ -599,12 +598,12 @@ public:
     auto InstanceMetadataAddress =
         readMetadataFromInstance(InstanceMetadataAddressAddress);
     if (!InstanceMetadataAddress)
-      return None;
+      return swift::runtime::llvm::None;
 
     // Read the value witness table.
     auto VWT = readValueWitnessTable(*InstanceMetadataAddress);
     if (!VWT)
-      return None;
+      return swift::runtime::llvm::None;
 
     // Now we need to skip over the instance metadata pointer and instance's
     // conformance pointer for Swift.Error.
@@ -629,22 +628,22 @@ public:
 
   /// Given a known-opaque existential, attemp to discover the pointer to its
   /// metadata address and its value.
-  llvm::Optional<RemoteExistential>
+  swift::runtime::llvm::Optional<RemoteExistential>
   readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
     // OpaqueExistentialContainer is the layout of an opaque existential.
     // `Type` is the pointer to the metadata.
     TargetOpaqueExistentialContainer<Runtime> Container;
     if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
                            (uint8_t *)&Container, sizeof(Container)))
-      return None;
+      return swift::runtime::llvm::None;
     auto MetadataAddress = static_cast<StoredPointer>(Container.Type);
     auto Metadata = readMetadata(MetadataAddress);
     if (!Metadata)
-      return None;
+      return swift::runtime::llvm::None;
 
     auto VWT = readValueWitnessTable(MetadataAddress);
     if (!VWT)
-      return None;
+      return swift::runtime::llvm::None;
 
     // Inline representation (the value fits in the existential container).
     // So, the value starts at the first word of the container.
@@ -656,7 +655,7 @@ public:
     // The first word of the container stores the address to the box.
     StoredPointer BoxAddress;
     if (!Reader->readInteger(ExistentialAddress, &BoxAddress))
-      return None;
+      return swift::runtime::llvm::None;
 
     auto AlignmentMask = VWT->getAlignmentMask();
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
@@ -675,7 +674,7 @@ public:
     // Check whether we have an Objective-C protocol.
     if (ProtocolAddress.isObjC()) {
       auto Name = readObjCProtocolName(ProtocolAddress.getObjCProtocol());
-      StringRef NameStr(Name);
+      swift::runtime::llvm::StringRef NameStr(Name);
 
       // If this is a Swift-defined protocol, demangle it.
       if (NameStr.startswith("_TtP")) {
@@ -738,7 +737,7 @@ public:
     case MetadataKind::Optional:
       return readNominalTypeFromMetadata(Meta);
     case MetadataKind::Tuple: {
-      auto tupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta);
+      auto tupleMeta = swift::runtime::llvm::cast<TargetTupleTypeMetadata<Runtime>>(Meta);
 
       std::vector<BuiltType> elementTypes;
       elementTypes.reserve(tupleMeta->NumElements);
@@ -763,7 +762,7 @@ public:
       return BuiltTuple;
     }
     case MetadataKind::Function: {
-      auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
+      auto Function = swift::runtime::llvm::cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
 
       std::vector<FunctionParam<BuiltType>> Parameters;
       for (unsigned i = 0, n = Function->getNumParameters(); i != n; ++i) {
@@ -792,7 +791,7 @@ public:
       return BuiltFunction;
     }
     case MetadataKind::Existential: {
-      auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta);
+      auto Exist = swift::runtime::llvm::cast<TargetExistentialTypeMetadata<Runtime>>(Meta);
 
       bool HasExplicitAnyObject = false;
       if (Exist->isClassBounded())
@@ -822,7 +821,7 @@ public:
         }
 
 #if SWIFT_OBJC_INTEROP
-        BuiltProtocolDecl objcProtocol(StringRef name) {
+        BuiltProtocolDecl objcProtocol(swift::runtime::llvm::StringRef name) {
           return builder.createObjCProtocolDecl(name.str());
         }
 #endif
@@ -842,7 +841,7 @@ public:
       return BuiltExist;
     }
     case MetadataKind::Metatype: {
-      auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta);
+      auto Metatype = swift::runtime::llvm::cast<TargetMetatypeMetadata<Runtime>>(Meta);
       auto Instance = readTypeFromMetadata(Metatype->InstanceType);
       if (!Instance) return BuiltType();
       auto BuiltMetatype = Builder.createMetatypeType(Instance);
@@ -850,7 +849,7 @@ public:
       return BuiltMetatype;
     }
     case MetadataKind::ObjCClassWrapper: {
-      auto objcWrapper = cast<TargetObjCClassWrapperMetadata<Runtime>>(Meta);
+      auto objcWrapper = swift::runtime::llvm::cast<TargetObjCClassWrapperMetadata<Runtime>>(Meta);
       auto classAddress = objcWrapper->Class;
 
       std::string className;
@@ -862,7 +861,7 @@ public:
       return BuiltObjCClass;
     }
     case MetadataKind::ExistentialMetatype: {
-      auto Exist = cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta);
+      auto Exist = swift::runtime::llvm::cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta);
       auto Instance = readTypeFromMetadata(Exist->InstanceType);
       if (!Instance) return BuiltType();
       auto BuiltExist = Builder.createExistentialMetatypeType(Instance);
@@ -908,7 +907,7 @@ public:
                                     size_t Length) {
     Demangle::Demangler Dem;
     Demangle::NodePointer Demangled =
-      Dem.demangleSymbol(StringRef(MangledTypeName, Length));
+      Dem.demangleSymbol(swift::runtime::llvm::StringRef(MangledTypeName, Length));
     return decodeMangledType(Demangled);
   }
 
@@ -1063,7 +1062,7 @@ public:
   
   /// Demangle the entity represented by a symbolic reference to a given symbol name.
   Demangle::NodePointer
-  buildContextManglingForSymbol(StringRef symbol, Demangler &dem) {
+  buildContextManglingForSymbol(swift::runtime::llvm::StringRef symbol, Demangler &dem) {
     auto demangledSymbol = dem.demangleSymbol(symbol);
     if (demangledSymbol->getKind() == Demangle::Node::Kind::Global) {
       demangledSymbol = demangledSymbol->getChild(0);
@@ -1115,8 +1114,8 @@ public:
 
     Demangle::NodePointer top;
     // References to type nodes behave as types in the mangling.
-    if (isa<TargetTypeContextDescriptor<Runtime>>(descriptor.getLocalBuffer()) ||
-        isa<TargetProtocolDescriptor<Runtime>>(descriptor.getLocalBuffer())) {
+    if (swift::runtime::llvm::isa<TargetTypeContextDescriptor<Runtime>>(descriptor.getLocalBuffer()) ||
+        swift::runtime::llvm::isa<TargetProtocolDescriptor<Runtime>>(descriptor.getLocalBuffer())) {
       top = dem.createNode(Node::Kind::Type);
       top->addChild(demangling, dem);
     } else {
@@ -1181,15 +1180,15 @@ public:
   }
 
   /// Read the isa pointer of an Object-C tagged pointer value.
-  llvm::Optional<StoredPointer>
+  swift::runtime::llvm::Optional<StoredPointer>
   readMetadataFromTaggedPointer(StoredPointer objectAddress) {
     auto readArrayElement =
         [&](StoredPointer base,
-            StoredPointer tag) -> llvm::Optional<StoredPointer> {
+            StoredPointer tag) -> swift::runtime::llvm::Optional<StoredPointer> {
       StoredPointer addr = base + tag * sizeof(StoredPointer);
       StoredPointer isa;
       if (!Reader->readInteger(RemoteAddress(addr), &isa))
-        return None;
+        return swift::runtime::llvm::None;
       return isa;
     };
 
@@ -1211,19 +1210,19 @@ public:
 
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
-  llvm::Optional<StoredPointer>
+  swift::runtime::llvm::Optional<StoredPointer>
   readMetadataFromInstance(StoredPointer objectAddress) {
     if (isTaggedPointer(objectAddress))
       return readMetadataFromTaggedPointer(objectAddress);
 
     StoredPointer isa;
     if (!Reader->readInteger(RemoteAddress(objectAddress), &isa))
-      return None;
+      return swift::runtime::llvm::None;
 
     switch (getIsaEncoding()) {
     case IsaEncodingKind::Unknown:
     case IsaEncodingKind::Error:
-      return None;
+      return swift::runtime::llvm::None;
 
     case IsaEncodingKind::None:
       return isa;
@@ -1242,7 +1241,7 @@ public:
 
       // 0 is never a valid index.
       if (classIndex == 0) {
-        return None;
+        return swift::runtime::llvm::None;
 
       // If the index is out of range, it's an error; but check for an
       // update first.  (This will also trigger the first time because
@@ -1251,12 +1250,12 @@ public:
         StoredPointer count;
         if (!Reader->readInteger(RemoteAddress(IndexedClassesCountPointer),
                                  &count)) {
-          return None;
+          return swift::runtime::llvm::None;
         }
 
         LastIndexedClassesCount = count;
         if (classIndex >= count) {
-          return None;
+          return swift::runtime::llvm::None;
         }
       }
 
@@ -1266,7 +1265,7 @@ public:
                         + classIndex * sizeof(StoredPointer));
       StoredPointer metadataPointer;
       if (!Reader->readInteger(eltPointer, &metadataPointer)) {
-        return None;
+        return swift::runtime::llvm::None;
       }
 
       return metadataPointer;
@@ -1282,18 +1281,18 @@ public:
   ///
   /// The offset is in units of words, from the start of the class's
   /// metadata.
-  llvm::Optional<int32_t>
+  swift::runtime::llvm::Optional<int32_t>
   readGenericArgsOffset(MetadataRef metadata, ContextDescriptorRef descriptor) {
     switch (descriptor->getKind()) {
     case ContextDescriptorKind::Class: {
-      auto type = cast<TargetClassDescriptor<Runtime>>(descriptor);
+      auto type = swift::runtime::llvm::cast<TargetClassDescriptor<Runtime>>(descriptor);
 
       if (!type->hasResilientSuperclass())
         return type->getNonResilientGenericArgumentOffset();
 
       auto bounds = readMetadataBoundsOfSuperclass(descriptor);
       if (!bounds)
-        return None;
+        return swift::runtime::llvm::None;
 
       bounds->adjustForSubclass(type->areImmediateMembersNegative(),
                                 type->NumImmediateMembers);
@@ -1302,26 +1301,26 @@ public:
     }
 
     case ContextDescriptorKind::Enum: {
-      auto type = cast<TargetEnumDescriptor<Runtime>>(descriptor);
+      auto type = swift::runtime::llvm::cast<TargetEnumDescriptor<Runtime>>(descriptor);
       return type->getGenericArgumentOffset();
     }
 
     case ContextDescriptorKind::Struct: {
-      auto type = cast<TargetStructDescriptor<Runtime>>(descriptor);
+      auto type = swift::runtime::llvm::cast<TargetStructDescriptor<Runtime>>(descriptor);
       return type->getGenericArgumentOffset();
     }
 
     default:
-      return None;
+      return swift::runtime::llvm::None;
     }
   }
 
   using ClassMetadataBounds = TargetClassMetadataBounds<Runtime>;
 
   // This follows computeMetadataBoundsForSuperclass.
-  llvm::Optional<ClassMetadataBounds>
+  swift::runtime::llvm::Optional<ClassMetadataBounds>
   readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
-    auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
+    auto subclass = swift::runtime::llvm::cast<TargetClassDescriptor<Runtime>>(subclassRef);
     if (!subclass->hasResilientSuperclass())
       return ClassMetadataBounds::forSwiftRootClass();
 
@@ -1334,28 +1333,28 @@ public:
     return forTypeReference<ClassMetadataBounds>(
         subclass->getResilientSuperclassReferenceKind(), rawSuperclass,
         [&](ContextDescriptorRef superclass)
-            -> llvm::Optional<ClassMetadataBounds> {
-          if (!isa<TargetClassDescriptor<Runtime>>(superclass))
-            return None;
+            -> swift::runtime::llvm::Optional<ClassMetadataBounds> {
+          if (!swift::runtime::llvm::isa<TargetClassDescriptor<Runtime>>(superclass))
+            return swift::runtime::llvm::None;
           return readMetadataBoundsOfSuperclass(superclass);
         },
-        [&](MetadataRef metadata) -> llvm::Optional<ClassMetadataBounds> {
-          auto cls = dyn_cast<TargetClassMetadata<Runtime>>(metadata);
+        [&](MetadataRef metadata) -> swift::runtime::llvm::Optional<ClassMetadataBounds> {
+          auto cls = swift::runtime::llvm::dyn_cast<TargetClassMetadata<Runtime>>(metadata);
           if (!cls)
-            return None;
+            return swift::runtime::llvm::None;
 
           return cls->getClassBoundsAsSwiftSuperclass();
         },
-        [](StoredPointer objcClassName) -> llvm::Optional<ClassMetadataBounds> {
+        [](StoredPointer objcClassName) -> swift::runtime::llvm::Optional<ClassMetadataBounds> {
           // We have no ability to look up an ObjC class by name.
           // FIXME: add a query for this; clients may have a way to do it.
-          return None;
+          return swift::runtime::llvm::None;
         });
   }
 
   template <class Result, class DescriptorFn, class MetadataFn,
             class ClassNameFn>
-  llvm::Optional<Result> forTypeReference(TypeReferenceKind refKind,
+  swift::runtime::llvm::Optional<Result> forTypeReference(TypeReferenceKind refKind,
                                           StoredPointer ref,
                                           const DescriptorFn &descriptorFn,
                                           const MetadataFn &metadataFn,
@@ -1364,7 +1363,7 @@ public:
     case TypeReferenceKind::IndirectTypeDescriptor: {
       StoredPointer descriptorAddress = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
-        return None;
+        return swift::runtime::llvm::None;
 
       ref = descriptorAddress;
       LLVM_FALLTHROUGH;
@@ -1373,7 +1372,7 @@ public:
     case TypeReferenceKind::DirectTypeDescriptor: {
       auto descriptor = readContextDescriptor(ref);
       if (!descriptor)
-        return None;
+        return swift::runtime::llvm::None;
 
       return descriptorFn(descriptor);
     }
@@ -1384,43 +1383,43 @@ public:
     case TypeReferenceKind::IndirectObjCClass: {
       StoredPointer classRef = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &classRef))
-        return None;
+        return swift::runtime::llvm::None;
 
       auto metadata = readMetadata(classRef);
       if (!metadata)
-        return None;
+        return swift::runtime::llvm::None;
 
       return metadataFn(metadata);
     }
     }
 
-    return None;
+    return swift::runtime::llvm::None;
   }
 
   /// Read a single generic type argument from a bound generic type
   /// metadata.
-  llvm::Optional<StoredPointer>
+  swift::runtime::llvm::Optional<StoredPointer>
   readGenericArgFromMetadata(StoredPointer metadata, unsigned index) {
     auto Meta = readMetadata(metadata);
     if (!Meta)
-      return None;
+      return swift::runtime::llvm::None;
 
     auto descriptorAddress = readAddressOfNominalTypeDescriptor(Meta);
     if (!descriptorAddress)
-      return None;
+      return swift::runtime::llvm::None;
 
     // Read the nominal type descriptor.
     auto descriptor = readContextDescriptor(descriptorAddress);
     if (!descriptor)
-      return None;
+      return swift::runtime::llvm::None;
 
     auto generics = descriptor->getGenericContext();
     if (!generics)
-      return None;
+      return swift::runtime::llvm::None;
     
     auto offsetToGenericArgs = readGenericArgsOffset(Meta, descriptor);
     if (!offsetToGenericArgs)
-      return None;
+      return swift::runtime::llvm::None;
 
     auto addressOfGenericArgAddress =
       (getAddress(Meta) +
@@ -1428,12 +1427,12 @@ public:
        index * sizeof(StoredPointer));
 
     if (index >= generics->getGenericContextHeader().getNumArguments())
-      return None;
+      return swift::runtime::llvm::None;
 
     StoredPointer genericArgAddress;
     if (!Reader->readInteger(RemoteAddress(addressOfGenericArgAddress),
                              &genericArgAddress))
-      return None;
+      return swift::runtime::llvm::None;
 
     return genericArgAddress;
   }
@@ -1457,7 +1456,7 @@ public:
       return false;
 
     // Ensure that the metadata actually is tuple metadata.
-    auto tupleMetadata = dyn_cast<TargetTupleTypeMetadata<Runtime>>(metadata);
+    auto tupleMetadata = swift::runtime::llvm::dyn_cast<TargetTupleTypeMetadata<Runtime>>(metadata);
     if (!tupleMetadata)
       return false;
 
@@ -1472,28 +1471,28 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
-  llvm::Optional<StoredPointer>
+  swift::runtime::llvm::Optional<StoredPointer>
   readOffsetToFirstCaptureFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
-      return None;
+      return swift::runtime::llvm::None;
 
-    auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
+    auto heapMeta = swift::runtime::llvm::cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
     return heapMeta->OffsetToFirstCapture;
   }
 
-  llvm::Optional<RemoteAbsolutePointer> readPointer(StoredPointer address) {
+  swift::runtime::llvm::Optional<RemoteAbsolutePointer> readPointer(StoredPointer address) {
     return Reader->readPointer(RemoteAddress(address), sizeof(StoredPointer));
   }
 
-  llvm::Optional<StoredPointer>
+  swift::runtime::llvm::Optional<StoredPointer>
   readResolvedPointerValue(StoredPointer address) {
     if (auto pointer = readPointer(address)) {
       if (!pointer->isResolved())
-        return None;
+        return swift::runtime::llvm::None;
       return (StoredPointer)pointer->getResolvedAddress().getAddressData();
     }
-    return None;
+    return swift::runtime::llvm::None;
   }
 
   template<typename T, typename U>
@@ -1505,13 +1504,13 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
-  llvm::Optional<RemoteAbsolutePointer>
+  swift::runtime::llvm::Optional<RemoteAbsolutePointer>
   readCaptureDescriptorFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
-      return None;
+      return swift::runtime::llvm::None;
 
-    auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
+    auto heapMeta = swift::runtime::llvm::cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
     return resolvePointerField(meta, heapMeta->CaptureDescription);
   }
 
@@ -1528,14 +1527,14 @@ protected:
   }
 
   template <typename Base, typename Field>
-  llvm::Optional<RemoteAbsolutePointer>
+  swift::runtime::llvm::Optional<RemoteAbsolutePointer>
   resolveRelativeIndirectableField(RemoteRef<Base> base, const Field &field) {
     auto fieldRef = base.getField(field);
     int32_t offset;
     memcpy(&offset, fieldRef.getLocalBuffer(), sizeof(int32_t));
     
     if (offset == 0)
-      return llvm::Optional<RemoteAbsolutePointer>(nullptr);
+      return swift::runtime::llvm::Optional<RemoteAbsolutePointer>(nullptr);
     bool indirect = offset & 1;
     offset &= ~1u;
     
@@ -1549,7 +1548,7 @@ protected:
       if (auto ptr = readPointer(resultAddress)) {
         return stripSignedPointer(*ptr);
       }
-      return None;
+      return swift::runtime::llvm::None;
     }
     
     return RemoteAbsolutePointer("", resultAddress);
@@ -1693,7 +1692,7 @@ protected:
                                      bool skipArtificialSubclasses = false) {
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
-      auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
+      auto classMeta = swift::runtime::llvm::cast<TargetClassMetadata<Runtime>>(metadata);
       while (true) {
         if (!classMeta->isTypeMetadata())
           return 0;
@@ -1714,7 +1713,7 @@ protected:
         if (!superMeta)
           return 0;
 
-        auto superclassMeta = dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
+        auto superclassMeta = swift::runtime::llvm::dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
         if (!superclassMeta)
           return 0;
 
@@ -1726,14 +1725,14 @@ protected:
     case MetadataKind::Struct:
     case MetadataKind::Optional:
     case MetadataKind::Enum: {
-      auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
+      auto valueMeta = swift::runtime::llvm::cast<TargetValueMetadata<Runtime>>(metadata);
       StoredSignedPointer descriptorAddressSigned = valueMeta->getDescriptionAsSignedPointer();
       StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
       return descriptorAddress;
     }
         
     case MetadataKind::ForeignClass: {
-      auto foreignMeta = cast<TargetForeignClassMetadata<Runtime>>(metadata);
+      auto foreignMeta = swift::runtime::llvm::cast<TargetForeignClassMetadata<Runtime>>(metadata);
       StoredSignedPointer descriptorAddressSigned = foreignMeta->getDescriptionAsSignedPointer();
       StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
       return descriptorAddress;
@@ -1765,16 +1764,16 @@ private:
 
   /// Returns Optional(ParentContextDescriptorRef()) if there's no parent descriptor.
   /// Returns None if there was an error reading the parent descriptor.
-  llvm::Optional<ParentContextDescriptorRef>
+  swift::runtime::llvm::Optional<ParentContextDescriptorRef>
   readParentContextDescriptor(ContextDescriptorRef base) {
     auto parentAddress = resolveRelativeIndirectableField(base, base->Parent);
     if (!parentAddress)
-      return None;
+      return swift::runtime::llvm::None;
     if (!parentAddress->isResolved()) {
       // Currently we can only handle references directly to a symbol without
       // an offset.
       if (parentAddress->getOffset() != 0) {
-        return None;
+        return swift::runtime::llvm::None;
       }
       return ParentContextDescriptorRef(parentAddress->getSymbol());
     }
@@ -1783,7 +1782,7 @@ private:
       return ParentContextDescriptorRef();
     if (auto parentDescriptor = readContextDescriptor(addr.getAddressData()))
       return ParentContextDescriptorRef(parentDescriptor);
-    return None;
+    return swift::runtime::llvm::None;
   }
 
   static bool isCImportedContext(Demangle::NodePointer node) {
@@ -1799,40 +1798,40 @@ private:
   }
 
   /// Read the name from a module, type, or protocol context descriptor.
-  llvm::Optional<std::string> readContextDescriptorName(
+  swift::runtime::llvm::Optional<std::string> readContextDescriptorName(
       ContextDescriptorRef descriptor,
-      llvm::Optional<TypeImportInfo<std::string>> &importInfo) {
+      swift::runtime::llvm::Optional<TypeImportInfo<std::string>> &importInfo) {
     std::string name;
     auto context = descriptor.getLocalBuffer();
 
     // Read the name of a protocol.
     if (auto protoBuffer =
-            dyn_cast<TargetProtocolDescriptor<Runtime>>(context)) {
+            swift::runtime::llvm::dyn_cast<TargetProtocolDescriptor<Runtime>>(context)) {
       auto nameAddress = resolveRelativeField(descriptor, protoBuffer->Name);
       if (Reader->readString(RemoteAddress(nameAddress), name))
         return name;
 
-      return None;
+      return swift::runtime::llvm::None;
     }
 
     // Read the name of a module.
     if (auto moduleBuffer =
-            dyn_cast<TargetModuleContextDescriptor<Runtime>>(context)) {
+            swift::runtime::llvm::dyn_cast<TargetModuleContextDescriptor<Runtime>>(context)) {
       auto nameAddress = resolveRelativeField(descriptor, moduleBuffer->Name);
       if (Reader->readString(RemoteAddress(nameAddress), name))
         return name;
 
-      return None;
+      return swift::runtime::llvm::None;
     }
 
     // Only type contexts remain.
-    auto typeBuffer = dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
+    auto typeBuffer = swift::runtime::llvm::dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
     if (!typeBuffer)
-      return None;
+      return swift::runtime::llvm::None;
 
     auto nameAddress = resolveRelativeField(descriptor, typeBuffer->Name);
     if (!Reader->readString(RemoteAddress(nameAddress), name))
-      return None;
+      return swift::runtime::llvm::None;
 
     // Read the TypeImportInfo if present.
     if (typeBuffer->getTypeContextDescriptorFlags().hasImportInfo()) {
@@ -1843,7 +1842,7 @@ private:
         // Read the next string.
         std::string temp;
         if (!Reader->readString(RemoteAddress(nameAddress), temp))
-          return None;
+          return swift::runtime::llvm::None;
 
         // If we read an empty string, we're done.
         if (temp.empty())
@@ -1947,7 +1946,7 @@ private:
   Demangle::NodePointer demangleAnonymousContextName(
       ContextDescriptorRef contextRef,
       Demangler &dem) {
-    auto anonymousBuffer = cast<TargetAnonymousContextDescriptor<Runtime>>(
+    auto anonymousBuffer = swift::runtime::llvm::cast<TargetAnonymousContextDescriptor<Runtime>>(
         contextRef.getLocalBuffer());
 
     if (!anonymousBuffer->hasMangledName())
@@ -1967,7 +1966,7 @@ private:
   /// produce a mangled node describing the name of \c context.
   Demangle::NodePointer adoptAnonymousContextName(
       ContextDescriptorRef contextRef,
-      llvm::Optional<ParentContextDescriptorRef> &parentContextRef,
+      swift::runtime::llvm::Optional<ParentContextDescriptorRef> &parentContextRef,
       Demangler &dem, Demangle::NodePointer &outerNode) {
     outerNode = nullptr;
 
@@ -1982,12 +1981,12 @@ private:
     auto parentContextLocalRef = parentContextRef->getResolved();
 
     auto context = contextRef.getLocalBuffer();
-    auto typeContext = dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
-    auto protoContext = dyn_cast<TargetProtocolDescriptor<Runtime>>(context);
+    auto typeContext = swift::runtime::llvm::dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
+    auto protoContext = swift::runtime::llvm::dyn_cast<TargetProtocolDescriptor<Runtime>>(context);
     if (!typeContext && !protoContext)
       return nullptr;
 
-    auto anonymousParent = dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
+    auto anonymousParent = swift::runtime::llvm::dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
             parentContextLocalRef.getLocalBuffer());
     if (!anonymousParent)
       return nullptr;
@@ -2016,7 +2015,7 @@ private:
       return nullptr;
 
     // Read the name of the current context.
-    llvm::Optional<TypeImportInfo<std::string>> importInfo;
+    swift::runtime::llvm::Optional<TypeImportInfo<std::string>> importInfo;
     auto contextName = readContextDescriptorName(contextRef, importInfo);
     if (!contextName)
       return nullptr;
@@ -2133,7 +2132,7 @@ private:
     }
 
     Demangle::Node::Kind nodeKind;
-    llvm::Optional<TypeImportInfo<std::string>> importInfo;
+    swift::runtime::llvm::Optional<TypeImportInfo<std::string>> importInfo;
 
     auto getContextName = [&]() -> bool {
       if (nameNode)
@@ -2214,7 +2213,7 @@ private:
         }
 
 #if SWIFT_OBJC_INTEROP
-        Result objcProtocol(StringRef name) {
+        Result objcProtocol(swift::runtime::llvm::StringRef name) {
           // FIXME: Unify this with the runtime's Demangle.cpp
           auto module = dem.createNode(Node::Kind::Module,
                                        MANGLING_MODULE_OBJC);
@@ -2596,7 +2595,7 @@ private:
 
   BuiltType readNominalTypeFromClassMetadata(MetadataRef origMetadata,
                                        bool skipArtificialSubclasses = false) {
-    auto classMeta = cast<TargetClassMetadata<Runtime>>(origMetadata);
+    auto classMeta = swift::runtime::llvm::cast<TargetClassMetadata<Runtime>>(origMetadata);
     if (classMeta->isTypeMetadata())
       return readNominalTypeFromMetadata(origMetadata, skipArtificialSubclasses);
 
@@ -2822,6 +2821,8 @@ private:
 } // end namespace remote
 } // end namespace swift
 
+namespace swift {
+namespace runtime {
 namespace llvm {
   template<typename T>
   struct simplify_type<swift::remote::RemoteRef<T>> {
@@ -2831,6 +2832,8 @@ namespace llvm {
       return value.getLocalBuffer();
     }
   };
+}
+}
 }
 
 #endif // SWIFT_REFLECTION_READER_H

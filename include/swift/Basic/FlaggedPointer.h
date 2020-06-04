@@ -34,7 +34,7 @@ namespace swift {
 /// Composing this with `PointerIntPair` is not allowed.
 template <typename PointerTy,
           unsigned BitPosition,
-          typename PtrTraits = llvm::PointerLikeTypeTraits<PointerTy>>
+          typename PtrTraits = runtime::llvm::PointerLikeTypeTraits<PointerTy>>
 class FlaggedPointer {
   intptr_t Value;
   static_assert(PtrTraits::NumLowBitsAvailable > 0,
@@ -151,7 +151,7 @@ public:
 
 // Teach SmallPtrSet that FlaggedPointer is "basically a pointer".
 template <typename PointerTy, unsigned BitPosition, typename PtrTraits>
-struct llvm::PointerLikeTypeTraits<
+struct swift::runtime::llvm::PointerLikeTypeTraits<
   swift::FlaggedPointer<PointerTy, BitPosition, PtrTraits>> {
 public:
   static inline void *

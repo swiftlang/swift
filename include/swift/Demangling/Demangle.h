@@ -60,7 +60,7 @@ struct DemangleOptions {
   bool DisplayStdlibModule = true;
   bool DisplayObjCModule = true;
   /// If this is nonempty, entities in this module name will not be qualified.
-  llvm::StringRef HidingCurrentModule;
+  swift::runtime::llvm::StringRef HidingCurrentModule;
   /// A function to render generic parameter names.
   std::function<std::string(uint64_t, uint64_t)> GenericParameterName =
       genericParameterName;
@@ -162,7 +162,7 @@ private:
   };
 
   union {
-    llvm::StringRef Text;
+    swift::runtime::llvm::StringRef Text;
     IndexType Index;
     NodePointer InlineChildren[2];
     NodeVector Children;
@@ -179,7 +179,7 @@ private:
   Node(Kind k)
       : NodeKind(k), NodePayloadKind(PayloadKind::None) {
   }
-  Node(Kind k, llvm::StringRef t)
+  Node(Kind k, swift::runtime::llvm::StringRef t)
       : NodeKind(k), NodePayloadKind(PayloadKind::Text) {
     Text = t;
   }
@@ -194,7 +194,7 @@ public:
   Kind getKind() const { return NodeKind; }
 
   bool hasText() const { return NodePayloadKind == PayloadKind::Text; }
-  llvm::StringRef getText() const {
+  swift::runtime::llvm::StringRef getText() const {
     assert(hasText());
     return Text;
   }
@@ -243,19 +243,19 @@ public:
 /// Returns the length of the swift mangling prefix of the \p SymbolName.
 ///
 /// Returns 0 if \p SymbolName is not a mangled swift (>= swift 4.x) name.
-int getManglingPrefixLength(llvm::StringRef mangledName);
+int getManglingPrefixLength(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if \p SymbolName is a mangled swift name.
 ///
 /// This does not include the old (<= swift 3.x) mangling prefix "_T".
-inline bool isMangledName(llvm::StringRef mangledName) {
+inline bool isMangledName(swift::runtime::llvm::StringRef mangledName) {
   return getManglingPrefixLength(mangledName) != 0;
 }
 
 /// Returns true if the mangledName starts with the swift mangling prefix.
 ///
 /// This includes the old (<= swift 3.x) mangling prefix "_T".
-bool isSwiftSymbol(llvm::StringRef mangledName);
+bool isSwiftSymbol(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if the mangledName starts with the swift mangling prefix.
 ///
@@ -266,43 +266,43 @@ bool isSwiftSymbol(const char *mangledName);
 /// one.
 ///
 /// This does not include the old (<= swift 3.x) mangling prefix "_T".
-llvm::StringRef dropSwiftManglingPrefix(llvm::StringRef mangledName);
+swift::runtime::llvm::StringRef dropSwiftManglingPrefix(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if the mangled name is an alias type name.
 ///
 /// \param mangledName A null-terminated string containing a mangled name.
-bool isAlias(llvm::StringRef mangledName);
+bool isAlias(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if the mangled name is a class type name.
 ///
 /// \param mangledName A null-terminated string containing a mangled name.
-bool isClass(llvm::StringRef mangledName);
+bool isClass(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if the mangled name is an enum type name.
 ///
 /// \param mangledName A null-terminated string containing a mangled name.
-bool isEnum(llvm::StringRef mangledName);
+bool isEnum(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if the mangled name is a protocol type name.
 ///
 /// \param mangledName A null-terminated string containing a mangled name.
-bool isProtocol(llvm::StringRef mangledName);
+bool isProtocol(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if the mangled name is a structure type name.
 ///
 /// \param mangledName A null-terminated string containing a mangled name.
-bool isStruct(llvm::StringRef mangledName);
+bool isStruct(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if the mangled name is an Objective-C symbol.
 ///
 /// \param mangledName A null-terminated string containing a mangled name.
-bool isObjCSymbol(llvm::StringRef mangledName);
+bool isObjCSymbol(swift::runtime::llvm::StringRef mangledName);
 
 /// Returns true if the mangled name has the old scheme of function type
 /// mangling where labels are part of the type.
 ///
 /// \param mangledName A null-terminated string containing a mangled name.
-bool isOldFunctionTypeMangling(llvm::StringRef mangledName);
+bool isOldFunctionTypeMangling(swift::runtime::llvm::StringRef mangledName);
 
 class Demangler;
 
@@ -342,7 +342,7 @@ public:
   /// on failure.
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// context or with a call of clear().
-  NodePointer demangleSymbolAsNode(llvm::StringRef MangledName);
+  NodePointer demangleSymbolAsNode(swift::runtime::llvm::StringRef MangledName);
 
   /// Demangle the given type and return the parse tree.
   ///
@@ -353,7 +353,7 @@ public:
   /// on failure.
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// context or with a call of clear().
-  NodePointer demangleTypeAsNode(llvm::StringRef MangledName);
+  NodePointer demangleTypeAsNode(swift::runtime::llvm::StringRef MangledName);
   
   /// Demangle the given symbol and return the readable name.
   ///
@@ -362,7 +362,7 @@ public:
   ///
   /// \returns The demangled string.
   std::string demangleSymbolAsString(
-      llvm::StringRef MangledName,
+      swift::runtime::llvm::StringRef MangledName,
       const DemangleOptions &Options = DemangleOptions());
 
   /// Demangle the given type and return the readable name.
@@ -372,14 +372,14 @@ public:
   ///
   /// \returns The demangled string.
   std::string
-  demangleTypeAsString(llvm::StringRef MangledName,
+  demangleTypeAsString(swift::runtime::llvm::StringRef MangledName,
                        const DemangleOptions &Options = DemangleOptions());
 
   /// Returns true if the mangledName refers to a thunk function.
   ///
   /// Thunk functions are either (ObjC) partial apply forwarder, swift-as-ObjC
   /// or ObjC-as-swift thunks or allocating init functions.
-  bool isThunkSymbol(llvm::StringRef MangledName);
+  bool isThunkSymbol(swift::runtime::llvm::StringRef MangledName);
 
   /// Returns the mangled name of the target of a thunk.
   ///
@@ -387,14 +387,14 @@ public:
   /// characters from \p MangledName. If \p MangledName is not a thunk symbol
   /// or the thunk target cannot be derived from the mangling, an empty string
   /// is returned.
-  std::string getThunkTarget(llvm::StringRef MangledName);
+  std::string getThunkTarget(swift::runtime::llvm::StringRef MangledName);
 
   /// Returns true if the \p mangledName refers to a function which conforms to
   /// the Swift calling convention.
   ///
   /// The return value is unspecified if the \p MangledName does not refer to a
   /// function symbol.
-  bool hasSwiftCallingConvention(llvm::StringRef MangledName);
+  bool hasSwiftCallingConvention(swift::runtime::llvm::StringRef MangledName);
 
   /// Demangle the given symbol and return the module name of the symbol.
   ///
@@ -402,7 +402,7 @@ public:
   /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The module name.
-  std::string getModuleName(llvm::StringRef mangledName);
+  std::string getModuleName(swift::runtime::llvm::StringRef mangledName);
 
   /// Deallocates all nodes.
   ///
@@ -442,7 +442,7 @@ demangleSymbolAsString(const std::string &mangledName,
 /// \param MangledName The mangled name string.
 /// \returns The demangled string.
 inline std::string
-demangleSymbolAsString(llvm::StringRef MangledName,
+demangleSymbolAsString(swift::runtime::llvm::StringRef MangledName,
                        const DemangleOptions &Options = DemangleOptions()) {
   return demangleSymbolAsString(MangledName.data(),
                                 MangledName.size(), Options);
@@ -478,7 +478,7 @@ demangleTypeAsString(const std::string &mangledName,
 /// \param MangledName The mangled name string.
 /// \returns The demangled string.
 inline std::string
-demangleTypeAsString(llvm::StringRef MangledName,
+demangleTypeAsString(swift::runtime::llvm::StringRef MangledName,
                      const DemangleOptions &Options = DemangleOptions()) {
   return demangleTypeAsString(MangledName.data(),
                               MangledName.size(), Options);
@@ -496,7 +496,7 @@ enum class OperatorKind {
 std::string mangleNode(NodePointer root);
 
 using SymbolicResolver =
-  llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
+  swift::runtime::llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
                                             const void *)>;
 
 /// Remangle a demangled parse tree, using a callback to resolve
@@ -508,7 +508,7 @@ std::string mangleNode(NodePointer root, SymbolicResolver resolver);
 ///
 /// The returned string is owned by \p Factory. This means \p Factory must stay
 /// alive as long as the returned string is used.
-llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
+swift::runtime::llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
                            NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme.
@@ -521,7 +521,7 @@ std::string mangleNodeOld(NodePointer root);
 /// This is only used for objc-runtime names.
 /// The returned string is owned by \p Factory. This means \p Factory must stay
 /// alive as long as the returned string is used.
-llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
+swift::runtime::llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme and embed the name in "_Tt<name>_".
 ///
@@ -550,7 +550,7 @@ class DemanglerPrinter {
 public:
   DemanglerPrinter() = default;
 
-  DemanglerPrinter &operator<<(llvm::StringRef Value) & {
+  DemanglerPrinter &operator<<(swift::runtime::llvm::StringRef Value) & {
     Stream.append(Value.data(), Value.size());
     return *this;
   }
@@ -583,7 +583,7 @@ public:
  
   std::string &&str() && { return std::move(Stream); }
 
-  llvm::StringRef getStringRef() const { return Stream; }
+  swift::runtime::llvm::StringRef getStringRef() const { return Stream; }
 
   /// Shrinks the buffer.
   void resetSize(size_t toPos) {
@@ -618,7 +618,7 @@ bool isFunctionAttr(Node::Kind kind);
 
 /// Form a StringRef around the mangled name starting at base, if the name may
 /// contain symbolic references.
-llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
+swift::runtime::llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 
 } // end namespace Demangle
 } // end namespace swift

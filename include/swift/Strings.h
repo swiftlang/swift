@@ -19,28 +19,28 @@
 namespace swift {
 
 /// The name of the standard library, which is a reserved module name.
-constexpr static const StringLiteral STDLIB_NAME = "Swift";
+constexpr static const runtime::llvm::StringLiteral STDLIB_NAME = "Swift";
 /// The name of the Onone support library, which is a reserved module name.
-constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
+constexpr static const runtime::llvm::StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
 /// The name of the SwiftShims module, which contains private stdlib decls.
-constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
+constexpr static const runtime::llvm::StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the Builtin module, which contains Builtin functions.
-constexpr static const StringLiteral BUILTIN_NAME = "Builtin";
+constexpr static const runtime::llvm::StringLiteral BUILTIN_NAME = "Builtin";
 /// The prefix of module names used by LLDB to capture Swift expressions
-constexpr static const StringLiteral LLDB_EXPRESSIONS_MODULE_NAME_PREFIX =
+constexpr static const runtime::llvm::StringLiteral LLDB_EXPRESSIONS_MODULE_NAME_PREFIX =
     "__lldb_expr_";
 
 /// The name of the fake module used to hold imported Objective-C things.
-constexpr static const StringLiteral MANGLING_MODULE_OBJC = "__C";
+constexpr static const runtime::llvm::StringLiteral MANGLING_MODULE_OBJC = "__C";
 /// The name of the fake module used to hold synthesized ClangImporter things.
-constexpr static const StringLiteral MANGLING_MODULE_CLANG_IMPORTER =
+constexpr static const runtime::llvm::StringLiteral MANGLING_MODULE_CLANG_IMPORTER =
     "__C_Synthesized";
 
-constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
+constexpr static const runtime::llvm::StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
     "programtermination_point";
 
 /// The name of the Builtin type prefix
-constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
+constexpr static const runtime::llvm::StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
 
 /// A composition class containing a StringLiteral for the names of
 /// Swift builtins. The reason we use this is to ensure that we when
@@ -51,11 +51,11 @@ constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
 /// work properly, one must always initialize these classes using an
 /// initializer list as shown below.
 struct BuiltinNameStringLiteral {
-  const StringLiteral literal;
+  const runtime::llvm::StringLiteral literal;
 
-  constexpr operator StringRef() const { return literal; }
+  constexpr operator runtime::llvm::StringRef() const { return literal; }
 
-  StringRef getWithoutPrefix() const {
+  runtime::llvm::StringRef getWithoutPrefix() const {
     return literal.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
   }
 };

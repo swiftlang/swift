@@ -21,7 +21,7 @@
 #include <iterator>
 #include <utility>
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
 /// A range adaptor for a pair of iterators.

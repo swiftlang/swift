@@ -30,7 +30,7 @@
 extern "C" size_t __builtin_strlen(const char *);
 #endif
 
-inline namespace __swift { inline namespace __runtime {
+namespace swift { namespace runtime {
 namespace llvm {
 
   class hash_code;

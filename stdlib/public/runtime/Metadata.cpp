@@ -17,7 +17,6 @@
 #include "swift/Runtime/Metadata.h"
 #include "MetadataCache.h"
 #include "swift/Basic/Lazy.h"
-#include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
@@ -52,6 +51,7 @@
 extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
     (Class _Nonnull oldClass, Class _Nonnull newClass));
 #endif
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "CompatibilityOverride.h"
@@ -97,7 +97,7 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
       return fn(description, pattern);
 
     // Otherwise, use the default behavior.
-    auto *classDescription = cast<ClassDescriptor>(description);
+    auto *classDescription = swift::runtime::llvm::cast<ClassDescriptor>(description);
     return _swift_relocateClassMetadata(classDescription, pattern);
   }
 
@@ -438,11 +438,11 @@ extern "C" void *_objc_empty_cache;
 
 template <>
 bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
-  if (auto *metadata = dyn_cast<StructMetadata>(this))
+  if (auto *metadata = swift::runtime::llvm::dyn_cast<StructMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-  if (auto *metadata = dyn_cast<EnumMetadata>(this))
+  if (auto *metadata = swift::runtime::llvm::dyn_cast<EnumMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+  if (auto *metadata = swift::runtime::llvm::dyn_cast<ClassMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
 
   return false;
@@ -910,12 +910,12 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
   // Unwrap ObjC class wrappers.
-  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+  if (auto wrapper = swift::runtime::llvm::dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
     return wrapper->Class;
   }
 
   // Otherwise, the input should already be a Swift class object.
-  auto theClass = cast<ClassMetadata>(theMetadata);
+  auto theClass = swift::runtime::llvm::cast<ClassMetadata>(theMetadata);
   assert(theClass->isTypeMetadata());
   return theClass;
 }
@@ -923,12 +923,12 @@ swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadataConditional(const Metadata *theMetadata) {
   // If it's an ordinary class, return it.
-  if (auto theClass = dyn_cast<ClassMetadata>(theMetadata)) {
+  if (auto theClass = swift::runtime::llvm::dyn_cast<ClassMetadata>(theMetadata)) {
     return theClass;
   }
 
   // Unwrap ObjC class wrappers.
-  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+  if (auto wrapper = swift::runtime::llvm::dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
     return wrapper->Class;
   }
 
@@ -1655,7 +1655,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
 
   // If we didn't manage to perform the insertion, free the memory associated
   // with the copy of the labels: nobody else can reference it.
-  if (cast<TupleTypeMetadata>(result.Value)->Labels != newLabels) {
+  if (swift::runtime::llvm::cast<TupleTypeMetadata>(result.Value)->Labels != newLabels) {
     cache.getAllocator().Deallocate(newLabels, labelsAllocSize, alignof(char));
   }
 
@@ -1854,7 +1854,7 @@ namespace {
   /// A class encapsulating everything interesting about the identity of
   /// a type context *except* the identity of the parent context.
   class TypeContextIdentity {
-    StringRef Name;
+    swift::runtime::llvm::StringRef Name;
   public:
     explicit TypeContextIdentity(const TypeContextDescriptor *type) {
       Name = ParsedTypeIdentity::parse(type).FullIdentity;
@@ -1893,8 +1893,8 @@ bool swift::equalContexts(const ContextDescriptor *a,
   switch (auto kind = a->getKind()) {
   case ContextDescriptorKind::Module: {
     // Modules with the same name are equivalent.
-    auto moduleA = cast<ModuleContextDescriptor>(a);
-    auto moduleB = cast<ModuleContextDescriptor>(b);
+    auto moduleA = swift::runtime::llvm::cast<ModuleContextDescriptor>(a);
+    auto moduleB = swift::runtime::llvm::cast<ModuleContextDescriptor>(b);
     return strcmp(moduleA->Name.get(), moduleB->Name.get()) == 0;
   }
   
@@ -1907,8 +1907,8 @@ bool swift::equalContexts(const ContextDescriptor *a,
     // Types in the same context with the same name are equivalent.
     if (kind >= ContextDescriptorKind::Type_First
         && kind <= ContextDescriptorKind::Type_Last) {
-      auto typeA = cast<TypeContextDescriptor>(a);
-      auto typeB = cast<TypeContextDescriptor>(b);
+      auto typeA = swift::runtime::llvm::cast<TypeContextDescriptor>(a);
+      auto typeB = swift::runtime::llvm::cast<TypeContextDescriptor>(b);
       return TypeContextIdentity(typeA) == TypeContextIdentity(typeB);
     }
     
@@ -2301,7 +2301,7 @@ static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   auto globalNode = Dem.createNode(Demangle::Node::Kind::Global);
   globalNode->addChild(typeNode, Dem);
 
-  llvm::StringRef string = Demangle::mangleNodeOld(globalNode, Dem);
+  swift::runtime::llvm::StringRef string = Demangle::mangleNodeOld(globalNode, Dem);
 
   // If the class is in the Swift module, add a $ to the end of the ObjC
   // name. The old and new Swift libraries must be able to coexist in
@@ -2476,7 +2476,7 @@ static void initClassVTable(ClassMetadata *self) {
       auto &descriptor = overrideDescriptors[i];
 
       // Get the base class and method.
-      auto *baseClass = cast_or_null<ClassDescriptor>(descriptor.Class.get());
+      auto *baseClass = swift::runtime::llvm::cast_or_null<ClassDescriptor>(descriptor.Class.get());
       auto *baseMethod = descriptor.Method.get();
 
       // If the base method is null, it's an unavailable weak-linked
@@ -2765,7 +2765,7 @@ getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self) {
   // If there is a mangled superclass name, demangle it to the superclass
   // type.
   if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
-    StringRef superclassName =
+    swift::runtime::llvm::StringRef superclassName =
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
     MetadataResponse response =
@@ -2805,13 +2805,13 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
 
   const ClassMetadata *second;
 #if SWIFT_OBJC_INTEROP
-  if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass)) {
+  if (auto objcWrapper = swift::runtime::llvm::dyn_cast<ObjCClassWrapperMetadata>(superclass)) {
     second = objcWrapper->Class;
   } else {
-    second = cast<ClassMetadata>(superclass);
+    second = swift::runtime::llvm::cast<ClassMetadata>(superclass);
   }
 #else
-  second = cast<ClassMetadata>(superclass);
+  second = swift::runtime::llvm::cast<ClassMetadata>(superclass);
 #endif
 
   // If the request isn't satisfied, we have a new dependency.
@@ -3792,7 +3792,8 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   // Calculate the class constraint and number of witness tables for the
   // protocol set.
   unsigned numWitnessTables = 0;
-  for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
+  for (auto p : swift::runtime::llvm::make_range(key.Protocols,
+                                                 key.Protocols + key.NumProtocols)) {
     if (p.needsWitnessTable())
       ++numWitnessTables;
   }
@@ -3867,9 +3868,9 @@ namespace {
 
 static const TypeContextDescriptor *
 getForeignTypeDescription(Metadata *metadata) {
-  if (auto foreignClass = dyn_cast<ForeignClassMetadata>(metadata))
+  if (auto foreignClass = swift::runtime::llvm::dyn_cast<ForeignClassMetadata>(metadata))
     return foreignClass->getDescription();
-  return cast<ValueMetadata>(metadata)->getDescription();
+  return swift::runtime::llvm::cast<ValueMetadata>(metadata)->getDescription();
 }
 
 class ForeignMetadataCacheEntry
@@ -3906,7 +3907,7 @@ public:
       }
     } else {
       if (candidate->getValueWitnesses() == nullptr) {
-        assert(isa<ForeignClassMetadata>(candidate) &&
+        assert(swift::runtime::llvm::isa<ForeignClassMetadata>(candidate) &&
                "cannot set default value witnesses for non-class foreign types");
         // Fill in the default VWT if it was not set in the candidate at build
         // time.
@@ -4133,7 +4134,7 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
 }
 #endif
 
-StringRef swift::getStringForMetadataKind(MetadataKind kind) {
+swift::runtime::llvm::StringRef swift::getStringForMetadataKind(MetadataKind kind) {
   switch (kind) {
 #define METADATAKIND(NAME, VALUE) \
     case MetadataKind::NAME: \
@@ -4172,11 +4173,11 @@ template <> SWIFT_USED void Metadata::dump() const {
     }
   }
 
-  if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
+  if (auto *tuple = swift::runtime::llvm::dyn_cast<TupleTypeMetadata>(this)) {
     printf("Labels: %s.\n", tuple->Labels);
   }
 
-  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(this)) {
+  if (auto *existential = swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(this)) {
     printf("Is class bounded: %s.\n",
            existential->isClassBounded() ? "true" : "false");
     auto protocols = existential->getProtocols();
@@ -4207,7 +4208,7 @@ template <> SWIFT_USED void ContextDescriptor::dump() const {
   printf("TargetTypeContextDescriptor.\n");
   printf("Flags: 0x%x.\n", this->Flags.getIntValue());
   printf("Parent: %p.\n", this->Parent.get());
-  if (auto *typeDescriptor = dyn_cast<TypeContextDescriptor>(this)) {
+  if (auto *typeDescriptor = swift::runtime::llvm::dyn_cast<TypeContextDescriptor>(this)) {
     printf("Name: %s.\n", typeDescriptor->Name.get());
     printf("Fields: %p.\n", typeDescriptor->Fields.get());
     printf("Access function: %p.\n",
@@ -4607,7 +4608,7 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
           return candidate;
 
         auto conformingType =
-          cast<TypeContextDescriptor>(conformance->getTypeDescriptor());
+          swift::runtime::llvm::cast<TypeContextDescriptor>(conformance->getTypeDescriptor());
 
         return _getForeignWitnessTable(candidate,
                                        conformingType,
@@ -4630,13 +4631,13 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 }
 
 /// Find the name of the associated type with the given descriptor.
-static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
+static swift::runtime::llvm::StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
                                         const ProtocolRequirement *assocType) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
-  if (!associatedTypeNamesPtr) return StringRef();
+  if (!associatedTypeNamesPtr) return swift::runtime::llvm::StringRef();
 
-  StringRef associatedTypeNames(associatedTypeNamesPtr);
+  swift::runtime::llvm::StringRef associatedTypeNames(associatedTypeNamesPtr);
   for (const auto &req : protocol->getRequirements()) {
     if (req.Flags.getKind() !=
           ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction)
@@ -4652,7 +4653,7 @@ static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
     associatedTypeNames = associatedTypeNames.substr(splitIdx).substr(1);
   }
 
-  return StringRef();
+  return swift::runtime::llvm::StringRef();
 }
 
 using AssociatedTypeWitness = std::atomic<const Metadata *>;
@@ -4717,7 +4718,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
   const ProtocolDescriptor *protocol = conformance->getProtocol();
 
   // Extract the mangled name itself.
-  StringRef mangledName =
+  swift::runtime::llvm::StringRef mangledName =
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
   // Demangle the associated type.
@@ -4766,9 +4767,9 @@ swift_getAssociatedTypeWitnessSlowImpl(
 
   if (!assocTypeMetadata) {
     auto conformingTypeNameInfo = swift_getTypeName(conformingType, true);
-    StringRef conformingTypeName(conformingTypeNameInfo.data,
+    swift::runtime::llvm::StringRef conformingTypeName(conformingTypeNameInfo.data,
                                  conformingTypeNameInfo.length);
-    StringRef assocTypeName = findAssociatedTypeName(protocol, assocType);
+    swift::runtime::llvm::StringRef assocTypeName = findAssociatedTypeName(protocol, assocType);
     fatalError(0,
                "failed to demangle witness for associated type '%s' in "
                "conformance '%s: %s' from mangled name '%s'\n",
@@ -4890,7 +4891,7 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
   if (*mangledNameBase == '\xFF')
     ++mangledNameBase;
 
-  StringRef mangledName =
+  swift::runtime::llvm::StringRef mangledName =
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
   // Relative reference to an associate conformance witness function.
@@ -4988,16 +4989,16 @@ static Result performOnMetadataCache(const Metadata *metadata,
 
   // Handle different kinds of type that can delay their metadata.
   const TypeContextDescriptor *description;
-  if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
+  if (auto classMetadata = swift::runtime::llvm::dyn_cast<ClassMetadata>(metadata)) {
     description = classMetadata->getDescription();
-  } else if (auto valueMetadata = dyn_cast<ValueMetadata>(metadata)) {
+  } else if (auto valueMetadata = swift::runtime::llvm::dyn_cast<ValueMetadata>(metadata)) {
     description = valueMetadata->getDescription();
-  } else if (auto tupleMetadata = dyn_cast<TupleTypeMetadata>(metadata)) {
+  } else if (auto tupleMetadata = swift::runtime::llvm::dyn_cast<TupleTypeMetadata>(metadata)) {
     // The empty tuple is special and doesn't belong to a metadata cache.
     if (tupleMetadata->NumElements == 0)
       return std::move(callbacks).forOtherMetadata(tupleMetadata);
     return std::move(callbacks).forTupleMetadata(tupleMetadata);
-  } else if (auto foreignClass = dyn_cast<ForeignClassMetadata>(metadata)) {
+  } else if (auto foreignClass = swift::runtime::llvm::dyn_cast<ForeignClassMetadata>(metadata)) {
     return std::move(callbacks).forForeignMetadata(foreignClass,
                                                 foreignClass->getDescription());
   } else {
@@ -5145,7 +5146,7 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
 
   // Classes require their superclass to be transitively complete,
   // and they can be generic.
-  if (auto classType = dyn_cast<ClassMetadata>(type)) {
+  if (auto classType = swift::runtime::llvm::dyn_cast<ClassMetadata>(type)) {
     description = classType->getDescription();
     if (auto super = classType->Superclass) {
       if (super->isTypeMetadata() && predicate(super))
@@ -5153,11 +5154,11 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
     }
 
   // Value types can be generic.
-  } else if (auto valueType = dyn_cast<ValueMetadata>(type)) {
+  } else if (auto valueType = swift::runtime::llvm::dyn_cast<ValueMetadata>(type)) {
     description = valueType->getDescription();
 
   // Tuples require their element types to be transitively complete.
-  } else if (auto tupleType = dyn_cast<TupleTypeMetadata>(type)) {
+  } else if (auto tupleType = swift::runtime::llvm::dyn_cast<TupleTypeMetadata>(type)) {
     for (size_t i = 0, e = tupleType->NumElements; i != e; ++i)
       if (predicate(tupleType->getElement(i).Type))
         return true;
@@ -5165,7 +5166,7 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
     return false;
 
   // Foreign classes require their superclass to be transitively complete.
-  } else if (auto foreignClassType = dyn_cast<ForeignClassMetadata>(type)) {
+  } else if (auto foreignClassType = swift::runtime::llvm::dyn_cast<ForeignClassMetadata>(type)) {
     if (auto super = foreignClassType->Superclass) {
       if (predicate(super))
         return true;
@@ -5256,7 +5257,7 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
 /// dependencies actually hold, and we can keep going.
 static MetadataDependency
 checkTransitiveCompleteness(const Metadata *initialType) {
-  llvm::SmallVector<const Metadata *, 8> worklist;
+  swift::runtime::llvm::SmallVector<const Metadata *, 8> worklist;
   
   // An efficient hash-set implementation in the spirit of llvm's SmallPtrSet:
   // The first 8 elements are stored in an inline-allocated array to avoid
@@ -5340,7 +5341,7 @@ checkTransitiveCompleteness(const Metadata *initialType) {
 /// Diagnose a metadata dependency cycle.
 SWIFT_NORETURN static void
 diagnoseMetadataDependencyCycle(const Metadata *start,
-                                llvm::ArrayRef<MetadataDependency> links) {
+                                swift::runtime::llvm::ArrayRef<MetadataDependency> links) {
   assert(start == links.back().Value);
 
   std::string diagnostic =
@@ -5445,7 +5446,7 @@ void swift::checkMetadataDependencyCycle(const Metadata *startMetadata,
       if (i->Value == newLink.Value) {
         auto next = i + 1;
         diagnoseMetadataDependencyCycle(i->Value,
-                                llvm::makeArrayRef(&*next, links.end() - next));
+                                swift::runtime::llvm::makeArrayRef(&*next, links.end() - next));
       }
     }
   };
@@ -5629,7 +5630,7 @@ void *swift::allocateMetadata(size_t size, size_t alignment) {
 template<>
 bool Metadata::satisfiesClassConstraint() const {
   // existential types marked with @objc satisfy class requirement.
-  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(this))
+  if (auto *existential = swift::runtime::llvm::dyn_cast<ExistentialTypeMetadata>(this))
     return existential->isObjC();
 
   // or it's a class.

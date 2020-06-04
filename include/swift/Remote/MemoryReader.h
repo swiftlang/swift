@@ -133,11 +133,11 @@ public:
   }
   
   /// Attempt to read and resolve a pointer value at the given remote address.
-  llvm::Optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
+  swift::runtime::llvm::Optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
                                                     unsigned pointerSize) {
     auto result = readBytes(address, pointerSize);
     if (!result)
-      return llvm::None;
+      return swift::runtime::llvm::None;
     
     uint64_t pointerData;
     if (pointerSize == 4) {
@@ -147,7 +147,7 @@ public:
     } else if (pointerSize == 8) {
       memcpy(&pointerData, result.get(), 8);
     } else {
-      return llvm::None;
+      return swift::runtime::llvm::None;
     }
     
     return resolvePointer(address, pointerData);
