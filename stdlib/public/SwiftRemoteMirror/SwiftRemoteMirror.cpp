@@ -635,3 +635,21 @@ swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
   NativeAllocation.Size = Allocation.Size;
   return Context->allocationMetadataPointer(NativeAllocation);
 }
+
+const char *swift_reflection_iterateMetadataAllocationBacktraces(
+    SwiftReflectionContextRef ContextRef, swift_metadataAllocationIterator Call,
+    void *ContextPtr) {
+  auto Context = ContextRef->nativeContext;
+  auto Error = Context->iterateMetadataAllocationBacktraces(
+      [&](auto AllocationPtr, auto Count, auto Ptrs) {
+        // Ptrs is an array of StoredPointer, but the callback expects an array
+        // of swift_reflection_ptr_t. Those may are not always the same type.
+        // (For example, swift_reflection_ptr_t can be 64-bit on 32-bit systems,
+        // while StoredPointer is always the pointer size of the target system.)
+        // Convert the array to an array of swift_reflection_ptr_t.
+        std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
+                                                          &Ptrs[Count]};
+        Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
+      });
+  return convertError(ContextRef, Error);
+}
