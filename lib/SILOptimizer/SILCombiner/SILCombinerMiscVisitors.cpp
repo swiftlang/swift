@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -807,6 +808,31 @@ static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
   }
 }
 
+static SingleValueInstruction *getValueFromStaticLet(SILValue v) {
+  if (auto *globalAddr = dyn_cast<GlobalAddrInst>(v)) {
+    SILGlobalVariable *global = globalAddr->getReferencedGlobal();
+    if (!global->isLet())
+      return nullptr;
+    return dyn_cast_or_null<SingleValueInstruction>(
+             global->getStaticInitializerValue());
+  }
+  if (auto *seai = dyn_cast<StructElementAddrInst>(v)) {
+    auto *structVal = getValueFromStaticLet(seai->getOperand());
+    if (!structVal)
+      return nullptr;
+    return cast<SingleValueInstruction>(
+      cast<StructInst>(structVal)->getOperandForField(seai->getField())->get());
+  }
+  if (auto *teai = dyn_cast<TupleElementAddrInst>(v)) {
+    auto *tupleVal = getValueFromStaticLet(teai->getOperand());
+    if (!tupleVal)
+      return nullptr;
+    return cast<SingleValueInstruction>(
+      cast<TupleInst>(tupleVal)->getElement(teai->getFieldNo()));
+  }
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   if (LI->getFunction()->hasOwnership())
     return nullptr;
@@ -832,6 +858,15 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // propagated by redundant load elimination.
   if (isZeroLoadFromEmptyCollection(LI))
     return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), 0);
+
+  // Propagate a value from a static "let" global variable.
+  // This optimization is also done by GlobalOpt, but not with de-serialized
+  // globals, which can occur with cross-module optimization.
+  if (SingleValueInstruction *initVal = getValueFromStaticLet(LI->getOperand())) {
+    StaticInitCloner cloner(LI);
+    cloner.add(initVal);
+    return cloner.clone(initVal);
+  }
 
   return nullptr;
 }
