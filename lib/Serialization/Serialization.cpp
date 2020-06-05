@@ -3241,6 +3241,14 @@ public:
         dependencyTypes.insert(element.getType());
     }
 
+    for (ExtensionDecl *ED : const_cast<ProtocolDecl *>(proto)->getExtensions())
+      for (auto element : ED->getInherited()) {
+        assert(!element.getType()->hasArchetype());
+        inheritedAndDependencyTypes.push_back(S.addTypeRef(element.getType()));
+        if (element.getType()->is<ProtocolType>())
+          dependencyTypes.insert(element.getType());
+      }
+
     for (Requirement req : proto->getRequirementSignature()) {
       // Requirements can be cyclic, so for now filter out any requirements
       // from elsewhere in the module. This isn't perfect---something else in

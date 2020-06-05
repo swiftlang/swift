@@ -6054,6 +6054,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto isConformanceReq = [](const Requirement &req) {
       return req.getKind() == RequirementKind::Conformance;
     };
+#if 0
     if (conformanceCount != llvm::count_if(proto->getRequirementSignature(),
                                            isConformanceReq)) {
       fatal(llvm::make_error<llvm::StringError>(
@@ -6062,6 +6063,28 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     }
     while (conformanceCount--)
       reqConformances.push_back(readConformance(DeclTypeCursor));
+#else
+    while (conformanceCount--)
+      reqConformances.push_back(readConformance(DeclTypeCursor));
+
+    // Tack on conformances due to protocol extensions.
+    SmallVector<Requirement, 10> signatureConformances;
+    llvm::copy_if(proto->getRequirementSignature(),
+                  std::back_inserter(signatureConformances), isConformanceReq);
+    for (unsigned extra = reqConformances.size();
+         extra < signatureConformances.size(); extra++)
+      if (ProtocolDecl *second = dyn_cast<ProtocolDecl>(signatureConformances
+                                      [extra].getSecondType()->getAnyNominal()))
+        reqConformances.push_back(ProtocolConformanceRef(second));
+      else
+        llvm::errs() << "Missed protocol extension conformance\n";
+
+    if (reqConformances.size() != signatureConformances.size()) {
+      fatal(llvm::make_error<llvm::StringError>(
+          "serialized conformances do not match requirement signature",
+          llvm::inconvertibleErrorCode()));
+    }
+#endif
   }
   conformance->setSignatureConformances(reqConformances);
 

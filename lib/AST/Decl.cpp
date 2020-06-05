@@ -1195,12 +1195,12 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
-    ExtendedTypeRepr(extendedType),
-    Inherited(inherited)
+    ExtendedTypeRepr(extendedType)
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
   setTrailingWhereClause(trailingWhereClause);
+  setInherited(inherited);
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
