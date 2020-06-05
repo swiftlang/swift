@@ -284,6 +284,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(Tuple)
   ALWAYS_RESOLVED_PATTERN(EnumElement)
   ALWAYS_RESOLVED_PATTERN(Bool)
+  ALWAYS_RESOLVED_PATTERN(Type)
 #undef ALWAYS_RESOLVED_PATTERN
 
   Pattern *visitVarPattern(VarPattern *P) {
@@ -835,6 +836,10 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     }
 
     return Context.TheUnresolvedType;
+
+  case PatternKind::Type:
+    llvm_unreachable(
+        "non-semantic leaf pattern is evaluated with its parent");
   }
   llvm_unreachable("bad pattern kind!");
 }
@@ -1580,6 +1585,9 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Bool:
     P->setType(type);
     return P;
+  case PatternKind::Type:
+    llvm_unreachable(
+        "non-semantic leaf pattern is evaluated with its parent");
   }
   llvm_unreachable("bad pattern kind!");
 }

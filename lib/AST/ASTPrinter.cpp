@@ -1155,6 +1155,15 @@ void PrintAST::printPattern(const Pattern *pattern) {
     printTypedPattern(cast<TypedPattern>(pattern));
     break;
 
+  case PatternKind::Type: {
+    const auto *const pat = cast<TypePattern>(pattern);
+    if (pat->hasType())
+      pat->getType().print(Printer, Options);
+    else
+      pat->getTypeRepr()->print(Printer, Options);
+    break;
+  }
+
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(pattern);
     Printer << tok::kw_is << " ";

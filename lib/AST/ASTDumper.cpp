@@ -485,7 +485,12 @@ namespace {
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-
+    void visitTypePattern(TypePattern *P) {
+      printCommon(P, "pattern_type") << '\n';
+      if (P->getTypeRepr())
+        printRec(P->getTypeRepr());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
     void visitIsPattern(IsPattern *P) {
       printCommon(P, "pattern_is")
         << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';

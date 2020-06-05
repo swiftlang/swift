@@ -2480,6 +2480,7 @@ void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
   case PatternKind::Bool:
   case PatternKind::Expr:
   case PatternKind::Any:
+  case PatternKind::Type:
     return;
   }
 }

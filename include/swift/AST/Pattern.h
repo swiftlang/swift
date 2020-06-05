@@ -456,6 +456,31 @@ public:
   }
 };
 
+/// A leaf pattern used to stand in for a type representation and its type.
+/// FIXME: Remove this line once TypeLoc in patterns is fully replaced by this.
+class TypePattern final : public Pattern {
+  TypeRepr *const tyRepr;
+
+public:
+  TypePattern(TypeRepr *tyRepr) : Pattern(PatternKind::Type), tyRepr(tyRepr) {}
+
+  static TypePattern *createImplicit(ASTContext &ctx, Type ty) {
+    assert(ty && "Expected a non-null type for implicit pattern");
+    auto *const pat = new (ctx) TypePattern(/*typeRepr*/ nullptr);
+    pat->setType(ty);
+    pat->setImplicit();
+    return pat;
+  }
+
+  TypeRepr *getTypeRepr() const { return tyRepr; }
+
+  SourceRange getSourceRange() const;
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Type;
+  }
+};
+
 /// A pattern which performs a dynamic type check. The match succeeds if the
 /// class, archetype, or existential value is dynamically of the given type.
 ///

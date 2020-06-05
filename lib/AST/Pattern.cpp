@@ -53,9 +53,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
   case PatternKind::EnumElement:
     return OS << "enum case matching pattern";
   case PatternKind::OptionalSome:
-    return OS << "optional .Some matching pattern";
+    return OS << "optional .some matching pattern";
   case PatternKind::Bool:
     return OS << "bool matching pattern";
+  case PatternKind::Type:
+    llvm_unreachable(
+        "non-semantic leaf pattern should be evaluated with its parent");
   }
   llvm_unreachable("bad PatternKind");
 }
@@ -201,6 +204,7 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
   switch (getKind()) {
   case PatternKind::Any:
   case PatternKind::Bool:
+  case PatternKind::Type:
     return;
 
   case PatternKind::Is:
@@ -251,6 +255,7 @@ void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
   case PatternKind::Named:
   case PatternKind::Expr:// FIXME: expr nodes are not modeled right in general.
   case PatternKind::Bool:
+  case PatternKind::Type:
     return;
 
   case PatternKind::Is:
@@ -439,6 +444,13 @@ SourceRange TypedPattern::getSourceRange() const {
 
   return { SubPattern->getSourceRange().Start,
            PatTypeRepr->getSourceRange().End };
+}
+
+SourceRange TypePattern::getSourceRange() const {
+  if (tyRepr == nullptr)
+    return SourceRange();
+
+  return tyRepr->getSourceRange();
 }
 
 /// Construct an ExprPattern.

@@ -2704,6 +2704,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       writePattern(typed->getSubPattern());
       break;
     }
+    case PatternKind::Type:
     case PatternKind::Is:
     case PatternKind::EnumElement:
     case PatternKind::OptionalSome:

@@ -1045,6 +1045,10 @@ struct InitializationForPattern
   InitializationPtr visitVarPattern(VarPattern *P) {
     return visit(P->getSubPattern());
   }
+  InitializationPtr visitTypePattern(TypePattern *P) {
+    llvm_unreachable(
+        "non-semantic leaf pattern should be evaluated with its parent");
+  }
 
   // AnyPatterns (i.e, _) don't require any storage. Any value bound here will
   // just be dropped.

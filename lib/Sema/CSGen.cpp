@@ -2440,6 +2440,10 @@ namespace {
         return setType(openedType);
       }
 
+      case PatternKind::Type:
+        llvm_unreachable(
+            "non-semantic leaf pattern is evaluated with its parent");
+
       case PatternKind::Tuple: {
         auto tuplePat = cast<TuplePattern>(pattern);
 

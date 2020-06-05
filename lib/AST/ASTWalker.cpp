@@ -1687,6 +1687,14 @@ Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
   return P;
 }
 
+Pattern *Traversal::visitTypePattern(TypePattern *P) {
+  if (auto *const tyRepr = P->getTypeRepr())
+    if (doIt(tyRepr))
+      return nullptr;
+
+  return P;
+}
+
 Pattern *Traversal::visitIsPattern(IsPattern *P) {
   if (auto sub = P->getSubPattern()) {
     if (Pattern *newSub = doIt(sub)) {

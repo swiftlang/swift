@@ -39,6 +39,7 @@ PATTERN(Named, Pattern) // let pat, var pat
 PATTERN(Any, Pattern)   // _
 PATTERN(Typed, Pattern) // pat : type
 PATTERN(Var, Pattern)   // x
+REFUTABLE_PATTERN(Type, Pattern)         // type
 REFUTABLE_PATTERN(Is, Pattern)           // x is myclass
 REFUTABLE_PATTERN(EnumElement, Pattern)  // .mycase(pat1, ..., patN)
                                          // MyType.mycase(pat1, ..., patN)

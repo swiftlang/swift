@@ -1414,6 +1414,9 @@ namespace {
       }
       case PatternKind::Typed:
         llvm_unreachable("cannot appear in case patterns");
+      case PatternKind::Type:
+        llvm_unreachable(
+            "non-semantic leaf pattern should be evaluated with its parent");
       case PatternKind::Expr:
         return Space();
       case PatternKind::Var: {
