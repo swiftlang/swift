@@ -2344,7 +2344,7 @@ public:
   }
 
   bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-    return expr->hasAppliedFunctionBuilder();
+    return expr->wasTypeCheckedInEnclosingContext();
   }
 
   bool shouldWalkIntoTapExpression() override { return false; }

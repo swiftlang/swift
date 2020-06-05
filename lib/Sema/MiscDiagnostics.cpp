@@ -93,7 +93,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
 
     bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+      return expr->wasTypeCheckedInEnclosingContext();
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -1291,7 +1291,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
     }
 
     bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+      return expr->wasTypeCheckedInEnclosingContext();
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -1464,7 +1464,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     }
 
     bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+      return expr->wasTypeCheckedInEnclosingContext();
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -3266,7 +3266,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
     bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+      return expr->wasTypeCheckedInEnclosingContext();
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -3416,7 +3416,7 @@ public:
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
 
   bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-    return expr->hasAppliedFunctionBuilder();
+    return expr->wasTypeCheckedInEnclosingContext();
   }
 
   bool shouldWalkIntoTapExpression() override { return false; }
@@ -4156,7 +4156,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
     }
 
     bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+      return expr->wasTypeCheckedInEnclosingContext();
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -4232,7 +4232,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
     }
 
     bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+      return expr->wasTypeCheckedInEnclosingContext();
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
