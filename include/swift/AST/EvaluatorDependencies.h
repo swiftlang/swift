@@ -267,9 +267,15 @@ private:
   void realize(const DependencyCollector::Reference &ref);
 
 public:
-  void replay(const swift::ActiveRequest &req);
+  void replay(const llvm::SetVector<swift::ActiveRequest> &stack,
+              const swift::ActiveRequest &req);
   void record(const llvm::SetVector<swift::ActiveRequest> &stack,
               llvm::function_ref<void(DependencyCollector &)> rec);
+
+private:
+  void
+  unionNearestCachedRequest(ArrayRef<swift::ActiveRequest> stack,
+                            const DependencyCollector::ReferenceSet &scratch);
 
 public:
   using ReferenceEnumerator =
