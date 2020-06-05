@@ -3663,7 +3663,8 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
   if (contexts.empty())
     return nullptr;
 
-  // If the innermost context is a brace statement, drop it.
+  // If the innermost context is a statement (which will be a BraceStmt per
+  // the filtering condition above), drop it.
   if (contexts.back().is<Stmt *>()) {
     contexts = contexts.drop_back();
   }
