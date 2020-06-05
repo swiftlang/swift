@@ -5495,7 +5495,7 @@ bool shouldTypeCheckInEnclosingExpression(ClosureExpr *expr);
 
 /// Visit each subexpression that will be part of the constraint system
 /// of the given expression, including those in closure bodies that will be
-/// part of the constraint system/
+/// part of the constraint system.
 void forEachExprInConstraintSystem(
     Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
 
