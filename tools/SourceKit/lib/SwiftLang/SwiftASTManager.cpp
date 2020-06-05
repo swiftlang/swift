@@ -519,7 +519,7 @@ bool SwiftASTManager::initCompilerInvocation(
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
       Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
     return Invocation.parseArgs(FrontendArgs, Diags);
-  });
+  }, /*ForceNoOutputs=*/true);
 
   // Remove the StreamDiagConsumer as it's no longer needed.
   Diags.removeConsumer(DiagConsumer);
