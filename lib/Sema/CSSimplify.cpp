@@ -1367,6 +1367,15 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
     if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
       return false;
     
+    auto isThin = [](FunctionTypeRepresentation rep) {
+      return rep == FunctionTypeRepresentation::CFunctionPointer ||
+          rep == FunctionTypeRepresentation::Thin;
+    };
+    
+    // Allowing "thin" (c, thin) to "thin" conventions
+    if (isThin(rep1) && isThin(rep2))
+      return false;
+    
     // Allowing all to "thick" (swift, block) conventions
     // "thin" (c, thin) to "thick" or "thick" to "thick"
     if (rep2 == FunctionTypeRepresentation::Swift ||

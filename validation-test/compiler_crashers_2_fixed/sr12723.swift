@@ -42,9 +42,8 @@ func cContext() {
 
     let _ :  (@convention(c) () -> Void) -> Void = c.function // OK
 
-    let _ :  (@convention(thin) () -> Void) -> Void = c.function 
-    // expected-error@-1 {{cannot convert value of type '(@convention(c) () -> Void) -> Void' to specified type '(@convention(thin) () -> Void) -> Void'}}
-
+    let _ :  (@convention(thin) () -> Void) -> Void = c.function // OK
+    
     let _ :  (() -> Void) -> Void = c.function 
     // expected-error@-1 {{cannot convert value of type '(@convention(c) () -> Void) -> Void' to specified type '(() -> Void) -> Void'}}
 
@@ -59,8 +58,7 @@ func thinContext() {
     let _ :  (@convention(block) () -> Void) -> Void = thin.function 
     // expected-error@-1 {{cannot convert value of type '(@convention(thin) () -> Void) -> Void' to specified type '(@convention(block) () -> Void) -> Void'}}
 
-    let _ :  (@convention(c) () -> Void) -> Void = thin.function 
-    // expected-error@-1 {{cannot convert value of type '(@convention(thin) () -> Void) -> Void' to specified type '(@convention(c) () -> Void) -> Void'}}
+    let _ :  (@convention(c) () -> Void) -> Void = thin.function // OK 
 
     let _ :  (@convention(thin) () -> Void) -> Void = thin.function // OK
 
