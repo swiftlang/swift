@@ -4313,12 +4313,12 @@ namespace {
       // "raw" name will be imported as unavailable with a more helpful and
       // specific message.
       ++NumFactoryMethodsAsInitializers;
-      bool redundant = false;
+      ConstructorDecl *existing = nullptr;
       auto result =
           importConstructor(decl, dc, false, importedName.getInitKind(),
                             /*required=*/false, selector, importedName,
                             {decl->param_begin(), decl->param_size()},
-                            decl->isVariadic(), redundant);
+                            decl->isVariadic(), existing);
 
       if (!isActiveSwiftVersion() && result)
         markAsVariant(result, *correctSwiftName);
@@ -4562,7 +4562,7 @@ namespace {
                                        ImportedName importedName,
                                        ArrayRef<const clang::ParmVarDecl*> args,
                                        bool variadic,
-                                       bool &redundant);
+                                       ConstructorDecl *&existing);
 
     void recordObjCOverride(SubscriptDecl *subscript);
 
@@ -6241,11 +6241,11 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     variadic = false;
   }
 
-  bool redundant;
+  ConstructorDecl *existing;
   auto result = importConstructor(objcMethod, dc, implicit,
                                   kind.getValueOr(importedName.getInitKind()),
                                   required, selector, importedName, params,
-                                  variadic, redundant);
+                                  variadic, existing);
 
   // If this is a compatibility stub, mark it as such.
   if (result && correctSwiftName)
@@ -6357,8 +6357,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     const clang::ObjCMethodDecl *objcMethod, const DeclContext *dc, bool implicit,
     CtorInitializerKind kind, bool required, ObjCSelector selector,
     ImportedName importedName, ArrayRef<const clang::ParmVarDecl *> args,
-    bool variadic, bool &redundant) {
-  redundant = false;
+    bool variadic, ConstructorDecl *&existing) {
+  existing = nullptr;
 
   // Figure out the type of the container.
   auto ownerNominal = dc->getSelfNominalTypeDecl();
@@ -6458,7 +6458,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
     // Otherwise, we shouldn't create a new constructor, because
     // it will be no better than the existing one.
-    redundant = true;
+    existing = ctor;
     return nullptr;
   }
 
@@ -7395,19 +7395,26 @@ void SwiftDeclConverter::importInheritedConstructors(
           !correctSwiftName &&
           "Import inherited initializers never references correctSwiftName");
       importedName.setHasCustomName();
-      bool redundant;
+      ConstructorDecl *existing;
       if (auto newCtor =
               importConstructor(objcMethod, classDecl,
                                 /*implicit=*/true, ctor->getInitKind(),
                                 /*required=*/false, ctor->getObjCSelector(),
                                 importedName, objcMethod->parameters(),
-                                objcMethod->isVariadic(), redundant)) {
+                                objcMethod->isVariadic(), existing)) {
         // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
           markAsVariant(newCtor, *correctSwiftName);
 
         Impl.importAttributes(objcMethod, newCtor, curObjCClass);
         newMembers.push_back(newCtor);
+      } else if (existing && existing->getClangDecl()) {
+        // Check that the existing constructor the prevented new creation is
+        // really an inherited factory initializer and not a class member.
+        auto existingMD = cast<clang::ObjCMethodDecl>(existing->getClangDecl());
+        if (existingMD->getClassInterface() != curObjCClass) {
+          newMembers.push_back(existing);
+        }
       }
       continue;
     }
