@@ -61,6 +61,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.SkipPrivateStdlibDecls = true;
   Opts.SkipUnderscoredStdlibProtocols = true;
   Opts.PrintGenericRequirements = true;
+  Opts.PrintInherited = false;
 
   Opts.ExclusiveAttrList.clear();
 
