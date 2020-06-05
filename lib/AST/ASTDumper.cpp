@@ -1780,18 +1780,15 @@ class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
   raw_ostream &OS;
   llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
-  llvm::function_ref<Type(TypeLoc &)> GetTypeOfTypeLoc;
   llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
       GetTypeOfKeyPathComponent;
   unsigned Indent;
 
   PrintExpr(raw_ostream &os, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
-            llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
             llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                 getTypeOfKeyPathComponent,
             unsigned indent)
       : OS(os), GetTypeOfExpr(getTypeOfExpr),
-        GetTypeOfTypeLoc(getTypeOfTypeLoc),
         GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent), Indent(indent) {}
 
   void printRec(Expr *E) {
@@ -2878,21 +2875,19 @@ void Expr::dump() const {
 }
 
 void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
-                llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
                 llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
-  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent, Indent)
+  PrintExpr(OS, getTypeOfExpr, getTypeOfKeyPathComponent, Indent)
       .visit(const_cast<Expr *>(this));
 }
 
 void Expr::dump(raw_ostream &OS, unsigned Indent) const {
   auto getTypeOfExpr = [](Expr *E) -> Type { return E->getType(); };
-  auto getTypeOfTypeLoc = [](TypeLoc &TL) -> Type { return TL.getType(); };
   auto getTypeOfKeyPathComponent = [](KeyPathExpr *E, unsigned index) -> Type {
     return E->getComponents()[index].getComponentType();
   };
-  dump(OS, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent, Indent);
+  dump(OS, getTypeOfExpr, getTypeOfKeyPathComponent, Indent);
 }
 
 void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {

@@ -2506,15 +2506,11 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(TypeLoc &L, Type T) { setType(ASTNode(&L), T); }
-
   void setType(KeyPathExpr *KP, unsigned I, Type T) {
     assert(KP && "Expected non-null key path parameter!");
     assert(T && "Expected non-null type!");
     KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
   }
-
-  bool hasType(TypeLoc &L) const { return hasType(ASTNode(&L)); }
 
   /// Check to see if we have a type for a node.
   bool hasType(ASTNode node) const {
@@ -2537,8 +2533,6 @@ public:
     //           "Mismatched types!");
     return NodeTypes.find(node)->second;
   }
-
-  Type getType(TypeLoc &L) const { return getType(ASTNode(&L)); }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
     assert(hasType(KP, I) && "Expected type to have been set!");

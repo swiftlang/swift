@@ -3035,18 +3035,13 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
       return getType(E);
     return Type();
   };
-  auto getTypeOfTypeLoc = [&](TypeLoc &TL) -> Type {
-    if (hasType(TL))
-      return getType(TL);
-    return Type();
-  };
   auto getTypeOfKeyPathComponent = [&](KeyPathExpr *KP, unsigned I) -> Type {
     if (hasType(KP, I))
       return getType(KP, I);
     return Type();
   };
 
-  E->dump(out, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent);
+  E->dump(out, getTypeOfExpr, getTypeOfKeyPathComponent);
 }
 
 void ConstraintSystem::print(raw_ostream &out) const {

@@ -556,7 +556,6 @@ public:
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getType,
-            llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
             llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                 getTypeOfKeyPathComponent,
             unsigned Indent = 0) const;

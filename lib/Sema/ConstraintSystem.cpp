@@ -4524,8 +4524,6 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
 SourceLoc constraints::getLoc(ASTNode anchor) {
   if (auto *E = anchor.dyn_cast<Expr *>()) {
     return E->getLoc();
-  } else if (auto *T = anchor.dyn_cast<TypeLoc *>()) {
-    return T->getLoc();
   } else if (auto *V = anchor.dyn_cast<Decl *>()) {
     if (auto VD = dyn_cast<VarDecl>(V))
       return VD->getNameLoc();
