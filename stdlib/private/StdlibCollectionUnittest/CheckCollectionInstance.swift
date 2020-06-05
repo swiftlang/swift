@@ -418,15 +418,15 @@ public func checkOneLevelOfForwardCollection<
   // Check Index semantics
   //===------------------------------------------------------------------===//
 
-  let succ = { collection.index(after: $0) }
+  let succ: (C.Index) -> C.Index = { collection.index(after: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
-  let next = { $0 == collection.endIndex ? $0 : succ($0) }
+  let next: (C.Index) -> C.Index = { $0 == collection.endIndex ? $0 : succ($0) }
 
   // advances up to 5 positions without passing endIndex.  Picking a
   // small constant to avoid complexity explosion on large input
   // collections.
-  let next5 = { next(next(next(next(next($0))))) }
+  let next5: (C.Index) -> C.Index = { next(next(next(next(next($0))))) }
 
   let partWay0 = next5(collection.startIndex)
   let partWay1 = next5(partWay0)
@@ -528,7 +528,7 @@ Expected: Collection, S : Collection
 
   let expectedArray = Array(expected)
 
-  let succ = { sliceable.index(after: $0) }
+  let succ: (S.Index) -> S.Index = { sliceable.index(after: $0) }
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
@@ -642,16 +642,16 @@ public func checkOneLevelOfBidirectionalCollection<
   // Check Index semantics
   //===------------------------------------------------------------------===//
 
-  let succ = { collection.index(after: $0) }
-  let pred = { collection.index(before: $0) }
+  let succ: (C.Index) -> C.Index = { collection.index(after: $0) }
+  let pred: (C.Index) -> C.Index = { collection.index(before: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
-  let next = { $0 == collection.endIndex ? $0 : succ($0) }
+  let next: (C.Index) -> C.Index = { $0 == collection.endIndex ? $0 : succ($0) }
 
   // advances up to 5 positions without passing endIndex.  Picking a
   // small constant to avoid complexity explosion on large input
   // collections.
-  let next5 = { next(next(next(next(next($0))))) }
+  let next5: (C.Index) -> C.Index = { next(next(next(next(next($0))))) }
 
   let partWay0 = next5(collection.startIndex)
   let partWay1 = next5(partWay0)
@@ -778,8 +778,8 @@ Expected: Collection, S : BidirectionalCollection
 
   let expectedArray = Array(expected)
 
-  let succ = { sliceable.index(after: $0) }
-  let pred = { sliceable.index(before: $0) }
+  let succ: (S.Index) -> S.Index = { sliceable.index(after: $0) }
+  let pred: (S.Index) -> S.Index = { sliceable.index(before: $0) }
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
@@ -905,15 +905,15 @@ public func checkOneLevelOfRandomAccessCollection<
   // Check Index semantics
   //===------------------------------------------------------------------===//
 
-  let succ = { collection.index(after: $0) }
+  let succ: (C.Index) -> C.Index = { collection.index(after: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
-  let next = { $0 == collection.endIndex ? $0 : succ($0) }
+  let next: (C.Index) -> C.Index = { $0 == collection.endIndex ? $0 : succ($0) }
 
   // advances up to 5 positions without passing endIndex.  Picking a
   // small constant to avoid complexity explosion on large input
   // collections.
-  let next5 = { next(next(next(next(next($0))))) }
+  let next5: (C.Index) -> C.Index = { next(next(next(next(next($0))))) }
 
   let partWay0 = next5(collection.startIndex)
   let partWay1 = next5(partWay0)
@@ -1037,8 +1037,8 @@ Expected: Collection, S : RandomAccessCollection
 
   let expectedArray = Array(expected)
 
-  let succ = { sliceable.index(after: $0) }
-  let pred = { sliceable.index(before: $0) }
+  let succ: (S.Index) -> S.Index = { sliceable.index(after: $0) }
+  let pred: (S.Index) -> S.Index = { sliceable.index(before: $0) }
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
@@ -1186,15 +1186,15 @@ public func checkOneLevelOfForwardCollection<
   // Check Index semantics
   //===------------------------------------------------------------------===//
 
-  let succ = { collection.index(after: $0) }
+  let succ: (C.Index) -> C.Index = { collection.index(after: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
-  let next = { $0 == collection.endIndex ? $0 : succ($0) }
+  let next: (C.Index) -> C.Index = { $0 == collection.endIndex ? $0 : succ($0) }
 
   // advances up to 5 positions without passing endIndex.  Picking a
   // small constant to avoid complexity explosion on large input
   // collections.
-  let next5 = { next(next(next(next(next($0))))) }
+  let next5: (C.Index) -> C.Index = { next(next(next(next(next($0))))) }
 
   let partWay0 = next5(collection.startIndex)
   let partWay1 = next5(partWay0)
@@ -1296,7 +1296,7 @@ Element, S : Collection
 
   let expectedArray = Array(expected)
 
-  let succ = { sliceable.index(after: $0) }
+  let succ: (S.Index) -> S.Index = { sliceable.index(after: $0) }
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
@@ -1410,16 +1410,16 @@ public func checkOneLevelOfBidirectionalCollection<
   // Check Index semantics
   //===------------------------------------------------------------------===//
 
-  let succ = { collection.index(after: $0) }
-  let pred = { collection.index(before: $0) }
+  let succ: (C.Index) -> C.Index = { collection.index(after: $0) }
+  let pred: (C.Index) -> C.Index = { collection.index(before: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
-  let next = { $0 == collection.endIndex ? $0 : succ($0) }
+  let next: (C.Index) -> C.Index = { $0 == collection.endIndex ? $0 : succ($0) }
 
   // advances up to 5 positions without passing endIndex.  Picking a
   // small constant to avoid complexity explosion on large input
   // collections.
-  let next5 = { next(next(next(next(next($0))))) }
+  let next5: (C.Index) -> C.Index = { next(next(next(next(next($0))))) }
 
   let partWay0 = next5(collection.startIndex)
   let partWay1 = next5(partWay0)
@@ -1546,8 +1546,8 @@ Element, S : BidirectionalCollection
 
   let expectedArray = Array(expected)
 
-  let succ = { sliceable.index(after: $0) }
-  let pred = { sliceable.index(before: $0) }
+  let succ: (S.Index) -> S.Index = { sliceable.index(after: $0) }
+  let pred: (S.Index) -> S.Index = { sliceable.index(before: $0) }
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
@@ -1673,15 +1673,15 @@ public func checkOneLevelOfRandomAccessCollection<
   // Check Index semantics
   //===------------------------------------------------------------------===//
 
-  let succ = { collection.index(after: $0) }
+  let succ: (C.Index) -> C.Index = { collection.index(after: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
-  let next = { $0 == collection.endIndex ? $0 : succ($0) }
+  let next: (C.Index) -> C.Index = { $0 == collection.endIndex ? $0 : succ($0) }
 
   // advances up to 5 positions without passing endIndex.  Picking a
   // small constant to avoid complexity explosion on large input
   // collections.
-  let next5 = { next(next(next(next(next($0))))) }
+  let next5: (C.Index) -> C.Index = { next(next(next(next(next($0))))) }
 
   let partWay0 = next5(collection.startIndex)
   let partWay1 = next5(partWay0)
@@ -1805,8 +1805,8 @@ Element, S : RandomAccessCollection
 
   let expectedArray = Array(expected)
 
-  let succ = { sliceable.index(after: $0) }
-  let pred = { sliceable.index(before: $0) }
+  let succ: (S.Index) -> S.Index = { sliceable.index(after: $0) }
+  let pred: (S.Index) -> S.Index = { sliceable.index(before: $0) }
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
