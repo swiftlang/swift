@@ -85,8 +85,6 @@ private:
       return;
 
     // FIXME: Use SolutionApplicationTarget?
-    cs.setContextualType(
-         expr, TypeLoc::withoutLoc(closureResultType), CTP_ClosureResult);
     expr = cs.generateConstraints(expr, closure, /*isInputExpression=*/false);
     if (!expr) {
       hadError = true;
