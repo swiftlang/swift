@@ -3,7 +3,7 @@
 // RUN: %target-codesign %t/main
 // RUN: env %env-SWIFT_DEBUG_HELP=YES %env-SWIFT_DEBUG_SOME_UNKNOWN_VARIABLE=42 %env-SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION=YES %env-SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=abc %env-SWIFT_DETERMINISTIC_HASHING=whatever %env-SWIFT_ENABLE_MANGLED_NAME_VERIFICATION=YES %target-run %t/main 2>&1 | %FileCheck %s --dump-input fail
 
-// CHECK-DAG: {{Warning: unknown environment variable SWIFT_DEBUG_SOME_UNKNOWN_VARIABLE|Using getenv to read variables. Unknown variables will not be flagged.}}
+// CHECK-DAG: {{Warning: unknown environment variable SWIFT_DEBUG_SOME_UNKNOWN_VARIABLE|Using getenv to read variables. Unknown SWIFT_DEBUG_ variables will not be flagged.}}
 // CHECK-DAG: Warning: cannot parse value SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=abc, defaulting to 2.
 // CHECK-DAG: Warning: cannot parse value SWIFT_DETERMINISTIC_HASHING=whatever, defaulting to false.
 // CHECK-DAG: Swift runtime debugging:
