@@ -549,10 +549,7 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
   : LangOpts(langOpts),
     TypeCheckerOpts(typeckOpts),
     SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
-    evaluator(Diags,
-              langOpts.DebugDumpCycles,
-              langOpts.BuildRequestDependencyGraph,
-              langOpts.EnableExperientalPrivateIntransitiveDependencies),
+    evaluator(Diags, langOpts),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -3846,7 +3843,7 @@ void SubstitutionMap::Storage::Profile(
       id.AddPointer(replacementTypes[i].getPointer());
     else
       id.AddPointer(nullptr);
-    i++;
+    ++i;
   });
 
   // Conformances.

@@ -174,7 +174,7 @@ public:
         if (!canHoistArrayPropsInst(ArrayPropsInst))
           return false;
 
-        LoopInstCount++;
+        ++LoopInstCount;
         FoundHoistable = true;
       }
     }

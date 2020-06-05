@@ -478,3 +478,20 @@ func rdar_60048356() {
     }
   }
 }
+
+// rdar://problem/63510989 - valid pattern doesn't type-check
+func rdar63510989() {
+  enum Value : P {
+    func p() {}
+  }
+
+  enum E {
+    case foo(P?)
+  }
+
+  func test(e: E) {
+    if case .foo(_ as Value) = e {} // Ok
+    if case .foo(let v as Value) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+  }
+}

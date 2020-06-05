@@ -883,8 +883,8 @@ namespace {
             }
 
             if (ctx.Stats) {
-              ctx.Stats->getFrontendCounters()
-                  .NumCyclicOneWayComponentsCollapsed++;
+              ++ctx.Stats->getFrontendCounters()
+                  .NumCyclicOneWayComponentsCollapsed;
             }
 
             contractedCycle = true;
@@ -1188,8 +1188,8 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
   SWIFT_FUNC_STAT;
   auto &context = CS.getASTContext();
   if (auto *Stats = context.Stats) {
-    Stats->getFrontendCounters()
-        .NumConstraintsConsideredForEdgeContraction++;
+    ++Stats->getFrontendCounters()
+        .NumConstraintsConsideredForEdgeContraction;
   }
 }
 

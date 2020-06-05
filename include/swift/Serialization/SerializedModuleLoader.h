@@ -138,6 +138,9 @@ protected:
   /// Scan the given serialized module file to determine dependencies.
   llvm::ErrorOr<ModuleDependencies> scanModuleFile(Twine modulePath);
 
+  /// Load the module file into a buffer and also collect its module name.
+  static std::unique_ptr<llvm::MemoryBuffer>
+  getModuleName(ASTContext &Ctx, StringRef modulePath, std::string &Name);
 public:
   virtual ~SerializedModuleLoaderBase();
   SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;

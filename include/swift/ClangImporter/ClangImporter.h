@@ -473,6 +473,7 @@ public:
 
   bool isSerializable(const clang::Type *type,
                       bool checkCanonical) const override;
+  ArrayRef<std::string> getExtraClangArgs() const;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

@@ -647,7 +647,7 @@ swift::swift51override_conformsToSwiftProtocol(const Metadata * const type,
   }
 
   // Really scan conformance records.
-  for (size_t i = startIndex; i < endIndex; i++) {
+  for (size_t i = startIndex; i < endIndex; ++i) {
     auto &section = snapshot.Start[i];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {

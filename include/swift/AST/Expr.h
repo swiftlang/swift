@@ -3774,7 +3774,7 @@ class ClosureExpr : public AbstractClosureExpr {
   /// The bit indicates whether this closure has had a function builder
   /// applied to it.
   llvm::PointerIntPair<VarDecl *, 1, bool> CapturedSelfDeclAndAppliedBuilder;
-  
+
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
   
@@ -3786,7 +3786,8 @@ class ClosureExpr : public AbstractClosureExpr {
   SourceLoc InLoc;
 
   /// The explicitly-specified result type.
-  TypeExpr *ExplicitResultType;
+  llvm::PointerIntPair<TypeExpr *, 1, bool>
+    ExplicitResultTypeAndEnclosingChecked;
 
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
@@ -3801,7 +3802,8 @@ public:
       BracketRange(bracketRange),
       CapturedSelfDeclAndAppliedBuilder(capturedSelfDecl, false),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultType(explicitResultType), Body(nullptr) {
+      ExplicitResultTypeAndEnclosingChecked(explicitResultType, false),
+      Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
@@ -3855,13 +3857,15 @@ public:
 
   Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultType->getInstanceType();
+    return ExplicitResultTypeAndEnclosingChecked.getPointer()
+        ->getInstanceType();
   }
   void setExplicitResultType(Type ty);
 
   TypeRepr *getExplicitResultTypeRepr() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultType->getTypeRepr();
+    return ExplicitResultTypeAndEnclosingChecked.getPointer()
+        ->getTypeRepr();
   }
 
   /// Determine whether the closure has a single expression for its
@@ -3916,6 +3920,16 @@ public:
 
   void setAppliedFunctionBuilder(bool flag = true) {
     CapturedSelfDeclAndAppliedBuilder.setInt(flag);
+  }
+
+  /// Whether this closure's body was type checked within the enclosing
+  /// context.
+  bool wasTypeCheckedInEnclosingContext() const {
+    return ExplicitResultTypeAndEnclosingChecked.getInt();
+  }
+
+  void setTypeCheckedInEnclosingContext(bool flag = true) {
+    ExplicitResultTypeAndEnclosingChecked.setInt(flag);
   }
 
   static bool classof(const Expr *E) {

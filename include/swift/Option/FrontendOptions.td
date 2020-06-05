@@ -214,6 +214,12 @@ def disable_objc_attr_requires_foundation_module :
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Deprecated, use -enable-library-evolution instead">;
 
+def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
+  HelpText<"Disable building Swift modules explicitly by the compiler">;
+
+def swift_module_file
+  : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module explicitly built from textual interface">;
 }
 
 
@@ -712,4 +718,6 @@ def target_sdk_version : Separate<["-"], "target-sdk-version">,
 def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
   HelpText<"The version of target variant SDK used for compilation">;
 
+def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
+  HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

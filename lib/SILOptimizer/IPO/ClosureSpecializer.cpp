@@ -340,7 +340,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   for (auto Arg : AI.getArguments()) {
     if (Index != CSDesc.getClosureIndex())
       NewArgs.push_back(Arg);
-    Index++;
+    ++Index;
   }
 
   // ... and appending the captured arguments. We also insert retains here at
@@ -982,7 +982,7 @@ void SILClosureSpecializerTransform::run() {
       LLVM_DEBUG(llvm::dbgs() << "    Visiting: " << *Closure);
       if (!tryDeleteDeadClosure(Closure)) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to delete closure!\n");
-        NumPropagatedClosuresNotEliminated++;
+        ++NumPropagatedClosuresNotEliminated;
         continue;
       }
 

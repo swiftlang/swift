@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -emit-ir -no-omit-leaf-frame-pointer| %FileCheck %s --check-prefix=CHECK-ALL
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -emit-ir -Xcc -mno-omit-leaf-frame-pointer| %FileCheck %s --check-prefix=CHECK-ALL
 // RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -S | %FileCheck %s --check-prefix=CHECKASM
-// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -S -no-omit-leaf-frame-pointer | %FileCheck %s --check-prefix=CHECKASM-ALL
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -S -Xcc -mno-omit-leaf-frame-pointer | %FileCheck %s --check-prefix=CHECKASM-ALL
 
 // REQUIRES: CODEGENERATOR=AArch64
 // REQUIRES: OS=ios

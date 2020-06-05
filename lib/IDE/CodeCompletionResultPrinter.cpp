@@ -143,7 +143,7 @@ class AnnotatingResultPrinter {
       if (i->is(ChunkKind::CallParameterTypeBegin)) {
         OS << "<callarg.type>";
         auto nestingLevel = i->getNestingLevel();
-        i++;
+        ++i;
         for (; i != e; ++i) {
           if (i->endsPreviousNestedGroup(nestingLevel))
             break;
@@ -241,7 +241,7 @@ void swift::ide::printCodeCompletionResultTypeName(const CodeCompletionResult &R
 
     if (i->is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
       auto nestingLevel = i->getNestingLevel();
-      i++;
+      ++i;
       for (; i != e && !i->endsPreviousNestedGroup(nestingLevel); ++i) {
         if (i->hasText())
           OS << i->getText();

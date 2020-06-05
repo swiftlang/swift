@@ -10,8 +10,16 @@ extension Int: P {}
 func foo() -> some P { return 0 }
 var prop: some P { return 0 }
 
+func bar() -> some Sequence { return [] }
+
 // DEMANGLE: $s18opaque_return_type3fooQryFQOyQo_
 // CHECK: some P
 
 // DEMANGLE: $s18opaque_return_type4propQrvpQOyQo_
 // CHECK: some P
+
+// DEMANGLE: $s18opaque_return_type3barQryFQOyQo_
+// CHECK: some Sequence
+
+// DEMANGLE: $s18opaque_return_type3barQryFQOyQo_7ElementSTQxD
+// CHECK: (some Sequence).Element

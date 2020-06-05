@@ -86,7 +86,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
       return SILValue();
 
     // Check that all of the operands are extracts of the correct kind.
-    for (unsigned i = 0, e = SI->getNumOperands(); i < e; i++) {
+    for (unsigned i = 0, e = SI->getNumOperands(); i < e; ++i) {
       auto *Ex = dyn_cast<StructExtractInst>(SI->getOperand(i));
       // Must be an extract.
       if (!Ex)
@@ -121,7 +121,7 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
       return SILValue();
 
     // Check that all of the operands are extracts of the correct kind.
-    for (unsigned i = 0, e = TI->getNumOperands(); i < e; i++) {
+    for (unsigned i = 0, e = TI->getNumOperands(); i < e; ++i) {
       auto *Ex = dyn_cast<TupleExtractInst>(TI->getOperand(i));
       // Must be an extract.
       if (!Ex)

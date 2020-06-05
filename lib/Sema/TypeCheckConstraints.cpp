@@ -1320,9 +1320,8 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   if (hadParameterError)
     return false;
 
-  // If the closure has a multi-statement body, we don't walk into it
-  // here.
-  if (!closure->hasSingleExpressionBody())
+  // If we won't be checking the body of the closure, don't walk into it here.
+  if (!shouldTypeCheckInEnclosingExpression(closure))
     return false;
 
   // Update the current DeclContext to be the closure we're about to
@@ -2355,23 +2354,23 @@ bool TypeChecker::typeCheckBinding(
   if (!initializer->getType())
     initializer->setType(ErrorType::get(Context));
 
-  // If the type of the pattern is inferred, assign error types to the pattern
-  // and its variables, to prevent it from being referenced by the constraint
-  // system.
+  // Assign error types to the pattern and its variables, to prevent it from
+  // being referenced by the constraint system.
   if (patternType->hasUnresolvedType() ||
       patternType->hasUnboundGenericType()) {
     pattern->setType(ErrorType::get(Context));
-    pattern->forEachVariable([&](VarDecl *var) {
-      // Don't change the type of a variable that we've been able to
-      // compute a type for.
-      if (var->hasInterfaceType() &&
-          !var->getType()->hasUnboundGenericType() &&
-          !var->isInvalid())
-        return;
-
-      var->setInvalid();
-    });
   }
+
+  pattern->forEachVariable([&](VarDecl *var) {
+    // Don't change the type of a variable that we've been able to
+    // compute a type for.
+    if (var->hasInterfaceType() &&
+        !var->getType()->hasUnboundGenericType() &&
+        !var->isInvalid())
+      return;
+
+    var->setInvalid();
+  });
   return true;
 }
 
@@ -2492,11 +2491,12 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   return !resultTy;
 }
 
-bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
-                                         Diag<> diagnosticForAlwaysTrue) {
+bool TypeChecker::typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
+                                                 DeclContext *dc) {
   auto &Context = dc->getASTContext();
   bool hadError = false;
   bool hadAnyFalsable = false;
+  auto cond = stmt->getCond();
   for (auto &elt : cond) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
       hadAnyFalsable = true;
@@ -2504,6 +2504,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     }
 
     if (auto E = elt.getBooleanOrNull()) {
+      assert(!E->getType() && "the bool condition is already type checked");
       hadError |= typeCheckCondition(E, dc);
       elt.setBoolean(E);
       hadAnyFalsable = true;
@@ -2528,8 +2529,10 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     };
 
     // Resolve the pattern.
+    assert(!elt.getPattern()->hasType() &&
+           "the pattern binding condition is already type checked");
     auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
-                                                /*isStmtCondition*/true);
+                                                /*isStmtCondition*/ true);
     if (!pattern) {
       typeCheckPatternFailed();
       continue;
@@ -2554,13 +2557,28 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     hadAnyFalsable |= pattern->isRefutablePattern();
   }
 
-  
   // If the binding is not refutable, and there *is* an else, reject it as
   // unreachable.
   if (!hadAnyFalsable && !hadError) {
     auto &diags = dc->getASTContext().Diags;
-    diags.diagnose(cond[0].getStartLoc(), diagnosticForAlwaysTrue);
+    Diag<> msg = diag::invalid_diagnostic;
+    switch (stmt->getKind()) {
+    case StmtKind::If:
+      msg = diag::if_always_true;
+      break;
+    case StmtKind::While:
+      msg = diag::while_always_true;
+      break;
+    case StmtKind::Guard:
+      msg = diag::guard_always_succeeds;
+      break;
+    default:
+      llvm_unreachable("unknown LabeledConditionalStmt kind");
+    }
+    diags.diagnose(cond[0].getStartLoc(), msg);
   }
+
+  stmt->setCond(cond);
   return false;
 }
 
@@ -4038,4 +4056,8 @@ HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
   return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {
     return type->hasDynamicCallableAttribute();
   });
+}
+
+bool swift::shouldTypeCheckInEnclosingExpression(ClosureExpr *expr) {
+  return expr->hasSingleExpressionBody();
 }

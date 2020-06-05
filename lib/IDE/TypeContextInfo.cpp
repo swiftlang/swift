@@ -89,9 +89,7 @@ void ContextInfoCallbacks::doneParsing() {
   if (!ParsedExpr)
     return;
 
-  typeCheckContextUntil(
-      CurDeclContext,
-      CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
+  typeCheckContextAt(CurDeclContext, ParsedExpr->getLoc());
 
   ExprContextInfo Info(CurDeclContext, ParsedExpr);
 

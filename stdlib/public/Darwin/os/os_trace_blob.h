@@ -135,7 +135,7 @@ static inline void
 os_trace_blob_rtrim(os_trace_blob_t ob)
 {
     uint32_t len = ob->ob_len;
-    while (len > 0 && isspace(ob->ob_s[len - 1])) len--;
+    while (len > 0 && isspace(ob->ob_s[len - 1])) --len;
     _os_trace_blob_setlen(ob, len);
 }
 

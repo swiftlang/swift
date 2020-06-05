@@ -247,6 +247,13 @@ constructValuesForKey(SILValue initialValue,
       continue;
     }
 
+    // We consider address_to_pointer to be an escape from our system. The
+    // frontend must protect the uses of the load_borrow as appropriate in other
+    // ways (for instance by using a mark_dependence).
+    if (isa<AddressToPointerInst>(user)) {
+      continue;
+    }
+
     if (auto *yi = dyn_cast<YieldInst>(user)) {
       auto info = yi->getYieldInfoForOperand(*op);
       if (info.isIndirectInGuaranteed()) {

@@ -331,18 +331,23 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     fn.setBody(newBody, /*isSingleExpression=*/false);
     if (closure) {
       closure->setAppliedFunctionBuilder();
+      closure->setTypeCheckedInEnclosingContext();
       solution.setExprTypes(closure);
     }
 
     return SolutionApplicationToFunctionResult::Success;
-  }
 
-  // If there is a single-expression body, transform that body now.
-  if (fn.hasSingleExpressionBody()) {
+  }
+  assert(closure && "Can only get here with a closure at the moment");
+
+  // If this closure is checked as part of the enclosing expression, handle
+  // that now.
+  if (shouldTypeCheckInEnclosingExpression(closure)) {
     ClosureConstraintApplication application(
         solution, closure, closureFnType->getResult(), rewriteTarget);
     application.visit(fn.getBody());
 
+    closure->setTypeCheckedInEnclosingContext();
     return SolutionApplicationToFunctionResult::Success;
   }
 

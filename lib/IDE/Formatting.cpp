@@ -1475,7 +1475,7 @@ private:
       return;
     for (auto Invalid = Loc.isInvalid(); CurrentTokIt != TokenList.end() &&
          (Invalid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
-         CurrentTokIt++) {
+         ++CurrentTokIt) {
       if (CurrentTokIt->getKind() == tok::comment) {
         CharSourceRange CommentRange = CurrentTokIt->getRange();
         SourceLoc StartLineLoc = Lexer::getLocForStartOfLine(

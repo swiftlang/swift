@@ -670,7 +670,7 @@ namespace {
       assert(!AFD->hasImplicitSelfDecl());
       for (auto param : *AFD->getParameters()) {
         if (!param->isDefaultArgument())
-          nNoDefault++;
+          ++nNoDefault;
       }
     } else {
       nNoDefault = nOperands;
@@ -2248,7 +2248,8 @@ namespace {
           // as potential hole right away.
           resultTy = CS.createTypeVariable(
               resultLoc,
-              closure->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
+              shouldTypeCheckInEnclosingExpression(closure)
+                ? 0 : TVO_CanBindToHole);
         }
       }
 
@@ -2544,7 +2545,17 @@ namespace {
             ConstraintKind::CheckedCast, subPatternType, castType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
-        return setType(subPatternType);
+        // Allow `is` pattern to infer type from context which is then going
+        // to be propaged down to its sub-pattern via conversion. This enables
+        // correct handling of patterns like `_ as Foo` where `_` would
+        // get a type of `Foo` but `is` pattern enclosing it could still be
+        // inferred from enclosing context.
+        auto isType = CS.createTypeVariable(CS.getConstraintLocator(pattern),
+                                            TVO_CanBindToNoEscape);
+        CS.addConstraint(
+            ConstraintKind::Conversion, subPatternType, isType,
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+        return setType(isType);
       }
 
       case PatternKind::Bool:

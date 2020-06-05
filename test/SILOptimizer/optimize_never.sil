@@ -469,13 +469,13 @@ bb0(%0 : $Base):
 
 sil_vtable C {
   #C.foo: @$s14optimize_never1CC3foos5Int32VyF
-  #C.deinit!deallocator: @$s14optimize_never1CCfD
   #C.init!initializer: @$s14optimize_never1CCACycfc
+  #C.deinit!deallocator: @$s14optimize_never1CCfD
 }
 
 sil_vtable D {
-  #C.foo: @$s14optimize_never1DC3foos5Int32VyF
-  #C.init!initializer: @$s14optimize_never1DCACycfc
+  #C.foo: @$s14optimize_never1DC3foos5Int32VyF [override]
+  #C.init!initializer: @$s14optimize_never1DCACycfc [override]
   #D.deinit!deallocator: @$s14optimize_never1DCfD
 }
 
@@ -485,12 +485,12 @@ sil_vtable Base {
 }
 
 sil_vtable Derived1 {
-  #Base.foo: @$s14optimize_never8Derived1C3foos5Int32VyF
-  #Base.boo: @$s14optimize_never8Derived1C3boos5Int32VyF
+  #Base.foo: @$s14optimize_never8Derived1C3foos5Int32VyF [override]
+  #Base.boo: @$s14optimize_never8Derived1C3boos5Int32VyF [override]
 }
 
 sil_vtable Derived2 {
-  #Base.foo: @$s14optimize_never8Derived2C3foos5Int32VyF
-  #Base.boo: @$s14optimize_never8Derived2C3boos5Int32VyF
+  #Base.foo: @$s14optimize_never8Derived2C3foos5Int32VyF [override]
+  #Base.boo: @$s14optimize_never8Derived2C3boos5Int32VyF [override]
 }
 

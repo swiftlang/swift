@@ -42,7 +42,6 @@ std::string genericParameterName(uint64_t depth, uint64_t index);
 /// Display style options for the demangler.
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
-  bool DisplayDebuggerGeneratedModule = true;
   bool QualifyEntities = true;
   bool DisplayExtensionContexts = true;
   bool DisplayUnmangledSuffix = true;
@@ -57,6 +56,12 @@ struct DemangleOptions {
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
   bool ShowFunctionArgumentTypes = true;
+  bool DisplayDebuggerGeneratedModule = true;
+  bool DisplayStdlibModule = true;
+  bool DisplayObjCModule = true;
+  /// If this is nonempty, entities in this module name will not be qualified.
+  llvm::StringRef HidingCurrentModule;
+  /// A function to render generic parameter names.
   std::function<std::string(uint64_t, uint64_t)> GenericParameterName =
       genericParameterName;
 

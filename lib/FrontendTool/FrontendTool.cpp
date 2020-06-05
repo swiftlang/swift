@@ -778,15 +778,16 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
+      Invocation.getClangImporterOptions(),
       Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface,
-      FEOpts.DisableInterfaceFileLock);
+      FEOpts.TrackSystemDeps, LoaderOpts);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {
@@ -1249,6 +1250,17 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Instance);
+
+  // If we aren't in a parse-only context and expect an implicit stdlib import,
+  // load in the standard library. If we either fail to find it or encounter an
+  // error while loading it, bail early. Continuing the compilation will at best
+  // trigger a bunch of other errors due to the stdlib being missing, or at
+  // worst crash downstream as many call sites don't currently handle a missing
+  // stdlib.
+  if (!FrontendOptions::shouldActionOnlyParse(Action)) {
+    if (Instance.loadStdlibIfNeeded())
+      return true;
+  }
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
     // Disable delayed parsing of type and function bodies when we've been
