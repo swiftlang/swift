@@ -43,6 +43,7 @@
 #if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
 #endif
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
