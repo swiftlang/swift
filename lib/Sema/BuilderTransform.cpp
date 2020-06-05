@@ -400,7 +400,7 @@ protected:
                                           unsigned &numPayloads,
                                           bool &isOptional) {
     // The 'then' clause contributes a payload.
-    numPayloads++;
+    ++numPayloads;
 
     // If there's an 'else' clause, it contributes payloads:
     if (auto elseStmt = ifStmt->getElseStmt()) {
@@ -410,7 +410,7 @@ protected:
                                            isOptional);
       // Otherwise it's just the one.
       } else {
-        numPayloads++;
+        ++numPayloads;
       }
 
     // If not, the chain result is at least optional.
@@ -1701,6 +1701,13 @@ public:
 FunctionBuilderBodyPreCheck
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
+  // We don't want to do the precheck if it will already have happened in
+  // the enclosing expression.
+  bool skipPrecheck = false;
+  if (auto closure = dyn_cast_or_null<ClosureExpr>(
+          fn.getAbstractClosureExpr()))
+    skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
+
   return PreCheckFunctionBuilderApplication(fn, false).run();
 }
 

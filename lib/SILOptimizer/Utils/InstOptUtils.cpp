@@ -212,7 +212,7 @@ unsigned swift::getNumInOutArguments(FullApplySite applySite) {
     switch (ParamConvention) {
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable: {
-      numInOutArguments++;
+      ++numInOutArguments;
       break;
     default:
       break;
@@ -641,7 +641,7 @@ void swift::eraseUsesOfInstruction(SILInstruction *inst, CallbackTy callback) {
 
 void swift::collectUsesOfValue(SILValue v,
                                llvm::SmallPtrSetImpl<SILInstruction *> &insts) {
-  for (auto ui = v->use_begin(), E = v->use_end(); ui != E; ui++) {
+  for (auto ui = v->use_begin(), E = v->use_end(); ui != E; ++ui) {
     auto *user = ui->getUser();
     // Instruction has been processed.
     if (!insts.insert(user).second)
@@ -927,7 +927,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
   if (auto srcTupleTy = srcTy.getAs<TupleType>()) {
     SmallVector<SILValue, 8> expectedTuple;
     bool changedCFG = false;
-    for (unsigned i = 0, e = srcTupleTy->getNumElements(); i < e; i++) {
+    for (unsigned i = 0, e = srcTupleTy->getNumElements(); i < e; ++i) {
       SILValue element = builder->createTupleExtract(loc, value, i);
       // Cast the value if necessary.
       bool neededCFGChange;
@@ -966,7 +966,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
 ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *abi,
                                              unsigned index) {
   SILBasicBlock::iterator iter(abi);
-  iter++;
+  ++iter;
   assert(iter != abi->getParent()->end()
          && "alloc_box cannot be the last instruction of a block");
   SILInstruction *nextInst = &*iter;

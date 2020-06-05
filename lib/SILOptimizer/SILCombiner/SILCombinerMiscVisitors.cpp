@@ -222,7 +222,7 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
     if (elementDecl.isNonNull()) {
       // Construct a new instruction by copying all the case entries.
       SmallVector<std::pair<EnumElementDecl *, SILValue>, 4> CaseValues;
-      for (int idx = 0, numIdcs = SEAI->getNumCases(); idx < numIdcs; idx++) {
+      for (int idx = 0, numIdcs = SEAI->getNumCases(); idx < numIdcs; ++idx) {
         CaseValues.push_back(SEAI->getCase(idx));
       }
       // Add the default-entry of the original instruction as case-entry.
@@ -1581,9 +1581,9 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
         if (isa<IntegerLiteralInst>(Pair.second)) {
           bool isFalse = match(Pair.second, Zero);
           if (!isFalse) {
-            TrueBBCases++;
+            ++TrueBBCases;
           } else {
-            FalseBBCases++;
+            ++FalseBBCases;
           }
           continue;
         }
@@ -1602,9 +1602,9 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     unsigned NumFalseBBCases = 0;
 
     if (DefaultBB == CBI->getFalseBB())
-      NumFalseBBCases++;
+      ++NumFalseBBCases;
     else
-      NumTrueBBCases++;
+      ++NumTrueBBCases;
 
     // We can now convert cond_br(select_enum) into switch_enum.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> Cases;
@@ -1619,11 +1619,11 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
       bool isFalse = match(Pair.second, Zero);
       if (!isFalse && DefaultBB != CBI->getTrueBB()) {
         Cases.push_back(std::make_pair(Pair.first, CBI->getTrueBB()));
-        NumTrueBBCases++;
+        ++NumTrueBBCases;
       }
       if (isFalse && DefaultBB != CBI->getFalseBB()) {
         Cases.push_back(std::make_pair(Pair.first, CBI->getFalseBB()));
-        NumFalseBBCases++;
+        ++NumFalseBBCases;
       }
     }
 
@@ -1649,7 +1649,7 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
     if (elementDecl.isNonNull()) {
       // Construct a new instruction by copying all the case entries.
       SmallVector<std::pair<EnumElementDecl *, SILValue>, 4> CaseValues;
-      for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; idx++) {
+      for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; ++idx) {
         CaseValues.push_back(SEI->getCase(idx));
       }
       // Add the default-entry of the original instruction as case-entry.

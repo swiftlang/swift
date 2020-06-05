@@ -450,17 +450,27 @@ bool CompilerInstance::setUpModuleLoaders() {
     return true;
   }
 
+  // If implicit modules are disabled, we need to install an explicit module
+  // loader.
+  if (Invocation.getFrontendOptions().DisableImplicitModules) {
+    auto ESML = ExplicitSwiftModuleLoader::create(
+        *Context,
+        getDependencyTracker(), MLM,
+        Invocation.getSearchPathOptions().ExplicitSwiftModules,
+        IgnoreSourceInfoFile);
+    Context->addModuleLoader(std::move(ESML));
+  }
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
     auto &FEOpts = Invocation.getFrontendOptions();
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
+    ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface,
-        IgnoreSourceInfoFile,
-        FEOpts.DisableInterfaceFileLock);
+        LoaderOpts,
+        IgnoreSourceInfoFile);
     Context->addModuleLoader(std::move(PIML));
   }
 
@@ -487,6 +497,12 @@ Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
                                      codeCompletePoint.second);
   }
   return codeCompletionBufferID;
+}
+
+SourceFile *CompilerInstance::getCodeCompletionFile() const {
+  auto *mod = getMainModule();
+  auto &eval = mod->getASTContext().evaluator;
+  return evaluateOrDefault(eval, CodeCompletionFileRequest{mod}, nullptr);
 }
 
 static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
@@ -707,6 +723,12 @@ ModuleDecl *CompilerInstance::getMainModule() const {
   return MainModule;
 }
 
+void CompilerInstance::setMainModule(ModuleDecl *newMod) {
+  assert(newMod->isMainModule());
+  MainModule = newMod;
+  Context->LoadedModules[newMod->getName()] = newMod;
+}
+
 void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                         bool CanDelayBodies) {
   const InputFileKind Kind = Invocation.getInputKind();
@@ -739,17 +761,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
 
   ModuleDecl *mainModule = getMainModule();
   Context->LoadedModules[mainModule->getName()] = mainModule;
-
-  // If we aren't in a parse-only context, load the standard library.
-  if (LimitStage > SourceFile::Unprocessed &&
-      Invocation.getImplicitStdlibKind() == ImplicitStdlibKind::Stdlib
-      && !loadStdlib()) {
-    // If we failed to load the stdlib, mark the main module as having
-    // "failed to load", as it will contain no files.
-    // FIXME: We need to better handle a missing stdlib.
-    mainModule->setFailedToLoad();
-    return;
-  }
 
   // Make sure the main file is the first file in the module, so do this now.
   if (MainBufferID != NO_SUCH_BUFFER) {
@@ -813,23 +824,27 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
   finishTypeChecking();
 }
 
-bool CompilerInstance::loadStdlib() {
+bool CompilerInstance::loadStdlibIfNeeded() {
+  // If we aren't expecting an implicit stdlib import, there's nothing to do.
+  if (getImplicitImportInfo().StdlibKind != ImplicitStdlibKind::Stdlib)
+    return false;
+
   FrontendStatsTracer tracer(getStatsReporter(), "load-stdlib");
-  ModuleDecl *M = Context->getStdlibModule(true);
+  ModuleDecl *M = Context->getStdlibModule(/*loadIfAbsent*/ true);
 
   if (!M) {
     Diagnostics.diagnose(SourceLoc(), diag::error_stdlib_not_found,
                          Invocation.getTargetTriple());
-    return false;
+    return true;
   }
 
-  // If we failed to load, we should have already diagnosed
+  // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {
     assert(Diagnostics.hadAnyError() &&
            "Module failed to load but nothing was diagnosed?");
-    return false;
+    return true;
   }
-  return true;
+  return false;
 }
 
 bool CompilerInstance::loadPartialModulesAndImplicitImports() {
@@ -870,7 +885,7 @@ void CompilerInstance::forEachFileToTypeCheck(
       fn(*SF);
     }
   } else {
-    for (auto *SF : PrimarySourceFiles) {
+    for (auto *SF : getPrimarySourceFiles()) {
       fn(*SF);
     }
   }
@@ -900,19 +915,12 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   SourceFile *inputFile = new (*Context)
       SourceFile(*mainModule, fileKind, bufferID,
                  Invocation.getLangOptions().CollectParsedToken,
-                 Invocation.getLangOptions().BuildSyntaxTree, opts);
+                 Invocation.getLangOptions().BuildSyntaxTree, opts, isPrimary);
   MainModule->addFile(*inputFile);
 
   if (isPrimary) {
-    PrimarySourceFiles.push_back(inputFile);
     inputFile->enableInterfaceHash();
   }
-
-  if (bufferID == SourceMgr.getCodeCompletionBufferID()) {
-    assert(!CodeCompletionFile && "Multiple code completion files?");
-    CodeCompletionFile = inputFile;
-  }
-
   return inputFile;
 }
 
@@ -923,7 +931,6 @@ void CompilerInstance::freeASTContext() {
   SML = nullptr;
   MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
-  PrimarySourceFiles.clear();
 }
 
 /// Perform "stable" optimizations that are invariant across compiler versions.

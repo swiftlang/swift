@@ -2238,7 +2238,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
   // We might need an extra bit to check if self was consumed.
   if (HasConditionalSelfInitialized)
-    NumMemoryElements++;
+    ++NumMemoryElements;
 
   // Create the control variable as the first instruction in the function (so
   // that it is easy to destroy the stack location.
@@ -2404,7 +2404,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
   // We might need an extra bit to check if self was consumed.
   if (HasConditionalSelfInitialized)
-    NumMemoryElements++;
+    ++NumMemoryElements;
 
   // Utilities.
 

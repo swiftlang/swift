@@ -30,6 +30,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Metadata.h"
 #include <memory>
+#include <inttypes.h>
 #include <stdio.h>
 
 // Pick a return-address strategy

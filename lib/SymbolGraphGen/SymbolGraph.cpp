@@ -60,7 +60,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintUserInaccessibleAttrs = false;
   Opts.SkipPrivateStdlibDecls = true;
   Opts.SkipUnderscoredStdlibProtocols = true;
-  Opts.PrintGenericRequirements = false;
+  Opts.PrintGenericRequirements = true;
 
   Opts.ExclusiveAttrList.clear();
 
@@ -90,6 +90,7 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
   Options.PrintDefaultArgumentValue = false;
   Options.PrintEmptyArgumentNames = false;
   Options.PrintOverrideKeyword = false;
+  Options.PrintGenericRequirements = false;
   return Options;
 }
 

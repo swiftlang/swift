@@ -33,6 +33,8 @@
 #include <vector>
 #include <unordered_map>
 
+#include <inttypes.h>
+
 namespace swift {
 namespace remote {
 

@@ -304,7 +304,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   auto *aliasDecl = cast<TypeAliasDecl>(decl);
 
   auto genericSig = aliasDecl->getGenericSignature();
-  for (unsigned i = 0, e = args.size(); i < e; i++) {
+  for (unsigned i = 0, e = args.size(); i < e; ++i) {
     auto origTy = genericSig->getInnermostGenericParams()[i];
     auto substTy = args[i];
 
@@ -609,20 +609,35 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base) {
-  if (!base->isTypeParameter())
-    return Type();
+  auto identifier = Ctx.getIdentifier(member);
 
-  return DependentMemberType::get(base, Ctx.getIdentifier(member));
+  if (auto *archetype = base->getAs<ArchetypeType>()) {
+    if (archetype->hasNestedType(identifier))
+      return archetype->getNestedType(identifier);
+
+  }
+
+  if (base->isTypeParameter()) {
+    return DependentMemberType::get(base, identifier);
+  }
+
+  return Type();
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base,
                                            ProtocolDecl *protocol) {
-  if (!base->isTypeParameter())
-    return Type();
+  auto identifier = Ctx.getIdentifier(member);
 
-  if (auto assocType = protocol->getAssociatedType(Ctx.getIdentifier(member)))
-    return DependentMemberType::get(base, assocType);
+  if (auto *archetype = base->getAs<ArchetypeType>()) {
+    if (archetype->hasNestedType(identifier))
+      return archetype->getNestedType(identifier);
+  }
+
+  if (base->isTypeParameter()) {
+    if (auto assocType = protocol->getAssociatedType(identifier))
+      return DependentMemberType::get(base, assocType);
+  }
 
   return Type();
 }

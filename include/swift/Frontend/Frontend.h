@@ -451,14 +451,6 @@ class CompilerInstance {
   /// considered primaries.
   llvm::SetVector<unsigned> PrimaryBufferIDs;
 
-  /// Identifies the set of SourceFiles that are considered primaries. An
-  /// invariant is that any SourceFile in this set with an associated
-  /// buffer will also have its buffer ID in PrimaryBufferIDs.
-  std::vector<SourceFile *> PrimarySourceFiles;
-
-  /// The file that has been registered for code completion.
-  NullablePtr<SourceFile> CodeCompletionFile;
-
   /// Return whether there is an entry in PrimaryInputs for buffer \p BufID.
   bool isPrimaryInput(unsigned BufID) const {
     return PrimaryBufferIDs.count(BufID) != 0;
@@ -514,7 +506,12 @@ public:
 
   UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
 
+  /// Retrieve the main module containing the files being compiled.
   ModuleDecl *getMainModule() const;
+
+  /// Replace the current main module with a new one. This is used for top-level
+  /// cached code completion.
+  void setMainModule(ModuleDecl *newMod);
 
   MemoryBufferSerializedModuleLoader *
   getMemoryBufferSerializedModuleLoader() const {
@@ -536,7 +533,7 @@ public:
   /// Gets the set of SourceFiles which are the primary inputs for this
   /// CompilerInstance.
   ArrayRef<SourceFile *> getPrimarySourceFiles() const {
-    return PrimarySourceFiles;
+    return getMainModule()->getPrimarySourceFiles();
   }
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
@@ -546,11 +543,12 @@ public:
   /// FIXME: This should be removed eventually, once there are no longer any
   /// codepaths that rely on a single primary file.
   SourceFile *getPrimarySourceFile() const {
-    if (PrimarySourceFiles.empty()) {
+    auto primaries = getPrimarySourceFiles();
+    if (primaries.empty()) {
       return nullptr;
     } else {
-      assert(PrimarySourceFiles.size() == 1);
-      return *PrimarySourceFiles.begin();
+      assert(primaries.size() == 1);
+      return *primaries.begin();
     }
   }
 
@@ -561,12 +559,7 @@ public:
 
   /// If a code completion buffer has been set, returns the corresponding source
   /// file.
-  NullablePtr<SourceFile> getCodeCompletionFile() { return CodeCompletionFile; }
-
-  /// Set a new file that we're performing code completion on.
-  void setCodeCompletionFile(SourceFile *file) {
-    CodeCompletionFile = file;
-  }
+  SourceFile *getCodeCompletionFile() const;
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
@@ -646,10 +639,11 @@ private:
 public:
   void freeASTContext();
 
-private:
-  /// Load stdlib & return true if should continue, i.e. no error
-  bool loadStdlib();
+  /// If an implicit standard library import is expected, loads the standard
+  /// library, returning \c false if we should continue, i.e. no error.
+  bool loadStdlibIfNeeded();
 
+private:
   /// Retrieve a description of which modules should be implicitly imported.
   ImplicitImportInfo getImplicitImportInfo() const;
 

@@ -546,6 +546,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::KeyPathInst:
       case SILInstructionKind::SwitchEnumAddrInst:
+      case SILInstructionKind::SelectEnumAddrInst:
         break;
       case SILInstructionKind::AddressToPointerInst:
         // We assume that the user is attempting to do something unsafe since we
@@ -3569,7 +3570,7 @@ public:
 
       fromCanTy = fromMetaty.getInstanceType();
       toCanTy = toMetaty.getInstanceType();
-      MetatyLevel++;
+      ++MetatyLevel;
     }
 
     if (isExact) {
@@ -5360,8 +5361,22 @@ void SILProperty::verify(const SILModule &M) const {
 void SILVTable::verify(const SILModule &M) const {
   if (!verificationEnabled(M))
     return;
-
-  for (auto &entry : getEntries()) {
+  
+  // Compare against the base class vtable if there is one.
+  const SILVTable *superVTable = nullptr;
+  auto superclass = getClass()->getSuperclassDecl();
+  if (superclass) {
+    for (auto &vt : M.getVTables()) {
+      if (vt.getClass() == superclass) {
+        superVTable = &vt;
+        break;
+      }
+    }
+  }
+  
+  for (unsigned i : indices(getEntries())) {
+    auto &entry = getEntries()[i];
+    
     // All vtable entries must be decls in a class context.
     assert(entry.Method.hasDecl() && "vtable entry is not a decl");
     auto baseInfo =
@@ -5402,6 +5417,55 @@ void SILVTable::verify(const SILModule &M) const {
               entry.Implementation->getLoweredFunctionType(),
               "vtable entry for " + baseName + " must be ABI-compatible",
               *entry.Implementation);
+    }
+    
+    // Validate the entry against its superclass vtable.
+    if (!superclass) {
+      // Root methods should not have inherited or overridden entries.
+      bool validKind;
+      switch (entry.TheKind) {
+      case Entry::Normal:
+      case Entry::NormalNonOverridden:
+        validKind = true;
+        break;
+        
+      case Entry::Inherited:
+      case Entry::Override:
+        validKind = false;
+        break;
+      }
+      assert(validKind && "vtable entry in root class must not be inherited or override");
+    } else if (superVTable) {
+      // Validate the entry against the matching entry from the superclass
+      // vtable.
+
+      const Entry *superEntry = nullptr;
+      for (auto &se : superVTable->getEntries()) {
+        if (se.Method.getOverriddenVTableEntry() == entry.Method.getOverriddenVTableEntry()) {
+          superEntry = &se;
+          break;
+        }
+      }
+      
+      switch (entry.TheKind) {
+      case Entry::Normal:
+      case Entry::NormalNonOverridden:
+        assert(!superEntry && "non-root vtable entry must be inherited or override");
+        break;
+
+      case Entry::Inherited:
+        break;
+          
+      case Entry::Override:
+        if (!superEntry)
+          break;
+
+        // The superclass entry must not prohibit overrides.
+        assert(superEntry->TheKind != Entry::NormalNonOverridden
+               && "vtable entry overrides an entry that claims to have no overrides");
+        // TODO: Check the root vtable entry for the method too.
+        break;
+      }
     }
   }
 }
@@ -5531,7 +5595,7 @@ void SILModule::verify() const {
                      << entry.Implementation->getName() << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
-      EntriesSZ++;
+      ++EntriesSZ;
     }
   }
   assert(EntriesSZ == VTableEntryCache.size() &&

@@ -241,7 +241,7 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
   bool IsObjC = true;
   unsigned NumParams = PL->size();
-  for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
+  for (unsigned ParamIndex = 0; ParamIndex != NumParams; ++ParamIndex) {
     auto param = PL->get(ParamIndex);
 
     // Swift Varargs are not representable in Objective-C.
@@ -734,7 +734,7 @@ bool swift::isRepresentableInObjC(
       // 'initFoo'.
       if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
         if (CD->isObjCZeroParameterWithLongSelector())
-          errorParameterIndex--;
+          --errorParameterIndex;
 
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.

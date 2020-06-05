@@ -548,6 +548,10 @@ public:
     return Bits.ModuleDecl.IsMainModule;
   }
 
+  /// For the main module, retrieves the list of primary source files being
+  /// compiled, that is, the files we're generating code for.
+  ArrayRef<SourceFile *> getPrimarySourceFiles() const;
+
   /// Retrieve the top-level module. If this module is already top-level, this
   /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
   /// returns the module \c Foo.

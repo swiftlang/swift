@@ -86,7 +86,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return closure->hasAppliedFunctionBuilder();
+        return closure->wasTypeCheckedInEnclosingContext();
       return false;
     }
 
@@ -189,14 +189,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         // Otherwise, try to drill down through member calls for the purposes
         // of argument-matching code below.
         } else if (auto selfApply = dyn_cast<SelfApplyExpr>(base)) {
-          uncurryLevel++;
+          ++uncurryLevel;
           base = selfApply->getSemanticFn();
           if (auto calleeDRE = dyn_cast<DeclRefExpr>(base))
             callee = calleeDRE->getDeclRef();
 
         // Otherwise, check for a dynamic member.
         } else if (auto dynamicMRE = dyn_cast<DynamicMemberRefExpr>(base)) {
-          uncurryLevel++;
+          ++uncurryLevel;
           callee = dynamicMRE->getMember();
         }
 
@@ -1459,7 +1459,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return closure->hasAppliedFunctionBuilder();
+        return closure->wasTypeCheckedInEnclosingContext();
       return false;
     }
 
@@ -3978,7 +3978,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
 
       SmallString<4> forceUnwrapString;
-      for (size_t i = 0; i < optionalityDifference; i++)
+      for (size_t i = 0; i < optionalityDifference; ++i)
         forceUnwrapString += "!";
 
       Ctx.Diags.diagnose(subExpr->getLoc(), diag::force_optional_to_any)

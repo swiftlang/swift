@@ -154,17 +154,17 @@ public:
     }
 
     if (BAI->getAccessKind() == SILAccessKind::Read)
-      Reads++;
+      ++Reads;
     else
-      NonReads++;
+      ++NonReads;
   }
 
   /// Decrement the count for given access.
   void endAccess(EndAccessInst *EAI) {
     if (EAI->getBeginAccess()->getAccessKind() == SILAccessKind::Read)
-      Reads--;
+      --Reads;
     else
-      NonReads--;
+      --NonReads;
 
     // If all open accesses are now ended, forget the location of the
     // first access.

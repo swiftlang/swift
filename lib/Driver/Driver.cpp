@@ -2027,7 +2027,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                                                          InputIndex);
             AllLinkerInputs.push_back(BJA);
           }
-          InputIndex++;
+          ++InputIndex;
         }
         if (!OI.isMultiThreading()) {
           // No multi-threading: the compilation only produces a single output

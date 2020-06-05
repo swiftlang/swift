@@ -2,6 +2,20 @@
 include(AddSwift)
 include(SwiftSource)
 
+function(is_darwin_based_sdk sdk_name out_var)
+  if ("${sdk_name}" STREQUAL "OSX" OR
+      "${sdk_name}" STREQUAL "IOS" OR
+      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
+      "${sdk_name}" STREQUAL "TVOS" OR
+      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
+      "${sdk_name}" STREQUAL "WATCHOS" OR
+      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
       ADMT # prefix
@@ -354,6 +368,8 @@ function(_add_target_variant_link_flags)
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
     list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
+    list(APPEND link_libraries "pthread")
+  elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.

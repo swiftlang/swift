@@ -613,7 +613,7 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
 
       if (!errorInfo.isErrorParameterReplacedWithVoid()) {
         if (paramIndex >= errorParamIndex) {
-          paramIndex++;
+          ++paramIndex;
         }
       }
     }

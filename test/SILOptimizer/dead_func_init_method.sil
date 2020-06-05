@@ -36,7 +36,7 @@ sil_vtable Base {
 }
 
 sil_vtable Derived {
-  #Base.init!allocator: @DerivedInit
+  #Base.init!allocator: @DerivedInit [override]
 }
 
 

@@ -168,14 +168,14 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // isa and enum-element patterns are refutable, at least in theory.
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(p);
-    n++;
+    ++n;
     if (auto sub = isa->getSubPattern())
       return getNumSpecializationsRecursive(sub, n);
     return n;
   }
   case PatternKind::EnumElement: {
     auto en = cast<EnumElementPattern>(p);
-    n++;
+    ++n;
     if (en->hasSubPattern())
       n = getNumSpecializationsRecursive(en->getSubPattern(), n);
     return n;
@@ -565,7 +565,7 @@ public:
     // AlwaysRefutable before decrementing because we only ever test
     // this value against zero.
     if (isDirectlyRefutablePattern(Columns[column]))
-      NumRemainingSpecializations--;
+      --NumRemainingSpecializations;
 
     if (newColumns.size() == 1) {
       Columns[column] = newColumns[0];

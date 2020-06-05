@@ -37,6 +37,7 @@ enum class SemaReferenceKind : uint8_t {
   TypeRef,
   EnumElementRef,
   SubscriptRef,
+  DynamicMemberRef,
 };
 
 struct ReferenceMetaData {

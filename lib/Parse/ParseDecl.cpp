@@ -351,7 +351,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     auto ArgumentLoc = Tok.getLoc();
     AnyAnnotations = true;
     StringRef ArgumentKindStr = Tok.getText();
-    ParamIndex++;
+    ++ParamIndex;
 
     enum {
       IsMessage, IsRenamed,
@@ -3276,13 +3276,13 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
     HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
       tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
     if (P.consumeIf(tok::l_brace)) {
-      OpenBraces++;
+      ++OpenBraces;
       continue;
     }
     if (OpenBraces == 1 && P.Tok.is(tok::r_brace))
       break;
     if (P.consumeIf(tok::r_brace)) {
-      OpenBraces--;
+      --OpenBraces;
       continue;
     }
     P.consumeToken();
@@ -4422,10 +4422,18 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   return Result;
 }
 
-bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                                 SourceLoc PosBeforeLB,
-                                 Diag<> ErrorDiag,
+bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
+                                 Diag<> LBraceDiag, Diag<> RBraceDiag,
                                  IterableDeclContext *IDC) {
+  if (parseToken(tok::l_brace, LBLoc, LBraceDiag)) {
+    LBLoc = RBLoc = PreviousLoc;
+
+    // Cache the empty result to prevent delayed parsing.
+    Context.evaluator.cacheOutput(
+        ParseMembersRequest{IDC}, FingerprintAndMembers{None, {}});
+    return true;
+  }
+
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
 
@@ -4444,7 +4452,7 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     bool hadError = false;
     ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
     auto membersAndHash =
-        parseDeclList(LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
+        parseDeclList(LBLoc, RBLoc, RBraceDiag, Options, IDC, hadError);
     IDC->setMaybeHasOperatorDeclarations();
     IDC->setMaybeHasNestedClassDeclarations();
     Context.evaluator.cacheOutput(
@@ -4503,7 +4511,7 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
 
   // Increase counter.
   if (auto *stat = Context.Stats) {
-    stat->getFrontendCounters().NumIterableDeclContextParsed ++;
+    ++stat->getFrontendCounters().NumIterableDeclContextParsed;
   }
   // If we found the closing brace, then the caller should not care if there
   // were errors while parsing inner decls, because we recovered.
@@ -4614,16 +4622,12 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
 
-  auto PosBeforeLB = Tok.getLoc();
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
-    LBLoc = PreviousLoc;
-    RBLoc = LBLoc;
-    status.setIsParseError();
-  } else {
+  {
     ContextChange CC(*this, ext);
     Scope S(this, ScopeKind::Extension);
 
-    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+    if (parseMemberDeclList(LBLoc, RBLoc,
+                            diag::expected_lbrace_extension,
                             diag::expected_rbrace_extension,
                             ext))
       status.setIsParseError();
@@ -5248,7 +5252,7 @@ bool Parser::skipBracedBlock() {
                                                 HasOperatorDeclarations,
                                                 HasNestedClassDeclarations);
   if (consumeIf(tok::r_brace))
-    OpenBraces--;
+    --OpenBraces;
   return OpenBraces != 0;
 }
 
@@ -6376,7 +6380,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
   if (auto *Stats = Context.Stats)
-    Stats->getFrontendCounters().NumFunctionsParsed++;
+    ++Stats->getFrontendCounters().NumFunctionsParsed;
 
   // In implicit getter, if a CC token is the first token after '{', it might
   // be a start of an accessor block. Perform special completion for that.
@@ -6576,15 +6580,11 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
-  SourceLoc PosBeforeLB = Tok.getLoc();
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
-    LBLoc = PreviousLoc;
-    RBLoc = LBLoc;
-    Status.setIsParseError();
-  } else {
+  {
     Scope S(this, ScopeKind::EnumBody);
 
-    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+    if (parseMemberDeclList(LBLoc, RBLoc,
+                            diag::expected_lbrace_enum,
                             diag::expected_rbrace_enum,
                             ED))
       Status.setIsParseError();
@@ -6862,16 +6862,12 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Make the entities of the struct as a code block.
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
-  SourceLoc PosBeforeLB = Tok.getLoc();
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
-    LBLoc = PreviousLoc;
-    RBLoc = LBLoc;
-    Status.setIsParseError();
-  } else {
+  {
     // Parse the body.
     Scope S(this, ScopeKind::StructBody);
 
-    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+    if (parseMemberDeclList(LBLoc, RBLoc,
+                            diag::expected_lbrace_struct,
                             diag::expected_rbrace_struct,
                             SD))
       Status.setIsParseError();
@@ -6978,16 +6974,12 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
-  auto PosBeforeLB = Tok.getLoc();
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
-    LBLoc = PreviousLoc;
-    RBLoc = LBLoc;
-    Status.setIsParseError();
-  } else {
+  {
     // Parse the body.
     Scope S(this, ScopeKind::ClassBody);
 
-    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+    if (parseMemberDeclList(LBLoc, RBLoc,
+                            diag::expected_lbrace_class,
                             diag::expected_rbrace_class,
                             CD))
       Status.setIsParseError();
@@ -7079,14 +7071,10 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;
-    SourceLoc PosBeforeLB = Tok.getLoc();
-    if (parseToken(tok::l_brace, LBraceLoc, diag::expected_lbrace_protocol)) {
-      LBraceLoc = PreviousLoc;
-      RBraceLoc = LBraceLoc;
-      Status.setIsParseError();
-    } else {
+    {
       // Parse the members.
-      if (parseMemberDeclList(LBraceLoc, RBraceLoc, PosBeforeLB,
+      if (parseMemberDeclList(LBraceLoc, RBraceLoc,
+                              diag::expected_lbrace_protocol,
                               diag::expected_rbrace_protocol,
                               Proto))
         Status.setIsParseError();
