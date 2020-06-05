@@ -2535,7 +2535,19 @@ namespace {
             ConstraintKind::CheckedCast, subPatternType, castType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
-        return setType(subPatternType);
+        // Allow `is` pattern to infer type from context which is then going
+        // to be propaged down to its sub-pattern via conversion. This enables
+        // correct handling of patterns like `_ as Foo` where `_` would
+        // get a type of `Foo` but `is` pattern enclosing it could still be
+        // inferred from enclosing context.
+        auto isType = CS.createTypeVariable(
+            CS.getConstraintLocator(
+                locator.withPathElement(LocatorPathElt::PatternMatch(pattern))),
+            TVO_CanBindToNoEscape);
+        CS.addConstraint(
+            ConstraintKind::Conversion, subPatternType, isType,
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+        return setType(isType);
       }
 
       case PatternKind::Bool:
