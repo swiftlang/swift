@@ -298,7 +298,12 @@ public:
   SourceFile *getActiveDependencySourceOrNull() const {
     if (dependencySources.empty())
       return nullptr;
-    return dependencySources.back().getPointer();
+    switch (mode) {
+    case Mode::StatusQuo:
+      return dependencySources.back().getPointer();
+    case Mode::ExperimentalPrivateDependencies:
+      return dependencySources.front().getPointer();
+    }
   }
 
 public:
@@ -331,14 +336,6 @@ public:
   };
 
 private:
-  /// Returns the first dependency source registered with the tracker, or
-  /// \c nullptr if no dependency sources have been registered.
-  SourceFile *getFirstDependencySourceOrNull() const {
-    if (dependencySources.empty())
-      return nullptr;
-    return dependencySources.front().getPointer();
-  }
-
   /// Returns \c true if the scope of the current active source cascades.
   ///
   /// If there is no active scope, the result always cascades.
