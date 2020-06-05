@@ -1,0 +1,3 @@
+func anotherFileFunction() {
+  print(#function)
+}
