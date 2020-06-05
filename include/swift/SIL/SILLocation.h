@@ -273,6 +273,8 @@ public:
     assert(isASTNode());
   }
 
+  static SILLocation invalid() { return SILLocation(); }
+
   /// Check if the location wraps an AST node or a valid SIL file
   /// location.
   ///
