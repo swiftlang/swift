@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -S -no-omit-leaf-frame-pointer | %FileCheck %s --check-prefix=CHECKASM-ALL
 
 // REQUIRES: CODEGENERATOR=AArch64
+// REQUIRES: OS=ios
 
 // UNSUPPORTED: OS=linux-gnu
 // UNSUPPORTED: OS=windows
