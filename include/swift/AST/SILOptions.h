@@ -188,9 +188,7 @@ public:
     return OptMode > OptimizationMode::NoOptimization;
   }
 
-  bool hasMultipleIRGenThreads() const { return NumThreads > 1; }
-  bool shouldPerformIRGenerationInParallel() const { return NumThreads != 0; }
-  bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
+  bool shouldPerformIRGenerationInParallel() const { return NumThreads > 1; }
 };
 
 } // end namespace swift
