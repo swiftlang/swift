@@ -173,18 +173,21 @@ enum class AutoDiffGeneratedDeclarationKind : uint8_t {
 };
 
 /// SIL-level automatic differentiation indices. Consists of:
-/// - Parameter indices: indices of parameters to differentiate with respect to.
-/// - Result index: index of the result to differentiate from.
+/// - The differentiability parameter indices.
+/// - The differentiability result indices.
 // TODO(TF-913): Remove `SILAutoDiffIndices` in favor of `AutoDiffConfig`.
-// `AutoDiffConfig` supports multiple result indices.
+// `AutoDiffConfig` additionally stores a derivative generic signature.
 struct SILAutoDiffIndices {
-  /// The index of the dependent result to differentiate from.
-  unsigned source;
-  /// The indices for independent parameters to differentiate with respect to.
+  /// The indices of independent parameters to differentiate with respect to.
   IndexSubset *parameters;
+  /// The indices of dependent results to differentiate from.
+  IndexSubset *results;
 
-  /*implicit*/ SILAutoDiffIndices(unsigned source, IndexSubset *parameters)
-      : source(source), parameters(parameters) {}
+  /*implicit*/ SILAutoDiffIndices(IndexSubset *parameters, IndexSubset *results)
+      : parameters(parameters), results(results) {
+    assert(parameters && "Parameter indices must be non-null");
+    assert(results && "Result indices must be non-null");
+  }
 
   bool operator==(const SILAutoDiffIndices &other) const;
 
@@ -202,7 +205,12 @@ struct SILAutoDiffIndices {
   SWIFT_DEBUG_DUMP;
 
   std::string mangle() const {
-    std::string result = "src_" + llvm::utostr(source) + "_wrt_";
+    std::string result = "src_";
+    interleave(
+        results->getIndices(),
+        [&](unsigned idx) { result += llvm::utostr(idx); },
+        [&] { result += '_'; });
+    result += "_wrt_";
     llvm::interleave(
         parameters->getIndices(),
         [&](unsigned idx) { result += llvm::utostr(idx); },

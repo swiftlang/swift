@@ -725,7 +725,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffDerivativeFunctionType(
-      desiredIndices.parameters, desiredIndices.source, kind, module.Types,
+      desiredIndices.parameters, desiredIndices.results, kind, module.Types,
       lookupConformance);
   auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {

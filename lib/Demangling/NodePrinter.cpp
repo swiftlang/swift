@@ -2088,6 +2088,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     printChildren(Node, " ");
     return nullptr;
   case Node::Kind::ImplParameter:
+  case Node::Kind::ImplResult:
     // Children: `convention, differentiability?, type`
     // Print convention.
     print(Node->getChild(0));
@@ -2097,9 +2098,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       print(Node->getChild(1));
     // Print type.
     print(Node->getLastChild());
-    return nullptr;
-  case Node::Kind::ImplResult:
-    printChildren(Node, " ");
     return nullptr;
   case Node::Kind::ImplFunctionType:
     printImplFunctionType(Node);

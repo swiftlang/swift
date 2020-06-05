@@ -2179,10 +2179,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   DifferentiableFunctionInst *createDifferentiableFunction(
-      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      SILLocation Loc, IndexSubset *ParameterIndices,
+      IndexSubset *ResultIndices, SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     return insert(DifferentiableFunctionInst::create(
-        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        getModule(), getSILDebugLocation(Loc), ParameterIndices, ResultIndices,
         OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
   }
 

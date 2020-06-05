@@ -2000,12 +2000,12 @@ static Optional<std::pair<AutoDiffConfig, SILFunction *>>
 parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
                                                   SILLocation L) {
   // Parse parameter and result indices.
-  SmallVector<unsigned, 8> parameterIndices;
-  SmallVector<unsigned, 8> resultIndices;
-  if (parseIndexList(P, "parameters", parameterIndices,
+  SmallVector<unsigned, 8> rawParameterIndices;
+  SmallVector<unsigned, 8> rawResultIndices;
+  if (parseIndexList(P, "parameters", rawParameterIndices,
                      diag::sil_autodiff_expected_parameter_index))
     return {};
-  if (parseIndexList(P, "results", resultIndices,
+  if (parseIndexList(P, "results", rawResultIndices,
                      diag::sil_autodiff_expected_result_index))
     return {};
   // Parse witness generic parameter clause.
@@ -2058,11 +2058,11 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
         nullptr);
   }
   auto origFnType = originalFunction->getLoweredFunctionType();
-  auto *parameterIndexSet = IndexSubset::get(
-      P.Context, origFnType->getNumParameters(), parameterIndices);
-  auto *resultIndexSet =
-      IndexSubset::get(P.Context, origFnType->getNumResults(), resultIndices);
-  AutoDiffConfig config(parameterIndexSet, resultIndexSet, witnessGenSig);
+  auto *parameterIndices = IndexSubset::get(
+      P.Context, origFnType->getNumParameters(), rawParameterIndices);
+  auto *resultIndices = IndexSubset::get(P.Context, origFnType->getNumResults(),
+                                         rawResultIndices);
+  AutoDiffConfig config(parameterIndices, resultIndices, witnessGenSig);
   return std::make_pair(config, originalFunction);
 }
 
@@ -5042,15 +5042,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       break;
     }
     case SILInstructionKind::DifferentiableFunctionInst: {
-      // e.g. differentiable_function [parameters 0 1 2] %0 : $T
+      // e.g. differentiable_function [parameters 0 1 2] [results 0] %0 : $T
       //
-      // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
-      //      {%1 : $T, %2 : $T}
-      //       ^~ jvp   ^~ vjp
+      // e.g. differentiable_function [parameters 0 1 2] [results 0] %0 : $T
+      //          with_derivative {%1 : $T, %2 : $T}
+      //                           ^~ jvp   ^~ vjp
       // Parse `[parameters <integer_literal>...]`.
-      SmallVector<unsigned, 8> parameterIndices;
-      if (parseIndexList(P, "parameters", parameterIndices,
+      SmallVector<unsigned, 8> rawParameterIndices;
+      if (parseIndexList(P, "parameters", rawParameterIndices,
                          diag::sil_autodiff_expected_parameter_index))
+        return true;
+      SmallVector<unsigned, 2> rawResultIndices;
+      if (parseIndexList(P, "results", rawResultIndices,
+                         diag::sil_autodiff_expected_result_index))
         return true;
       // Parse the original function value.
       SILValue original;
@@ -5085,18 +5089,23 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
       if (parseSILDebugLocation(InstLoc, B))
         return true;
-      auto *parameterIndicesSubset = IndexSubset::get(
-          P.Context, fnType->getNumParameters(), parameterIndices);
-      ResultVal = B.createDifferentiableFunction(
-          InstLoc, parameterIndicesSubset, original, derivativeFunctions);
+      auto *parameterIndices = IndexSubset::get(
+          P.Context, fnType->getNumParameters(), rawParameterIndices);
+      auto *resultIndices = IndexSubset::get(
+          P.Context,
+          fnType->getNumResults() + fnType->getNumIndirectMutatingParameters(),
+          rawResultIndices);
+      ResultVal = B.createDifferentiableFunction(InstLoc, parameterIndices,
+                                                 resultIndices, original,
+                                                 derivativeFunctions);
       break;
     }
     case SILInstructionKind::LinearFunctionInst: {
       // e.g. linear_function [parameters 0 1 2] %0 : $T
       // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
       // Parse `[parameters <integer_literal>...]`.
-      SmallVector<unsigned, 8> parameterIndices;
-      if (parseIndexList(P, "parameters", parameterIndices,
+      SmallVector<unsigned, 8> rawParameterIndices;
+      if (parseIndexList(P, "parameters", rawParameterIndices,
                          diag::sil_autodiff_expected_parameter_index))
         return true;
       // Parse the original function value.
@@ -5121,7 +5130,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (parseSILDebugLocation(InstLoc, B))
         return true;
       auto *parameterIndicesSubset = IndexSubset::get(
-          P.Context, fnType->getNumParameters(), parameterIndices);
+          P.Context, fnType->getNumParameters(), rawParameterIndices);
       ResultVal = B.createLinearFunction(
           InstLoc, parameterIndicesSubset, original, transpose);
       break;

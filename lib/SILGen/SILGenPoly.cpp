@@ -3466,6 +3466,7 @@ static ManagedValue createDifferentiableFunctionThunk(
 
   SILValue convertedBundle = SGF.B.createDifferentiableFunction(
       loc, sourceType->getDifferentiabilityParameterIndices(),
+      sourceType->getDifferentiabilityResultIndices(),
       originalThunk.forward(SGF),
       std::make_pair(jvpThunk.forward(SGF), vjpThunk.forward(SGF)));
   return SGF.emitManagedRValueWithCleanup(convertedBundle);
@@ -3914,8 +3915,6 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     SILFunction *customDerivativeFn, SILFunction *originalFn,
     const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind) {
-  auto indices = config.getSILAutoDiffIndices();
-
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
                               ? customDerivativeFnTy->getSubstGenericSignature()
@@ -3927,7 +3926,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   if (auto derivativeGenSig = config.derivativeGenericSignature)
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
-      indices.parameters, indices.source, kind, Types,
+      config.parameterIndices, config.resultIndices, kind, Types,
       LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
@@ -4017,9 +4016,9 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     if (!originalFn->hasSelfParam())
       return false;
     auto selfParamIndex = origFnTy->getNumParameters() - 1;
-    if (!indices.isWrtParameter(selfParamIndex))
+    if (!config.parameterIndices->contains(selfParamIndex))
       return false;
-    return indices.parameters->getNumIndices() > 1;
+    return config.parameterIndices->getNumIndices() > 1;
   };
   bool reorderSelf = shouldReorderSelf();
 
@@ -4582,8 +4581,10 @@ getWitnessFunctionRef(SILGenFunction &SGF,
       auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
           derivativeId->getParameterIndices(),
           witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
-      auto diffFn = SGF.B.createDifferentiableFunction(loc, loweredParamIndices,
-                                                       originalFn);
+      auto *loweredResultIndices = IndexSubset::get(
+          SGF.getASTContext(), 1, {0}); // FIXME, set to all results
+      auto diffFn = SGF.B.createDifferentiableFunction(
+          loc, loweredParamIndices, loweredResultIndices, originalFn);
       return SGF.B.createDifferentiableFunctionExtract(
           loc,
           NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),

@@ -3942,13 +3942,34 @@ inline bool isIndirectFormalResult(ResultConvention convention) {
   return convention == ResultConvention::Indirect;
 }
 
+/// The differentiability of a SIL function type result.
+enum class SILResultDifferentiability : unsigned {
+  /// Either differentiable or not applicable.
+  ///
+  /// - If the function type is not `@differentiable`, result
+  ///   differentiability is not applicable. This case is the default value.
+  /// - If the function type is `@differentiable`, the function is
+  ///   differentiable with respect to this result.
+  DifferentiableOrNotApplicable,
+
+  /// Not differentiable: a `@noDerivative` result.
+  ///
+  /// May be applied only to result of `@differentiable` function types.
+  /// The function type is not differentiable with respect to this result.
+  NotDifferentiable,
+};
+
 /// A result type and the rules for returning it.
 class SILResultInfo {
   llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
+  SILResultDifferentiability Differentiability : 1;
+
 public:
   SILResultInfo() = default;
-  SILResultInfo(CanType type, ResultConvention conv)
-    : TypeAndConvention(type, conv) {
+  SILResultInfo(CanType type, ResultConvention conv,
+                SILResultDifferentiability differentiability =
+                    SILResultDifferentiability::DifferentiableOrNotApplicable)
+      : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILResultInfo has illegal SIL type");
   }
 
@@ -3969,6 +3990,17 @@ public:
   ResultConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
+
+  SILResultDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
+
+  SILResultInfo
+  getWithDifferentiability(SILResultDifferentiability differentiability) const {
+    return SILResultInfo(getInterfaceType(), getConvention(),
+                         differentiability);
+  }
+
   /// The SIL storage type determines the ABI for arguments based purely on the
   /// formal result conventions. The actual SIL type for the result values may
   /// differ in canonical SIL. In particular, opaque values require indirect
@@ -4025,6 +4057,7 @@ public:
 
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(TypeAndConvention.getOpaqueValue());
+    id.AddInteger((unsigned)getDifferentiability());
   }
 
   SWIFT_DEBUG_DUMP;
@@ -4714,24 +4747,31 @@ public:
   /// `@noDerivative` ones).
   IndexSubset *getDifferentiabilityParameterIndices();
 
+  /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
+  /// function type, returns an `IndexSubset` corresponding to the
+  /// differentiability/linearity results (e.g. all results except the
+  /// `@noDerivative` ones).
+  IndexSubset *getDifferentiabilityResultIndices();
+
   /// Returns the `@differentiable` or `@differentiable(linear)` function type
-  /// for the given differentiability kind and parameter indices representing
-  /// differentiability/linearity parameters.
+  /// for the given differentiability kind and differentiability/linearity
+  /// parameter/result indices.
   CanSILFunctionType getWithDifferentiability(DifferentiabilityKind kind,
-                                              IndexSubset *parameterIndices);
+                                              IndexSubset *parameterIndices,
+                                              IndexSubset *resultIndices);
 
   /// Returns the SIL function type stripping differentiability kind and
   /// differentiability from all parameters.
   CanSILFunctionType getWithoutDifferentiability();
 
   /// Returns the type of the derivative function for the given parameter
-  /// indices, result index, derivative function kind, derivative function
+  /// indices, result indices, derivative function kind, derivative function
   /// generic signature (optional), and other auxiliary parameters.
   ///
   /// Preconditions:
   /// - Parameters corresponding to parameter indices must conform to
   ///   `Differentiable`.
-  /// - The result corresponding to the result index must conform to
+  /// - Results corresponding to result indices must conform to
   ///   `Differentiable`.
   ///
   /// Typing rules, given:
@@ -4803,14 +4843,8 @@ public:
   ///     function - this is more direct. It may be possible to implement
   ///     reabstraction thunk derivatives using "reabstraction thunks for
   ///     the original function's derivative", avoiding extra code generation.
-  ///
-  /// Caveats:
-  /// - We may support multiple result indices instead of a single result index
-  ///   eventually. At the SIL level, this enables differentiating wrt multiple
-  ///   function results. At the Swift level, this enables differentiating wrt
-  ///   multiple tuple elements for tuple-returning functions.
   CanSILFunctionType getAutoDiffDerivativeFunctionType(
-      IndexSubset *parameterIndices, unsigned resultIndex,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,

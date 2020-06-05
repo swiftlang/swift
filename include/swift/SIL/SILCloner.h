@@ -2853,6 +2853,7 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiableFunction(
                 getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
+                Inst->getResultIndices(),
                 getOpValue(Inst->getOriginalFunction()), derivativeFns));
 }
 

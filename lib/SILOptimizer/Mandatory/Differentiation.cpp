@@ -341,7 +341,7 @@ static SILValue reapplyFunctionConversion(
     ADContext &context, SILValue newFunc, SILValue oldFunc,
     SILValue oldConvertedFunc, SILBuilder &builder, SILLocation loc,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc,
-    IndexSubset *parameterIndices,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
     GenericSignature newFuncGenSig = GenericSignature()) {
   // If the old func is the new func, then there's no conversion.
   if (oldFunc == oldConvertedFunc)
@@ -354,7 +354,7 @@ static SILValue reapplyFunctionConversion(
     // function.
     return reapplyFunctionConversion(
         context, newFunc, oldFunc, cvi->getOperand(), builder, loc,
-        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+        newBuffersToDealloc, parameterIndices, resultIndices, newFuncGenSig);
   }
   // begin_borrow
   if (auto *bbi = dyn_cast<BeginBorrowInst>(oldConvertedFunc)) {
@@ -363,19 +363,19 @@ static SILValue reapplyFunctionConversion(
     // function.
     return reapplyFunctionConversion(
         context, newFunc, oldFunc, bbi->getOperand(), builder, loc,
-        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+        newBuffersToDealloc, parameterIndices, resultIndices, newFuncGenSig);
   }
   // convert_function
   if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
     return reapplyFunctionConversion(
         context, newFunc, oldFunc, cfi->getOperand(), builder, loc,
-        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+        newBuffersToDealloc, parameterIndices, resultIndices, newFuncGenSig);
   }
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
         context, newFunc, oldFunc, tttfi->getOperand(), builder, loc,
-        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+        newBuffersToDealloc, parameterIndices, resultIndices, newFuncGenSig);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto thickTy = operandFnTy->getWithRepresentation(
         SILFunctionTypeRepresentation::Thick);
@@ -391,7 +391,7 @@ static SILValue reapplyFunctionConversion(
                                    newBuffersToDealloc);
     auto innerNewFunc = reapplyFunctionConversion(
         context, newFunc, oldFunc, pai->getCallee(), builder, loc,
-        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+        newBuffersToDealloc, parameterIndices, resultIndices, newFuncGenSig);
     // Reabstraction thunk `partial_apply` reapplications require special
     // support. Reabstraction thunk JVP/VJP expects a `@differentiable`
     // function-typed argument to avoid opaque function non-differentiability
@@ -407,7 +407,7 @@ static SILValue reapplyFunctionConversion(
              "Expected reabstraction thunk to be partially applied with only "
              "one argument");
       auto *dfi = context.createDifferentiableFunction(
-          builder, loc, parameterIndices, newArgs.back());
+          builder, loc, parameterIndices, resultIndices, newArgs.back());
       context.addDifferentiableFunctionInstToWorklist(dfi);
       newArgs.back() = dfi;
     }
@@ -487,8 +487,7 @@ emitDerivativeFunctionReference(
       derivativeFn =
           builder.emitCopyValueOperation(original.getLoc(), derivativeFn);
       builder.emitEndBorrowOperation(original.getLoc(), borrowedDiffFunc);
-      SILAutoDiffIndices indices(0, desiredIndices.parameters);
-      return std::make_pair(derivativeFn, indices);
+      return std::make_pair(derivativeFn, desiredIndices);
     }
   }
 
@@ -499,11 +498,8 @@ emitDerivativeFunctionReference(
     auto *originalFn = originalFRI->getReferencedFunctionOrNull();
     assert(originalFn);
     auto originalFnTy = originalFn->getLoweredFunctionType();
-    auto numResults = originalFnTy->getNumResults() +
-                      originalFnTy->getNumIndirectMutatingParameters();
-    auto *desiredResultIndices = IndexSubset::get(
-        context.getASTContext(), numResults, {desiredIndices.source});
     auto *desiredParameterIndices = desiredIndices.parameters;
+    auto *desiredResultIndices = desiredIndices.results;
     // NOTE(TF-893): Extending capacity is necessary when `originalFnTy` has
     // parameters corresponding to captured variables.
     // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
@@ -547,22 +543,23 @@ emitDerivativeFunctionReference(
         }
       }
       // Check and diagnose non-differentiable results.
-      SILType resultType;
-      if (desiredIndices.source >= originalFnTy->getNumResults()) {
-        auto inoutParamIdx =
-            desiredIndices.source - originalFnTy->getNumResults();
-        auto inoutParam =
-            *std::next(originalFnTy->getIndirectMutatingParameters().begin(),
-                       inoutParamIdx);
-        resultType = inoutParam.getSILStorageInterfaceType();
-      } else {
-        resultType = originalFnTy->getResults()[desiredIndices.source]
-                         .getSILStorageInterfaceType();
-      }
-      if (!resultType.isDifferentiable(context.getModule())) {
-        context.emitNondifferentiabilityError(
-            original, invoker, diag::autodiff_nondifferentiable_result);
-        return None;
+      for (auto resultIndex : desiredResultIndices->getIndices()) {
+        SILType resultType;
+        if (resultIndex >= originalFnTy->getNumResults()) {
+          auto inoutParamIdx = resultIndex - originalFnTy->getNumResults();
+          auto inoutParam =
+              *std::next(originalFnTy->getIndirectMutatingParameters().begin(),
+                         inoutParamIdx);
+          resultType = inoutParam.getSILStorageInterfaceType();
+        } else {
+          resultType = originalFnTy->getResults()[resultIndex]
+                           .getSILStorageInterfaceType();
+        }
+        if (!resultType.isDifferentiable(context.getModule())) {
+          context.emitNondifferentiabilityError(
+              original, invoker, diag::autodiff_nondifferentiable_result);
+          return None;
+        }
       }
       // Check and diagnose external declarations.
       if (originalFn->isExternalDeclaration()) {
@@ -642,15 +639,14 @@ emitDerivativeFunctionReference(
         loc, witnessKind, minimalWitness);
     auto convertedRef = reapplyFunctionConversion(
         context, derivativeFnRef, originalFRI, original, builder, loc,
-        newBuffersToDealloc, desiredIndices.parameters,
+        newBuffersToDealloc, desiredIndices.parameters, desiredIndices.results,
         derivativeFnRef->getType()
             .getASTType()
             ->castTo<SILFunctionType>()
             ->getSubstGenericSignature());
     return std::make_pair(
-        convertedRef,
-        SILAutoDiffIndices(desiredIndices.source,
-                           minimalWitness->getParameterIndices()));
+        convertedRef, SILAutoDiffIndices(minimalWitness->getParameterIndices(),
+                                         minimalWitness->getResultIndices()));
   }
 
   // Handle `witness_method`.
@@ -682,7 +678,7 @@ emitDerivativeFunctionReference(
     // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
-        minimalIndices.parameters, minimalIndices.source, kind,
+        minimalIndices.parameters, minimalIndices.results, kind,
         context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
@@ -694,7 +690,7 @@ emitDerivativeFunctionReference(
         SILType::getPrimitiveObjectType(assocType));
     auto convertedRef = reapplyFunctionConversion(
         context, ref, witnessMethod, original, builder, loc,
-        newBuffersToDealloc, desiredIndices.parameters);
+        newBuffersToDealloc, desiredIndices.parameters, desiredIndices.results);
     return std::make_pair(convertedRef, minimalIndices);
   }
 
@@ -727,7 +723,7 @@ emitDerivativeFunctionReference(
     // Emit a `class_method` instruction for the derivative function.
     auto originalType = classMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
-        minimalIndices.parameters, minimalIndices.source, kind,
+        minimalIndices.parameters, minimalIndices.results, kind,
         context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
@@ -739,7 +735,7 @@ emitDerivativeFunctionReference(
         SILType::getPrimitiveObjectType(assocType));
     auto convertedRef = reapplyFunctionConversion(
         context, ref, classMethod, original, builder, loc, newBuffersToDealloc,
-        desiredIndices.parameters);
+        desiredIndices.parameters, desiredIndices.results);
     return std::make_pair(convertedRef, minimalIndices);
   }
 
@@ -781,7 +777,7 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
     vjpGenericEnv = vjpCanGenSig->getGenericEnvironment();
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
-      indices.parameters, indices.source, AutoDiffDerivativeFunctionKind::VJP,
+      indices.parameters, indices.results, AutoDiffDerivativeFunctionKind::VJP,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
       vjpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
@@ -826,7 +822,7 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
   if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
     jvpGenericEnv = jvpCanGenSig->getGenericEnvironment();
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
-      indices.parameters, indices.source, AutoDiffDerivativeFunctionKind::JVP,
+      indices.parameters, indices.results, AutoDiffDerivativeFunctionKind::JVP,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
       jvpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
@@ -979,9 +975,9 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
     DifferentiationTransformer &dt, DifferentiableFunctionInst *dfi,
     SILBuilder &builder, SILLocation loc, DifferentiationInvoker invoker) {
   auto origFnOperand = dfi->getOriginalFunction();
-  auto parameterIndices = dfi->getParameterIndices();
+  auto *parameterIndices = dfi->getParameterIndices();
+  auto *resultIndices = dfi->getResultIndices();
   auto &context = dt.getContext();
-  unsigned resultIndex = context.getResultIndex(dfi);
 
   // Check for curry thunk application:
   // - The original function operand must be an `apply` instruction.
@@ -1001,7 +997,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
     return nullptr;
 
   // Create a new curry thunk.
-  SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
+  SILAutoDiffIndices desiredIndices(parameterIndices, resultIndices);
   // TODO(TF-685): Use more principled mangling for thunks.
   auto newThunkName = "AD__" + thunk->getName().str() +
                       "__differentiable_curry_thunk_" + desiredIndices.mangle();
@@ -1044,8 +1040,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
     SILBuilderWithScope dfiBuilder(
         std::next(returnValue->getDefiningInstruction()->getIterator()));
     auto *dfi = context.createDifferentiableFunction(
-        dfiBuilder, loc, parameterIndices, returnValue);
-    context.setResultIndex(dfi, resultIndex);
+        dfiBuilder, loc, parameterIndices, resultIndices, returnValue);
     dfiBuilder.setInsertionPoint(newThunk->findReturnBB());
     dfiBuilder.createReturn(loc, dfi);
     retInst->eraseFromParent();
@@ -1076,16 +1071,17 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
 SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     DifferentiableFunctionInst *dfi, SILBuilder &builder, SILLocation loc,
     DifferentiationInvoker invoker) {
+  auto &astCtx = context.getASTContext();
   auto origFnOperand = dfi->getOriginalFunction();
   auto origFnTy = origFnOperand->getType().castTo<SILFunctionType>();
-  auto parameterIndices = dfi->getParameterIndices();
-  unsigned resultIndex = context.getResultIndex(dfi);
+  auto *parameterIndices = dfi->getParameterIndices();
+  auto *resultIndices = dfi->getResultIndices();
 
   if (auto diffFn = promoteCurryThunkApplicationToDifferentiableFunction(
           *this, dfi, builder, loc, invoker))
     return diffFn;
 
-  SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
+  SILAutoDiffIndices desiredIndices(parameterIndices, resultIndices);
   SmallVector<SILValue, 2> derivativeFns;
   SmallVector<AllocStackInst *, 2> newBuffersToDealloc;
   for (auto derivativeFnKind : {AutoDiffDerivativeFunctionKind::JVP,
@@ -1112,10 +1108,11 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     // have smaller capacity than `actualIndices`. We expect this logic to go
     // away when we support `@differentiable` partial apply.
     // if (actualIndices != desiredIndices) { // TODO: Re-enable.
-    auto extendedDesiredIndices = desiredIndices.parameters->extendingCapacity(
-        context.getASTContext(), actualIndices.parameters->getCapacity());
-    if (actualIndices.source != desiredIndices.source ||
-        !actualIndices.parameters->equals(extendedDesiredIndices)) {
+    auto extendedDesiredParameterIndices =
+        desiredIndices.parameters->extendingCapacity(
+            astCtx, actualIndices.parameters->getCapacity());
+    if (!actualIndices.parameters->equals(extendedDesiredParameterIndices) ||
+        !actualIndices.results->equals(desiredIndices.results)) {
       // Destroy the already emitted derivative function reference because it
       // is no longer used.
       builder.emitDestroyValueOperation(loc, derivativeFn);
@@ -1139,7 +1136,8 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
         return nullptr;
       }
       // Create the parameter subset thunk.
-      assert(actualIndices.parameters->isSupersetOf(extendedDesiredIndices));
+      assert(actualIndices.parameters->isSupersetOf(
+          extendedDesiredParameterIndices));
       SILFunction *thunk;
       SubstitutionMap interfaceSubs;
       SILOptFunctionBuilder fb(transform);
@@ -1158,7 +1156,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
       }
     }
     auto expectedDerivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
-        parameterIndices, resultIndex, derivativeFnKind,
+        parameterIndices, resultIndices, derivativeFnKind,
         context.getTypeConverter(),
         LookUpConformanceInModule(context.getModule().getSwiftModule()));
     // If `derivativeFn` is `@convention(thin)` but is expected to be
@@ -1181,9 +1179,8 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
 
   auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *newDiffFn = context.createDifferentiableFunction(
-      builder, loc, parameterIndices, origFnCopy,
+      builder, loc, parameterIndices, resultIndices, origFnCopy,
       std::make_pair(derivativeFns[0], derivativeFns[1]));
-  context.setResultIndex(dfi, resultIndex);
   context.addDifferentiableFunctionInstToWorklist(dfi);
   return newDiffFn;
 }
