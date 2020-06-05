@@ -333,7 +333,6 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
     fn.setBody(newBody, /*isSingleExpression=*/false);
     if (closure) {
-      closure->setAppliedFunctionBuilder();
       closure->setTypeCheckedInEnclosingContext();
       solution.setExprTypes(closure);
     }
