@@ -477,7 +477,9 @@ func _masterThreadOneTrial<RT>(_ sharedState: _RaceTestSharedState<RT>) {
         observations.append(sharedState.workerStates[j].observations[i])
       }
 
-      let sink = { sharedState.aggregatedEvaluations.addEvaluation($0) }
+      let sink = { (x: RaceTestObservationEvaluation) in
+        sharedState.aggregatedEvaluations.addEvaluation(x)
+      }
       rt.evaluateObservations(observations, sink)
       observations.removeAll(keepingCapacity: true)
     }

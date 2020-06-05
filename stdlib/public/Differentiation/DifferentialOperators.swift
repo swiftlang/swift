@@ -23,7 +23,7 @@ public func transpose<T, R>(
   of body: @escaping @differentiable(linear) (T) -> R
 ) -> @differentiable(linear) (R) -> T {
   let original = body as (T) -> R
-  let transpose = { x in Builtin.applyTranspose_arity1(body, x) }
+  let transpose = { (x: R) in Builtin.applyTranspose_arity1(body, x) }
   return Builtin.linearFunction_arity1(transpose, original)
 }
 
