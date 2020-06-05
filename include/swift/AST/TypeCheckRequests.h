@@ -2513,6 +2513,21 @@ public:
   bool isCached() const { return true; }
 };
 
+class DeriveProtocolRequirementRequest
+    : public SimpleRequest<DeriveProtocolRequirementRequest,
+                           ValueDecl *(DeclContext *, NominalTypeDecl *,
+                                       ValueDecl *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ValueDecl *evaluate(Evaluator &evaluator, DeclContext *DC,
+                      NominalTypeDecl *TypeDecl, ValueDecl *Requirement) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
