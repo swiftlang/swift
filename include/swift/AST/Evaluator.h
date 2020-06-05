@@ -439,7 +439,7 @@ private:
                                   !Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
-    recorder.replay(ActiveRequest(r));
+    recorder.replay(activeRequests, ActiveRequest(r));
   }
 
   // Report the result of evaluating a request that is a dependency sink.
