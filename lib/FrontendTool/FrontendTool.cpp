@@ -169,20 +169,31 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
 
   llvm::SmallString<256> buffer;
 
+  // collect everything in memory to avoid redundant work
+  // when there are multiple targets
+  std::string dependencyString;
+  
+  // First include all other files in the module. Make-style dependencies
+  // need to be conservative!
+  auto inputPaths =
+    reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames());
+  for (auto const &path : inputPaths) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+  }
+  // Then print dependencies we've picked up during compilation.
+  auto dependencyPaths =
+    reversePathSortedFilenames(depTracker->getDependencies());
+  for (auto const &path : dependencyPaths) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+  }
+  
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
   opts.forAllOutputPaths(input, [&](const StringRef targetName) {
-    out << swift::frontend::utils::escapeForMake(targetName, buffer) << " :";
-    // First include all other files in the module. Make-style dependencies
-    // need to be conservative!
-    for (auto const &path :
-         reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames()))
-      out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
-    // Then print dependencies we've picked up during compilation.
-    for (auto const &path :
-           reversePathSortedFilenames(depTracker->getDependencies()))
-      out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
-    out << '\n';
+    auto targetNameEscaped = frontend::utils::escapeForMake(targetName, buffer);
+    out << targetNameEscaped << " :" << dependencyString << '\n';
   });
 
   return false;
