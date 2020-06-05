@@ -815,21 +815,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
     }
 
-    // Handle single-expression closures.
-    if (expr->hasSingleExpressionBody()) {
-      if (Expr *body = doIt(expr->getSingleExpressionBody())) {
-        expr->setSingleExpressionBody(body);
-        return expr;
-      }
-      return nullptr;
-    }
-
-    if (!Walker.shouldWalkIntoNonSingleExpressionClosure(expr))
+    // Always walk into closures with a single-expression body; for those
+    // that don't have a single-expression body, ask the walker first.
+    if (!expr->hasSingleExpressionBody() &&
+        !Walker.shouldWalkIntoNonSingleExpressionClosure(expr))
       return expr;
 
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
-      expr->setBody(body, false);
+      expr->setBody(body, expr->hasSingleExpressionBody());
       return expr;
     }
     return nullptr;

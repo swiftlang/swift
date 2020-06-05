@@ -3859,7 +3859,8 @@ namespace {
       if (expr->isLiteralInit()) {
         auto *literalInit = expr->getSubExpr();
         if (auto *call = dyn_cast<CallExpr>(literalInit)) {
-          call->getFn()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+          forEachExprInConstraintSystem(call->getFn(),
+                                        [&](Expr *subExpr) -> Expr * {
             auto *TE = dyn_cast<TypeExpr>(subExpr);
             if (!TE)
               return subExpr;
@@ -5788,7 +5789,7 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
     cs.setType(CE, toType);
 
     // If this closure isn't type-checked in its enclosing expression, write
-    // theg type into the ClosureExpr directly here, since the visitor won't.
+    // the type into the ClosureExpr directly here, since the visitor won't.
     if (!shouldTypeCheckInEnclosingExpression(CE))
       CE->setType(toType);
 

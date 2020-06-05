@@ -1548,7 +1548,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
 
       // Something like `foo { x in }` or `foo { $0 }`
       if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-        closure->forEachChildExpr([&](Expr *expr) -> Expr * {
+        forEachExprInConstraintSystem(closure, [&](Expr *expr) -> Expr * {
           if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
             if (!isParam(UDE->getBase()))
               return expr;
@@ -9334,7 +9334,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   bool found = false;
   if (auto *expr = getAsExpr(anchor)) {
-    expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+    forEachExprInConstraintSystem(expr, [&](Expr *subExpr) -> Expr * {
       found |= anchors.count(subExpr);
       return subExpr;
     });
