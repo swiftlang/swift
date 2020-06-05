@@ -3784,7 +3784,7 @@ class ClosureExpr : public AbstractClosureExpr {
 
   /// The explicitly-specified result type.
   llvm::PointerIntPair<TypeExpr *, 1, bool>
-    ExplicitResultTypeAndEnclosingChecked;
+    ExplicitResultTypeAndSeparatelyChecked;
 
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
@@ -3799,7 +3799,7 @@ public:
       BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultTypeAndEnclosingChecked(explicitResultType, false),
+      ExplicitResultTypeAndSeparatelyChecked(explicitResultType, false),
       Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
@@ -3854,14 +3854,14 @@ public:
 
   Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultTypeAndEnclosingChecked.getPointer()
+    return ExplicitResultTypeAndSeparatelyChecked.getPointer()
         ->getInstanceType();
   }
   void setExplicitResultType(Type ty);
 
   TypeRepr *getExplicitResultTypeRepr() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultTypeAndEnclosingChecked.getPointer()
+    return ExplicitResultTypeAndSeparatelyChecked.getPointer()
         ->getTypeRepr();
   }
 
@@ -3904,14 +3904,14 @@ public:
   /// captured non-weakly).
   bool capturesSelfEnablingImplictSelf() const;
 
-  /// Whether this closure's body was type checked within the enclosing
-  /// context.
-  bool wasTypeCheckedInEnclosingContext() const {
-    return ExplicitResultTypeAndEnclosingChecked.getInt();
+  /// Whether this closure's body was type checked separately from its
+  /// enclosing expression.
+  bool wasSeparatelyTypeChecked() const {
+    return ExplicitResultTypeAndSeparatelyChecked.getInt();
   }
 
-  void setTypeCheckedInEnclosingContext(bool flag = true) {
-    ExplicitResultTypeAndEnclosingChecked.setInt(flag);
+  void setSeparatelyTypeChecked(bool flag = true) {
+    ExplicitResultTypeAndSeparatelyChecked.setInt(flag);
   }
 
   static bool classof(const Expr *E) {

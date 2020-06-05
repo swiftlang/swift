@@ -333,7 +333,6 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
     fn.setBody(newBody, /*isSingleExpression=*/false);
     if (closure) {
-      closure->setTypeCheckedInEnclosingContext();
       solution.setExprTypes(closure);
     }
 
@@ -349,7 +348,6 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
         solution, closure, closureFnType->getResult(), rewriteTarget);
     application.visit(fn.getBody());
 
-    closure->setTypeCheckedInEnclosingContext();
     return SolutionApplicationToFunctionResult::Success;
   }
 

@@ -216,12 +216,12 @@ public:
   virtual bool shouldWalkIntoLazyInitializers() { return true; }
 
   /// This method configures whether the walker should visit the body of a
-  /// non-single expression closure.
+  /// closure that was checked separately from its enclosing expression.
   ///
   /// For work that is performed for every top-level expression, this should
   /// be overridden to return false, to avoid duplicating work or visiting
   /// bodies of closures that have not yet been type checked.
-  virtual bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *) {
+  virtual bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *) {
     return true;
   }
 

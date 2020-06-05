@@ -815,10 +815,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
     }
 
-    // Always walk into closures with a single-expression body; for those
-    // that don't have a single-expression body, ask the walker first.
-    if (!expr->hasSingleExpressionBody() &&
-        !Walker.shouldWalkIntoNonSingleExpressionClosure(expr))
+    // If the closure was separately type checked and we don't want to
+    // visit separately-checked closure bodies, bail out now.
+    if (expr->wasSeparatelyTypeChecked() &&
+        !Walker.shouldWalkIntoSeparatelyCheckedClosure(expr))
       return expr;
 
     // Handle other closures.
