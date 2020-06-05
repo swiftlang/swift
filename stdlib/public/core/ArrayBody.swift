@@ -24,11 +24,13 @@ import SwiftShims
 // Therefore all this is guarded by availability directives, which only enable
 // the flag and the checks if run with a own built stdlib.
 // It will not work when linking against a swift library in the OS.
+/*
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 @inline(never)
 public var _arrayImmutableFlag: UInt {
   return UInt(bitPattern:  Int.min)
 }
+*/
 #endif
 
 @frozen
@@ -76,9 +78,10 @@ internal struct _ArrayBody {
   @inlinable
   internal var capacity: Int {
 #if INTERNAL_CHECKS_ENABLED
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+/*    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       return Int((_capacityAndFlags & ~_arrayImmutableFlag) &>> 1)
     }
+    */
     return Int(_capacityAndFlags &>> 1)
 #else
     return Int(_capacityAndFlags &>> 1)
@@ -89,12 +92,15 @@ internal struct _ArrayBody {
   @_alwaysEmitIntoClient
   internal var isImmutable: Bool {
     get {
+    /*
       if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         return (_capacityAndFlags & _arrayImmutableFlag) != 0 || capacity == 0
       }
+      */
       return true
     }
     set {
+    /*
       if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         if newValue {
           if capacity > 0 {
@@ -107,14 +113,17 @@ internal struct _ArrayBody {
           _capacityAndFlags = _capacityAndFlags & ~_arrayImmutableFlag
         }
       }
+      */
     }
   }
   
   @_alwaysEmitIntoClient
   internal var isMutable: Bool {
+  /*
     if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       return (_capacityAndFlags & _arrayImmutableFlag) == 0
     }
+    */
     return true
   }
 #endif
