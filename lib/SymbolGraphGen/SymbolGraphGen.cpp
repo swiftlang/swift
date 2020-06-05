@@ -74,6 +74,9 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   Success |= serializeSymbolGraph(Walker.MainGraph, Options);
 
   for (const auto &Entry : Walker.ExtendedModuleGraphs) {
+    if (Entry.getValue()->empty()) {
+      continue;
+    }
     Success |= serializeSymbolGraph(*Entry.getValue(), Options);
   }
 
