@@ -2841,7 +2841,7 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
     auto instr = cast<DifferentiableFunctionInst>(convInstr);
     newInstr = convBuilder.createDifferentiableFunction(
         instr->getLoc(), instr->getParameterIndices(),
-        instr->getOriginalFunction(),
+        instr->getResultIndices(), instr->getOriginalFunction(),
         instr->getOptionalDerivativeFunctionPair());
     break;
   }

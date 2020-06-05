@@ -100,7 +100,7 @@ class SubSub: Sub {}
 // CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @AD__${{.*}}5SuperC6methody{{.*}}jvp_src_0_wrt_0_vtable_entry_thunk : $@convention(method) (Float, Float, @guaranteed Super) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK: bb0(%0 : $Float, %1 : $Float, %2 : @guaranteed $Super):
 // CHECK:   %3 = function_ref @$s6vtable5SuperC6methodyS2f_SftF : $@convention(method) (Float, Float, @guaranteed Super) -> Float
-// CHECK:   %4 = differentiable_function [parameters 0] %3 : $@convention(method) (Float, Float, @guaranteed Super) -> Float
+// CHECK:   %4 = differentiable_function [parameters 0] [results 0] %3 : $@convention(method) (Float, Float, @guaranteed Super) -> Float
 // CHECK:   %5 = differentiable_function_extract [jvp] %4 : $@differentiable @convention(method) (Float, @noDerivative Float, @noDerivative @guaranteed Super) -> Float
 // CHECK:   %6 = apply %5(%0, %1, %2) : $@convention(method) (Float, Float, @guaranteed Super) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK:   return %6 : $(Float, @callee_guaranteed (Float) -> Float)

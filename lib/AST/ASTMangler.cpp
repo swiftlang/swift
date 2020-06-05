@@ -1584,7 +1584,7 @@ getParamDifferentiability(SILParameterDifferentiability diffKind) {
   case swift::SILParameterDifferentiability::NotDifferentiable:
     return 'w';
   }
-  llvm_unreachable("bad parameter convention");
+  llvm_unreachable("bad parameter differentiability");
 };
 
 static char getResultConvention(ResultConvention conv) {
@@ -1596,6 +1596,17 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::Autoreleased: return 'a';
   }
   llvm_unreachable("bad result convention");
+};
+
+static Optional<char>
+getResultDifferentiability(SILResultDifferentiability diffKind) {
+  switch (diffKind) {
+  case swift::SILResultDifferentiability::DifferentiableOrNotApplicable:
+    return None;
+  case swift::SILResultDifferentiability::NotDifferentiable:
+    return 'w';
+  }
+  llvm_unreachable("bad result differentiability");
 };
 
 void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
@@ -1684,6 +1695,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   // Mangle the results.
   for (auto result : fn->getResults()) {
     OpArgs.push_back(getResultConvention(result.getConvention()));
+    if (auto diffKind =
+            getResultDifferentiability(result.getDifferentiability()))
+      OpArgs.push_back(*diffKind);
     appendType(result.getInterfaceType());
   }
 

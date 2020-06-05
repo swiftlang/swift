@@ -123,13 +123,7 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   auto &file = getSynthesizedFile();
   // Create a branching trace enum.
   Mangle::ASTMangler mangler;
-  auto originalFnTy = original->getLoweredFunctionType();
-  auto numResults = originalFnTy->getNumResults() +
-                    originalFnTy->getNumIndirectMutatingParameters();
-  auto *resultIndices =
-      IndexSubset::get(original->getASTContext(), numResults, indices.source);
-  auto *parameterIndices = indices.parameters;
-  AutoDiffConfig config(parameterIndices, resultIndices, genericSig);
+  AutoDiffConfig config(indices.parameters, indices.results, genericSig);
   auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
       AutoDiffGeneratedDeclarationKind::BranchingTraceEnum,
       original->getName().str(), originalBB->getDebugID(), kind, config);
@@ -196,13 +190,7 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   auto &file = getSynthesizedFile();
   // Create a linear map struct.
   Mangle::ASTMangler mangler;
-  auto originalFnTy = original->getLoweredFunctionType();
-  auto numResults = originalFnTy->getNumResults() +
-                    originalFnTy->getNumIndirectMutatingParameters();
-  auto *resultIndices =
-      IndexSubset::get(original->getASTContext(), numResults, indices.source);
-  auto *parameterIndices = indices.parameters;
-  AutoDiffConfig config(parameterIndices, resultIndices, genericSig);
+  AutoDiffConfig config(indices.parameters, indices.results, genericSig);
   auto structName = mangler.mangleAutoDiffGeneratedDeclaration(
       AutoDiffGeneratedDeclarationKind::LinearMapStruct,
       original->getName().str(), originalBB->getDebugID(), kind, config);
@@ -292,9 +280,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
   if (!hasActiveResults && !hasActiveInoutArgument)
     return;
 
-  // Compute differentiation result index.
-  auto source = activeResultIndices.front();
-  // Compute differentiation parameters.
+  // Compute differentiability parameters.
   // - If the callee has `@differentiable` function type, use differentiation
   //   parameters from the function type.
   // - Otherwise, use the active parameters.
@@ -311,35 +297,41 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
         original->getASTContext(),
         ai->getArgumentsWithoutIndirectResults().size(), activeParamIndices);
   }
+  // Compute differentiability results.
+  auto numResults = remappedOrigFnSubstTy->getNumResults() +
+                    remappedOrigFnSubstTy->getNumIndirectMutatingParameters();
+  auto *results = IndexSubset::get(original->getASTContext(), numResults,
+                                   activeResultIndices);
   // Create autodiff indices for the `apply` instruction.
-  SILAutoDiffIndices applyIndices(source, parameters);
+  SILAutoDiffIndices applyIndices(parameters, results);
 
   // Check for non-differentiable original function type.
-  auto checkNondifferentiableOriginalFunctionType =
-      [&](CanSILFunctionType origFnTy) {
-        // Check non-differentiable arguments.
-        for (unsigned paramIndex : range(origFnTy->getNumParameters())) {
-          auto remappedParamType = origFnTy->getParameters()[paramIndex]
-                                       .getSILStorageInterfaceType();
-          if (applyIndices.isWrtParameter(paramIndex) &&
-              !remappedParamType.isDifferentiable(derivative->getModule()))
-            return true;
-        }
-        // Check non-differentiable results.
-        SILType remappedResultType;
-        if (applyIndices.source >= origFnTy->getNumResults()) {
-          auto inoutArgIdx = applyIndices.source - origFnTy->getNumResults();
-          auto inoutArg =
-              *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
-          remappedResultType = inoutArg->getType();
-        } else {
-          remappedResultType = origFnTy->getResults()[applyIndices.source]
-                                   .getSILStorageInterfaceType();
-        }
-        if (!remappedResultType.isDifferentiable(derivative->getModule()))
-          return true;
-        return false;
-      };
+  auto checkNondifferentiableOriginalFunctionType = [&](CanSILFunctionType
+                                                            origFnTy) {
+    // Check non-differentiable arguments.
+    for (auto paramIndex : applyIndices.parameters->getIndices()) {
+      auto remappedParamType =
+          origFnTy->getParameters()[paramIndex].getSILStorageInterfaceType();
+      if (!remappedParamType.isDifferentiable(derivative->getModule()))
+        return true;
+    }
+    // Check non-differentiable results.
+    for (auto resultIndex : applyIndices.results->getIndices()) {
+      SILType remappedResultType;
+      if (resultIndex >= origFnTy->getNumResults()) {
+        auto inoutArgIdx = resultIndex - origFnTy->getNumResults();
+        auto inoutArg =
+            *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
+        remappedResultType = inoutArg->getType();
+      } else {
+        remappedResultType =
+            origFnTy->getResults()[resultIndex].getSILStorageInterfaceType();
+      }
+      if (!remappedResultType.isDifferentiable(derivative->getModule()))
+        return true;
+    }
+    return false;
+  };
   if (checkNondifferentiableOriginalFunctionType(remappedOrigFnSubstTy))
     return;
 
@@ -347,7 +339,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
   auto derivativeFnType =
       remappedOrigFnSubstTy
           ->getAutoDiffDerivativeFunctionType(
-              parameters, source, derivativeFnKind, context.getTypeConverter(),
+              parameters, results, derivativeFnKind, context.getTypeConverter(),
               LookUpConformanceInModule(
                   derivative->getModule().getSwiftModule()))
           ->getUnsubstitutedType(original->getModule());
