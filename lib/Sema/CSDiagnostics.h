@@ -1066,6 +1066,8 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
+  
+  bool findUnintendedExtraGenericParam(Type instanceTy, FunctionRefKind functionKind);
 };
 
 /// Diagnose cases where a member only accessible on generic constraints

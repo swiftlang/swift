@@ -31,6 +31,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -3109,6 +3111,53 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
   return (candidate ? candidate->getName() : DeclName());
 }
 
+bool MissingMemberFailure::findUnintendedExtraGenericParam(Type instanceTy, FunctionRefKind functionKind) {
+  auto archetype = instanceTy->getAs<ArchetypeType>();
+  if (!archetype)
+    return false;
+  auto genericTy = archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
+  if (!genericTy)
+    return false;
+  
+  for (auto param : archetype->getGenericEnvironment()->getGenericParams()) {
+    // Find a param at the same depth and one index past the type we're dealing with
+    if (param->getDepth() != genericTy->getDepth() || param->getIndex() != genericTy->getIndex() + 1)
+      continue;
+    
+    auto &cs = getConstraintSystem();
+    auto paramDecl = param->getDecl();
+    auto descriptor = UnqualifiedLookupDescriptor(
+        DeclNameRef(param->getName()), paramDecl->getDeclContext()->getParentForLookup(), paramDecl->getStartLoc(),
+        UnqualifiedLookupFlags::KnownPrivate | UnqualifiedLookupFlags::TypeLookup);
+    auto lookup = evaluateOrDefault(cs.getASTContext().evaluator, UnqualifiedLookupRequest{descriptor}, {});
+    for (auto &result : lookup) {
+      if (auto proto = dyn_cast_or_null<ProtocolDecl>(result.getValueDecl())) {
+        auto memberLookup = cs.performMemberLookup(
+            ConstraintKind::ValueMember, getName().withoutArgumentLabels(),
+            proto->getDeclaredType(), functionKind, getLocator(),
+            /*includeInaccessibleMembers=*/true);
+        if (memberLookup.ViableCandidates.size() || memberLookup.UnviableCandidates.size()) {
+          SourceLoc loc = genericTy->getDecl()->getSourceRange().End;
+          StringRef replacement;
+          
+          if (archetype->getConformsTo().size()) {
+            loc = loc.getAdvancedLoc(archetype->getConformsTo().back()->getName().getLength());
+            replacement = " &";
+          } else {
+            loc = loc.getAdvancedLoc(archetype->getName().getLength());
+            replacement = ":";
+          }
+          emitDiagnosticAt(loc, diag::did_you_mean_generic_param_as_conformance, paramDecl->getName(), archetype)
+              .fixItReplaceChars(loc, loc.getAdvancedLoc(1), replacement);
+          return true;
+        }
+      }
+    }
+    break;
+  }
+  return false;
+}
+
 bool MissingMemberFailure::diagnoseAsError() {
   auto anchor = getRawAnchor();
   auto memberBase = getAnchor();
@@ -3217,6 +3266,7 @@ bool MissingMemberFailure::diagnoseAsError() {
       }
     } else {
       emitBasicError(baseType);
+      findUnintendedExtraGenericParam(instanceTy, FunctionRefKind::DoubleApply);
     }
   } else if (auto moduleTy = baseType->getAs<ModuleType>()) {
     emitDiagnosticAt(::getLoc(memberBase), diag::no_member_of_module,
@@ -3278,6 +3328,7 @@ bool MissingMemberFailure::diagnoseAsError() {
         correction->addFixits(diagnostic);
       } else {
         emitBasicError(baseType);
+        findUnintendedExtraGenericParam(baseType, FunctionRefKind::SingleApply);
       }
     }
   }
