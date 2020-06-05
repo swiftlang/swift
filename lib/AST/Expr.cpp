@@ -1898,19 +1898,6 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
   return body.get<Expr *>();
 }
 
-void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
-  assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getFirstElement();
-  if (auto stmt = body.dyn_cast<Stmt *>()) {
-    if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
-      braceStmt->getFirstElement() = NewBody;
-    else
-      cast<ReturnStmt>(stmt)->setResult(NewBody);
-    return;
-  }
-  getBody()->setFirstElement(NewBody);
-}
-
 bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
 }

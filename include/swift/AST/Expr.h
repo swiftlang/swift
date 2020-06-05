@@ -3891,13 +3891,6 @@ public:
   /// Only valid when \c hasSingleExpressionBody() is true.
   Expr *getSingleExpressionBody() const;
 
-  /// Set the body for a closure that has a single expression as its
-  /// body.
-  ///
-  /// This routine cannot change whether a closure has a single expression as
-  /// its body; it can only update that expression.
-  void setSingleExpressionBody(Expr *NewBody);
-
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
 
