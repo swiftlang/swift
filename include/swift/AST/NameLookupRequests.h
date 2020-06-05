@@ -447,7 +447,7 @@ class LookupInModuleRequest
                            QualifiedLookupResult(
                                const DeclContext *, DeclName, NLKind,
                                namelookup::ResolutionKind, const DeclContext *),
-                           RequestFlags::Uncached> {
+                           RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -459,6 +459,11 @@ private:
   evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
            NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
            const DeclContext *moduleScopeContext) const;
+
+public:
+  // Incremental dependencies
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
+                           QualifiedLookupResult l) const;
 };
 
 /// Perform \c AnyObject lookup for a given member.
