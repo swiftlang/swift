@@ -118,7 +118,7 @@ void printHelp(const char *extra) {
 // Initialization code.
 OnceToken_t swift::runtime::environment::initializeToken;
 
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
 extern "C" char **environ;
 #define ENVIRON environ
 #elif defined(_WIN32)
