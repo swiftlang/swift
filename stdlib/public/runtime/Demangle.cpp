@@ -19,6 +19,7 @@
 #include "swift/Strings.h"
 
 #include <vector>
+#include <inttypes.h>
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
