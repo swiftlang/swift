@@ -917,6 +917,8 @@ namespace {
       case clang::BuiltinType::Float16:
         llvm_unreachable("When upstream support is added for Float16 in "
                          "clang::TargetInfo, use the implementation here");
+      case clang::BuiltinType::BFloat16:
+        return convertFloatingType(Ctx.getTargetInfo().getBFloat16Format());
       case clang::BuiltinType::Float128:
         return convertFloatingType(Ctx.getTargetInfo().getFloat128Format());
 

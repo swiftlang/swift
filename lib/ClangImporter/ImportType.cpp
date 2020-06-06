@@ -274,6 +274,7 @@ namespace {
       case clang::BuiltinType::SatUShortFract:
       case clang::BuiltinType::SatUFract:
       case clang::BuiltinType::SatULongFract:
+      case clang::BuiltinType::BFloat16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
       case clang::BuiltinType::Char8:
