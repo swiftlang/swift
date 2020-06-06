@@ -143,7 +143,7 @@ namespace {
         // If the closure was type checked within its enclosing context,
         // we need to walk into it with a new sequence.
         // Otherwise, it'll have been separately type-checked.
-        if (CE->wasTypeCheckedInEnclosingContext())
+        if (!CE->wasSeparatelyTypeChecked())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
         TypeChecker::computeCaptures(CE);
@@ -1976,6 +1976,7 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
+  closure->setSeparatelyTypeChecked();
   return HadError;
 }
 

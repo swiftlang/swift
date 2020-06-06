@@ -590,6 +590,8 @@ static void extendDepthMap(
    Expr *expr,
    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
   class RecordingTraversal : public ASTWalker {
+    SmallVector<ClosureExpr *, 4> Closures;
+
   public:
     llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &DepthMap;
     unsigned Depth = 0;
@@ -601,12 +603,36 @@ static void extendDepthMap(
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       DepthMap[E] = {Depth, Parent.getAsExpr()};
       ++Depth;
+
+      if (auto CE = dyn_cast<ClosureExpr>(E))
+        Closures.push_back(CE);
+
       return { true, E };
     }
 
     Expr *walkToExprPost(Expr *E) override {
+      if (auto CE = dyn_cast<ClosureExpr>(E)) {
+        assert(Closures.back() == CE);
+        Closures.pop_back();
+      }
+
       --Depth;
       return E;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      if (auto RS = dyn_cast<ReturnStmt>(S)) {
+        // For return statements, treat the parent of the return expression
+        // as the closure itself.
+        if (RS->hasResult() && !Closures.empty()) {
+          llvm::SaveAndRestore<ParentTy> SavedParent(Parent, Closures.back());
+          auto E = RS->getResult();
+          E->walk(*this);
+          return { false, S };
+        }
+      }
+
+      return { true, S };
     }
   };
 

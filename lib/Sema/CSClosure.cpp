@@ -84,6 +84,7 @@ private:
     if (!expr)
       return;
 
+    // FIXME: Use SolutionApplicationTarget?
     expr = cs.generateConstraints(expr, closure, /*isInputExpression=*/false);
     if (!expr) {
       hadError = true;
@@ -330,8 +331,6 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
     fn.setBody(newBody, /*isSingleExpression=*/false);
     if (closure) {
-      closure->setAppliedFunctionBuilder();
-      closure->setTypeCheckedInEnclosingContext();
       solution.setExprTypes(closure);
     }
 
@@ -347,7 +346,6 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
         solution, closure, closureFnType->getResult(), rewriteTarget);
     application.visit(fn.getBody());
 
-    closure->setTypeCheckedInEnclosingContext();
     return SolutionApplicationToFunctionResult::Success;
   }
 

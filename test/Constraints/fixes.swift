@@ -179,7 +179,7 @@ struct S1116 {
 
 let a1116: [S1116] = []
 var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{49-49=(}} {{53-53= ?? <#default value#>)}}
+// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{53-53= ?? <#default value#>}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{53-53=!}}
 
 func makeArray<T>(_ x: T) -> [T] { [x] }
