@@ -288,7 +288,7 @@ protected:
         continue;
 
       // Keep track of this binding entry.
-      applied.patternBindingEntries.insert({{patternBinding, index}, target});
+      cs->setSolutionApplicationTarget({patternBinding, index}, target);
     }
   }
 
@@ -1035,11 +1035,11 @@ private:
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
       // Find the solution application target for this.
       auto knownTarget =
-          builderTransform.patternBindingEntries.find({patternBinding, index});
-      assert(knownTarget != builderTransform.patternBindingEntries.end());
+          *solution.getConstraintSystem().getSolutionApplicationTarget(
+            {patternBinding, index});
 
       // Rewrite the target.
-      auto resultTarget = rewriteTarget(knownTarget->second);
+      auto resultTarget = rewriteTarget(knownTarget);
       if (!resultTarget)
         continue;
 
