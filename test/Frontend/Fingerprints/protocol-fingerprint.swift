@@ -71,9 +71,5 @@
 
 // only-run-for-debugging: cp %t/usesB.swiftdeps %t/usesB4.swiftdeps
 
-// RUN: %FileCheck -check-prefix=CHECK-MAINB-RECOMPILED %s < %t/output4
-
-// CHECK-MAINB-RECOMPILED-NOT: Queuing because of dependencies discovered later: {compile: usesB.o <= usesB.swift}
-// CHECK-MAINB-RECOMPILED: Queuing because of dependencies discovered later: {compile: usesA.o <= usesA.swift}
-// CHECK-MAINB-RECOMPILED-NOT: Queuing because of dependencies discovered later: {compile: usesB.o <= usesB.swift}
+// RUN: %FileCheck -check-prefix=CHECK-MAINAB-RECOMPILED %s < %t/output4
 
