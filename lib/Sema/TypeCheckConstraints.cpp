@@ -3906,7 +3906,9 @@ HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
 }
 
 bool swift::shouldTypeCheckInEnclosingExpression(ClosureExpr *expr) {
-  return expr->hasSingleExpressionBody();
+  auto &ctx = expr->getASTContext();
+  return expr->hasSingleExpressionBody() ||
+    ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
 }
 
 void swift::forEachExprInConstraintSystem(

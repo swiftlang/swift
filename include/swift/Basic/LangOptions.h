@@ -576,6 +576,10 @@ namespace swift {
     /// Enable experimental support for one-way constraints for the
     /// parameters of closures.
     bool EnableOneWayClosureParameters = false;
+
+    /// Enable experimental support for type inference through multi-statement
+    /// closures.
+    bool EnableMultiStatementClosureInference = false;
   };
 } // end namespace swift
 

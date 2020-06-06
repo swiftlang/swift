@@ -7523,7 +7523,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   // type.
   bool oneWayConstraints =
     getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters ||
-    functionBuilderType;
+    functionBuilderType ||
+    !closure->hasSingleExpressionBody();
 
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
