@@ -10,6 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import product
 from . import skstresstester
 
 
@@ -35,3 +36,19 @@ class SwiftEvolve(skstresstester.SKStressTester):
 
     def should_install(self, host_target):
         return self.args.install_swiftevolve
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB,
+                product.LibDispatch,
+                product.Foundation,
+                product.XCTest,
+                product.LLBuild,
+                product.SwiftPM,
+                product.SwiftSyntax,
+                product.SKStressTester]

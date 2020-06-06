@@ -21,3 +21,11 @@ class LLDB(product.Product):
         Whether this product is produced by build-script-impl.
         """
         return True
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift]
