@@ -55,7 +55,7 @@ class Product(object):
 
         Whether this product is produced by build-script-impl.
         """
-        return True
+        raise NotImplementedError
 
     @classmethod
     def is_swiftpm_unified_build_product(cls):
