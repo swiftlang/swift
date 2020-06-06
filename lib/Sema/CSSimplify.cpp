@@ -7186,8 +7186,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
     Type internalType;
 
-    bool oneWayConstraints =
-      getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters;
+    bool oneWayConstraints = true;
     if (paramList->get(i)->getTypeRepr()) {
       // Internal type is the type used in the body of the closure,
       // so "external" type translates to it as follows:
