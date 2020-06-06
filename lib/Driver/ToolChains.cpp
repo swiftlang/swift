@@ -518,6 +518,11 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-track-system-dependencies");
   }
 
+  if (auto arg = context.Args.getLastArg(options::OPT_lto)) {
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-lto=") + arg->getValue()));
+  }
+
   context.Args.AddLastArg(
       Arguments,
       options::

@@ -3770,10 +3770,7 @@ class ClosureExpr : public AbstractClosureExpr {
   /// the CaptureListExpr which would normally maintain this sort of
   /// information about captured variables), we need to have some way to access
   /// this information directly on the ClosureExpr.
-  ///
-  /// The bit indicates whether this closure has had a function builder
-  /// applied to it.
-  llvm::PointerIntPair<VarDecl *, 1, bool> CapturedSelfDeclAndAppliedBuilder;
+  VarDecl * CapturedSelfDecl;
 
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
@@ -3787,7 +3784,7 @@ class ClosureExpr : public AbstractClosureExpr {
 
   /// The explicitly-specified result type.
   llvm::PointerIntPair<TypeExpr *, 1, bool>
-    ExplicitResultTypeAndEnclosingChecked;
+    ExplicitResultTypeAndSeparatelyChecked;
 
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
@@ -3800,9 +3797,9 @@ public:
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
       BracketRange(bracketRange),
-      CapturedSelfDeclAndAppliedBuilder(capturedSelfDecl, false),
+      CapturedSelfDecl(capturedSelfDecl),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultTypeAndEnclosingChecked(explicitResultType, false),
+      ExplicitResultTypeAndSeparatelyChecked(explicitResultType, false),
       Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
@@ -3857,14 +3854,14 @@ public:
 
   Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultTypeAndEnclosingChecked.getPointer()
+    return ExplicitResultTypeAndSeparatelyChecked.getPointer()
         ->getInstanceType();
   }
   void setExplicitResultType(Type ty);
 
   TypeRepr *getExplicitResultTypeRepr() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultTypeAndEnclosingChecked.getPointer()
+    return ExplicitResultTypeAndSeparatelyChecked.getPointer()
         ->getTypeRepr();
   }
 
@@ -3894,19 +3891,12 @@ public:
   /// Only valid when \c hasSingleExpressionBody() is true.
   Expr *getSingleExpressionBody() const;
 
-  /// Set the body for a closure that has a single expression as its
-  /// body.
-  ///
-  /// This routine cannot change whether a closure has a single expression as
-  /// its body; it can only update that expression.
-  void setSingleExpressionBody(Expr *NewBody);
-
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
 
   /// VarDecl captured by this closure under the literal name \c self , if any.
   VarDecl *getCapturedSelfDecl() const {
-    return CapturedSelfDeclAndAppliedBuilder.getPointer();
+    return CapturedSelfDecl;
   }
   
   /// Whether this closure captures the \c self param in its body in such a
@@ -3914,22 +3904,14 @@ public:
   /// captured non-weakly).
   bool capturesSelfEnablingImplictSelf() const;
 
-  bool hasAppliedFunctionBuilder() const {
-    return CapturedSelfDeclAndAppliedBuilder.getInt();
+  /// Whether this closure's body was type checked separately from its
+  /// enclosing expression.
+  bool wasSeparatelyTypeChecked() const {
+    return ExplicitResultTypeAndSeparatelyChecked.getInt();
   }
 
-  void setAppliedFunctionBuilder(bool flag = true) {
-    CapturedSelfDeclAndAppliedBuilder.setInt(flag);
-  }
-
-  /// Whether this closure's body was type checked within the enclosing
-  /// context.
-  bool wasTypeCheckedInEnclosingContext() const {
-    return ExplicitResultTypeAndEnclosingChecked.getInt();
-  }
-
-  void setTypeCheckedInEnclosingContext(bool flag = true) {
-    ExplicitResultTypeAndEnclosingChecked.setInt(flag);
+  void setSeparatelyTypeChecked(bool flag = true) {
+    ExplicitResultTypeAndSeparatelyChecked.setInt(flag);
   }
 
   static bool classof(const Expr *E) {

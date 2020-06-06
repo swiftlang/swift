@@ -450,6 +450,9 @@ struct PrintOptions {
   /// Whether to print parameter specifiers as 'let' and 'var'.
   bool PrintParameterSpecifiers = false;
 
+  /// Whether to print inheritance lists for types.
+  bool PrintInherited = true;
+
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {
     Never,

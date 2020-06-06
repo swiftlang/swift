@@ -6,10 +6,20 @@
 // RUN: %FileCheck %s --input-file %t/NominalTypes.symbols.json --check-prefix=ENUM
 // RUN: %FileCheck %s --input-file %t/NominalTypes.symbols.json --check-prefix=TYPEALIAS
 
-public struct S<T> where T: Sequence {}
+public protocol P {}
+
+@frozen public struct S<T> : P where T: Sequence {}
 
 // STRUCT-LABEL: "precise": "s:12NominalTypes1SV",
 // STRUCT: "declarationFragments": [
+// STRUCT-NEXT:   {
+// STRUCT-NEXT:     "kind": "attribute",
+// STRUCT-NEXT:     "spelling": "@frozen"
+// STRUCT-NEXT:   },
+// STRUCT-NEXT:   {
+// STRUCT-NEXT:     "kind": "text",
+// STRUCT-NEXT:     "spelling": " "
+// STRUCT-NEXT:   },
 // STRUCT-NEXT:   {
 // STRUCT-NEXT:     "kind": "keyword",
 // STRUCT-NEXT:     "spelling": "struct"

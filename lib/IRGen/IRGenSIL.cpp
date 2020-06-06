@@ -1852,7 +1852,8 @@ void IRGenSILFunction::visitDifferentiableFunctionInst(
     auto origFnType =
         i->getOriginalFunction()->getType().castTo<SILFunctionType>();
     auto derivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
-        i->getParameterIndices(), /*resultIndex*/ 0, kind, i->getModule().Types,
+        i->getParameterIndices(), i->getResultIndices(), kind,
+        i->getModule().Types,
         LookUpConformanceInModule(i->getModule().getSwiftModule()));
     auto *undef = SILUndef::get(
         SILType::getPrimitiveObjectType(derivativeFnType), *i->getFunction());

@@ -120,7 +120,7 @@ func apply() {
 // CHECK-LABEL: @{{.*}}apply{{.*}}
 // CHECK:       [[ORIG:%.*]] = function_ref @{{.*}}thin{{.*}} : $@convention(thin) (Float) -> Float
 // CHECK-NEXT:  [[ORIG_THICK:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
-// CHECK-NEXT:  [[DIFFED:%.*]] = differentiable_function [parameters 0] [[ORIG_THICK]] : $@callee_guaranteed (Float) -> Float
+// CHECK-NEXT:  [[DIFFED:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_THICK]] : $@callee_guaranteed (Float) -> Float
 // CHECK:       [[ORIG:%.*]] = function_ref @{{.*}}thin{{.*}} : $@convention(thin) (Float) -> Float
 // CHECK-NEXT:  [[ORIG_THICK:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
 // CHECK-NEXT:  [[LIN:%.*]] = linear_function [parameters 0] [[ORIG_THICK]] : $@callee_guaranteed (Float) -> Float

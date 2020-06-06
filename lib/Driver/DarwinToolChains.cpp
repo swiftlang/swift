@@ -238,12 +238,15 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfos.push_back(
-        {Arguments.back(), file_types::TY_Object,
+        {Arguments.back(), context.OI.CompilerOutputType,
          FilelistInfo::WhichFiles::InputJobsAndSourceInputActions});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_LLVM_BC);
     addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+    addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
   }
 
 
@@ -303,6 +306,20 @@ toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
     // Arclite depends on CoreFoundation.
     Arguments.push_back("-framework");
     Arguments.push_back("CoreFoundation");
+  }
+}
+
+void
+toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
+                                  const JobContext &context) const {
+  llvm::SmallString<128> LTOLibPath;
+  if (findXcodeClangPath(LTOLibPath)) {
+    llvm::sys::path::remove_filename(LTOLibPath); // 'clang'
+    llvm::sys::path::remove_filename(LTOLibPath); // 'bin'
+    llvm::sys::path::append(LTOLibPath, "lib", "libLTO.dylib");
+
+    Arguments.push_back("-lto_library");
+    Arguments.push_back(context.Args.MakeArgString(LTOLibPath));
   }
 }
 
@@ -723,6 +740,10 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
 
   addArgsToLinkARCLite(Arguments, context);
 
+  if (job.PerformLTO()) {
+    addLTOLibArgs(Arguments, context);
+  }
+
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
     Arguments.push_back("-F");
@@ -790,14 +811,17 @@ toolchains::Darwin::constructInvocation(const StaticLinkJobAction &job,
   if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
+    II.FilelistInfos.push_back({Arguments.back(), context.OI.CompilerOutputType,
                                 FilelistInfo::WhichFiles::InputJobs});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_LLVM_BC);
   }
 
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   Arguments.push_back("-o");
 

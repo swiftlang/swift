@@ -3892,6 +3892,13 @@ namespace {
           }
         }
 
+        // If this is a closure, only walk into its children if they
+        // are type-checked in the context of the enclosing expression.
+        if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+          if (!shouldTypeCheckInEnclosingExpression(closure))
+            return { false, expr };
+        }
+
         // Now, we're ready to walk into sub expressions.
         return {true, expr};
       }
@@ -4031,12 +4038,6 @@ namespace {
 
     /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
-
-    // Don't walk into statements.  This handles the BraceStmt in
-    // non-single-expr closures, so we don't walk into their body.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
   };
 
   class ConstraintWalker : public ASTWalker {

@@ -1129,7 +1129,7 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
         if (Expr *ParentExpr = Parent.getAsExpr()) {
           auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
           if (!ParentClosure ||
-              !ParentClosure->wasTypeCheckedInEnclosingContext()) {
+              ParentClosure->wasSeparatelyTypeChecked()) {
             return false;
           }
         } else if (auto *ParentStmt = Parent.getAsStmt()) {
@@ -2343,8 +2343,8 @@ public:
     return true;
   }
 
-  bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-    return expr->hasAppliedFunctionBuilder();
+  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+    return false;
   }
 
   bool shouldWalkIntoTapExpression() override { return false; }

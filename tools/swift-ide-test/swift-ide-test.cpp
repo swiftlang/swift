@@ -3224,7 +3224,7 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
+static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args, bool ForceNoOutputs) {
   PrintingDiagnosticConsumer PDC;
   SourceManager SM;
   DiagnosticEngine Diags(SM);
@@ -3233,8 +3233,13 @@ static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
   CompilerInvocation CI;
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
       Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    llvm::outs() << "Frontend Arguments BEGIN\n";
+    for (const char *arg : FrontendArgs) {
+      llvm::outs() << arg << "\n";
+    }
+    llvm::outs() << "Frontend Arguments END\n";
     return CI.parseArgs(FrontendArgs, Diags);
-  });
+  }, ForceNoOutputs);
 
   if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
@@ -3272,8 +3277,13 @@ int main(int argc, char *argv[]) {
     // llvm::cl::ParseCommandLineOptions.
     StringRef FirstArg(argv[1]);
     if (FirstArg == "-test-createCompilerInvocation") {
+      bool ForceNoOutputs = false;
       ArrayRef<const char *> Args(argv + 2, argc - 2);
-      return doTestCreateCompilerInvocation(Args);
+      if (argc > 2 && StringRef(argv[2]) == "-force-no-outputs") {
+        ForceNoOutputs = true;
+        Args = Args.drop_front();
+      }
+      return doTestCreateCompilerInvocation(Args, ForceNoOutputs);
     }
   }
 

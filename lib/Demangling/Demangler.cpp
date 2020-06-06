@@ -1835,6 +1835,8 @@ NodePointer Demangler::demangleImplFunctionType() {
   while (NodePointer Result = demangleImplResultConvention(
                                                     Node::Kind::ImplResult)) {
     type = addChild(type, Result);
+    if (NodePointer Diff = demangleImplDifferentiability())
+      Result = addChild(Result, Diff);
     ++NumTypesToAdd;
   }
   while (nextIf('Y')) {
