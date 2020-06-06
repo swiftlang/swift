@@ -13,7 +13,6 @@ cmake -G Ninja \
   -DCMAKE_STAGING_PREFIX="$DESTINATION_TOOLCHAIN/usr" \
   -DCMAKE_TOOLCHAIN_FILE="$SOURCE_PATH/swift/utils/webassembly/toolchain-wasi.cmake" \
   -DWASI_SDK_PATH="$SOURCE_PATH/wasi-sdk" \
-  -DICU_ROOT="$SOURCE_PATH/icu_out" \
   -DBUILD_SHARED_LIBS=OFF \
   -DSWIFT_FOUNDATION_PATH=$DESTINATION_TOOLCHAIN/usr/lib/swift/wasi/wasm32 \
   "${SOURCE_PATH}/swift-corelibs-xctest"
