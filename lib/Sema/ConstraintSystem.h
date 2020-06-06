@@ -1334,13 +1334,16 @@ struct DynamicCallableMethods {
 /// Describes the target to which a constraint system's solution can be
 /// applied.
 class SolutionApplicationTarget {
+public:
   enum class Kind {
     expression,
     function,
     stmtCondition,
     caseLabelItem,
+    patternBinding,
   } kind;
 
+private:
   union {
     struct {
       /// The expression being type-checked.
@@ -1402,6 +1405,8 @@ class SolutionApplicationTarget {
       CaseLabelItem *caseLabelItem;
       DeclContext *dc;
     } caseLabelItem;
+
+    PatternBindingDecl *patternBinding;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1442,6 +1447,11 @@ public:
     this->caseLabelItem.dc = dc;
   }
 
+  SolutionApplicationTarget(PatternBindingDecl *patternBinding) {
+    kind = Kind::patternBinding;
+    this->patternBinding = patternBinding;
+  }
+
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
@@ -1467,6 +1477,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -1485,6 +1496,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.dc;
+
+    case Kind::patternBinding:
+      return patternBinding->getDeclContext();
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -1636,6 +1650,7 @@ public:
     case Kind::expression:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return None;
 
     case Kind::function:
@@ -1649,6 +1664,7 @@ public:
     case Kind::expression:
     case Kind::function:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return None;
 
     case Kind::stmtCondition:
@@ -1662,12 +1678,26 @@ public:
     case Kind::expression:
     case Kind::function:
     case Kind::stmtCondition:
+    case Kind::patternBinding:
       return None;
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem;
     }
     llvm_unreachable("invalid case label type");
+  }
+
+  PatternBindingDecl *getAsPatternBinding() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+      return nullptr;
+
+    case Kind::patternBinding:
+      return patternBinding;
+    }
   }
 
   BraceStmt *getFunctionBody() const {
@@ -1695,6 +1725,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem->getSourceRange();
+
+    case Kind::patternBinding:
+      return patternBinding->getSourceRange();
     }
     llvm_unreachable("invalid target type");
   }
@@ -1713,6 +1746,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem->getStartLoc();
+
+    case Kind::patternBinding:
+      return patternBinding->getLoc();
     }
     llvm_unreachable("invalid target type");
   }
