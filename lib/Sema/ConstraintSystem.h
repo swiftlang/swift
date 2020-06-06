@@ -724,13 +724,6 @@ struct AppliedBuilderTransform {
 
   /// The return expression, capturing the last value to be emitted.
   Expr *returnExpr = nullptr;
-
-  using PatternEntry = std::pair<const PatternBindingDecl *, unsigned>;
-
-  /// Mapping from specific pattern binding entries to the solution application
-  /// targets capturing their initialization.
-  llvm::DenseMap<PatternEntry, SolutionApplicationTarget>
-      patternBindingEntries;
 };
 
 /// Describes the fixed score of a solution to the constraint system.
@@ -855,8 +848,111 @@ struct ForEachStmtInfo {
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
 /// solution application targets.
-using SolutionApplicationTargetsKey =
-    PointerUnion<const StmtConditionElement *, const Stmt *>;
+class SolutionApplicationTargetsKey {
+public:
+  enum class Kind {
+    empty,
+    tombstone,
+    stmtCondElement,
+    stmt,
+    patternBindingEntry,
+  };
+
+private:
+  Kind kind;
+
+  union {
+    const StmtConditionElement *stmtCondElement;
+
+    const Stmt *stmt;
+
+    struct PatternBindingEntry {
+      const PatternBindingDecl *patternBinding;
+      unsigned index;
+    } patternBindingEntry;
+  } storage;
+
+public:
+  SolutionApplicationTargetsKey(Kind kind) {
+    assert(kind == Kind::empty || kind == Kind::tombstone);
+    this->kind = kind;
+  }
+
+  SolutionApplicationTargetsKey(const StmtConditionElement *stmtCondElement) {
+    kind = Kind::stmtCondElement;
+    storage.stmtCondElement = stmtCondElement;
+  }
+
+  SolutionApplicationTargetsKey(const Stmt *stmt) {
+    kind = Kind::stmt;
+    storage.stmt = stmt;
+  }
+
+  SolutionApplicationTargetsKey(
+      const PatternBindingDecl *patternBinding, unsigned index) {
+    kind = Kind::stmt;
+    storage.patternBindingEntry.patternBinding = patternBinding;
+    storage.patternBindingEntry.index = index;
+  }
+
+  friend bool operator==(
+      SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
+    if (lhs.kind != rhs.kind)
+      return false;
+
+    switch (lhs.kind) {
+    case Kind::empty:
+    case Kind::tombstone:
+      return true;
+
+    case Kind::stmtCondElement:
+      return lhs.storage.stmtCondElement == rhs.storage.stmtCondElement;
+
+    case Kind::stmt:
+      return lhs.storage.stmt == rhs.storage.stmt;
+
+    case Kind::patternBindingEntry:
+      return (lhs.storage.patternBindingEntry.patternBinding
+                == rhs.storage.patternBindingEntry.patternBinding) &&
+          (lhs.storage.patternBindingEntry.index
+             == rhs.storage.patternBindingEntry.index);
+    }
+  }
+
+  friend bool operator!=(
+      SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
+    return !(lhs == rhs);
+  }
+
+  unsigned getHashValue() const {
+    using llvm::hash_combine;
+    using llvm::DenseMapInfo;
+
+    switch (kind) {
+    case Kind::empty:
+    case Kind::tombstone:
+      return llvm::DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind));
+
+    case Kind::stmtCondElement:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.stmtCondElement));
+
+    case Kind::stmt:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.stmt));
+
+    case Kind::patternBindingEntry:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(
+              storage.patternBindingEntry.patternBinding),
+          DenseMapInfo<unsigned>::getHashValue(
+              storage.patternBindingEntry.index));
+    }
+  }
+};
 
 /// A complete solution to a constraint system.
 ///
@@ -1238,13 +1334,16 @@ struct DynamicCallableMethods {
 /// Describes the target to which a constraint system's solution can be
 /// applied.
 class SolutionApplicationTarget {
+public:
   enum class Kind {
     expression,
     function,
     stmtCondition,
     caseLabelItem,
+    patternBinding,
   } kind;
 
+private:
   union {
     struct {
       /// The expression being type-checked.
@@ -1306,6 +1405,8 @@ class SolutionApplicationTarget {
       CaseLabelItem *caseLabelItem;
       DeclContext *dc;
     } caseLabelItem;
+
+    PatternBindingDecl *patternBinding;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1346,6 +1447,11 @@ public:
     this->caseLabelItem.dc = dc;
   }
 
+  SolutionApplicationTarget(PatternBindingDecl *patternBinding) {
+    kind = Kind::patternBinding;
+    this->patternBinding = patternBinding;
+  }
+
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
@@ -1371,6 +1477,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -1389,6 +1496,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.dc;
+
+    case Kind::patternBinding:
+      return patternBinding->getDeclContext();
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -1540,6 +1650,7 @@ public:
     case Kind::expression:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return None;
 
     case Kind::function:
@@ -1553,6 +1664,7 @@ public:
     case Kind::expression:
     case Kind::function:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return None;
 
     case Kind::stmtCondition:
@@ -1566,12 +1678,26 @@ public:
     case Kind::expression:
     case Kind::function:
     case Kind::stmtCondition:
+    case Kind::patternBinding:
       return None;
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem;
     }
     llvm_unreachable("invalid case label type");
+  }
+
+  PatternBindingDecl *getAsPatternBinding() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+      return nullptr;
+
+    case Kind::patternBinding:
+      return patternBinding;
+    }
   }
 
   BraceStmt *getFunctionBody() const {
@@ -1599,6 +1725,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem->getSourceRange();
+
+    case Kind::patternBinding:
+      return patternBinding->getSourceRange();
     }
     llvm_unreachable("invalid target type");
   }
@@ -1617,6 +1746,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem->getStartLoc();
+
+    case Kind::patternBinding:
+      return patternBinding->getLoc();
     }
     llvm_unreachable("invalid target type");
   }
@@ -2610,7 +2742,6 @@ public:
 
   void setSolutionApplicationTarget(
       SolutionApplicationTargetsKey key, SolutionApplicationTarget target) {
-    assert(key && "Expected non-null solution application target key!");
     assert(solutionApplicationTargets.count(key) == 0 &&
            "Already set this solution application target");
     solutionApplicationTargets.insert({key, target});
@@ -5500,5 +5631,26 @@ void forEachExprInConstraintSystem(
     Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
 
 } // end namespace swift
+
+namespace llvm {
+template<>
+struct DenseMapInfo<swift::constraints::SolutionApplicationTargetsKey> {
+  using Key = swift::constraints::SolutionApplicationTargetsKey;
+
+  static inline Key getEmptyKey() {
+    return Key(Key::Kind::empty);
+  }
+  static inline Key getTombstoneKey() {
+    return Key(Key::Kind::tombstone);
+  }
+  static inline unsigned getHashValue(Key key) {
+    return key.getHashValue();
+  }
+  static bool isEqual(Key a, Key b) {
+    return a == b;
+  }
+};
+
+}
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
