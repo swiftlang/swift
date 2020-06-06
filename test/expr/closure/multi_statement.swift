@@ -2,7 +2,8 @@
 
 func mapWithMoreStatements(ints: [Int]) {
   let _ = ints.map { i in
-    print(i)
-    return String(i)
+    let value = i + 1
+    print(value)
+    return String(value)
   }
 }

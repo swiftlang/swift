@@ -58,6 +58,15 @@ private:
     if (isa<VarDecl>(decl))
       return;
 
+    // Generate constraints for pattern binding declarations.
+    if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+      SolutionApplicationTarget target(patternBinding);
+      if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+        hadError = true;
+
+      return;
+    }
+
     llvm_unreachable("Unimplemented case for closure body");
   }
 
@@ -171,6 +180,20 @@ private:
   }
 
   void visitDecl(Decl *decl) {
+    // Ignore variable declarations, because they're always handled within
+    // their enclosing pattern bindings.
+    if (isa<VarDecl>(decl))
+      return;
+
+    // Generate constraints for pattern binding declarations.
+    if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+      SolutionApplicationTarget target(patternBinding);
+      if (!rewriteTarget(target))
+        hadError = true;
+
+      return;
+    }
+
     llvm_unreachable("Declarations not supported");
   }
 
