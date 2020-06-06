@@ -81,6 +81,7 @@ else
 fi
 
 $UTILS_PATH/build-foundation.sh $TMP_DIR/$TOOLCHAIN_NAME
+$UTILS_PATH/build-xctest.sh $TMP_DIR/$TOOLCHAIN_NAME
 
 cd $TMP_DIR
 tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME
