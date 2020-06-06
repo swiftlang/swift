@@ -711,6 +711,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   Opts.SolverEnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_solver_enable_operator_designated_types);
+  Opts.EnableOneWayClosureParameters |=
+      Args.hasArg(OPT_experimental_one_way_closure_params);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);

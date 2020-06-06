@@ -269,26 +269,12 @@ protected:
       return;
     }
 
-    // If we aren't generating constraints, there's nothing to do.
-    if (!cs)
-      return;
-
-    /// Generate constraints for each pattern binding entry
-    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
-      // Type check the pattern.
-      auto pattern = patternBinding->getPattern(index);
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
-      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-
-      // Generate constraints for the initialization.
-      auto target = SolutionApplicationTarget::forInitialization(
-          patternBinding->getInit(index), dc, patternType, pattern,
-          /*bindPatternVarsOneWay=*/true);
+    // If there is a constraint system, generate constraints for the pattern
+    // binding.
+    if (cs) {
+      SolutionApplicationTarget target(patternBinding);
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
-        continue;
-
-      // Keep track of this binding entry.
-      applied.patternBindingEntries.insert({{patternBinding, index}, target});
+        hadError = true;
     }
   }
 
@@ -1035,11 +1021,11 @@ private:
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
       // Find the solution application target for this.
       auto knownTarget =
-          builderTransform.patternBindingEntries.find({patternBinding, index});
-      assert(knownTarget != builderTransform.patternBindingEntries.end());
+          *solution.getConstraintSystem().getSolutionApplicationTarget(
+            {patternBinding, index});
 
       // Rewrite the target.
-      auto resultTarget = rewriteTarget(knownTarget->second);
+      auto resultTarget = rewriteTarget(knownTarget);
       if (!resultTarget)
         continue;
 
