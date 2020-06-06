@@ -21,7 +21,7 @@
         "swift-stress-tester": {
             "remote": { "id": "apple/swift-stress-tester" } },
         "swift-corelibs-xctest": {
-            "remote": { "id": "apple/swift-corelibs-xctest" } },
+            "remote": { "id": "swiftwasm/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
             "remote": { "id": "swiftwasm/swift-corelibs-foundation" } },
         "swift-corelibs-libdispatch": {
@@ -71,7 +71,7 @@
                 "swift-driver": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
-                "swift-corelibs-xctest": "master",
+                "swift-corelibs-xctest": "swiftwasm",
                 "swift-corelibs-foundation": "swiftwasm",
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
