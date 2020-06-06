@@ -15,6 +15,14 @@ from . import product
 
 class LibICU(product.Product):
     @classmethod
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
+
+    @classmethod
     def product_source_name(cls):
         """product_source_name() -> str
 
