@@ -3237,62 +3237,18 @@ public:
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// storage wrapper if the decl has an associated storage wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getStorageWrapperInformation(SelectedOverload resolvedOverload) {
-    if (resolvedOverload.choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-        if (decl->hasAttachedPropertyWrapper()) {
-          if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
-            Type type = storageWrapper->getInterfaceType();
-            if (Type baseType = resolvedOverload.choice.getBaseType()) {
-              type = baseType->getTypeOfMember(DC->getParentModule(),
-                                               storageWrapper, type);
-            }
-            return std::make_pair(decl, type);
-          }
-        }
-      }
-    }
-    return None;
-  }
+  getStorageWrapperInformation(SelectedOverload resolvedOverload);
 
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getPropertyWrapperInformation(SelectedOverload resolvedOverload) {
-    if (resolvedOverload.choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-        if (decl->hasAttachedPropertyWrapper()) {
-          auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
-          if (Type baseType = resolvedOverload.choice.getBaseType()) {
-            wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
-                                                  decl, wrapperTy);
-          }
-          return std::make_pair(decl, wrapperTy);
-        }
-      }
-    }
-    return None;
-  }
+  getPropertyWrapperInformation(SelectedOverload resolvedOverload);
 
   /// Gets the VarDecl, and the type of the type property that it wraps if
   /// resolved overload has a decl which is the backing storage for a
   /// property wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getWrappedPropertyInformation(SelectedOverload resolvedOverload) {
-    if (resolvedOverload.choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-        if (auto wrapped = decl->getOriginalWrappedProperty()) {
-          Type type = wrapped->getInterfaceType();
-          if (Type baseType = resolvedOverload.choice.getBaseType()) {
-            type = baseType->getTypeOfMember(DC->getParentModule(),
-                                             wrapped, type);
-          }
-          return std::make_pair(decl, type);
-        }
-      }
-    }
-    return None;
-  }
+  getWrappedPropertyInformation(SelectedOverload resolvedOverload);
 
   /// Merge the equivalence sets of the two type variables.
   ///
