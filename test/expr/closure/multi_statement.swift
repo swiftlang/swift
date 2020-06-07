@@ -4,9 +4,17 @@ func isInt<T>(_ value: T) -> Bool {
   return value is Int
 }
 
+func maybeGetValue<T>(_ value: T) -> T? {
+  return value
+}
+
 func mapWithMoreStatements(ints: [Int]) {
   let _ = ints.map { i in
-    let value = i + 1
+    guard let actualValue = maybeGetValue(i) else {
+      return String(0)
+    }
+
+    let value = actualValue + 1
     do {
       if isInt(i) {
         print(value)

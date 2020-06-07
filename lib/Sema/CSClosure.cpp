@@ -90,6 +90,12 @@ private:
     visit(doStmt->getBody());
   }
 
+  void visitGuardStmt(GuardStmt *guardStmt) {
+    if (cs.generateConstraints(guardStmt->getCond(), closure))
+      hadError = true;
+    visit(guardStmt->getBody());
+  }
+
   void visitIfStmt(IfStmt *ifStmt) {
     if (cs.generateConstraints(ifStmt->getCond(), closure))
       hadError = true;
@@ -127,7 +133,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(RepeatWhile)
@@ -232,6 +237,19 @@ private:
     return doStmt;
   }
 
+  ASTNode visitGuardStmt(GuardStmt *guardStmt) {
+    // Rewrite the condition.
+    if (auto condition = rewriteTarget(
+            SolutionApplicationTarget(guardStmt->getCond(), closure)))
+      guardStmt->setCond(*condition->getAsStmtCondition());
+    else
+      hadError = true;
+
+    auto body = visit(guardStmt->getBody()).get<Stmt *>();
+    guardStmt->setBody(cast<BraceStmt>(body));
+    return guardStmt;
+  }
+
   ASTNode visitIfStmt(IfStmt *ifStmt) {
     // Rewrite the condition.
     if (auto condition = rewriteTarget(
@@ -320,7 +338,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(RepeatWhile)
