@@ -72,10 +72,7 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
-  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                         file_types::TY_LLVM_BC);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   Arguments.push_back("-o");
   Arguments.push_back(
@@ -170,9 +167,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   std::string Linker;
   if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
     Linker = A->getValue();
-  } else if (context.OI.LTOVariant != OutputInfo::LTOKind::None) {
-    // Force to use lld for LTO
-    Linker = "lld";
   } else {
     Linker = getDefaultLinker();
   }
@@ -224,16 +218,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back("-pie");
   }
 
-  switch (context.OI.LTOVariant) {
-  case OutputInfo::LTOKind::LLVMThin:
-    Arguments.push_back("-flto=thin");
-    break;
-  case OutputInfo::LTOKind::LLVMFull:
-    Arguments.push_back("-flto=full");
-    break;
-  case OutputInfo::LTOKind::None: break;
-  }
-
   bool staticExecutable = false;
   bool staticStdlib = false;
 
@@ -269,11 +253,7 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
-  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                         file_types::TY_LLVM_BC);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
-
 
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
@@ -388,7 +368,7 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
   ArgStringList Arguments;
 
   // Configure the toolchain.
-  const char *AR = "llvm-ar";
+  const char *AR = "ar";
   Arguments.push_back("crs");
 
   Arguments.push_back(
@@ -396,11 +376,7 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
-  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                         file_types::TY_LLVM_BC);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
-
 
   InvocationInfo II{AR, Arguments};
 

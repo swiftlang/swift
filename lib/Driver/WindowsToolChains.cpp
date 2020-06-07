@@ -143,11 +143,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
-  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                         file_types::TY_LLVM_BC);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
-
 
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
@@ -190,21 +186,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
-  switch (context.OI.LTOVariant) {
-  case OutputInfo::LTOKind::LLVMThin:
-  case OutputInfo::LTOKind::LLVMFull: {
-    if (Linker.empty())
-      Arguments.push_back("-fuse-ld=lld");
-    if (context.OI.LTOVariant == OutputInfo::LTOKind::LLVMThin) {
-      Arguments.push_back("-flto=thin");
-    } else {
-      Arguments.push_back("-flto=full");
-    }
-    break;
-  }
-  case OutputInfo::LTOKind::None: break;
-  }
-
   // Run clang++ in verbose mode if "-v" is set
   if (context.Args.hasArg(options::OPT_v)) {
     Arguments.push_back("-v");
@@ -229,46 +210,22 @@ toolchains::Windows::constructInvocation(const StaticLinkJobAction &job,
 
   ArgStringList Arguments;
 
-  switch (context.OI.LTOVariant) {
-  case OutputInfo::LTOKind::LLVMThin:
-  case OutputInfo::LTOKind::LLVMFull: {
-    const char *AR = "llvm-ar";
-    Arguments.push_back("crs");
+  const char *Linker = "link";
+  if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld))
+    Linker = context.Args.MakeArgString(A->getValue());
 
-    Arguments.push_back(
-        context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+  Arguments.push_back("/lib");
+  Arguments.push_back("-nologo");
 
-    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                           file_types::TY_Object);
-    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                           file_types::TY_LLVM_BC);
-    addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
-    addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
 
-    InvocationInfo II{AR, Arguments};
+  StringRef OutputFile = context.Output.getPrimaryOutputFilename();
+  Arguments.push_back(context.Args.MakeArgString(Twine("/OUT:") + OutputFile));
 
-    return II;
-  }
-  case OutputInfo::LTOKind::None:
-    const char *Linker = "link";
-    if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld))
-      Linker = context.Args.MakeArgString(A->getValue());
+  InvocationInfo II{Linker, Arguments};
+  II.allowsResponseFiles = true;
 
-    Arguments.push_back("/lib");
-    Arguments.push_back("-nologo");
-
-    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                           file_types::TY_Object);
-    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                           file_types::TY_LLVM_BC);
-    addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
-    addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
-
-    StringRef OutputFile = context.Output.getPrimaryOutputFilename();
-    Arguments.push_back(context.Args.MakeArgString(Twine("/OUT:") + OutputFile));
-
-    InvocationInfo II{Linker, Arguments};
-    II.allowsResponseFiles = true;
-    return II;
-  }
+  return II;
 }
