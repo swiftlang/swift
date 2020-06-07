@@ -341,6 +341,19 @@ void DepGraphNode::dump(raw_ostream &os) const {
     llvm::errs() << "no fingerprint";
 }
 
+void SourceFileDepGraphNode::dump() const {
+  dump(llvm::errs());
+}
+
+void SourceFileDepGraphNode::dump(raw_ostream &os) const {
+  DepGraphNode::dump(os);
+  os << " sequence number: " << sequenceNumber;
+  os << " is provides: " << isProvides;
+  os << " depends on:";
+  for (auto def : defsIDependUpon)
+    os << " " << def;
+}
+
 std::string DepGraphNode::humanReadableName(StringRef where) const {
 
   return getKey().humanReadableName() +

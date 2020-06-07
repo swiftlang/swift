@@ -741,6 +741,9 @@ public:
                                                            : "somewhere else");
   }
 
+  SWIFT_DEBUG_DUMP;
+  void dump(llvm::raw_ostream &os) const;
+
   bool verify() const {
     DepGraphNode::verify();
     assert(getIsProvides() || isDepends());
