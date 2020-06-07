@@ -8,6 +8,8 @@ func maybeGetValue<T>(_ value: T) -> T? {
   return value
 }
 
+func random(_: Int) -> Bool { return false }
+
 func mapWithMoreStatements(ints: [Int]) {
   let _ = ints.map { i in
     guard var actualValue = maybeGetValue(i) else {
@@ -26,6 +28,10 @@ func mapWithMoreStatements(ints: [Int]) {
     while actualValue < 100 {
       actualValue += 1
     }
+
+    repeat {
+      print("still here")
+    } while random(i)
 
     return String(value)
   }

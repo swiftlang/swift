@@ -109,6 +109,21 @@ private:
       visit(elseStmt);
   }
 
+  void visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
+    visit(repeatWhileStmt->getBody());
+
+    auto boolDecl = cs.getASTContext().getBoolDecl();
+    assert(boolDecl && "Bool is missing");
+
+    SolutionApplicationTarget target(
+        repeatWhileStmt->getCond(), closure, CTP_Condition,
+        boolDecl->getDeclaredType(), /*isDiscarded=*/false);
+    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      hadError = true;
+
+    cs.setSolutionApplicationTarget(repeatWhileStmt->getCond(), target);
+  }
+
   void visitReturnStmt(ReturnStmt *returnStmt) {
     auto expr = returnStmt->getResult();
 
@@ -144,7 +159,6 @@ private:
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
@@ -272,6 +286,22 @@ private:
     return ifStmt;
   }
 
+  ASTNode visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
+    auto body = visit(repeatWhileStmt->getBody()).get<Stmt *>();
+    repeatWhileStmt->setBody(cast<BraceStmt>(body));
+
+    // Rewrite the condition.
+    auto &cs = solution.getConstraintSystem();
+    auto target = *cs.getSolutionApplicationTarget(repeatWhileStmt->getCond());
+    if (auto condition = rewriteTarget(target))
+      repeatWhileStmt->setCond(condition->getAsExpr());
+    else
+      hadError = true;
+
+
+    return repeatWhileStmt;
+  }
+
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
     auto resultExpr = returnStmt->getResult();
     if (!resultExpr)
@@ -357,7 +387,6 @@ private:
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
