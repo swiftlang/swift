@@ -73,11 +73,15 @@ private:
   void visitBraceStmt(BraceStmt *braceStmt) {
     for (auto node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
-        auto generatedExpr = cs.generateConstraints(
-            expr, closure, /*isInputExpression=*/false);
-        if (!generatedExpr) {
+        ASTContext &ctx = cs.getASTContext();
+        bool isDiscarded = (!ctx.LangOpts.Playground &&
+                            !ctx.LangOpts.DebuggerSupport);
+        SolutionApplicationTarget target(
+            expr, closure, CTP_Unused, Type(), isDiscarded);
+        if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
           hadError = true;
-        }
+
+        cs.setSolutionApplicationTarget(expr, target);
       } else if (auto stmt = node.dyn_cast<Stmt *>()) {
         visit(stmt);
       } else {
@@ -189,17 +193,6 @@ public:
       isSingleExpression(closure->hasSingleExpressionBody()) { }
 
 private:
-  /// Rewrite an expression without any particularly special context.
-  Expr *rewriteExpr(Expr *expr) {
-    auto result = rewriteTarget(
-      SolutionApplicationTarget(expr, closure, CTP_Unused, Type(),
-                                /*isDiscarded=*/false));
-    if (result)
-      return result->getAsExpr();
-
-    return nullptr;
-  }
-
   void visitDecl(Decl *decl) {
     // Ignore variable declarations, because they're always handled within
     // their enclosing pattern bindings.
@@ -221,9 +214,16 @@ private:
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
+        // FIXME: Factor this out completely.
+        ASTContext &ctx = solution.getConstraintSystem().getASTContext();
+        bool isDiscarded = (!ctx.LangOpts.Playground &&
+                            !ctx.LangOpts.DebuggerSupport);
+        SolutionApplicationTarget target(
+            expr, closure, CTP_Unused, Type(), isDiscarded);
+
         // Rewrite the expression.
-        if (auto rewrittenExpr = rewriteExpr(expr))
-          node = expr;
+        if (auto rewrittenTarget = rewriteTarget(target))
+          node = rewrittenTarget->getAsExpr();
         else
           hadError = true;
       } else if (auto stmt = node.dyn_cast<Stmt *>()) {
