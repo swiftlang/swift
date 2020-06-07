@@ -1427,15 +1427,12 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                              const bool BatchMode, const InputFileList &Inputs,
                              OutputInfo &OI) const {
-  auto LinkerInputType = Args.hasArg(options::OPT_lto)
-                            ? file_types::TY_LLVM_BC
-                            : file_types::TY_Object;
   // By default, the driver does not link its output; this will be updated
   // appropriately below if linking is required.
 
   OI.CompilerOutputType = driverKind == DriverKind::Interactive
                               ? file_types::TY_Nothing
-                              : LinkerInputType;
+                              : file_types::TY_Object;
 
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
     if (BatchMode) {
@@ -1465,14 +1462,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                        diag::error_static_emit_executable_disallowed);
                        
       OI.LinkAction = LinkKind::Executable;
-      OI.CompilerOutputType = LinkerInputType;
+      OI.CompilerOutputType = file_types::TY_Object;
       break;
 
     case options::OPT_emit_library:
       OI.LinkAction = Args.hasArg(options::OPT_static) ?
                       LinkKind::StaticLibrary :
                       LinkKind::DynamicLibrary;
-      OI.CompilerOutputType = LinkerInputType;
+      OI.CompilerOutputType = file_types::TY_Object;
       break;
 
     case options::OPT_static:
@@ -1780,18 +1777,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     (void)parseSanitizerCoverageArgValue(A, TC.getTriple(), Diags,
                                          OI.SelectedSanitizers);
 
-  }
-
-  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
-    auto LTOVariant = llvm::StringSwitch<Optional<OutputInfo::LTOKind>>(A->getValue())
-      .Case("llvm", OutputInfo::LTOKind::LLVMThin)
-      .Case("llvm-full", OutputInfo::LTOKind::LLVMFull)
-      .Default(llvm::None);
-    if (LTOVariant)
-      OI.LTOVariant = LTOVariant.getValue();
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
   }
 
   if (TC.getTriple().isOSWindows()) {
@@ -2128,17 +2113,15 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     MergeModuleAction = C.createAction<MergeModuleJobAction>(AllModuleInputs);
   }
 
-  auto PerformLTO = Args.hasArg(options::OPT_lto);
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
     JobAction *LinkAction = nullptr;
 
     if (OI.LinkAction == LinkKind::StaticLibrary) {
       LinkAction = C.createAction<StaticLinkJobAction>(AllLinkerInputs,
-                                                       OI.LinkAction);
+                                                    OI.LinkAction);
     } else {
       LinkAction = C.createAction<DynamicLinkJobAction>(AllLinkerInputs,
-                                                        OI.LinkAction,
-                                                        PerformLTO);
+                                                 OI.LinkAction);
     }
 
     // On ELF platforms there's no built in autolinking mechanism, so we
@@ -2147,7 +2130,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     const auto &Triple = TC.getTriple();
     SmallVector<const Action *, 2> AutolinkExtractInputs;
     for (const Action *A : AllLinkerInputs)
-      if (A->getType() == OI.CompilerOutputType) {
+      if (A->getType() == file_types::TY_Object) {
         // Shared objects on ELF platforms don't have a swift1_autolink_entries
         // section in them because the section in the .o files is marked as
         // SHF_EXCLUDE.
@@ -2163,7 +2146,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         (Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
         Triple.getObjectFormat() == llvm::Triple::Wasm ||
         Triple.isOSCygMing();
-    if (!AutolinkExtractInputs.empty() && AutolinkExtractRequired && !PerformLTO) {
+    if (!AutolinkExtractInputs.empty() && AutolinkExtractRequired) {
       auto *AutolinkExtractAction =
           C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
       // Takes the same inputs as the linker...

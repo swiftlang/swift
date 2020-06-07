@@ -1,3 +1,0 @@
-import A
-
-libraryFunction()

@@ -1,3 +1,0 @@
-func anotherFileFunction() {
-  print(#function)
-}
