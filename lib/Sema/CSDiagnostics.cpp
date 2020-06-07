@@ -2356,8 +2356,8 @@ bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
   auto anchor = getAnchor();
 
   if (auto *coerceExpr = getAsExpr<CoerceExpr>(anchor)) {
-    auto fromType = getType(coerceExpr->getSubExpr());
-    auto toType = getType(&coerceExpr->getCastTypeLoc());
+    const auto fromType = getType(coerceExpr->getSubExpr());
+    const auto toType = getType(coerceExpr->getCastTypeRepr());
 
     auto diagnostic = getDiagnosticFor(CTP_CoerceOperand, toType);
 
@@ -5115,7 +5115,7 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
   }
 
   if (auto *CE = getAsExpr<ExplicitCastExpr>(getRawAnchor())) {
-    auto castTo = getType(&CE->getCastTypeLoc());
+    const auto castTo = getType(CE->getCastTypeRepr());
     auto *NTD = castTo->getAnyNominal();
     emitDiagnosticAt(loc, diag::unbound_generic_parameter_cast, GP,
                      NTD ? NTD->getDeclaredType() : castTo);
@@ -5213,15 +5213,17 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
     llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback) {
   using Callback = llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)>;
 
-  auto anchor = getRawAnchor();
+  auto *const typeRepr = [this]() -> TypeRepr * {
+    const auto anchor = getRawAnchor();
+    if (const auto *TE = getAsExpr<TypeExpr>(anchor))
+      return TE->getTypeRepr();
+    else if (const auto *ECE = getAsExpr<ExplicitCastExpr>(anchor))
+      return ECE->getCastTypeRepr();
+    else
+      return nullptr;
+  }();
 
-  TypeLoc typeLoc;
-  if (auto *TE = getAsExpr<TypeExpr>(anchor))
-    typeLoc = TE->getTypeRepr();
-  else if (auto *ECE = getAsExpr<ExplicitCastExpr>(anchor))
-    typeLoc = ECE->getCastTypeLoc();
-
-  if (!typeLoc.hasLocation())
+  if (!typeRepr)
     return false;
 
   struct AssociateMissingParams : public ASTWalker {
@@ -5276,7 +5278,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
 
   } associator(Parameters, callback);
 
-  typeLoc.getTypeRepr()->walk(associator);
+  typeRepr->walk(associator);
   return associator.allParamsAssigned();
 }
 

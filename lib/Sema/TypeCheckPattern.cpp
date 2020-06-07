@@ -360,10 +360,11 @@ public:
     auto cast = dyn_cast<CoerceExpr>(E->getElement(1));
     if (!cast)
       return nullptr;
-    
+
+    const auto tyLoc = TypeLoc(cast->getCastTypeRepr(), cast->getCastType());
     Pattern *subPattern = getSubExprPattern(E->getElement(0));
-    return new (Context) IsPattern(cast->getLoc(), cast->getCastTypeLoc(),
-                                   subPattern, CheckedCastKind::Unresolved);
+    return new (Context) IsPattern(cast->getLoc(), tyLoc, subPattern,
+                                   CheckedCastKind::Unresolved);
   }
   
   // Convert a paren expr to a pattern if it contains a pattern.
@@ -1252,7 +1253,6 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       return coercePatternToType(
           pattern.forSubPattern(P, /*retainTopLevle=*/true), type, options);
     }
-
 
     CheckedCastKind castKind
       = TypeChecker::typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),

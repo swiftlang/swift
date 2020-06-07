@@ -147,12 +147,9 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
   if (!coerceExpr)
     return nullptr;
 
-  auto subExpr = coerceExpr->getSubExpr();
-  auto castKind =
-      TypeChecker::typeCheckCheckedCast(fromType, toType,
-                                        CheckedCastContextKind::None, cs.DC,
-                                        coerceExpr->getLoc(), subExpr,
-                                        coerceExpr->getCastTypeLoc().getSourceRange());
+  const auto castKind = TypeChecker::typeCheckCheckedCast(
+      fromType, toType, CheckedCastContextKind::None, cs.DC,
+      SourceLoc(), coerceExpr->getSubExpr(), SourceRange());
 
   // Invalid cast.
   if (castKind == CheckedCastKind::Unresolved)

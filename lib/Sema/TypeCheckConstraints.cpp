@@ -1916,34 +1916,37 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!protocol)
     return nullptr;
 
-  TypeLoc typeLoc;
+  Type castTy;
   if (auto precheckedTy = typeExpr->getInstanceType()) {
-    typeLoc = TypeLoc(typeExpr->getTypeRepr(), precheckedTy);
+    castTy = precheckedTy;
   } else {
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
+    const auto options =
+        TypeResolutionOptions(TypeResolverContext::InExpression) |
+        TypeResolutionFlags::AllowUnboundGenerics |
+        TypeResolutionFlags::SilenceErrors;
 
     auto result = TypeResolution::forContextual(DC, options)
                       .resolveType(typeExpr->getTypeRepr());
     if (result->hasError())
       return nullptr;
-    typeLoc = TypeLoc{typeExpr->getTypeRepr(), result};
+    castTy = result;
   }
 
-  if (!typeLoc.getType() || !typeLoc.getType()->getAnyNominal())
+  if (!castTy || !castTy->getAnyNominal())
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
   if (auto selectorTy = getASTContext().getSelectorType()) {
-    if (typeLoc.getType()->isEqual(selectorTy))
+    if (castTy->isEqual(selectorTy))
       return nullptr;
   }
 
-  auto *NTD = typeLoc.getType()->getAnyNominal();
   SmallVector<ProtocolConformance *, 2> conformances;
-  return NTD->lookupConformance(DC->getParentModule(), protocol, conformances)
+  return castTy->getAnyNominal()->lookupConformance(DC->getParentModule(),
+                                                    protocol, conformances)
              ? CoerceExpr::forLiteralInit(getASTContext(), argExpr,
-                                          call->getSourceRange(), typeLoc)
+                                          call->getSourceRange(),
+                                          typeExpr->getTypeRepr())
              : nullptr;
 }
 
@@ -3032,9 +3035,9 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
       return getType(E);
     return Type();
   };
-  auto getTypeOfTypeLoc = [&](TypeLoc &TL) -> Type {
-    if (hasType(TL))
-      return getType(TL);
+  auto getTypeOfTypeRepr = [&](TypeRepr *TR) -> Type {
+    if (hasType(TR))
+      return getType(TR);
     return Type();
   };
   auto getTypeOfKeyPathComponent = [&](KeyPathExpr *KP, unsigned I) -> Type {
@@ -3043,7 +3046,7 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
     return Type();
   };
 
-  E->dump(out, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent);
+  E->dump(out, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent);
 }
 
 void ConstraintSystem::print(raw_ostream &out) const {
@@ -3229,6 +3232,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                                   SourceLoc diagLoc,
                                                   Expr *fromExpr,
                                                   SourceRange diagToRange) {
+  // Determine whether we should suppress diagnostics.
+  const bool suppressDiagnostics = contextKind == CheckedCastContextKind::None;
+  assert((suppressDiagnostics || diagLoc.isValid()) &&
+         "diagnostics require a valid source location");
+
   SourceRange diagFromRange;
   if (fromExpr)
     diagFromRange = fromExpr->getSourceRange();
@@ -3252,9 +3260,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   Type origFromType = fromType;
   Type origToType = toType;
-
-  // Determine whether we should suppress diagnostics.
-  bool suppressDiagnostics = (contextKind == CheckedCastContextKind::None);
 
   auto &diags = dc->getASTContext().Diags;
   bool optionalToOptionalCast = false;
