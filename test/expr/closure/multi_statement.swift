@@ -10,7 +10,7 @@ func maybeGetValue<T>(_ value: T) -> T? {
 
 func mapWithMoreStatements(ints: [Int]) {
   let _ = ints.map { i in
-    guard let actualValue = maybeGetValue(i) else {
+    guard var actualValue = maybeGetValue(i) else {
       return String(0)
     }
 
@@ -22,6 +22,11 @@ func mapWithMoreStatements(ints: [Int]) {
         print("seventeen!")
       }
     }
+
+    while actualValue < 100 {
+      actualValue += 1
+    }
+
     return String(value)
   }
 }

@@ -128,12 +128,17 @@ private:
            closure, LocatorPathElt::ClosureBody(hasReturn)));
   }
 
+  void visitWhileStmt(WhileStmt *whileStmt) {
+    if (cs.generateConstraints(whileStmt->getCond(), closure))
+      hadError = true;
+    visit(whileStmt->getBody());
+  }
+
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
@@ -333,12 +338,24 @@ private:
     return returnStmt;
   }
 
+  ASTNode visitWhileStmt(WhileStmt *whileStmt) {
+    // Rewrite the condition.
+    if (auto condition = rewriteTarget(
+            SolutionApplicationTarget(whileStmt->getCond(), closure)))
+      whileStmt->setCond(*condition->getAsStmtCondition());
+    else
+      hadError = true;
+
+    auto body = visit(whileStmt->getBody()).get<Stmt *>();
+    whileStmt->setBody(cast<BraceStmt>(body));
+    return whileStmt;
+  }
+
 #define UNSUPPORTED_STMT(STMT) ASTNode visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
