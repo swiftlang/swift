@@ -90,6 +90,15 @@ private:
     visit(doStmt->getBody());
   }
 
+  void visitIfStmt(IfStmt *ifStmt) {
+    if (cs.generateConstraints(ifStmt->getCond(), closure))
+      hadError = true;
+
+    visit(ifStmt->getThenStmt());
+    if (auto elseStmt = ifStmt->getElseStmt())
+      visit(elseStmt);
+  }
+
   void visitReturnStmt(ReturnStmt *returnStmt) {
     auto expr = returnStmt->getResult();
 
@@ -118,7 +127,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(If)
   UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(DoCatch)
@@ -224,6 +232,23 @@ private:
     return doStmt;
   }
 
+  ASTNode visitIfStmt(IfStmt *ifStmt) {
+    // Rewrite the condition.
+    if (auto condition = rewriteTarget(
+            SolutionApplicationTarget(ifStmt->getCond(), closure)))
+      ifStmt->setCond(*condition->getAsStmtCondition());
+    else
+      hadError = true;
+
+    ifStmt->setThenStmt(visit(ifStmt->getThenStmt()).get<Stmt *>());
+
+    if (auto elseStmt = ifStmt->getElseStmt()) {
+      ifStmt->setElseStmt(visit(elseStmt).get<Stmt *>());
+    }
+
+    return ifStmt;
+  }
+
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
     auto resultExpr = returnStmt->getResult();
     if (!resultExpr)
@@ -295,7 +320,6 @@ private:
   }
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
-  UNSUPPORTED_STMT(If)
   UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
   UNSUPPORTED_STMT(DoCatch)
