@@ -892,6 +892,7 @@ public:
   enum class Kind {
     empty,
     tombstone,
+    expr,
     stmtCondElement,
     stmt,
     patternBindingEntry,
@@ -903,6 +904,8 @@ private:
 
   union {
     const StmtConditionElement *stmtCondElement;
+
+    const Expr *expr;
 
     const Stmt *stmt;
 
@@ -923,6 +926,11 @@ public:
   SolutionApplicationTargetsKey(const StmtConditionElement *stmtCondElement) {
     kind = Kind::stmtCondElement;
     storage.stmtCondElement = stmtCondElement;
+  }
+
+  SolutionApplicationTargetsKey(const Expr *expr) {
+    kind = Kind::expr;
+    storage.expr = expr;
   }
 
   SolutionApplicationTargetsKey(const Stmt *stmt) {
@@ -954,6 +962,9 @@ public:
 
     case Kind::stmtCondElement:
       return lhs.storage.stmtCondElement == rhs.storage.stmtCondElement;
+
+    case Kind::expr:
+      return lhs.storage.expr == rhs.storage.expr;
 
     case Kind::stmt:
       return lhs.storage.stmt == rhs.storage.stmt;
@@ -993,6 +1004,11 @@ public:
       return hash_combine(
           DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
           DenseMapInfo<void *>::getHashValue(storage.stmt));
+
+    case Kind::expr:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.expr));
 
     case Kind::patternBindingEntry:
       return hash_combine(
