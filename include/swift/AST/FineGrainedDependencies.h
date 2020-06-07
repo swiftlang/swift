@@ -689,7 +689,7 @@ class SourceFileDepGraphNode : public DepGraphNode {
   /// True iff a Decl exists for this node.
   /// If a provides and a depends in the existing system both have the same key,
   /// only one SourceFileDepGraphNode is emitted.
-  bool isProvides;
+  bool isProvides = false;
 
   friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode,
                                             SourceFileDepGraph>;
@@ -697,7 +697,7 @@ class SourceFileDepGraphNode : public DepGraphNode {
 public:
   /// When the driver imports a node create an uninitialized instance for
   /// deserializing.
-  SourceFileDepGraphNode() : DepGraphNode(), sequenceNumber(~0) {}
+  SourceFileDepGraphNode() : DepGraphNode() {}
 
   /// Used by the frontend to build nodes.
   SourceFileDepGraphNode(DependencyKey key, Optional<StringRef> fingerprint,
