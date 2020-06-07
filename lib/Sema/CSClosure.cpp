@@ -86,6 +86,10 @@ private:
     }
   }
 
+  void visitDoStmt(DoStmt *doStmt) {
+    visit(doStmt->getBody());
+  }
+
   void visitReturnStmt(ReturnStmt *returnStmt) {
     auto expr = returnStmt->getResult();
 
@@ -117,7 +121,6 @@ private:
   UNSUPPORTED_STMT(If)
   UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
-  UNSUPPORTED_STMT(Do)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
@@ -215,6 +218,12 @@ private:
     return braceStmt;
   }
 
+  ASTNode visitDoStmt(DoStmt *doStmt) {
+    auto body = visit(doStmt->getBody()).get<Stmt *>();
+    doStmt->setBody(cast<BraceStmt>(body));
+    return doStmt;
+  }
+
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
     auto resultExpr = returnStmt->getResult();
     if (!resultExpr)
@@ -289,7 +298,6 @@ private:
   UNSUPPORTED_STMT(If)
   UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
-  UNSUPPORTED_STMT(Do)
   UNSUPPORTED_STMT(DoCatch)
   UNSUPPORTED_STMT(RepeatWhile)
   UNSUPPORTED_STMT(ForEach)
