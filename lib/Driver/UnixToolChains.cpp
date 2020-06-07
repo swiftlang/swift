@@ -168,11 +168,11 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   // Select the linker to use.
   std::string Linker;
-  if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
-    Linker = A->getValue();
-  } else if (context.OI.LTOVariant != OutputInfo::LTOKind::None) {
+  if (context.OI.LTOVariant != OutputInfo::LTOKind::None) {
     // Force to use lld for LTO
     Linker = "lld";
+  } else if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
+    Linker = A->getValue();
   } else {
     Linker = getDefaultLinker();
   }
