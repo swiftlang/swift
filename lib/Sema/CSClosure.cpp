@@ -94,6 +94,25 @@ private:
     visit(doStmt->getBody());
   }
 
+  void visitForEachStmt(ForEachStmt *forEachStmt) {
+    auto sequenceProto = TypeChecker::getProtocol(
+        closure->getASTContext(), forEachStmt->getForLoc(),
+        KnownProtocolKind::Sequence);
+    assert(sequenceProto && "Missing Sequence protocol");
+
+    // Generate constraints for the loop header. This also wires up the
+    // types for the patterns.
+    auto target = SolutionApplicationTarget::forForEachStmt(
+        forEachStmt, sequenceProto, closure, /*bindPatternVarsOneWay=*/true);
+    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      hadError = true;
+    }
+
+    cs.setSolutionApplicationTarget(forEachStmt, target);
+
+    visit(forEachStmt->getBody());
+  }
+
   void visitGuardStmt(GuardStmt *guardStmt) {
     if (cs.generateConstraints(guardStmt->getCond(), closure))
       hadError = true;
@@ -159,7 +178,6 @@ private:
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Break)
@@ -254,6 +272,19 @@ private:
     auto body = visit(doStmt->getBody()).get<Stmt *>();
     doStmt->setBody(cast<BraceStmt>(body));
     return doStmt;
+  }
+
+  ASTNode visitForEachStmt(ForEachStmt *forEachStmt) {
+    ConstraintSystem &cs = solution.getConstraintSystem();
+    auto forEachTarget =
+        rewriteTarget(*cs.getSolutionApplicationTarget(forEachStmt));
+    if (!forEachTarget)
+      hadError = true;
+
+    auto body = visit(forEachStmt->getBody()).get<Stmt *>();
+    forEachStmt->setBody(cast<BraceStmt>(body));
+
+    return forEachStmt;
   }
 
   ASTNode visitGuardStmt(GuardStmt *guardStmt) {
@@ -387,7 +418,6 @@ private:
   UNSUPPORTED_STMT(Yield)
   UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(DoCatch)
-  UNSUPPORTED_STMT(ForEach)
   UNSUPPORTED_STMT(Switch)
   UNSUPPORTED_STMT(Case)
   UNSUPPORTED_STMT(Break)

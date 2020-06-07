@@ -33,6 +33,10 @@ func mapWithMoreStatements(ints: [Int]) {
       print("still here")
     } while random(i)
 
+    for j in 0..<i where j % 2 == 0 {
+      print("even")
+    }
+
     return String(value)
   }
 }
