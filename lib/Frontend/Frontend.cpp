@@ -1000,7 +1000,7 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time, via the dense maps.
   C.NumSILOptFunctions += Module.getFunctionList().size();
-  C.NumSILOptVtables += Module.getVTableList().size();
+  C.NumSILOptVtables += Module.getVTables().size();
   C.NumSILOptWitnessTables += Module.getWitnessTableList().size();
   C.NumSILOptDefaultWitnessTables += Module.getDefaultWitnessTableList().size();
   C.NumSILOptGlobalVariables += Module.getSILGlobalList().size();
