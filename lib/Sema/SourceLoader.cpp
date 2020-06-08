@@ -120,10 +120,9 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.LoadedModules[moduleID.Item] = importMod;
 
-  auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
-                                          bufferID,
-                                          Ctx.LangOpts.CollectParsedToken,
-                                          Ctx.LangOpts.BuildSyntaxTree);
+  auto *importFile =
+      new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
+                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts));
   importMod->addFile(*importFile);
   performImportResolution(*importFile);
   importMod->setHasResolvedImports();
