@@ -1,0 +1,4 @@
+module CustomDestructor {
+  header "custom-destructors.h"
+  requires cplusplus
+}

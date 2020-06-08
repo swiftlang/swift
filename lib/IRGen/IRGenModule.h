@@ -1062,10 +1062,10 @@ public:
                               SILType objectType, const TypeInfo &objectTI,
                               const OutliningMetadataCollector &collector);
 
-private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
+private:
   using CopyAddrHelperGenerator =
     llvm::function_ref<void(IRGenFunction &IGF, Address dest, Address src,
                             SILType objectType, const TypeInfo &objectTI)>;
