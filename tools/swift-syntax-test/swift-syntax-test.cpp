@@ -609,7 +609,10 @@ int parseFile(
   Invocation.getLangOptions().ParseForSyntaxTreeOnly = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
+
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
+
   if (InputFileName.endswith(".swiftinterface"))
     Invocation.setInputKind(InputFileKind::SwiftModuleInterface);
   Invocation.setMainExecutablePath(

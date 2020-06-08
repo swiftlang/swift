@@ -105,7 +105,7 @@ public:
     /// decl.
     ///
     /// FIXME: When condition evaluation moves to a later phase, remove this
-    /// and adjust the client call 'performParseOnly'.
+    /// and the associated language option.
     DisablePoundIfEvaluation = 1 << 1,
 
     /// Whether to build a syntax tree.

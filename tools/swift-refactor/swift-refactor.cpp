@@ -268,7 +268,7 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
-      CI.performParseOnly(/*EvaluateConditionals*/true);
+      CI.performParseOnly();
       break;
     default:
       CI.performSema();

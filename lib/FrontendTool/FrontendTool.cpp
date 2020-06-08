@@ -1274,14 +1274,7 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
-    // Disable delayed parsing of type and function bodies when we've been
-    // asked to dump the resulting AST.
-    bool CanDelayBodies = Action != FrontendOptions::ActionType::DumpParse;
-    bool EvaluateConditionals =
-        Action == FrontendOptions::ActionType::EmitImportedModules
-        || Action == FrontendOptions::ActionType::ScanDependencies;
-    Instance.performParseOnly(EvaluateConditionals,
-                              CanDelayBodies);
+    Instance.performParseOnly();
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
   } else {

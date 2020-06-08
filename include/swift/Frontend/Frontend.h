@@ -616,8 +616,7 @@ public:
   void performSema();
 
   /// Parses the input file but does no type-checking or module imports.
-  void performParseOnly(bool EvaluateConditionals = false,
-                        bool CanDelayBodies = true);
+  void performParseOnly();
 
   /// Parses and performs import resolution on all input files.
   ///
@@ -633,8 +632,7 @@ public:
 private:
   SourceFile *
   createSourceFileForMainModule(SourceFileKind FileKind,
-                                Optional<unsigned> BufferID,
-                                SourceFile::ParsingOptions options = {});
+                                Optional<unsigned> BufferID);
 
 public:
   void freeASTContext();
@@ -647,8 +645,7 @@ private:
   /// Retrieve a description of which modules should be implicitly imported.
   ImplicitImportInfo getImplicitImportInfo() const;
 
-  void performSemaUpTo(SourceFile::ASTStage_t LimitStage,
-                       SourceFile::ParsingOptions POpts = {});
+  void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
 
   /// Return true if had load error
   bool loadPartialModulesAndImplicitImports();

@@ -729,20 +729,14 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   Context->LoadedModules[newMod->getName()] = newMod;
 }
 
-void CompilerInstance::performParseOnly(bool EvaluateConditionals,
-                                        bool CanDelayBodies) {
+void CompilerInstance::performParseOnly() {
   const InputFileKind Kind = Invocation.getInputKind();
   assert((Kind == InputFileKind::Swift || Kind == InputFileKind::SwiftLibrary ||
           Kind == InputFileKind::SwiftModuleInterface) &&
          "only supports parsing .swift files");
   (void)Kind;
 
-  SourceFile::ParsingOptions parsingOpts;
-  if (!EvaluateConditionals)
-    parsingOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
-  if (!CanDelayBodies)
-    parsingOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
-  performSemaUpTo(SourceFile::Unprocessed, parsingOpts);
+  performSemaUpTo(SourceFile::Unprocessed);
   assert(Context->LoadedModules.size() == 1 &&
          "Loaded a module during parse-only");
 }
@@ -755,8 +749,7 @@ void CompilerInstance::performSema() {
   performSemaUpTo(SourceFile::TypeChecked);
 }
 
-void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
-                                       SourceFile::ParsingOptions POpts) {
+void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   ModuleDecl *mainModule = getMainModule();
@@ -765,7 +758,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
   // Make sure the main file is the first file in the module, so do this now.
   if (MainBufferID != NO_SUCH_BUFFER) {
     auto *mainFile = createSourceFileForMainModule(
-        Invocation.getSourceFileKind(), MainBufferID, POpts);
+        Invocation.getSourceFileKind(), MainBufferID);
     mainFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
   }
 
@@ -789,8 +782,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
       SF = &getMainModule()->getMainSourceFile(Invocation.getSourceFileKind());
     } else {
       // Otherwise create a library file.
-      SF = createSourceFileForMainModule(SourceFileKind::Library,
-                                         BufferID, POpts);
+      SF = createSourceFileForMainModule(SourceFileKind::Library, BufferID);
     }
     // Trigger parsing of the file.
     if (LimitStage == SourceFile::Unprocessed) {
@@ -898,9 +890,27 @@ void CompilerInstance::finishTypeChecking() {
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
-    SourceFileKind fileKind, Optional<unsigned> bufferID,
-    SourceFile::ParsingOptions opts) {
+    SourceFileKind fileKind, Optional<unsigned> bufferID) {
   ModuleDecl *mainModule = getMainModule();
+
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto action = frontendOpts.RequestedAction;
+
+  auto opts = SourceFile::getDefaultParsingOptions(getASTContext().LangOpts);
+  if (FrontendOptions::shouldActionOnlyParse(action)) {
+    // Generally in a parse-only invocation, we want to disable #if evaluation.
+    // However, there are a couple of modes where we need to know which clauses
+    // are active.
+    if (action != FrontendOptions::ActionType::EmitImportedModules &&
+        action != FrontendOptions::ActionType::ScanDependencies) {
+      opts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
+    }
+
+    // If we need to dump the parse tree, disable delayed bodies as we want to
+    // show everything.
+    if (action == FrontendOptions::ActionType::DumpParse)
+      opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+  }
 
   auto isPrimary = bufferID && isPrimaryInput(*bufferID);
   if (isPrimary || isWholeModuleCompilation()) {
@@ -917,7 +927,6 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   if (isPrimary) {
     opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
-  opts |= SourceFile::getDefaultParsingOptions(getASTContext().LangOpts);
 
   auto *inputFile = new (*Context)
       SourceFile(*mainModule, fileKind, bufferID, opts, isPrimary);

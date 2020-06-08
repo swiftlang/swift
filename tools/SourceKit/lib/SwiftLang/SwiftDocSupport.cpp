@@ -808,6 +808,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::Swift);
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
@@ -1406,7 +1407,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation set up failed";
     return nullptr;
   }
-  ParseCI.performParseOnly(/*EvaluateConditionals*/true);
+  ParseCI.performParseOnly();
 
   SourceFile *SF = nullptr;
   unsigned BufferID = ParseCI.getInputBufferIDs().back();
