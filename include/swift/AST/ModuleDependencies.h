@@ -29,6 +29,8 @@ namespace swift {
 
 class ClangModuleDependenciesCacheImpl;
 class SourceFile;
+class ASTContext;
+class Identifier;
 
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependenciesKind : int8_t {
@@ -246,6 +248,11 @@ public:
   /// Add (Clang) module on which the bridging header depends.
   void addBridgingModuleDependency(StringRef module,
                                    llvm::StringSet<> &alreadyAddedModules);
+
+  /// Collect a map from a secondary module name to a list of cross-import
+  /// overlays, when this current module serves as the primary module.
+  llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
+  collectCrossImportOverlayNames(ASTContext &ctx, StringRef moduleName);
 };
 
 using ModuleDependencyID = std::pair<std::string, ModuleDependenciesKind>;

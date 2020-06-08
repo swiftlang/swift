@@ -1520,6 +1520,7 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
 namespace swift {
 /// Represents a file containing information about cross-module overlays.
 class OverlayFile {
+  friend class ModuleDecl;
   /// The file that data should be loaded from.
   StringRef filePath;
 
@@ -1536,7 +1537,10 @@ class OverlayFile {
   ///          before returning.
   bool loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
                               Identifier bystandingModule);
-
+  bool loadOverlayModuleNames(ASTContext &ctx,
+                              StringRef module,
+                              StringRef bystandingModule,
+                              SourceLoc diagLoc);
 public:
   // Only allocate in ASTContexts.
   void *operator new(size_t bytes) = delete;
@@ -1575,6 +1579,21 @@ void ModuleDecl::addCrossImportOverlayFile(StringRef file) {
   Identifier secondaryModule = ctx.getIdentifier(llvm::sys::path::stem(file));
   declaredCrossImports[secondaryModule]
       .push_back(new (ctx) OverlayFile(ctx.AllocateCopy(file)));
+}
+
+llvm::SmallSetVector<Identifier, 4>
+ModuleDecl::collectCrossImportOverlay(ASTContext &ctx,
+                                      StringRef file,
+                                      StringRef moduleName,
+                                      StringRef &bystandingModule) {
+  OverlayFile ovFile(file);
+  bystandingModule = llvm::sys::path::stem(file);
+  ovFile.loadOverlayModuleNames(ctx, moduleName, bystandingModule, SourceLoc());
+  llvm::SmallSetVector<Identifier, 4> result;
+  for (auto Id: ovFile.overlayModuleNames) {
+    result.insert(Id);
+  }
+  return result;
 }
 
 bool ModuleDecl::mightDeclareCrossImportOverlays() const {
@@ -1803,15 +1822,15 @@ OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
 }
 
 bool
-OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
-                                    Identifier bystanderName) {
-  auto &ctx = M->getASTContext();
+OverlayFile::loadOverlayModuleNames(ASTContext &ctx, StringRef module,
+                                    StringRef bystanderName,
+                                    SourceLoc diagLoc) {
   llvm::vfs::FileSystem &fs = *ctx.SourceMgr.getFileSystem();
 
   auto bufOrError = fs.getBufferForFile(filePath);
   if (!bufOrError) {
     ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
-                       M->getName(), bystanderName,
+                       module, bystanderName,
                        bufOrError.getError().message(), filePath);
     return false;
   }
@@ -1825,7 +1844,7 @@ OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
 
     for (auto message : errorMessages)
       ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
-                         M->getName(), bystanderName, message, filePath);
+                         module, bystanderName, message, filePath);
     return false;
   }
 
@@ -1837,6 +1856,15 @@ OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
   }
 
   return true;
+}
+
+bool
+OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
+                                    Identifier bystanderName) {
+  return loadOverlayModuleNames(M->getASTContext(),
+                                M->getName().str(),
+                                bystanderName.str(),
+                                diagLoc);
 }
 
 //===----------------------------------------------------------------------===//
