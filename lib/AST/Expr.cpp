@@ -831,15 +831,16 @@ APInt BuiltinIntegerWidth::parse(StringRef text, unsigned radix, bool negate,
 static APFloat getFloatLiteralValue(bool IsNegative, StringRef Text,
                                     const llvm::fltSemantics &Semantics) {
   APFloat Val(Semantics);
-  auto Res =
-    Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
-  assert(Res && "Sema didn't reject invalid number");
-  consumeError(Res.takeError());
+  llvm::Expected<APFloat::opStatus> MaybeRes =
+      Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
+  assert(MaybeRes && *MaybeRes != APFloat::opInvalidOp &&
+         "Sema didn't reject invalid number");
+  (void)MaybeRes;
   if (IsNegative) {
     auto NegVal = APFloat::getZero(Semantics, /*negative*/ true);
-    Res = NegVal.subtract(Val, llvm::APFloat::rmNearestTiesToEven);
-    assert(Res && "Sema didn't reject invalid number");
-    consumeError(Res.takeError());
+    auto Res = NegVal.subtract(Val, llvm::APFloat::rmNearestTiesToEven);
+    assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
+    (void)Res;
     return NegVal;
   }
   return Val;

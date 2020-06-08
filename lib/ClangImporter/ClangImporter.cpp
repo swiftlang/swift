@@ -3309,7 +3309,7 @@ StringRef ClangModuleUnit::getModuleDefiningPath() const {
   return clangSourceMgr.getFilename(clangModule->DefinitionLoc);
 }
 
-Optional<clang::ASTSourceDescriptor>
+Optional<clang::ExternalASTSource::ASTSourceDescriptor>
 ClangModuleUnit::getASTSourceDescriptor() const {
   if (clangModule) {
     assert(ASTSourceDescriptor.getModuleOrNull() == clangModule);

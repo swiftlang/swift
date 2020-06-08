@@ -110,7 +110,6 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/IR/CFG.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Analysis/CFG.h"

@@ -22,7 +22,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 
 #include "clang/AST/Decl.h"
-#include "clang/Basic/Module.h"
 
 #include "llvm/Support/raw_ostream.h"
 

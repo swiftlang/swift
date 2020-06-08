@@ -575,7 +575,7 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 
   // Emit the dynamic alloca.
   auto *alloca = Builder.IRBuilderBase::CreateAlloca(eltTy, arraySize, name);
-  alloca->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
+  alloca->setAlignment(llvm::MaybeAlign(align.getValue()));
 
   assert(!isInEntryBlock ||
          getActiveDominancePoint().isUniversal() &&

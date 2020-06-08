@@ -3,7 +3,6 @@
 
 // SR-12194
 // XFAIL: OS=linux-android, CPU=aarch64
-// UNSUPPORTED: OS=linux-gnu
 
 // RUN: %target-swift-frontend %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu -check-prefix=%target-cpu-%target-sdk-name %s
 

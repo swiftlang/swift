@@ -98,8 +98,8 @@ class ParsedRawSyntaxNode {
     assert(DeferredToken.NumTrailingTrivia == numTrailingTrivia &&
            "numLeadingTrivia is too large value!");
   }
-  ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) = delete;
-  ParsedRawSyntaxNode &operator=(const ParsedRawSyntaxNode &other) = delete;
+  ParsedRawSyntaxNode(ParsedRawSyntaxNode &other) = delete;
+  ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &other) = delete;
 
 public:
   ParsedRawSyntaxNode()

@@ -76,7 +76,7 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     platform = getPlatformNameForTriple(LangOpts.Target);
   }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
-  FrontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPath.str());
+  FrontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,

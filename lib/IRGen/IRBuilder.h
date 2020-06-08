@@ -125,7 +125,7 @@ public:
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
     llvm::LoadInst *load = IRBuilderBase::CreateLoad(addr, name);
-    load->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
+    load->setAlignment(llvm::MaybeAlign(align.getValue()));
     return load;
   }
   llvm::LoadInst *CreateLoad(Address addr, const llvm::Twine &name = "") {
@@ -135,7 +135,7 @@ public:
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr,
                                Alignment align) {
     llvm::StoreInst *store = IRBuilderBase::CreateStore(value, addr);
-    store->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
+    store->setAlignment(llvm::MaybeAlign(align.getValue()));
     return store;
   }
   llvm::StoreInst *CreateStore(llvm::Value *value, Address addr) {

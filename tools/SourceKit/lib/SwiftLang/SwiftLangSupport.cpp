@@ -270,7 +270,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
-  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath().str();
+  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath();
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();

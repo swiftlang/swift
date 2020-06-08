@@ -81,7 +81,7 @@ const clang::Decl *
 importer::getFirstNonLocalDecl(const clang::Decl *D) {
   D = D->getCanonicalDecl();
   auto iter = llvm::find_if(D->redecls(), [](const clang::Decl *next) -> bool {
-    return !next->isInLocalScope();
+    return !next->isLexicallyWithinFunctionOrMethod();
   });
   if (iter == D->redecls_end())
     return nullptr;
@@ -344,7 +344,6 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::ARCUnbridgedCast:
     case clang::BuiltinType::BoundMember:
     case clang::BuiltinType::BuiltinFn:
-    case clang::BuiltinType::IncompleteMatrixIdx:
     case clang::BuiltinType::Overload:
     case clang::BuiltinType::PseudoObject:
     case clang::BuiltinType::UnknownAny:
@@ -377,7 +376,6 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::SatULongFract:
     case clang::BuiltinType::Half:
     case clang::BuiltinType::LongDouble:
-    case clang::BuiltinType::BFloat16:
     case clang::BuiltinType::Float16:
     case clang::BuiltinType::Float128:
     case clang::BuiltinType::NullPtr:
@@ -448,8 +446,6 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
 
     // OpenMP types that don't have Swift equivalents.
     case clang::BuiltinType::OMPArraySection:
-    case clang::BuiltinType::OMPArrayShaping:
-    case clang::BuiltinType::OMPIterator:
       return OmissionTypeName();
 
     // SVE builtin types that don't have Swift equivalents.

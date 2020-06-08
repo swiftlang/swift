@@ -688,11 +688,9 @@ struct DenseMapInfo<swift::SourceFile::ImportedModuleDesc> {
                               StringRefDMI::getTombstoneKey());
   }
   static inline unsigned getHashValue(const ImportedModuleDesc &import) {
-    return detail::combineHashValue(
-        ImportedModuleDMI::getHashValue(import.module),
-        detail::combineHashValue(
-            ImportOptionsDMI::getHashValue(import.importOptions),
-            StringRefDMI::getHashValue(import.filename)));
+    return combineHashValue(ImportedModuleDMI::getHashValue(import.module),
+           combineHashValue(ImportOptionsDMI::getHashValue(import.importOptions),
+                            StringRefDMI::getHashValue(import.filename)));
   }
   static bool isEqual(const ImportedModuleDesc &a,
                       const ImportedModuleDesc &b) {

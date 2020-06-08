@@ -16,7 +16,6 @@
 #include "TypeInfo.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/Support/Debug.h"
 
 namespace swift {
 namespace irgen {

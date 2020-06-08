@@ -85,8 +85,7 @@ llvm::Constant *irgen::emitConstantZero(IRGenModule &IGM, BuiltinInst *BI) {
 
   if (auto vector = BI->getType().getAs<BuiltinVectorType>()) {
     auto zero = helper(vector.getElementType());
-    return llvm::ConstantVector::getSplat(
-        llvm::ElementCount(vector->getNumElements(), /*scalable*/ false), zero);
+    return llvm::ConstantVector::getSplat(vector->getNumElements(), zero);
   }
 
   return helper(BI->getType().getASTType());

@@ -19,7 +19,6 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/Support/PointerLikeTypeTraits.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include <type_traits>

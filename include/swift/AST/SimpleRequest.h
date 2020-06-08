@@ -24,7 +24,6 @@
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Error.h"
 #include <tuple>
 #include <type_traits>
 

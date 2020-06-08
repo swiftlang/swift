@@ -19,7 +19,6 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ExternalASTSource.h"
-#include "clang/Basic/Module.h"
 
 namespace clang {
   class ASTContext;
@@ -38,7 +37,7 @@ class ClangModuleUnit final : public LoadedFile {
   llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
   mutable Optional<ArrayRef<ModuleDecl::ImportedModule>> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
-  clang::ASTSourceDescriptor ASTSourceDescriptor;
+  clang::ExternalASTSource::ASTSourceDescriptor ASTSourceDescriptor;
 
 public:
   /// True if the given Module contains an imported Clang module unit.
@@ -116,7 +115,8 @@ public:
 
   /// Returns the ASTSourceDescriptor of the associated Clang module if one
   /// exists.
-  Optional<clang::ASTSourceDescriptor> getASTSourceDescriptor() const;
+  Optional<clang::ExternalASTSource::ASTSourceDescriptor>
+  getASTSourceDescriptor() const;
 
   virtual StringRef getModuleDefiningPath() const override;
 
