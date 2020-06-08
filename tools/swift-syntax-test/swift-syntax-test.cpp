@@ -609,7 +609,10 @@ int parseFile(
   Invocation.getLangOptions().ParseForSyntaxTreeOnly = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
+
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
+
   if (InputFileName.endswith(".swiftinterface"))
     Invocation.setInputKind(InputFileKind::SwiftModuleInterface);
   Invocation.setMainExecutablePath(
@@ -633,9 +636,6 @@ int parseFile(
   assert(BufferIDs.size() == 1 && "Only expecting to process one source file");
   unsigned BufferID = BufferIDs.front();
 
-  // Parse the actual source file
-  Instance.performParseOnly();
-
   SourceFile *SF = nullptr;
   for (auto Unit : Instance.getMainModule()->getFiles()) {
     SF = dyn_cast<SourceFile>(Unit);
@@ -644,6 +644,9 @@ int parseFile(
     }
   }
   assert(SF && "No source file");
+
+  // Force parsing to populate the syntax cache.
+  (void)SF->getSyntaxRoot();
 
   // In case the action specific callback succeeds, we output this error code
   int InternalExitCode = EXIT_SUCCESS;
