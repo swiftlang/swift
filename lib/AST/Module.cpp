@@ -1088,12 +1088,8 @@ void SourceFile::getInterfaceHash(llvm::SmallString<32> &str) const {
   llvm::MD5::stringifyResult(result, str);
 }
 
-bool SourceFile::hasSyntaxRoot() const {
-  return ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
-}
-
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
-  assert(hasSyntaxRoot() && "has no syntax root");
+  assert(shouldBuildSyntaxTree() && "Syntax tree disabled");
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<SourceFile *>(this);
   return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})

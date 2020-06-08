@@ -582,7 +582,6 @@ public:
   bool hasDelayedBodyParsing() const;
 
   syntax::SourceFileSyntax getSyntaxRoot() const;
-  bool hasSyntaxRoot() const;
 
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
 
