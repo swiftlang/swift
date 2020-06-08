@@ -223,9 +223,12 @@ struct DynamicTupled3 {
   }
 }
 
-extension DynamicTupled3: Tupled {
+extension DynamicTupled3: OtherTupled {
   @_dynamicReplacement(for: dynamicTuple)
-  var tuple: some Any {
+  var tuple: some Any { // expected-error{{ambiguous function builder inferred for 'tuple': 'OtherTupleBuilder' or 'TupleBuilder'}}
+    // expected-note@-1{{add an explicit 'return' statement to not use a function builder}}
+    // expected-note@-2{{apply function builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}
+    // expected-note@-3{{apply function builder 'TupleBuilder' (inferred from dynamic replacement of 'dynamicTuple')}}
     0
   }
 }
