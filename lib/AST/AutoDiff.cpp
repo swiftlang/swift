@@ -372,25 +372,6 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
   return operationName.empty();
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-// Not-yet-upstreamed `tensorflow` branch additions are below.
-
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
-#include "swift/SIL/SILLinkage.h"
-#include "llvm/ADT/StringSwitch.h"
-
-using namespace swift;
-
-bool SILAutoDiffIndices::operator==(const SILAutoDiffIndices &other) const {
-  return source == other.source && parameters == other.parameters;
-}
-
-void AutoDiffConfig::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
-
 Type TangentSpace::getType() const {
   switch (kind) {
   case Kind::TangentVector:

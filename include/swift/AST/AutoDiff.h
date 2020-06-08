@@ -35,8 +35,6 @@ class AnyFunctionType;
 class SourceFile;
 class SILFunctionType;
 class TupleType;
-struct SILAutoDiffIndices;
-class SILFunctionType;
 
 /// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
@@ -526,7 +524,7 @@ IndexSubset *getLoweredParameterIndices(IndexSubset *astParameterIndices,
 /// - Differentiability/linearity parameter indices.
 /// - A possibly "unconstrained" derivative/transpose generic signature.
 GenericSignature getConstrainedDerivativeGenericSignature(
-    SILFunctionType *originalFnTy, IndexSubset *parameterIndices,
+    SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose = false);
 
@@ -686,125 +684,5 @@ template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
 };
 
 } // end namespace llvm
-
-// SWIFT_ENABLE_TENSORFLOW
-// Not-yet-upstreamed `tensorflow` branch additions are below.
-#include "swift/AST/GenericSignature.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/IndexSubset.h"
-#include "swift/AST/Type.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/raw_ostream.h"
-
-namespace swift {
-
-class ASTContext;
-class AnyFunctionType;
-typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
-enum class SILLinkage : uint8_t;
-
-/// The key type used for uniquing `SILDifferentiabilityWitness` in
-/// `SILModule`: original function name, parameter indices, result indices, and
-/// derivative generic signature.
-using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
-
-/// Automatic differentiation utility namespace.
-namespace autodiff {
-
-/// Returns an index subset for the SIL function parameters corresponding to the
-/// parameters in this subset. In particular, this explodes tuples. For example,
-///
-///   functionType = (A, B, C) -> R
-///   if "A" and "C" are in the set,
-///   ==> returns 101
-///   (because the lowered SIL type is (A, B, C) -> R)
-///
-///   functionType = (Self) -> (A, B, C) -> R
-///   if "Self" and "C" are in the set,
-///   ==> returns 0011
-///   (because the lowered SIL type is (A, B, C, Self) -> R)
-///
-///   functionType = (A, (B, C), D) -> R
-///   if "A" and "(B, C)" are in the set,
-///   ==> returns 1110
-///   (because the lowered SIL type is (A, B, C, D) -> R)
-///
-/// Note:
-/// - The function must not be curried unless it's a method. Otherwise, the
-///   behavior is undefined.
-/// - For methods, whether the self parameter is set is represented by the
-///   inclusion of the `0` index in `indices`.
-IndexSubset *getLoweredParameterIndices(IndexSubset *indices,
-                                        AnyFunctionType *type);
-
-/// Retrieve config from the function name of a variant of
-/// `Builtin.applyDerivative`, e.g. `Builtin.applyDerivative_jvp_arity2`.
-/// Returns true if the function name is parsed successfully.
-bool getBuiltinApplyDerivativeConfig(
-    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
-    unsigned &arity, bool &rethrows);
-
-/// Retrieve config from the function name of a variant of
-/// `Builtin.applyTranspose`, e.g. `Builtin.applyTranspose_arity2`.
-/// Returns true if the function name is parsed successfully.
-bool getBuiltinApplyTransposeConfig(
-  StringRef operationName, unsigned &arity, bool &rethrows);
-
-/// Retrieve config from the function name of a variant of
-/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
-/// `Builtin.differentiableFunction_arity1_throws`.
-/// Returns true if the function name is parsed successfully.
-bool getBuiltinDifferentiableOrLinearFunctionConfig(
-    StringRef operationName, unsigned &arity, bool &throws);
-
-/// Retrieve config from the function name of a variant of
-/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
-/// `Builtin.differentiableFunction_arity1_throws`.
-/// Returns true if the function name is parsed successfully.
-bool getBuiltinDifferentiableOrLinearFunctionConfig(
-    StringRef operationName, unsigned &arity, bool &throws);
-
-} // end namespace autodiff
-
-class BuiltinFloatType;
-class NominalOrBoundGenericNominalType;
-
-} // end namespace swift
-
-namespace llvm {
-
-using swift::SILAutoDiffIndices;
-
-template <> struct DenseMapInfo<SILAutoDiffIndices> {
-  static SILAutoDiffIndices getEmptyKey() {
-    return { DenseMapInfo<unsigned>::getEmptyKey(), nullptr };
-  }
-
-  static SILAutoDiffIndices getTombstoneKey() {
-    return { DenseMapInfo<unsigned>::getTombstoneKey(), nullptr };
-  }
-
-  static unsigned getHashValue(const SILAutoDiffIndices &Val) {
-    unsigned combinedHash =
-      hash_combine(~1U, DenseMapInfo<unsigned>::getHashValue(Val.source),
-                   hash_combine_range(Val.parameters->begin(),
-                                      Val.parameters->end()));
-    return combinedHash;
-  }
-
-  static bool isEqual(const SILAutoDiffIndices &LHS,
-                      const SILAutoDiffIndices &RHS) {
-    return LHS == RHS;
-  }
-};
-
-} // namespace llvm
-// SWIFT_ENABLE_TENSORFLOW END
 
 #endif // SWIFT_AST_AUTODIFF_H
