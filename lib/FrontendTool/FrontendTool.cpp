@@ -1226,9 +1226,20 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 /// before or after LLVM depending on when the ASTContext gets freed.
 static void performEndOfPipelineActions(CompilerInstance &Instance) {
   assert(Instance.hasASTContext());
+  auto &ctx = Instance.getASTContext();
+
+  // Make sure we didn't load a module during a parse-only invocation, unless
+  // it's -emit-imported-modules, which can load modules.
+  auto action = Instance.getInvocation().getFrontendOptions().RequestedAction;
+  if (FrontendOptions::shouldActionOnlyParse(action) &&
+      action != FrontendOptions::ActionType::EmitImportedModules) {
+    assert(ctx.LoadedModules.size() == 1 &&
+           "Loaded a module during parse-only");
+    assert(ctx.LoadedModules.front().second == Instance.getMainModule());
+  }
 
   // Verify the AST for all the modules we've loaded.
-  Instance.getASTContext().verifyAllLoadedModules();
+  ctx.verifyAllLoadedModules();
 
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
@@ -1272,6 +1283,13 @@ static bool performCompile(CompilerInstance &Instance,
     if (Instance.loadStdlibIfNeeded())
       return true;
   }
+
+  SWIFT_DEFER {
+    // We might have freed the ASTContext already, but in that case we would
+    // have already performed these actions.
+    if (Instance.hasASTContext())
+      performEndOfPipelineActions(Instance);
+  };
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
     Instance.performParseOnly();
@@ -1329,13 +1347,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
-
-  SWIFT_DEFER {
-    // We might have freed the ASTContext already, but in that case we would
-    // have already performed these actions.
-    if (Instance.hasASTContext())
-      performEndOfPipelineActions(Instance);
-  };
 
   if (Context.hadError())
     return true;

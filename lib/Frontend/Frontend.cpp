@@ -784,8 +784,6 @@ void CompilerInstance::performParseOnly() {
   (void)Kind;
 
   performSemaUpTo(SourceFile::Unprocessed);
-  assert(Context->LoadedModules.size() == 1 &&
-         "Loaded a module during parse-only");
 }
 
 void CompilerInstance::performParseAndResolveImportsOnly() {
