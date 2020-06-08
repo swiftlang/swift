@@ -652,8 +652,6 @@ private:
   /// Retrieve a description of which modules should be implicitly imported.
   ImplicitImportInfo getImplicitImportInfo() const;
 
-  void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
-
   /// For any serialized AST inputs, loads them in as partial module files,
   /// appending them to \p partialModules. If a loading error occurs, returns
   /// \c true.

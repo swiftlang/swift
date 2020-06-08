@@ -777,34 +777,14 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
 }
 
 void CompilerInstance::performParseAndResolveImportsOnly() {
-  performSemaUpTo(SourceFile::ImportsResolved);
-}
+  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
 
-void CompilerInstance::performSema() {
-  performSemaUpTo(SourceFile::TypeChecked);
-}
-
-void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
-  FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
-
-  ModuleDecl *mainModule = getMainModule();
-
-  // Then parse all the input files.
+  // Resolve imports for all the source files.
+  auto *mainModule = getMainModule();
   for (auto *file : mainModule->getFiles()) {
-    auto *SF = dyn_cast<SourceFile>(file);
-    if (!SF)
-      continue;
-
-    // Trigger parsing of the file.
-    if (LimitStage == SourceFile::Unprocessed) {
-      (void)SF->getTopLevelDecls();
-    } else {
+    if (auto *SF = dyn_cast<SourceFile>(file))
       performImportResolution(*SF);
-    }
   }
-
-  if (LimitStage == SourceFile::Unprocessed)
-    return;
 
   assert(llvm::all_of(mainModule->getFiles(), [](const FileUnit *File) -> bool {
     auto *SF = dyn_cast<SourceFile>(File);
@@ -815,10 +795,12 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   mainModule->setHasResolvedImports();
 
   bindExtensions(*mainModule);
+}
 
-  // If the limiting AST stage is import resolution, we're done.
-  if (LimitStage == SourceFile::ImportsResolved)
-    return;
+void CompilerInstance::performSema() {
+  performParseAndResolveImportsOnly();
+
+  FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
