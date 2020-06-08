@@ -2693,6 +2693,10 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                            initializer);
     pbd->setInit(0, initializer);
     pbd->setInitializerChecked(0);
+
+    if (var->getOpaqueResultTypeDecl()) {
+      var->diagnose(diag::opaque_type_var_no_underlying_type);
+    }
   }
 
   // If there is a projection property (projectedValue) in the wrapper,
