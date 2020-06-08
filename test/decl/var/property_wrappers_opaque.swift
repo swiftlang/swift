@@ -22,3 +22,6 @@ struct FB7699647 {
   @WrapperWithDefaultInit() var otherProperty: some P // expected-error{{property declares an opaque return type, but cannot infer the underlying type from its initializer expression}}
 }
 
+struct FB7699647b {
+  @WrapperWithDefaultInit var property: some P // expected-error{{property declares an opaque return type, but cannot infer the underlying type from its initializer expression}}
+}
