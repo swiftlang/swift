@@ -2233,6 +2233,8 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
 SourceFile::ParsingOptions
 SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
   ParsingOptions opts;
+  if (langOpts.DisablePoundIfEvaluation)
+    opts |= ParsingFlags::DisablePoundIfEvaluation;
   if (langOpts.BuildSyntaxTree)
     opts |= ParsingFlags::BuildSyntaxTree;
   if (langOpts.CollectParsedToken)
