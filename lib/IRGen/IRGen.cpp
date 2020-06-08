@@ -550,14 +550,9 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   case IRGenOutputKind::LLVMAssembly:
     EmitPasses.add(createPrintModulePass(*RawOS));
     break;
-  case IRGenOutputKind::LLVMBitcode: {
-    if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-      EmitPasses.add(createWriteThinLTOBitcodePass(*RawOS));
-    } else {
-      EmitPasses.add(createBitcodeWriterPass(*RawOS));
-    }
+  case IRGenOutputKind::LLVMBitcode:
+    EmitPasses.add(createBitcodeWriterPass(*RawOS));
     break;
-  }
   case IRGenOutputKind::NativeAssembly:
   case IRGenOutputKind::ObjectFile: {
     CodeGenFileType FileType;

@@ -29,3 +29,12 @@ class LibDispatch(product.Product):
         The name of the source code directory of this product.
         """
         return "swift-corelibs-libdispatch"
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB]

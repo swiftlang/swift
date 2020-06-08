@@ -21,3 +21,8 @@ class CMark(product.Product):
         Whether this product is produced by build-script-impl.
         """
         return True
+
+    # This is the root of the build-graph, so it doesn't have any dependencies.
+    @classmethod
+    def get_dependencies(cls):
+        return []

@@ -453,20 +453,16 @@ function(add_swift_host_library name)
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    set_target_properties(${name}
-      PROPERTIES
+    set_target_properties(${name} PROPERTIES
       INSTALL_NAME_DIR "@rpath")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
-    set_target_properties(${name}
-      PROPERTIES
+    set_target_properties(${name} PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL CYGWIN)
-    set_target_properties(${name}
-      PROPERTIES
+    set_target_properties(${name} PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
-    set_target_properties(${name}
-      PROPERTIES
+    set_target_properties(${name} PROPERTIES
       INSTALL_RPATH "$ORIGIN")
   endif()
 

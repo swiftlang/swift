@@ -65,3 +65,7 @@ class LLVM(product.Product):
                 'CLANG_REPOSITORY_STRING',
                 "clang-{}".format(self.args.clang_compiler_version))
         return result
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark]

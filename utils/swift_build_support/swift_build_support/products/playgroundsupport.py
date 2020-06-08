@@ -110,3 +110,17 @@ class PlaygroundSupport(product.Product):
                 "TOOLCHAIN_INSTALL_DIR={}".format(toolchain_prefix),
                 "BUILD_PLAYGROUND_LOGGER_TESTS=NO",
             ])
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB,
+                product.LibDispatch,
+                product.Foundation,
+                product.XCTest,
+                product.LLBuild,
+                product.SwiftPM]

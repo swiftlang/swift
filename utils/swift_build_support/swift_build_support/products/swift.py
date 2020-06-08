@@ -129,3 +129,10 @@ updated without updating swift.py?")
     def _enable_experimental_differentiable_programming(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL',
                  self.args.enable_experimental_differentiable_programming)]
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU]
