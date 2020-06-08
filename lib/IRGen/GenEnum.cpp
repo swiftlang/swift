@@ -260,13 +260,21 @@ static void emitResilientTagIndex(IRGenModule &IGM,
     IGM.getAddrOfEnumCase(Case, ForDefinition).getAddress());
   global->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
 
+  auto oldLinkEntity = LinkEntity::forEnumCaseCompatibility(Case);
+  auto newLinkEntity = LinkEntity::forEnumCase(Case);
+
+  // If the old and new manglings are the same, then we don't need to
+  // emit an alias.
+  if (oldLinkEntity.mangleAsString() == newLinkEntity.mangleAsString())
+    return;
+
   // Emit an alias for compatibility reasons.
   auto *globalCompat = cast<llvm::GlobalVariable>(
       IGM.getAddrOfEnumCase(Case, ForDefinition, /*forCaseCompatibility*/ true)
           .getAddress());
   globalCompat->setInitializer(
       llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
-  IGM.defineAlias(LinkEntity::forEnumCase(Case), globalCompat);
+  IGM.defineAlias(newLinkEntity, globalCompat);
 }
 
 void
