@@ -2190,6 +2190,30 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   return cast<TypeDecl>(getDecl(*iter));
 }
 
+std::unique_ptr<llvm::MemoryBuffer>
+ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
+                          std::string &Name) {
+  // Open the module file
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto moduleBuf = fs.getBufferForFile(modulePath);
+  if (!moduleBuf)
+    return nullptr;
+
+  // Load the module file without validation.
+  std::unique_ptr<ModuleFile> loadedModuleFile;
+  ExtendedValidationInfo ExtInfo;
+  bool isFramework = false;
+  serialization::ValidationInfo loadInfo =
+     ModuleFile::load(modulePath.str(),
+                      std::move(moduleBuf.get()),
+                      nullptr,
+                      nullptr,
+                      /*isFramework*/isFramework, loadedModuleFile,
+                      &ExtInfo);
+  Name = loadedModuleFile->Name;
+  return std::move(loadedModuleFile->ModuleInputBuffer);
+}
+
 OpaqueTypeDecl *ModuleFile::lookupOpaqueResultType(StringRef MangledName) {
   PrettyStackTraceModuleFile stackEntry(*this);
 

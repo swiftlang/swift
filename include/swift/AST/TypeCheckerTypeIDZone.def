@@ -36,6 +36,8 @@ SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CodeCompletionFileRequest,
+              SourceFile *(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
               bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
               NoLocationInfo)
@@ -151,6 +153,8 @@ SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
 SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
               const PatternBindingEntry *(PatternBindingDecl *, unsigned),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
+              ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
               PropertyWrapperBackingPropertyInfo(VarDecl *), Cached,
               NoLocationInfo)
@@ -196,9 +200,11 @@ SWIFT_REQUEST(TypeChecker, SuperclassTypeRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
               AccessorDecl *(AbstractStorageDecl *, AccessorKind),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyUntilRequest,
+SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
+              bool(AbstractFunctionDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyAtLocRequest,
               bool(AbstractFunctionDecl *, SourceLoc),
-              Cached, NoLocationInfo)
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),

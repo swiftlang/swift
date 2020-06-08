@@ -65,7 +65,7 @@ GenericSignatureImpl::GenericSignatureImpl(
       count = 0;
     }
     assert(param->getIndex() == count && "Generic parameter index mismatch");
-    count++;
+    ++count;
   }
 #endif
 
@@ -76,18 +76,22 @@ GenericSignatureImpl::GenericSignatureImpl(
 
 TypeArrayView<GenericTypeParamType>
 GenericSignatureImpl::getInnermostGenericParams() const {
-  auto params = getGenericParams();
+  const auto params = getGenericParams();
 
-  // Find the point at which the depth changes.
-  unsigned depth = params.back()->getDepth();
-  for (unsigned n = params.size(); n > 0; --n) {
-    if (params[n-1]->getDepth() != depth) {
-      return params.slice(n);
-    }
+  const unsigned maxDepth = params.back()->getDepth();
+  if (params.front()->getDepth() == maxDepth)
+    return params;
+
+  // There is a depth change. Count the number of elements
+  // to slice off the front.
+  unsigned sliceCount = params.size() - 1;
+  while (true) {
+    if (params[sliceCount - 1]->getDepth() != maxDepth)
+      break;
+    --sliceCount;
   }
 
-  // All parameters are at the same depth.
-  return params;
+  return params.slice(sliceCount);
 }
 
 void GenericSignatureImpl::forEachParam(

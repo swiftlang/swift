@@ -44,3 +44,17 @@ class SourceKitLSP(product.Product):
     def install(self, host_target):
         indexstoredb.run_build_script_helper(
             'install', host_target, self, self.args)
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB,
+                product.LibDispatch,
+                product.Foundation,
+                product.XCTest,
+                product.LLBuild,
+                product.SwiftPM]

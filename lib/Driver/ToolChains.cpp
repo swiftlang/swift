@@ -25,6 +25,7 @@
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -288,8 +289,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     if (!OptArg || OptArg->getOption().matches(options::OPT_Onone))
       arguments.push_back("-enable-anonymous-context-mangled-names");
   }
-
-  inputArgs.AddLastArg(arguments, options::OPT_disable_leaf_frame_pointer_elim);
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);

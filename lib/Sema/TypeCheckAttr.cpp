@@ -3868,7 +3868,7 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   Type selfType;
   if (isCurried && wrtSelf) {
     selfType = transposeResultTypes.front().getType();
-    transposeResultTypesIndex++;
+    ++transposeResultTypesIndex;
   } else if (isCurried) {
     selfType = transposeFnType->getParams().front().getPlainType();
   }

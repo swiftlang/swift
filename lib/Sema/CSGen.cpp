@@ -28,6 +28,7 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include <utility>
@@ -669,7 +670,7 @@ namespace {
       assert(!AFD->hasImplicitSelfDecl());
       for (auto param : *AFD->getParameters()) {
         if (!param->isDefaultArgument())
-          nNoDefault++;
+          ++nNoDefault;
       }
     } else {
       nNoDefault = nOperands;
@@ -2247,7 +2248,8 @@ namespace {
           // as potential hole right away.
           resultTy = CS.createTypeVariable(
               resultLoc,
-              closure->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
+              shouldTypeCheckInEnclosingExpression(closure)
+                ? 0 : TVO_CanBindToHole);
         }
       }
 
@@ -2543,7 +2545,17 @@ namespace {
             ConstraintKind::CheckedCast, subPatternType, castType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
-        return setType(subPatternType);
+        // Allow `is` pattern to infer type from context which is then going
+        // to be propaged down to its sub-pattern via conversion. This enables
+        // correct handling of patterns like `_ as Foo` where `_` would
+        // get a type of `Foo` but `is` pattern enclosing it could still be
+        // inferred from enclosing context.
+        auto isType = CS.createTypeVariable(CS.getConstraintLocator(pattern),
+                                            TVO_CanBindToNoEscape);
+        CS.addConstraint(
+            ConstraintKind::Conversion, subPatternType, isType,
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+        return setType(isType);
       }
 
       case PatternKind::Bool:
@@ -3880,6 +3892,13 @@ namespace {
           }
         }
 
+        // If this is a closure, only walk into its children if they
+        // are type-checked in the context of the enclosing expression.
+        if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+          if (!shouldTypeCheckInEnclosingExpression(closure))
+            return { false, expr };
+        }
+
         // Now, we're ready to walk into sub expressions.
         return {true, expr};
       }
@@ -4019,12 +4038,6 @@ namespace {
 
     /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
-
-    // Don't walk into statements.  This handles the BraceStmt in
-    // non-single-expr closures, so we don't walk into their body.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
   };
 
   class ConstraintWalker : public ASTWalker {
@@ -4415,7 +4428,48 @@ bool ConstraintSystem::generateConstraints(
     return false;
   }
 
-  llvm_unreachable("BOOM");
+  switch (target.kind) {
+  case SolutionApplicationTarget::Kind::expression:
+    llvm_unreachable("Handled above");
+
+  case SolutionApplicationTarget::Kind::caseLabelItem:
+  case SolutionApplicationTarget::Kind::function:
+  case SolutionApplicationTarget::Kind::stmtCondition:
+    llvm_unreachable("Handled separately");
+
+  case SolutionApplicationTarget::Kind::patternBinding: {
+    auto patternBinding = target.getAsPatternBinding();
+    auto dc = target.getDeclContext();
+    bool hadError = false;
+
+    /// Generate constraints for each pattern binding entry
+    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      // Type check the pattern.
+      auto pattern = patternBinding->getPattern(index);
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+
+      auto init = patternBinding->getInit(index);
+      if (!init) {
+        llvm_unreachable("Unsupported pattern binding entry");
+      }
+
+      // Generate constraints for the initialization.
+      auto target = SolutionApplicationTarget::forInitialization(
+          init, dc, patternType, pattern,
+          /*bindPatternVarsOneWay=*/true);
+      if (generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+        hadError = true;
+        continue;
+      }
+
+      // Keep track of this binding entry.
+      setSolutionApplicationTarget({patternBinding, index}, target);
+    }
+
+    return hadError;
+  }
+  }
 }
 
 Expr *ConstraintSystem::generateConstraints(

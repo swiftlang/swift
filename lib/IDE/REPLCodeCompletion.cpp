@@ -326,7 +326,7 @@ REPLCompletions::CookedResult REPLCompletions::getNextStem() {
   if (CookedResults.empty())
     return {};
 
-  CurrentCompletionIdx++;
+  ++CurrentCompletionIdx;
   if (CurrentCompletionIdx >= CookedResults.size())
     CurrentCompletionIdx = 0;
 

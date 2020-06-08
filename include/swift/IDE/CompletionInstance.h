@@ -16,7 +16,6 @@
 #include "swift/Frontend/Frontend.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -44,7 +43,6 @@ class CompletionInstance {
   std::mutex mtx;
 
   std::unique_ptr<CompilerInstance> CachedCI;
-  ModuleDecl *CurrentModule = nullptr;
   llvm::hash_code CachedArgHash;
   llvm::sys::TimePoint<> DependencyCheckedTimestamp;
   llvm::StringMap<llvm::hash_code> InMemoryDependencyHash;

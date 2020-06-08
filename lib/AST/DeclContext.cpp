@@ -924,7 +924,7 @@ void IterableDeclContext::loadAllMembers() const {
   --NumUnloadedLazyIterableDeclContexts;
   // FIXME: (transitional) decrement the redundant "always-on" counter.
   if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts--;
+    --s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
 }
 
 bool IterableDeclContext::wasDeserialized() const {

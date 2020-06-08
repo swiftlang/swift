@@ -3361,7 +3361,7 @@ struct ParamLowering {
     }
 
     if (foreignError)
-      count++;
+      ++count;
 
     if (foreignSelf.isImportAsMember()) {
       // Claim only the self parameter.

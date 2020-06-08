@@ -1322,6 +1322,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a conversion");
   }
@@ -1387,6 +1388,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     return false;
   }
@@ -1548,7 +1550,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
 
       // Something like `foo { x in }` or `foo { $0 }`
       if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-        closure->forEachChildExpr([&](Expr *expr) -> Expr * {
+        forEachExprInConstraintSystem(closure, [&](Expr *expr) -> Expr * {
           if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
             if (!isParam(UDE->getBase()))
               return expr;
@@ -1699,6 +1701,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a relational constraint");
   }
@@ -3135,6 +3138,60 @@ bool ConstraintSystem::repairFailures(
     return false;
   };
 
+  // Check whether given `value` type matches a `RawValue` type of
+  // a given raw representable type.
+  auto isValueOfRawRepresentable = [&](Type valueType,
+                                       Type rawReprType) -> bool {
+    // diagnostic is going to suggest failable initializer anyway.
+    if (auto objType = rawReprType->getOptionalObjectType())
+      rawReprType = objType;
+
+    // If value is optional diagnostic would suggest using `Optional.map` in
+    // combination with `<Type>(rawValue: ...)` initializer.
+    if (auto objType = valueType->getOptionalObjectType())
+      valueType = objType;
+
+    if (rawReprType->isTypeVariableOrMember())
+      return false;
+
+    auto rawValue = isRawRepresentable(*this, rawReprType);
+    if (!rawValue)
+      return false;
+
+    auto result = matchTypes(valueType, rawValue, ConstraintKind::Conversion,
+                             TMF_ApplyingFix, locator);
+    return !result.isFailure();
+  };
+
+  // Check whether given `rawReprType` does indeed conform to `RawRepresentable`
+  // and if so check that given `expectedType` matches its `RawValue` type. If
+  // that condition holds add a tailored fix which is going to suggest to
+  // explicitly construct a raw representable type from a given value type.
+  auto repairByConstructingRawRepresentableType =
+      [&](Type expectedType, Type rawReprType) -> bool {
+    if (!isValueOfRawRepresentable(expectedType, rawReprType))
+      return false;
+
+    conversionsOrFixes.push_back(ExplicitlyConstructRawRepresentable::create(
+        *this, rawReprType, expectedType, getConstraintLocator(locator)));
+    return true;
+  };
+
+  // Check whether given `rawReprType` does indeed conform to `RawRepresentable`
+  // and if so check that given `expectedType` matches its `RawValue` type. If
+  // that condition holds add a tailored fix which is going to suggest to
+  // use `.rawValue` associated with given raw representable type to match
+  // given expected type.
+  auto repairByUsingRawValueOfRawRepresentableType =
+      [&](Type rawReprType, Type expectedType) -> bool {
+    if (!isValueOfRawRepresentable(expectedType, rawReprType))
+      return false;
+
+    conversionsOrFixes.push_back(UseRawValue::create(
+        *this, rawReprType, expectedType, getConstraintLocator(locator)));
+    return true;
+  };
+
   auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
     return llvm::any_of(conversionsOrFixes,
                         [kind](const RestrictionOrFix correction) {
@@ -3349,6 +3406,13 @@ bool ConstraintSystem::repairFailures(
 
       if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                   conversionsOrFixes, locator))
+        return true;
+
+      // `rhs` - is an assignment destination and `lhs` is its source.
+      if (repairByConstructingRawRepresentableType(lhs, rhs))
+        return true;
+
+      if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
         return true;
 
       // Let's try to match source and destination types one more
@@ -3583,18 +3647,6 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (auto *fix = ExplicitlyConstructRawRepresentable::attempt(
-            *this, lhs, rhs, locator)) {
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
-    if (auto *fix = UseValueTypeOfRawRepresentative::attempt(*this, lhs, rhs,
-                                                             locator)) {
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
     // If parameter is a collection but argument is not, let's try
     // to try and match collection element type to the argument to
     // produce better diagnostics e.g.:
@@ -3623,6 +3675,13 @@ bool ConstraintSystem::repairFailures(
     // If either type has a hole, consider this fixed.
     if (lhs->hasHole() || rhs->hasHole())
       return true;
+
+    // `lhs` - is an argument and `rhs` is a parameter type.
+    if (repairByConstructingRawRepresentableType(lhs, rhs))
+      break;
+
+    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
+      break;
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
@@ -3842,6 +3901,9 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
+    if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
+      break;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       break;
@@ -3852,6 +3914,10 @@ bool ConstraintSystem::repairFailures(
                      [](const RestrictionOrFix &correction) {
                        return bool(correction.getRestriction());
                      }))
+      break;
+
+    // `lhs` - is an result type and `rhs` is a contextual type.
+    if (repairByConstructingRawRepresentableType(lhs, rhs))
       break;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
@@ -4343,6 +4409,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:
       llvm_unreachable("Not a relational constraint");
     }
@@ -7058,9 +7125,16 @@ ConstraintSystem::simplifyOneWayConstraint(
     return SolutionKind::Solved;
   }
 
-  // Translate this constraint into a one-way binding constraint.
-  return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
-                    locator);
+  // Translate this constraint into an equality or bind-parameter constraint,
+  // as appropriate.
+  if (kind == ConstraintKind::OneWayEqual) {
+    return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
+                      locator);
+  }
+
+  assert(kind == ConstraintKind::OneWayBindParam);
+  return matchTypes(
+      secondSimplified, first, ConstraintKind::BindParam, flags, locator);
 }
 
 static Type getFunctionBuilderTypeFor(ConstraintSystem &cs, unsigned paramIdx,
@@ -7112,12 +7186,27 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
     Type internalType;
 
+    bool oneWayConstraints =
+      getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters;
     if (paramList->get(i)->getTypeRepr()) {
       // Internal type is the type used in the body of the closure,
       // so "external" type translates to it as follows:
       //  - `Int...` -> `[Int]`,
       //  - `inout Int` -> `@lvalue Int`.
       internalType = param.getParameterType();
+
+      // When there are type variables in the type and we have enabled
+      // one-way constraints, create a fresh type variable to handle the
+      // binding.
+      if (oneWayConstraints && internalType->hasTypeVariable()) {
+        auto *paramLoc =
+            getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+        auto *typeVar = createTypeVariable(paramLoc, TVO_CanBindToLValue |
+                                                         TVO_CanBindToNoEscape);
+        addConstraint(
+            ConstraintKind::OneWayBindParam, typeVar, internalType, paramLoc);
+        internalType = typeVar;
+      }
     } else {
       auto *paramLoc =
           getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
@@ -7131,7 +7220,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
           param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
 
       auto externalType = param.getOldType();
-      addConstraint(ConstraintKind::BindParam, externalType, typeVar, paramLoc);
+      if (oneWayConstraints) {
+        addConstraint(
+            ConstraintKind::OneWayBindParam, typeVar, externalType, paramLoc);
+      } else {
+        addConstraint(
+            ConstraintKind::BindParam, externalType, typeVar, paramLoc);
+      }
     }
 
     setType(paramList->get(i), internalType);
@@ -7157,14 +7252,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
-  bool hasReturn = hasExplicitResult(closure);
+  // If this closure should be type-checked as part of this expression,
+  // generate constraints for it now.
   auto &ctx = getASTContext();
-  // If this is a multi-statement closure its body doesn't participate
-  // in type-checking.
-  if (closure->hasSingleExpressionBody()) {
+  if (shouldTypeCheckInEnclosingExpression(closure)) {
     if (generateConstraints(closure, closureType->getResult()))
       return false;
-  } else if (!hasReturn) {
+  } else if (!hasExplicitResult(closure)) {
     // If this closure has an empty body and no explicit result type
     // let's bind result type to `Void` since that's the only type empty body
     // can produce. Otherwise, if (multi-statement) closure doesn't have
@@ -9335,7 +9429,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   bool found = false;
   if (auto *expr = getAsExpr(anchor)) {
-    expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+    forEachExprInConstraintSystem(expr, [&](Expr *subExpr) -> Expr * {
       found |= anchors.count(subExpr);
       return subExpr;
     });
@@ -9509,7 +9603,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
   case FixKind::ExpandArrayIntoVarargs:
-  case FixKind::UseValueTypeOfRawRepresentative:
+  case FixKind::UseRawValue:
   case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
@@ -9697,6 +9791,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
                                                subflags, locator);
 
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
     return simplifyOneWayConstraint(kind, first, second, subflags, locator);
 
   case ConstraintKind::ValueMember:
@@ -10209,6 +10304,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return SolutionKind::Unsolved;
 
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
     return simplifyOneWayConstraint(constraint.getKind(),
                                     constraint.getFirstType(),
                                     constraint.getSecondType(),

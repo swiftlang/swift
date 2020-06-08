@@ -166,7 +166,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
 
   B.createApply(ReleaseInst->getLoc(), MI, AllocSubMap, {object});
 
-  NumReleasesDevirtualized++;
+  ++NumReleasesDevirtualized;
   ReleaseInst->eraseFromParent();
   return true;
 }

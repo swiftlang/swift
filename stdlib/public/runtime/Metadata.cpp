@@ -21,6 +21,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
@@ -113,15 +114,14 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
   // Such a template will fail the `isTypeMetadata` test and we'll think that it
   // isn't Swift metadata but a plain old ObjC class instead.
   if (metadata->getKind() == MetadataKind::Class) {
-    auto *classMetadata = static_cast<ClassMetadata*>(metadata);
-#if SWIFT_OBJC_INTEROP
-    classMetadata->setAsTypeMetadata();
-#endif
     auto *fullMetadata = asFullMetadata(metadata);
 
     // Begin by initializing the value witness table; everything else is
     // initialized by swift_initClassMetadata().
 #if SWIFT_OBJC_INTEROP
+    auto *classMetadata = static_cast<ClassMetadata*>(metadata);
+    classMetadata->setAsTypeMetadata();
+
     fullMetadata->ValueWitnesses =
       (classMetadata->Flags & ClassFlags::UsesSwiftRefcounting)
          ? &VALUE_WITNESS_SYM(Bo)
@@ -2281,7 +2281,7 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
 
   uint32_t log2 = 0;
   while ((1 << log2) != (alignMask + 1))
-    log2++;
+    ++log2;
   return log2;
 }
 
@@ -4163,7 +4163,7 @@ template <> SWIFT_USED void Metadata::dump() const {
       auto genericCount = contextDescriptor->getFullGenericContextHeader().Base.getNumArguments();
       auto *args = getGenericArgs();
       printf("Generic Args: %u: [", genericCount);
-      for (uint32_t i = 0; i < genericCount; i++) {
+      for (uint32_t i = 0; i < genericCount; ++i) {
         if (i > 0)
           printf(", ");
         printf("%p", args[i]);
@@ -5505,21 +5505,21 @@ bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
 const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
 
 static void checkAllocatorDebugEnvironmentVariable(void *context) {
-  const char *value =
-    getenv("SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION");
-  if (value && (value[0] == '1' || value[0] == 'y' || value[0] == 'Y')) {
-    _swift_debug_metadataAllocationIterationEnabled = true;
-    // Write a PoolTrailer to the end of InitialAllocationPool and shrink
-    // the pool accordingly.
-    auto poolCopy = AllocationPool.load(std::memory_order_relaxed);
-    assert(poolCopy.Begin == InitialAllocationPool.Pool);
-    size_t newPoolSize = InitialPoolSize - sizeof(PoolTrailer);
-    PoolTrailer trailer = { nullptr, newPoolSize };
-    memcpy(InitialAllocationPool.Pool + newPoolSize, &trailer,
-           sizeof(trailer));
-    poolCopy.Remaining = newPoolSize;
-    AllocationPool.store(poolCopy, std::memory_order_relaxed);
-  }
+  _swift_debug_metadataAllocationIterationEnabled
+    = runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION();
+  if (!_swift_debug_metadataAllocationIterationEnabled)
+    return;
+
+  // Write a PoolTrailer to the end of InitialAllocationPool and shrink
+  // the pool accordingly.
+  auto poolCopy = AllocationPool.load(std::memory_order_relaxed);
+  assert(poolCopy.Begin == InitialAllocationPool.Pool);
+  size_t newPoolSize = InitialPoolSize - sizeof(PoolTrailer);
+  PoolTrailer trailer = { nullptr, newPoolSize };
+  memcpy(InitialAllocationPool.Pool + newPoolSize, &trailer,
+         sizeof(trailer));
+  poolCopy.Remaining = newPoolSize;
+  AllocationPool.store(poolCopy, std::memory_order_relaxed);
 }
 
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
@@ -5655,10 +5655,8 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   // variable lets us easily turn on verification to find and fix these
   // bugs. Remove this and leave it permanently on once everything works
   // with it enabled.
-  bool verificationEnabled =
-    SWIFT_LAZY_CONSTANT((bool)getenv("SWIFT_ENABLE_MANGLED_NAME_VERIFICATION"));
-  
-  if (!verificationEnabled) return;
+  if (!swift::runtime::environment::SWIFT_ENABLE_MANGLED_NAME_VERIFICATION())
+    return;
   
   Demangle::StackAllocatedDemangler<1024> Dem;
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);

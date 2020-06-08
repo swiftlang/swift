@@ -243,9 +243,15 @@ private:
     if (!Options.QualifyEntities)
       return false;
 
-    if (Context->getKind() == Node::Kind::Module &&
-        Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX)) {
-      return Options.DisplayDebuggerGeneratedModule;
+    if (Context->getKind() == Node::Kind::Module) {
+      if (Context->getText() == swift::STDLIB_NAME)
+        return Options.DisplayStdlibModule;
+      if (Context->getText() == swift::MANGLING_MODULE_OBJC)
+        return Options.DisplayObjCModule;
+      if (Context->getText() == Options.HidingCurrentModule)
+        return false;
+      if (Context->getText().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
+        return Options.DisplayDebuggerGeneratedModule;
     }
     return true;
   }
@@ -990,7 +996,7 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
             print(child);
           }
         }
-        argNum++;
+        ++argNum;
         break;
     }
   }
@@ -1583,13 +1589,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     bool isSerialized = false;
     if (lastChild->getKind() == Node::Kind::IsSerialized) {
       isSerialized = true;
-      lastChildIndex--;
+      --lastChildIndex;
       lastChild = Node->getChild(lastChildIndex - 1);
     }
 
     if (lastChild->getKind() == Node::Kind::DependentGenericSignature) {
       print(lastChild);
-      lastChildIndex--;
+      --lastChildIndex;
     }
 
     Printer << "(";
@@ -1880,7 +1886,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       NodePointer repr = Node->getChild(Idx);
       print(repr);
       Printer << " ";
-      Idx++;
+      ++Idx;
     }
     NodePointer type = Node->getChild(Idx)->getChild(0);
     printWithParens(type);
@@ -1897,7 +1903,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       NodePointer repr = Node->getChild(Idx);
       print(repr);
       Printer << " ";
-      Idx++;
+      ++Idx;
     }
 
     NodePointer type = Node->getChild(Idx);
@@ -1947,8 +1953,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       printChildren(type_list, " & ");
       Printer << " & ";
     }
-    if (Options.QualifyEntities)
-      Printer << "Swift.";
+    if (Options.QualifyEntities && Options.DisplayStdlibModule)
+      Printer << swift::STDLIB_NAME << ".";
     Printer << "AnyObject";
     return nullptr;
   }
@@ -2082,6 +2088,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     printChildren(Node, " ");
     return nullptr;
   case Node::Kind::ImplParameter:
+  case Node::Kind::ImplResult:
     // Children: `convention, differentiability?, type`
     // Print convention.
     print(Node->getChild(0));
@@ -2091,9 +2098,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       print(Node->getChild(1));
     // Print type.
     print(Node->getLastChild());
-    return nullptr;
-  case Node::Kind::ImplResult:
-    printChildren(Node, " ");
     return nullptr;
   case Node::Kind::ImplFunctionType:
     printImplFunctionType(Node);

@@ -340,7 +340,9 @@ PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
-PASS_RANGE(AllPasses, AADumper, BugReducerTester)
+PASS(PruneVTables, "prune-vtables",
+     "Mark class methods that do not require vtable dispatch")
+PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
 #undef IRGEN_PASS
 #undef PASS

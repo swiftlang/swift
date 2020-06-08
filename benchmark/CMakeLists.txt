@@ -108,6 +108,7 @@ set(SWIFT_BENCH_MODULES
     single-source/LuhnAlgoLazy
     single-source/MapReduce
     single-source/Memset
+    single-source/Mirror
     single-source/MonteCarloE
     single-source/MonteCarloPi
     single-source/NSDictionaryCastToSwift

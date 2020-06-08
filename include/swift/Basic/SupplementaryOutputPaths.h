@@ -14,7 +14,6 @@
 #define SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 
 #include <string>
 

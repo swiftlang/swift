@@ -3973,16 +3973,16 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     return substitutions;
   }
 
+  const auto genericSig = dc->getGenericSignatureOfContext();
+  if (!genericSig)
+    return substitutions;
+
   // Find the superclass type with the context matching that of the member.
   auto *ownerNominal = dc->getSelfNominalTypeDecl();
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
   // Gather all of the substitutions for all levels of generic arguments.
-  auto genericSig = dc->getGenericSignatureOfContext();
-  if (!genericSig)
-    return substitutions;
-
   auto params = genericSig->getGenericParams();
   unsigned n = params.size();
 
@@ -4008,7 +4008,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     // Continue looking into the parent.
     if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
       baseTy = protocolTy->getParent();
-      n--;
+      --n;
       continue;
     }
 

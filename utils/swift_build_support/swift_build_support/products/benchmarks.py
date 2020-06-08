@@ -57,6 +57,20 @@ class Benchmarks(product.Product):
     def install(self, host_target):
         pass
 
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB,
+                product.LibDispatch,
+                product.Foundation,
+                product.XCTest,
+                product.LLBuild,
+                product.SwiftPM]
+
 
 def run_build_script_helper(host_target, product, args):
     toolchain_path = args.install_destdir

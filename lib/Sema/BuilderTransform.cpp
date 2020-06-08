@@ -269,26 +269,12 @@ protected:
       return;
     }
 
-    // If we aren't generating constraints, there's nothing to do.
-    if (!cs)
-      return;
-
-    /// Generate constraints for each pattern binding entry
-    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
-      // Type check the pattern.
-      auto pattern = patternBinding->getPattern(index);
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
-      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-
-      // Generate constraints for the initialization.
-      auto target = SolutionApplicationTarget::forInitialization(
-          patternBinding->getInit(index), dc, patternType, pattern,
-          /*bindPatternVarsOneWay=*/true);
+    // If there is a constraint system, generate constraints for the pattern
+    // binding.
+    if (cs) {
+      SolutionApplicationTarget target(patternBinding);
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
-        continue;
-
-      // Keep track of this binding entry.
-      applied.patternBindingEntries.insert({{patternBinding, index}, target});
+        hadError = true;
     }
   }
 
@@ -400,7 +386,7 @@ protected:
                                           unsigned &numPayloads,
                                           bool &isOptional) {
     // The 'then' clause contributes a payload.
-    numPayloads++;
+    ++numPayloads;
 
     // If there's an 'else' clause, it contributes payloads:
     if (auto elseStmt = ifStmt->getElseStmt()) {
@@ -410,7 +396,7 @@ protected:
                                            isOptional);
       // Otherwise it's just the one.
       } else {
-        numPayloads++;
+        ++numPayloads;
       }
 
     // If not, the chain result is at least optional.
@@ -1035,11 +1021,11 @@ private:
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
       // Find the solution application target for this.
       auto knownTarget =
-          builderTransform.patternBindingEntries.find({patternBinding, index});
-      assert(knownTarget != builderTransform.patternBindingEntries.end());
+          *solution.getConstraintSystem().getSolutionApplicationTarget(
+            {patternBinding, index});
 
       // Rewrite the target.
-      auto resultTarget = rewriteTarget(knownTarget->second);
+      auto resultTarget = rewriteTarget(knownTarget);
       if (!resultTarget)
         continue;
 
@@ -1701,6 +1687,13 @@ public:
 FunctionBuilderBodyPreCheck
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
+  // We don't want to do the precheck if it will already have happened in
+  // the enclosing expression.
+  bool skipPrecheck = false;
+  if (auto closure = dyn_cast_or_null<ClosureExpr>(
+          fn.getAbstractClosureExpr()))
+    skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
+
   return PreCheckFunctionBuilderApplication(fn, false).run();
 }
 

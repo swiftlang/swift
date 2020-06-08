@@ -764,7 +764,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     ++NumLazyRequirementSignaturesLoaded;
     // FIXME: (transitional) increment the redundant "always-on" counter.
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded++;
+      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
 
     auto contextData = static_cast<LazyProtocolData *>(
         ctx.getOrCreateLazyContextData(proto, nullptr));
@@ -830,6 +830,10 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   if (!isa<ClassDecl>(dc))
     return true;
 
+  // Destructors always use a fixed vtable entry.
+  if (isa<DestructorDecl>(decl))
+    return false;
+  
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
 
   // Final members are always be called directly.
@@ -2360,23 +2364,33 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   if (!namingPattern) {
     auto *canVD = VD->getCanonicalVarDecl();
     namingPattern = canVD->NamingPattern;
+  }
 
+  if (!namingPattern) {
+    // Try type checking parent conditional statement.
+    if (auto parentStmt = VD->getParentPatternStmt()) {
+      if (auto LCS = dyn_cast<LabeledConditionalStmt>(parentStmt)) {
+        TypeChecker::typeCheckConditionForStatement(LCS, VD->getDeclContext());
+        namingPattern = VD->NamingPattern;
+      }
+    }
+  }
+
+  if (!namingPattern) {
     // HACK: If no other diagnostic applies, emit a generic diagnostic about
     // a variable being unbound. We can't do better than this at the
     // moment because TypeCheckPattern does not reliably invalidate parts of
     // the pattern AST on failure.
     //
     // Once that's through, this will only fire during circular validation.
-    if (!namingPattern) {
-      if (VD->hasInterfaceType() &&
-          !VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
-        VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
-      }
-
-      VD->getParentPattern()->setType(ErrorType::get(Context));
-      setBoundVarsTypeError(VD->getParentPattern(), Context);
-      return nullptr;
+    if (VD->hasInterfaceType() &&
+        !VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
+      VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
     }
+
+    VD->getParentPattern()->setType(ErrorType::get(Context));
+    setBoundVarsTypeError(VD->getParentPattern(), Context);
+    return nullptr;
   }
 
   if (!namingPattern->hasType()) {

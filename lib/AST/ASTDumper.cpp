@@ -1420,7 +1420,13 @@ void SourceFile::dump() const {
   dump(llvm::errs());
 }
 
-void SourceFile::dump(llvm::raw_ostream &OS) const {
+void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
+  // If we're allowed to parse the SourceFile, do so now. We need to force the
+  // parsing request as by default the dumping logic tries not to kick any
+  // requests.
+  if (parseIfNeeded)
+    (void)getTopLevelDecls();
+
   PrintDecl(OS).visitSourceFile(*this);
   llvm::errs() << '\n';
 }
@@ -2496,11 +2502,7 @@ public:
     }
 
     OS << '\n';
-    if (E->hasSingleExpressionBody()) {
-      printRec(E->getSingleExpressionBody());
-    } else {
-      printRec(E->getBody(), E->getASTContext());
-    }
+    printRec(E->getBody(), E->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitAutoClosureExpr(AutoClosureExpr *E) {

@@ -347,10 +347,13 @@ public:
 
 #undef CLONE_AND_EMIT_TANGENT
 
-  /// Handle `apply` instruction.
+  /// Handle `apply` instruction, given:
+  /// - The minimal indices for differentiating the `apply`.
+  /// - The original non-reabstracted differential type.
+  ///
   ///   Original: y = apply f(x0, x1, ...)
   ///    Tangent: tan[y] = apply diff_f(tan[x0], tan[x1], ...)
-  void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices actualIndices,
+  void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices applyIndices,
                                CanSILFunctionType originalDifferentialType);
 
   /// Generate a `return` instruction in the current differential basic block.

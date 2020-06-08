@@ -478,7 +478,7 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
   if (auto *Stats = getContext().Stats)
-    Stats->getFrontendCounters().NumConformancesDeserialized++;
+    ++Stats->getFrontendCounters().NumConformancesDeserialized;
 
   unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
   switch (kind) {
@@ -4510,7 +4510,7 @@ DeclDeserializer::getDeclCheckedImpl(
   }
 
   if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumDeclsDeserialized++;
+    ++s->getFrontendCounters().NumDeclsDeserialized;
 
   // FIXME: @_dynamicReplacement(for:) includes a reference to another decl,
   // usually in the same type, and that can result in this decl being
@@ -4754,6 +4754,21 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   CASE(Unowned)
   CASE(UnownedInnerPointer)
   CASE(Autoreleased)
+#undef CASE
+  }
+  return None;
+}
+
+/// Translate from the serialization SILResultDifferentiability enumerators,
+/// which are guaranteed to be stable, to the AST ones.
+static Optional<swift::SILResultDifferentiability>
+getActualSILResultDifferentiability(uint8_t raw) {
+  switch (serialization::SILResultDifferentiability(raw)) {
+#define CASE(ID)                                                               \
+  case serialization::SILResultDifferentiability::ID:                          \
+    return swift::SILResultDifferentiability::ID;
+    CASE(DifferentiableOrNotApplicable)
+    CASE(NotDifferentiable)
 #undef CASE
   }
   return None;
@@ -5417,7 +5432,7 @@ public:
 
     auto processParameter =
         [&](TypeID typeID, uint64_t rawConvention,
-            uint64_t ramDifferentiability) -> llvm::Expected<SILParameterInfo> {
+            uint64_t rawDifferentiability) -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
       if (!convention)
         MF.fatal();
@@ -5428,7 +5443,7 @@ public:
           swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
       if (diffKind != DifferentiabilityKind::NonDifferentiable) {
         auto differentiabilityOpt =
-            getActualSILParameterDifferentiability(ramDifferentiability);
+            getActualSILParameterDifferentiability(rawDifferentiability);
         if (!differentiabilityOpt)
           MF.fatal();
         differentiability = *differentiabilityOpt;
@@ -5448,15 +5463,26 @@ public:
       return SILYieldInfo(type.get()->getCanonicalType(), *convention);
     };
 
-    auto processResult = [&](TypeID typeID, uint64_t rawConvention)
-                               -> llvm::Expected<SILResultInfo> {
+    auto processResult =
+        [&](TypeID typeID, uint64_t rawConvention,
+            uint64_t rawDifferentiability) -> llvm::Expected<SILResultInfo> {
       auto convention = getActualResultConvention(rawConvention);
       if (!convention)
         MF.fatal();
       auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
-      return SILResultInfo(type.get()->getCanonicalType(), *convention);
+      auto differentiability =
+          swift::SILResultDifferentiability::DifferentiableOrNotApplicable;
+      if (diffKind != DifferentiabilityKind::NonDifferentiable) {
+        auto differentiabilityOpt =
+            getActualSILResultDifferentiability(rawDifferentiability);
+        if (!differentiabilityOpt)
+          MF.fatal();
+        differentiability = *differentiabilityOpt;
+      }
+      return SILResultInfo(type.get()->getCanonicalType(), *convention,
+                           differentiability);
     };
 
     // Bounds check.  FIXME: overflow
@@ -5476,10 +5502,11 @@ public:
     for (unsigned i = 0; i != numParams; ++i) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      uint64_t differentiability = 0;
+      uint64_t rawDifferentiability = 0;
       if (diffKind != DifferentiabilityKind::NonDifferentiable)
-        differentiability = variableData[nextVariableDataIndex++];
-      auto param = processParameter(typeID, rawConvention, differentiability);
+        rawDifferentiability = variableData[nextVariableDataIndex++];
+      auto param =
+          processParameter(typeID, rawConvention, rawDifferentiability);
       if (!param)
         return param.takeError();
       allParams.push_back(param.get());
@@ -5503,7 +5530,10 @@ public:
     for (unsigned i = 0; i != numResults; ++i) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      auto result = processResult(typeID, rawConvention);
+      uint64_t rawDifferentiability = 0;
+      if (diffKind != DifferentiabilityKind::NonDifferentiable)
+        rawDifferentiability = variableData[nextVariableDataIndex++];
+      auto result = processResult(typeID, rawConvention, rawDifferentiability);
       if (!result)
         return result.takeError();
       allResults.push_back(result.get());
@@ -5514,7 +5544,9 @@ public:
     if (hasErrorResult) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      auto maybeErrorResult = processResult(typeID, rawConvention);
+      uint64_t rawDifferentiability = 0;
+      auto maybeErrorResult =
+          processResult(typeID, rawConvention, rawDifferentiability);
       if (!maybeErrorResult)
         return maybeErrorResult.takeError();
       errorResult = maybeErrorResult.get();
@@ -5637,7 +5669,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumTypesDeserialized++;
+    ++s->getFrontendCounters().NumTypesDeserialized;
 
   llvm::BitstreamEntry entry =
       MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());

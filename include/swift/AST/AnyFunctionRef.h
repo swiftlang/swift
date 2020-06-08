@@ -89,20 +89,6 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
   }
 
-  void setSingleExpressionBody(Expr *expr) {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      AFD->setSingleExpressionBody(expr);
-      return;
-    }
-
-    auto ACE = TheFunction.get<AbstractClosureExpr *>();
-    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
-      CE->setSingleExpressionBody(expr);
-    } else {
-      cast<AutoClosureExpr>(ACE)->setBody(expr);
-    }
-  }
-
   Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getInterfaceType();

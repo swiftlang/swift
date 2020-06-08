@@ -223,7 +223,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     addEmptyElement(elt);
     // If the element type is empty, it adds nothing.
-    NextNonFixedOffsetIndex++;
+    ++NextNonFixedOffsetIndex;
     return false;
   }
   // TODO: consider using different layout rules.
@@ -238,7 +238,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   } else {
     addNonFixedSizeElement(elt);
   }
-  NextNonFixedOffsetIndex++;
+  ++NextNonFixedOffsetIndex;
   return true;
 }
 

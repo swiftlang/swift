@@ -554,7 +554,9 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
 
   SmallVector<SILValue, 8> origFormalResults;
   collectAllFormalResultsInTypeOrder(original, origFormalResults);
-  auto origResult = origFormalResults[getIndices().source];
+  assert(getIndices().results->getNumIndices() == 1 &&
+         "Getter should have one semantic result");
+  auto origResult = origFormalResults[*getIndices().results->begin()];
 
   // TODO(TF-970): Emit diagnostic when `TangentVector` is not a struct.
   auto tangentVectorSILTy = pullback.getConventions().getSingleSILResultType(
@@ -736,19 +738,20 @@ bool PullbackEmitter::run() {
 
   SmallVector<SILValue, 8> origFormalResults;
   collectAllFormalResultsInTypeOrder(original, origFormalResults);
-  auto origResult = origFormalResults[getIndices().source];
-
-  // If original result is non-varied, it will always have a zero derivative.
-  // Skip full pullback generation and simply emit zero derivatives for wrt
-  // parameters.
-  //
-  // NOTE(TF-876): This shortcut is currently necessary for functions
-  // returning non-varied result with >1 basic block where some basic blocks
-  // have no dominated active values; control flow differentiation does not
-  // handle this case. See TF-876 for context.
-  if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
-    emitZeroDerivativesForNonvariedResult(origResult);
-    return false;
+  for (auto resultIndex : getIndices().results->getIndices()) {
+    auto origResult = origFormalResults[resultIndex];
+    // If original result is non-varied, it will always have a zero derivative.
+    // Skip full pullback generation and simply emit zero derivatives for wrt
+    // parameters.
+    //
+    // NOTE(TF-876): This shortcut is currently necessary for functions
+    // returning non-varied result with >1 basic block where some basic blocks
+    // have no dominated active values; control flow differentiation does not
+    // handle this case. See TF-876 for context.
+    if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
+      emitZeroDerivativesForNonvariedResult(origResult);
+      return false;
+    }
   }
 
   // Get dominated active values in original blocks.
@@ -934,6 +937,9 @@ bool PullbackEmitter::run() {
   auto pbParamArgs = pullback.getArgumentsWithoutIndirectResults();
   assert(pbParamArgs.size() == 2);
   seed = pbParamArgs[0];
+  // TODO(TF-983): Handle multiple original results.
+  assert(getIndices().results->getNumIndices() == 1);
+  auto origResult = origFormalResults[*getIndices().results->begin()];
 
   // Assign adjoint for original result.
   builder.setInsertionPoint(pullbackEntry,
@@ -1453,36 +1459,39 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
         ai->getArgumentsWithoutIndirectResults()[paramIdx]);
   }
 
-  assert(applyInfo.indices.source < origAllResults.size());
-  auto origResult = origAllResults[applyInfo.indices.source];
-  assert(origResult);
-  auto origNumIndRes = ai->getNumIndirectResults();
-
-  // Get pullback arguments.
+  // Get callee pullback arguments.
   SmallVector<SILValue, 8> args;
+
+  // Handle callee pullback indirect results.
+  // Create local allocations for these and destroy them after the call.
   auto pullbackType = remapType(pullback->getType()).castTo<SILFunctionType>();
-
-  // Get the seed (i.e. adjoint value of the original result).
-  SILValue seed;
-  auto *bb = ai->getParent();
-  if (origResult->getType().isObject()) {
-    // Otherwise, materialize adjoint value of `ai`.
-    seed = materializeAdjoint(getAdjointValue(bb, origResult), loc);
-  } else {
-    seed = getAdjointBuffer(bb, origResult);
-  }
-
-  // Create allocations for pullback indirect results.
-  SmallVector<AllocStackInst *, 4> pullbackIndirectResults;
   auto actualPullbackType = applyInfo.originalPullbackType
                                 ? *applyInfo.originalPullbackType
                                 : pullbackType;
   actualPullbackType = actualPullbackType->getUnsubstitutedType(getModule());
+  SmallVector<AllocStackInst *, 4> pullbackIndirectResults;
   for (auto indRes : actualPullbackType->getIndirectFormalResults()) {
     auto *alloc = builder.createAllocStack(
         loc, remapType(indRes.getSILStorageInterfaceType()));
     pullbackIndirectResults.push_back(alloc);
     args.push_back(alloc);
+  }
+
+  // Get formal callee pullback arguments.
+  auto *bb = ai->getParent();
+  assert(applyInfo.indices.results->getNumIndices() == 1);
+  for (auto resultIndex : applyInfo.indices.results->getIndices()) {
+    assert(resultIndex < origAllResults.size());
+    auto origResult = origAllResults[resultIndex];
+    // Get the seed (i.e. adjoint value of the original result).
+    SILValue seed;
+    if (origResult->getType().isObject()) {
+      // Otherwise, materialize adjoint value of `ai`.
+      seed = materializeAdjoint(getAdjointValue(bb, origResult), loc);
+    } else {
+      seed = getAdjointBuffer(bb, origResult);
+    }
+    args.push_back(seed);
   }
 
   // If callee pullback was reabstracted in VJP, reabstract callee pullback.
@@ -1494,7 +1503,6 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
           return this->remapSubstitutionMap(subs);
         });
   }
-  args.push_back(seed);
 
   // Call the callee pullback.
   auto *pullbackCall = builder.createApply(loc, pullback, SubstitutionMap(),
@@ -1517,7 +1525,7 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   // Accumulate adjoints for original differentiation parameters.
   auto allResultsIt = allResults.begin();
   for (unsigned i : applyInfo.indices.parameters->getIndices()) {
-    auto origArg = ai->getArgument(origNumIndRes + i);
+    auto origArg = ai->getArgument(ai->getNumIndirectResults() + i);
     // Skip adjoint accumulation for `inout` arguments.
     auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
         ai->getNumIndirectResults() + i);

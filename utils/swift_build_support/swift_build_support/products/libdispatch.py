@@ -15,9 +15,26 @@ from . import product
 
 class LibDispatch(product.Product):
     @classmethod
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
+
+    @classmethod
     def product_source_name(cls):
         """product_source_name() -> str
 
         The name of the source code directory of this product.
         """
         return "swift-corelibs-libdispatch"
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB]

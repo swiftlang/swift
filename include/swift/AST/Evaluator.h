@@ -243,10 +243,7 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags,
-            bool debugDumpCycles,
-            bool buildDependencyGraph,
-            bool enableExperimentalPrivateDeps);
+  Evaluator(DiagnosticEngine &diags, const LangOptions &opts);
 
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
@@ -442,7 +439,7 @@ private:
                                   !Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
-    recorder.replay(ActiveRequest(r));
+    recorder.replay(activeRequests, ActiveRequest(r));
   }
 
   // Report the result of evaluating a request that is a dependency sink.

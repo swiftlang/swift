@@ -84,6 +84,7 @@ private:
     if (!expr)
       return;
 
+    // FIXME: Use SolutionApplicationTarget?
     expr = cs.generateConstraints(expr, closure, /*isInputExpression=*/false);
     if (!expr) {
       hadError = true;
@@ -330,15 +331,17 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
     fn.setBody(newBody, /*isSingleExpression=*/false);
     if (closure) {
-      closure->setAppliedFunctionBuilder();
       solution.setExprTypes(closure);
     }
 
     return SolutionApplicationToFunctionResult::Success;
-  }
 
-  // If there is a single-expression body, transform that body now.
-  if (fn.hasSingleExpressionBody()) {
+  }
+  assert(closure && "Can only get here with a closure at the moment");
+
+  // If this closure is checked as part of the enclosing expression, handle
+  // that now.
+  if (shouldTypeCheckInEnclosingExpression(closure)) {
     ClosureConstraintApplication application(
         solution, closure, closureFnType->getResult(), rewriteTarget);
     application.visit(fn.getBody());

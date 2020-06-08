@@ -41,7 +41,6 @@
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Located.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <type_traits>

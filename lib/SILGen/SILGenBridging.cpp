@@ -1709,7 +1709,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
       if (foreignError &&
           foreignArgIndex == foreignError->getErrorParameterIndex()) {
         args.push_back(ManagedValue());
-        foreignArgIndex++;
+        ++foreignArgIndex;
       }
     };
 
@@ -1759,7 +1759,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           // Leave space for `self` to be filled in later.
           if (foreignArgIndex == memberStatus.getSelfIndex()) {
             args.push_back({});
-            foreignArgIndex++;
+            ++foreignArgIndex;
           }
           
           // Use the `self` space we skipped earlier if it's time.

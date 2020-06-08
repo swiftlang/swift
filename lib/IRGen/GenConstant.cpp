@@ -178,7 +178,7 @@ namespace {
 void insertPadding(SmallVectorImpl<llvm::Constant *> &Elements,
                    llvm::StructType *sTy) {
   // fill in any gaps, which are the explicit padding that swiftc inserts.
-  for (unsigned i = 0, e = Elements.size(); i != e; i++) {
+  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     auto &elt = Elements[i];
     if (elt == nullptr) {
       auto *eltTy = sTy->getElementType(i);
@@ -200,7 +200,7 @@ llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
 
   // run over the Swift initializers, putting them into the struct as
   // appropriate.
-  for (unsigned i = 0, e = inst->getElements().size(); i != e; i++) {
+  for (unsigned i = 0, e = inst->getElements().size(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     Optional<unsigned> index = nextIndex(IGM, type, i);
     if (index.hasValue()) {
@@ -245,7 +245,7 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
   assert(NumElems == ClassLayout->getElements().size());
 
   // Construct the object init value including tail allocated elements.
-  for (unsigned i = 0; i != NumElems; i++) {
+  for (unsigned i = 0; i != NumElems; ++i) {
     SILValue Val = OI->getAllElements()[i];
     const ElementLayout &EL = ClassLayout->getElements()[i];
     if (!EL.isEmpty()) {

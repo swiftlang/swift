@@ -93,18 +93,20 @@ public:
 };
 } // anonymous namespace
 
-void SyntaxTreeCreator::acceptSyntaxRoot(OpaqueSyntaxNode rootN,
-                                         SourceFile &SF) {
+Optional<SourceFileSyntax>
+SyntaxTreeCreator::realizeSyntaxRoot(OpaqueSyntaxNode rootN,
+                                     const SourceFile &SF) {
   auto raw = transferOpaqueNode(rootN);
-  SF.setSyntaxRoot(make<SourceFileSyntax>(raw));
+  auto rootNode = make<SourceFileSyntax>(raw);
 
   // Verify the tree if specified.
   if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
     ASTContext &ctx = SF.getASTContext();
     SyntaxVerifier Verifier(ctx.SourceMgr, SF.getBufferID().getValue(),
                             ctx.Diags);
-    Verifier.verify(SF.getSyntaxRoot());
+    Verifier.verify(rootNode);
   }
+  return rootNode;
 }
 
 OpaqueSyntaxNode

@@ -45,6 +45,21 @@ class IndexStoreDB(product.Product):
     def install(self, host_target):
         pass
 
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB,
+                product.LibDispatch,
+                product.Foundation,
+                product.XCTest,
+                product.LLBuild,
+                product.SwiftPM,
+                product.SwiftSyntax]
+
 
 def run_build_script_helper(action, host_target, product, args,
                             sanitize_all=False):

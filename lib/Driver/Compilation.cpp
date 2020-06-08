@@ -374,9 +374,9 @@ namespace driver {
       if (auto *Stats = Comp.getStatsReporter()) {
           auto &D = Stats->getDriverCounters();
           if (Skipped)
-            D.NumDriverJobsSkipped++;
+            ++D.NumDriverJobsSkipped;
           else
-            D.NumDriverJobsRun++;
+            ++D.NumDriverJobsRun;
       }
       auto BlockedIter = BlockingCommands.find(Cmd);
       if (BlockedIter != BlockingCommands.end()) {

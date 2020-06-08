@@ -45,6 +45,14 @@ class Swift(product.Product):
         self.cmake_options.extend(
             self._enable_experimental_differentiable_programming)
 
+    @classmethod
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
+
     @property
     def _runtime_sanitizer_flags(self):
         sanitizer_list = []
@@ -121,3 +129,10 @@ updated without updating swift.py?")
     def _enable_experimental_differentiable_programming(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL',
                  self.args.enable_experimental_differentiable_programming)]
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU]

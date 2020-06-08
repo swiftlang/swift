@@ -26,6 +26,7 @@
 #include "clang/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/Error.h"
@@ -105,6 +106,10 @@ class ModuleFile
   StringRef MiscVersion;
 
 public:
+  static std::unique_ptr<llvm::MemoryBuffer> getModuleName(ASTContext &Ctx,
+                                                           StringRef modulePath,
+                                                           std::string &Name);
+
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:

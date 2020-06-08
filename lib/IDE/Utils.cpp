@@ -812,7 +812,7 @@ unsigned DeclNameViewer::commonPartsCount(DeclNameViewer &Other) const {
   unsigned Len = std::min(args().size(), Other.args().size());
   for (unsigned I = 0; I < Len; ++ I) {
     if (args()[I] == Other.args()[I])
-      Result ++;
+      ++Result;
     else
       return Result;
   }

@@ -549,10 +549,7 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
   : LangOpts(langOpts),
     TypeCheckerOpts(typeckOpts),
     SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
-    evaluator(Diags,
-              langOpts.DebugDumpCycles,
-              langOpts.BuildRequestDependencyGraph,
-              langOpts.EnableExperientalPrivateIntransitiveDependencies),
+    evaluator(Diags, langOpts),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -3367,14 +3364,22 @@ SILFunctionType::SILFunctionType(
     }
   }
 
-  // Check that `@noDerivative` parameters only exist on `@differentiable`
-  // functions.
-  if (!ext.isDifferentiable())
-    for (auto param : getParameters())
+  // Check that `@noDerivative` parameters and results only exist in
+  // `@differentiable` function types.
+  if (!ext.isDifferentiable()) {
+    for (auto param : getParameters()) {
       assert(param.getDifferentiability() ==
                  SILParameterDifferentiability::DifferentiableOrNotApplicable &&
-             "non-`@differentiable` function should not have NotDifferentiable "
-             "parameter");
+             "non-`@differentiable` function type should not have "
+             "`@noDerivative` parameter");
+    }
+    for (auto result : getResults()) {
+      assert(result.getDifferentiability() ==
+                 SILResultDifferentiability::DifferentiableOrNotApplicable &&
+             "non-`@differentiable` function type should not have "
+             "`@noDerivative` result");
+    }
+  }
 #endif
 }
 
@@ -3846,7 +3851,7 @@ void SubstitutionMap::Storage::Profile(
       id.AddPointer(replacementTypes[i].getPointer());
     else
       id.AddPointer(nullptr);
-    i++;
+    ++i;
   });
 
   // Conformances.

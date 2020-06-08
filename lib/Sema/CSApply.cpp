@@ -628,7 +628,7 @@ namespace {
       // equal to its parent expression's base.
       Expr *prev = ExprStack.back();
 
-      for (argCount = 1; argCount < maxArgCount && argCount < e; argCount++) {
+      for (argCount = 1; argCount < maxArgCount && argCount < e; ++argCount) {
         Expr *result = ExprStack[e - argCount - 1];
         Expr *base = getBaseExpr(result);
         if (base != prev)
@@ -3859,7 +3859,8 @@ namespace {
       if (expr->isLiteralInit()) {
         auto *literalInit = expr->getSubExpr();
         if (auto *call = dyn_cast<CallExpr>(literalInit)) {
-          call->getFn()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+          forEachExprInConstraintSystem(call->getFn(),
+                                        [&](Expr *subExpr) -> Expr * {
             auto *TE = dyn_cast<TypeExpr>(subExpr);
             if (!TE)
               return subExpr;
@@ -5293,7 +5294,7 @@ static unsigned getOptionalEvaluationDepth(Expr *expr, Expr *target) {
 
     // If we see an optional evaluation, the depth goes up.
     if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)) {
-      depth++;
+      ++depth;
       expr = optEval->getSubExpr();
 
     // We have to handle any other expressions that can be introduced by
@@ -5787,9 +5788,9 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
   if (auto CE = dyn_cast<ClosureExpr>(expr)) {
     cs.setType(CE, toType);
 
-    // If this is not a single-expression closure, write the type into the
-    // ClosureExpr directly here, since the visitor won't.
-    if (!CE->hasSingleExpressionBody())
+    // If this closure isn't type-checked in its enclosing expression, write
+    // the type into the ClosureExpr directly here, since the visitor won't.
+    if (!shouldTypeCheckInEnclosingExpression(CE))
       CE->setType(toType);
 
     return true;
@@ -7063,7 +7064,7 @@ ExprRewriter::buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
         conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
-    for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
+    for (unsigned i = 0, n = arg->getNumElements(); i < n; ++i) {
       Expr *labelExpr =
         new (ctx) StringLiteralExpr(arg->getElementName(i).get(),
                                     arg->getElementNameLoc(i),
@@ -8103,6 +8104,25 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     }
 
     return target;
+  } else if (auto patternBinding = target.getAsPatternBinding()) {
+    ConstraintSystem &cs = solution.getConstraintSystem();
+    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      // Find the solution application target for this.
+      auto knownTarget = *cs.getSolutionApplicationTarget(
+          {patternBinding, index});
+
+      // Rewrite the target.
+      auto resultTarget = rewriteTarget(knownTarget);
+      if (!resultTarget)
+        return None;
+
+      patternBinding->setPattern(
+          index, resultTarget->getInitializationPattern(),
+          resultTarget->getDeclContext());
+      patternBinding->setInit(index, resultTarget->getAsExpr());
+    }
+
+    return target;
   } else {
     auto fn = *target.getAsFunction();
     if (rewriteFunction(fn))
@@ -8379,6 +8399,10 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
     }
 
     return *this;
+
+  case Kind::patternBinding:
+    return *this;
   }
+
   llvm_unreachable("invalid target kind");
 }

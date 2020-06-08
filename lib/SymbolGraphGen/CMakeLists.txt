@@ -1,4 +1,5 @@
 add_swift_host_library(swiftSymbolGraphGen STATIC
+  AvailabilityMixin.cpp
   DeclarationFragmentPrinter.cpp
   Edge.cpp
   JSON.cpp

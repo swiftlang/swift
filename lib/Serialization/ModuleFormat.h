@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 557; // COW instructions
+const uint16_t SWIFTMODULE_VERSION_MINOR = 558; // SIL function type result differentiability
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -356,7 +356,7 @@ using ParameterConventionField = BCFixed<4>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class SILParameterDifferentiability : uint8_t {
-  DifferentiableOrNotApplicable,
+  DifferentiableOrNotApplicable = 0,
   NotDifferentiable,
 };
 
@@ -370,6 +370,13 @@ enum class ResultConvention : uint8_t {
   Autoreleased,
 };
 using ResultConventionField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class SILResultDifferentiability : uint8_t {
+  DifferentiableOrNotApplicable = 0,
+  NotDifferentiable,
+};
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.

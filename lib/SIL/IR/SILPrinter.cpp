@@ -2334,6 +2334,10 @@ public:
     for (auto i : dfi->getParameterIndices()->getIndices())
       *this << ' ' << i;
     *this << "] ";
+    *this << "[results";
+    for (auto i : dfi->getResultIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
     *this << getIDAndType(dfi->getOriginalFunction());
     if (dfi->hasDerivativeFunctions()) {
       *this << " with_derivative ";
@@ -3127,6 +3131,9 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     switch (entry.TheKind) {
     case SILVTable::Entry::Kind::Normal:
       break;
+    case SILVTable::Entry::Kind::NormalNonOverridden:
+      OS << " [nonoverridden]";
+      break;
     case SILVTable::Entry::Kind::Inherited:
       OS << " [inherited]";
       break;
@@ -3569,7 +3576,7 @@ ID SILPrintContext::getID(const SILNode *node) {
     // If there are no results, make sure we don't reuse that ID.
     auto results = I.getResults();
     if (results.empty()) {
-      idx++;
+      ++idx;
       continue;
     }
 

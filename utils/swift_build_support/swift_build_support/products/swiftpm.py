@@ -93,3 +93,16 @@ class SwiftPM(product.Product):
         self.run_bootstrap_script('install', host_target, [
             '--prefix', install_prefix
         ])
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB,
+                product.LibDispatch,
+                product.Foundation,
+                product.XCTest,
+                product.LLBuild]

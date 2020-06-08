@@ -677,8 +677,9 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
                                  InInactiveClauseEnvironment || !isActive);
     // Disable updating the interface hash inside inactive blocks.
-    llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
-        CurrentTokenHash, isActive ? CurrentTokenHash : nullptr);
+    Optional<llvm::SaveAndRestore<Optional<llvm::MD5>>> T;
+    if (!isActive)
+      T.emplace(CurrentTokenHash, None);
 
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);

@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -module-name Availability -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name Availability -I %t -pretty-print -output-dir %t
-// RUN: %FileCheck %s --input-file %t/Availability.symbols.json
+// RUN: %target-build-swift %s -module-name Basic -emit-module -emit-module-path %t/
+// RUN: %target-swift-symbolgraph-extract -module-name Basic -I %t -pretty-print -output-dir %t
+// RUN: %FileCheck %s --input-file %t/Basic.symbols.json
+
+// REQUIRES: OS=macosx
 
 @available(macOS, introduced: 10.9, deprecated: 10.10, obsoleted: 10.11, message: "Everyone makes mistakes", renamed: "S2")
 public struct S {}

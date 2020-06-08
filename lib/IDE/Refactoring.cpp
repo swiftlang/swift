@@ -1174,12 +1174,11 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
-
-  Instance->performParseOnly();
 
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();
@@ -1959,7 +1958,7 @@ bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange(
     return true;
   EditorConsumerInsertStream OS(EditConsumer, SM, RangeInfo.ContentRange);
   OS << "\"";
-  for (auto It = Expressions->begin(); It != Expressions->end(); It++) {
+  for (auto It = Expressions->begin(); It != Expressions->end(); ++It) {
     interpolatedExpressionForm(*It, SM, OS);
   }
   OS << "\"";
@@ -3586,7 +3585,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
 static std::string insertUnderscore(StringRef Text) {
   llvm::SmallString<64> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
-  for (auto It = Text.begin(); It != Text.end(); It++) {
+  for (auto It = Text.begin(); It != Text.end(); ++It) {
     unsigned Distance = It - Text.begin();
     if (Distance && !(Distance % 3)) {
       OS << '_';
@@ -3659,16 +3658,25 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
            return N.isStmt(StmtKind::Brace) || N.isExpr(ExprKind::Call);
          });
   Finder.resolve();
-  if (Finder.getContexts().empty()
-      || !Finder.getContexts().back().is<Expr*>())
+  auto contexts = Finder.getContexts();
+  if (contexts.empty())
     return nullptr;
-  CallExpr *CE = cast<CallExpr>(Finder.getContexts().back().get<Expr*>());
+
+  // If the innermost context is a statement (which will be a BraceStmt per
+  // the filtering condition above), drop it.
+  if (contexts.back().is<Stmt *>()) {
+    contexts = contexts.drop_back();
+  }
+
+  if (contexts.empty() || !contexts.back().is<Expr*>())
+    return nullptr;
+  CallExpr *CE = cast<CallExpr>(contexts.back().get<Expr*>());
 
   if (CE->hasTrailingClosure())
     // Call expression already has a trailing closure.
     return nullptr;
 
-  // The last arugment is a closure?
+  // The last argument is a closure?
   Expr *Args = CE->getArg();
   if (!Args)
     return nullptr;

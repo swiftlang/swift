@@ -18,7 +18,6 @@
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxKind.h"
-#include <vector>
 
 namespace swift {
 

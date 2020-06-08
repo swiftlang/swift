@@ -1201,7 +1201,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
   auto i = node->begin(), e = node->end();
   if (i != e && (*i)->getKind() == Node::Kind::ImplConvention) {
     StringRef text = (*i)->getText();
-    i++;
+    ++i;
     if (text == "@callee_unowned") {
       Buffer << 'd';
     } else if (text == "@callee_guaranteed") {
@@ -1224,7 +1224,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
     Buffer << ((*i)->getKind() == Node::Kind::DependentGenericSignature
               ? 'G' : 'g');
     mangleDependentGenericSignature((*i));
-    i++;
+    ++i;
   }
   Buffer << '_';
   for (; i != e && (*i)->getKind() == Node::Kind::ImplParameter; ++i) {

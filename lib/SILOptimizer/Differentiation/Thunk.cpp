@@ -330,7 +330,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Convert direct result to indirect result.
     // Increment thunk argument iterator; reabstraction handled later.
-    toArgIter++;
+    ++toArgIter;
   }
 
   // Reabstract parameters.
@@ -562,7 +562,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     unsigned indexInBitVec = 0;
     for (auto index : actualIndices.parameters->getIndices()) {
       actualParamIndicesMap[index] = indexInBitVec;
-      indexInBitVec++;
+      ++indexInBitVec;
     }
   }
   auto mapOriginalParameterIndex = [&](unsigned index) -> unsigned {
@@ -622,7 +622,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
         continue;
       auto resultInfo = linearMapType->getResults()[pullbackResultIndex];
       assert(pullbackResultIndex < linearMapType->getNumResults());
-      pullbackResultIndex++;
+      ++pullbackResultIndex;
       // Skip pullback direct results. Only indirect results are relevant as
       // arguments.
       if (resultInfo.isFormalDirect())
@@ -725,7 +725,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffDerivativeFunctionType(
-      desiredIndices.parameters, desiredIndices.source, kind, module.Types,
+      desiredIndices.parameters, desiredIndices.results, kind, module.Types,
       lookupConformance);
   auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {
