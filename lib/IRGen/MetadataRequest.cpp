@@ -672,7 +672,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
   } else if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
     if (isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
             IGF.IGM, *theClass, theType,
-            /*usingCanonicalSpecializedAccessor=*/true)) {
+            ForUseOnlyFromAccessor)) {
       llvm::Function *accessor =
           IGF.IGM
               .getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
@@ -699,7 +699,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 
 bool irgen::isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
     IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
-    bool usingCanonicalSpecializedAccessor) {
+    CanonicalSpecializedMetadataUsageIsOnlyFromAccessor onlyFromAccessor) {
   assert(nominal.isGenericContext());
 
   if (!IGM.shouldPrespecializeGenericMetadata()) {
@@ -788,7 +788,7 @@ bool irgen::isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
         (protocols.size() > 0);
     };
     auto metadataAccessIsTrivial = [&]() {
-      if (usingCanonicalSpecializedAccessor) {
+      if (onlyFromAccessor) {
         // If an accessor is being used, then the accessor will be able to
         // initialize the arguments, i.e. register classes with the ObjC
         // runtime.
@@ -821,7 +821,7 @@ bool irgen::
   //   Struct<Klass<Int>>
   //   Enum<Klass<Int>>
   return isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-      IGM, nominal, type, /*usingCanonicalSpecializedAccessor=*/false);
+      IGM, nominal, type, NotForUseOnlyFromAccessor);
 }
 
 /// Is there a known address for canonical specialized metadata?  The metadata
@@ -841,7 +841,7 @@ bool irgen::isInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
     // runtime.
     // Concretely, Clazz<Klass<Int>> can be prespecialized.
     return isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-        IGM, *nominal, type, /*usingCanonicalSpecializedAccessor=*/true);
+        IGM, *nominal, type, ForUseOnlyFromAccessor);
   }
 
   return false;
@@ -923,7 +923,7 @@ bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
       return true;
     if (classDecl->isGenericContext() &&
         isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
-            IGM, *classDecl, type, /*usingCanonicalSpecializedAccessor=*/true))
+            IGM, *classDecl, type, ForUseOnlyFromAccessor))
       return false;
     auto strategy = IGM.getClassMetadataStrategy(classDecl);
     return strategy != ClassMetadataStrategy::Fixed;
