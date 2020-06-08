@@ -912,15 +912,17 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
     opts |= SourceFile::ParsingFlags::SuppressWarnings;
   }
 
-  SourceFile *inputFile = new (*Context)
-      SourceFile(*mainModule, fileKind, bufferID,
-                 Invocation.getLangOptions().CollectParsedToken,
-                 Invocation.getLangOptions().BuildSyntaxTree, opts, isPrimary);
+  // Enable interface hash computation for primaries, but not in WMO, as it's
+  // only currently needed for incremental mode.
+  if (isPrimary) {
+    opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
+  }
+  opts |= SourceFile::getDefaultParsingOptions(getASTContext().LangOpts);
+
+  auto *inputFile = new (*Context)
+      SourceFile(*mainModule, fileKind, bufferID, opts, isPrimary);
   MainModule->addFile(*inputFile);
 
-  if (isPrimary) {
-    inputFile->enableInterfaceHash();
-  }
   return inputFile;
 }
 
