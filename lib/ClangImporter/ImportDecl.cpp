@@ -3505,10 +3505,11 @@ namespace {
     }
 
     Decl *VisitCXXRecordDecl(const clang::CXXRecordDecl *decl) {
-      // lldb can call this without enabling C++ interop. To avoid crashing in
-      // Clang's Sema, fall back to importing this as a plain RecordDecl.
-      // FIXME: Fix lldb to enable C++ interop when appropriate, then remove
-      // this fallback.
+      // This can be called from lldb without C++ interop being enabled: There
+      // may be C++ declarations in imported modules, but the interface for
+      // those modules may be a pure C or Objective-C interface.
+      // To avoid crashing in Clang's Sema, fall back to importing this as a
+      // plain RecordDecl.
       if (!Impl.SwiftContext.LangOpts.EnableCXXInterop)
         return VisitRecordDecl(decl);
 
