@@ -705,6 +705,37 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   return imports;
 }
 
+bool CompilerInstance::createFilesForMainModule(
+    ModuleDecl *mod, SmallVectorImpl<FileUnit *> &files) const {
+  // Make sure the main file is the first file in the module.
+  if (MainBufferID != NO_SUCH_BUFFER) {
+    auto *mainFile = createSourceFileForMainModule(
+        mod, Invocation.getSourceFileKind(), MainBufferID);
+    files.push_back(mainFile);
+  }
+
+  // If we have partial modules to load, do so now, bailing if any failed to
+  // load.
+  if (!PartialModules.empty()) {
+    if (loadPartialModulesAndImplicitImports(mod, files))
+      return true;
+  }
+
+  // Finally add the library files.
+  // FIXME: This is the only demand point for InputSourceCodeBufferIDs. We
+  // should compute this list of source files lazily.
+  for (auto BufferID : InputSourceCodeBufferIDs) {
+    // Skip the main buffer, we've already handled it.
+    if (BufferID == MainBufferID)
+      continue;
+
+    auto *libraryFile =
+        createSourceFileForMainModule(mod, SourceFileKind::Library, BufferID);
+    files.push_back(libraryFile);
+  }
+  return false;
+}
+
 ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
@@ -719,6 +750,22 @@ ModuleDecl *CompilerInstance::getMainModule() const {
 
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+
+    Context->LoadedModules[MainModule->getName()] = MainModule;
+
+    // Create and add the module's files.
+    SmallVector<FileUnit *, 16> files;
+    if (!createFilesForMainModule(MainModule, files)) {
+      for (auto *file : files)
+        MainModule->addFile(*file);
+    } else {
+      // If we failed to load a partial module, mark the main module as having
+      // "failed to load", as it will contain no files. Note that we don't try
+      // to add any of the successfully loaded partial modules. This ensures
+      // that we don't encounter cases where we try to resolve a cross-reference
+      // into a partial module that failed to load.
+      MainModule->setFailedToLoad();
+    }
   }
   return MainModule;
 }
@@ -753,37 +800,13 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   ModuleDecl *mainModule = getMainModule();
-  Context->LoadedModules[mainModule->getName()] = mainModule;
-
-  // Make sure the main file is the first file in the module, so do this now.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    auto *mainFile = createSourceFileForMainModule(
-        Invocation.getSourceFileKind(), MainBufferID);
-    mainFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
-  }
-
-  // If we aren't in a parse-only context, load the remaining serialized inputs
-  // and resolve implicit imports.
-  if (LimitStage > SourceFile::Unprocessed &&
-      loadPartialModulesAndImplicitImports()) {
-    // If we failed to load a partial module, mark the main module as having
-    // "failed to load", as it may contain no files.
-    mainModule->setFailedToLoad();
-    return;
-  }
 
   // Then parse all the input files.
-  // FIXME: This is the only demand point for InputSourceCodeBufferIDs. We
-  // should compute this list of source files lazily.
-  for (auto BufferID : InputSourceCodeBufferIDs) {
-    SourceFile *SF;
-    if (BufferID == MainBufferID) {
-      // If this is the main file, we've already created it.
-      SF = &getMainModule()->getMainSourceFile(Invocation.getSourceFileKind());
-    } else {
-      // Otherwise create a library file.
-      SF = createSourceFileForMainModule(SourceFileKind::Library, BufferID);
-    }
+  for (auto *file : mainModule->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
     // Trigger parsing of the file.
     if (LimitStage == SourceFile::Unprocessed) {
       (void)SF->getTopLevelDecls();
@@ -795,15 +818,15 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   if (LimitStage == SourceFile::Unprocessed)
     return;
 
-  assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
+  assert(llvm::all_of(mainModule->getFiles(), [](const FileUnit *File) -> bool {
     auto *SF = dyn_cast<SourceFile>(File);
     if (!SF)
       return true;
     return SF->ASTStage >= SourceFile::ImportsResolved;
   }) && "some files have not yet had their imports resolved");
-  MainModule->setHasResolvedImports();
+  mainModule->setHasResolvedImports();
 
-  bindExtensions(*MainModule);
+  bindExtensions(*mainModule);
 
   // If the limiting AST stage is import resolution, we're done.
   if (LimitStage == SourceFile::ImportsResolved)
@@ -839,26 +862,27 @@ bool CompilerInstance::loadStdlibIfNeeded() {
   return false;
 }
 
-bool CompilerInstance::loadPartialModulesAndImplicitImports() {
+bool CompilerInstance::loadPartialModulesAndImplicitImports(
+    ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const {
   FrontendStatsTracer tracer(getStatsReporter(),
                              "load-partial-modules-and-implicit-imports");
   // Force loading implicit imports. This is currently needed to allow
   // deserialization to resolve cross references into bridging headers.
   // FIXME: Once deserialization loads all the modules it needs for cross
   // references, this can be removed.
-  (void)MainModule->getImplicitImports();
+  (void)mod->getImplicitImports();
 
+  // Load in the partial modules.
   bool hadLoadError = false;
-  // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
     auto *file =
-        SML->loadAST(*MainModule, SourceLoc(), /*moduleInterfacePath*/ "",
+        SML->loadAST(*mod, /*diagLoc*/ SourceLoc(), /*moduleInterfacePath*/ "",
                      std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
                      std::move(PM.ModuleSourceInfoBuffer),
                      /*isFramework*/ false);
     if (file) {
-      MainModule->addFile(*file);
+      partialModules.push_back(file);
     } else {
       hadLoadError = true;
     }
@@ -869,7 +893,7 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports() {
 void CompilerInstance::forEachFileToTypeCheck(
     llvm::function_ref<void(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
-    for (auto fileName : MainModule->getFiles()) {
+    for (auto fileName : getMainModule()->getFiles()) {
       auto *SF = dyn_cast<SourceFile>(fileName);
       if (!SF) {
         continue;
@@ -928,15 +952,16 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
-    SourceFileKind fileKind, Optional<unsigned> bufferID) {
-  ModuleDecl *mainModule = getMainModule();
-
+    ModuleDecl *mod, SourceFileKind fileKind,
+    Optional<unsigned> bufferID) const {
   auto isPrimary = bufferID && isPrimaryInput(*bufferID);
   auto opts = getSourceFileParsingOptions(isPrimary);
 
   auto *inputFile = new (*Context)
-      SourceFile(*mainModule, fileKind, bufferID, opts, isPrimary);
-  MainModule->addFile(*inputFile);
+      SourceFile(*mod, fileKind, bufferID, opts, isPrimary);
+
+  if (bufferID == MainBufferID)
+    inputFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
   return inputFile;
 }

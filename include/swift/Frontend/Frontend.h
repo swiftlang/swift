@@ -441,8 +441,9 @@ class CompilerInstance {
   std::vector<unsigned> InputSourceCodeBufferIDs;
 
   /// Contains \c MemoryBuffers for partial serialized module files and
-  /// corresponding partial serialized module documentation files.
-  std::vector<ModuleBuffers> PartialModules;
+  /// corresponding partial serialized module documentation files. This is
+  /// \c mutable as it is consumed by \c loadPartialModulesAndImplicitImports.
+  mutable std::vector<ModuleBuffers> PartialModules;
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
@@ -630,9 +631,15 @@ public:
   bool performSILProcessing(SILModule *silModule);
 
 private:
-  SourceFile *
-  createSourceFileForMainModule(SourceFileKind FileKind,
-                                Optional<unsigned> BufferID);
+  /// Creates a new source file for the main module.
+  SourceFile *createSourceFileForMainModule(ModuleDecl *mod,
+                                            SourceFileKind FileKind,
+                                            Optional<unsigned> BufferID) const;
+
+  /// Creates all the files to be added to the main module, appending them to
+  /// \p files. If a loading error occurs, returns \c true.
+  bool createFilesForMainModule(ModuleDecl *mod,
+                                SmallVectorImpl<FileUnit *> &files) const;
 
 public:
   void freeASTContext();
@@ -650,8 +657,11 @@ private:
 
   void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
 
-  /// Return true if had load error
-  bool loadPartialModulesAndImplicitImports();
+  /// For any serialized AST inputs, loads them in as partial module files,
+  /// appending them to \p partialModules. If a loading error occurs, returns
+  /// \c true.
+  bool loadPartialModulesAndImplicitImports(
+      ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const;
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
