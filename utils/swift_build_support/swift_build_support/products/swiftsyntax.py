@@ -91,3 +91,17 @@ class SwiftSyntax(product.Product):
 
         self.run_swiftsyntax_build_script(target=target_name,
                                           additional_params=additional_params)
+
+    @classmethod
+    def get_dependencies(cls):
+        return [product.CMark,
+                product.LLVM,
+                product.LibCXX,
+                product.LibICU,
+                product.Swift,
+                product.LLDB,
+                product.LibDispatch,
+                product.Foundation,
+                product.XCTest,
+                product.LLBuild,
+                product.SwiftPM]

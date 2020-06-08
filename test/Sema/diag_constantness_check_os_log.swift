@@ -73,6 +73,10 @@ func testValidLogCalls(x: Int) {
 func testTypeIncorrectLogCalls() {
   let message = "test message"
 
+  class TestClass {
+  }
+  let x = TestClass()
+
   _osLogTestHelper(message)
   // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'OSLogMessage'}}
   _osLogTestHelper("prefix" + "\(x)")
@@ -81,9 +85,6 @@ func testTypeIncorrectLogCalls() {
   // expected-error@-1 {{cannot convert value of type 'String' to expected argument type '(String, UnsafeBufferPointer<UInt8>) -> Void'}}
   // expected-error@-2 {{missing argument label 'assertion:' in call}}
 
-  class TestClass {
-  }
-  let x = TestClass()
   _osLogTestHelper("\(x, format: .hex)")
   //expected-error@-1 {{no exact matches in call to instance method 'appendInterpolation'}}
 

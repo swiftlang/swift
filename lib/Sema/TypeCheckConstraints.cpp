@@ -1294,15 +1294,13 @@ namespace {
     }
 
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      // Never walk into statements.
-      return { false, stmt };
+      return { true, stmt };
     }
   };
 } // end anonymous namespace
 
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
-/// true for single-expression closures, where we want the body to be considered
-/// part of this larger expression.
+/// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   auto *PL = closure->getParameters();
 
@@ -3708,9 +3706,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   else
     fromRequiresClass = fromType->mayHaveSuperclass();
   
-  // Casts between protocol metatypes only succeed if the type is existential.
+  // Casts between protocol metatypes only succeed if the type is existential
+  // or if it involves generic types because they may be protocol conformances
+  // we can't know at compile time.
   if (metatypeCast) {
-    if (toExistential || fromExistential)
+    if ((toExistential || fromExistential) && !(fromArchetype || toArchetype))
       return failed();
   }
 
@@ -4060,4 +4060,31 @@ HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
 
 bool swift::shouldTypeCheckInEnclosingExpression(ClosureExpr *expr) {
   return expr->hasSingleExpressionBody();
+}
+
+void swift::forEachExprInConstraintSystem(
+    Expr *expr, llvm::function_ref<Expr *(Expr *)> callback) {
+  struct ChildWalker : ASTWalker {
+    llvm::function_ref<Expr *(Expr *)> callback;
+
+    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
+    : callback(callback) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto closure = dyn_cast<ClosureExpr>(E)) {
+        if (!shouldTypeCheckInEnclosingExpression(closure))
+          return { false, callback(E) };
+      }
+      return { true, callback(E) };
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      return { false, P };
+    }
+    bool walkToDeclPre(Decl *D) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+  };
+
+  expr->walk(ChildWalker(callback));
 }

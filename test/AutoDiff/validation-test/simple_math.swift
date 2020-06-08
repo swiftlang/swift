@@ -368,7 +368,21 @@ SimpleMathTests.test("ForceUnwrapping") {
   expectEqual((1, 2), forceUnwrap(Float(2)))
 }
 
-// CHECK-LABEL: sil private [ossa] @AD__${{.*}}jumpTimesTwo{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__$s4nullyycfU18_12jumpTimesTwoL_5modelSfAAyycfU18_14SmallTestModelL_V_tF_bb0__PB__src_0_wrt_0) -> SmallTestModel.TangentVector {
+SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete rhs") {
+  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.
+  struct SmallTestModel : Differentiable {
+    public var stored: Float = 3.0
+    @differentiable public func callAsFunction() -> Float { return stored }
+  }
+
+  func doubled(_ model: SmallTestModel) -> Float{
+    return model() + model.stored
+  }
+  let grads = gradient(at: SmallTestModel(), in: doubled)
+  expectEqual(2.0, grads.stored)
+}
+
+// CHECK-LABEL: sil private [ossa] @AD__${{.*}}doubled{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
 // CHECK: bb0([[DX:%.*]] : $Float, [[PB_STRUCT:%.*]] : {{.*}}):
 // CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
 // CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
@@ -386,19 +400,5 @@ SimpleMathTests.test("ForceUnwrapping") {
 // CHECK:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
 // CHECK:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
 // CHECK: }
-
-SimpleMathTests.test("Struct") {
-  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.
-  struct SmallTestModel : Differentiable {
-    public var jump: Float = 3.0
-    @differentiable public func callAsFunction() -> Float { return jump }
-  }
-
-  func jumpTimesTwo(model: SmallTestModel) -> Float{
-    return model() + model.jump
-  }
-  let grads = gradient(at: SmallTestModel(), in: jumpTimesTwo)
-  expectEqual(2.0, grads.jump)
-}
 
 runAllTests()
