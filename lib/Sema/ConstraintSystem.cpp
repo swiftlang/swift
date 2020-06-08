@@ -3074,6 +3074,20 @@ static bool diagnoseAmbiguity(
 
   auto &DE = cs.getASTContext().Diags;
 
+  {
+    auto fixKind = aggregateFix.front().second->getKind();
+    if (llvm::all_of(
+            aggregateFix, [&](const std::pair<const Solution *,
+                                              const ConstraintFix *> &entry) {
+              auto &fix = entry.second;
+              return fix->getKind() == fixKind && fix->getLocator() == locator;
+            })) {
+      auto *primaryFix = aggregateFix.front().second;
+      if (primaryFix->diagnoseForAmbiguity(aggregateFix))
+        return true;
+    }
+  }
+
   auto *decl = ambiguity.choices.front().getDeclOrNull();
   if (!decl)
     return false;
@@ -3234,6 +3248,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   for (const auto &entry : fixes) {
     const auto &solution = *entry.first;
     const auto *fix = entry.second;
+
     auto *calleeLocator = solution.getCalleeLocator(fix->getLocator());
 
     fixesByCallee[calleeLocator].push_back({&solution, fix});
