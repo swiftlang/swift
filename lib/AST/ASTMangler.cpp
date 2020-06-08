@@ -2311,7 +2311,7 @@ void ASTMangler::appendFunctionInputType(
       // mangling as well, to avoid collisions when we have enum cases
       // that share the same base name, but have different labeled
       // arguments.
-      if (isa<EnumElementDecl>(forDecl) && param.hasLabel() &&
+      if (forDecl && isa<EnumElementDecl>(forDecl) && param.hasLabel() &&
           IncludeEnumCasePayloadLabels) {
         appendTypeListElement(param.getLabel(), param.getPlainType(),
                               param.getParameterFlags(), forDecl);
