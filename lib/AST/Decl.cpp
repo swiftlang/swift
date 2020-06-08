@@ -738,9 +738,6 @@ bool Decl::hasUnderscoredNaming() const {
   }
 
   if (const auto PD = dyn_cast<ProtocolDecl>(D)) {
-    if (PD->getAttrs().hasAttribute<ShowInInterfaceAttr>()) {
-      return false;
-    }
     StringRef NameStr = PD->getNameStr();
     if (NameStr.startswith("_Builtin")) {
       return true;
@@ -795,6 +792,10 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   if (isa<ProtocolDecl>(D)) {
     if (treatNonBuiltinProtocolsAsPublic)
       return false;
+  }
+
+  if (D->getAttrs().hasAttribute<ShowInInterfaceAttr>()) {
+    return false;
   }
 
   return hasUnderscoredNaming();
