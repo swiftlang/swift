@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
@@ -35,6 +36,7 @@
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace importer;
@@ -783,6 +785,34 @@ SwiftLookupTable::lookupObjCMembers(SerializedSwiftName baseName) {
     case ContextKind::ObjCProtocol:
     case ContextKind::Typedef:
       break;
+    }
+
+    // Map each of the declarations.
+    for (auto &stored : entry.DeclsOrMacros) {
+      assert(isDeclEntry(stored) && "Not a declaration?");
+      result.push_back(mapStoredDecl(stored));
+    }
+  }
+
+  return result;
+}
+
+SmallVector<clang::NamedDecl *, 4>
+SwiftLookupTable::lookupMemberOperators(SerializedSwiftName baseName) {
+  SmallVector<clang::NamedDecl *, 4> result;
+
+  // Find the lookup table entry for this base name.
+  auto known = findOrCreate(LookupTable, baseName,
+                             [](auto &results, auto &Reader, auto Name) {
+     return (void)Reader.lookup(Name, results);
+   });
+  if (known == LookupTable.end()) return result;
+
+  // Walk each of the entries.
+  for (auto &entry : known->second) {
+    // We're only looking for C++ operators
+    if (entry.Context.first != ContextKind::Tag) {
+      continue;
     }
 
     // Map each of the declarations.

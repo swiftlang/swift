@@ -3812,7 +3812,9 @@ namespace {
             decl->isVariadic(), isInSystemModule(dc), name, bodyParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
-          if (!mdecl->isStatic()) {
+          if (!mdecl->isStatic() &&
+              mdecl->getDeclName().getNameKind() !=
+                  clang::DeclarationName::CXXOperatorName) {
             selfIdx = 0;
             // Workaround until proper const support is handled: Force
             // everything to be mutating. This implicitly makes the parameter

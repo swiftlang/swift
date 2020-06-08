@@ -2769,7 +2769,8 @@ getSILFunctionTypeForClangDecl(TypeConverter &TC, const clang::Decl *clangDecl,
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    AbstractionPattern origPattern =
+    AbstractionPattern origPattern = method->isOverloadedOperator() ?
+        AbstractionPattern::getOperator(origType, method):
         AbstractionPattern::getCXXMethod(origType, method);
     auto conventions = CXXMethodConventions(method);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
@@ -4025,7 +4026,9 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       assert(numParameterLists == 2);
       if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
-        return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
+        return method->isOverloadedOperator()
+                   ? AbstractionPattern::getCurriedOperator(fnType, bridgedFn)
+                   : AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {
         // C function imported as a method.
         return AbstractionPattern::getCurriedCFunctionAsMethod(fnType,

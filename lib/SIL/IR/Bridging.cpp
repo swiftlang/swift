@@ -42,8 +42,8 @@ TypeConverter::getBridgedParam(SILFunctionTypeRepresentation rep,
                                AbstractionPattern pattern,
                                AnyFunctionType::Param param,
                                Bridgeability bridging) {
-  assert(!param.getParameterFlags().isInOut() &&
-         !param.getParameterFlags().isVariadic());
+  // assert(!param.getParameterFlags().isInOut() &&
+  //        !param.getParameterFlags().isVariadic());
 
   auto bridged = getLoweredBridgedType(pattern, param.getPlainType(), bridging,
                                        rep, TypeConverter::ForArgument);

@@ -3585,6 +3585,16 @@ void ClangImporter::Implementation::lookupValue(
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
 
+  if (name.isOperator()) {
+    for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
+      if (isVisibleClangEntry(entry)) {
+        if (auto decl = dyn_cast<ValueDecl>(
+                importDeclReal(entry->getMostRecentDecl(), CurrentVersion)))
+          consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+      }
+    }
+  }
+
   for (auto entry : table.lookup(name.getBaseName(), clangTU)) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(entry)) continue;

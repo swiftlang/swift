@@ -169,6 +169,14 @@ AbstractionPattern::getCurriedCXXMethod(CanType origType,
 }
 
 AbstractionPattern
+AbstractionPattern::getCurriedOperator(CanType origType,
+                                        const AbstractFunctionDecl *function) {
+  auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
+  return getCurriedOperator(origType, clangMethod);
+}
+
+
+AbstractionPattern
 AbstractionPattern::getOptional(AbstractionPattern object) {
   switch (object.getKind()) {
   case Kind::Invalid:
@@ -183,6 +191,9 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("cannot add optionality to non-type abstraction");
@@ -290,6 +301,9 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     return false;
@@ -364,6 +378,9 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("function types are not tuples");
@@ -470,6 +487,8 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   }
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
                               getCXXMethod()->getReturnType().getTypePtr());
@@ -488,6 +507,9 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   case Kind::CurriedCXXMethodType:
     return getPartialCurriedCXXMethod(getGenericSignatureForFunctionComponent(),
                                       getResultType(getType()), getCXXMethod());
+  case Kind::CurriedCXXOperatorMethodType:
+    return getPartialCurriedOperator(getGenericSignatureForFunctionComponent(),
+                                     getResultType(getType()), getCXXMethod());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType:
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
@@ -521,6 +543,11 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     return getCFunctionAsMethodSelfPattern(params[0].getParameterType());
   }
   case Kind::CurriedCXXMethodType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
+    assert(params.size() == 1);
+    return getCXXMethodSelfPattern(params[0].getParameterType());
+  }
+  case Kind::CurriedCXXOperatorMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     assert(params.size() == 1);
     return getCXXMethodSelfPattern(params[0].getParameterType());
@@ -578,6 +605,24 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               paramType,
                               getClangFunctionParameterType(methodType, index));
+  }
+  case Kind::CXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
+
+    // A parameter of type () does not correspond to a Clang parameter.
+    auto paramType = params[index].getParameterType();
+    if (paramType->isVoid())
+      return AbstractionPattern(paramType);
+
+    if (index == 0)
+      return getCXXMethodSelfPattern(paramType);
+    
+    // Otherwise, we're talking about the formal parameter clause.
+    auto methodType = getCXXMethod()->getType().getTypePtr();
+    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                              paramType,
+                              getClangFunctionParameterType(methodType, index-1));
   }
   case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
@@ -660,6 +705,9 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -703,6 +751,9 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -795,6 +846,9 @@ void AbstractionPattern::print(raw_ostream &out) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
     out << (getKind() == Kind::CXXMethodType
               ? "AP::CXXMethodType(" :
             getKind() == Kind::CurriedCXXMethodType
@@ -927,6 +981,9 @@ const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXOperatorMethodType:
+  case Kind::CurriedCXXOperatorMethodType:
+  case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard:
