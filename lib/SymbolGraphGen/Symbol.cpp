@@ -125,8 +125,22 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
   OS.attributeObject("names", [&](){
     SmallVector<SmallString<32>, 8> PathComponents;
     getPathComponents(PathComponents);
-    
-    OS.attribute("title", PathComponents.back());
+
+    if (isa<GenericTypeDecl>(VD)) {    
+      SmallString<64> FullyQualifiedTitle;
+
+      for (const auto *It = PathComponents.begin(); It != PathComponents.end(); ++It) {
+        if (It != PathComponents.begin()) {
+          FullyQualifiedTitle.push_back('.');
+        }
+        FullyQualifiedTitle.append(*It);
+      }
+      
+      OS.attribute("title", FullyQualifiedTitle.str());
+    } else {
+      OS.attribute("title", PathComponents.back());
+    }
+
     Graph->serializeNavigatorDeclarationFragments("navigator", *this, OS);
     Graph->serializeSubheadingDeclarationFragments("subHeading", *this, OS);
     // "prose": null
