@@ -1098,10 +1098,18 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
-    llvm::SmallString<32> opt =
-        getTargetDependentLibraryOption(Triple, linkLib.getName());
-    AutolinkEntries.push_back(
-        llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
+    if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF && IRGen.Opts.LLVMLTOKind != IRGenLLVMLTOKind::None) {
+      // When performing LTO, we always use lld that supports auto linking mechanism with ELF.
+      // So embed dependent libraries names in "llvm.dependent-libraries" instead of options
+      // to avoid using swift-autolink-extract.
+      AutolinkEntries.push_back(
+          llvm::MDNode::get(ctx, llvm::MDString::get(ctx, linkLib.getName())));
+    } else {
+      llvm::SmallString<32> opt =
+          getTargetDependentLibraryOption(Triple, linkLib.getName());
+      AutolinkEntries.push_back(
+          llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
+    }
     break;
   }
   case LibraryKind::Framework: {
@@ -1188,7 +1196,12 @@ static bool isFirstObjectFileInModule(IRGenModule &IGM) {
 void IRGenModule::emitAutolinkInfo() {
   // Collect the linker options already in the module (from ClangCodeGen).
   // FIXME: This constant should be vended by LLVM somewhere.
-  auto *Metadata = Module.getOrInsertNamedMetadata("llvm.linker.options");
+  // When performing LTO, we always use lld that supports auto linking mechanism with ELF.
+  // So embed dependent libraries names in "llvm.dependent-libraries" instead of "llvm.linker.options".
+  const StringRef AutolinkSectionName =
+      TargetInfo.OutputObjectFormat == llvm::Triple::ELF && IRGen.Opts.LLVMLTOKind != IRGenLLVMLTOKind::None
+        ? "llvm.dependent-libraries" : "llvm.linker.options";
+  auto *Metadata = Module.getOrInsertNamedMetadata(AutolinkSectionName);
   for (llvm::MDNode *LinkOption : Metadata->operands())
     AutolinkEntries.push_back(LinkOption);
 
@@ -1203,9 +1216,9 @@ void IRGenModule::emitAutolinkInfo() {
                         AutolinkEntries.end());
 
   const bool AutolinkExtractRequired =
-      (TargetInfo.OutputObjectFormat == llvm::Triple::ELF && !Triple.isPS4()) ||
+      ((TargetInfo.OutputObjectFormat == llvm::Triple::ELF && !Triple.isPS4()) ||
       TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
-      Triple.isOSCygMing();
+      Triple.isOSCygMing()) && IRGen.Opts.LLVMLTOKind == IRGenLLVMLTOKind::None;
 
   if (!AutolinkExtractRequired) {
     // On platforms that support autolinking, continue to use the metadata.
