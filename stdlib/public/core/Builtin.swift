@@ -345,6 +345,16 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 #endif
 }
 
+#if INTERNAL_CHECKS_ENABLED
+@usableFromInline
+@_silgen_name("_swift_isImmutableCOWBuffer")
+internal func _swift_isImmutableCOWBuffer(_ object: AnyObject) -> Bool
+
+@usableFromInline
+@_silgen_name("_swift_setImmutableCOWBuffer")
+internal func _swift_setImmutableCOWBuffer(_ object: AnyObject, _ immutable: Bool) -> Bool
+#endif
+
 @inlinable
 internal func _isValidAddress(_ address: UInt) -> Bool {
   // TODO: define (and use) ABI max valid pointer value
