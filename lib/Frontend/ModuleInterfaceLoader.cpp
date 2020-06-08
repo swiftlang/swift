@@ -1131,7 +1131,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
 
   if (CompRe.match(SB, &CompMatches)) {
     assert(CompMatches.size() == 2);
-    CompilerVersion = ArgSaver.save(CompMatches[1]);
+    CompilerVersion = ArgSaver.save(CompMatches[1]).str();
   }
   else {
     // Don't diagnose; handwritten module interfaces don't include this field.

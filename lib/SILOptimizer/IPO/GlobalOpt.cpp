@@ -301,7 +301,7 @@ bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
 
   if (LoopCheckedFunctions.insert(F).second) {
     for (auto I = scc_begin(F); !I.isAtEnd(); ++I) {
-      if (I.hasLoop())
+      if (I.hasCycle())
         for (SILBasicBlock *BB : *I)
           LoopBlocks.insert(BB);
     }

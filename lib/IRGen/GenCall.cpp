@@ -727,6 +727,13 @@ namespace {
       case clang::Type::Pipe:
         llvm_unreachable("OpenCL type in ABI lowering?");
 
+      case clang::Type::ExtInt:
+        llvm_unreachable("ExtInt type in ABI lowering?");
+
+      case clang::Type::ConstantMatrix: {
+        llvm_unreachable("ConstantMatrix type in ABI lowering?");
+      }
+
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
         auto elt = Ctx.getCanonicalType(array->getElementType());
@@ -910,6 +917,8 @@ namespace {
       case clang::BuiltinType::Float16:
         llvm_unreachable("When upstream support is added for Float16 in "
                          "clang::TargetInfo, use the implementation here");
+      case clang::BuiltinType::BFloat16:
+        return convertFloatingType(Ctx.getTargetInfo().getBFloat16Format());
       case clang::BuiltinType::Float128:
         return convertFloatingType(Ctx.getTargetInfo().getFloat128Format());
 
@@ -2110,7 +2119,8 @@ static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
       Alignment(coercionTyLayout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(temporary.getAddress());
   if (alloca->getAlignment() < coercionTyAlignment.getValue()) {
-    alloca->setAlignment(llvm::MaybeAlign(coercionTyAlignment.getValue()));
+    alloca->setAlignment(
+        llvm::MaybeAlign(coercionTyAlignment.getValue()).valueOrOne());
     temporary = Address(temporary.getAddress(), coercionTyAlignment);
   }
 
@@ -2388,7 +2398,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
         auto ABIAlign = AI.getIndirectAlign();
         if (ABIAlign > addr.getAlignment()) {
           auto *AS = cast<llvm::AllocaInst>(addr.getAddress());
-          AS->setAlignment(llvm::MaybeAlign(ABIAlign.getQuantity()));
+          AS->setAlignment(
+              llvm::MaybeAlign(ABIAlign.getQuantity()).valueOrOne());
           addr = Address(addr.getAddress(), Alignment(ABIAlign.getQuantity()));
         }
       }
@@ -3080,7 +3091,8 @@ static void adjustAllocaAlignment(const llvm::DataLayout &DL,
   Alignment layoutAlignment = Alignment(layout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(allocaAddr.getAddress());
   if (alloca->getAlignment() < layoutAlignment.getValue()) {
-    alloca->setAlignment(llvm::MaybeAlign(layoutAlignment.getValue()));
+    alloca->setAlignment(
+        llvm::MaybeAlign(layoutAlignment.getValue()).valueOrOne());
     allocaAddr = Address(allocaAddr.getAddress(), layoutAlignment);
   }
 }
