@@ -460,7 +460,7 @@ class CompilerInstance {
   /// If \p BufID is already in the set, do nothing.
   void recordPrimaryInputBuffer(unsigned BufID);
 
-  bool isWholeModuleCompilation() { return PrimaryBufferIDs.empty(); }
+  bool isWholeModuleCompilation() const { return PrimaryBufferIDs.empty(); }
 
 public:
   // Out of line to avoid having to import SILModule.h.
@@ -642,6 +642,9 @@ public:
   bool loadStdlibIfNeeded();
 
 private:
+  /// Compute the parsing options for a source file in the main module.
+  SourceFile::ParsingOptions getSourceFileParsingOptions(bool forPrimary) const;
+
   /// Retrieve a description of which modules should be implicitly imported.
   ImplicitImportInfo getImplicitImportInfo() const;
 

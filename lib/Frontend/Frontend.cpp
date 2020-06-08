@@ -889,10 +889,8 @@ void CompilerInstance::finishTypeChecking() {
   });
 }
 
-SourceFile *CompilerInstance::createSourceFileForMainModule(
-    SourceFileKind fileKind, Optional<unsigned> bufferID) {
-  ModuleDecl *mainModule = getMainModule();
-
+SourceFile::ParsingOptions
+CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
   const auto &frontendOpts = Invocation.getFrontendOptions();
   const auto action = frontendOpts.RequestedAction;
 
@@ -912,9 +910,8 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
       opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
   }
 
-  auto isPrimary = bufferID && isPrimaryInput(*bufferID);
-  if (isPrimary || isWholeModuleCompilation()) {
-    // Disable delayed body parsing for primaries.
+  if (forPrimary || isWholeModuleCompilation()) {
+    // Disable delayed body parsing for primaries and in WMO.
     opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
   } else {
     // Suppress parse warnings for non-primaries, as they'll get parsed multiple
@@ -924,9 +921,18 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
 
   // Enable interface hash computation for primaries, but not in WMO, as it's
   // only currently needed for incremental mode.
-  if (isPrimary) {
+  if (forPrimary) {
     opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
+  return opts;
+}
+
+SourceFile *CompilerInstance::createSourceFileForMainModule(
+    SourceFileKind fileKind, Optional<unsigned> bufferID) {
+  ModuleDecl *mainModule = getMainModule();
+
+  auto isPrimary = bufferID && isPrimaryInput(*bufferID);
+  auto opts = getSourceFileParsingOptions(isPrimary);
 
   auto *inputFile = new (*Context)
       SourceFile(*mainModule, fileKind, bufferID, opts, isPrimary);
