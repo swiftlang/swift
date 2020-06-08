@@ -3200,6 +3200,17 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;
 
+  if (isDebugMode()) {
+    auto &log = llvm::errs();
+    log << "--- Ambiguity: Considering #" << solutions.size()
+        << " solutions with fixes ---\n";
+    int i = 0;
+    for (auto &solution : solutions) {
+      log << "--- Solution #" << i++ << "---\n";
+      solution.dump(log);
+      log << "\n";
+    }
+  }
 
   // Algorithm is as follows:
   //
