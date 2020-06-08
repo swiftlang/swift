@@ -10,6 +10,9 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import libcxx
+from . import llvm
 from . import product
 
 
@@ -32,6 +35,6 @@ class LibICU(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM,
-                product.LibCXX]
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX]
