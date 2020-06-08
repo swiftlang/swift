@@ -240,10 +240,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
-  if (CI.setup(Invocation))
-    return true;
-  CI.performParseOnly();
-  return false;
+  return CI.setup(Invocation);
 }
 
 static void reportSyntacticAnnotations(CompilerInstance &CI,

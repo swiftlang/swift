@@ -776,16 +776,6 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   Context->LoadedModules[newMod->getName()] = newMod;
 }
 
-void CompilerInstance::performParseOnly() {
-  const InputFileKind Kind = Invocation.getInputKind();
-  assert((Kind == InputFileKind::Swift || Kind == InputFileKind::SwiftLibrary ||
-          Kind == InputFileKind::SwiftModuleInterface) &&
-         "only supports parsing .swift files");
-  (void)Kind;
-
-  performSemaUpTo(SourceFile::Unprocessed);
-}
-
 void CompilerInstance::performParseAndResolveImportsOnly() {
   performSemaUpTo(SourceFile::ImportsResolved);
 }

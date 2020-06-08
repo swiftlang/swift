@@ -1727,9 +1727,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     CI.getMainModule()->setDebugClient(DebuggerClient.get());
   }
 
-  if (!RunTypeChecker)
-    CI.performParseOnly();
-  else
+  if (RunTypeChecker)
     CI.performSema();
 
   if (MangledNameToFind.empty()) {

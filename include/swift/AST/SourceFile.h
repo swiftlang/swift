@@ -490,7 +490,7 @@ public:
   }
 
   SWIFT_DEBUG_DUMP;
-  void dump(raw_ostream &os) const;
+  void dump(raw_ostream &os, bool parseIfNeeded = false) const;
 
   /// Pretty-print the contents of this source file.
   ///

@@ -510,11 +510,6 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 
 /// Writes the Syntax tree to the given file
 static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
-  auto bufferID = SF->getBufferID();
-  assert(bufferID && "frontend should have a buffer ID "
-         "for the main source file");
-  (void)bufferID;
-
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
@@ -884,12 +879,13 @@ static void dumpAST(CompilerInstance &Instance) {
       auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
       auto OutputFilename = PSPs.OutputFilename;
       auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
-      sourceFile->dump(*OS);
+      sourceFile->dump(*OS, /*parseIfNeeded*/ true);
     }
   } else {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
-    getPrimaryOrMainSourceFile(Instance)->dump(llvm::outs());
+    auto *SF = getPrimaryOrMainSourceFile(Instance);
+    SF->dump(llvm::outs(), /*parseIfNeeded*/ true);
   }
 }
 
@@ -1292,7 +1288,14 @@ static bool performCompile(CompilerInstance &Instance,
   };
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
-    Instance.performParseOnly();
+    // Parsing gets triggered lazily, but let's make sure we have the right
+    // input kind.
+    auto kind = Invocation.getInputKind();
+    assert((kind == InputFileKind::Swift ||
+            kind == InputFileKind::SwiftLibrary ||
+            kind == InputFileKind::SwiftModuleInterface) &&
+           "Only supports parsing .swift files");
+    (void)kind;
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
   } else {
@@ -1300,8 +1303,15 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   ASTContext &Context = Instance.getASTContext();
-  if (Action == FrontendOptions::ActionType::Parse)
+  if (Action == FrontendOptions::ActionType::Parse) {
+    // A -parse invocation only cares about the side effects of parsing, so
+    // force the parsing of all the source files.
+    for (auto *file : Instance.getMainModule()->getFiles()) {
+      if (auto *SF = dyn_cast<SourceFile>(file))
+        (void)SF->getTopLevelDecls();
+    }
     return Context.hadError();
+  }
 
   if (Action == FrontendOptions::ActionType::ScanDependencies) {
     scanDependencies(Instance);

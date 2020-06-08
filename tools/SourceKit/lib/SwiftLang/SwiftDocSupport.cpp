@@ -814,10 +814,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
-  if (CI.setup(Invocation))
-    return true;
-  CI.performParseOnly();
-  return false;
+  return CI.setup(Invocation);
 }
 
 static void collectFuncEntities(std::vector<TextEntity> &Ents,
@@ -1407,7 +1404,6 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation set up failed";
     return nullptr;
   }
-  ParseCI.performParseOnly();
 
   SourceFile *SF = nullptr;
   unsigned BufferID = ParseCI.getInputBufferIDs().back();
