@@ -3303,7 +3303,10 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
 }
 
 void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
-  // Add this protocol conformance.
+
+  emitProtocolConformance(record);
+
+  // Add this conformance to the conformance list.
   ProtocolConformances.push_back(std::move(record));
 }
 
@@ -3311,10 +3314,6 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
 llvm::Constant *IRGenModule::emitProtocolConformances() {
   if (ProtocolConformances.empty())
     return nullptr;
-
-  // Emit the conformances.
-  for (const auto &record : ProtocolConformances)
-    emitProtocolConformance(record);
 
   // Define the global variable for the conformance list.
   ConstantInitBuilder builder(*this);
