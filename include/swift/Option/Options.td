@@ -534,13 +534,13 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
-def enable_experimental_private_intransitive_dependencies : Flag<["-"],
-    "enable-experimental-private-intransitive-dependencies">,
+def enable_direct_intramodule_dependencies : Flag<["-"],
+    "enable-direct-intramodule-dependencies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable experimental dependency tracking that never cascades">;
 
-def disable_experimental_private_intransitive_dependencies : Flag<["-"],
-    "disable-experimental-private-intransitive-dependencies">,
+def disable_direct_intramodule_dependencies : Flag<["-"],
+    "disable-direct-intramodule-dependencies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable experimental dependency tracking that never cascades">;
 

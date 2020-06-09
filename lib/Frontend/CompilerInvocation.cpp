@@ -435,10 +435,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
-  Opts.EnableExperientalPrivateIntransitiveDependencies =
-      Args.hasFlag(OPT_enable_experimental_private_intransitive_dependencies,
-                   OPT_disable_experimental_private_intransitive_dependencies,
-                   /*default*/ true);
+  Opts.DirectIntramoduleDependencies =
+      Args.hasFlag(OPT_enable_direct_intramodule_dependencies,
+                   OPT_disable_direct_intramodule_dependencies,
+                   Opts.DirectIntramoduleDependencies);
 
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
