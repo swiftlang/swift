@@ -56,6 +56,8 @@ public:
   /// Create a scope for an artificial function.
   SILDebugScope(SILLocation Loc);
 
+  SILLocation getLoc() const { return Loc; }
+
   /// Return the function this scope originated from before being inlined.
   SILFunction *getInlinedFunction() const;
 
