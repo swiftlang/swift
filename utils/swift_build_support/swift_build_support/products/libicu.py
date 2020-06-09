@@ -34,6 +34,10 @@ class LibICU(product.Product):
         return "icu"
 
     @classmethod
+    def is_nondarwin_only_build_product(cls):
+        return True
+
+    @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
                 llvm.LLVM,

@@ -67,6 +67,13 @@ class Product(object):
         return False
 
     @classmethod
+    def is_nondarwin_only_build_product(cls):
+        """Returns true if this target should be skipped in darwin builds when
+        inferring dependencies.
+        """
+        return False
+
+    @classmethod
     def get_dependencies(cls):
         """Return a list of products that this product depends upon"""
         raise NotImplementedError
