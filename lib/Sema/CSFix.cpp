@@ -531,6 +531,23 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, alreadyDiagnosed, locator);
 }
 
+bool DefineMemberBasedOnUnintendedGenericParam::diagnose(
+    const Solution &solution, bool asNote) const {
+  UnintendedExtraGenericParamMemberFailure failure(solution, BaseType, Name,
+                                                   ParamName, getLocator());
+  return failure.diagnose(asNote);
+}
+
+DefineMemberBasedOnUnintendedGenericParam *
+DefineMemberBasedOnUnintendedGenericParam::create(ConstraintSystem &cs,
+                                                  Type baseType,
+                                                  DeclNameRef member,
+                                                  Identifier paramName,
+                                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) DefineMemberBasedOnUnintendedGenericParam(
+      cs, baseType, member, paramName, locator);
+}
+
 AllowMemberRefOnExistential *
 AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
                                     ValueDecl *member, DeclNameRef memberName,
