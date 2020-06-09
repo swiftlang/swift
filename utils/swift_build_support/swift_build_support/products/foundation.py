@@ -10,7 +10,14 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import lldb
+from . import llvm
 from . import product
+from . import swift
 
 
 class Foundation(product.Product):
@@ -32,10 +39,10 @@ class Foundation(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM,
-                product.LibCXX,
-                product.LibICU,
-                product.Swift,
-                product.LLDB,
-                product.LibDispatch]
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                lldb.LLDB,
+                libdispatch.LibDispatch]

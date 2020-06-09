@@ -10,6 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import libcxx
+from . import libicu
+from . import llvm
 from . import product
 from ..cmake import CMakeOptions
 
@@ -132,7 +136,7 @@ updated without updating swift.py?")
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM,
-                product.LibCXX,
-                product.LibICU]
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU]
