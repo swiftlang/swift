@@ -158,7 +158,7 @@ private:
       case SymbolSubKind::SwiftGenericTypeParam:
         return false;
       default:
-       break;
+        break;
     }
     switch (Kind) {
       case SymbolKind::Enum:
