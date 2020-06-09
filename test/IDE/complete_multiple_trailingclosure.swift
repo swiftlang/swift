@@ -13,6 +13,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_2 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_1 | %FileCheck %s -check-prefix=INIT_FALLBACK
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_2 | %FileCheck %s -check-prefix=INIT_FALLBACK
 
 func globalFunc1(fn1: () -> Int, fn2: () -> String) {}
 func testGlobalFunc() {
@@ -183,4 +185,25 @@ func testOptionalInit() {
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn2
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn3
 // INIT_REQUIRED_NEWLINE_3: End completions
+}
+
+struct MyStruct4<T> {
+  init(arg1: Int = 0, arg2: () -> T) {}
+  init(name: String, arg2: () -> String, arg3: () -> T) {}
+
+  func testStructMethod() {}
+}
+func testFallbackPostfix() {
+  let _ = MyStruct4 {
+    1
+  } #^INIT_FALLBACK_1^#
+// INIT_FALLBACK: Begin completions, 2 items
+// INIT_FALLBACK-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INIT_FALLBACK-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#];
+// INIT_FALLBACK: End completions
+  let _ = MyStruct4(name: "test") {
+    ""
+  } arg3: {
+    1
+  } #^INIT_FALLBACK_2^#
 }
