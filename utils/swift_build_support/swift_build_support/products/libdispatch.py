@@ -37,6 +37,10 @@ class LibDispatch(product.Product):
         return "swift-corelibs-libdispatch"
 
     @classmethod
+    def is_nondarwin_only_build_product(cls):
+        return True
+
+    @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
                 llvm.LLVM,

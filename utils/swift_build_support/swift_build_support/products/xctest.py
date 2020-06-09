@@ -48,3 +48,7 @@ class XCTest(product.Product):
                 lldb.LLDB,
                 libdispatch.LibDispatch,
                 foundation.Foundation]
+
+    @classmethod
+    def is_nondarwin_only_build_product(cls):
+        return True
