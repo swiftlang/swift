@@ -3706,9 +3706,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   else
     fromRequiresClass = fromType->mayHaveSuperclass();
   
-  // Casts between protocol metatypes only succeed if the type is existential
-  // or if it involves generic types because they may be protocol conformances
-  // we can't know at compile time.
+  // Casts between metatypes only succeed if none of the types are existentials
+  // or if one is an existential and the other is a generic type because there
+  // may be protocol conformances unknown at compile time.
   if (metatypeCast) {
     if ((toExistential || fromExistential) && !(fromArchetype || toArchetype))
       return failed();
