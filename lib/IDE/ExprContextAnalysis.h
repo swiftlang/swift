@@ -34,6 +34,13 @@ void typeCheckContextUntil(DeclContext *DC, SourceLoc Loc);
 /// exact the same as \p TargetRange. Returns \c nullptr if not found.
 Expr *findParsedExpr(const DeclContext *DC, SourceRange TargetRange);
 
+/// Remove \c CodeCompletionExpr from \p expr . Returns \c true if it actually
+/// mutated the expression.
+///
+/// NOTE: Currently, this only removes CodeCompletionExpr at call argument
+///       position.
+bool removeCodeCompletionExpr(ASTContext &Ctx, Expr *&expr);
+
 /// Returns expected return type of the given decl context.
 /// \p DC should be an \c AbstractFunctionDecl or an \c AbstractClosureExpr.
 Type getReturnTypeFromContext(const DeclContext *DC);
