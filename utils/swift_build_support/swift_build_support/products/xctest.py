@@ -10,7 +10,15 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import lldb
+from . import llvm
 from . import product
+from . import swift
 
 
 class XCTest(product.Product):
@@ -32,11 +40,11 @@ class XCTest(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM,
-                product.LibCXX,
-                product.LibICU,
-                product.Swift,
-                product.LLDB,
-                product.LibDispatch,
-                product.Foundation]
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                lldb.LLDB,
+                libdispatch.LibDispatch,
+                foundation.Foundation]

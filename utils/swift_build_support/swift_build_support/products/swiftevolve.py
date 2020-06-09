@@ -10,8 +10,19 @@
 #
 # ----------------------------------------------------------------------------
 
-from . import product
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import lldb
+from . import llvm
 from . import skstresstester
+from . import swift
+from . import swiftpm
+from . import swiftsyntax
+from . import xctest
 
 
 class SwiftEvolve(skstresstester.SKStressTester):
@@ -39,16 +50,16 @@ class SwiftEvolve(skstresstester.SKStressTester):
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM,
-                product.LibCXX,
-                product.LibICU,
-                product.Swift,
-                product.LLDB,
-                product.LibDispatch,
-                product.Foundation,
-                product.XCTest,
-                product.LLBuild,
-                product.SwiftPM,
-                product.SwiftSyntax,
-                product.SKStressTester]
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                lldb.LLDB,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM,
+                swiftsyntax.SwiftSyntax,
+                skstresstester.SKStressTester]
