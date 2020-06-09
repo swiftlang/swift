@@ -508,10 +508,9 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
 #if arch(arm64)
   case .constantTagged:
     let taggedContents = getConstantTaggedCocoaContents(cocoaString)!
-    return _StringGuts(
-      taggedConstantCocoa: cocoaString,
-      length: taggedContents.utf16Length
-    )
+    let object = _StringObject(prediscriminatedImmortalASCIICocoa: cocoaString,
+                               length: taggedContents.utf16Length)
+    return _StringGuts(object)
 #endif
 #endif
   case .cocoa:

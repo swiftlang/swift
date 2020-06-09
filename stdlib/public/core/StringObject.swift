@@ -229,15 +229,12 @@ extension _StringObject {
   }
 
 #if arch(arm64)
-  // Initializer to use for constant ObjC tagged values
+  // Initializer to use for values that already have the discriminator included
   @inline(__always)
   internal init(
-    objcConstantTaggedPointerBits: UInt64, countAndFlags: CountAndFlags
+    prediscriminatedObject: UInt64, countAndFlags: CountAndFlags
   ) {
-    // The incoming constant tagged NSString's top nibble should already be 1100
-    precondition(objcConstantTaggedPointerBits & 0xF000_0000_0000_0000 ==
-                  _StringObject.Nibbles.taggedConstantCocoa())
-    let builtinValueBits: Builtin.Int64 = objcConstantTaggedPointerBits._value
+    let builtinValueBits: Builtin.Int64 = prediscriminatedObject._value
     self.init(
       bridgeObject: Builtin.valueToBridgeObject(builtinValueBits),
       countAndFlags: countAndFlags)
@@ -401,7 +398,7 @@ extension _StringObject.Nibbles {
   
   // Discriminator for bridged constant tagged pointer NSStrings
   // Immortal, bridged, but not foreign since we can get the char *
-  internal static func taggedConstantCocoa() -> UInt64 {
+  internal static func prediscriminatedImmortalASCIICocoa() -> UInt64 {
     return 0xC000_0000_0000_0000
   }
 }
@@ -491,8 +488,8 @@ extension _StringObject {
   }
   
   @inline(__always)
-  internal var isImmortalCocoa: Bool {
-    let nibbleValue = _StringObject.Nibbles.taggedConstantCocoa()
+  internal var isImmortalSharedCocoa: Bool {
+    let nibbleValue = _StringObject.Nibbles.prediscriminatedImmortalASCIICocoa()
     return (discriminatedObjectRawBits & 0xF000_0000_0000_0000) == nibbleValue
   }
 
@@ -880,7 +877,12 @@ extension _StringObject {
     }
     return object
 #else
-    _internalInvariant((largeIsCocoa && !isImmortal) || isImmortalCocoa)
+    _internalInvariant((largeIsCocoa && !isImmortal) || isImmortalSharedCocoa)
+#if arch(arm64)
+    if isImmortalSharedCocoa {
+      return Builtin.reinterpretCast(discriminatedObjectRawBits)
+    }
+#endif
     return Builtin.reinterpretCast(largeAddressBits)
 #endif
   }
@@ -939,7 +941,7 @@ extension _StringObject {
     @_effects(releasenone) get {
       // Currently, all mortal objects can zero-cost bridge
       // as can immortal bridged foreign objects
-      return !isImmortal || isImmortalCocoa
+      return !isImmortal || isImmortalSharedCocoa
     }
   }
 
@@ -1022,11 +1024,16 @@ extension _StringObject {
   
 #if arch(arm64)
   internal init(
-    taggedConstantCocoa cocoa: AnyObject, length: Int
+    prediscriminatedImmortalASCIICocoa cocoa: AnyObject, length: Int
   ) {
+ 
     let countAndFlags = CountAndFlags(sharedCount: length, isASCII: true)
+    let bits = unsafeBitCast(cocoa, to: UInt64.self)
+    // The incoming constant tagged NSString's top nibble should already be 1100
+    precondition(bits & 0xF000_0000_0000_0000 ==
+                  _StringObject.Nibbles.prediscriminatedImmortalASCIICocoa())
     self.init(
-      objcConstantTaggedPointerBits: unsafeBitCast(cocoa, to: UInt64.self),
+      prediscriminatedObject: bits,
       countAndFlags: countAndFlags
     )
     _internalInvariant(self.cocoaObject == Builtin.reinterpretCast(cocoa))
