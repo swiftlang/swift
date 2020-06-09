@@ -514,6 +514,66 @@ void PullbackEmitter::addToAdjointBuffer(SILBasicBlock *origBB,
 }
 
 //--------------------------------------------------------------------------//
+// Debugging utilities
+//--------------------------------------------------------------------------//
+
+void PullbackEmitter::printAdjointValueMapping() {
+  // Group original/adjoint values by basic block.
+  llvm::DenseMap<SILBasicBlock *, llvm::DenseMap<SILValue, AdjointValue>> tmp;
+  for (auto pair : valueMap) {
+    auto origPair = pair.first;
+    auto *origBB = origPair.first;
+    auto origValue = origPair.second;
+    auto adjValue = pair.second;
+    tmp[origBB].insert({origValue, adjValue});
+  }
+  // Print original/adjoint values per basic block.
+  auto &s = getADDebugStream() << "Adjoint value mapping:\n";
+  for (auto &origBB : getOriginal()) {
+    if (!pullbackBBMap.count(&origBB))
+      continue;
+    auto bbValueMap = tmp[&origBB];
+    s << "bb" << origBB.getDebugID();
+    s << " (size " << bbValueMap.size() << "):\n";
+    for (auto valuePair : bbValueMap) {
+      auto origValue = valuePair.first;
+      auto adjValue = valuePair.second;
+      s << "ORIG: " << origValue;
+      s << "ADJ: " << adjValue << '\n';
+    }
+    s << '\n';
+  }
+}
+
+void PullbackEmitter::printAdjointBufferMapping() {
+  // Group original/adjoint buffers by basic block.
+  llvm::DenseMap<SILBasicBlock *, llvm::DenseMap<SILValue, SILValue>> tmp;
+  for (auto pair : bufferMap) {
+    auto origPair = pair.first;
+    auto *origBB = origPair.first;
+    auto origBuf = origPair.second;
+    auto adjBuf = pair.second;
+    tmp[origBB][origBuf] = adjBuf;
+  }
+  // Print original/adjoint buffers per basic block.
+  auto &s = getADDebugStream() << "Adjoint buffer mapping:\n";
+  for (auto &origBB : getOriginal()) {
+    if (!pullbackBBMap.count(&origBB))
+      continue;
+    auto bbBufferMap = tmp[&origBB];
+    s << "bb" << origBB.getDebugID();
+    s << " (size " << bbBufferMap.size() << "):\n";
+    for (auto valuePair : bbBufferMap) {
+      auto origBuf = valuePair.first;
+      auto adjBuf = valuePair.second;
+      s << "ORIG: " << origBuf;
+      s << "ADJ: " << adjBuf << '\n';
+    }
+    s << '\n';
+  }
+}
+
+//--------------------------------------------------------------------------//
 // Member accessor pullback generation
 //--------------------------------------------------------------------------//
 
