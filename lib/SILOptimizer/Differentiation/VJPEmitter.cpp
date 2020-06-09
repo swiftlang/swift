@@ -541,6 +541,15 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     TypeSubstCloner::visitApplyInst(ai);
     return;
   }
+  // If callee is `array.finalize_intrinsic`, do standard cloning.
+  // `array.finalize_intrinsic` has special-case pullback generation.
+  if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC)) {
+    LLVM_DEBUG(getADDebugStream()
+               << "Cloning `array.finalize_intrinsic` `apply`:\n"
+               << *ai << '\n');
+    TypeSubstCloner::visitApplyInst(ai);
+    return;
+  }
   // If the original function is a semantic member accessor, do standard
   // cloning. Semantic member accessors have special pullback generation logic,
   // so all `apply` instructions can be directly cloned to the VJP.
