@@ -1349,6 +1349,29 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return getTypeMatchSuccess();
 }
 
+// Determine if a function representation conversion is allowed returning
+// 'false' (i.e. no error) if the conversion is valid.
+static bool
+matchFunctionConversionRepresentations(FunctionTypeRepresentation rep1,
+                                       FunctionTypeRepresentation rep2) {
+  auto isThin = [](FunctionTypeRepresentation rep) {
+    return rep == FunctionTypeRepresentation::CFunctionPointer ||
+        rep == FunctionTypeRepresentation::Thin;
+  };
+  
+  // Allowing "thin" (c, thin) to "thin" conventions
+  if (isThin(rep1) && isThin(rep2))
+    return false;
+  
+  // Allowing all to "thick" (swift, block) conventions
+  // "thin" (c, thin) to "thick" or "thick" to "thick"
+  if (rep2 == FunctionTypeRepresentation::Swift ||
+      rep2 == FunctionTypeRepresentation::Block)
+    return false;
+  
+  return rep1 != rep2;
+}
+
 // Returns 'false' (i.e. no error) if it is legal to match functions with the
 // corresponding function type representations and the given match kind.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
@@ -1367,22 +1390,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
     if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
       return false;
     
-    auto isThin = [](FunctionTypeRepresentation rep) {
-      return rep == FunctionTypeRepresentation::CFunctionPointer ||
-          rep == FunctionTypeRepresentation::Thin;
-    };
-    
-    // Allowing "thin" (c, thin) to "thin" conventions
-    if (isThin(rep1) && isThin(rep2))
-      return false;
-    
-    // Allowing all to "thick" (swift, block) conventions
-    // "thin" (c, thin) to "thick" or "thick" to "thick"
-    if (rep2 == FunctionTypeRepresentation::Swift ||
-        rep2 == FunctionTypeRepresentation::Block)
-      return false;
-    
-    return rep1 != rep2;
+    return matchFunctionConversionRepresentations(rep1, rep2);
   }
 
   case ConstraintKind::OpaqueUnderlyingType:
