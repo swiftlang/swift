@@ -51,10 +51,10 @@ func testDiagnoseForAmbiguityCrash(schools: [School]) {
 
 class DefaultValue {
   static func foo(_ a: Int) {}
-  static func foo(_ a: Int, _ b: Int = 1) {} // expected-note {{candidate expects value of type 'Int' for parameter #1}}
-  static func foo(_ a: Int, _ b: Int = 1, _ c: Int = 2) {} // expected-note {{candidate expects value of type 'Int' for parameter #1}}
+  static func foo(_ a: Int, _ b: Int = 1) {}
+  static func foo(_ a: Int, _ b: Int = 1, _ c: Int = 2) {}
 }
-DefaultValue.foo(1.0, 1) // expected-error {{no exact matches in call to static method 'foo'}}
+DefaultValue.foo(1.0, 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 
 class Variadic {

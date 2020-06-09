@@ -252,6 +252,33 @@ bool ContextualMismatch::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool ContextualMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto getTypes =
+      [&](const std::pair<const Solution *, const ConstraintFix *> &entry)
+      -> std::pair<Type, Type> {
+    auto &solution = *entry.first;
+    auto *fix = static_cast<const ContextualMismatch *>(entry.second);
+
+    return {solution.simplifyType(fix->getFromType()),
+            solution.simplifyType(fix->getToType())};
+  };
+
+  auto etalonTypes = getTypes(commonFixes.front());
+  if (llvm::all_of(
+          commonFixes,
+          [&](const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            auto types = getTypes(entry);
+            return etalonTypes.first->isEqual(types.first) &&
+                   etalonTypes.second->isEqual(types.second);
+          })) {
+    const auto &primary = commonFixes.front();
+    return primary.second->diagnose(*primary.first, /*aNote=*/false);
+  }
+
+  return false;
+}
+
 ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {

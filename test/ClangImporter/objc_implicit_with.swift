@@ -43,7 +43,7 @@ func testNSErrorFactoryMethod(_ path: String) throws {
 }
 
 func testNonInstanceTypeFactoryMethod(_ s: String) {
-  _ = NSObjectFactory(string: s) // expected-error{{no exact matches in call to initializer}}
+  _ = NSObjectFactory(string: s) // expected-error{{argument passed to call that takes no arguments}}
 }
 
 func testUseOfFactoryMethod(_ queen: Bee) {

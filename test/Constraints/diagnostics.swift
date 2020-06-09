@@ -408,8 +408,7 @@ enum Color {
 }
 
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) })
-// expected-error@-1 {{no 'map' candidates produce the expected contextual result type '(Int, Color)'}}
-// expected-note@-2 {{found candidate with type '((Int) throws -> (Int, _)) throws -> Array<(Int, _)>'}}
+// expected-error@-1 {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
