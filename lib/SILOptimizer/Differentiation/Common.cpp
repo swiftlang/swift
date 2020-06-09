@@ -27,18 +27,6 @@ raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
 // Helpers
 //===----------------------------------------------------------------------===//
 
-bool isArrayLiteralIntrinsic(FullApplySite applySite) {
-  return doesApplyCalleeHaveSemantics(applySite.getCalleeOrigin(),
-                                      "array.uninitialized_intrinsic");
-}
-
-ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
-  if (auto *ai = dyn_cast<ApplyInst>(v))
-    if (isArrayLiteralIntrinsic(ai))
-      return ai;
-  return nullptr;
-}
-
 ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
   // Find the `pointer_to_address` result, peering through `index_addr`.
   auto *ptai = dyn_cast<PointerToAddressInst>(v);
@@ -48,10 +36,9 @@ ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
     return nullptr;
   // Return the `array.uninitialized_intrinsic` application, if it exists.
   if (auto *dti = dyn_cast<DestructureTupleInst>(
-          ptai->getOperand()->getDefiningInstruction())) {
-    if (auto *ai = getAllocateUninitializedArrayIntrinsic(dti->getOperand()))
-      return ai;
-  }
+          ptai->getOperand()->getDefiningInstruction()))
+    return ArraySemanticsCall(dti->getOperand(),
+                              semantics::ARRAY_UNINITIALIZED_INTRINSIC);
   return nullptr;
 }
 

@@ -403,7 +403,9 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
     SILValue value, unsigned dependentVariableIndex) {
   // Array initializer syntax is lowered to an intrinsic and one or more
   // stores to a `RawPointer` returned by the intrinsic.
-  auto *uai = getAllocateUninitializedArrayIntrinsic(value);
+  ArraySemanticsCall uninitCall(value,
+                                semantics::ARRAY_UNINITIALIZED_INTRINSIC);
+  ApplyInst *uai = uninitCall;
   if (!uai)
     return;
   for (auto use : value->getUses()) {
