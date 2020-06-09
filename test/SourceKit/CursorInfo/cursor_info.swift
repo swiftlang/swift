@@ -492,7 +492,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // RUN: %sourcekitd-test -req=cursor -pos=92:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck %s -check-prefix=CHECK40
 // CHECK40: source.lang.swift.decl.enumelement (92:8-92:10)
 // CHECK40-NEXT: C2
-// CHECK40-NEXT: s:11cursor_info2E2O2C2yACSi_SStcACmF
+// CHECK40-NEXT: s:11cursor_info2E2O2C2yACSi1x_SS1ytcACmF
 // CHECK40-NEXT: (E2.Type) -> (Int, String) -> E2
 // CHECK40: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
 // CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:SS">String</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>

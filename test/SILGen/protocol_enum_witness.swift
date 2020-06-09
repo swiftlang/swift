@@ -35,7 +35,7 @@ enum AnotherBar: AnotherFoo {
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21protocol_enum_witness10AnotherBarOAA0D3FooA2aDP3bar3argxSi_tFZTW : $@convention(witness_method: AnotherFoo) (Int, @thick AnotherBar.Type) -> @out AnotherBar {
 // CHECK: bb0([[ANOTHER_BAR:%.*]] : $*AnotherBar, [[INT_ARG:%.*]] : $Int, [[ANOTHER_BAR_TYPE:%.*]] : $@thick AnotherBar.Type):
 // CHECK-NEXT: [[META_TYPE:%.*]] = metatype $@thin AnotherBar.Type
-// CHECK: [[REF:%.*]] = function_ref @$s21protocol_enum_witness10AnotherBarO3baryACSi_tcACmF : $@convention(method) (Int, @thin AnotherBar.Type) -> AnotherBar
+// CHECK: [[REF:%.*]] = function_ref @$s21protocol_enum_witness10AnotherBarO3baryACSi3arg_tcACmF : $@convention(method) (Int, @thin AnotherBar.Type) -> AnotherBar
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[REF]]([[INT_ARG]], [[META_TYPE]]) : $@convention(method) (Int, @thin AnotherBar.Type) -> AnotherBar
 // CHECK-NEXT: store [[RESULT]] to [trivial] [[ANOTHER_BAR]] : $*AnotherBar
 // CHECK-NEXT: [[TUPLE:%.*]] = tuple ()
