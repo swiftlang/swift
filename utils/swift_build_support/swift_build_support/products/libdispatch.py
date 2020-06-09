@@ -13,7 +13,6 @@
 from . import cmark
 from . import libcxx
 from . import libicu
-from . import lldb
 from . import llvm
 from . import product
 from . import swift
@@ -46,5 +45,4 @@ class LibDispatch(product.Product):
                 llvm.LLVM,
                 libcxx.LibCXX,
                 libicu.LibICU,
-                swift.Swift,
-                lldb.LLDB]
+                swift.Swift]
