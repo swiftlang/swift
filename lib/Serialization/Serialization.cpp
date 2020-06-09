@@ -46,6 +46,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/RecordLayout.h"

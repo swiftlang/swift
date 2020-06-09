@@ -1165,7 +1165,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
 }
 
 void InterfaceSubContextDelegateImpl::addExtraClangArg(StringRef arg) {
-  subInvocation.getClangImporterOptions().ExtraArgs.push_back(arg);
+  subInvocation.getClangImporterOptions().ExtraArgs.push_back(arg.str());
   GenericArgs.push_back("-Xcc");
   GenericArgs.push_back(ArgSaver.save(arg));
 }

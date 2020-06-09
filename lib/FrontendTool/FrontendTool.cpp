@@ -179,14 +179,14 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames());
   for (auto const &path : inputPaths) {
     dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   // Then print dependencies we've picked up during compilation.
   auto dependencyPaths =
     reversePathSortedFilenames(depTracker->getDependencies());
   for (auto const &path : dependencyPaths) {
     dependencyString.push_back(' ');
-    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
   
   // FIXME: Xcode can't currently handle multiple targets in a single
