@@ -158,7 +158,7 @@ func testRenamedUnknownEnum() {
 }
 
 func testRenamedTrueEnum() {
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumValue'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'TrueEnumValue' in scope
   _ = TrueEnumValue
 
   // CHECK-DIAGS: [[@LINE+1]]:16: error: type 'TrueEnum' has no member 'TrueEnumValue'
@@ -169,7 +169,7 @@ func testRenamedTrueEnum() {
 
   _ = TrueEnum.value // okay
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'TrueEnumRenamed' in scope
   _ = TrueEnumRenamed
 
   // CHECK-DIAGS: [[@LINE+1]]:16: error: type 'TrueEnum' has no member 'TrueEnumRenamed'
@@ -190,7 +190,7 @@ func testRenamedTrueEnum() {
   _ = TrueEnum.renamedSwift4
   // CHECK-DIAGS-4-NOT: :[[@LINE-1]]:16:
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumAliasRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'TrueEnumAliasRenamed' in scope
   _ = TrueEnumAliasRenamed
 
   // CHECK-DIAGS: [[@LINE+1]]:16: error: type 'TrueEnum' has no member 'TrueEnumAliasRenamed'
@@ -213,7 +213,7 @@ func testRenamedTrueEnum() {
 }
 
 func testRenamedOptionyEnum() {
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'OptionyEnumValue'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'OptionyEnumValue' in scope
   _ = OptionyEnumValue
 
   // CHECK-DIAGS: [[@LINE+1]]:19: error: type 'OptionyEnum' has no member 'OptionyEnumValue'
@@ -224,7 +224,7 @@ func testRenamedOptionyEnum() {
 
   _ = OptionyEnum.value // okay
 
-  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'OptionyEnumRenamed'
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: cannot find 'OptionyEnumRenamed' in scope
   _ = OptionyEnumRenamed
 
   // CHECK-DIAGS: [[@LINE+1]]:19: error: type 'OptionyEnum' has no member 'OptionyEnumRenamed'

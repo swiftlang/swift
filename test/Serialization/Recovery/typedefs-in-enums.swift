@@ -14,11 +14,11 @@ import Lib
 
 func use(_: OkayEnum) {}
 // FIXME: Better to import the enum and make it unavailable.
-func use(_: BadEnum) {} // expected-error {{use of undeclared type 'BadEnum'}}
+func use(_: BadEnum) {} // expected-error {{cannot find type 'BadEnum' in scope}}
 
 func test() {
   _ = producesOkayEnum()
-  _ = producesBadEnum() // expected-error {{use of unresolved identifier 'producesBadEnum'}}
+  _ = producesBadEnum() // expected-error {{cannot find 'producesBadEnum' in scope}}
 
   // Force a lookup of the ==
   _ = Optional(OkayEnum.noPayload).map { $0 == .noPayload }

@@ -113,7 +113,7 @@ class Builder(object):
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + deployment_version,
                 "-DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS=" + deployment_version,
             ]
-            llvm_c_flags += " -miphoneos-version-min==" + deployment_version
+            llvm_c_flags += " -miphoneos-version-min=" + deployment_version
 
         elif self.host == "appletvsimulator":
             deployment_version = "10.0"
@@ -234,7 +234,12 @@ class Builder(object):
             "-DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE",
             "-DSWIFT_BUILD_STATIC_SDK_OVERLAY=FALSE",
         ]
-        cmake_args += ["-DLLVM_ENABLE_LIBXML2=FALSE"]
+        cmake_args += [
+            "-DLLVM_ENABLE_LIBXML2=FALSE",
+            "-DLLVM_ENABLE_LIBEDIT=FALSE",
+            "-DLLVM_ENABLE_TERMINFO=FALSE",
+            "-DLLVM_ENABLE_ZLIB=FALSE",
+        ]
         # We are not using cmark but initialize the CMARK variables to something so
         # that configure can succeed.
         cmake_args += [
@@ -246,7 +251,7 @@ class Builder(object):
             "-DCLANG_INCLUDE_TESTS=FALSE",
             "-DSWIFT_INCLUDE_TESTS=FALSE",
         ]
-        cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, "llvm")]
+        cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "llvm")]
         self.call(cmake_args)
 
     def build_target(self, build_dir, target, env=None):
@@ -322,7 +327,23 @@ def extract_symbols(install_destdir, install_prefix, install_symroot, jobs):
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="""Builds Swift Syntax Parser library.""",
+        description="""
+Builds Swift Syntax Parser library.
+
+Example invocations:
+
+* Building for host (macOS, linux):
+
+  $ utils/build-parser-lib --release --no-assertions --build-dir /tmp/parser-lib-build
+
+* Building for iOS
+
+  $ utils/build-parser-lib --release --no-assertions --build-dir \
+/tmp/parser-lib-build-iossim --host iphonesimulator --architectures x86_64
+  $ utils/build-parser-lib --release --no-assertions --build-dir \
+/tmp/parser-lib-build-ios --host iphoneos --architectures arm64
+
+""",
     )
     optbuilder = parser.to_builder()
     option = optbuilder.add_option
@@ -448,6 +469,17 @@ def main():
 
     if not args.install_destdir:
         args.install_destdir = os.path.join(args.build_dir, "install")
+
+    swift_src_path = os.path.join(SWIFT_SOURCE_ROOT, "swift")
+    swift_src_in_llvm_project_path = \
+        os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "swift")
+    # Need to symlink 'swift' into 'llvm-project' since we will be doing
+    # a unified configure with 'swift' as an external project.
+    if not os.path.exists(swift_src_in_llvm_project_path):
+        print("Symlinking '%s' to '%s'" %
+              (swift_src_path, swift_src_in_llvm_project_path), file=sys.stderr)
+        shell.symlink(swift_src_path, swift_src_in_llvm_project_path,
+                      dry_run=args.dry_run, echo=args.verbose)
 
     architectures = args.architectures.split(" ")
     architectures = [arch for arch in architectures if arch != ""]

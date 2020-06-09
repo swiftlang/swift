@@ -99,8 +99,7 @@ public:
   bool renameBase(CharSourceRange Range, RefactoringRangeKind RangeKind) {
     assert(Range.isValid());
 
-    StringRef Existing = Range.str();
-    if (Existing != Old.base())
+    if (stripBackticks(Range).str() != Old.base())
       return true;
     doRenameBase(Range, RangeKind);
     return false;
@@ -109,10 +108,12 @@ public:
   /// Adds replacements to rename the given label ranges
   /// \return true if the label ranges do not match the old name
   bool renameLabels(ArrayRef<CharSourceRange> LabelRanges,
+                    Optional<unsigned> FirstTrailingLabel,
                     LabelRangeType RangeType, bool isCallSite) {
     if (isCallSite)
-      return renameLabelsLenient(LabelRanges, RangeType);
+      return renameLabelsLenient(LabelRanges, FirstTrailingLabel, RangeType);
 
+    assert(!FirstTrailingLabel);
     ArrayRef<StringRef> OldLabels = Old.args();
 
     if (OldLabels.size() != LabelRanges.size())
@@ -131,6 +132,27 @@ public:
   bool isOperator() const { return Lexer::isOperator(Old.base()); }
 
 private:
+
+  /// Returns the range of the  (possibly escaped) identifier at the start of
+  /// \p Range and updates \p IsEscaped to indicate whether it's escaped or not.
+  CharSourceRange getLeadingIdentifierRange(CharSourceRange Range, bool &IsEscaped) {
+    assert(Range.isValid() && Range.getByteLength());
+    IsEscaped = Range.str().front() == '`';
+    SourceLoc Start = Range.getStart();
+    if (IsEscaped)
+      Start = Start.getAdvancedLoc(1);
+    return Lexer::getCharSourceRangeFromSourceRange(SM, Start);
+  }
+
+  CharSourceRange stripBackticks(CharSourceRange Range) {
+    StringRef Content = Range.str();
+    if (Content.size() < 3 || Content.front() != '`' || Content.back() != '`') {
+      return Range;
+    }
+    return CharSourceRange(Range.getStart().getAdvancedLoc(1),
+                           Range.getByteLength() - 2);
+  }
+
   void splitAndRenameLabel(CharSourceRange Range, LabelRangeType RangeType,
                            size_t NameIndex) {
     switch (RangeType) {
@@ -218,13 +240,15 @@ private:
 
   bool labelRangeMatches(CharSourceRange Range, LabelRangeType RangeType, StringRef Expected) {
     if (Range.getByteLength()) {
-      CharSourceRange ExistingLabelRange =
-          Lexer::getCharSourceRangeFromSourceRange(SM, Range.getStart());
+      bool IsEscaped = false;
+      CharSourceRange ExistingLabelRange = getLeadingIdentifierRange(Range, IsEscaped);
       StringRef ExistingLabel = ExistingLabelRange.str();
+      bool IsSingleName = Range == ExistingLabelRange ||
+        (IsEscaped && Range.getByteLength() == ExistingLabel.size() + 2);
 
       switch (RangeType) {
       case LabelRangeType::NoncollapsibleParam:
-        if (ExistingLabelRange == Range && Expected.empty()) // subscript([x]: Int)
+        if (IsSingleName && Expected.empty()) // subscript([x]: Int)
           return true;
         LLVM_FALLTHROUGH;
       case LabelRangeType::CallArg:
@@ -239,10 +263,56 @@ private:
   }
 
   bool renameLabelsLenient(ArrayRef<CharSourceRange> LabelRanges,
+                           Optional<unsigned> FirstTrailingLabel,
                            LabelRangeType RangeType) {
 
     ArrayRef<StringRef> OldNames = Old.args();
 
+    // First, match trailing closure arguments in reverse
+    if (FirstTrailingLabel) {
+      auto TrailingLabels = LabelRanges.drop_front(*FirstTrailingLabel);
+      LabelRanges = LabelRanges.take_front(*FirstTrailingLabel);
+
+      for (auto LabelIndex: llvm::reverse(indices(TrailingLabels))) {
+        CharSourceRange Label = TrailingLabels[LabelIndex];
+
+        if (Label.getByteLength()) {
+          if (OldNames.empty())
+            return true;
+
+          while (!labelRangeMatches(Label, LabelRangeType::Selector,
+                                    OldNames.back())) {
+            if ((OldNames = OldNames.drop_back()).empty())
+              return true;
+          }
+          splitAndRenameLabel(Label, LabelRangeType::Selector,
+                              OldNames.size() - 1);
+          OldNames = OldNames.drop_back();
+          continue;
+        }
+
+        // empty labelled trailing closure label
+        if (LabelIndex) {
+          if (OldNames.empty())
+            return true;
+
+          while (!OldNames.back().empty()) {
+            if ((OldNames = OldNames.drop_back()).empty())
+              return true;
+          }
+          splitAndRenameLabel(Label, LabelRangeType::Selector,
+                              OldNames.size() - 1);
+          OldNames = OldNames.drop_back();
+          continue;
+        }
+
+        // unlabelled trailing closure label
+        OldNames = OldNames.drop_back();
+        continue;
+      }
+    }
+
+    // Next, match the non-trailing arguments.
     size_t NameIndex = 0;
 
     for (CharSourceRange Label : LabelRanges) {
@@ -316,21 +386,35 @@ public:
     // FIXME: handle escaped keyword names `init`
     bool IsSubscript = Old.base() == "subscript" && Config.IsFunctionLike;
     bool IsInit = Old.base() == "init" && Config.IsFunctionLike;
-    bool IsKeywordBase = IsInit || IsSubscript;
+
+    // FIXME: this should only be treated specially for instance methods.
+    bool IsCallAsFunction = Old.base() == "callAsFunction" &&
+        Config.IsFunctionLike;
+
+    bool IsSpecialBase = IsInit || IsSubscript || IsCallAsFunction;
     
-    // Filter out non-semantic keyword basename locations with no labels.
+    // Filter out non-semantic special basename locations with no labels.
     // We've already filtered out those in active code, so these are
-    // any appearance of just 'init' or 'subscript' in strings, comments, and
-    // inactive code.
-    if (IsKeywordBase && (Config.Usage == NameUsage::Unknown &&
-                           Resolved.LabelType == LabelRangeType::None))
+    // any appearance of just 'init', 'subscript', or 'callAsFunction' in
+    // strings, comments, and inactive code.
+    if (IsSpecialBase && (Config.Usage == NameUsage::Unknown &&
+                          Resolved.LabelType == LabelRangeType::None))
       return RegionType::Unmatched;
 
-    if (!Config.IsFunctionLike || !IsKeywordBase) {
+    if (!Config.IsFunctionLike || !IsSpecialBase) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::BaseName))
         return RegionType::Mismatch;
 
-    } else if (IsKeywordBase && Config.Usage == NameUsage::Definition) {
+    } else if (IsInit || IsCallAsFunction) {
+      if (renameBase(Resolved.Range, RefactoringRangeKind::KeywordBaseName)) {
+        // The base name doesn't need to match (but may) for calls, but
+        // it should for definitions and references.
+        if (Config.Usage == NameUsage::Definition ||
+            Config.Usage == NameUsage::Reference) {
+          return RegionType::Mismatch;
+        }
+      }
+    } else if (IsSubscript && Config.Usage == NameUsage::Definition) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::KeywordBaseName))
         return RegionType::Mismatch;
     }
@@ -363,7 +447,8 @@ public:
                         (Config.Usage != NameUsage::Reference || IsSubscript) &&
                         Resolved.LabelType == LabelRangeType::CallArg;
 
-      if (renameLabels(Resolved.LabelRanges, Resolved.LabelType, isCallSite))
+      if (renameLabels(Resolved.LabelRanges, Resolved.FirstTrailingLabel,
+                       Resolved.LabelType, isCallSite))
         return Config.Usage == NameUsage::Unknown ?
             RegionType::Unmatched : RegionType::Mismatch;
     }
@@ -528,9 +613,11 @@ static const ValueDecl *getRelatedSystemDecl(const ValueDecl *VD) {
   return nullptr;
 }
 
-static Optional<RefactoringKind> getAvailableRenameForDecl(const ValueDecl *VD) {
+static Optional<RefactoringKind>
+getAvailableRenameForDecl(const ValueDecl *VD,
+                          Optional<RenameRefInfo> RefInfo) {
   std::vector<RenameAvailabiliyInfo> Scratch;
-  for (auto &Info : collectRenameAvailabilityInfo(VD, Scratch)) {
+  for (auto &Info : collectRenameAvailabilityInfo(VD, RefInfo, Scratch)) {
     if (Info.AvailableKind == RenameAvailableKind::Available)
       return Info.Kind;
   }
@@ -744,16 +831,22 @@ bool RefactoringActionLocalRename::
 isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
   if (CursorInfo.Kind != CursorInfoKind::ValueRef)
     return false;
-  auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
+
+  Optional<RenameRefInfo> RefInfo;
+  if (CursorInfo.IsRef)
+    RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+
+  auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD, RefInfo);
   return RenameOp.hasValue() &&
     RenameOp.getValue() == RefactoringKind::LocalRename;
 }
 
-static void analyzeRenameScope(ValueDecl *VD, DiagnosticEngine &Diags,
+static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
+                               DiagnosticEngine &Diags,
                                llvm::SmallVectorImpl<DeclContext *> &Scopes) {
   Scopes.clear();
-  if (!getAvailableRenameForDecl(VD).hasValue()) {
-    Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getFullName());
+  if (!getAvailableRenameForDecl(VD, RefInfo).hasValue()) {
+    Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getName());
     return;
   }
 
@@ -786,7 +879,12 @@ bool RefactoringActionLocalRename::performChange() {
   if (CursorInfo.isValid() && CursorInfo.ValueD) {
     ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
     llvm::SmallVector<DeclContext *, 8> Scopes;
-    analyzeRenameScope(VD, DiagEngine, Scopes);
+
+    Optional<RenameRefInfo> RefInfo;
+    if (CursorInfo.IsRef)
+      RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+
+    analyzeRenameScope(VD, RefInfo, DiagEngine, Scopes);
     if (Scopes.empty())
       return true;
     RenameRangeCollector rangeCollector(VD, PreferredName);
@@ -861,7 +959,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
   if (It != Declared.end()) {
     DiagEngine.diagnose(It->VD->getLoc(),
                         diag::value_decl_referenced_out_of_range,
-                        It->VD->getFullName());
+                        It->VD->getName());
     return ExtractCheckResult();
   }
 
@@ -1076,17 +1174,16 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
 
-  Instance->performParseOnly();
-
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
-  auto LineAndCol = SM.getLineAndColumn(NameLoc);
+  auto LineAndCol = SM.getPresumedLineAndColumnForLoc(NameLoc);
 
   UnresolvedLoc UnresoledName{NameLoc, true};
 
@@ -1104,12 +1201,14 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   auto Ranges = Renamer.Ranges;
 
   std::vector<NoteRegion> NoteRegions(Renamer.Ranges.size());
-  std::transform(Ranges.begin(), Ranges.end(), NoteRegions.begin(),
-                 [&SM](RenameRangeDetail &Detail) -> NoteRegion {
-    auto Start = SM.getLineAndColumn(Detail.Range.getStart());
-    auto End = SM.getLineAndColumn(Detail.Range.getEnd());
-    return {Detail.RangeKind, Start.first, Start.second, End.first, End.second, Detail.Index};
-  });
+  std::transform(
+      Ranges.begin(), Ranges.end(), NoteRegions.begin(),
+      [&SM](RenameRangeDetail &Detail) -> NoteRegion {
+        auto Start = SM.getPresumedLineAndColumnForLoc(Detail.Range.getStart());
+        auto End = SM.getPresumedLineAndColumnForLoc(Detail.Range.getEnd());
+        return {Detail.RangeKind, Start.first, Start.second,
+                End.first,        End.second,  Detail.Index};
+      });
 
   return NoteRegions;
 }
@@ -1859,7 +1958,7 @@ bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange(
     return true;
   EditorConsumerInsertStream OS(EditConsumer, SM, RangeInfo.ContentRange);
   OS << "\"";
-  for (auto It = Expressions->begin(); It != Expressions->end(); It++) {
+  for (auto It = Expressions->begin(); It != Expressions->end(); ++It) {
     interpolatedExpressionForm(*It, SM, OS);
   }
   OS << "\"";
@@ -2533,8 +2632,8 @@ struct ConvertToTernaryExprInfo {
         if (!ThenRef || !ThenRef->getDecl() || !ElseRef || !ElseRef->getDecl())
           return nullptr;
 
-        auto ThenName = ThenRef->getDecl()->getFullName();
-        auto ElseName = ElseRef->getDecl()->getFullName();
+        const auto ThenName = ThenRef->getDecl()->getName();
+        const auto ElseName = ElseRef->getDecl()->getName();
 
         if (ThenName.compare(ElseName) != 0)
           return nullptr;
@@ -2703,7 +2802,8 @@ bool RefactoringActionConvertToTernaryExpr::performChange() {
 /// these stubs should be filled.
 class FillProtocolStubContext {
 
-  std::vector<ValueDecl*> getUnsatisfiedRequirements(const DeclContext *DC);
+  std::vector<ValueDecl*>
+  getUnsatisfiedRequirements(const IterableDeclContext *IDC);
 
   /// Context in which the content should be filled; this could be either a
   /// nominal type declaraion or an extension declaration.
@@ -2774,12 +2874,12 @@ getContextFromCursorInfo(ResolvedCursorInfo CursorInfo) {
 }
 
 std::vector<ValueDecl*> FillProtocolStubContext::
-getUnsatisfiedRequirements(const DeclContext *DC) {
+getUnsatisfiedRequirements(const IterableDeclContext *IDC) {
   // The results to return.
   std::vector<ValueDecl*> NonWitnessedReqs;
 
   // For each conformance of the extended nominal.
-  for(ProtocolConformance *Con : DC->getLocalConformances()) {
+  for(ProtocolConformance *Con : IDC->getLocalConformances()) {
 
     // Collect non-witnessed requirements.
     Con->forEachNonWitnessedRequirement(
@@ -2972,8 +3072,8 @@ bool RefactoringActionExpandSwitchCases::performChange() {
     InsertRange = CharSourceRange(SM, RBraceLoc, RBraceLoc);
   }
   EditorConsumerInsertStream OS(EditConsumer, SM, InsertRange);
-  if (SM.getLineNumber(SwitchS->getLBraceLoc()) ==
-      SM.getLineNumber(SwitchS->getRBraceLoc())) {
+  if (SM.getLineAndColumnInBuffer(SwitchS->getLBraceLoc()).first ==
+      SM.getLineAndColumnInBuffer(SwitchS->getRBraceLoc()).first) {
     OS << "\n";
   }
   auto Result = performCasesExpansionInSwitchStmt(SwitchS,
@@ -3145,6 +3245,250 @@ bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
   return false;
 }
 
+class AddEquatableContext {
+
+  /// Declaration context
+  DeclContext *DC;
+
+  /// Adopter type
+  Type Adopter;
+
+  /// Start location of declaration context brace
+  SourceLoc StartLoc;
+
+  /// Array of all inherited protocols' locations
+  ArrayRef<TypeLoc> ProtocolsLocations;
+
+  /// Array of all conformed protocols
+  SmallVector<swift::ProtocolDecl *, 2> Protocols;
+
+  /// Start location of declaration,
+  /// a place to write protocol name
+  SourceLoc ProtInsertStartLoc;
+
+  /// Stored properties of extending adopter
+  ArrayRef<VarDecl *> StoredProperties;
+
+  /// Range of internal members in declaration
+  DeclRange Range;
+
+  bool conformsToEquatableProtocol() {
+    for (ProtocolDecl *Protocol : Protocols) {
+      if (Protocol->getKnownProtocolKind() == KnownProtocolKind::Equatable) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool isRequirementValid() {
+    auto Reqs = getProtocolRequirements();
+    if (Reqs.empty()) {
+      return false;
+    }
+    auto Req = dyn_cast<FuncDecl>(Reqs[0]);
+    return Req && Req->getParameters()->size() == 2;
+  }
+
+  bool isPropertiesListValid() {
+    return !getUserAccessibleProperties().empty();
+  }
+
+  void printFunctionBody(ASTPrinter &Printer, StringRef ExtraIndent,
+  ParameterList *Params);
+
+  std::vector<ValueDecl *> getProtocolRequirements();
+
+  std::vector<VarDecl *> getUserAccessibleProperties();
+
+public:
+
+  AddEquatableContext(NominalTypeDecl *Decl) : DC(Decl),
+  Adopter(Decl->getDeclaredType()), StartLoc(Decl->getBraces().Start),
+  ProtocolsLocations(Decl->getInherited()),
+  Protocols(Decl->getAllProtocols()), ProtInsertStartLoc(Decl->getNameLoc()),
+  StoredProperties(Decl->getStoredProperties()), Range(Decl->getMembers()) {};
+
+  AddEquatableContext(ExtensionDecl *Decl) : DC(Decl),
+  Adopter(Decl->getExtendedType()), StartLoc(Decl->getBraces().Start),
+  ProtocolsLocations(Decl->getInherited()),
+  Protocols(Decl->getExtendedNominal()->getAllProtocols()),
+  ProtInsertStartLoc(Decl->getExtendedTypeRepr()->getEndLoc()),
+  StoredProperties(Decl->getExtendedNominal()->getStoredProperties()), Range(Decl->getMembers()) {};
+
+  AddEquatableContext() : DC(nullptr), Adopter(), ProtocolsLocations(),
+  Protocols(), StoredProperties(), Range(nullptr, nullptr) {};
+
+  static AddEquatableContext getDeclarationContextFromInfo(ResolvedCursorInfo Info);
+
+  std::string getInsertionTextForProtocol();
+
+  std::string getInsertionTextForFunction(SourceManager &SM);
+
+  bool isValid() {
+    // FIXME: Allow to generate explicit == method for declarations which already have
+    // compiler-generated == method
+    return StartLoc.isValid() && ProtInsertStartLoc.isValid() &&
+    !conformsToEquatableProtocol() && isPropertiesListValid() &&
+    isRequirementValid();
+  }
+
+  SourceLoc getStartLocForProtocolDecl() {
+    if (ProtocolsLocations.empty()) {
+      return ProtInsertStartLoc;
+    }
+    return ProtocolsLocations.back().getSourceRange().Start;
+  }
+
+  bool isMembersRangeEmpty() {
+    return Range.empty();
+  }
+
+  SourceLoc getInsertStartLoc();
+};
+
+SourceLoc AddEquatableContext::
+getInsertStartLoc() {
+  SourceLoc MaxLoc = StartLoc;
+  for (auto Mem : Range) {
+    if (Mem->getEndLoc().getOpaquePointerValue() >
+        MaxLoc.getOpaquePointerValue()) {
+      MaxLoc = Mem->getEndLoc();
+    }
+  }
+  return MaxLoc;
+}
+
+std::string AddEquatableContext::
+getInsertionTextForProtocol() {
+  StringRef ProtocolName = getProtocolName(KnownProtocolKind::Equatable);
+  std::string Buffer;
+  llvm::raw_string_ostream OS(Buffer);
+  if (ProtocolsLocations.empty()) {
+    OS << ": " << ProtocolName;
+    return Buffer;
+  }
+  OS << ", " << ProtocolName;
+  return Buffer;
+}
+
+std::string AddEquatableContext::
+getInsertionTextForFunction(SourceManager &SM) {
+  auto Reqs = getProtocolRequirements();
+  auto Req = dyn_cast<FuncDecl>(Reqs[0]);
+  auto Params = Req->getParameters();
+  StringRef ExtraIndent;
+  StringRef CurrentIndent =
+    Lexer::getIndentationForLine(SM, getInsertStartLoc(), &ExtraIndent);
+  std::string Indent;
+  if (isMembersRangeEmpty()) {
+    Indent = (CurrentIndent + ExtraIndent).str();
+  } else {
+    Indent = CurrentIndent.str();
+  }
+  PrintOptions Options = PrintOptions::printVerbose();
+  Options.PrintDocumentationComments = false;
+  Options.setBaseType(Adopter);
+  Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
+    Printer << " {";
+    Printer.printNewline();
+    printFunctionBody(Printer, ExtraIndent, Params);
+    Printer.printNewline();
+    Printer << "}";
+  };
+  std::string Buffer;
+  llvm::raw_string_ostream OS(Buffer);
+  ExtraIndentStreamPrinter Printer(OS, Indent);
+  Printer.printNewline();
+  if (!isMembersRangeEmpty()) {
+    Printer.printNewline();
+  }
+  Reqs[0]->print(Printer, Options);
+  return Buffer;
+}
+
+std::vector<VarDecl *> AddEquatableContext::
+getUserAccessibleProperties() {
+  std::vector<VarDecl *> PublicProperties;
+  for (VarDecl *Decl : StoredProperties) {
+    if (Decl->Decl::isUserAccessible()) {
+      PublicProperties.push_back(Decl);
+    }
+  }
+  return PublicProperties;
+}
+
+std::vector<ValueDecl *> AddEquatableContext::
+getProtocolRequirements() {
+  std::vector<ValueDecl *> Collection;
+  auto Proto = DC->getASTContext().getProtocol(KnownProtocolKind::Equatable);
+  for (auto Member : Proto->getMembers()) {
+    auto Req = dyn_cast<ValueDecl>(Member);
+    if (!Req || Req->isInvalid() || !Req->isProtocolRequirement()) {
+      continue;
+    }
+    Collection.push_back(Req);
+  }
+  return Collection;
+}
+
+AddEquatableContext AddEquatableContext::
+getDeclarationContextFromInfo(ResolvedCursorInfo Info) {
+  if (Info.isInvalid()) {
+    return AddEquatableContext();
+  }
+  if (!Info.IsRef) {
+    if (auto *NomDecl = dyn_cast<NominalTypeDecl>(Info.ValueD)) {
+      return AddEquatableContext(NomDecl);
+    }
+  } else if (auto *ExtDecl = Info.ExtTyRef) {
+    return AddEquatableContext(ExtDecl);
+  }
+  return AddEquatableContext();
+}
+
+void AddEquatableContext::
+printFunctionBody(ASTPrinter &Printer, StringRef ExtraIndent, ParameterList *Params) {
+  llvm::SmallString<128> Return;
+  llvm::raw_svector_ostream SS(Return);
+  SS << tok::kw_return;
+  StringRef Space = " ";
+  StringRef AdditionalSpace = "       ";
+  StringRef Point = ".";
+  StringRef Join = " == ";
+  StringRef And = " &&";
+  auto Props = getUserAccessibleProperties();
+  auto FParam = Params->get(0)->getName();
+  auto SParam = Params->get(1)->getName();
+  auto Prop = Props[0]->getName();
+  Printer << ExtraIndent << Return << Space
+  << FParam << Point << Prop << Join << SParam << Point << Prop;
+  if (Props.size() > 1) {
+    std::for_each(Props.begin() + 1, Props.end(), [&](VarDecl *VD){
+      auto Name = VD->getName();
+      Printer << And;
+      Printer.printNewline();
+      Printer << ExtraIndent << AdditionalSpace << FParam << Point
+      << Name << Join << SParam << Point << Name;
+    });
+  }
+}
+
+bool RefactoringActionAddEquatableConformance::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+  return AddEquatableContext::getDeclarationContextFromInfo(Tok).isValid();
+}
+
+bool RefactoringActionAddEquatableConformance::
+performChange() {
+  auto Context = AddEquatableContext::getDeclarationContextFromInfo(CursorInfo);
+  EditConsumer.insertAfter(SM, Context.getStartLocForProtocolDecl(),
+                           Context.getInsertionTextForProtocol());
+  EditConsumer.insertAfter(SM, Context.getInsertStartLoc(),
+                           Context.getInsertionTextForFunction(SM));
+  return false;
+}
+
 static CharSourceRange
   findSourceRangeToWrapInCatch(ResolvedCursorInfo CursorInfo,
                                SourceFile *TheFile,
@@ -3241,7 +3585,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
 static std::string insertUnderscore(StringRef Text) {
   llvm::SmallString<64> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
-  for (auto It = Text.begin(); It != Text.end(); It++) {
+  for (auto It = Text.begin(); It != Text.end(); ++It) {
     unsigned Distance = It - Text.begin();
     if (Distance && !(Distance % 3)) {
       OS << '_';
@@ -3314,16 +3658,25 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
            return N.isStmt(StmtKind::Brace) || N.isExpr(ExprKind::Call);
          });
   Finder.resolve();
-  if (Finder.getContexts().empty()
-      || !Finder.getContexts().back().is<Expr*>())
+  auto contexts = Finder.getContexts();
+  if (contexts.empty())
     return nullptr;
-  CallExpr *CE = cast<CallExpr>(Finder.getContexts().back().get<Expr*>());
+
+  // If the innermost context is a statement (which will be a BraceStmt per
+  // the filtering condition above), drop it.
+  if (contexts.back().is<Stmt *>()) {
+    contexts = contexts.drop_back();
+  }
+
+  if (contexts.empty() || !contexts.back().is<Expr*>())
+    return nullptr;
+  CallExpr *CE = cast<CallExpr>(contexts.back().get<Expr*>());
 
   if (CE->hasTrailingClosure())
     // Call expression already has a trailing closure.
     return nullptr;
 
-  // The last arugment is a closure?
+  // The last argument is a closure?
   Expr *Args = CE->getArg();
   if (!Args)
     return nullptr;
@@ -3623,9 +3976,11 @@ accept(SourceManager &SM, RegionType RegionType,
     Impl.accept(SM, Range);
   }
 }
+
 ArrayRef<RenameAvailabiliyInfo>
 swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
-                                std::vector<RenameAvailabiliyInfo> &Scratch) {
+                                          Optional<RenameRefInfo> RefInfo,
+                                  std::vector<RenameAvailabiliyInfo> &Scratch) {
   RenameAvailableKind AvailKind = RenameAvailableKind::Available;
   if (getRelatedSystemDecl(VD)){
     AvailKind = RenameAvailableKind::Unavailable_system_symbol;
@@ -3650,6 +4005,30 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
     if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
       if (!CD->getParameters()->size())
         return Scratch;
+
+      if (RefInfo && !RefInfo->IsArgLabel) {
+        NameMatcher Matcher(*(RefInfo->SF));
+        auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
+        if (Resolved.LabelRanges.empty())
+          return Scratch;
+      }
+    }
+
+    // Disallow renaming 'callAsFunction' method with no arguments.
+    if (auto FD = dyn_cast<FuncDecl>(VD)) {
+      // FIXME: syntactic rename can only decide by checking the spelling, not
+      // whether it's an instance method, so we do the same here for now.
+      if (FD->getBaseIdentifier() == FD->getASTContext().Id_callAsFunction) {
+        if (!FD->getParameters()->size())
+          return Scratch;
+
+        if (RefInfo && !RefInfo->IsArgLabel) {
+          NameMatcher Matcher(*(RefInfo->SF));
+          auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
+          if (Resolved.LabelRanges.empty())
+            return Scratch;
+        }
+      }
     }
   }
 
@@ -3682,7 +4061,10 @@ collectAvailableRefactorings(SourceFile *SF,
   case CursorInfoKind::ExprStart:
     break;
   case CursorInfoKind::ValueRef: {
-    auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
+    Optional<RenameRefInfo> RefInfo;
+    if (CursorInfo.IsRef)
+      RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+    auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD, RefInfo);
     if (RenameOp.hasValue() &&
         RenameOp.getValue() == RefactoringKind::GlobalRename)
       AllKinds.push_back(RenameOp.getValue());
@@ -3919,8 +4301,12 @@ int swift::ide::findLocalRenameRanges(
     return true;
   }
   ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
+  Optional<RenameRefInfo> RefInfo;
+  if (CursorInfo.IsRef)
+    RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+
   llvm::SmallVector<DeclContext *, 8> Scopes;
-  analyzeRenameScope(VD, Diags, Scopes);
+  analyzeRenameScope(VD, RefInfo, Diags, Scopes);
   if (Scopes.empty())
     return true;
   RenameRangeCollector RangeCollector(VD, StringRef());

@@ -817,7 +817,7 @@ bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF) {
         for (const auto &clause : ifc->getClauses()) {
           if (clause.isActive)
             continue;
-          for (const auto n : clause.Elements) {
+          for (const auto &n : clause.Elements) {
             SourceRange sr = n.getSourceRange();
             if (sr.isValid() && SM.rangeContainsTokenLoc(sr, loc)) {
               wasFoundWithinInactiveClause = true;

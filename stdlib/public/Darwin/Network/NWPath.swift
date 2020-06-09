@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
-import _SwiftNetworkOverlayShims
+@_implementationOnly import _SwiftNetworkOverlayShims
 
 /// An NWInterface object represents an instance of a network interface of a specific
 /// type, such as a Wi-Fi or Cellular interface.

@@ -1,0 +1,61 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
+
+sil_stage canonical
+
+import Swift
+
+class C {}
+
+sil_vtable C {}
+
+struct SingleRefcounted {
+    var c: C
+}
+
+// CHECK-LABEL: define {{.*}} @escape_partial_apply_swift_class
+// CHECK-arm64e:  call i64 @llvm.ptrauth.resign.i64
+// CHECK:      [[FPTR:%.*]] = insertvalue { i8*, %swift.refcounted* } undef, i8* {{.*}}, 0
+// CHECK-NEXT: [[FCTX:%.*]] = insertvalue { i8*, %swift.refcounted* } [[FPTR]], %swift.refcounted* {{.*}}, 1
+// CHECK-NEXT: ret { i8*, %swift.refcounted* } [[FCTX]]
+sil @escape_partial_apply_swift_class : $@convention(thin) (@convention(method) (Int, @guaranteed C) -> Int, @guaranteed C) -> @callee_guaranteed (Int) -> Int {
+entry(%body : $@convention(method) (Int, @guaranteed C) -> Int, %context : $C):
+  %closure = partial_apply [callee_guaranteed] %body(%context) : $@convention(method) (Int, @guaranteed C) -> Int
+  return %closure : $@callee_guaranteed (Int) -> Int
+}
+
+// CHECK-LABEL: define {{.*}} @escape_partial_apply_swift_single_refcount_struct
+// CHECK-arm64e:  call i64 @llvm.ptrauth.resign.i64
+// CHECK:      [[FPTR:%.*]] = insertvalue { i8*, %swift.refcounted* } undef, i8* {{.*}}, 0
+// CHECK-NEXT: [[FCTX:%.*]] = insertvalue { i8*, %swift.refcounted* } [[FPTR]], %swift.refcounted* {{.*}}, 1
+// CHECK-NEXT: ret { i8*, %swift.refcounted* } [[FCTX]]
+sil @escape_partial_apply_swift_single_refcount_struct : $@convention(thin) (@convention(method) (Int, @guaranteed SingleRefcounted) -> Int, @guaranteed SingleRefcounted) -> @callee_guaranteed (Int) -> Int {
+entry(%body : $@convention(method) (Int, @guaranteed SingleRefcounted) -> Int, %context : $SingleRefcounted):
+  %closure = partial_apply [callee_guaranteed] %body(%context) : $@convention(method) (Int, @guaranteed SingleRefcounted) -> Int
+  return %closure : $@callee_guaranteed (Int) -> Int
+}
+
+// CHECK-LABEL: define {{.*}} @noescape_partial_apply_swift_indirect
+// CHECK-arm64e:  call i64 @llvm.ptrauth.resign.i64
+// CHECK:         [[CTX:%.*]] = bitcast {{.*}}** %1 to %swift.opaque*
+// CHECK-NEXT:    [[CONT:%.*]] = bitcast i8* %2
+// CHECK-NEXT:    call {{.*}}void [[CONT]](i8* {{.*}}, %swift.opaque* [[CTX]], %swift.refcounted* {{.*}}%3)
+sil @noescape_partial_apply_swift_indirect : $@convention(thin) (@convention(method) (Int, @in_guaranteed C) -> Int, @in_guaranteed C, @guaranteed @callee_guaranteed (@noescape @callee_guaranteed (Int) -> Int) -> ()) -> () {
+entry(%body : $@convention(method) (Int, @in_guaranteed C) -> Int, %context : $*C, %cont : $@callee_guaranteed (@noescape @callee_guaranteed (Int) -> Int) -> ()):
+  %closure = partial_apply [callee_guaranteed] [on_stack] %body(%context) : $@convention(method) (Int, @in_guaranteed C) -> Int
+  %x = apply %cont(%closure) : $@callee_guaranteed (@noescape @callee_guaranteed (Int) -> Int) -> ()
+  dealloc_stack %closure : $@noescape @callee_guaranteed (Int) -> Int
+  return undef : $()
+}
+
+// CHECK-LABEL: define {{.*}} @noescape_partial_apply_swift_direct_word
+// CHECK-arm64e:  call i64 @llvm.ptrauth.resign.i64
+// CHECK:         [[CTX:%.*]] = inttoptr i{{.*}} %1 to %swift.opaque*
+// CHECK-NEXT:    [[CONT:%.*]] = bitcast i8* %2
+// CHECK-NEXT:    call {{.*}}void [[CONT]](i8* {{.*}}, %swift.opaque* [[CTX]], %swift.refcounted* {{.*}}%3)
+sil @noescape_partial_apply_swift_direct_word : $@convention(thin) (@convention(method) (Int, Int) -> Int, Int, @guaranteed @callee_guaranteed (@noescape @callee_guaranteed (Int) -> Int) -> ()) -> () {
+entry(%body : $@convention(method) (Int, Int) -> Int, %context : $Int, %cont : $@callee_guaranteed (@noescape @callee_guaranteed (Int) -> Int) -> ()):
+  %closure = partial_apply [callee_guaranteed] [on_stack] %body(%context) : $@convention(method) (Int, Int) -> Int
+  %x = apply %cont(%closure) : $@callee_guaranteed (@noescape @callee_guaranteed (Int) -> Int) -> ()
+  dealloc_stack %closure : $@noescape @callee_guaranteed (Int) -> Int
+  return undef : $()
+}

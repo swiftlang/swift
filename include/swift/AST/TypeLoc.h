@@ -19,6 +19,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
@@ -28,8 +29,7 @@ class TypeRepr;
 
 /// TypeLoc - Provides source location information for a parsed type.
 /// A TypeLoc is stored in AST nodes which use an explicitly written type.
-struct TypeLoc {
-private:
+class alignas(1 << TypeLocAlignInBits) TypeLoc {
   Type Ty;
   TypeRepr *TyR = nullptr;
 
@@ -65,8 +65,6 @@ public:
   void setInvalidType(ASTContext &C);
   void setType(Type Ty);
 
-  TypeLoc clone(ASTContext &ctx) const;
-  
   friend llvm::hash_code hash_value(const TypeLoc &owner) {
     return llvm::hash_combine(owner.Ty.getPointer(), owner.TyR);
   }

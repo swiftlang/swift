@@ -197,6 +197,8 @@ extension S3 {
 
 func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : cake.Prot, T2 : cake.C1, T1.Element == Int
 
+func shouldPrintAnyAsKeyword(x x: Any)
+
 
 [
   {
@@ -1918,6 +1920,31 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : cake.Prot, T2 : cake.C1, T1.E
     key.usr: "s:Si",
     key.offset: 2408,
     key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2413,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 2418,
+    key.length: 23
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 2442,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 2444,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 2447,
+    key.length: 3
   }
 ]
 [
@@ -3068,6 +3095,23 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : cake.Prot, T2 : cake.C1, T1.E
         key.name: "iy",
         key.offset: 2354,
         key.length: 2
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "shouldPrintAnyAsKeyword(x:)",
+    key.usr: "s:4cake23shouldPrintAnyAsKeyword1xyyp_tF",
+    key.offset: 2413,
+    key.length: 38,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>shouldPrintAnyAsKeyword</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><syntaxtype.keyword>Any</syntaxtype.keyword></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.var.local,
+        key.keyword: "x",
+        key.name: "x",
+        key.offset: 2447,
+        key.length: 3
       }
     ]
   }

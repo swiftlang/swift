@@ -120,9 +120,9 @@ bool doesRangeableRangeMatch(const T *x, const SourceManager &SM,
   auto const r = getRangeableSourceRange(x);
   if (r.isInvalid())
     return false;
-  if (start && SM.getLineNumber(r.Start) != start)
+  if (start && SM.getLineAndColumnInBuffer(r.Start).first != start)
     return false;
-  if (end && SM.getLineNumber(r.End) != end)
+  if (end && SM.getLineAndColumnInBuffer(r.End).first != end)
     return false;
   if (file.empty())
     return true;
@@ -658,9 +658,10 @@ public:
     ASTScopeAssert(!n.isDecl(DeclKind::Accessor),
                    "Should not see accessors here");
     // Can occur in illegal code
+    // non-empty brace stmt could define a new insertion point
     if (auto *const s = n.dyn_cast<Stmt *>()) {
       if (auto *const bs = dyn_cast<BraceStmt>(s))
-        ASTScopeAssert(bs->empty(), "Might mess up insertion point");
+        return !bs->empty();
     }
     return !n.isDecl(DeclKind::Var);
   }
@@ -711,7 +712,7 @@ public:
         }
       }
     }
-    for (const auto dcAndScope : bogusDCs) {
+    for (const auto &dcAndScope : bogusDCs) {
       llvm::errs() << "ASTScope tree confabulated: " << dcAndScope.getFirst()
                    << ":\n";
       dcAndScope.getFirst()->printContext(llvm::errs());
@@ -767,8 +768,7 @@ bool ASTScope::areInactiveIfConfigClausesSupported() {
 
 void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   auto *const SF = AFD->getParentSourceFile();
-  if (SF->isSuitableForASTScopes())
-    SF->getScope().expandFunctionBodyImpl(AFD);
+  SF->getScope().expandFunctionBodyImpl(AFD);
 }
 
 void ASTScope::expandFunctionBodyImpl(AbstractFunctionDecl *AFD) {
@@ -2122,7 +2122,7 @@ private:
       return;
     auto bufID = SM.findBufferContainingLoc(loc);
     auto f = SM.getIdentifierForBuffer(bufID);
-    auto lin = SM.getLineNumber(loc);
+    auto lin = SM.getLineAndColumnInBuffer(loc).first;
     if (f.endswith(file) && lin == line)
       if (isa<PatternBindingDecl>(D))
         llvm::errs() << "*** catchForDebugging: " << lin << " ***\n";

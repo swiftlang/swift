@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 //
 //
-// RUN: %target-build-swift %S/Inputs/CommandLineStressTest/CommandLineStressTest.swift -parse-as-library -force-single-frontend-invocation -module-name CommandLineStressTestSwift -emit-object -o %t/CommandLineStressTestSwift.o
+// RUN: %target-build-swift %S/Inputs/CommandLineStressTest/CommandLineStressTest.swift -parse-as-library -whole-module-optimization -module-name CommandLineStressTestSwift -emit-object -o %t/CommandLineStressTestSwift.o
 // RUN: %clang -arch %target-cpu -c -o %t/CommandLineStressTest.o -x c %S/Inputs/CommandLineStressTest/CommandLineStressTest.c
 // RUN: %target-build-swift %t/CommandLineStressTest.o %t/CommandLineStressTestSwift.o -o %t/CommandLineStressTest
 // RUN: %target-codesign %t/CommandLineStressTest

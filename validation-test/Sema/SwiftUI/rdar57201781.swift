@@ -11,7 +11,7 @@ struct ContentView : View {
     VStack { // expected-error{{type of expression is ambiguous without more context}}
       HStack {
         Text("")
-        TextFi // expected-error {{use of unresolved identifier 'TextFi'}}
+        TextFi // expected-error {{cannot find 'TextFi' in scope}}
       }
 
       ForEach(0 ... 4, id: \.self) { i in

@@ -107,7 +107,7 @@ internal func getSectionInfo(_ name: String,
 
 /// Get the Swift Reflection section locations for a loaded image.
 ///
-/// An image of interest must have the following sections in the __DATA
+/// An image of interest must have the following sections in the __TEXT
 /// segment:
 /// - __swift5_fieldmd
 /// - __swift5_assocty

@@ -21,7 +21,7 @@ import Foundation
 import ObjectiveCTests
 #endif
 
-let t: [BenchmarkCategory] = [.validation, .bridging]
+let t: [BenchmarkCategory] = [.validation, .bridging, .cpubench]
 
 public let ObjectiveCNoBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStubToNSStringRef",

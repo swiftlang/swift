@@ -84,6 +84,7 @@ import FloatingPointPrinting
 import Hanoi
 import Hash
 import Histogram
+import HTTP2StateMachine
 import InsertCharacter
 import IntegerParsing
 import Integrate
@@ -95,6 +96,7 @@ import LuhnAlgoEager
 import LuhnAlgoLazy
 import MapReduce
 import Memset
+import Mirror
 import MonteCarloE
 import MonteCarloPi
 import NibbleSort
@@ -268,6 +270,7 @@ registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(Histogram)
+registerBenchmark(HTTP2StateMachine)
 registerBenchmark(InsertCharacter)
 registerBenchmark(IntegerParsing)
 registerBenchmark(IntegrateTest)
@@ -279,6 +282,7 @@ registerBenchmark(LuhnAlgoEager)
 registerBenchmark(LuhnAlgoLazy)
 registerBenchmark(MapReduce)
 registerBenchmark(Memset)
+registerBenchmark(MirrorDefault)
 registerBenchmark(MonteCarloE)
 registerBenchmark(MonteCarloPi)
 registerBenchmark(NSDictionaryCastToSwift)
@@ -364,6 +368,7 @@ registerBenchmark(Suffix)
 registerBenchmark(SuperChars)
 registerBenchmark(TwoSum)
 registerBenchmark(TypeFlood)
+registerBenchmark(TypeName)
 registerBenchmark(UTF8Decode)
 registerBenchmark(Walsh)
 registerBenchmark(WordCount)

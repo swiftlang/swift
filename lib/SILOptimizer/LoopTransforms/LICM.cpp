@@ -963,6 +963,41 @@ static bool storesCommonlyDominateLoopExits(SILValue addr, SILLoop *loop,
   if (stores.count(header) != 0)
     return true;
 
+  // Also a store in the pre-header dominates all exists. Although the situation
+  // is a bit different here: the store in the pre-header remains - it's not
+  // (re)moved by the LICM transformation.
+  // But even if the loop-stores are not dominating the loop exits, it
+  // makes sense to move them out of the loop if this case. When this is done,
+  // dead-store-elimination can then most likely eliminate the store in the
+  // pre-header.
+  //
+  //   pre_header:
+  //     store %v1 to %addr
+  //   header:
+  //     cond_br %cond, then, tail
+  //   then:
+  //     store %v2 to %addr    // a conditional store in the loop
+  //     br tail
+  //   tail:
+  //     cond_br %loop_cond, header, exit
+  //   exit:
+  //
+  //  will be transformed to
+  //
+  //   pre_header:
+  //     store %v1 to %addr    // <- can be removed by DSE afterwards
+  //   header:
+  //     cond_br %cond, then, tail
+  //   then:
+  //     br tail
+  //   tail(%phi):
+  //     cond_br %loop_cond, header, exit
+  //   exit:
+  //     store %phi to %addr
+  //
+  if (stores.count(loop->getLoopPreheader()) != 0)
+    return true;
+
   // Propagate the store-is-not-alive flag through the control flow in the loop,
   // starting at the header.
   SmallPtrSet<SILBasicBlock *, 16> storesNotAlive;

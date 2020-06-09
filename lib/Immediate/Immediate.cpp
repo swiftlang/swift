@@ -22,9 +22,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -32,10 +32,7 @@
 #include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/IR/DiagnosticPrinter.h"
-#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/Linker/Linker.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Support/Path.h"
@@ -179,48 +176,6 @@ bool swift::immediate::tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                      [](bool Value) { return Value; });
 }
 
-static void linkerDiagnosticHandlerNoCtx(const llvm::DiagnosticInfo &DI) {
-  if (DI.getSeverity() != llvm::DS_Error)
-    return;
-
-  std::string MsgStorage;
-  {
-    llvm::raw_string_ostream Stream(MsgStorage);
-    llvm::DiagnosticPrinterRawOStream DP(Stream);
-    DI.print(DP);
-  }
-  llvm::errs() << "Error linking swift modules\n";
-  llvm::errs() << MsgStorage << "\n";
-}
-
-
-
-static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
-                                    void *Context) {
-  // This assert self documents our precondition that Context is always
-  // nullptr. It seems that parts of LLVM are using the flexibility of having a
-  // context. We don't really care about this.
-  assert(Context == nullptr && "We assume Context is always a nullptr");
-
-  return linkerDiagnosticHandlerNoCtx(DI);
-}
-
-bool swift::immediate::linkLLVMModules(llvm::Module *Module,
-                                       std::unique_ptr<llvm::Module> SubModule
-                            // TODO: reactivate the linker mode if it is
-                            // supported in llvm again. Otherwise remove the
-                            // commented code completely.
-                            /*, llvm::Linker::LinkerMode LinkerMode */)
-{
-  llvm::LLVMContext &Ctx = SubModule->getContext();
-  auto OldHandler = Ctx.getDiagnosticHandlerCallBack();
-  void *OldDiagnosticContext = Ctx.getDiagnosticContext();
-  Ctx.setDiagnosticHandlerCallBack(linkerDiagnosticHandler, nullptr);
-  bool Failed = llvm::Linker::linkModules(*Module, std::move(SubModule));
-  Ctx.setDiagnosticHandlerCallBack(OldHandler, OldDiagnosticContext);
-  return !Failed;
-}
-
 bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
                                                const IRGenOptions &IRGenOpts) {
   // Perform autolinking.
@@ -246,15 +201,14 @@ int swift::RunImmediately(CompilerInstance &CI,
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
   const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
-  // FIXME: We shouldn't need to use the global context here, but
-  // something is persisting across calls to performIRGeneration.
-  auto ModuleCtx = std::make_unique<llvm::LLVMContext>();
-  auto Module = performIRGeneration(
+  auto GenModule = performIRGeneration(
       IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
-      PSPs, *ModuleCtx, ArrayRef<std::string>());
+      PSPs, ArrayRef<std::string>());
 
   if (Context.hadError())
     return -1;
+
+  assert(GenModule && "Emitted no diagnostics but IR generation failed?");
 
   // Load libSwiftCore to setup process arguments.
   //
@@ -326,6 +280,7 @@ int swift::RunImmediately(CompilerInstance &CI,
       JIT = std::move(*JITOrErr);
   }
 
+  auto Module = GenModule.getModule();
   {
     // Get a generator for the process symbols and attach it to the main
     // JITDylib.
@@ -341,8 +296,7 @@ int swift::RunImmediately(CompilerInstance &CI,
              Module->dump());
 
   {
-    auto TSM = llvm::orc::ThreadSafeModule(std::move(Module), std::move(ModuleCtx));
-    if (auto Err = JIT->addIRModule(std::move(TSM))) {
+    if (auto Err = JIT->addIRModule(std::move(GenModule).intoThreadSafeContext())) {
       llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
       return -1;
     }

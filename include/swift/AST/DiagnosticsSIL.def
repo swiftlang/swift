@@ -17,30 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && defined(REMARK)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
-
-#ifndef REMARK
-#  define REMARK(ID,Options,Text,Signature) \
-  DIAG(REMARK,ID,Options,Text,Signature)
-#endif
-
+#define DEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
 
 // SILGen issues.
 ERROR(bridging_module_missing,none,
@@ -130,7 +108,7 @@ ERROR(capture_before_declaration_defer,none,
 NOTE(captured_value_declared_here,none,
      "captured value declared here", ())
 
-#define SELECT_ESCAPING_CLOSURE_KIND "escaping %select{local function|closure}0"
+#define SELECT_ESCAPING_CLOSURE_KIND "escaping %select{local function|closure|autoclosure}0"
 
 // Invalid escaping capture diagnostics.
 ERROR(escaping_inout_capture,none,
@@ -154,6 +132,10 @@ ERROR(escaping_noescape_var_capture,none,
       " captures non-escaping value", (unsigned))
 
 NOTE(value_captured_here,none,"captured here", ())
+
+NOTE(copy_inout_captured_by_autoclosure,none, "pass a copy of %0", (Identifier))
+
+NOTE(copy_self_captured_by_autoclosure,none, "pass a copy of 'self'", ())
 
 #undef SELECT_ESCAPING_CLOSURE_KIND
 
@@ -602,14 +584,15 @@ NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
 
 // OS log optimization diagnostics.
 
-ERROR(oslog_non_const_interpolation_options, none, "interpolation arguments "
-      "like format and privacy options must be constants", ())
+ERROR(oslog_constant_eval_trap, none, "%0", (StringRef))
 
-ERROR(oslog_const_evaluable_fun_error, none, "evaluation of constant-evaluable "
-      "function '%0' failed", (StringRef))
+ERROR(oslog_too_many_instructions, none, "interpolated expression and arguments "
+      "are too complex", ())
 
-ERROR(oslog_fail_stop_error, none, "constant evaluation of log call failed "
-      "with fatal error", ())
+ERROR(oslog_invalid_log_message, none, "invalid log message; extending "
+      "types defined in the os module is not supported", ())
+
+NOTE(oslog_const_evaluable_fun_error, none, "'%0' failed evaluation", (StringRef))
 
 ERROR(oslog_non_constant_message, none, "'OSLogMessage' instance passed to the "
       "log call is not a constant", ())
@@ -620,14 +603,18 @@ ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' instance "
 ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
       "constant", (StringRef))
 
-ERROR(oslog_message_alive_after_opts, none, "OSLogMessage instance must not "
-      "be explicitly created and must be deletable", ())
+ERROR(oslog_message_alive_after_opts, none, "string interpolation cannot "
+      "be used in this context; if you are calling an os_log function, "
+      "try a different overload", ())
+
+ERROR(oslog_message_explicitly_created, none, "'OSLogMessage' must be "
+      " created from a string interpolation or string literal", ())
 
 WARNING(oslog_call_in_unreachable_code, none, "os log call will never be "
         "executed and may have undiagnosed errors", ())
 
 ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
-      "builtin must used only on string literals", ())
+      "builtin must be used only on string literals", ())
 
 ERROR(polymorphic_builtin_passed_non_trivial_non_builtin_type, none, "Argument "
       "of type %0 can not be passed as an argument to a Polymorphic "
@@ -644,12 +631,5 @@ ERROR(box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc, none,
 NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
      "value escapes here", ())
 
-#ifndef DIAG_NO_UNDEF
-# if defined(DIAG)
-#  undef DIAG
-# endif
-# undef REMARK
-# undef NOTE
-# undef WARNING
-# undef ERROR
-#endif
+#define UNDEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"

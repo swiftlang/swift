@@ -1,8 +1,8 @@
-//===--- Overrides.cpp - Compat overrides for Swift 5.0 runtime ----s------===//
+//===--- Overrides.h --- Compat overrides for Swift 5.0 runtime ----s------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Metadata.h"
 
 namespace swift {

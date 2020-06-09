@@ -48,11 +48,17 @@ deprecatedOnIOSButNotMacCatalyst() // no-warning
 func introducedLaterOnMacCatalyst() {
 }
 
+@available(iOS 57.0, macCatalyst 56.0, *)
+func introducedLaterOnIOS() {
+}
+
 // expected-note@+1 *{{add @available attribute to enclosing global function}}
 func testPoundAvailable() {
 
   if #available(macCatalyst 55.0, *) {
     introducedLaterOnMacCatalyst() // expected-error {{'introducedLaterOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
   }
 
@@ -61,10 +67,18 @@ func testPoundAvailable() {
   if #available(iOS 56.0, macCatalyst 55.0, *) {
     introducedLaterOnMacCatalyst() // expected-error {{'introducedLaterOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
   }
 
   if #available(iOS 55.0, macCatalyst 56.0, *) {
     introducedLaterOnMacCatalyst() // no-warning
+    introducedLaterOnIOS() // no-error
+  }
+
+  if #available(iOS 57.0, macCatalyst 56.0, *) {
+    introducedLaterOnMacCatalyst() // no-warning
+    introducedLaterOnIOS() // no-error
   }
 
   // iOS availability should be inherited when macCatalyst is not present
@@ -72,10 +86,13 @@ func testPoundAvailable() {
   if #available(iOS 55.0, *) {
     introducedLaterOnMacCatalyst() // expected-error {{'introducedLaterOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
   }
 
   if #available(iOS 56.0, *) {
     introducedLaterOnMacCatalyst() // no-warning
+    introducedLaterOnIOS() // no-error
   }
 
   // macOS availability doesn't count on macCatalyst for Swift.

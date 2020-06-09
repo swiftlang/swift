@@ -17,40 +17,40 @@
 
 #if swift(>=3)
 asdf
-// ERROR_4: [[@LINE-1]]:1: error: {{use of unresolved identifier}}
-// ERROR_5: [[@LINE-2]]:1: error: {{use of unresolved identifier}}
+// ERROR_4: [[@LINE-1]]:1: error: {{cannot find 'asdf' in scope}}
+// ERROR_5: [[@LINE-2]]:1: error: {{cannot find 'asdf' in scope}}
 #else
 jkl
 #endif
 
 #if swift(>=3.1)
 asdf
-// ERROR_4: [[@LINE-1]]:1: error: {{use of unresolved identifier}}
-// ERROR_5: [[@LINE-2]]:1: error: {{use of unresolved identifier}}
+// ERROR_4: [[@LINE-1]]:1: error: {{cannot find 'asdf' in scope}}
+// ERROR_5: [[@LINE-2]]:1: error: {{cannot find 'asdf' in scope}}
 #else
 jkl
 #endif
 
 #if swift(>=4)
 asdf 
-// ERROR_4: [[@LINE-1]]:1: error: {{use of unresolved identifier}}
-// ERROR_5: [[@LINE-2]]:1: error: {{use of unresolved identifier}}
+// ERROR_4: [[@LINE-1]]:1: error: {{cannot find 'asdf' in scope}}
+// ERROR_5: [[@LINE-2]]:1: error: {{cannot find 'asdf' in scope}}
 #else
 jkl
 #endif
 
 #if swift(>=4.1)
 asdf
-// ERROR_4: [[@LINE-1]]:1: error: {{use of unresolved identifier}}
-// ERROR_5: [[@LINE-2]]:1: error: {{use of unresolved identifier}}
+// ERROR_4: [[@LINE-1]]:1: error: {{cannot find 'asdf' in scope}}
+// ERROR_5: [[@LINE-2]]:1: error: {{cannot find 'asdf' in scope}}
 #else
 jkl
 #endif
 
 #if swift(>=5)
 asdf
-// ERROR_5: [[@LINE-1]]:1: error: {{use of unresolved identifier}}
+// ERROR_5: [[@LINE-1]]:1: error: {{cannot find 'asdf' in scope}}
 #else
 jkl
-// ERROR_4: [[@LINE-1]]:1: error: {{use of unresolved identifier}}
+// ERROR_4: [[@LINE-1]]:1: error: {{cannot find 'jkl' in scope}}
 #endif

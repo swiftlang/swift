@@ -184,13 +184,14 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 
     auto visitImport = [&](ModuleDecl::ImportedModule import,
                            const DeclContext *moduleScopeContext) {
-      if (import.first.empty())
-        import.first = accessPath;
+      if (import.accessPath.empty())
+        import.accessPath = accessPath;
       else if (!accessPath.empty() &&
-               !ModuleDecl::isSameAccessPath(import.first, accessPath))
+               !ModuleDecl::isSameAccessPath(import.accessPath, accessPath))
         return;
 
-      getDerived()->doLocalLookup(import.second, import.first, decls);
+      getDerived()->doLocalLookup(import.importedModule, import.accessPath,
+                                  decls);
       updateNewDecls(moduleScopeContext);
     };
 
@@ -201,7 +202,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       if (auto *loader = ctx.getClangModuleLoader()) {
         headerImportModule = loader->getImportedHeaderModule();
         if (headerImportModule) {
-          ModuleDecl::ImportedModule import({}, headerImportModule);
+          ModuleDecl::ImportedModule import{ModuleDecl::AccessPathTy(),
+                                            headerImportModule};
           visitImport(import, nullptr);
         }
       }
@@ -210,11 +212,11 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     for (auto import : imports.getTopLevelImports()) {
       // A module appears in its own top-level import list; since we checked
       // it already, skip it.
-      if (import.second == module)
+      if (import.importedModule == module)
         continue;
 
       // Skip the special import set module; we've already visited it.
-      if (import.second == headerImportModule)
+      if (import.importedModule == headerImportModule)
         continue;
 
       visitImport(import, moduleScopeContext);
@@ -222,7 +224,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 
     for (auto import : imports.getTransitiveImports()) {
       // Skip the special import set module; we've already visited it.
-      if (import.second == headerImportModule)
+      if (import.importedModule == headerImportModule)
         continue;
 
       visitImport(import, nullptr);

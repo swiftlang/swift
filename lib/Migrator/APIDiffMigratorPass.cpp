@@ -505,11 +505,16 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     auto Ranges = getCallArgLabelRanges(SM, Arg,
                                         LabelRangeEndAt::LabelNameOnly);
     llvm::SmallVector<uint8_t, 2> ToRemoveIndices;
-    for (unsigned I = 0; I < Ranges.size(); I ++) {
+    for (unsigned I = 0; I < Ranges.first.size(); I ++) {
       if (std::any_of(IgnoreArgIndex.begin(), IgnoreArgIndex.end(),
                       [I](unsigned Ig) { return Ig == I; }))
         continue;
-      auto LR = Ranges[I];
+
+      // Ignore the first trailing closure label
+      if (Ranges.second && I == Ranges.second)
+        continue;
+
+      auto LR = Ranges.first[I];
       if (Idx < NewName.argSize()) {
         auto Label = NewName.args()[Idx++];
 
@@ -528,7 +533,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       auto Ranges = getCallArgLabelRanges(SM, Arg,
                                          LabelRangeEndAt::BeforeElemStart);
       for (auto I : ToRemoveIndices) {
-        Editor.remove(Ranges[I]);
+        Editor.remove(Ranges.first[I]);
       }
     }
   }

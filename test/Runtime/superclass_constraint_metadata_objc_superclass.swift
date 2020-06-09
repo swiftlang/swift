@@ -6,17 +6,16 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %S/Inputs/print_subclass/main.swift
 
+// REQUIRES: objc_interop
 // REQUIRES: executable_test
-
 // REQUIRES: OS=macosx
-// Testing runtime changes that aren't in the os stdlib.
 // UNSUPPORTED: use_os_stdlib
 
 import Swift
 import Foundation
 import Framework
 
-// Swift subclass of a Swift class
+// Swift subclass of a ObjC class
 
 // subclass isSwiftClassMetadataSubclass metadata completeness : Complete
 // superclass metadata path: loop

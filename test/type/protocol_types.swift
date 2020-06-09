@@ -52,7 +52,7 @@ struct NestedCompoAliasTypeWhereRequirement<T> where T: CompoAssocType.Compo {}
 
 struct Struct1<T> { }
 struct Struct2<T : Pub & Bar> { }
-struct Struct3<T : Pub & Bar & P3> { } // expected-error {{use of undeclared type 'P3'}}
+struct Struct3<T : Pub & Bar & P3> { } // expected-error {{cannot find type 'P3' in scope}}
 struct Struct4<T> where T : Pub & Bar {}
 
 struct Struct5<T : protocol<Pub, Bar>> { } // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}

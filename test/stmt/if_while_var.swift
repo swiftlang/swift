@@ -14,14 +14,14 @@ if let x = foo() {
   modify(&x) // expected-error{{cannot pass immutable value as inout argument: 'x' is a 'let' constant}}
 }
 
-use(x) // expected-error{{unresolved identifier 'x'}}
+use(x) // expected-error{{cannot find 'x' in scope}}
 
 if var x = foo() {
   use(x)
   modify(&x)
 }
 
-use(x) // expected-error{{unresolved identifier 'x'}}
+use(x) // expected-error{{cannot find 'x' in scope}}
 
 if let x = nonOptionalStruct() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 if let x = nonOptionalEnum() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
@@ -44,17 +44,17 @@ if let x = foo() {
   _ = x
 } else {
   // TODO: more contextual error? "x is only available on the true branch"?
-  use(x) // expected-error{{unresolved identifier 'x'}}
+  use(x) // expected-error{{cannot find 'x' in scope}}
 }
 
 if let x = foo() {
   use(x)
 } else if let y = foo() { // expected-note {{did you mean 'y'?}}
-  use(x) // expected-error{{unresolved identifier 'x'}}
+  use(x) // expected-error{{cannot find 'x' in scope}}
   use(y)
 } else {
-  use(x) // expected-error{{unresolved identifier 'x'}}
-  use(y) // expected-error{{unresolved identifier 'y'}}
+  use(x) // expected-error{{cannot find 'x' in scope}}
+  use(y) // expected-error{{cannot find 'y' in scope}}
 }
 
 var opt: Int? = .none
@@ -96,7 +96,7 @@ if 1 != 2, 4 == 57 {}
 if 1 != 2, 4 == 57, let x = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 
 // Test that these don't cause the parser to crash.
-if true { if a == 0; {} }   // expected-error {{use of unresolved identifier 'a'}} expected-error {{expected '{' after 'if' condition}}
+if true { if a == 0; {} }   // expected-error {{cannot find 'a' in scope}} expected-error {{expected '{' after 'if' condition}}
 if a == 0, where b == 0 {}  // expected-error 4{{}} expected-note {{}} {{25-25=do }}
 
 
@@ -141,7 +141,7 @@ func useInt(_ x: Int) {}
 
 func testWhileScoping(_ a: Int?) {// expected-note {{did you mean 'a'?}}
   while let x = a { }
-  useInt(x) // expected-error{{use of unresolved identifier 'x'}}
+  useInt(x) // expected-error{{cannot find 'x' in scope}}
 }
 
 // Matching a case with a single, labeled associated value.

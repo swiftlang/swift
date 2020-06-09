@@ -70,7 +70,7 @@ func vjpSubtractWrt1(x: Float, y: Float) -> (value: Float, pullback: (Float) -> 
 
 // Test invalid original function.
 
-// expected-error @+1 {{use of unresolved identifier 'nonexistentFunction'}}
+// expected-error @+1 {{cannot find 'nonexistentFunction' in scope}}
 @derivative(of: nonexistentFunction)
 func vjpOriginalFunctionNotFound(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
@@ -78,7 +78,7 @@ func vjpOriginalFunctionNotFound(_ x: Float) -> (value: Float, pullback: (Float)
 
 // Test `@derivative` attribute where `value:` result does not conform to `Differentiable`.
 // Invalid original function should be diagnosed first.
-// expected-error @+1 {{use of unresolved identifier 'nonexistentFunction'}}
+// expected-error @+1 {{cannot find 'nonexistentFunction' in scope}}
 @derivative(of: nonexistentFunction)
 func vjpOriginalFunctionNotFound2(_ x: Float) -> (value: Int, pullback: (Float) -> Float) {
   fatalError()
@@ -707,6 +707,14 @@ extension InoutParameters {
   ) { fatalError() }
 }
 
+// Test no semantic results.
+
+func noSemanticResults(_ x: Float) {}
+
+// expected-error @+1 {{cannot differentiate void function 'noSemanticResults'}}
+@derivative(of: noSemanticResults)
+func vjpNoSemanticResults(_ x: Float) -> (value: Void, pullback: Void) {}
+
 // Test multiple semantic results.
 
 extension InoutParameters {
@@ -746,6 +754,7 @@ extension InoutParameters {
 // Test cross-file derivative registration.
 
 extension FloatingPoint where Self: Differentiable {
+  @usableFromInline
   @derivative(of: rounded)
   func vjpRounded() -> (
     value: Self,
@@ -801,4 +810,144 @@ extension HasADefaultDerivative {
   func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     (x, { 10 * $0 })
   }
+}
+
+// MARK: - Original function visibility = derivative function visibility
+
+public func public_original_public_derivative(_ x: Float) -> Float { x }
+@derivative(of: public_original_public_derivative)
+public func _public_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+public func public_original_usablefrominline_derivative(_ x: Float) -> Float { x }
+@usableFromInline
+@derivative(of: public_original_usablefrominline_derivative)
+func _public_original_usablefrominline_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_internal_derivative(_ x: Float) -> Float { x }
+@derivative(of: internal_original_internal_derivative)
+func _internal_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+private func private_original_private_derivative(_ x: Float) -> Float { x }
+@derivative(of: private_original_private_derivative)
+private func _private_original_private_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+fileprivate func fileprivate_original_fileprivate_derivative(_ x: Float) -> Float { x }
+@derivative(of: fileprivate_original_fileprivate_derivative)
+fileprivate func _fileprivate_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_usablefrominline_derivative(_ x: Float) -> Float { x }
+@usableFromInline
+@derivative(of: internal_original_usablefrominline_derivative)
+func _internal_original_usablefrominline_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_inlinable_derivative(_ x: Float) -> Float { x }
+@inlinable
+@derivative(of: internal_original_inlinable_derivative)
+func _internal_original_inlinable_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
+@_alwaysEmitIntoClient
+@derivative(of: internal_original_alwaysemitintoclient_derivative)
+func _internal_original_alwaysemitintoclient_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// MARK: - Original function visibility < derivative function visibility
+
+@usableFromInline
+func usablefrominline_original_public_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_usablefrominline_original_public_derivative' is public, but original function 'usablefrominline_original_public_derivative' is internal}}
+@derivative(of: usablefrominline_original_public_derivative)
+// expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-7=internal}}
+public func _usablefrominline_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_public_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_internal_original_public_derivative' is public, but original function 'internal_original_public_derivative' is internal}}
+@derivative(of: internal_original_public_derivative)
+// expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-7=internal}}
+public func _internal_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+private func private_original_usablefrominline_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_private_original_usablefrominline_derivative' is internal, but original function 'private_original_usablefrominline_derivative' is private}}
+@derivative(of: private_original_usablefrominline_derivative)
+@usableFromInline
+// expected-note @+1 {{mark the derivative function as 'private' to match the original function}} {{1-1=private }}
+func _private_original_usablefrominline_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+private func private_original_public_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_private_original_public_derivative' is public, but original function 'private_original_public_derivative' is private}}
+@derivative(of: private_original_public_derivative)
+// expected-note @+1 {{mark the derivative function as 'private' to match the original function}} {{1-7=private}}
+public func _private_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+private func private_original_internal_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_private_original_internal_derivative' is internal, but original function 'private_original_internal_derivative' is private}}
+@derivative(of: private_original_internal_derivative)
+// expected-note @+1 {{mark the derivative function as 'private' to match the original function}}
+func _private_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+fileprivate func fileprivate_original_private_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_fileprivate_original_private_derivative' is private, but original function 'fileprivate_original_private_derivative' is fileprivate}}
+@derivative(of: fileprivate_original_private_derivative)
+// expected-note @+1 {{mark the derivative function as 'fileprivate' to match the original function}} {{1-8=fileprivate}}
+private func _fileprivate_original_private_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+private func private_original_fileprivate_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_private_original_fileprivate_derivative' is fileprivate, but original function 'private_original_fileprivate_derivative' is private}}
+@derivative(of: private_original_fileprivate_derivative)
+// expected-note @+1 {{mark the derivative function as 'private' to match the original function}} {{1-12=private}}
+fileprivate func _private_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// MARK: - Original function visibility > derivative function visibility
+
+public func public_original_private_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_public_original_private_derivative' is fileprivate, but original function 'public_original_private_derivative' is public}}
+@derivative(of: public_original_private_derivative)
+// expected-note @+1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{1-1=@usableFromInline }}
+fileprivate func _public_original_private_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+public func public_original_internal_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_public_original_internal_derivative' is internal, but original function 'public_original_internal_derivative' is public}}
+@derivative(of: public_original_internal_derivative)
+// expected-note @+1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{1-1=@usableFromInline }}
+func _public_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_fileprivate_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_internal_original_fileprivate_derivative' is fileprivate, but original function 'internal_original_fileprivate_derivative' is internal}}
+@derivative(of: internal_original_fileprivate_derivative)
+// expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-12=internal}}
+fileprivate func _internal_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
 }

@@ -22,7 +22,7 @@ class Conditional<T> {
 }
 
 extension Conditional: Codable where T: Codable { // expected-note 2 {{where 'T' = 'Nonconforming'}}
-    // expected-error@-1 2 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be be satisfied by a 'required' initializer in the class definition}}
+    // expected-error@-1 2 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be satisfied by a 'required' initializer in the class definition}}
 }
 
 // They should receive synthesized init(from:) and an encode(to:).

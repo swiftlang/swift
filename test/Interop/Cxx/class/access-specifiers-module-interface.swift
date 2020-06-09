@@ -37,6 +37,7 @@
 // CHECK-NEXT:     typealias Element = PublicPrivate.PublicFlagEnum
 // CHECK-NEXT:     typealias ArrayLiteralElement = PublicPrivate.PublicFlagEnum
 // CHECK-NEXT:   }
+// CHECK-NEXT:   static var PublicStaticMemberVar: Int32
 // CHECK-NEXT:   var PublicMemberVar: Int32
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   mutating func publicMemberFunc()

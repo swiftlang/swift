@@ -27,7 +27,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
@@ -571,8 +570,7 @@ bool UnqualifiedLookupFactory::wouldUseASTScopesForLookupIfItWereEnabled()
     const {
   if (!Loc.isValid())
     return false;
-  const auto *const SF = DC->getParentSourceFile();
-  return SF && SF->isSuitableForASTScopes();
+  return (bool) DC->getParentSourceFile();
 }
 
 #pragma mark context-based lookup definitions
@@ -1048,7 +1046,6 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
     DeclContext *topLevelContext, DeclNameRef name, bool isCascadingUse) {
-  recordLookupOfTopLevelName(topLevelContext, Name.getFullName(), isCascadingUse);
   recordedSF = dyn_cast<SourceFile>(topLevelContext);
   recordedIsCascadingUse = isCascadingUse;
 }
@@ -1222,7 +1219,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
-    if (!value->getFullName().matchesRef(factory.Name.getFullName()))
+    if (!value->getName().matchesRef(factory.Name.getFullName()))
       continue;
 
     // In order to preserve the behavior of the existing context-based lookup,

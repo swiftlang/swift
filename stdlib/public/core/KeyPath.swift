@@ -122,15 +122,19 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   // SPI for the Foundation overlay to allow interop with KVC keypath-based
   // APIs.
   public var _kvcKeyPathString: String? {
-    guard let ptr = _kvcKeyPathStringPtr else { return nil }
+    @_semantics("keypath.kvcKeyPathString")
+    get {
+      guard let ptr = _kvcKeyPathStringPtr else { return nil }
 
-    return String(validatingUTF8: ptr)
+      return String(validatingUTF8: ptr)
+    }
   }
   
   // MARK: Implementation details
   
   // Prevent normal initialization. We use tail allocation via
   // allocWithTailElems().
+  @available(*, unavailable)
   internal init() {
     _internalInvariantFailure("use _create(...)")
   }
@@ -155,7 +159,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return result
   }
   
-  internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
+  final internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
     defer { _fixLifetime(self) }
     
     let base = UnsafeRawPointer(Builtin.projectTailElems(self, Int32.self))
@@ -344,14 +348,6 @@ public class ReferenceWritableKeyPath<
   // MARK: Implementation detail
 
   internal final override class var kind: Kind { return .reference }
-  
-  internal final override func _projectMutableAddress(
-    from base: UnsafePointer<Root>
-  ) -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
-    // Since we're a ReferenceWritableKeyPath, we know we don't mutate the base
-    // in practice.
-    return _projectMutableAddress(from: base.pointee)
-  }
   
   @usableFromInline
   internal final func _projectMutableAddress(from origBase: Root)

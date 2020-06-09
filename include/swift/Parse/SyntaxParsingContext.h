@@ -326,6 +326,9 @@ public:
     IsBacktracking = true;
   }
 
+  /// Cancels backtracking state from the top of the context stack until `this` context.
+  void cancelBacktrack();
+
   bool isBacktracking() const { return IsBacktracking; }
 
   void setShouldDefer(bool Value = true) { ShouldDefer = Value; }

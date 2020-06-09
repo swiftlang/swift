@@ -460,15 +460,20 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   // arguments are dead?
   std::pair<SILFunction *, SILFunction *> GenericSpecialized;
   SILOptFunctionBuilder FuncBuilder(*this);
-  if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder,
-          PAI, SubstF, PAI->getNumArguments(), GenericSpecialized)) {
-    rewritePartialApply(PAI, NewFunc);
-    if (GenericSpecialized.first) {
-      // Notify the pass manager about the new function.
-      addFunctionToPassManagerWorklist(GenericSpecialized.first,
-                                       GenericSpecialized.second);
+  if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder, PAI, SubstF,
+                                                   PAI->getNumArguments(),
+                                                   GenericSpecialized)) {
+    // `partial_apply` can be rewritten to `thin_to_thick_function` only if the
+    // specialized callee is `@convention(thin)`.
+    if (NewFunc->getRepresentation() == SILFunctionTypeRepresentation::Thin) {
+      rewritePartialApply(PAI, NewFunc);
+      if (GenericSpecialized.first) {
+        // Notify the pass manager about the new function.
+        addFunctionToPassManagerWorklist(GenericSpecialized.first,
+                                         GenericSpecialized.second);
+      }
+      return true;
     }
-    return true;
   }
 
   // Second possibility: Are all partially applied arguments constant?

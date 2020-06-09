@@ -91,12 +91,12 @@ public:
 };
 
 /// Check whether the given type witness can be used for the given
-/// associated type.
+/// associated type in the given conformance.
 ///
 /// \returns an empty result on success, or a description of the error.
-CheckTypeWitnessResult checkTypeWitness(DeclContext *dc, ProtocolDecl *proto,
+CheckTypeWitnessResult checkTypeWitness(Type type,
                                         AssociatedTypeDecl *assocType,
-                                        Type type);
+                                        NormalProtocolConformance *Conf);
 
 /// The set of associated types that have been inferred by matching
 /// the given value witness to its corresponding requirement.
@@ -954,6 +954,11 @@ Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
 llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
                                      const ValueDecl *witness,
                                      bool anySingleRequirement = false);
+
+void diagnoseConformanceFailure(Type T,
+                                ProtocolDecl *Proto,
+                                DeclContext *DC,
+                                SourceLoc ComplainLoc);
 
 }
 

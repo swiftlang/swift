@@ -183,6 +183,7 @@ public:
   SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
+  SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
   SILInstruction *visitUnconditionalCheckedCastInst(
@@ -225,6 +226,8 @@ public:
   // Optimize the "isConcrete" builtin.
   SILInstruction *optimizeBuiltinIsConcrete(BuiltinInst *I);
 
+  SILInstruction *optimizeBuiltinCOWBufferForReading(BuiltinInst *BI);
+
   // Optimize the "trunc_N1_M2" builtin. if N1 is a result of "zext_M1_*" and
   // the following holds true: N1 > M1 and M2>= M1
   SILInstruction *optimizeBuiltinTruncOrBitCast(BuiltinInst *I);
@@ -241,7 +244,9 @@ public:
 
   bool tryOptimizeKeypath(ApplyInst *AI);
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
-
+  bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee);
+  bool tryOptimizeKeypathKVCString(ApplyInst *AI, SILDeclRef callee);
+      
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
@@ -259,8 +264,6 @@ private:
           replaceValueUsesWith(oldValue, newValue);
         });
   }
-
-  FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
 
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>

@@ -53,11 +53,46 @@ llvm::Constant *irgen::emitConstantInt(IRGenModule &IGM,
     assert(width.isFixedWidth() && "impossible width value");
   }
 
-  return llvm::ConstantInt::get(IGM.LLVMContext, value);
+  return llvm::ConstantInt::get(IGM.getLLVMContext(), value);
+}
+
+llvm::Constant *irgen::emitConstantZero(IRGenModule &IGM, BuiltinInst *BI) {
+  assert(IGM.getSILModule().getBuiltinInfo(BI->getName()).ID ==
+         BuiltinValueKind::ZeroInitializer);
+
+  auto helper = [&](CanType astType) -> llvm::Constant * {
+    if (auto type = astType->getAs<BuiltinIntegerType>()) {
+      APInt zero(type->getWidth().getLeastWidth(), 0);
+      return llvm::ConstantInt::get(IGM.getLLVMContext(), zero);
+    }
+
+    if (auto type = astType->getAs<BuiltinFloatType>()) {
+      const llvm::fltSemantics *sema = nullptr;
+      switch (type->getFPKind()) {
+      case BuiltinFloatType::IEEE16: sema = &APFloat::IEEEhalf(); break;
+      case BuiltinFloatType::IEEE32: sema = &APFloat::IEEEsingle(); break;
+      case BuiltinFloatType::IEEE64: sema = &APFloat::IEEEdouble(); break;
+      case BuiltinFloatType::IEEE80: sema = &APFloat::x87DoubleExtended(); break;
+      case BuiltinFloatType::IEEE128: sema = &APFloat::IEEEquad(); break;
+      case BuiltinFloatType::PPC128: sema = &APFloat::PPCDoubleDouble(); break;
+      }
+      auto zero = APFloat::getZero(*sema);
+      return llvm::ConstantFP::get(IGM.getLLVMContext(), zero);
+    }
+
+    llvm_unreachable("SIL allowed an unknown type?");
+  };
+
+  if (auto vector = BI->getType().getAs<BuiltinVectorType>()) {
+    auto zero = helper(vector.getElementType());
+    return llvm::ConstantVector::getSplat(vector->getNumElements(), zero);
+  }
+
+  return helper(BI->getType().getASTType());
 }
 
 llvm::Constant *irgen::emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI) {
-  return llvm::ConstantFP::get(IGM.LLVMContext, FLI->getValue());
+  return llvm::ConstantFP::get(IGM.getLLVMContext(), FLI->getValue());
 }
 
 llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
@@ -94,6 +129,8 @@ static llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue operand) {
     return emitAddrOfConstantString(IGM, SLI);
   } else if (auto *BI = dyn_cast<BuiltinInst>(operand)) {
     switch (IGM.getSILModule().getBuiltinInfo(BI->getName()).ID) {
+      case BuiltinValueKind::ZeroInitializer:
+        return emitConstantZero(IGM, BI);
       case BuiltinValueKind::PtrToInt: {
         llvm::Constant *ptr = emitConstantValue(IGM, BI->getArguments()[0]);
         return llvm::ConstantExpr::getPtrToInt(ptr, IGM.IntPtrTy);
@@ -140,7 +177,7 @@ namespace {
 void insertPadding(SmallVectorImpl<llvm::Constant *> &Elements,
                    llvm::StructType *sTy) {
   // fill in any gaps, which are the explicit padding that swiftc inserts.
-  for (unsigned i = 0, e = Elements.size(); i != e; i++) {
+  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     auto &elt = Elements[i];
     if (elt == nullptr) {
       auto *eltTy = sTy->getElementType(i);
@@ -162,7 +199,7 @@ llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
 
   // run over the Swift initializers, putting them into the struct as
   // appropriate.
-  for (unsigned i = 0, e = inst->getElements().size(); i != e; i++) {
+  for (unsigned i = 0, e = inst->getElements().size(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     Optional<unsigned> index = nextIndex(IGM, type, i);
     if (index.hasValue()) {
@@ -207,7 +244,7 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
   assert(NumElems == ClassLayout->getElements().size());
 
   // Construct the object init value including tail allocated elements.
-  for (unsigned i = 0; i != NumElems; i++) {
+  for (unsigned i = 0; i != NumElems; ++i) {
     SILValue Val = OI->getAllElements()[i];
     const ElementLayout &EL = ClassLayout->getElements()[i];
     if (!EL.isEmpty()) {

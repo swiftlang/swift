@@ -294,7 +294,7 @@ public:
 
   /// Returns true if the referenced type is a function type that never
   /// returns.
-  bool isNoReturnFunction(SILModule &M) const;
+  bool isNoReturnFunction(SILModule &M, TypeExpansionContext context) const;
 
   /// Returns true if the referenced AST type has reference semantics, even if
   /// the lowered SIL type is known to be trivial.
@@ -509,6 +509,8 @@ public:
   SILType subst(Lowering::TypeConverter &tc, SubstitutionMap subs) const;
 
   SILType subst(SILModule &M, SubstitutionMap subs) const;
+  SILType subst(SILModule &M, SubstitutionMap subs,
+                TypeExpansionContext context) const;
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.

@@ -234,15 +234,13 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::Swift);
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
-  if (CI.setup(Invocation))
-    return true;
-  CI.performParseOnly();
-  return false;
+  return CI.setup(Invocation);
 }
 
 static void reportSyntacticAnnotations(CompilerInstance &CI,
@@ -303,25 +301,6 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
     return true;
   }
 
-  std::vector<StringRef> SplitModuleName;
-  while (!ModuleName.empty()) {
-    StringRef SubModuleName;
-    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
-    SplitModuleName.push_back(SubModuleName);
-  }
-  assert(!SplitModuleName.empty());
-
-  // FIXME: If this is a submodule, get its top-level module, which will be the
-  // DeclContext for all of its Decls since we don't have first-class submodules.
-  if (SplitModuleName.size() > 1) {
-    Mod = getModuleByFullName(Ctx, SplitModuleName[0]);
-    if (!Mod) {
-      ErrMsg = "Could not load module: ";
-      ErrMsg += ModuleName;
-      return true;
-    }
-  }
-
   PrintOptions Options = PrintOptions::printModuleInterface();
   ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
   SmallString<128> Text;
@@ -330,11 +309,11 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   if (!Group && InterestedUSR) {
     Group = findGroupNameForUSR(Mod, InterestedUSR.getValue());
   }
-  printSubmoduleInterface(Mod, SplitModuleName,
-    Group.hasValue() ? llvm::makeArrayRef(Group.getValue()) : ArrayRef<StringRef>(),
-                          TraversalOptions,
-                          Printer, Options,
-                          Group.hasValue() && SynthesizedExtensions);
+  printModuleInterface(Mod, Group.hasValue()
+                         ? llvm::makeArrayRef(Group.getValue())
+                         : ArrayRef<StringRef>(),
+                       TraversalOptions, Printer, Options,
+                       Group.hasValue() && SynthesizedExtensions);
 
   Info.Text = std::string(OS.str());
   return false;

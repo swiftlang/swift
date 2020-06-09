@@ -18,6 +18,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
 #include "swift/Subsystems.h"
@@ -49,11 +50,11 @@ InheritedTypeRequest::evaluate(
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
-    resolution = TypeResolution::forStructural(dc);
+    resolution = TypeResolution::forStructural(dc, options);
     break;
 
   case TypeResolutionStage::Interface:
-    resolution = TypeResolution::forInterface(dc);
+    resolution = TypeResolution::forInterface(dc, options);
     break;
 
   case TypeResolutionStage::Contextual: {
@@ -72,7 +73,7 @@ InheritedTypeRequest::evaluate(
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())
-    inheritedType = resolution->resolveType(typeLoc.getTypeRepr(), options);
+    inheritedType = resolution->resolveType(typeLoc.getTypeRepr());
   else
     inheritedType = typeLoc.getType();
 
@@ -182,11 +183,180 @@ AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
+/// Attempt to infer the function builder type for a declaration.
+static Type inferFunctionBuilderType(ValueDecl *decl)  {
+  auto dc = decl->getDeclContext();
+  if (!dc->isTypeContext() || isa<ProtocolDecl>(dc))
+    return Type();
+
+  auto funcDecl = dyn_cast<FuncDecl>(decl);
+  if (!funcDecl || !funcDecl->hasBody() ||
+      !decl->getDeclContext()->getParentSourceFile())
+    return Type();
+
+  // Check whether there are any return statements in the function's body.
+  // If there are, the function builder transform will be disabled,
+  // so don't infer a function builder.
+  if (!TypeChecker::findReturnStatements(funcDecl).empty())
+    return Type();
+
+  // Only getters can have function builders. When we find one, look at
+  // the storage declaration for the purposes of witness matching.
+  auto lookupDecl = decl;
+  if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
+    if (accessor->getAccessorKind() != AccessorKind::Get)
+      return Type();
+
+    lookupDecl = accessor->getStorage();
+  }
+
+  // Find all of the potentially inferred function builder types.
+  struct Match {
+    enum Kind {
+      Conformance,
+      DynamicReplacement,
+    } kind;
+
+    union {
+      struct {
+        ProtocolConformance *conformance;
+        ValueDecl *requirement;
+      } conformanceMatch;
+
+      ValueDecl *dynamicReplacement;
+    };
+
+    Type functionBuilderType;
+
+    static Match forConformance(
+        ProtocolConformance *conformance,
+        ValueDecl *requirement,
+        Type functionBuilderType) {
+      Match match;
+      match.kind = Conformance;
+      match.conformanceMatch.conformance = conformance;
+      match.conformanceMatch.requirement = requirement;
+      match.functionBuilderType = functionBuilderType;
+      return match;
+    }
+
+    static Match forDynamicReplacement(
+        ValueDecl *dynamicReplacement, Type functionBuilderType) {
+      Match match;
+      match.kind = DynamicReplacement;
+      match.dynamicReplacement = dynamicReplacement;
+      match.functionBuilderType = functionBuilderType;
+      return match;
+    }
+
+    DeclName getSourceName() const {
+      switch (kind) {
+      case Conformance:
+        return conformanceMatch.conformance->getProtocol()->getName();
+
+      case DynamicReplacement:
+        return dynamicReplacement->getName();
+      }
+    }
+  };
+
+  // The set of matches from which we can infer function builder types.
+  SmallVector<Match, 2> matches;
+
+  // Determine all of the conformances within the same context as
+  // this declaration. If this declaration is a witness to any
+  // requirement within one of those protocols that has a function builder
+  // attached, use that function builder type.
+  auto addConformanceMatches = [&matches](ValueDecl *lookupDecl) {
+    DeclContext *dc = lookupDecl->getDeclContext();
+    auto idc = cast<IterableDeclContext>(dc->getAsDecl());
+    auto conformances = evaluateOrDefault(
+        dc->getASTContext().evaluator,
+        LookupAllConformancesInContextRequest{idc}, { });
+
+    for (auto conformance : conformances) {
+      auto protocol = conformance->getProtocol();
+      for (auto found : protocol->lookupDirect(lookupDecl->getName())) {
+        if (!isa<ProtocolDecl>(found->getDeclContext()))
+          continue;
+
+        auto requirement = dyn_cast<ValueDecl>(found);
+        if (!requirement)
+          continue;
+
+        Type functionBuilderType = requirement->getFunctionBuilderType();
+        if (!functionBuilderType)
+          continue;
+
+        auto witness = conformance->getWitnessDecl(requirement);
+        if (witness != lookupDecl)
+          continue;
+
+        // Substitute into the function builder type.
+        auto subs =
+            conformance->getSubstitutions(lookupDecl->getModuleContext());
+        Type subFunctionBuilderType = functionBuilderType.subst(subs);
+
+        matches.push_back(
+            Match::forConformance(
+              conformance, requirement, subFunctionBuilderType));
+      }
+    }
+  };
+
+  addConformanceMatches(lookupDecl);
+
+  // Look for function builder types inferred through dynamic replacements.
+  if (auto replaced = lookupDecl->getDynamicallyReplacedDecl()) {
+    if (auto functionBuilderType = replaced->getFunctionBuilderType()) {
+      matches.push_back(
+        Match::forDynamicReplacement(replaced, functionBuilderType));
+    } else {
+      addConformanceMatches(replaced);
+    }
+  }
+
+  if (matches.size() == 0)
+    return Type();
+
+  // Determine whether there is more than one actual function builder type.
+  Type functionBuilderType = matches[0].functionBuilderType;
+  for (const auto &match : matches) {
+    // If the types were the same anyway, there's nothing to do.
+    Type otherFunctionBuilderType = match.functionBuilderType;
+    if (functionBuilderType->isEqual(otherFunctionBuilderType))
+      continue;
+
+    // We have at least two different function builder types.
+    // Diagnose the ambiguity and provide potential solutions.
+    decl->diagnose(
+        diag::function_builder_infer_ambig, lookupDecl->getName(),
+        functionBuilderType, otherFunctionBuilderType);
+    decl->diagnose(diag::function_builder_infer_add_return)
+      .fixItInsert(funcDecl->getBodySourceRange().End, "return <#expr#>\n");
+    for (const auto &match : matches) {
+      decl->diagnose(
+          diag::function_builder_infer_pick_specific,
+          match.functionBuilderType,
+          static_cast<unsigned>(match.kind),
+          match.getSourceName())
+        .fixItInsert(
+          lookupDecl->getAttributeInsertionLoc(false),
+          "@" + match.functionBuilderType.getString() + " ");
+    }
+
+    return Type();
+  }
+
+  return functionBuilderType;
+}
+
 Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
                                           ValueDecl *decl) const {
   // Look for a function-builder custom attribute.
   auto attr = decl->getAttachedFunctionBuilder();
-  if (!attr) return Type();
+  if (!attr)
+    return inferFunctionBuilderType(decl);
 
   // Resolve a type for the attribute.
   auto mutableAttr = const_cast<CustomAttr*>(attr);
@@ -213,7 +383,7 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
     if (!paramFnType) {
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::function_builder_parameter_not_of_function_type,
-                         nominal->getFullName());
+                         nominal->getName());
       mutableAttr->setInvalid();
       return Type();
     }
@@ -222,7 +392,7 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
     if (param->isAutoClosure()) {
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::function_builder_parameter_autoclosure,
-                         nominal->getFullName());
+                         nominal->getName());
       mutableAttr->setInvalid();
       return Type();
     }

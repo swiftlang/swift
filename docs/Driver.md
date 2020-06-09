@@ -14,8 +14,8 @@ The target audience for this document is people who want to integrate the Swift
 compiler into their build system, rather than using Xcode or the package
 manager (`swift build`). If you're looking to work on the driver itself...well,
 this is probably still useful to you, but you should also check out
-[DriverInternals.rst](DriverInternals.rst) and maybe
-[DependencyAnalysis.rst](DependencyAnalysis.rst) as well. If you're just using
+[DriverInternals.md](DriverInternals.md) and maybe
+[DependencyAnalysis.md](DependencyAnalysis.md) as well. If you're just using
 Xcode or SwiftPM and want to find out what mysterious command-line options you
 could be passing, `swiftc --help` is a better choice.
 
@@ -26,7 +26,7 @@ Some terms:
 
 - For the purposes of this document, a _module_ is a single distributable unit
   of API. (We use this term for a lot of other things too, though; check out
-  [Lexicon.rst](Lexicon.rst) for the full list.) "Foundation" is a single
+  [Lexicon.md](Lexicon.md) for the full list.) "Foundation" is a single
   module, as is the Swift standard library ("Swift"). An app is a module too.
 
 - A _compilation unit_ is a set of source files that are compiled together. In
@@ -206,7 +206,7 @@ in becoming more like non-whole-module builds.
 ## Incremental Builds ##
 
 Incremental builds in Swift work by primarily by cross-file dependency
-analysis, described in [DependencyAnalysis.rst](DependencyAnalysis.rst).
+analysis, described in [DependencyAnalysis.md](DependencyAnalysis.md).
 Compiling a single file might be necessary because that file has changed, but
 it could also be because that file depends on something else that might have
 changed. From a build system perspective, the files in a particular module
@@ -293,15 +293,6 @@ past that, so:
    - Invoke `swiftc -c`, then pass the resulting object files to your linker.
      All the same options from above apply, but you'll have to manually deal
      with the work the compiler would have done automatically for you.
-
-   - Invoke `swiftc -c` with `-###`. Then run all of the outputted commands
-     that include `-primary-file`, then run the remaining commands in order
-     (they may have dependencies). If none of the commands have `-primary-file`
-     in them, they're not parallelizable, sorry.
-
-     This is the most hacky approach, because (a) it involves looking for an
-     internal flag in a non-stable interface, and (b) you don't get anything
-     incremental out of this. We could stand some improvements here.
 
    Whatever you do, do *not* invoke the frontend directly.
 

@@ -18,7 +18,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
@@ -163,7 +162,7 @@ public:
     if (T.RecursionDepth == 0) {
       T.Timer.emplace(Name);
     }
-    T.RecursionDepth++;
+    ++T.RecursionDepth;
   }
 
   void endTimer(StringRef Name) {
@@ -171,7 +170,7 @@ public:
     assert(I != Timers.end());
     RecursionSafeTimer &T = I->getValue();
     assert(T.RecursionDepth != 0);
-    T.RecursionDepth--;
+    --T.RecursionDepth;
     if (T.RecursionDepth == 0) {
       T.Timer.reset();
     }
@@ -652,10 +651,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   if (currentProcessExitStatus != EXIT_SUCCESS) {
     if (FrontendCounters) {
       auto &C = getFrontendCounters();
-      C.NumProcessFailures++;
+      ++C.NumProcessFailures;
     } else {
       auto &C = getDriverCounters();
-      C.NumProcessFailures++;
+      ++C.NumProcessFailures;
     }
   }
 

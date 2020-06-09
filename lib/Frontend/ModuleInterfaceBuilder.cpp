@@ -12,13 +12,13 @@
 
 #define DEBUG_TYPE "textual-module-interface"
 
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "ModuleInterfaceBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
-#include "llvm/ADT/StringSet.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -27,7 +27,6 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/xxhash.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -68,115 +67,6 @@ static Optional<StringRef> getRelativeDepPath(StringRef DepPath,
   return None;
 }
 
-void ModuleInterfaceBuilder::configureSubInvocationInputsAndOutputs(
-    StringRef OutPath) {
-  auto &SubFEOpts = subInvocation.getFrontendOptions();
-  SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
-  SubFEOpts.InputsAndOutputs.addPrimaryInputFile(interfacePath);
-  SupplementaryOutputPaths SOPs;
-  SOPs.ModuleOutputPath = OutPath.str();
-
-  // Pick a primary output path that will cause problems to use.
-  std::string MainOut = "/<unused>";
-  SubFEOpts.InputsAndOutputs
-  .setMainAndSupplementaryOutputs({MainOut}, {SOPs});
-}
-
-void ModuleInterfaceBuilder::configureSubInvocation(
-    const SearchPathOptions &SearchPathOpts,
-    const LangOptions &LangOpts,
-    ClangModuleLoader *ClangLoader) {
-  // Start with a SubInvocation that copies various state from our
-  // invoking ASTContext.
-  subInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
-  subInvocation.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
-  subInvocation.setSDKPath(SearchPathOpts.SDKPath);
-  subInvocation.setInputKind(InputFileKind::SwiftModuleInterface);
-  subInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
-  subInvocation.setTargetTriple(LangOpts.Target);
-
-  subInvocation.setModuleName(moduleName);
-  subInvocation.setClangModuleCachePath(moduleCachePath);
-  subInvocation.getFrontendOptions().PrebuiltModuleCachePath =
-      prebuiltCachePath.str();
-  subInvocation.getFrontendOptions().TrackSystemDeps = trackSystemDependencies;
-
-  // Respect the detailed-record preprocessor setting of the parent context.
-  // This, and the "raw" clang module format it implicitly enables, are
-  // required by sourcekitd.
-  if (ClangLoader) {
-    auto &Opts = ClangLoader->getClangInstance().getPreprocessorOpts();
-    if (Opts.DetailedRecord) {
-      subInvocation.getClangImporterOptions().DetailedPreprocessingRecord = true;
-    }
-  }
-
-  // Inhibit warnings from the SubInvocation since we are assuming the user
-  // is not in a position to fix them.
-  subInvocation.getDiagnosticOptions().SuppressWarnings = true;
-
-  // Inherit this setting down so that it can affect error diagnostics (mostly
-  // by making them non-fatal).
-  subInvocation.getLangOptions().DebuggerSupport = LangOpts.DebuggerSupport;
-
-  // Disable this; deinitializers always get printed with `@objc` even in
-  // modules that don't import Foundation.
-  subInvocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
-
-  // Tell the subinvocation to serialize dependency hashes if asked to do so.
-  auto &frontendOpts = subInvocation.getFrontendOptions();
-  frontendOpts.SerializeModuleInterfaceDependencyHashes =
-  serializeDependencyHashes;
-
-  // Tell the subinvocation to remark on rebuilds from an interface if asked
-  // to do so.
-  frontendOpts.RemarkOnRebuildFromModuleInterface =
-  remarkOnRebuildFromInterface;
-}
-
-bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
-    swift::version::Version &Vers, StringRef &CompilerVersion,
-    llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs) {
-  llvm::vfs::FileSystem &fs = *sourceMgr.getFileSystem();
-  auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
-  if (!FileOrError) {
-    // Don't use this->diagnose() because it'll just try to re-open
-    // interfacePath.
-    diags.diagnose(diagnosticLoc, diag::error_open_input_file,
-                   interfacePath, FileOrError.getError().message());
-    return true;
-  }
-  auto SB = FileOrError.get()->getBuffer();
-  auto VersRe = getSwiftInterfaceFormatVersionRegex();
-  auto CompRe = getSwiftInterfaceCompilerVersionRegex();
-  auto FlagRe = getSwiftInterfaceModuleFlagsRegex();
-  SmallVector<StringRef, 1> VersMatches, FlagMatches, CompMatches;
-  if (!VersRe.match(SB, &VersMatches)) {
-    diagnose(diag::error_extracting_version_from_module_interface);
-    return true;
-  }
-  if (!FlagRe.match(SB, &FlagMatches)) {
-    diagnose(diag::error_extracting_flags_from_module_interface);
-    return true;
-  }
-  assert(VersMatches.size() == 2);
-  assert(FlagMatches.size() == 2);
-  // FIXME We should diagnose this at a location that makes sense:
-  Vers = swift::version::Version(VersMatches[1], SourceLoc(), &diags);
-  llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], SubArgSaver, SubArgs);
-
-  if (CompRe.match(SB, &CompMatches)) {
-    assert(CompMatches.size() == 2);
-    CompilerVersion = SubArgSaver.save(CompMatches[1]);
-  }
-  else {
-    // Don't diagnose; handwritten module interfaces don't include this field.
-    CompilerVersion = "(unspecified, file possibly handwritten)";
-  }
-
-  return false;
-}
-
 bool ModuleInterfaceBuilder::collectDepsForSerialization(
     CompilerInstance &SubInstance, SmallVectorImpl<FileDependency> &Deps,
     bool IsHashBased) {
@@ -193,7 +83,6 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
   InitialDepNames.push_back(interfacePath);
   InitialDepNames.insert(InitialDepNames.end(),
                          extraDependencies.begin(), extraDependencies.end());
-  llvm::StringSet<> AllDepNames;
   SmallString<128> Scratch;
 
   for (const auto &InitialDepName : InitialDepNames) {
@@ -212,7 +101,7 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
     if (!prebuiltCachePath.empty() && DepName.startswith(prebuiltCachePath))
       continue;
 
-    if (AllDepNames.insert(DepName).second && dependencyTracker) {
+    if (dependencyTracker) {
       dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
     }
 
@@ -271,15 +160,13 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
       llvm::RestorePrettyStackState(savedInnerPrettyStackState);
     };
 
-    llvm::vfs::FileSystem &fs = *sourceMgr.getFileSystem();
-    
-    // Note that we don't assume cachePath is the same as the Clang
-    // module cache path at this point.
-    if (!moduleCachePath.empty())
-      (void)llvm::sys::fs::create_directories(moduleCachePath);
-
-    configureSubInvocationInputsAndOutputs(OutPath);
-
+    SubError = subASTDelegate.runInSubCompilerInstance(moduleName,
+                                                       interfacePath,
+                                                       OutPath,
+                                                       diagnosticLoc,
+                                           [&](SubCompilerInstanceInfo &info) {
+    auto &SubInstance = *info.Instance;
+    auto subInvocation = SubInstance.getInvocation();
     FrontendOptions &FEOpts = subInvocation.getFrontendOptions();
     const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
     StringRef InPath = InputInfo.file();
@@ -287,54 +174,11 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     InputInfo.getPrimarySpecificPaths().SupplementaryOutputs;
     StringRef OutPath = OutputInfo.ModuleOutputPath;
 
-    llvm::BumpPtrAllocator SubArgsAlloc;
-    llvm::StringSaver SubArgSaver(SubArgsAlloc);
-    SmallVector<const char *, 16> SubArgs;
-    swift::version::Version Vers;
-    StringRef emittedByCompiler;
-    if (extractSwiftInterfaceVersionAndArgs(Vers, emittedByCompiler,
-                                            SubArgSaver, SubArgs)) {
-      SubError = true;
-      return;
-    }
-
-    // For now: we support anything with the same "major version" and assume
-    // minor versions might be interesting for debugging, or special-casing a
-    // compatible field variant.
-    if (Vers.asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
-      diagnose(diag::unsupported_version_of_module_interface, interfacePath,
-               Vers);
-      SubError = true;
-      return;
-    }
-
-    SmallString<32> ExpectedModuleName = subInvocation.getModuleName();
-    if (subInvocation.parseArgs(SubArgs, diags)) {
-      SubError = true;
-      return;
-    }
-
-    if (subInvocation.getModuleName() != ExpectedModuleName) {
-      auto DiagKind = diag::serialization_name_mismatch;
-      if (subInvocation.getLangOptions().DebuggerSupport)
-        DiagKind = diag::serialization_name_mismatch_repl;
-      diagnose(DiagKind, subInvocation.getModuleName(), ExpectedModuleName);
-      SubError = true;
-      return;
-    }
-
     // Build the .swiftmodule; this is a _very_ abridged version of the logic
     // in performCompile in libFrontendTool, specialized, to just the one
     // module-serialization task we're trying to do here.
     LLVM_DEBUG(llvm::dbgs() << "Setting up instance to compile "
                << InPath << " to " << OutPath << "\n");
-    CompilerInstance SubInstance;
-    SubInstance.getSourceMgr().setFileSystem(&fs);
-
-    ForwardingDiagnosticConsumer FDC(diags);
-    SubInstance.addDiagnosticConsumer(&FDC);
-
-    SubInstance.createDependencyTracker(FEOpts.TrackSystemDeps);
 
     SWIFT_DEFER {
       // Make sure to emit a generic top-level error if a module fails to
@@ -345,33 +189,27 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
         auto builtByCompiler =
             getSwiftInterfaceCompilerVersionForCurrentCompiler(
                 SubInstance.getASTContext());
+        StringRef emittedByCompiler = info.CompilerVersion;
         diagnose(diag::module_interface_build_failed, moduleName,
                  emittedByCompiler == builtByCompiler, emittedByCompiler,
                  builtByCompiler);
       }
     };
 
-    if (SubInstance.setup(subInvocation)) {
-      SubError = true;
-      return;
-    }
-
     LLVM_DEBUG(llvm::dbgs() << "Performing sema\n");
     SubInstance.performSema();
     if (SubInstance.getASTContext().hadError()) {
       LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
-      SubError = true;
-      return;
+      return true;
     }
 
     SILOptions &SILOpts = subInvocation.getSILOptions();
     auto Mod = SubInstance.getMainModule();
     auto &TC = SubInstance.getSILTypes();
-    auto SILMod = performSILGeneration(Mod, TC, SILOpts);
+    auto SILMod = performASTLowering(Mod, TC, SILOpts);
     if (!SILMod) {
       LLVM_DEBUG(llvm::dbgs() << "SILGen did not produce a module\n");
-      SubError = true;
-      return;
+      return true;
     }
 
     // Setup the callbacks for serialization, which can occur during the
@@ -391,8 +229,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     SmallVector<FileDependency, 16> Deps;
     bool serializeHashes = FEOpts.SerializeModuleInterfaceDependencyHashes;
     if (collectDepsForSerialization(SubInstance, Deps, serializeHashes)) {
-      SubError = true;
-      return;
+      return true;
     }
     if (ShouldSerializeDeps)
       SerializationOpts.Dependencies = Deps;
@@ -408,11 +245,10 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     LLVM_DEBUG(llvm::dbgs() << "Running SIL processing passes\n");
     if (SubInstance.performSILProcessing(SILMod.get())) {
       LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
-      SubError = true;
-      return;
+      return true;
     }
-
-    SubError = SubInstance.getDiags().hadAnyError();
+    return SubInstance.getDiags().hadAnyError();
+    });
   });
   return !RunSuccess || SubError;
 }

@@ -591,3 +591,13 @@ enum SR11261_Newline2 {
 enum SR11261_PatternMatching {
   case let .foo(x, y): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
+
+enum CasesWithMissingElement: Int {
+  // expected-error@-1 {{'CasesWithMissingElement' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+
+  case a = "hello", // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  // expected-error@-1 {{cannot convert value of type 'String' to raw type 'Int'}}
+
+  case b = "hello", // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  // expected-error@-1 {{cannot convert value of type 'String' to raw type 'Int'}}
+}

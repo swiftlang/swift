@@ -27,6 +27,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Error.h"
 
 namespace swift {
 
@@ -172,18 +173,21 @@ enum class AutoDiffGeneratedDeclarationKind : uint8_t {
 };
 
 /// SIL-level automatic differentiation indices. Consists of:
-/// - Parameter indices: indices of parameters to differentiate with respect to.
-/// - Result index: index of the result to differentiate from.
+/// - The differentiability parameter indices.
+/// - The differentiability result indices.
 // TODO(TF-913): Remove `SILAutoDiffIndices` in favor of `AutoDiffConfig`.
-// `AutoDiffConfig` supports multiple result indices.
+// `AutoDiffConfig` additionally stores a derivative generic signature.
 struct SILAutoDiffIndices {
-  /// The index of the dependent result to differentiate from.
-  unsigned source;
-  /// The indices for independent parameters to differentiate with respect to.
+  /// The indices of independent parameters to differentiate with respect to.
   IndexSubset *parameters;
+  /// The indices of dependent results to differentiate from.
+  IndexSubset *results;
 
-  /*implicit*/ SILAutoDiffIndices(unsigned source, IndexSubset *parameters)
-      : source(source), parameters(parameters) {}
+  /*implicit*/ SILAutoDiffIndices(IndexSubset *parameters, IndexSubset *results)
+      : parameters(parameters), results(results) {
+    assert(parameters && "Parameter indices must be non-null");
+    assert(results && "Result indices must be non-null");
+  }
 
   bool operator==(const SILAutoDiffIndices &other) const;
 
@@ -201,8 +205,13 @@ struct SILAutoDiffIndices {
   SWIFT_DEBUG_DUMP;
 
   std::string mangle() const {
-    std::string result = "src_" + llvm::utostr(source) + "_wrt_";
+    std::string result = "src_";
     interleave(
+        results->getIndices(),
+        [&](unsigned idx) { result += llvm::utostr(idx); },
+        [&] { result += '_'; });
+    result += "_wrt_";
+    llvm::interleave(
         parameters->getIndices(),
         [&](unsigned idx) { result += llvm::utostr(idx); },
         [&] { result += '_'; });
@@ -386,6 +395,68 @@ public:
 
   /// Get the underlying nominal type declaration of the tangent space type.
   NominalTypeDecl *getNominal() const;
+};
+
+/// A derivative function type calculation error.
+class DerivativeFunctionTypeError
+    : public llvm::ErrorInfo<DerivativeFunctionTypeError> {
+public:
+  enum class Kind {
+    /// Original function type has no semantic results.
+    NoSemanticResults,
+    /// Original function type has multiple semantic results.
+    // TODO(TF-1250): Support function types with multiple semantic results.
+    MultipleSemanticResults,
+    /// Differentiability parmeter indices are empty.
+    NoDifferentiabilityParameters,
+    /// A differentiability parameter does not conform to `Differentiable`.
+    NonDifferentiableDifferentiabilityParameter,
+    /// The original result type does not conform to `Differentiable`.
+    NonDifferentiableResult
+  };
+
+  static const char ID;
+  /// The original function type.
+  AnyFunctionType *functionType;
+  /// The error kind.
+  Kind kind;
+
+  /// The type and index of a differentiability parameter or result.
+  using TypeAndIndex = std::pair<Type, unsigned>;
+
+private:
+  union Value {
+    TypeAndIndex typeAndIndex;
+    Value(TypeAndIndex typeAndIndex) : typeAndIndex(typeAndIndex) {}
+    Value() {}
+  } value;
+
+public:
+  explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind)
+      : functionType(functionType), kind(kind), value(Value()) {
+    assert(kind == Kind::NoSemanticResults ||
+           kind == Kind::MultipleSemanticResults ||
+           kind == Kind::NoDifferentiabilityParameters);
+  };
+
+  explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind,
+                                       TypeAndIndex nonDiffTypeAndIndex)
+      : functionType(functionType), kind(kind), value(nonDiffTypeAndIndex) {
+    assert(kind == Kind::NonDifferentiableDifferentiabilityParameter ||
+           kind == Kind::NonDifferentiableResult);
+  };
+
+  TypeAndIndex getNonDifferentiableTypeAndIndex() const {
+    assert(kind == Kind::NonDifferentiableDifferentiabilityParameter ||
+           kind == Kind::NonDifferentiableResult);
+    return value.typeAndIndex;
+  }
+
+  void log(raw_ostream &OS) const override;
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
 };
 
 /// The key type used for uniquing `SILDifferentiabilityWitness` in

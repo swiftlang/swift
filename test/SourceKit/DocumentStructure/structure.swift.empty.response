@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2787,
+  key.length: 2858,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1687,6 +1687,54 @@
           key.namelength: 5,
           key.bodyoffset: 2773,
           key.bodylength: 3
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "A",
+      key.offset: 2788,
+      key.length: 69,
+      key.nameoffset: 2794,
+      key.namelength: 1,
+      key.bodyoffset: 2797,
+      key.bodylength: 59,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "foo(a:)",
+          key.offset: 2827,
+          key.length: 19,
+          key.selector_name: "fooWithA:",
+          key.nameoffset: 2832,
+          key.namelength: 11,
+          key.bodyoffset: 2845,
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 2821,
+              key.length: 5,
+              key.attribute: source.decl.attribute.objc.name
+            },
+            {
+              key.offset: 2811,
+              key.length: 9,
+              key.attribute: source.decl.attribute.ibaction
+            }
+          ],
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "a",
+              key.offset: 2836,
+              key.length: 6,
+              key.typename: "Int",
+              key.nameoffset: 2836,
+              key.namelength: 1
+            }
+          ]
         }
       ]
     }

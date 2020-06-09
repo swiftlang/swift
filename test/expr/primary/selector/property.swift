@@ -108,7 +108,7 @@ func testNonObjCMembers(nonObjCInstance: NonObjCClass) {
 
   // Referencing undefined symbols
 
-  let _ = #selector(getter: UndefinedClass.myVariable) // expected-error{{use of unresolved identifier 'UndefinedClass'}}
+  let _ = #selector(getter: UndefinedClass.myVariable) // expected-error{{cannot find 'UndefinedClass' in scope}}
   let _ = #selector(getter: ObjCClass.undefinedProperty) // expected-error{{type 'ObjCClass' has no member 'undefinedProperty'}}
   let _ = #selector(getter: myObjcInstance.undefinedProperty) // expected-error{{value of type 'ObjCClass' has no member 'undefinedProperty'}}
 }

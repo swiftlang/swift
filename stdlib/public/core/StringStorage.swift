@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -206,13 +206,17 @@ fileprivate func _allocate<T: AnyObject>(
   let totalTailBytes = total - numHeaderBytes
 
   let object = tailAllocator(totalTailBytes)
-  let mallocSize = _swift_stdlib_malloc_size(
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(object)))
-  _internalInvariant(mallocSize % MemoryLayout<Int>.stride == 0)
+  if let allocSize = _mallocSize(ofAllocation:
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(object))) {
+    _internalInvariant(allocSize % MemoryLayout<Int>.stride == 0)
 
-  let realNumTailBytes = mallocSize - numHeaderBytes
-  _internalInvariant(realNumTailBytes >= numTailBytes)
-  return (object, realNumTailBytes)
+    let realNumTailBytes = allocSize - numHeaderBytes
+    _internalInvariant(realNumTailBytes >= numTailBytes)
+
+    return (object, realNumTailBytes)
+  } else {
+    return (object, totalTailBytes)
+  }
 }
 
 fileprivate func _allocateStringStorage(

@@ -55,16 +55,28 @@ class Product(object):
 
         Whether this product is produced by build-script-impl.
         """
-        return True
+        raise NotImplementedError
 
     @classmethod
     def is_swiftpm_unified_build_product(cls):
         """is_swiftpm_unified_build_product -> bool
 
-        Whether this product should be build in the unified build of SwiftPM
+        Whether this product should be built in the unified build of SwiftPM
         products.
         """
         return False
+
+    @classmethod
+    def is_nondarwin_only_build_product(cls):
+        """Returns true if this target should be skipped in darwin builds when
+        inferring dependencies.
+        """
+        return False
+
+    @classmethod
+    def get_dependencies(cls):
+        """Return a list of products that this product depends upon"""
+        raise NotImplementedError
 
     def should_build(self, host_target):
         """should_build() -> Bool

@@ -71,7 +71,7 @@
 // RUN: c-index-test -read-diagnostics %t/err.dia 2>&1 | %FileCheck %s -check-prefix=CHECK-ERROR
 //
 //
-// Next test: add an inlinable function body with an unresolved identifier to LeafModule.swiftinterface; check we do not get a rebuild and report the additional error correctly.
+// Next test: add an inlinable function body with an cannot find to LeafModule.swiftinterface; check we do not get a rebuild and report the additional error correctly.
 //
 // RUN: mv %t/LeafModule.swiftinterface.backup %t/LeafModule.swiftinterface
 // RUN: echo "@inlinable func bar() { var x = unresolved }" >>%t/LeafModule.swiftinterface
@@ -81,7 +81,7 @@
 // RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err-inline.txt 2>&1
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR-INLINE <%t/err-inline.txt
-// CHECK-ERROR-INLINE: LeafModule.swiftinterface:6:33: error: use of unresolved identifier 'unresolved'
+// CHECK-ERROR-INLINE: LeafModule.swiftinterface:6:33: error: cannot find 'unresolved' in scope
 // CHECK-ERROR-INLINE: OtherModule.swiftinterface:4:8: error: failed to build module 'LeafModule' from its module interface; it may have been damaged or it may have triggered a bug in the Swift compiler when it was produced
 // CHECK-ERROR-INLINE: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to build module 'OtherModule' from its module interface; it may have been damaged or it may have triggered a bug in the Swift compiler when it was produced
 // CHECK-ERROR-INLINE-NOT: error:

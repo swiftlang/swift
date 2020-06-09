@@ -51,6 +51,7 @@ using SILLinkageField = BCFixed<4>;
 
 enum SILVTableEntryKindEncoding : uint8_t {
   SIL_VTABLE_ENTRY_NORMAL,
+  SIL_VTABLE_ENTRY_NORMAL_NON_OVERRIDDEN,
   SIL_VTABLE_ENTRY_INHERITED,
   SIL_VTABLE_ENTRY_OVERRIDE,
 };
@@ -455,6 +456,8 @@ namespace sil_block {
   using SILInstDifferentiableFunctionLayout = BCRecordLayout<
     SIL_INST_DIFFERENTIABLE_FUNCTION,
     BCVBR<8>,             // number of function parameters
+    BCVBR<8>,   // number of function results
+    BCVBR<8>,   // number of differentiability parameters
     BCFixed<1>,           // has derivative functions?
     BCArray<ValueIDField> // parameter indices and operands
   >;

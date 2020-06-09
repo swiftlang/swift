@@ -28,7 +28,7 @@
 ///     }
 ///
 ///     switch result {
-///     case .success(let integralResult, let estimatedAbsoluteError):
+///     case .success(let (integralResult, estimatedAbsoluteError)):
 ///         print("quadrature success:", integralResult,
 ///                                      estimatedAbsoluteError)
 ///     case .failure(let error):
@@ -46,7 +46,7 @@
 ///         }
 ///     }
 ///
-///     let vRresult = quadrature.integrate(over: 0.0 ... diameter,
+///     let vRresult = quadrature.integrate(over: 0.0 ... 25.0,
 ///                                         integrand: vectorExp)
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public struct Quadrature {

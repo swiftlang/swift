@@ -1,6 +1,6 @@
-sil_register_sources(
+target_sources(swiftSIL PRIVATE
+  LoadBorrowInvalidationChecker.cpp
   LinearLifetimeChecker.cpp
   MemoryLifetime.cpp
   SILOwnershipVerifier.cpp
-  SILVerifier.cpp
-)
+  SILVerifier.cpp)

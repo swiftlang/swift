@@ -30,6 +30,10 @@
 #define __has_builtin(builtin) 0
 #endif
 
+#if !defined(__has_cpp_attribute)
+#define __has_cpp_attribute(attribute) 0
+#endif
+
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -64,6 +68,24 @@
 #define SWIFT_ALWAYS_INLINE __attribute__((always_inline))
 #else
 #define SWIFT_ALWAYS_INLINE
+#endif
+
+#if __has_attribute(noinline)
+#define SWIFT_NOINLINE __attribute__((__noinline__))
+#else
+#define SWIFT_NOINLINE
+#endif
+
+#if __has_attribute(noreturn)
+#define SWIFT_NORETURN __attribute__((__noreturn__))
+#else
+#define SWIFT_NORETURN
+#endif
+
+#if __has_attribute(used)
+#define SWIFT_USED __attribute__((__used__))
+#else
+#define SWIFT_USED
 #endif
 
 #if __has_attribute(unavailable)
@@ -115,19 +137,26 @@
 #define SWIFT_RUNTIME_EXPORT SWIFT_EXPORT_ATTRIBUTE
 #endif
 
-
-#ifndef SWIFT_GNUC_PREREQ
-# if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
-#  define SWIFT_GNUC_PREREQ(maj, min, patch) \
-    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) + __GNUC_PATCHLEVEL__ >= \
-     ((maj) << 20) + ((min) << 10) + (patch))
-# elif defined(__GNUC__) && defined(__GNUC_MINOR__)
-#  define SWIFT_GNUC_PREREQ(maj, min, patch) \
-    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) >= ((maj) << 20) + ((min) << 10))
-# else
-#  define SWIFT_GNUC_PREREQ(maj, min, patch) 0
-# endif
+#if __cplusplus > 201402l && __has_cpp_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH [[fallthrough]]
+#elif __has_cpp_attribute(gnu::fallthrough)
+#define SWIFT_FALLTHROUGH [[gnu::fallthrough]]
+#elif __has_cpp_attribute(clang::fallthrough)
+#define SWIFT_FALLTHROUGH [[clang::fallthrough]]
+#elif __has_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH __attribute__((__fallthrough__))
+#else
+#define SWIFT_FALLTHROUGH
 #endif
+
+#if __cplusplus >= 201402l && __has_cpp_attribute(nodiscard)
+#define SWIFT_NODISCARD [[nodiscard]]
+#elif __has_cpp_attribute(clang::warn_unused_result)
+#define SWIFT_NODISCARD [[clang::warn_unused_result]]
+#else
+#define SWIFT_NODISCARD
+#endif
+
 
 /// Attributes for runtime-stdlib interfaces.
 /// Use these for C implementations that are imported into Swift via SwiftShims
@@ -151,9 +180,8 @@
 
 // Match the definition of LLVM_LIBRARY_VISIBILITY from LLVM's
 // Compiler.h. That header requires C++ and this needs to work in C.
-#if (__has_attribute(visibility) || SWIFT_GNUC_PREREQ(4, 0, 0)) &&              \
-    !defined(__MINGW32__) && !defined(__CYGWIN__) && !defined(_WIN32)
-#define SWIFT_LIBRARY_VISIBILITY __attribute__ ((visibility("hidden")))
+#if __has_attribute(visibility) && (defined(__ELF__) || defined(__MACH__))
+#define SWIFT_LIBRARY_VISIBILITY __attribute__ ((__visibility__("hidden")))
 #else
 #define SWIFT_LIBRARY_VISIBILITY
 #endif

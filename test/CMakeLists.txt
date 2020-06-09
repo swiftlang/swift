@@ -92,6 +92,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
+     ("${SDK}" STREQUAL "OPENBSD") OR
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
      ("${SDK}" STREQUAL "HAIKU"))
@@ -119,26 +120,26 @@ set(LIT "${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py")
 # instead of by the path, which is good for CI. In this mode lit also updates
 # the mtime on the failed tests, which makes them run first on the
 # consecutive execution, which makes local builds fail faster.
-set(SWIFT_TEST_EXTRA_ARGS "--incremental")
+set(SWIFT_LIT_ARGS "--incremental" CACHE STRING "Arguments to pass to lit")
 
 if(NOT SWIFT_INCLUDE_TOOLS)
-  list(APPEND SWIFT_TEST_EXTRA_ARGS
+  list(APPEND SWIFT_LIT_ARGS
        "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
        "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
        "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
   if(SWIFT_BUILD_STDLIB)
-    list(APPEND SWIFT_TEST_EXTRA_ARGS
+    list(APPEND SWIFT_LIT_ARGS
          "--param" "test_resource_dir=${SWIFTLIB_DIR}")
   endif()
 endif()
 
 option(SWIFT_TEST_USE_LEAKS "Run Swift stdlib tests under leaks" FALSE)
 if (SWIFT_TEST_USE_LEAKS)
-  list(APPEND SWIFT_TEST_EXTRA_ARGS "--param" "leaks-all")
+  list(APPEND SWIFT_LIT_ARGS "--param" "leaks-all")
 endif()
 
 if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
-  list(APPEND SWIFT_TEST_EXTRA_ARGS
+  list(APPEND SWIFT_LIT_ARGS
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
@@ -310,9 +311,9 @@ _Block_release(void) { }\n")
               # Reboot the device and remove everything in its tmp
               # directory. Build products and test executables are pushed
               # to that directory when running the test suite.
-              ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
+              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
           COMMAND
-              ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
+              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
               --ndk "${SWIFT_ANDROID_NDK_PATH}"
               --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
               --destination-arch "${ARCH}"
@@ -331,7 +332,7 @@ _Block_release(void) { }\n")
         COMMENT "Uploading stdlib")
 
     foreach(test_mode ${TEST_MODES})
-      set(LIT_ARGS "${SWIFT_TEST_EXTRA_ARGS} ${LLVM_LIT_ARGS}")
+      set(LIT_ARGS "${SWIFT_LIT_ARGS} ${LLVM_LIT_ARGS}")
       separate_arguments(LIT_ARGS)
 
       if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)

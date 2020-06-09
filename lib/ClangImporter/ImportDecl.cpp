@@ -45,8 +45,10 @@
 #include "swift/Config.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
@@ -1328,10 +1330,10 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
   // To keep DI happy, initialize stored properties before computed.
   auto parameters = constructor->getParameters();
-  for (unsigned pass = 0; pass < 2; pass++) {
+  for (unsigned pass = 0; pass < 2; ++pass) {
     unsigned paramPos = 0;
 
-    for (unsigned i = 0, e = members.size(); i < e; i++) {
+    for (unsigned i = 0, e = members.size(); i < e; ++i) {
       auto var = members[i];
 
       if (var->hasClangNode() &&
@@ -1339,7 +1341,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
         continue;
 
       if (var->hasStorage() == (pass != 0)) {
-        paramPos++;
+        ++paramPos;
         continue;
       }
 
@@ -1367,7 +1369,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
       assign->setType(TupleType::getEmpty(ctx));
 
       stmts.push_back(assign);
-      paramPos++;
+      ++paramPos;
     }
   }
 
@@ -2189,10 +2191,13 @@ namespace {
           if (fd->isInstanceMember() != decl->isInstanceProperty())
             continue;
 
-          assert(fd->getFullName().getArgumentNames().empty());
+          // We only care about methods with no arguments, because they can
+          // shadow imported properties.
+          if (!fd->getName().getArgumentNames().empty())
+            continue;
+
           foundMethod = true;
-        } else {
-          auto *var = cast<VarDecl>(result);
+        } else if (auto *var = dyn_cast<VarDecl>(result)) {
           if (var->isInstanceMember() != decl->isInstanceProperty())
             continue;
 
@@ -2278,7 +2283,7 @@ namespace {
       return getVersion() == getActiveSwiftVersion();
     }
 
-    void recordMemberInContext(DeclContext *dc, ValueDecl *member) {
+    void recordMemberInContext(const DeclContext *dc, ValueDecl *member) {
       assert(member && "Attempted to record null member!");
       auto *nominal = dc->getSelfNominalTypeDecl();
       auto name = member->getBaseName();
@@ -3311,6 +3316,12 @@ namespace {
       // it is nested in a struct.
 
       for (auto m : decl->decls()) {
+        if (isa<clang::AccessSpecDecl>(m)) {
+          // The presence of AccessSpecDecls themselves does not influence
+          // whether we can generate a member-wise initializer.
+          continue;
+        }
+
         auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.
@@ -3341,8 +3352,8 @@ namespace {
 
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
-          if (!isa<clang::TypeDecl>(nd)) {
-            // We don't know what this field is.
+          if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
+            // We don't know what this member is.
             // Assume it may be important in C.
             hasUnreferenceableStorage = true;
             hasMemberwiseInitializer = false;
@@ -3460,6 +3471,25 @@ namespace {
       }
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
+
+      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+        result->setIsCxxNotTriviallyCopyable(
+            !cxxRecordDecl->isTriviallyCopyable());
+
+        for (auto ctor : cxxRecordDecl->ctors()) {
+          if (ctor->isCopyConstructor() &&
+              (ctor->isDeleted() || ctor->getAccess() != clang::AS_public)) {
+            result->setIsCxxNotTriviallyCopyable(true);
+            break;
+          }
+        }
+
+        if (auto dtor = cxxRecordDecl->getDestructor()) {
+          if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
+            result->setIsCxxNotTriviallyCopyable(true);
+          }
+        }
+      }
 
       return result;
     }
@@ -3954,10 +3984,6 @@ namespace {
     }
 
     Decl *VisitVarDecl(const clang::VarDecl *decl) {
-      // FIXME: Swift does not have static variables in structs/classes yet.
-      if (decl->getDeclContext()->isRecord())
-        return nullptr;
-
       // Variables are imported as... variables.
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(decl, correctSwiftName);
@@ -4147,33 +4173,51 @@ namespace {
                                  bool isInstance, const DeclContext *dc,
                     llvm::function_ref<bool(AbstractFunctionDecl *fn)> filter) {
       // We only need to perform this check for classes.
-      auto classDecl
-        = dc->getDeclaredInterfaceType()->getClassOrBoundGenericClass();
+      auto *classDecl = dc->getSelfClassDecl();
       if (!classDecl)
         return false;
 
-      // Make sure we don't search in Clang modules for this method.
-      ++Impl.ActiveSelectors[{selector, isInstance}];
+      auto matchesImportedDecl = [&](Decl *member) -> bool {
+        auto *afd = dyn_cast<AbstractFunctionDecl>(member);
+        if (!afd)
+          return false;
 
-      // Look for a matching imported or deserialized member.
-      bool result = false;
-      for (auto decl : classDecl->lookupDirect(selector, isInstance)) {
-        if ((decl->getClangDecl()
-             || !decl->getDeclContext()->getParentSourceFile())
-            && importedName.getDeclName() == decl->getFullName()
-            && filter(decl)) {
-          result = true;
-          break;
+        // Instance-ness must match.
+        if (afd->isObjCInstanceMethod() != isInstance)
+          return false;
+
+        // Both the selector and imported name must match.
+        if (afd->getObjCSelector() != selector ||
+            importedName.getDeclName() != afd->getName()) {
+          return false;
+        }
+
+        // Finally, the provided filter must match.
+        return filter(afd);
+      };
+
+      // First check to see if we've already imported a method with the same
+      // selector.
+      auto importedMembers = Impl.MembersForNominal.find(classDecl);
+      if (importedMembers != Impl.MembersForNominal.end()) {
+        auto baseName = importedName.getDeclName().getBaseName();
+        auto membersForName = importedMembers->second.find(baseName);
+        if (membersForName != importedMembers->second.end()) {
+          return llvm::any_of(membersForName->second, matchesImportedDecl);
         }
       }
 
-      // Restore the previous active count in the active-selector mapping.
-      auto activeCount = Impl.ActiveSelectors.find({selector, isInstance});
-      --activeCount->second;
-      if (activeCount->second == 0)
-        Impl.ActiveSelectors.erase(activeCount);
-
-      return result;
+      // Then, for a deserialized Swift class, check to see if it has brought in
+      // any matching @objc methods.
+      if (classDecl->wasDeserialized()) {
+        auto &ctx = Impl.SwiftContext;
+        TinyPtrVector<AbstractFunctionDecl *> deserializedMethods;
+        ctx.loadObjCMethods(classDecl, selector, isInstance,
+                            /*prevGeneration*/ 0, deserializedMethods,
+                            /*swiftOnly*/ true);
+        return llvm::any_of(deserializedMethods, matchesImportedDecl);
+      }
+      return false;
     }
 
     Decl *importObjCMethodDecl(const clang::ObjCMethodDecl *decl,
@@ -4425,6 +4469,9 @@ namespace {
       // If this method overrides another method, mark it as such.
       recordObjCOverride(result);
 
+      // Make a note that we've imported this method into this context.
+      recordMemberInContext(dc, result);
+
       // Record the error convention.
       if (errorConvention) {
         result->setForeignErrorConvention(*errorConvention);
@@ -4461,14 +4508,6 @@ namespace {
             Impl.addAlternateDecl(result, cast<ValueDecl>(imported));
         }
       }
-
-      // We only care about recording methods with no arguments here, because
-      // they can shadow imported properties.
-      if (!isa<AccessorDecl>(result) &&
-          result->getFullName().getArgumentNames().empty()) {
-        recordMemberInContext(dc, result);
-      }
-
       return result;
     }
 
@@ -6438,6 +6477,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc));
 
   addObjCAttribute(result, selector);
+  recordMemberInContext(dc, result);
 
   Impl.recordImplicitUnwrapForDecl(result,
                                    importedType.isImplicitlyUnwrapped());
@@ -6519,7 +6559,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     return;
   // Dig out the Objective-C superclass.
   SmallVector<ValueDecl *, 4> results;
-  superDecl->lookupQualified(superDecl, DeclNameRef(decl->getFullName()),
+  superDecl->lookupQualified(superDecl, DeclNameRef(decl->getName()),
                              NL_QualifiedDefault | NL_KnownNoDependency,
                              results);
   for (auto member : results) {
@@ -6592,7 +6632,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   // operation.
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
-      superDecl, DeclNameRef(subscript->getFullName()),
+      superDecl, DeclNameRef(subscript->getName()),
       NL_QualifiedDefault | NL_KnownNoDependency, lookup);
 
   for (auto result : lookup) {
@@ -6645,14 +6685,24 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   };
 
   auto findCounterpart = [&](clang::Selector sel) -> FuncDecl * {
-    // If the declaration we're starting from is in a class, first
-    // look for a class member with the appropriate selector.
+    // If the declaration we're starting from is in a class, first check to see
+    // if we've already imported an instance method with a matching selector.
     if (auto classDecl = decl->getDeclContext()->getSelfClassDecl()) {
       auto swiftSel = Impl.importSelector(sel);
-      for (auto found : classDecl->lookupDirect(swiftSel, true)) {
-        if (auto foundFunc = dyn_cast<FuncDecl>(found))
-          if (foundFunc->hasClangNode())
-            return foundFunc;
+      auto importedMembers = Impl.MembersForNominal.find(classDecl);
+      if (importedMembers != Impl.MembersForNominal.end()) {
+        for (auto membersForName : importedMembers->second) {
+          for (auto *member : membersForName.second) {
+            // Must be an instance method.
+            auto *afd = dyn_cast<FuncDecl>(member);
+            if (!afd || !afd->isInstanceMember())
+              continue;
+
+            // Selector must match.
+            if (afd->getObjCSelector() == swiftSel)
+              return afd;
+          }
+        }
       }
     }
 
@@ -7705,7 +7755,7 @@ void ClangImporter::Implementation::importAttributes(
   // Hack: mark any method named "print" with less than two parameters as
   // warn_unqualified_access.
   if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
-    if (isPrintLikeMethod(MD->getFullName(), MD->getDeclContext())) {
+    if (isPrintLikeMethod(MD->getName(), MD->getDeclContext())) {
       // Use a non-implicit attribute so it shows up in the generated
       // interface.
       MD->getAttrs().add(new (C) WarnUnqualifiedAccessAttr(/*implicit*/false));
@@ -7878,7 +7928,7 @@ void ClangImporter::Implementation::startedImportingEntity() {
   ++NumTotalImportedEntities;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = SwiftContext.Stats)
-    Stats->getFrontendCounters().NumTotalClangImportedEntities++;
+    ++Stats->getFrontendCounters().NumTotalClangImportedEntities;
 }
 
 /// Look up associated type requirements in the conforming type.
@@ -7902,7 +7952,7 @@ static void finishTypeWitnesses(
                           NL_OnlyTypes |
                           NL_ProtocolMembers);
 
-    dc->lookupQualified(nominal, DeclNameRef(assocType->getFullName()), options,
+    dc->lookupQualified(nominal, DeclNameRef(assocType->getName()), options,
                         lookupResults);
     for (auto member : lookupResults) {
       auto typeDecl = cast<TypeDecl>(member);

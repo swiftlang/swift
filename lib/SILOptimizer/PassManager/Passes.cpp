@@ -84,13 +84,6 @@ bool swift::runSILOwnershipEliminatorPass(SILModule &Module) {
   return Ctx.hadError();
 }
 
-// Prepare SIL for the -O pipeline.
-void swift::runSILOptPreparePasses(SILModule &Module) {
-  auto &opts = Module.getOptions();
-  auto plan = SILPassPipelinePlan::getSILOptPreparePassPipeline(opts);
-  executePassPipelinePlan(&Module, plan);
-}
-
 void swift::runSILOptimizationPasses(SILModule &Module) {
   auto &opts = Module.getOptions();
 

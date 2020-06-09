@@ -24,6 +24,10 @@ set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
 set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
 set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
 
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
+
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
   if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
     message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
@@ -61,11 +65,8 @@ endif()
 # on the presence of symbols in libSupport to identify how the code was
 # built and cause link failures for mismatches. Without linking that library,
 # we get link failures regardless, so instead, this just disables the checks.
-if(CMAKE_VERSION VERSION_LESS 3.12)
-  append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
-else()
-  add_compile_definitions(LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
-endif()
+add_compile_definitions($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1>)
+include_directories(BEFORE ${CMAKE_PROJECT_SOURCE_DIR}/include)
 
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)

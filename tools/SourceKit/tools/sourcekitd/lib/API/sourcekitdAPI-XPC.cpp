@@ -258,19 +258,9 @@ ResponseBuilder::Dictionary::setDictionary(UIdent Key) {
 }
 
 void ResponseBuilder::Dictionary::setCustomBuffer(
-      SourceKit::UIdent Key,
-      CustomBufferKind Kind, std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
-
-  std::unique_ptr<llvm::WritableMemoryBuffer> CustomBuf;
-  CustomBuf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      sizeof(uint64_t) + MemBuf->getBufferSize());
-  char *BufPtr = CustomBuf->getBufferStart();
-  *reinterpret_cast<uint64_t*>(BufPtr) = (uint64_t)Kind;
-  BufPtr += sizeof(uint64_t);
-  memcpy(BufPtr, MemBuf->getBufferStart(), MemBuf->getBufferSize());
-
-  xpc_object_t xdata = xpc_data_create(CustomBuf->getBufferStart(),
-                                       CustomBuf->getBufferSize());
+    SourceKit::UIdent Key, std::unique_ptr<llvm::MemoryBuffer> Buf) {
+  xpc_object_t xdata = xpc_data_create(Buf->getBufferStart(),
+                                       Buf->getBufferSize());
   xpc_dictionary_set_value(Impl, Key.c_str(), xdata);
   xpc_release(xdata);
 }

@@ -125,7 +125,9 @@
 ///
 ///     let temperatureData = ["21.5", "19.25", "27", "no data", "28.25", "no data", "23"]
 ///     let tempsCelsius = temperatureData.map { Double($0) ?? .nan }
-///     // tempsCelsius == [21.5, 19.25, 27, nan, 28.25, nan, 23.0]
+///     print(tempsCelsius)
+///     // Prints "[21.5, 19.25, 27, nan, 28.25, nan, 23.0]"
+///
 ///
 /// Note that some elements in the `temperatureData ` array are not valid
 /// numbers. When these invalid strings are parsed by the `Double` failable
@@ -135,7 +137,8 @@
 /// Next, the observations in Celsius are converted to Fahrenheit:
 ///
 ///     let tempsFahrenheit = tempsCelsius.map { $0 * 1.8 + 32 }
-///     // tempsFahrenheit == [70.7, 66.65, 80.6, nan, 82.85, nan, 73.4]
+///     print(tempsFahrenheit)
+///     // Prints "[70.7, 66.65, 80.6, nan, 82.85, nan, 73.4]"
 ///
 /// The NaN values in the `tempsCelsius` array are propagated through the
 /// conversion and remain NaN in `tempsFahrenheit`.
@@ -144,14 +147,14 @@
 /// every value of the `tempsFahrenheit` array, any NaN values cause the
 /// result to also be NaN, as seen in this example:
 ///
-///     let badAverage = tempsFahrenheit.reduce(0.0, combine: +) / Double(tempsFahrenheit.count)
+///     let badAverage = tempsFahrenheit.reduce(0.0, +) / Double(tempsFahrenheit.count)
 ///     // badAverage.isNaN == true
 ///
 /// Instead, when you need an operation to have a specific numeric result,
 /// filter out any NaN values using the `isNaN` property.
 ///
 ///     let validTemps = tempsFahrenheit.filter { !$0.isNaN }
-///     let average = validTemps.reduce(0.0, combine: +) / Double(validTemps.count)
+///     let average = validTemps.reduce(0.0, +) / Double(validTemps.count)
 ///
 /// Finally, report the average temperature and observation counts:
 ///
@@ -1104,7 +1107,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   ///     var numbers = [2.5, 21.25, 3.0, .nan, -9.5]
   ///     numbers.sort { !$1.isTotallyOrdered(belowOrEqualTo: $0) }
-  ///     // numbers == [-9.5, 2.5, 3.0, 21.25, NaN]
+  ///     print(numbers)
+  ///     // Prints "[-9.5, 2.5, 3.0, 21.25, nan]"
   ///
   /// The `isTotallyOrdered(belowOrEqualTo:)` method implements the total order
   /// relation as defined by the [IEEE 754 specification][spec].

@@ -21,6 +21,10 @@ func testSimpleInterpolation() {
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
 
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
+
     // CHECK: [[ENABLED]]:
     //
     // Header bytes.
@@ -47,10 +51,6 @@ func testSimpleInterpolation() {
     // CHECK-32-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([27 x i8], [27 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
-
-    // CHECK: [[NOT_ENABLED]]:
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"${{.*}}testInterpolationWithMultipleArguments
@@ -67,6 +67,10 @@ func testInterpolationWithMultipleArguments() {
     // CHECK: entry:
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
 
     // CHECK: [[ENABLED]]:
     //
@@ -112,10 +116,6 @@ func testInterpolationWithMultipleArguments() {
     // CHECK-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([106 x i8], [106 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* {{(nonnull )?}}[[BUFFER]], i32 20)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
-
-    // CHECK: [[NOT_ENABLED]]:
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"${{.*}}testNSObjectInterpolation
@@ -133,6 +133,10 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: tail call void @swift_release
     // CHECK-NEXT: tail call void @llvm.objc.release
     // CHECK-NEXT: br label %[[EXIT:[0-9]+]]
+
+    // CHECK: [[EXIT]]:
+    // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG]])
+    // CHECK-NEXT: ret void
 
     // CHECK: [[ENABLED]]:
     //
@@ -163,10 +167,6 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: tail call void @swift_release
     // CHECK-NEXT: br label %[[EXIT]]
-
-    // CHECK: [[EXIT]]:
-    // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG]])
-    // CHECK-NEXT: ret void
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"${{.*}}testFloatInterpolation
@@ -175,6 +175,10 @@ func testFloatInterpolation(doubleValue: Double) {
     // CHECK: entry:
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
 
     // CHECK: [[ENABLED]]:
     //
@@ -198,10 +202,6 @@ func testFloatInterpolation(doubleValue: Double) {
     // CHECK-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([17 x i8], [17 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
-
-    // CHECK: [[NOT_ENABLED]]:
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
 }
 
 // This test checks that the precision and alignment are optimally "stored" into the
@@ -216,6 +216,10 @@ func testDynamicPrecisionAndAlignment() {
     // CHECK: entry:
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
+
+    // CHECK: [[NOT_ENABLED]]:
+    // CHECK-NEXT: tail call void @swift_release
+    // CHECK-NEXT: ret void
 
     // CHECK: [[ENABLED]]:
     //
@@ -261,10 +265,6 @@ func testDynamicPrecisionAndAlignment() {
     // CHECK-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([28 x i8], [28 x i8]* @{{.*}}, i{{.*}} 0, i{{.*}} 0), i8* {{(nonnull )?}}[[BUFFER]], i32 20)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
-
-    // CHECK: [[NOT_ENABLED]]:
-    // CHECK-NEXT: tail call void @swift_release
-    // CHECK-NEXT: ret void
 }
 
 // TODO: add test for String. It is more complicated due to more complex logic

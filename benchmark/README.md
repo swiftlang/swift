@@ -74,6 +74,7 @@ The following build options are available:
 The following build targets are available:
 
 * `swift-benchmark-macosx-x86_64`
+* `swift-benchmark-iphoneos-arm64e`
 * `swift-benchmark-iphoneos-arm64`
 * `swift-benchmark-iphoneos-armv7`
 * `swift-benchmark-appletvos-arm64`

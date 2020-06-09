@@ -247,7 +247,7 @@ struct CommentToXMLConverter {
 
   void printTagFields(ArrayRef<StringRef> Tags) {
     OS << "<Tags>";
-    for (const auto Tag : Tags) {
+    for (const auto &Tag : Tags) {
       if (Tag.empty()) {
         continue;
       }
@@ -318,7 +318,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     if (Loc.isValid()) {
       const auto &SM = D->getASTContext().SourceMgr;
       StringRef FileName = SM.getDisplayNameForLoc(Loc);
-      auto LineAndColumn = SM.getLineAndColumn(Loc);
+      auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
       OS << " file=\"";
       appendWithXMLEscaping(OS, FileName);
       OS << "\"";
@@ -336,7 +336,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
   if (VD && VD->hasName()) {
     llvm::SmallString<64> SS;
     llvm::raw_svector_ostream NameOS(SS);
-    NameOS << VD->getFullName();
+    NameOS << VD->getName();
     appendWithXMLEscaping(OS, NameOS.str());
   }
   OS << "</Name>";
@@ -821,7 +821,7 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
     Converter.visit(N);
   }
 
-  for (const auto PF : DC->getParamFields()) {
+  for (const auto &PF : DC->getParamFields()) {
     Converter.visit(PF);
   }
 

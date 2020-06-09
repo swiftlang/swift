@@ -24,7 +24,7 @@
 @_exported import XCTest // Clang module
 
 import CoreGraphics
-import _SwiftXCTestOverlayShims
+@_implementationOnly import _SwiftXCTestOverlayShims
 
 // --- XCTest API Swiftification ---
 

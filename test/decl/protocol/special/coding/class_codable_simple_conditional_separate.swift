@@ -25,7 +25,7 @@ extension Conditional: Encodable where T: Encodable { // expected-note {{where '
 }
 
 extension Conditional: Decodable where T: Decodable {
-    // expected-error@-1 2 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be be satisfied by a 'required' initializer in the class definition}}
+    // expected-error@-1 2 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be satisfied by a 'required' initializer in the class definition}}
 }
 
 struct OnlyEnc: Encodable {}

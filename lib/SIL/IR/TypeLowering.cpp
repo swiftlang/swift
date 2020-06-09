@@ -272,11 +272,13 @@ namespace {
       // `SILFunctionType:getAutoDiffDerivativeFunctionType` for correct type
       // lowering.
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
+          type->getDifferentiabilityParameterIndices(),
+          type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
           LookUpConformanceInModule(&M), CanGenericSignature());
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiabilityParameterIndices(), /*resultIndex*/ 0,
+          type->getDifferentiabilityParameterIndices(),
+          type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(&M), CanGenericSignature());
       RecursiveProperties props;
@@ -1040,9 +1042,11 @@ namespace {
                               ArrayRef<SILValue> values) const override {
       assert(values.size() == 3);
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
-      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
+      auto *parameterIndices = fnTy->getDifferentiabilityParameterIndices();
+      auto *resultIndices = fnTy->getDifferentiabilityResultIndices();
       return B.createDifferentiableFunction(
-          loc, paramIndices, values[0], std::make_pair(values[1], values[2]));
+          loc, parameterIndices, resultIndices, values[0],
+          std::make_pair(values[1], values[2]));
     }
 
     void lowerChildren(TypeConverter &TC,
@@ -1051,7 +1055,8 @@ namespace {
       auto numDerivativeFns = 2;
       children.reserve(numDerivativeFns + 1);
       auto origFnTy = fnTy->getWithoutDifferentiability();
-      auto paramIndices = fnTy->getDifferentiabilityParameterIndices();
+      auto *paramIndices = fnTy->getDifferentiabilityParameterIndices();
+      auto *resultIndices = fnTy->getDifferentiabilityResultIndices();
       children.push_back(Child{
         NormalDifferentiableFunctionTypeComponent::Original,
         TC.getTypeLowering(origFnTy, getExpansionContext())
@@ -1060,7 +1065,7 @@ namespace {
                {AutoDiffDerivativeFunctionKind::JVP,
                 AutoDiffDerivativeFunctionKind::VJP}) {
         auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
-            paramIndices, 0, kind, TC,
+            paramIndices, resultIndices, kind, TC,
             LookUpConformanceInModule(&TC.M));
         auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
         NormalDifferentiableFunctionTypeComponent extractee(kind);
@@ -1446,6 +1451,10 @@ namespace {
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
+      if (D->isCxxNotTriviallyCopyable()) {
+        properties.setAddressOnly();
+      }
+
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
 
       // Classify the type according to its stored properties.
@@ -1821,7 +1830,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
     auto origMeta = origType.getAs<MetatypeType>();
     if (!origMeta) {
       // If the metatype matches a dependent type, it must be thick.
-      assert(origType.isTypeParameter());
+      assert(origType.isTypeParameterOrOpaqueArchetype());
       repr = MetatypeRepresentation::Thick;
     } else {
       // Otherwise, we're thin if the metatype is thinnable both
@@ -2784,8 +2793,9 @@ checkForABIDifferencesInYield(TypeConverter &TC, SILModule &M,
     return TypeConverter::ABIDifference::NeedsThunk;
 
   // Also make sure that the actual yield types match in ABI.
-  return TC.checkForABIDifferences(M, yield1.getSILStorageType(M, fnTy1),
-                                   yield2.getSILStorageType(M, fnTy2));
+  return TC.checkForABIDifferences(
+      M, yield1.getSILStorageType(M, fnTy1, TypeExpansionContext::minimal()),
+      yield2.getSILStorageType(M, fnTy2, TypeExpansionContext::minimal()));
 }
 
 TypeConverter::ABIDifference
@@ -2833,10 +2843,13 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
       return ABIDifference::NeedsThunk;
 
     if (checkForABIDifferences(M,
-                               result1.getSILStorageType(M, fnTy1),
-                               result2.getSILStorageType(M, fnTy2),
-             /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::CompatibleRepresentation)
+                               result1.getSILStorageType(
+                                   M, fnTy1, TypeExpansionContext::minimal()),
+                               result2.getSILStorageType(
+                                   M, fnTy2, TypeExpansionContext::minimal()),
+                               /*thunk iuos*/ fnTy1->getLanguage() ==
+                                   SILFunctionLanguage::Swift) !=
+        ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2861,11 +2874,13 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
     if (error1.getConvention() != error2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(M,
-                               error1.getSILStorageType(M, fnTy1),
-                               error2.getSILStorageType(M, fnTy2),
-              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::CompatibleRepresentation)
+    if (checkForABIDifferences(
+            M,
+            error1.getSILStorageType(M, fnTy1, TypeExpansionContext::minimal()),
+            error2.getSILStorageType(M, fnTy2, TypeExpansionContext::minimal()),
+            /*thunk iuos*/ fnTy1->getLanguage() ==
+                SILFunctionLanguage::Swift) !=
+        ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2877,11 +2892,13 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
 
     // Parameters are contravariant and our relation is not symmetric, so
     // make sure to flip the relation around.
-    if (checkForABIDifferences(M,
-                               param2.getSILStorageType(M, fnTy2),
-                               param1.getSILStorageType(M, fnTy1),
-              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::CompatibleRepresentation)
+    if (checkForABIDifferences(
+            M,
+            param2.getSILStorageType(M, fnTy2, TypeExpansionContext::minimal()),
+            param1.getSILStorageType(M, fnTy1, TypeExpansionContext::minimal()),
+            /*thunk iuos*/ fnTy1->getLanguage() ==
+                SILFunctionLanguage::Swift) !=
+        ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 

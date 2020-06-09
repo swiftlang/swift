@@ -600,7 +600,7 @@ struct Company { // expected-note 2{{'Company' declared here}}
 
 func test1() {
   let example: Company? = Company(owner: Person(name: "Owner"))
-  if let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'; did you mean 'Company'?}}
+  if let person = aCompany.owner, // expected-error {{cannot find 'aCompany' in scope; did you mean 'Company'?}}
      let aCompany = example {
     _ = person
   }
@@ -608,13 +608,13 @@ func test1() {
 
 func test2() {
   let example: Company? = Company(owner: Person(name: "Owner"))
-  guard let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'; did you mean 'Company'?}}
+  guard let person = aCompany.owner, // expected-error {{cannot find 'aCompany' in scope; did you mean 'Company'?}}
         let aCompany = example else { return }
 }
 
 func test3() {
   var c: String? = "c" // expected-note {{'c' declared here}}
-  if let a = b = c, let b = c { // expected-error {{use of unresolved identifier 'b'; did you mean 'c'?}}
+  if let a = b = c, let b = c { // expected-error {{cannot find 'b' in scope; did you mean 'c'?}}
     _ = b
   }
 }

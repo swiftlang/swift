@@ -90,7 +90,7 @@ function(handle_swift_sources
 
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
-    list(APPEND swift_compile_flags "-force-single-frontend-invocation")
+    list(APPEND swift_compile_flags "-whole-module-optimization")
 
     _compile_swift_files(
         dependency_target
@@ -172,7 +172,7 @@ function(_add_extra_swift_flags_for_module module_name result_var_name)
   set("${result_var_name}" ${result_list} PARENT_SCOPE)
 endfunction()
 
-function(_add_variant_swift_compile_flags
+function(_add_target_variant_swift_compile_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
@@ -352,7 +352,7 @@ function(_compile_swift_files
   set(swift_flags)
   set(swift_module_flags)
 
-  _add_variant_swift_compile_flags(
+  _add_target_variant_swift_compile_flags(
       "${SWIFTFILE_SDK}"
       "${SWIFTFILE_ARCHITECTURE}"
       "${SWIFT_STDLIB_BUILD_TYPE}"
@@ -362,13 +362,13 @@ function(_compile_swift_files
       )
 
   # Determine the subdirectory where the binary should be placed.
-  compute_library_subdir(library_subdir
-      "${SWIFTFILE_SDK}" "${SWIFTFILE_ARCHITECTURE}")
-
+  set(library_subdir_sdk "${SWIFTFILE_SDK}")
   if(maccatalyst_build_flavor STREQUAL "ios-like")
-  	compute_library_subdir(library_subdir
-      "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
+    set(library_subdir_sdk "MACCATALYST")
   endif()
+
+  compute_library_subdir(library_subdir
+    "${library_subdir_sdk}" "${SWIFTFILE_ARCHITECTURE}")
 
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
@@ -464,10 +464,11 @@ function(_compile_swift_files
     list(APPEND swift_flags "-parse-as-library")
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
+    set(module_triple ${SWIFT_SDK_${library_subdir_sdk}_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
        SWIFTFILE_SDK STREQUAL "MACCATALYST")
       set(specific_module_dir "${module_base}.swiftmodule")
-      set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
+      set(module_base "${module_base}.swiftmodule/${module_triple}")
     else()
       set(specific_module_dir)
     endif()
@@ -530,11 +531,19 @@ function(_compile_swift_files
 
       set(maccatalyst_specific_module_dir
           "${maccatalyst_module_dir}/${SWIFTFILE_MODULE_NAME}.swiftmodule")
-      set(maccatalyst_module_base "${maccatalyst_specific_module_dir}/${SWIFTFILE_ARCHITECTURE}")
+      set(maccatalyst_module_triple ${SWIFT_SDK_MACCATALYST_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
+      set(maccatalyst_module_base "${maccatalyst_specific_module_dir}/${maccatalyst_module_triple}")
       set(maccatalyst_module_file "${maccatalyst_module_base}.swiftmodule")
       set(maccatalyst_module_doc_file "${maccatalyst_module_base}.swiftdoc")
 
       set(maccatalyst_module_outputs "${maccatalyst_module_file}" "${maccatalyst_module_doc_file}")
+
+      if(SWIFT_ENABLE_MODULE_INTERFACES)
+        set(maccatalyst_interface_file "${maccatalyst_module_base}.swiftinterface")
+        list(APPEND maccatalyst_module_outputs "${maccatalyst_interface_file}")
+      else()
+        set(maccatalyst_interface_file)
+      endif()
 
       swift_install_in_component(DIRECTORY ${maccatalyst_specific_module_dir}
                                  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${maccatalyst_library_subdir}"
@@ -611,6 +620,12 @@ function(_compile_swift_files
     list(APPEND maccatalyst_swift_flags
       "-I" "${SWIFTLIB_DIR}/${maccatalyst_library_subdir}")
     set(maccatalyst_swift_module_flags ${swift_module_flags})
+    list(FIND maccatalyst_swift_module_flags "${interface_file}" interface_file_index)
+    if(NOT interface_file_index EQUAL -1)
+      list(INSERT maccatalyst_swift_module_flags ${interface_file_index} "${maccatalyst_interface_file}")
+      math(EXPR old_interface_file_index "${interface_file_index} + 1")
+      list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
+    endif()
   elseif(maccatalyst_build_flavor STREQUAL "ios-like")
     compute_library_subdir(maccatalyst_library_subdir
       "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
@@ -693,7 +708,7 @@ function(_compile_swift_files
   add_custom_command_target(
       dependency_target
       COMMAND
-        "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+        "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
         "${swift_compiler_tool}" "${main_command}" ${swift_flags}
         ${output_option} ${embed_bitcode_option} "@${file_path}"
       ${command_touch_standard_outputs}
@@ -731,7 +746,7 @@ function(_compile_swift_files
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
           ${specific_module_dir}
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
           "-avoid-emit-module-source-info"
           ${swift_flags} ${swift_module_flags} "@${file_path}"
@@ -766,7 +781,7 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${maccatalyst_specific_module_dir}
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${maccatalyst_module_file}"
           ${maccatalyst_swift_flags} ${maccatalyst_swift_module_flags} "@${file_path}"
         ${command_touch_maccatalyst_module_outputs}
@@ -792,7 +807,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sib_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sib" "-o" "${sib_file}" ${swift_flags} -Onone
           "@${file_path}"
         ${command_touch_sib_outputs}
@@ -808,7 +823,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sibopt_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sib" "-o" "${sibopt_file}" ${swift_flags} -O
           "@${file_path}"
         ${command_touch_sibopt_outputs}
@@ -825,7 +840,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sibgen_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sibgen" "-o" "${sibgen_file}" ${swift_flags}
           "@${file_path}"
         ${command_touch_sibgen_outputs}

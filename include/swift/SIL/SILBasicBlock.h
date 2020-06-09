@@ -110,6 +110,10 @@ public:
     InstList.splice(end(), Other->InstList);
   }
 
+  void spliceAtBegin(SILBasicBlock *Other) {
+    InstList.splice(begin(), Other->InstList);
+  }
+
   bool empty() const { return InstList.empty(); }
   iterator begin() { return InstList.begin(); }
   iterator end() { return InstList.end(); }
@@ -201,6 +205,8 @@ public:
   SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
   void cloneArgumentList(SILBasicBlock *Other);
+
+  void moveArgumentList(SILBasicBlock *from);
 
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);
@@ -396,8 +402,8 @@ public:
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
-  /// Pretty-print the SILBasicBlock with the designated stream and context.
-  void print(llvm::raw_ostream &OS, SILPrintContext &Ctx) const;
+  /// Pretty-print the SILBasicBlock with the designated context.
+  void print(SILPrintContext &Ctx) const;
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
 

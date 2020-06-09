@@ -19,6 +19,7 @@
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/VersionTuple.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Type.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -40,7 +41,15 @@ void serialize(const llvm::VersionTuple &VT, llvm::json::OStream &OS);
 void serialize(const llvm::Triple &T, llvm::json::OStream &OS);
 void serialize(const ExtensionDecl *Extension, llvm::json::OStream &OS);
 void serialize(const Requirement &Req, llvm::json::OStream &OS);
+void serialize(const swift::GenericTypeParamType *Param,
+               llvm::json::OStream &OS);
 
+
+/// Filter generic requirements that aren't relevant for documentation.
+void
+filterGenericRequirements(ArrayRef<Requirement> Requirements,
+                          const NominalTypeDecl *Self,
+                          SmallVectorImpl<Requirement> &FilteredRequirements);
 } // end namespace symbolgraphgen
 } // end namespace swift
 

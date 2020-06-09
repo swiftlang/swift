@@ -81,6 +81,7 @@ EXPECTED_DEFAULTS = {
     'build_subdir': None,
     'build_swift_dynamic_sdk_overlay': True,
     'build_swift_dynamic_stdlib': True,
+    'build_swift_inspect': False,
     'build_swift_static_sdk_overlay': False,
     'build_swift_static_stdlib': False,
     'build_swift_stdlib_unittest_extra': False,
@@ -91,6 +92,8 @@ EXPECTED_DEFAULTS = {
     'build_skstresstester': False,
     'build_swiftevolve': False,
     'build_indexstoredb': False,
+    'test_indexstoredb_sanitize_all': False,
+    'test_sourcekitlsp_sanitize_all': False,
     'build_sourcekitlsp': False,
     'install_swiftpm': False,
     'install_swiftsyntax': False,
@@ -213,6 +216,7 @@ EXPECTED_DEFAULTS = {
     'test_osx': False,
     'test_paths': [],
     'test_pythonkit': False,
+    'test_swift_inspect': True,
     'test_tvos': False,
     'test_tvos_host': False,
     'test_tvos_simulator': False,
@@ -232,7 +236,8 @@ EXPECTED_DEFAULTS = {
     'validation_test': None,
     'verbose_build': False,
     'watchos': False,
-    'watchos_all': False
+    'watchos_all': False,
+    'llvm_install_components': defaults.llvm_install_components(),
 }
 
 
@@ -503,7 +508,11 @@ EXPECTED_OPTIONS = [
     EnableOption('--libdispatch', dest='build_libdispatch'),
     EnableOption('--libicu', dest='build_libicu'),
     EnableOption('--indexstore-db', dest='build_indexstoredb'),
+    EnableOption('--test-indexstore-db-sanitize-all',
+                 dest='test_indexstoredb_sanitize_all'),
     EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
+    EnableOption('--test-sourcekit-lsp-sanitize-all',
+                 dest='test_sourcekitlsp_sanitize_all'),
     EnableOption('--install-swiftsyntax', dest='install_swiftsyntax'),
     EnableOption('--swiftsyntax-verify-generated-files',
                  dest='swiftsyntax_verify_generated_files'),
@@ -512,6 +521,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--install-skstresstester', dest='install_skstresstester'),
     EnableOption('--install-swiftevolve', dest='install_swiftevolve'),
     EnableOption('--toolchain-benchmarks', dest='build_toolchainbenchmarks'),
+    EnableOption('--swift-inspect', dest='build_swift_inspect'),
     EnableOption('--tsan-libdispatch-test'),
     EnableOption('--long-test'),
     EnableOption('--show-sdks'),
@@ -575,6 +585,8 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-swiftevolve', dest='test_swiftevolve'),
     DisableOption('--skip-test-toolchain-benchmarks',
                   dest='test_toolchainbenchmarks'),
+    DisableOption('--skip-test-swift-inspect',
+                  dest='test_swift_inspect'),
     DisableOption('--skip-build-clang-tools-extra',
                   dest='build_clang_tools_extra'),
 
@@ -664,4 +676,6 @@ EXPECTED_OPTIONS = [
     IgnoreOption('--ios-all'),
     IgnoreOption('--tvos-all'),
     IgnoreOption('--watchos-all'),
+
+    StrOption('--llvm-install-components'),
 ]

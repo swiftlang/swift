@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 552; // simple didSet
+const uint16_t SWIFTMODULE_VERSION_MINOR = 558; // SIL function type result differentiability
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -356,7 +356,7 @@ using ParameterConventionField = BCFixed<4>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class SILParameterDifferentiability : uint8_t {
-  DifferentiableOrNotApplicable,
+  DifferentiableOrNotApplicable = 0,
   NotDifferentiable,
 };
 
@@ -370,6 +370,13 @@ enum class ResultConvention : uint8_t {
   Autoreleased,
 };
 using ResultConventionField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class SILResultDifferentiability : uint8_t {
+  DifferentiableOrNotApplicable = 0,
+  NotDifferentiable,
+};
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -397,6 +404,21 @@ static inline OperatorKind getStableFixity(OperatorFixity fixity) {
     return Postfix;
   case OperatorFixity::Infix:
     return Infix;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+/// Translates a stable Serialization fixity back to an AST operator fixity.
+static inline OperatorFixity getASTOperatorFixity(OperatorKind fixity) {
+  switch (fixity) {
+  case Prefix:
+    return OperatorFixity::Prefix;
+  case Postfix:
+    return OperatorFixity::Postfix;
+  case Infix:
+    return OperatorFixity::Infix;
+  case PrecedenceGroup:
+    llvm_unreachable("Not an operator kind");
   }
   llvm_unreachable("Unhandled case in switch");
 }
@@ -1292,7 +1314,8 @@ namespace decls_block {
     GenericSignatureIDField, // interface generic signature
     TypeIDField, // interface type for opaque type
     GenericSignatureIDField, // generic environment
-    SubstitutionMapIDField // optional substitution map for underlying type
+    SubstitutionMapIDField, // optional substitution map for underlying type
+    AccessLevelField // access level
     // trailed by generic parameters
   >;
 
@@ -1447,16 +1470,14 @@ namespace decls_block {
   >;
 
   using ParenPatternLayout = BCRecordLayout<
-    PAREN_PATTERN,
-    BCFixed<1> // implicit?
+    PAREN_PATTERN
     // The sub-pattern trails the record.
   >;
 
   using TuplePatternLayout = BCRecordLayout<
     TUPLE_PATTERN,
     TypeIDField, // type
-    BCVBR<5>,    // arity
-    BCFixed<1>   // implicit?
+    BCVBR<5>     // arity
     // The elements trail the record.
   >;
 
@@ -1469,28 +1490,24 @@ namespace decls_block {
   using NamedPatternLayout = BCRecordLayout<
     NAMED_PATTERN,
     DeclIDField, // associated VarDecl
-    TypeIDField, // type
-    BCFixed<1>   // implicit?
+    TypeIDField  // type
   >;
 
   using AnyPatternLayout = BCRecordLayout<
     ANY_PATTERN,
-    TypeIDField, // type
-    BCFixed<1>   // implicit?
+    TypeIDField  // type
     // FIXME: is the type necessary?
   >;
 
   using TypedPatternLayout = BCRecordLayout<
     TYPED_PATTERN,
-    TypeIDField, // associated type
-    BCFixed<1>   // implicit?
+    TypeIDField  // associated type
     // The sub-pattern trails the record.
   >;
 
   using VarPatternLayout = BCRecordLayout<
     VAR_PATTERN,
-    BCFixed<1>, // isLet?
-    BCFixed<1>  // implicit?
+    BCFixed<1>  // isLet?
     // The sub-pattern trails the record.
   >;
 

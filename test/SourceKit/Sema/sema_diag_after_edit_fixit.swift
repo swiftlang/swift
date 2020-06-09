@@ -29,7 +29,7 @@ let a = 0; let b = 0 }; unresolved
 
 // CHECK:      key.line: 2,
 // CHECK-NEXT: key.column: 25,
-// CHECK:      key.description: "use of unresolved identifier 'unresolved'",
+// CHECK:      key.description: "cannot find 'unresolved' in scope",
 // CHECK:      key.ranges:
 // CHECK-NEXT: {
 // CHECK-NEXT:   key.offset: 37,
@@ -50,7 +50,7 @@ let a = 0; let b = 0 }; unresolved
 
 // CHECK:      key.line: 2,
 // CHECK-NEXT: key.column: 21,
-// CHECK:      key.description: "use of unresolved identifier 'unresolved'",
+// CHECK:      key.description: "cannot find 'unresolved' in scope",
 // CHECK:      key.ranges:
 // CHECK-NEXT: {
 // CHECK-NEXT:   key.offset: 33,

@@ -200,9 +200,11 @@ public:
     // We are checking for retain. If this is a self-recursion. call
     // to the function (which returns an owned value) can be treated as
     // the retain instruction.
-    if (auto *AI = dyn_cast<ApplyInst>(II))
-     if (AI->getCalleeFunction() == II->getParent()->getParent())
-       return true;
+    if (auto *AI = dyn_cast<ApplyInst>(II)) {
+      return AI->getCalleeFunction() == II->getParent()->getParent() &&
+             RCFI->getRCIdentityRoot(AI) ==
+             RCFI->getRCIdentityRoot(getArg(AI->getParent()));
+    }
     // Check whether this is a retain instruction and the argument it
     // retains.
     return isRetainInstruction(II) &&

@@ -497,6 +497,10 @@ def create_argument_parser():
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
 
+    option('--llvm-install-components', store,
+           default=defaults.llvm_install_components(),
+           help='A semi-colon split list of llvm components to install')
+
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
 
@@ -567,8 +571,14 @@ def create_argument_parser():
 
     option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
+    option('--test-indexstore-db-sanitize-all',
+           toggle_true('test_indexstoredb_sanitize_all'),
+           help='run indexstore-db tests under all sanitizers')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
+    option('--test-sourcekit-lsp-sanitize-all',
+           toggle_true('test_sourcekitlsp_sanitize_all'),
+           help='run sourcekit-lsp tests under all sanitizers')
     option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
            help='install SwiftSyntax')
     option('--swiftsyntax-verify-generated-files',
@@ -586,6 +596,10 @@ def create_argument_parser():
     option(['--toolchain-benchmarks'],
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
+                'toolchain')
+    option(['--swift-inspect'],
+           toggle_true('build_swift_inspect'),
+           help='build SwiftInspect using swiftpm against the just built '
                 'toolchain')
 
     option('--xctest', toggle_true('build_xctest'),
@@ -1006,6 +1020,9 @@ def create_argument_parser():
     option('--skip-test-toolchain-benchmarks',
            toggle_false('test_toolchainbenchmarks'),
            help='skip testing toolchain benchmarks')
+    option('--skip-test-swift-inspect',
+           toggle_false('test_swift_inspect'),
+           help='skip testing swift_inspect')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')

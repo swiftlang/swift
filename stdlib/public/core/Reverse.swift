@@ -156,7 +156,7 @@ extension ReversedCollection {
     ///     // name[aIndex] == "a"
     ///
     ///     let reversedName = name.reversed()
-    ///     let i = ReversedIndex<String>(aIndex)
+    ///     let i = ReversedCollection<String>.Index(aIndex)
     ///     // reversedName[i] == "r"
     ///
     /// The element at the position created using `ReversedIndex<...>(aIndex)` is

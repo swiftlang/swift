@@ -31,7 +31,7 @@ var (paren) = 0
 var paren2: Int = paren
 
 struct Broken {
-  var b : Bool = True // expected-error{{use of unresolved identifier 'True'}}
+  var b : Bool = True // expected-error{{cannot find 'True' in scope}}
 }
 
 // rdar://16252090 - Warning when inferring empty tuple type for declarations

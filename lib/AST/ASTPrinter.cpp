@@ -43,6 +43,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
@@ -802,7 +803,6 @@ public:
                                               Decl *attachingTo);
   void printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                                                 Decl *attachingTo);
-  void printTrailingWhereClause(TrailingWhereClause *whereClause);
 
   void printGenericSignature(GenericSignature genericSig,
                              unsigned flags);
@@ -1361,18 +1361,6 @@ void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
       });
 }
 
-void PrintAST::printTrailingWhereClause(TrailingWhereClause *whereClause) {
-  Printer << " " << tok::kw_where << " ";
-  interleave(
-      whereClause->getRequirements(),
-      [&](const RequirementRepr &req) {
-        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-        req.print(Printer);
-        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
-      },
-      [&] { Printer << ", "; });
-}
-
 /// A helper function to return the depth of a requirement.
 static unsigned getDepthOfRequirement(const Requirement &req) {
   switch (req.getKind()) {
@@ -1448,7 +1436,7 @@ void PrintAST::printGenericSignature(
     // Move index to genericParams.
     unsigned lastParamIdx = paramIdx;
     do {
-      lastParamIdx++;
+      ++lastParamIdx;
     } while (lastParamIdx < numParam &&
              genericParams[lastParamIdx]->getDepth() == depth);
 
@@ -1470,6 +1458,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
+  printRequirements &= Options.PrintGenericRequirements;
   bool printInherited = (flags & PrintInherited);
   bool swapSelfAndDependentMemberType =
     (flags & SwapSelfAndDependentMemberType);
@@ -1490,25 +1479,26 @@ void PrintAST::printSingleDepthOfGenericSignature(
   if (printParams) {
     // Print the generic parameters.
     Printer << "<";
-    interleave(genericParams,
-               [&](GenericTypeParamType *param) {
-                 if (!subMap.empty()) {
-                   if (auto argTy = substParam(param))
-                     printType(argTy);
-                   else
-                     printType(param);
-                 } else if (auto *GP = param->getDecl()) {
-                   Printer.callPrintStructurePre(
-                       PrintStructureKind::GenericParameter, GP);
-                   Printer.printName(GP->getName(),
-                                     PrintNameContext::GenericParameter);
-                   Printer.printStructurePost(
-                       PrintStructureKind::GenericParameter, GP);
-                 } else {
-                   printType(param);
-                 }
-               },
-               [&] { Printer << ", "; });
+    llvm::interleave(
+        genericParams,
+        [&](GenericTypeParamType *param) {
+          if (!subMap.empty()) {
+            if (auto argTy = substParam(param))
+              printType(argTy);
+            else
+              printType(param);
+          } else if (auto *GP = param->getDecl()) {
+            Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
+                                          GP);
+            Printer.printName(GP->getName(),
+                              PrintNameContext::GenericParameter);
+            Printer.printStructurePost(PrintStructureKind::GenericParameter,
+                                       GP);
+          } else {
+            printType(param);
+          }
+        },
+        [&] { Printer << ", "; });
   }
 
   if (printRequirements || printInherited) {
@@ -1679,6 +1669,14 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     if (Options.AccessFilter > AccessLevel::Private &&
         VD->getFormalAccess() < Options.AccessFilter)
       return false;
+  }
+
+  // Skip clang decls marked with the swift_private attribute.
+  if (Options.SkipSwiftPrivateClangDecls) {
+    if (auto ClangD = D->getClangDecl()) {
+      if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+        return false;
+    }
   }
 
   if (Options.SkipPrivateStdlibDecls &&
@@ -2075,6 +2073,9 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
 }
 
 void PrintAST::printInherited(const Decl *decl) {
+  if (!Options.PrintInherited) {
+    return;
+  }
   SmallVector<TypeLoc, 6> TypesToPrint;
   getInheritedForPrinting(decl, Options, TypesToPrint);
   if (TypesToPrint.empty())
@@ -2586,7 +2587,7 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
   }
 
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
-    printer << "@escaping ";
+    printer.printKeyword("@escaping", options, " ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -2623,11 +2624,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   auto type = decl->getInterfaceType();
   Printer << ": ";
   TypeLoc tyLoc;
-  if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr())
+  if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr()) {
     tyLoc = TypeLoc(repr, type);
-  else
+  } else {
     tyLoc = TypeLoc::withoutLoc(type);
-
+  }
   Printer.printDeclResultTypePre(decl, tyLoc);
 
   // HACK: When printing result types for vars with opaque result types,
@@ -3038,7 +3039,7 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
   }
   Printer << tok::kw_case << " ";
 
-  interleave(elems.begin(), elems.end(),
+  llvm::interleave(elems.begin(), elems.end(),
     [&](EnumElementDecl *elt) {
       printEnumElement(elt);
     },
@@ -3277,7 +3278,7 @@ void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
 
 void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   Printer << "/* placeholder for ";
-  recordDeclLoc(decl, [&]{ Printer << decl->getFullName(); });
+  recordDeclLoc(decl, [&]{ Printer << decl->getName(); });
   unsigned numVTableEntries = decl->getNumberOfVTableEntries();
   if (numVTableEntries > 0)
     Printer << " (vtable entries: " << numVTableEntries << ")";
@@ -3652,11 +3653,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return false;
 
     // Don't print qualifiers for imported types.
-    for (auto File : M->getFiles()) {
-      if (File->getKind() == FileUnitKind::ClangModule ||
-          File->getKind() == FileUnitKind::DWARFModule)
-        return false;
-    }
+    if (!Options.QualifyImportedTypes)
+      for (auto File : M->getFiles()) {
+        if (File->getKind() == FileUnitKind::ClangModule ||
+            File->getKind() == FileUnitKind::DWARFModule)
+          return false;
+      }
 
     return true;
   }
@@ -4360,7 +4362,7 @@ public:
       if (T->hasExplicitAnyObject())
         Printer << "AnyObject";
       else
-        Printer << "Any";
+        Printer.printKeyword("Any", Options);
     } else {
       interleave(T->getMembers(), [&](Type Ty) { visit(Ty); },
                  [&] { Printer << " & "; });
@@ -4451,9 +4453,9 @@ public:
       if (!T->getSubstitutions().empty()) {
         Printer << '<';
         auto replacements = T->getSubstitutions().getReplacementTypes();
-        interleave(replacements.begin(), replacements.end(),
-                   [&](Type t) { visit(t); },
-                   [&] { Printer << ", "; });
+        llvm::interleave(
+            replacements.begin(), replacements.end(), [&](Type t) { visit(t); },
+            [&] { Printer << ", "; });
         Printer << '>';
       }
       return;
@@ -4751,6 +4753,13 @@ void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   print(Printer, Opts);
 }
 void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
+  switch (getDifferentiability()) {
+  case SILResultDifferentiability::NotDifferentiable:
+    Printer << "@noDerivative ";
+    break;
+  default:
+    break;
+  }
   Printer << getStringForResultConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }

@@ -126,6 +126,9 @@ def main():
                         choices=["true", "verbose", "skip"], default='true',
                         help="build test dependencies before running tests "
                              "(default: true)")
+    parser.add_argument("--build-jobs",
+                        type=int,
+                        help="The number of parallel build jobs to use")
     parser.add_argument("--target",
                         type=argparse.types.ShellSplitType(),
                         action=argparse.actions.AppendAction,
@@ -232,7 +235,11 @@ def main():
         cmake_build = ['cmake', '--build', build_dir, '--']
         if args.build == 'verbose':
             cmake_build += ['-v']
-        cmake_build += ['-j%d' % multiprocessing.cpu_count()]
+
+        if args.build_jobs is not None:
+            cmake_build += ['-j%d' % args.build_jobs]
+        else:
+            cmake_build += ['-j%d' % multiprocessing.cpu_count()]
 
         print("--- Building test dependencies %s ---" %
               ', '.join(dependency_targets))

@@ -1,19 +1,28 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -enable-library-evolution -enable-objc-interop -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_objc_class.swiftmodule -module-name=resilient_objc_class %S/../Inputs/resilient_objc_class.swift -I %t
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -enable-library-evolution -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
+//   This is XFAILed on these targets because they're 32-bit but support tagged pointers.
+//   The test is cloned as class_resilience_objc_armv7k.swift for them.
 // XFAIL: CPU=armv7k
-// XFAIL: CPU=powerpc64le
-// XFAIL: CPU=s390x
+// XFAIL: CPU=arm64_32
+// REQUIRES: objc_interop
 
 import Foundation
 import resilient_struct
+import resilient_objc_class
 
 // Note that these are all mutable to allow for the runtime to slide them.
 // CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC9resilient0I7_struct0H3IntVvpWvd" = hidden global [[INT]] 0,
 // CHECK: @"$s21class_resilience_objc27ClassWithResilientThenEmptyC9resilient0I7_struct0F3IntVvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc34AnotherClassWithEmptyThenResilientC9resilient0J7_struct0I3IntVvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc34AnotherClassWithResilientThenEmptyC9resilient0J7_struct0G3IntVvpWvd" = hidden global [[INT]] 0,
+
 // CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC5emptyAA0F0VvpWvd" = hidden global [[INT]] 0,
 // CHECK: @"$s21class_resilience_objc27ClassWithResilientThenEmptyC5emptyAA0H0VvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc34AnotherClassWithEmptyThenResilientC5emptyAA0G0VvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc34AnotherClassWithResilientThenEmptyC5emptyAA0I0VvpWvd" = hidden global [[INT]] 0,
 
 public class FixedLayoutObjCSubclass : NSObject {
   // This field could use constant direct access because NSObject has
@@ -113,6 +122,29 @@ public class ClassWithEmptyThenResilient : DummyClass {
 }
 
 public class ClassWithResilientThenEmpty : DummyClass {
+  public let resilient: ResilientInt
+  public let empty: Empty
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+// Same as the above, but the superclass is resilient, and ultimately inherits
+// from an Objective-C base class.
+
+public class AnotherClassWithEmptyThenResilient : ResilientNSObjectOutsideParent {
+  public let empty: Empty
+  public let resilient: ResilientInt
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+public class AnotherClassWithResilientThenEmpty : ResilientNSObjectOutsideParent {
   public let resilient: ResilientInt
   public let empty: Empty
 

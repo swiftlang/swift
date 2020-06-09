@@ -40,6 +40,11 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
+  // begin_access is defined to have side effects, but this is not relevant for
+  // DCE.
+  if (isa<BeginAccessInst>(I))
+    return false;
+
   if (I->mayHaveSideEffects())
     return true;
 
@@ -256,6 +261,10 @@ void DCE::markLive(SILFunction &F) {
         } else {
           markValueLive(FLI);
         }
+        continue;
+      }
+      if (auto *endAccess = dyn_cast<EndAccessInst>(&I)) {
+        addReverseDependency(endAccess->getBeginAccess(), &I);
         continue;
       }
       if (seemsUseful(&I))
@@ -480,7 +489,7 @@ bool DCE::removeDead(SILFunction &F) {
 
     for (auto I = BB.begin(), E = BB.end(); I != E; ) {
       auto *Inst = &*I;
-      I++;
+      ++I;
       if (LiveValues.count(Inst) || isa<BranchInst>(Inst))
         continue;
 

@@ -15,11 +15,9 @@
 
 using namespace swift;
 
-SWIFT_CC(swift) LLVM_LIBRARY_VISIBILITY extern "C"
-const char *getMetadataKindOf(
-    OpaqueValue *value,
-    const Metadata *type
-) {
+SWIFT_CC(swift)
+SWIFT_LIBRARY_VISIBILITY extern "C" const
+    char *getMetadataKindOf(OpaqueValue *value, const Metadata *type) {
   switch (type->getKind()) {
 #define METADATAKIND(NAME, VALUE) \
   case MetadataKind::NAME: return #NAME;
@@ -28,4 +26,3 @@ const char *getMetadataKindOf(
   default: return "none of your business";
   }
 }
-

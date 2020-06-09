@@ -176,6 +176,11 @@ class FreeBSD(GenericUnix):
         return int(out)
 
 
+class OpenBSD(GenericUnix):
+    def __init__(self):
+        super(OpenBSD, self).__init__([''])
+
+
 class Cygwin(Linux):
     # Currently, Cygwin is considered as the same as Linux.
     pass
@@ -203,6 +208,8 @@ def host_toolchain(**kwargs):
         return Linux()
     elif sys == 'FreeBSD':
         return FreeBSD()
+    elif sys == 'OpenBSD':
+        return OpenBSD()
     elif sys.startswith('CYGWIN'):
         return Cygwin()
     elif sys == 'Windows':

@@ -72,7 +72,7 @@ struct AutoclosureEscapeTest {
 // expected-error @+1 {{attribute can only be applied to types, not declarations}}
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected parameter name followed by ':'}}
 
-func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{use of undeclared type 'escaping'}}
+func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{cannot find type 'escaping' in scope}}
 // expected-error @-1 {{attribute can only be applied to types, not declarations}}
 // expected-error @-2 {{expected ',' separator}}
 // expected-error @-3 {{expected parameter name followed by ':'}}
@@ -115,7 +115,7 @@ let _ : AutoclosureFailableOf<Int> = .Success(42)
 let _ : (@autoclosure () -> ()) -> ()
 
 // escaping is the name of param type
-let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
+let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{cannot find type 'escaping' in scope}}
 
 // Migration
 // expected-error @+1 {{attribute can only be applied to types, not declarations}}

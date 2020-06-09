@@ -30,30 +30,73 @@ namespace swift {
 } // end namespace swift
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const SILGenDescriptor &desc) {
+                           const ASTLoweringDescriptor &desc) {
   auto *MD = desc.context.dyn_cast<ModuleDecl *>();
   auto *unit = desc.context.dyn_cast<FileUnit *>();
   if (MD) {
-    out << "SIL Generation for module " << MD->getName();
+    out << "Lowering AST to SIL for module " << MD->getName();
   } else {
     assert(unit);
-    out << "SIL Generation for file ";
+    out << "Lowering AST to SIL for file ";
     simple_display(out, unit);
   }
 }
 
-SourceLoc swift::extractNearestSourceLoc(const SILGenDescriptor &desc) {
+SourceLoc swift::extractNearestSourceLoc(const ASTLoweringDescriptor &desc) {
   return SourceLoc();
 }
 
-evaluator::DependencySource
-SILGenSourceFileRequest::readDependencySource(Evaluator &e) const {
+evaluator::DependencySource ASTLoweringRequest::readDependencySource(
+    const evaluator::DependencyRecorder &e) const {
   auto &desc = std::get<0>(getStorage());
+
+  // We don't track dependencies in whole-module mode.
+  if (auto *mod = desc.context.dyn_cast<ModuleDecl *>()) {
+    return {nullptr, e.getActiveSourceScope()};
+  }
+
+  // If we have a single source file, it's the source of dependencies.
   auto *unit = desc.context.get<FileUnit *>();
-  return {
-    dyn_cast_or_null<SourceFile>(unit),
-    evaluator::DependencyScope::Cascading
-  };
+  return {dyn_cast<SourceFile>(unit), evaluator::DependencyScope::Cascading};
+}
+
+ArrayRef<FileUnit *> ASTLoweringDescriptor::getFiles() const {
+  if (auto *mod = context.dyn_cast<ModuleDecl *>())
+    return mod->getFiles();
+
+  // For a single file, we can form an ArrayRef that points at its storage in
+  // the union.
+  return llvm::makeArrayRef(*context.getAddrOfPtr1());
+}
+
+SourceFile *ASTLoweringDescriptor::getSourceFileToParse() const {
+#ifndef NDEBUG
+  auto sfCount = llvm::count_if(getFiles(), [](FileUnit *file) {
+    return isa<SourceFile>(file);
+  });
+  auto silFileCount = llvm::count_if(getFiles(), [](FileUnit *file) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    return SF && SF->Kind == SourceFileKind::SIL;
+  });
+  assert(silFileCount == 0 || (silFileCount == 1 && sfCount == 1) &&
+         "Cannot currently mix a .sil file with other SourceFiles");
+#endif
+
+  for (auto *file : getFiles()) {
+    // Skip other kinds of files.
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    // Given the above precondition that a .sil file isn't mixed with other
+    // SourceFiles, we can return a SIL file if we have it, or return nullptr.
+    if (SF->Kind == SourceFileKind::SIL) {
+      return SF;
+    } else {
+      return nullptr;
+    }
+  }
+  return nullptr;
 }
 
 // Define request evaluation functions for each of the SILGen requests.

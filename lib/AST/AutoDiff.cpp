@@ -62,6 +62,7 @@ NormalDifferentiableFunctionTypeComponent::getAsDerivativeFunctionKind() const {
   case VJP:
     return {AutoDiffDerivativeFunctionKind::VJP};
   }
+  llvm_unreachable("invalid derivative kind");
 }
 
 LinearDifferentiableFunctionTypeComponent::
@@ -93,13 +94,17 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   case Transpose:
     return None;
   }
+  llvm_unreachable("invalid derivative kind");
 }
 
 void SILAutoDiffIndices::print(llvm::raw_ostream &s) const {
-  s << "(source=" << source << " parameters=(";
+  s << "(parameters=(";
   interleave(
       parameters->getIndices(), [&s](unsigned p) { s << p; },
       [&s] { s << ' '; });
+  s << ") results=(";
+  interleave(
+      results->getIndices(), [&s](unsigned p) { s << p; }, [&s] { s << ' '; });
   s << "))";
 }
 
@@ -109,8 +114,7 @@ void SILAutoDiffIndices::dump() const {
 }
 
 SILAutoDiffIndices AutoDiffConfig::getSILAutoDiffIndices() const {
-  assert(resultIndices->getNumIndices() == 1);
-  return SILAutoDiffIndices(*resultIndices->begin(), parameterIndices);
+  return SILAutoDiffIndices(parameterIndices, resultIndices);
 }
 
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
@@ -134,7 +138,7 @@ bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
   // the given source file.
   bool importsDifferentiationModule = false;
   for (auto import : namelookup::getAllImports(&SF)) {
-    if (import.second->getName() == ctx.Id_Differentiation) {
+    if (import.importedModule->getName() == ctx.Id_Differentiation) {
       importsDifferentiationModule = true;
       break;
     }
@@ -375,6 +379,7 @@ Type TangentSpace::getType() const {
   case Kind::Tuple:
     return value.tupleType;
   }
+  llvm_unreachable("invalid tangent space kind");
 }
 
 CanType TangentSpace::getCanonicalType() const {
@@ -384,4 +389,35 @@ CanType TangentSpace::getCanonicalType() const {
 NominalTypeDecl *TangentSpace::getNominal() const {
   assert(isTangentVector());
   return getTangentVector()->getNominalOrBoundGenericNominal();
+}
+
+const char DerivativeFunctionTypeError::ID = '\0';
+
+void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
+  OS << "original function type '";
+  functionType->print(OS);
+  OS << "' ";
+  switch (kind) {
+  case Kind::NoSemanticResults:
+    OS << "has no semantic results ('Void' result)";
+    break;
+  case Kind::MultipleSemanticResults:
+    OS << "has multiple semantic results";
+    break;
+  case Kind::NoDifferentiabilityParameters:
+    OS << "has no differentiability parameters";
+    break;
+  case Kind::NonDifferentiableDifferentiabilityParameter: {
+    auto nonDiffParam = getNonDifferentiableTypeAndIndex();
+    OS << "has non-differentiable differentiability parameter "
+       << nonDiffParam.second << ": " << nonDiffParam.first;
+    break;
+  }
+  case Kind::NonDifferentiableResult: {
+    auto nonDiffResult = getNonDifferentiableTypeAndIndex();
+    OS << "has non-differentiable result " << nonDiffResult.second << ": "
+       << nonDiffResult.first;
+    break;
+  }
+  }
 }

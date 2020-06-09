@@ -69,6 +69,11 @@ struct function_traits<R (T::*)(Args...) const> {
   using argument_types = std::tuple<Args...>;
 };
 
+} // end namespace swift
+
+#if !defined(swiftCore_EXPORTS)
+namespace llvm {
+
 /// @{
 
 /// An STL-style algorithm similar to std::for_each that applies a second
@@ -103,6 +108,12 @@ inline void interleave(const Container &c, UnaryFunctor each_fn,
 }
 
 /// @}
+
+} // end namespace llvm
+#endif
+
+namespace swift {
+
 /// @{
 
 /// The equivalent of std::for_each, but for two lists at once.
@@ -517,19 +528,18 @@ makeOptionalTransformRange(Range range, OptionalTransform op) {
 /// the result in an optional to indicate success or failure.
 template<typename Subclass>
 struct DowncastAsOptional {
-  template<typename Superclass>
+  template <typename Superclass>
   auto operator()(Superclass &value) const
-         -> Optional<decltype(llvm::cast<Subclass>(value))> {
+      -> llvm::Optional<decltype(llvm::cast<Subclass>(value))> {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
     return None;
   }
 
-  template<typename Superclass>
+  template <typename Superclass>
   auto operator()(const Superclass &value) const
-         -> Optional<decltype(llvm::cast<Subclass>(value))>
-  {
+      -> llvm::Optional<decltype(llvm::cast<Subclass>(value))> {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 

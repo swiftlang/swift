@@ -33,12 +33,14 @@ ArrayCallKind swift::getArraySemanticsKind(SILFunction *f) {
             .StartsWith("array.init", ArrayCallKind::kArrayInit)
             .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
             .Case("array.uninitialized_intrinsic", ArrayCallKind::kArrayUninitializedIntrinsic)
+            .Case("array.finalize_intrinsic", ArrayCallKind::kArrayFinalizeIntrinsic)
             .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
             .Case("array.check_index", ArrayCallKind::kCheckIndex)
             .Case("array.get_count", ArrayCallKind::kGetCount)
             .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
             .Case("array.get_element", ArrayCallKind::kGetElement)
             .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
+            .Case("array.end_mutation", ArrayCallKind::kEndMutation)
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
             .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
@@ -101,10 +103,12 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   }
   case ArrayCallKind::kCheckSubscript: {
     // Int, Bool, Self
-    if (SemanticsCall->getNumArguments() != 3 ||
-        !SemanticsCall->getArgument(0)->getType().isTrivial(*F))
+    unsigned numArgs = SemanticsCall->getNumArguments();
+    if (numArgs != 2 && numArgs != 3)
       return false;
-    if (!SemanticsCall->getArgument(1)->getType().isTrivial(*F))
+    if (!SemanticsCall->getArgument(0)->getType().isTrivial(*F))
+      return false;
+    if (numArgs == 3 && !SemanticsCall->getArgument(1)->getType().isTrivial(*F))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||
@@ -324,27 +328,26 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
     // Not implemented yet.
     return false;
 
-  case ArrayCallKind::kCheckSubscript: {
-    auto IsNativeArg = getArrayPropertyIsNativeTypeChecked();
-    ArraySemanticsCall IsNative(IsNativeArg,
-                                "array.props.isNativeTypeChecked", true);
-    if (!IsNative) {
-      // Do we have a constant parameter?
-      auto *SI = dyn_cast<StructInst>(IsNativeArg);
-      if (!SI)
+  case ArrayCallKind::kCheckSubscript:
+    if (SILValue IsNativeArg = getArrayPropertyIsNativeTypeChecked()) {
+      ArraySemanticsCall IsNative(IsNativeArg,
+                                  "array.props.isNativeTypeChecked", true);
+      if (!IsNative) {
+        // Do we have a constant parameter?
+        auto *SI = dyn_cast<StructInst>(IsNativeArg);
+        if (!SI)
+          return false;
+        if (!isa<IntegerLiteralInst>(SI->getOperand(0)))
+          return false;
+      } else if (!IsNative.canHoist(InsertBefore, DT))
+        // Otherwise, we must be able to hoist the function call.
         return false;
-      if (!isa<IntegerLiteralInst>(SI->getOperand(0)))
-        return false;
-    } else if (!IsNative.canHoist(InsertBefore, DT))
-      // Otherwise, we must be able to hoist the function call.
-      return false;
-
+    }
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
-  }
 
-  case ArrayCallKind::kMakeMutable: {
+  case ArrayCallKind::kMakeMutable:
+  case ArrayCallKind::kEndMutation:
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
-  }
   } // End switch.
 
   return false;
@@ -448,9 +451,8 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
         hoistOrCopySelf(SemanticsCall, InsertBefore, DT, LeaveOriginal);
 
     SILValue NewArrayProps;
-    if (Kind == ArrayCallKind::kCheckSubscript) {
+    if (SILValue IsNativeArg = getArrayPropertyIsNativeTypeChecked()) {
       // Copy the array.props argument call.
-      auto IsNativeArg = getArrayPropertyIsNativeTypeChecked();
       ArraySemanticsCall IsNative(IsNativeArg,
                                   "array.props.isNativeTypeChecked", true);
       if (!IsNative) {
@@ -492,8 +494,8 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     return Call;
   }
 
-  case ArrayCallKind::kMakeMutable: {
-    assert(!LeaveOriginal && "Copying not yet implemented");
+  case ArrayCallKind::kMakeMutable:
+  case ArrayCallKind::kEndMutation: {
     // Hoist the call.
     auto Call = hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
     return Call;
@@ -515,14 +517,15 @@ void swift::ArraySemanticsCall::removeCall() {
 
   switch (getKind()) {
   default: break;
-  case ArrayCallKind::kCheckSubscript: {
-    // Remove all uses with the empty tuple ().
-    auto EmptyDep = SILBuilderWithScope(SemanticsCall)
-                        .createStruct(SemanticsCall->getLoc(),
-                                      SemanticsCall->getType(), {});
-    SemanticsCall->replaceAllUsesWith(EmptyDep);
-  }
-  break;
+  case ArrayCallKind::kCheckSubscript:
+    if (!SemanticsCall->getType().isVoid()){
+      // Remove all uses with the empty tuple ().
+      auto EmptyDep = SILBuilderWithScope(SemanticsCall)
+                          .createStruct(SemanticsCall->getLoc(),
+                                        SemanticsCall->getType(), {});
+      SemanticsCall->replaceAllUsesWith(EmptyDep);
+    }
+    break;
   case ArrayCallKind::kGetElement: {
     // Remove the matching isNativeTypeChecked and check_subscript call.
     ArraySemanticsCall IsNative(getTypeCheckedArgument(),
@@ -552,11 +555,13 @@ SILValue
 swift::ArraySemanticsCall::getArrayPropertyIsNativeTypeChecked() const {
   switch (getKind()) {
     case ArrayCallKind::kCheckSubscript:
-      return SemanticsCall->getArgument(1);
+      if (SemanticsCall->getNumArguments() == 3)
+        return SemanticsCall->getArgument(1);
+      return SILValue();
     case ArrayCallKind::kGetElement:
       return getTypeCheckedArgument();
     default:
-      llvm_unreachable("Must have an array.props argument");
+      return SILValue();
   }
 }
 
@@ -569,6 +574,7 @@ bool swift::ArraySemanticsCall::doesNotChangeArray() const {
     case ArrayCallKind::kGetCount:
     case ArrayCallKind::kGetCapacity:
     case ArrayCallKind::kGetElement:
+    case ArrayCallKind::kEndMutation:
       return true;
   }
 }
@@ -750,8 +756,10 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
       ReserveFnRef->getType().castTo<SILFunctionType>();
     assert(ReserveFnTy->getNumParameters() == 2);
     StructType *IntType =
-      ReserveFnTy->getParameters()[0].getArgumentType(F->getModule(), ReserveFnTy)
-                 ->castTo<StructType>();
+        ReserveFnTy->getParameters()[0]
+            .getArgumentType(F->getModule(), ReserveFnTy,
+                             Builder.getTypeExpansionContext())
+            ->castTo<StructType>();
     StructDecl *IntDecl = IntType->getDecl();
     VarDecl *field = IntDecl->getStoredProperties()[0];
     SILType BuiltinIntTy =SILType::getPrimitiveObjectType(

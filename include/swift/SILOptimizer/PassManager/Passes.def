@@ -120,6 +120,8 @@ PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies")
+PASS(COWOpts, "cow-opts",
+     "Optimize COW operations")
 PASS(Differentiation, "differentiation",
      "Automatic Differentiation")
 PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
@@ -152,6 +154,9 @@ PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Constants Propagation for Diagnostics")
+PASS(DifferentiabilityWitnessDevirtualizer,
+     "differentiability-witness-devirtualizer",
+     "Inlines Differentiability Witnesses")
 PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
@@ -257,6 +262,8 @@ PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
      "Eliminate dead temporary allocations after diagnostics")
 PASS(RedundantPhiElimination, "redundant-phi-elimination",
      "Redundant Phi Block Argument Elimination")
+PASS(PhiExpansion, "phi-expansion",
+     "Replace Phi arguments by their only used field")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
@@ -311,6 +318,8 @@ PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
 PASS(OwnershipDumper, "ownership-dumper",
      "Print Ownership information for Testing")
+PASS(OwnershipVerifierTextualErrorDumper, "ownership-verifier-textual-error-dumper",
+     "Run ownership verification on all functions, emitting FileCheck-able textual errors instead of asserting")
 PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
@@ -331,7 +340,9 @@ PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
-PASS_RANGE(AllPasses, AADumper, BugReducerTester)
+PASS(PruneVTables, "prune-vtables",
+     "Mark class methods that do not require vtable dispatch")
+PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
 #undef IRGEN_PASS
 #undef PASS

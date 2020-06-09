@@ -46,8 +46,37 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
   getStorage().reserve(128);
 }
 
+void SyntaxParsingContext::cancelBacktrack() {
+  SyntaxParsingContext *curr = CtxtHolder;
+  while (true) {
+    curr->IsBacktracking = false;
+    if (curr == this) {
+      break;
+    }
+    curr = curr->getParent();
+  }
+}
+
 size_t SyntaxParsingContext::lookupNode(size_t LexerOffset, SourceLoc Loc) {
   if (!Enabled)
+    return 0;
+
+  // Avoid doing lookup for a previous parsed node when we are in backtracking
+  // mode. This is because if the parser library client give us a node pointer
+  // and we discard it due to backtracking then we are violating this invariant:
+  //
+  //   The parser guarantees that any \c swiftparse_client_node_t, given to the
+  //   parser by \c swiftparse_node_handler_t or \c swiftparse_node_lookup_t,
+  //   will be returned back to the client.
+  //
+  // which will end up likely creating a memory leak for the client because
+  // the semantics is that the parser accepts ownership of the object that the
+  // node pointer represents.
+  //
+  // Note that the fact that backtracking mode is disabling incremental parse
+  // node re-use is another reason that we should keep backtracking state as
+  // minimal as possible.
+  if (isBacktracking())
     return 0;
 
   assert(getStorage().size() == Offset &&

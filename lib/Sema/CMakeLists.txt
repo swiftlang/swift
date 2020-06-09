@@ -2,6 +2,7 @@ add_swift_host_library(swiftSema STATIC
   BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
+  CSClosure.cpp
   CSGen.cpp
   CSRanking.cpp
   CSSimplify.cpp
@@ -53,7 +54,6 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckPropertyWrapper.cpp
   TypeCheckProtocol.cpp
   TypeCheckProtocolInference.cpp
-  TypeCheckREPL.cpp
   TypeCheckRequestFunctions.cpp
   TypeCheckStmt.cpp
   TypeCheckStorage.cpp

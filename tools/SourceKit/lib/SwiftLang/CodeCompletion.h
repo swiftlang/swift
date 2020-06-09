@@ -124,8 +124,7 @@ class CompletionBuilder {
   CompletionSink &sink;
   SwiftResult &current;
   bool modified = false;
-  bool isNotRecommended;
-  Completion::NotRecommendedReason notRecommendedReason;
+  Completion::ExpectedTypeRelation typeRelation;
   SemanticContextKind semanticContext;
   CodeCompletionString *completionString;
   llvm::SmallVector<char, 64> originalName;
@@ -149,11 +148,9 @@ public:
     moduleImportDepth = value;
   }
 
-  void setNotRecommended(Completion::NotRecommendedReason Reason) {
+  void setExpectedTypeRelation(Completion::ExpectedTypeRelation Relation) {
     modified = true;
-    notRecommendedReason = Reason;
-    if (Reason != Completion::NoReason)
-      isNotRecommended = true;
+    typeRelation = Relation;
   }
 
   void setSemanticContext(SemanticContextKind kind) {

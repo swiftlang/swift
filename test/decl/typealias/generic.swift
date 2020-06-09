@@ -68,7 +68,7 @@ typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
 // expected-note@-1 {{'T1' declared as parameter to type 'E'}}
 // expected-note@-2 {{'T2' declared as parameter to type 'E'}}
 
-typealias F<T1, T2> = (T1) -> T2 // expected-note {{'T1' declared as parameter to type 'F'}}
+typealias F<T1, T2> = (T1) -> T2
 
 // Type alias of type alias.
 typealias G<S1, S2> = A<S1, S2>
@@ -94,7 +94,7 @@ let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
-let _ : F = { a in a } // expected-error {{generic parameter 'T1' could not be inferred}}
+let _ : F = { a in a } // expected-error {{unable to infer type of a closure parameter 'a' in the current context}}
 
 _ = MyType(a: "foo", b: 42)
 _ = A(a: "foo", b: 42)
@@ -303,7 +303,7 @@ extension A {}
 
 extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
 extension A<Float,Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
-extension C<T> {}  // expected-error {{use of undeclared type 'T'}}
+extension C<T> {}  // expected-error {{cannot find type 'T' in scope}}
 extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
 
 

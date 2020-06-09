@@ -402,7 +402,7 @@ static bool tryRewriteToPartialApplyStack(
   // instruction from the memoized map.
   auto saveDeleteInst = [&](SILInstruction *i) {
     if (&*advanceIfDelete == i)
-      advanceIfDelete++;
+      ++advanceIfDelete;
     memoized.erase(i);
     i->eraseFromParent();
   };
@@ -1003,7 +1003,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     if (fixupClosureLifetimes(*getFunction(), checkStackNesting, modifiedCFG)) {
       if (checkStackNesting){
         StackNesting sn;
-        modifiedCFG =
+        modifiedCFG |=
             sn.correctStackNesting(getFunction()) == StackNesting::Changes::CFG;
       }
       if (modifiedCFG)

@@ -801,7 +801,7 @@ extension _StringObject {
     _internalInvariant(largeFastIsShared)
 #if _runtime(_ObjC)
     if largeIsCocoa {
-      return _cocoaASCIIPointer(cocoaObject)._unsafelyUnwrappedUnchecked
+      return stableCocoaASCIIPointer(cocoaObject)._unsafelyUnwrappedUnchecked
     }
 #endif
 
@@ -855,6 +855,14 @@ extension _StringObject {
     _internalInvariant(largeIsCocoa && !isImmortal)
     return Builtin.reinterpretCast(largeAddressBits)
 #endif
+  }
+
+  @_alwaysEmitIntoClient
+  @inlinable
+  @inline(__always)
+  internal var owner: AnyObject? {
+    guard self.isMortal else { return nil }
+    return Builtin.reinterpretCast(largeAddressBits)
   }
 }
 

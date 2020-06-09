@@ -154,17 +154,17 @@ public:
     }
 
     if (BAI->getAccessKind() == SILAccessKind::Read)
-      Reads++;
+      ++Reads;
     else
-      NonReads++;
+      ++NonReads;
   }
 
   /// Decrement the count for given access.
   void endAccess(EndAccessInst *EAI) {
     if (EAI->getBeginAccess()->getAccessKind() == SILAccessKind::Read)
-      Reads--;
+      --Reads;
     else
-      NonReads--;
+      --NonReads;
 
     // If all open accesses are now ended, forget the location of the
     // first access.
@@ -886,17 +886,15 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
       });
   }
 
-  if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-    // Record calls to swap() for potential Fix-Its.
-    if (isCallToStandardLibrarySwap(AI, I.getFunction()->getASTContext()))
-      State.CallsToSwap.push_back(AI);
-    else
-      checkForViolationAtApply(AI, State);
-    return;
-  }
-
-  if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
-    checkForViolationAtApply(TAI, State);
+  if (auto apply = FullApplySite::isa(&I)) {
+    if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+      // Record calls to swap() for potential Fix-Its.
+      if (isCallToStandardLibrarySwap(AI, I.getFunction()->getASTContext())) {
+        State.CallsToSwap.push_back(AI);
+        return;
+      }
+    }
+    checkForViolationAtApply(apply, State);
     return;
   }
 

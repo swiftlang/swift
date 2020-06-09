@@ -50,6 +50,13 @@ extension Point {
     self.x = xx // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
     self.y = 0 // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+
+  // Test failable initializer.
+  init?(p: Point) {
+    if p.x > 0 {
+      self = p
+    }
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 extension GenericPoint {

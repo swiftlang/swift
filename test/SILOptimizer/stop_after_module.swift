@@ -19,5 +19,5 @@ public func caller() {
   _blackHole(inlinableFunction(20))
 }
 
-// NOTSKIPPING: *** SIL function after {{.*}}, stage MidLevel, pass {{.*}}: PerfInliner (inline)
-// SKIPPING-NOT: *** SIL function after {{.*}}, stage MidLevel, pass {{.*}}: PerfInliner (inline)
+// NOTSKIPPING: *** SIL function after {{.*}}, stage MidLevel,Function, pass {{.*}}: PerfInliner (inline)
+// SKIPPING-NOT: *** SIL function after {{.*}}, stage MidLevel,Function, pass {{.*}}: PerfInliner (inline)

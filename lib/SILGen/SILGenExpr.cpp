@@ -519,6 +519,8 @@ namespace {
                                  MakeTemporarilyEscapableExpr *E, SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
+    RValue visitPropertyWrapperValuePlaceholderExpr(
+        PropertyWrapperValuePlaceholderExpr *E, SGFContext C);
 
     RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
@@ -715,11 +717,12 @@ SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
 
 namespace {
 
-/// This is a simple cleanup class that is only meant to help with delegating
-/// initializers. Specifically, if the delegating initializer fails to consume
-/// the loaded self, we want to write back self into the slot to ensure that
-/// ownership is preserved.
-struct DelegateInitSelfWritebackCleanup : Cleanup {
+/// This is a simple cleanup class that at the end of a lexical scope consumes
+/// an owned value by writing it back to memory. The user can forward this
+/// cleanup to take ownership of the value and thus prevent it form being
+/// written back.
+struct OwnedValueWritebackCleanup final : Cleanup {
+  using Flags = Cleanup::Flags;
 
   /// We store our own loc so that we can ensure that DI ignores our writeback.
   SILLocation loc;
@@ -727,9 +730,14 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
   SILValue lvalueAddress;
   SILValue value;
 
-  DelegateInitSelfWritebackCleanup(SILLocation loc, SILValue lvalueAddress,
-                                   SILValue value)
+  OwnedValueWritebackCleanup(SILLocation loc, SILValue lvalueAddress,
+                             SILValue value)
       : loc(loc), lvalueAddress(lvalueAddress), value(value) {}
+
+  bool getWritebackBuffer(function_ref<void(SILValue)> func) override {
+    func(lvalueAddress);
+    return true;
+  }
 
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
     SILValue valueToStore = value;
@@ -747,14 +755,13 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
                                                   lvalueObjTy);
     }
 
-    auto &lowering = SGF.B.getTypeLowering(lvalueAddress->getType());
-    lowering.emitStore(SGF.B, loc, valueToStore, lvalueAddress,
-                       StoreOwnershipQualifier::Init);
+    SGF.B.emitStoreValueOperation(loc, valueToStore, lvalueAddress,
+                                  StoreOwnershipQualifier::Init);
   }
 
   void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
-    llvm::errs() << "SimpleWritebackCleanup "
+    llvm::errs() << "OwnedValueWritebackCleanup "
                  << "State:" << getState() << "\n"
                  << "lvalueAddress:" << lvalueAddress << "value:" << value
                  << "\n";
@@ -764,10 +771,9 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
 
 } // end anonymous namespace
 
-CleanupHandle SILGenFunction::enterDelegateInitSelfWritebackCleanup(
+CleanupHandle SILGenFunction::enterOwnedValueWritebackCleanup(
     SILLocation loc, SILValue address, SILValue newValue) {
-  Cleanups.pushCleanup<DelegateInitSelfWritebackCleanup>(loc, address,
-                                                         newValue);
+  Cleanups.pushCleanup<OwnedValueWritebackCleanup>(loc, address, newValue);
   return Cleanups.getTopCleanup();
 }
 
@@ -813,8 +819,8 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
     // Forward our initial value for init delegation self and create a new
     // cleanup that performs a writeback at the end of lexical scope if our
     // value is not consumed.
-    InitDelegationSelf = ManagedValue(
-        self, enterDelegateInitSelfWritebackCleanup(*InitDelegationLoc, addr, self));
+    InitDelegationSelf = ManagedValue::forExclusivelyBorrowedOwnedObjectRValue(
+        self, enterOwnedValueWritebackCleanup(*InitDelegationLoc, addr, self));
     InitDelegationSelfBox = addr;
     return RValue(*this, loc, refType, InitDelegationSelf);
   }
@@ -1303,7 +1309,7 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   if (inExclusiveBorrowSelfSection(SGF.SelfInitDelegationState)) {
     if (auto *dre = dyn_cast<DeclRefExpr>(E->getSubExpr())) {
       if (isa<ParamDecl>(dre->getDecl()) &&
-          dre->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
+          dre->getDecl()->getName() == SGF.getASTContext().Id_self &&
           dre->getDecl()->isImplicit()) {
         return visitDerivedToBaseExprOfSelf(SGF, dre, E, C);
       }
@@ -2107,10 +2113,11 @@ ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
   // Reactivate the result cleanup.
-  auto result = varargs.getArray();
-  if (result.hasCleanup())
-    SGF.Cleanups.setCleanupState(result.getCleanup(), CleanupState::Active);
-  return result;
+  auto array = varargs.getArray();
+  if (array.hasCleanup())
+    SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Active);
+
+  return SGF.emitUninitializedArrayFinalization(loc, array.forward(SGF));
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
@@ -2371,7 +2378,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
     if (inExclusiveBorrowSelfSection(SelfInitDelegationState)) {
       if (auto *dre = dyn_cast<DeclRefExpr>(baseExpr)) {
         if (isa<ParamDecl>(dre->getDecl()) &&
-            dre->getDecl()->getFullName() == getASTContext().Id_self &&
+            dre->getDecl()->getName() == getASTContext().Id_self &&
             dre->getDecl()->isImplicit()) {
           return emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
               *this, loc, dre, metaTy);
@@ -2407,22 +2414,15 @@ RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   return visit(E->getClosureBody(), C);
 }
 
-static OpaqueValueExpr *opaqueValueExprToSubstituteForAutoClosure(
-    const AbstractClosureExpr *e) {
-  // When we find an autoclosure that just calls an opaque closure,
-  // this is a case where we've created the opaque closure as a
-  // stand-in for the autoclosure itself. Such an opaque closure is
-  // created when we have a property wrapper's 'init(wrappedValue:)'
-  // taking an autoclosure argument.
+/// Returns the wrapped value placeholder that is meant to be substituted
+/// in for the given autoclosure. This autoclosure placeholder is created
+/// when \c init(wrappedValue:) takes an autoclosure for the \c wrappedValue
+/// parameter.
+static PropertyWrapperValuePlaceholderExpr *
+wrappedValueAutoclosurePlaceholder(const AbstractClosureExpr *e) {
   if (auto ace = dyn_cast<AutoClosureExpr>(e)) {
     if (auto ce = dyn_cast<CallExpr>(ace->getSingleExpressionBody())) {
-      if (auto ove = dyn_cast<OpaqueValueExpr>(ce->getFn())) {
-        if (!ace->isImplicit() || !ove->isImplicit() || !ove->isPlaceholder())
-          return nullptr;
-
-        if (ace->getType()->isEqual(ove->getType()))
-          return ove;
-      }
+      return dyn_cast<PropertyWrapperValuePlaceholderExpr>(ce->getFn());
     }
   }
   return nullptr;
@@ -2430,8 +2430,8 @@ static OpaqueValueExpr *opaqueValueExprToSubstituteForAutoClosure(
 
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
-  if (auto ove = opaqueValueExprToSubstituteForAutoClosure(e))
-    return visitOpaqueValueExpr(ove, C);
+  if (auto *placeholder = wrappedValueAutoclosurePlaceholder(e))
+    return visitPropertyWrapperValuePlaceholderExpr(placeholder, C);
 
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
@@ -2777,9 +2777,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
   auto entry = thunk->begin();
   auto resultArgTy = signature->getSingleResult().getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.F.getTypeExpansionContext());
   auto baseArgTy = signature->getParameters()[0].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.F.getTypeExpansionContext());
   if (genericEnv) {
     resultArgTy = genericEnv->mapTypeIntoContext(SGM.M, resultArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -2789,7 +2789,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   SILValue indexPtrArg;
   if (!indexes.empty()) {
     auto indexArgTy = signature->getParameters()[1].getSILStorageType(
-        SGM.M, signature);
+        SGM.M, signature, subSGF.F.getTypeExpansionContext());
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
   
@@ -2927,9 +2927,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   auto entry = thunk->begin();
   auto valueArgTy = signature->getParameters()[0].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.getTypeExpansionContext());
   auto baseArgTy = signature->getParameters()[1].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.getTypeExpansionContext());
   if (genericEnv) {
     valueArgTy = genericEnv->mapTypeIntoContext(SGM.M, valueArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -2940,7 +2940,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   if (!indexes.empty()) {
     auto indexArgTy = signature->getParameters()[2].getSILStorageType(
-        SGM.M, signature);
+        SGM.M, signature, subSGF.getTypeExpansionContext());
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
 
@@ -3094,10 +3094,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
-    auto lhsPtr =
-      entry->createFunctionArgument(params[0].getSILStorageType(SGM.M, signature));
-    auto rhsPtr =
-      entry->createFunctionArgument(params[1].getSILStorageType(SGM.M, signature));
+    auto lhsPtr = entry->createFunctionArgument(params[0].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
+    auto rhsPtr = entry->createFunctionArgument(params[1].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
 
     Scope scope(subSGF, loc);
 
@@ -3269,8 +3269,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
-    auto indexPtr = entry->createFunctionArgument(
-                                params[0].getSILStorageType(SGM.M, signature));
+    auto indexPtr = entry->createFunctionArgument(params[0].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
 
     SILValue hashCode;
 
@@ -4104,8 +4104,6 @@ static bool isVerbatimNullableTypeInC(SILModule &M, Type ty) {
 
   // Other types like UnsafePointer can also be nullable.
   const DeclContext *DC = M.getAssociatedContext();
-  if (!DC)
-    DC = M.getSwiftModule();
   ty = OptionalType::get(ty);
   return ty->isTriviallyRepresentableIn(ForeignLanguage::C, DC);
 }
@@ -5141,6 +5139,11 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   return RValue(SGF, E, SGF.manageOpaqueValue(value, E, C));
 }
 
+RValue RValueEmitter::visitPropertyWrapperValuePlaceholderExpr(
+    PropertyWrapperValuePlaceholderExpr *E, SGFContext C) {
+  return visitOpaqueValueExpr(E->getOpaqueValuePlaceholder(), C);
+}
+
 ProtocolDecl *SILGenFunction::getPointerProtocol() {
   if (SGM.PointerProtocol)
     return *SGM.PointerProtocol;
@@ -5449,7 +5452,8 @@ RValue RValueEmitter::visitDifferentiableFunctionExpr(
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   auto *diffFunc = SGF.B.createDifferentiableFunction(
-      E, destTy->getDifferentiabilityParameterIndices(), origFunc.forward(SGF));
+      E, destTy->getDifferentiabilityParameterIndices(),
+      destTy->getDifferentiabilityResultIndices(), origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 

@@ -497,7 +497,7 @@ public:
   buildPatternAndVariable(Expr *InitExpr) {
     SmallString<16> NameBuf;
     (Twine("pctmp") + Twine(TmpNameIndex)).toVector(NameBuf);
-    TmpNameIndex++;
+    ++TmpNameIndex;
 
     Expr *MaybeLoadInitExpr = nullptr;
 
@@ -516,7 +516,7 @@ public:
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
-    NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/ true);
+    NamedPattern *NP = NamedPattern::createImplicit(Context, VD);
     PatternBindingDecl *PBD = PatternBindingDecl::createImplicit(
         Context, StaticSpellingKind::None, NP, MaybeLoadInitExpr, TypeCheckDC);
 
@@ -547,10 +547,11 @@ public:
     }
 
     std::pair<unsigned, unsigned> StartLC =
-        Context.SourceMgr.getLineAndColumn(SR.Start);
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(SR.Start);
 
-    std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
-        Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
+    std::pair<unsigned, unsigned> EndLC =
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(
+            Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
     Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
     Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
@@ -575,7 +576,7 @@ public:
         Context, BeforeLoggerRef, ArgsWithSourceRange, ArgLabels);
     Added<ApplyExpr *> AddedBeforeLogger(BeforeLoggerCall);
     if (!doTypeCheck(Context, TypeCheckDC, AddedBeforeLogger)) {
-      // typically due to 'use of unresolved identifier '__builtin_pc_before''
+      // typically due to 'cannot find '__builtin_pc_before' in scope'
       return E; // return E, it will be used in recovering from TC failure
     }
 
@@ -587,7 +588,7 @@ public:
         Context, AfterLoggerRef, ArgsWithSourceRange, ArgLabels);
     Added<ApplyExpr *> AddedAfterLogger(AfterLoggerCall);
     if (!doTypeCheck(Context, TypeCheckDC, AddedAfterLogger)) {
-      // typically due to 'use of unresolved identifier '__builtin_pc_after''
+      // typically due to 'cannot find '__builtin_pc_after' in scope'
       return E; // return E, it will be used in recovering from TC failure
     }
 
@@ -617,10 +618,11 @@ public:
     }
 
     std::pair<unsigned, unsigned> StartLC =
-        Context.SourceMgr.getLineAndColumn(SR.Start);
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(SR.Start);
 
-    std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
-        Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
+    std::pair<unsigned, unsigned> EndLC =
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(
+            Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
     Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
     Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);

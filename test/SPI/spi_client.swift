@@ -21,7 +21,7 @@
 // Use as SPI
 publicFunc()
 spiFunc()
-internalFunc() // expected-error {{use of unresolved identifier}}
+internalFunc() // expected-error {{cannot find 'internalFunc' in scope}}
 
 let c = SPIClass()
 c.spiMethod()
@@ -47,7 +47,7 @@ ps.spiMethod()
 ps.spiVar = "write"
 print(ps.spiVar)
 
-otherApiFunc() // expected-error {{use of unresolved identifier}}
+otherApiFunc() // expected-error {{cannot find 'otherApiFunc' in scope}}
 
 public func publicUseOfSPI(param: SPIClass) -> SPIClass {} // expected-error 2{{cannot use class 'SPIClass' here; it is an SPI imported from 'SPIHelper'}}
 // expected-error@-1 {{function cannot be declared public because its parameter uses an '@_spi' type}}

@@ -71,6 +71,9 @@ TYPE("tbd",                 TBD,                       "tbd",             "")
 // Swift section of the internal wiki.
 TYPE("module-trace",        ModuleTrace,               "trace.json",      "")
 
+// Complete dependency information for the given Swift files as JSON.
+TYPE("json-dependencies",   JSONDependencies,          "dependencies.json",      "")
+
 TYPE("index-data",          IndexData,                 "",                "")
 TYPE("yaml-opt-record",     YAMLOptRecord,             "opt.yaml",        "")
 TYPE("bitstream-opt-record",BitstreamOptRecord,        "opt.bitstream",   "")

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // import Foundation
-import _SwiftDispatchOverlayShims
+@_implementationOnly import _SwiftDispatchOverlayShims
 
 extension DispatchSourceProtocol {
 	public typealias DispatchSourceHandler = @convention(block) () -> Void

@@ -20,15 +20,15 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/LLVMContext.h"
+#include "llvm/Support/ManagedStatic.h"
 #include <tuple>
+
 using namespace swift;
 
 struct BuiltinExtraInfoTy {
@@ -45,13 +45,13 @@ bool BuiltinInfo::isReadNone() const {
   return strchr(BuiltinExtraInfo[(unsigned)ID].Attributes, 'n') != nullptr;
 }
 
-bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
+const llvm::AttributeList &
+IntrinsicInfo::getOrCreateAttributes(ASTContext &Ctx) const {
   using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeList>;
   if (DenseMapInfo::isEqual(Attrs, DenseMapInfo::getEmptyKey())) {
-    // FIXME: We should not be relying on the global LLVM context.
-    Attrs = llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
+    Attrs = llvm::Intrinsic::getAttributes(Ctx.getIntrinsicScratchContext(), ID);
   }
-  return Attrs.hasFnAttribute(Kind);
+  return Attrs;
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -195,7 +195,7 @@ getBuiltinGenericFunction(Identifier Id,
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
   SmallVector<ParamDecl*, 4> params;
-  for (unsigned i = 0, e = ArgParamTypes.size(); i < e; i++) {
+  for (unsigned i = 0, e = ArgParamTypes.size(); i < e; ++i) {
     auto paramIfaceType = ArgParamTypes[i].getPlainType();
     auto specifier =
       ParamDecl::getParameterSpecifierForValueOwnership(
@@ -431,12 +431,25 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
 
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
-                                          unsigned numParameters) {
+                                          unsigned numParameters,
+                                          bool isAnyObject) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
 
   SmallVector<GenericTypeParamDecl*, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
     genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i));
+
+
+  if (isAnyObject) {
+    CanType ao = ctx.getAnyObjectType();
+    SmallVector<RequirementRepr, 1> req;
+    req.push_back(RequirementRepr::getTypeConstraint(TypeLoc::withoutLoc(genericParams[0]->getInterfaceType()), SourceLoc(),
+      TypeLoc::withoutLoc(ao)));
+
+    auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
+                                              SourceLoc(), req, SourceLoc());
+    return paramList;
+  }
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
@@ -460,9 +473,10 @@ namespace {
     SmallVector<Requirement, 2> addedRequirements;
 
   public:
-    BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
+    BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1,
+                           bool isAnyObject = false)
         : Context(ctx) {
-      TheGenericParamList = getGenericParams(ctx, numGenericParams);
+      TheGenericParamList = getGenericParams(ctx, numGenericParams, isAnyObject);
       for (auto gp : TheGenericParamList->getParams()) {
         genericParamTypes.push_back(
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
@@ -642,6 +656,14 @@ static ValueDecl *getIsUniqueOperation(ASTContext &Context, Identifier Id) {
   BuiltinFunctionBuilder builder(Context);
   builder.addParameter(makeGenericParam(), ValueOwnership::InOut);
   builder.setResult(makeConcrete(Int1Ty));
+  return builder.build(Id);
+}
+
+static ValueDecl *getEndCOWMutation(ASTContext &Context, Identifier Id) {
+  // <T> (@inout T) -> ()
+  BuiltinFunctionBuilder builder(Context);
+  builder.addParameter(makeGenericParam(), ValueOwnership::InOut);
+  builder.setResult(makeConcrete(TupleType::getEmpty(Context)));
   return builder.build(Id);
 }
 
@@ -905,6 +927,16 @@ static ValueDecl *getValueToBridgeObject(ASTContext &C, Identifier Id) {
   BuiltinFunctionBuilder builder(C);
   builder.addParameter(makeGenericParam(0));
   builder.setResult(makeConcrete(C.TheBridgeObjectType));
+  return builder.build(Id);
+}
+
+static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
+  // <T : AnyObject> T -> T
+  //
+  BuiltinFunctionBuilder builder(C, 1, true);
+  auto T = makeGenericParam();
+  builder.addParameter(T);
+  builder.setResult(T);
   return builder.build(Id);
 }
 
@@ -1824,8 +1856,9 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
   }
   
   // Translate LLVM function attributes to Swift function attributes.
-  llvm::AttributeList attrs =
-      llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
+  IntrinsicInfo II;
+  II.ID = ID;
+  auto attrs = II.getOrCreateAttributes(Context);
   if (attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
@@ -1971,11 +2004,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
     // Accept weak, volatile, and singlethread if present.
     if (NextPart != Parts.end() && *NextPart == "weak")
-      NextPart++;
+      ++NextPart;
     if (NextPart != Parts.end() && *NextPart == "volatile")
-      NextPart++;
+      ++NextPart;
     if (NextPart != Parts.end() && *NextPart == "singlethread")
-      NextPart++;
+      ++NextPart;
     // Nothing else is allowed in the name.
     if (NextPart != Parts.end())
       return nullptr;
@@ -2248,8 +2281,15 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::IsUnique:
   case BuiltinValueKind::IsUnique_native:
+  case BuiltinValueKind::BeginCOWMutation:
+  case BuiltinValueKind::BeginCOWMutation_native:
     if (!Types.empty()) return nullptr;
+    // BeginCOWMutation has the same signature as IsUnique.
     return getIsUniqueOperation(Context, Id);
+
+  case BuiltinValueKind::EndCOWMutation:
+    if (!Types.empty()) return nullptr;
+    return getEndCOWMutation(Context, Id);
 
   case BuiltinValueKind::BindMemory:
     if (!Types.empty()) return nullptr;
@@ -2379,6 +2419,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty())
       return nullptr;
     return getValueToBridgeObject(Context, Id);
+
+  case BuiltinValueKind::COWBufferForReading:
+    return getCOWBufferForReading(Context, Id);
+
   case BuiltinValueKind::UnsafeGuaranteed:
     return getUnsafeGuaranteed(Context, Id);
 

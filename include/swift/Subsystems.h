@@ -21,9 +21,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/Version.h"
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Mutex.h"
@@ -48,6 +46,7 @@ namespace swift {
   class DiagnosticEngine;
   class Evaluator;
   class FileUnit;
+  class GeneratedModule;
   class GenericEnvironment;
   class GenericParamList;
   class IRGenOptions;
@@ -58,7 +57,6 @@ namespace swift {
   class SerializationOptions;
   class SILOptions;
   class SILModule;
-  class SILParserTUState;
   class SourceFile;
   enum class SourceFileKind;
   class SourceManager;
@@ -67,23 +65,12 @@ namespace swift {
   class Token;
   class TopLevelContext;
   class TypeCheckerOptions;
-  struct TypeLoc;
+  class TypeLoc;
   class UnifiedStatsReporter;
 
   namespace Lowering {
     class TypeConverter;
   }
-
-  /// Used to optionally maintain SIL parsing context for the parser.
-  ///
-  /// When not parsing SIL, this has no overhead.
-  class SILParserState {
-  public:
-    std::unique_ptr<SILParserTUState> Impl;
-
-    explicit SILParserState(SILModule *M);
-    ~SILParserState();
-  };
 
   /// @{
 
@@ -101,9 +88,6 @@ namespace swift {
   void verify(Decl *D);
 
   /// @}
-
-  /// Parse a source file's SIL declarations into a given SIL module.
-  void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);
 
   /// Finish the code completion.
   void performCodeCompletionSecondPass(SourceFile &SF,
@@ -140,7 +124,7 @@ namespace swift {
   void performPCMacro(SourceFile &SF);
 
   /// Bind all 'extension' visible from \p SF to the extended nominal.
-  void bindExtensions(SourceFile &SF);
+  void bindExtensions(ModuleDecl &mod);
 
   /// Once import resolution is complete, this walks the AST to resolve types
   /// and diagnose problems therein.
@@ -154,14 +138,6 @@ namespace swift {
   /// provide a somewhat defined order in which diagnostics should be
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
-
-  /// Checks to see if any of the imports in \p M use `@_implementationOnly` in
-  /// one file and not in another.
-  ///
-  /// Like redeclaration checking, but for imports. This isn't part of
-  /// swift::performWholeModuleTypeChecking because it's linear in the number
-  /// of declarations in the module.
-  void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
 
   /// Recursively validate the specified type.
   ///
@@ -195,13 +171,13 @@ namespace swift {
   /// The module must contain source files. The optimizer will assume that the
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
-                       const SILOptions &options);
+  performASTLowering(ModuleDecl *M, Lowering::TypeConverter &TC,
+                     const SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
-                       const SILOptions &options);
+  performASTLowering(FileUnit &SF, Lowering::TypeConverter &TC,
+                     const SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -230,11 +206,10 @@ namespace swift {
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
-  std::unique_ptr<llvm::Module>
+  GeneratedModule
   performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-                      llvm::LLVMContext &LLVMContext,
                       ArrayRef<std::string> parallelOutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr,
                       llvm::StringSet<> *LinkerDirectives = nullptr);
@@ -242,12 +217,11 @@ namespace swift {
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
-  std::unique_ptr<llvm::Module>
+  GeneratedModule
   performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       StringRef PrivateDiscriminator,
-                      llvm::LLVMContext &LLVMContext,
                       llvm::GlobalVariable **outModuleHash = nullptr,
                       llvm::StringSet<> *LinkerDirectives = nullptr);
 
@@ -289,9 +263,7 @@ namespace swift {
                    UnifiedStatsReporter *Stats);
 
   /// Dump YAML describing all fixed-size types imported from the given module.
-  bool performDumpTypeInfo(const IRGenOptions &Opts,
-                           SILModule &SILMod,
-                           llvm::LLVMContext &LLVMContext);
+  bool performDumpTypeInfo(const IRGenOptions &Opts, SILModule &SILMod);
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>

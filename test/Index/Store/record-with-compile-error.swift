@@ -5,5 +5,5 @@
 // CHECK: function/Swift | test1() | [[TEST1_FUNC:.*]] | <no-cgname> | Def
 // CHECK: [[@LINE+1]]:6 | function/Swift | [[TEST1_FUNC]]
 func test1() {
-  unresolved() // expected-error {{use of unresolved identifier}}
+  unresolved() // expected-error {{cannot find 'unresolved' in scope}}
 }

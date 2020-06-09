@@ -1,3 +1,5 @@
+// REQUIRES: VENDOR=apple
+
 // RUN: %empty-directory(%t.module-cache)
 // RUN: %api-digester -dump-sdk -module Foo -o %t.dump1.json -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %S/Inputs/Foo -avoid-location
 // RUN: %api-digester -dump-sdk -module Foo -o %t.dump2.json -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %S/Inputs/Foo-new-version -avoid-location

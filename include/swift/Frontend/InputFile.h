@@ -17,7 +17,6 @@
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <string>
-#include <vector>
 
 namespace swift {
 
@@ -25,7 +24,6 @@ enum class InputFileKind {
   None,
   Swift,
   SwiftLibrary,
-  SwiftREPL,
   SwiftModuleInterface,
   SIL,
   LLVM

@@ -89,10 +89,10 @@ bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
           imported, importFilter);
 
       for (auto IM : imported) {
-        if (auto clangModule = IM.second->findUnderlyingClangModule())
+        if (auto clangModule = IM.importedModule->findUnderlyingClangModule())
           Modules.insert(getTopLevelName(clangModule));
         else
-          assert(IM.second->isStdlibModule() &&
+          assert(IM.importedModule->isStdlibModule() &&
                  "unexpected non-stdlib swift module");
       }
     }

@@ -1,5 +1,5 @@
-from Child import Child
-from Node import Node  # noqa: I201
+from .Child import Child
+from .Node import Node  # noqa: I201
 
 GENERIC_NODES = [
     # generic-where-clause -> 'where' requirement-list

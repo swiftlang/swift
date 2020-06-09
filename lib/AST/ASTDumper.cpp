@@ -164,6 +164,23 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out, /*AsWritten=*/true);
 }
 
+static void printTrailingRequirements(ASTPrinter &Printer,
+                                      ArrayRef<RequirementRepr> Reqs,
+                                      bool printWhereKeyword) {
+  if (Reqs.empty()) return;
+
+  if (printWhereKeyword)
+    Printer << " where ";
+  interleave(
+      Reqs,
+      [&](const RequirementRepr &req) {
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+        req.print(Printer);
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
+      },
+      [&] { Printer << ", "; });
+}
+
 void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '<';
   interleave(*this,
@@ -176,20 +193,22 @@ void GenericParamList::print(llvm::raw_ostream &OS) const {
              },
              [&] { OS << ", "; });
 
-  if (!getRequirements().empty()) {
-    OS << " where ";
-    interleave(getRequirements(),
-               [&](const RequirementRepr &req) {
-                 req.print(OS);
-               },
-               [&] { OS << ", "; });
-  }
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(),
+                            /*printWhereKeyword*/true);
   OS << '>';
 }
 
 void GenericParamList::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
+}
+
+void TrailingWhereClause::print(llvm::raw_ostream &OS,
+                                bool printWhereKeyword) const {
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(),
+                            printWhereKeyword);
 }
 
 static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
@@ -525,12 +544,32 @@ namespace {
 
     explicit PrintDecl(raw_ostream &os, unsigned indent = 0)
       : OS(os), Indent(indent) { }
-    
+
+  private:
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
     void printRec(Expr *E) { E->dump(OS, Indent+2); }
     void printRec(Stmt *S, const ASTContext &Ctx) { S->dump(OS, &Ctx, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
     void printRec(TypeRepr *T);
+
+    void printWhereRequirements(
+        PointerUnion<const AssociatedTypeDecl *, const GenericContext *> Owner)
+        const {
+      const auto printWhere = [&](const TrailingWhereClause *Where) {
+        if (Where) {
+          OS << " where requirements: ";
+          Where->print(OS, /*printWhereKeyword*/ false);
+        }
+      };
+
+      if (const auto GC = Owner.dyn_cast<const GenericContext *>()) {
+        if (!GC->isGeneric() || isa<ProtocolDecl>(GC))
+          printWhere(GC->getTrailingWhereClause());
+      } else {
+        const auto ATD = Owner.get<const AssociatedTypeDecl *>();
+        printWhere(ATD->getTrailingWhereClause());
+      }
+    }
 
     // Print a field with a value.
     template<typename T>
@@ -569,6 +608,7 @@ namespace {
                  [&] { OS << ", "; });
     }
 
+  public:
     void visitImportDecl(ImportDecl *ID) {
       printCommon(ID, "import_decl");
 
@@ -591,18 +631,13 @@ namespace {
       printCommon(ED, "extension_decl", ExtensionColor);
       OS << ' ';
       ED->getExtendedType().print(OS);
-      printInherited(ED->getInherited());
-      for (Decl *Member : ED->getMembers()) {
-        OS << '\n';
-        printRec(Member);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(ED);
     }
 
     void printDeclName(const ValueDecl *D) {
-      if (D->getFullName()) {
+      if (D->getName()) {
         PrintWithColorRAII(OS, IdentifierColor)
-          << '\"' << D->getFullName() << '\"';
+          << '\"' << D->getName() << '\"';
       } else {
         PrintWithColorRAII(OS, IdentifierColor)
           << "'anonname=" << (const void*)D << '\'';
@@ -611,17 +646,17 @@ namespace {
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
-      PrintWithColorRAII(OS, TypeColor) << " type='";
-      if (auto underlying = TAD->getUnderlyingType()) {
+      PrintWithColorRAII(OS, TypeColor) << " type=";
+      if (auto underlying = TAD->getCachedUnderlyingType()) {
         PrintWithColorRAII(OS, TypeColor)
-          << underlying.getString();
+          << "'" << underlying.getString() << "'";
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
-      printInherited(TAD->getInherited());
-      OS << "')";
+      printWhereRequirements(TAD);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    
+
     void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
       printCommon(OTD, "opaque_type");
       OS << " naming_decl=";
@@ -662,12 +697,7 @@ namespace {
         OS << " default=";
         defaultDef.print(OS);
       }
-      if (auto whereClause = decl->getTrailingWhereClause()) {
-        OS << " where requirements: ";
-        interleave(whereClause->getRequirements(),
-                   [&](const RequirementRepr &req) { req.print(OS); },
-                   [&] { OS << ", "; });
-      }
+      printWhereRequirements(decl);
       if (decl->overriddenDeclsComputed()) {
         OS << " overridden=";
         interleave(decl->getOverriddenDecls(),
@@ -692,19 +722,7 @@ namespace {
       } else {
         OS << "<null>";
       }
-      printInherited(PD->getInherited());
-      if (auto whereClause = PD->getTrailingWhereClause()) {
-        OS << " where requirements: ";
-        interleave(whereClause->getRequirements(),
-                   [&](const RequirementRepr &req) { req.print(OS); },
-                   [&] { OS << ", "; });
-      }
-
-      for (auto VD : PD->getMembers()) {
-        OS << '\n';
-        printRec(VD);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(PD);
     }
 
     void printCommon(ValueDecl *VD, const char *Name,
@@ -778,6 +796,28 @@ namespace {
         else
           OS << " non-resilient";
       }
+    }
+
+    void printCommonPost(const IterableDeclContext *IDC) {
+      switch (IDC->getIterableContextKind()) {
+      case IterableDeclContextKind::NominalTypeDecl: {
+        const auto NTD = cast<NominalTypeDecl>(IDC);
+        printInherited(NTD->getInherited());
+        printWhereRequirements(NTD);
+        break;
+      }
+      case IterableDeclContextKind::ExtensionDecl:
+        const auto ED = cast<ExtensionDecl>(IDC);
+        printInherited(ED->getInherited());
+        printWhereRequirements(ED);
+        break;
+      }
+
+      for (Decl *D : IDC->getMembers()) {
+        OS << '\n';
+        printRec(D);
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitSourceFile(const SourceFile &SF) {
@@ -854,12 +894,7 @@ namespace {
 
     void visitEnumDecl(EnumDecl *ED) {
       printCommon(ED, "enum_decl");
-      printInherited(ED->getInherited());
-      for (Decl *D : ED->getMembers()) {
-        OS << '\n';
-        printRec(D);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(ED);
     }
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
@@ -869,24 +904,14 @@ namespace {
 
     void visitStructDecl(StructDecl *SD) {
       printCommon(SD, "struct_decl");
-      printInherited(SD->getInherited());
-      for (Decl *D : SD->getMembers()) {
-        OS << '\n';
-        printRec(D);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(SD);
     }
 
     void visitClassDecl(ClassDecl *CD) {
       printCommon(CD, "class_decl");
       if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
         OS << " @_staticInitializeObjCMetadata";
-      printInherited(CD->getInherited());
-      for (Decl *D : CD->getMembers()) {
-        OS << '\n';
-        printRec(D);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(CD);
     }
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -1089,7 +1114,7 @@ namespace {
     void visitAccessorDecl(AccessorDecl *AD) {
       printCommonFD(AD, "accessor_decl");
       OS << " " << getAccessorKindString(AD->getAccessorKind());
-      OS << "_for=" << AD->getStorage()->getFullName();
+      OS << "_for=" << AD->getStorage()->getName();
       printAbstractFunctionDecl(AD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -1204,7 +1229,7 @@ namespace {
       auto identifiers = OD->getIdentifiers();
       for (auto index : indices(identifiers)) {
         OS.indent(Indent + 2);
-        OS << "identifier #" << index << " " << identifiers[index];
+        OS << "identifier #" << index << " " << identifiers[index].Item;
         if (index != identifiers.size() - 1)
           OS << "\n";
       }
@@ -1242,13 +1267,17 @@ namespace {
 
     void visitModuleDecl(ModuleDecl *MD) {
       printCommon(MD, "module");
+
+      if (MD->isNonSwiftModule())
+        OS << " non_swift";
+      
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitMissingMemberDecl(MissingMemberDecl *MMD) {
       printCommon(MMD, "missing_member_decl ");
       PrintWithColorRAII(OS, IdentifierColor)
-          << '\"' << MMD->getFullName() << '\"';
+          << '\"' << MMD->getName() << '\"';
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
   };
@@ -1347,15 +1376,15 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::AbstractFunctionDecl:
-    printName(os, cast<AbstractFunctionDecl>(dc)->getFullName());
+    printName(os, cast<AbstractFunctionDecl>(dc)->getName());
     break;
 
   case DeclContextKind::SubscriptDecl:
-    printName(os, cast<SubscriptDecl>(dc)->getFullName());
+    printName(os, cast<SubscriptDecl>(dc)->getName());
     break;
 
   case DeclContextKind::EnumElementDecl:
-    printName(os, cast<EnumElementDecl>(dc)->getFullName());
+    printName(os, cast<EnumElementDecl>(dc)->getName());
     break;
   }
 }
@@ -1373,7 +1402,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
   os << ".";
 
   // Print name.
-  getFullName().printPretty(os);
+  getName().printPretty(os);
 
   // Print location.
   auto &srcMgr = getASTContext().SourceMgr;
@@ -1391,14 +1420,24 @@ void SourceFile::dump() const {
   dump(llvm::errs());
 }
 
-void SourceFile::dump(llvm::raw_ostream &OS) const {
+void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
+  // If we're allowed to parse the SourceFile, do so now. We need to force the
+  // parsing request as by default the dumping logic tries not to kick any
+  // requests.
+  if (parseIfNeeded)
+    (void)getTopLevelDecls();
+
   PrintDecl(OS).visitSourceFile(*this);
   llvm::errs() << '\n';
 }
 
 void Pattern::dump() const {
-  PrintPattern(llvm::errs()).visit(const_cast<Pattern*>(this));
-  llvm::errs() << '\n';
+  dump(llvm::errs());
+}
+
+void Pattern::dump(raw_ostream &OS, unsigned Indent) const {
+  PrintPattern(OS, Indent).visit(const_cast<Pattern*>(this));
+  OS << '\n';
 }
 
 //===----------------------------------------------------------------------===//
@@ -1741,15 +1780,16 @@ namespace {
 class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
   raw_ostream &OS;
-  llvm::function_ref<Type(const Expr *)> GetTypeOfExpr;
-  llvm::function_ref<Type(const TypeLoc &)> GetTypeOfTypeLoc;
-  llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> GetTypeOfKeyPathComponent;
+  llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
+  llvm::function_ref<Type(TypeLoc &)> GetTypeOfTypeLoc;
+  llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+      GetTypeOfKeyPathComponent;
   unsigned Indent;
 
-  PrintExpr(raw_ostream &os,
-            llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
-            llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
-            llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
+  PrintExpr(raw_ostream &os, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
+            llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
+            llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                getTypeOfKeyPathComponent,
             unsigned indent)
       : OS(os), GetTypeOfExpr(getTypeOfExpr),
         GetTypeOfTypeLoc(getTypeOfTypeLoc),
@@ -2462,11 +2502,7 @@ public:
     }
 
     OS << '\n';
-    if (E->hasSingleExpressionBody()) {
-      printRec(E->getSingleExpressionBody());
-    } else {
-      printRec(E->getBody(), E->getASTContext());
-    }
+    printRec(E->getBody(), E->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitAutoClosureExpr(AutoClosureExpr *E) {
@@ -2491,6 +2527,18 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << " @ " << (void*)E;
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitPropertyWrapperValuePlaceholderExpr(
+      PropertyWrapperValuePlaceholderExpr *E) {
+    printCommon(E, "property_wrapper_value_placeholder_expr");
+    OS << '\n';
+    printRec(E->getOpaqueValuePlaceholder());
+    if (auto *value = E->getOriginalWrappedValue()) {
+      OS << '\n';
+      printRec(value);
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2627,7 +2675,11 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitForceValueExpr(ForceValueExpr *E) {
-    printCommon(E, "force_value_expr") << '\n';
+    printCommon(E, "force_value_expr");
+    if (E->isForceOfImplicitlyUnwrappedOptional())
+      PrintWithColorRAII(OS, ExprModifierColor) << " implicit_iuo_unwrap";
+    OS << '\n';
+
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2663,7 +2715,7 @@ public:
       }
     }
     OS << '\n';
-    auto *TyR = E->getTypeLoc().getTypeRepr();
+    auto *TyR = E->getPlaceholderTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)
       printRec(TyR);
@@ -2819,21 +2871,19 @@ void Expr::dump() const {
   llvm::errs() << "\n";
 }
 
-void Expr::dump(raw_ostream &OS,
-                 llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
-                 llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
-                 llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
-                 unsigned Indent) const {
+void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
+                llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
+                llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                    getTypeOfKeyPathComponent,
+                unsigned Indent) const {
   PrintExpr(OS, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent, Indent)
       .visit(const_cast<Expr *>(this));
 }
 
 void Expr::dump(raw_ostream &OS, unsigned Indent) const {
-  auto getTypeOfExpr = [](const Expr *E) -> Type { return E->getType(); };
-  auto getTypeOfTypeLoc = [](const TypeLoc &TL) -> Type {
-    return TL.getType();
-  };
-  auto getTypeOfKeyPathComponent = [](const KeyPathExpr *E, unsigned index) -> Type {
+  auto getTypeOfExpr = [](Expr *E) -> Type { return E->getType(); };
+  auto getTypeOfTypeLoc = [](TypeLoc &TL) -> Type { return TL.getType(); };
+  auto getTypeOfKeyPathComponent = [](KeyPathExpr *E, unsigned index) -> Type {
     return E->getComponents()[index].getComponentType();
   };
   dump(OS, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent, Indent);
@@ -3139,7 +3189,7 @@ static void dumpProtocolConformanceRec(
         out << '\n';
         out.indent(indent + 2);
         PrintWithColorRAII(out, ParenthesisColor) << '(';
-        out << "value req=" << req->getFullName() << " witness=";
+        out << "value req=" << req->getName() << " witness=";
         if (!witness) {
           out << "(none)";
         } else if (witness.getDecl() == req) {
@@ -3298,6 +3348,13 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
 
   dumpProtocolConformanceRefRec(*this, out, indent, visited);
 }
+
+void ProtocolConformanceRef::print(llvm::raw_ostream &out) const {
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  dumpProtocolConformanceRefRec(*this, out, 0, visited);
+
+}
+
 void ProtocolConformance::dump() const {
   auto &out = llvm::errs();
   dump(out);
@@ -3441,9 +3498,10 @@ namespace {
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon(label, "type_alias_type");
       printField("decl", T->getDecl()->printRef());
-      PrintWithColorRAII(OS, TypeColor) << " underlying='";
+      PrintWithColorRAII(OS, TypeColor) << " underlying=";
       if (auto underlying = T->getSinglyDesugaredType()) {
-        PrintWithColorRAII(OS, TypeColor) << underlying->getString();
+        PrintWithColorRAII(OS, TypeColor)
+          << "'" << underlying->getString() << "'";
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }

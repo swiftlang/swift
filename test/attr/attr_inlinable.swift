@@ -9,11 +9,11 @@
 // expected-warning@-1 {{'@inlinable' declaration is already '@usableFromInline'}}
 
 private func privateFunction() {}
-// expected-note@-1{{global function 'privateFunction()' is not '@usableFromInline' or public}}
+// expected-note@-1 2{{global function 'privateFunction()' is not '@usableFromInline' or public}}
 fileprivate func fileprivateFunction() {}
 // expected-note@-1{{global function 'fileprivateFunction()' is not '@usableFromInline' or public}}
 func internalFunction() {}
-// expected-note@-1{{global function 'internalFunction()' is not '@usableFromInline' or public}}
+// expected-note@-1 2{{global function 'internalFunction()' is not '@usableFromInline' or public}}
 @usableFromInline func versionedFunction() {}
 public func publicFunction() {}
 
@@ -299,3 +299,23 @@ extension P {
   }
 }
 
+// rdar://problem/60605117
+public struct PrivateInlinableCrash {
+  @inlinable // expected-error {{'@inlinable' attribute can only be applied to public declarations, but 'formatYesNo' is private}}
+  private func formatYesNo(_ value: Bool) -> String {
+    value ? "YES" : "NO"
+  }
+}
+
+// https://bugs.swift.org/browse/SR-12404
+@inlinable public func inlinableOuterFunction() {
+  func innerFunction1(x: () = privateFunction()) {}
+  // expected-error@-1 {{global function 'privateFunction()' is private and cannot be referenced from a default argument value}}
+
+  func innerFunction2(x: () = internalFunction()) {}
+  // expected-error@-1 {{global function 'internalFunction()' is internal and cannot be referenced from a default argument value}}
+
+  func innerFunction3(x: () = versionedFunction()) {}
+
+  func innerFunction4(x: () = publicFunction()) {}
+}

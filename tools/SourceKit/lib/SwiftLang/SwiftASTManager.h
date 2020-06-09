@@ -92,7 +92,8 @@ public:
   explicit SwiftASTManager(std::shared_ptr<SwiftEditorDocumentFileMap>,
                            std::shared_ptr<GlobalConfig> Config,
                            std::shared_ptr<SwiftStatistics> Stats,
-                           StringRef RuntimeResourcePath);
+                           StringRef RuntimeResourcePath,
+                           StringRef DiagnosticDocumentationPath);
   ~SwiftASTManager();
 
   SwiftInvocationRef getInvocation(

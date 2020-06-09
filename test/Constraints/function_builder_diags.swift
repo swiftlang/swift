@@ -88,7 +88,7 @@ func testDiags() {
   tuplify(true) { _ in
     17
     for c in name { // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilder'}}
-    // expected-error@-1 {{use of unresolved identifier 'name'}}
+    // expected-error@-1 {{cannot find 'name' in scope}}
     }
   }
 
@@ -418,12 +418,12 @@ func testNonExhaustiveSwitch(e: E) {
 // rdar://problem/59856491
 struct TestConstraintGenerationErrors {
   @TupleBuilder var buildTupleFnBody: String {
-    String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+    String(nothing) // expected-error {{cannot find 'nothing' in scope}}
   }
 
   func buildTupleClosure() {
     tuplify(true) { _ in
-      String(nothing) // expected-error {{use of unresolved identifier 'nothing'}}
+      String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
   }
 }

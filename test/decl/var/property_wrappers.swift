@@ -818,11 +818,26 @@ struct TestProjectionValuePropertyAttr {
 @propertyWrapper
 struct BrokenLazy { }
 // expected-error@-1{{property wrapper type 'BrokenLazy' does not contain a non-static property named 'wrappedValue'}}
-// expected-note@-2{{'BrokenLazy' declared here}}
 
 struct S {
-  @BrokenLazy // expected-error{{struct 'BrokenLazy' cannot be used as an attribute}}
+  @BrokenLazy
   var wrappedValue: Int
+}
+
+@propertyWrapper
+struct DynamicSelfStruct {
+  var wrappedValue: Self { self } // okay
+  var projectedValue: Self { self } // okay
+}
+
+@propertyWrapper
+class DynamicSelf {
+  var wrappedValue: Self { self } // expected-error {{property wrapper wrapped value cannot have dynamic Self type}}
+  var projectedValue: Self? { self } // expected-error {{property wrapper projected value cannot have dynamic Self type}}
+}
+
+struct UseDynamicSelfWrapper {
+  @DynamicSelf() var value
 }
 
 // ---------------------------------------------------------------------------
@@ -834,15 +849,28 @@ struct WrapperWithProjectedValue<T> {
   var projectedValue: T { return wrappedValue }
 }
 
-class TestInvalidRedeclaration {
+class TestInvalidRedeclaration1 {
+
   @WrapperWithProjectedValue var i = 17
   // expected-note@-1 {{'i' previously declared here}}
-  // expected-note@-2 {{'$i' previously declared here}}
-  // expected-note@-3 {{'_i' previously declared here}}
+  // expected-note@-2 {{'$i' synthesized for property wrapper projected value}}
+  // expected-note@-3 {{'_i' synthesized for property wrapper backing storage}}
+
   @WrapperWithProjectedValue var i = 39
   // expected-error@-1 {{invalid redeclaration of 'i'}}
-  // expected-error@-2 {{invalid redeclaration of '$i'}}
-  // expected-error@-3 {{invalid redeclaration of '_i'}}
+  // expected-error@-2 {{invalid redeclaration of synthesized property '$i'}}
+  // expected-error@-3 {{invalid redeclaration of synthesized property '_i'}}
+}
+
+// SR-12839
+struct TestInvalidRedeclaration2 {
+  var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
+  @WrapperWithInitialValue var foo1 = 123 // expected-note {{'_foo1' synthesized for property wrapper backing storage}}
+}
+
+struct TestInvalidRedeclaration3 {
+  @WrapperWithInitialValue var foo1 = 123 // expected-note {{'_foo1' synthesized for property wrapper backing storage}}
+  var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
 }
 
 // ---------------------------------------------------------------------------
@@ -1938,5 +1966,10 @@ struct TestDefaultableIntWrapper {
   }
 }
 
-
-
+@propertyWrapper
+public struct NonVisibleImplicitInit {
+// expected-error@-1 {{internal initializer 'init()' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleImplicitInit' (which is public)}}
+  public var wrappedValue: Bool {
+    return false
+  }
+}

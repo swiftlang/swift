@@ -3,7 +3,7 @@
 
 final class VarInit {
   // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC018initializedWrapperE0SivpfP"
-  // CHECK-NEXT: [[@LINE+1]]:4 -> [[@LINE+1]]:38 : 0
+  // CHECK-NEXT: [[@LINE+1]]:4 -> [[@LINE+1]]:42 : 0
   @Wrapper var initializedWrapperInit = 2
 
   // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC04lazydE033_49373CB2DFB47C8DC62FA963604688DFLLSSvgSSyXEfU_"

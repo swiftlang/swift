@@ -79,7 +79,7 @@
 ///     var destBytes = someBytes[0..<n]
 ///
 /// Next, the bytes referenced by `destBytes` are copied into `byteArray`, a
-/// new `[UInt]` array, and then the remainder of `someBytes` is appended to
+/// new `[UInt8]` array, and then the remainder of `someBytes` is appended to
 /// `byteArray`:
 ///
 ///     var byteArray: [UInt8] = Array(destBytes)

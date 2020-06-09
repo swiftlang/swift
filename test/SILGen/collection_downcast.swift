@@ -239,3 +239,62 @@ func testSetDowncastBridgedConditional(_ dict: Set<NSObject>)
   // CHECK-NOT: destroy_value [[SET]]
   return dict as? Set<BridgedSwift>
 }
+
+func promote<T>(_ x: T) -> T? { nil }
+
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast36testCollectionCompatibilityCoercionsyySaySiG_SayypGSgShySSGSDySSSiGtF
+func testCollectionCompatibilityCoercions(_ arr: [Int], _ optArr: [Any]?, _ set: Set<String>, _ dict: [String: Int]) {
+  // Make sure we generate reasonable code for all of the below examples.
+
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: apply [[CAST_FN]]<Any, NSObject>({{%.+}}) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  _ = (optArr ?? []) as [NSObject]
+
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: [[RESULT:%.+]] = apply [[CAST_FN]]<Any, Optional<String>>({{%.+}}) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: enum $Optional<Array<Optional<String>>>, #Optional.some!enumelt, [[RESULT]] : $Array<Optional<String>>
+  _ = (optArr ?? []) as [String?]?
+
+  // CHECK: switch_enum {{%.+}} : $Optional<Optional<Optional<Array<Int>>>>
+  // CHECK: switch_enum {{%.+}} : $Optional<Optional<Array<Int>>>
+  // CHECK: switch_enum {{%.+}} : $Optional<Array<Int>>
+  // CHECK: bb{{[0-9]+}}([[ARR:%.+]] : @owned $Array<Int>)
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: apply [[CAST_FN]]<Int, Optional<Float>>([[ARR]]) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
+  _ = promote(promote(promote(arr))) as [Float?]
+
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss10_setUpCastyShyq_GShyxGSHRzSHR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: apply [[CAST_FN]]<String, Int>({{%.+}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
+  _ = (set ?? []) as Set<Int>
+
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss10_setUpCastyShyq_GShyxGSHRzSHR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: [[RESULT:%.+]] = apply [[CAST_FN]]<String, Optional<Float>>({{%.+}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: [[OPT_RESULT:%.+]] = enum $Optional<Set<Optional<Float>>>, #Optional.some!enumelt, [[RESULT]] : $Set<Optional<Float>>
+  // CHECK: enum $Optional<Optional<Set<Optional<Float>>>>, #Optional.some!enumelt, [[OPT_RESULT]] : $Optional<Set<Optional<Float>>>
+  _ = (set ?? []) as Set<Float?>??
+
+  // CHECK: switch_enum {{%.+}} : $Optional<Optional<Optional<Set<String>>>>
+  // CHECK: switch_enum {{%.+}} : $Optional<Optional<Set<String>>>
+  // CHECK: switch_enum {{%.+}} : $Optional<Set<String>>
+  // CHECK: bb{{[0-9]+}}([[SET:%.+]] : @owned $Set<String>)
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss10_setUpCastyShyq_GShyxGSHRzSHR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: apply [[CAST_FN]]<String, Int>([[SET]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
+  _ = promote(promote(promote(set))) as Set<Int>
+
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: apply [[CAST_FN]]<String, Int, Float, String>({{%.+}}) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  _ = (dict ?? [:]) as [Float: String]
+
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: [[RESULT:%.+]] = apply [[CAST_FN]]<String, Int, Double, Optional<Int>>({{%.+}}) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: enum $Optional<Dictionary<Double, Optional<Int>>>, #Optional.some!enumelt, [[RESULT]] : $Dictionary<Double, Optional<Int>>
+  _ = (dict ?? [:]) as [Double: Int?]?
+
+  // CHECK: switch_enum {{%.+}} : $Optional<Optional<Optional<Dictionary<String, Int>>>>
+  // CHECK: switch_enum {{%.+}} : $Optional<Optional<Dictionary<String, Int>>>
+  // CHECK: switch_enum {{%.+}} : $Optional<Dictionary<String, Int>>
+  // CHECK: bb{{[0-9]+}}([[DICT:%.+]] : @owned $Dictionary<String, Int>)
+  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: apply [[CAST_FN]]<String, Int, Int, String>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  _ = promote(promote(promote(dict))) as [Int: String]
+}

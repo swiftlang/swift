@@ -271,7 +271,9 @@ public:
     // assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on
     // call");
     assert(!isTrapIntrinsic(Callee) && "Use CreateNonMergeableTrap");
-    auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
+    auto Call = IRBuilderBase::CreateCall(
+        cast<llvm::FunctionType>(Callee->getType()->getPointerElementType()),
+        Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
   }

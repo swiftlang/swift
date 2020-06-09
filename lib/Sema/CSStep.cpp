@@ -100,7 +100,7 @@ void SplitterStep::computeFollowupSteps(
     return;
   }
 
-  if (isDebugMode()) {
+  if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
     // Verify that the constraint graph is valid.
     CG.verify();
@@ -238,7 +238,7 @@ bool SplitterStep::mergePartialSolutions() const {
       // Finalize this solution.
       auto solution = CS.finalize();
       solutionMemory += solution.getTotalMemory();
-      if (isDebugMode())
+      if (CS.isDebugMode())
         getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
 
       // Save this solution.
@@ -260,7 +260,7 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
   // "split" is considered a failure if previous step failed,
   // or there is a failure recorded by constraint system, or
   // system can't be simplified.
-  if (prevFailed || CS.failedConstraint || CS.simplify())
+  if (prevFailed || CS.getFailedConstraint() || CS.simplify())
     return done(/*isSuccess=*/false);
 
   // Figure out the sets of partial solutions that this component depends on.
@@ -354,6 +354,25 @@ StepResult ComponentStep::take(bool prevFailed) {
     return finalize(/*isSuccess=*/false);
   }
 
+  // If we don't have any disjunction or type variable choices left, we're done
+  // solving. Make sure we don't have any unsolved constraints left over, using
+  // report_fatal_error to make sure we trap in release builds instead of
+  // potentially miscompiling.
+  if (!CS.ActiveConstraints.empty()) {
+    CS.print(llvm::errs());
+    llvm::report_fatal_error("Active constraints left over?");
+  }
+  if (!CS.solverState->allowsFreeTypeVariables()) {
+    if (!CS.InactiveConstraints.empty()) {
+      CS.print(llvm::errs());
+      llvm::report_fatal_error("Inactive constraints left over?");
+    }
+    if (CS.hasFreeTypeVariables()) {
+      CS.print(llvm::errs());
+      llvm::report_fatal_error("Free type variables left over?");
+    }
+  }
+
   // If this solution is worse than the best solution we've seen so far,
   // skip it.
   if (CS.worseThanBestSolution())
@@ -372,7 +391,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto solution = CS.finalize();
-  if (isDebugMode())
+  if (CS.isDebugMode())
     getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
 
   Solutions.push_back(std::move(solution));
@@ -389,7 +408,7 @@ StepResult ComponentStep::finalize(bool isSuccess) {
   // Rewind all modifications done to constraint system.
   ComponentScope.reset();
 
-  if (isDebugMode()) {
+  if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
     log << (isSuccess ? "finished" : "failed") << " component #" << Index
         << ")\n";
@@ -421,7 +440,7 @@ StepResult ComponentStep::finalize(bool isSuccess) {
 
 void TypeVariableStep::setup() {
   ++CS.solverState->NumTypeVariablesBound;
-  if (isDebugMode()) {
+  if (CS.isDebugMode()) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
     auto &log = getDebugLogger();
@@ -459,7 +478,7 @@ StepResult TypeVariableStep::resume(bool prevFailed) {
   // Rewind back all of the changes made to constraint system.
   ActiveChoice.reset();
 
-  if (isDebugMode())
+  if (CS.isDebugMode())
     getDebugLogger() << ")\n";
 
   // Let's check if we should stop right before
@@ -498,7 +517,7 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   // Rewind back the constraint system information.
   ActiveChoice.reset();
 
-  if (isDebugMode())
+  if (CS.isDebugMode())
     getDebugLogger() << ")\n";
 
   // Attempt next disjunction choice (if any left).
@@ -511,7 +530,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   bool attemptFixes = CS.shouldAttemptFixes();
   // Enable all disabled choices in "diagnostic" mode.
   if (!attemptFixes && choice.isDisabled()) {
-    if (isDebugMode()) {
+    if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";
       choice.print(log, &ctx.SourceMgr);

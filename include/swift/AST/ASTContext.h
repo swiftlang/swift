@@ -50,6 +50,10 @@ namespace clang {
   class ObjCInterfaceDecl;
 }
 
+namespace llvm {
+  class LLVMContext;
+}
+
 namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
@@ -74,6 +78,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
+  class ModuleDependencies;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -87,6 +92,7 @@ namespace swift {
   class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
+  class ModuleDependenciesCache;
   class ModuleLoader;
   class NominalTypeDecl;
   class NormalProtocolConformance;
@@ -105,7 +111,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
   class SILBoxType;
@@ -115,6 +120,7 @@ namespace swift {
   class UnifiedStatsReporter;
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
+  struct InterfaceSubContextDelegate;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -231,10 +237,10 @@ public:
   UnifiedStatsReporter *Stats = nullptr;
 
   /// The language options used for translation.
-  LangOptions &LangOpts;
+  const LangOptions &LangOpts;
 
   /// The type checker options.
-  TypeCheckerOptions &TypeCheckerOpts;
+  const TypeCheckerOptions &TypeCheckerOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -268,9 +274,6 @@ public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
-
-  /// A consumer of type checker debug output.
-  std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
 
   /// Cache for names of canonical GenericTypeParamTypes.
   mutable llvm::DenseMap<unsigned, Identifier>
@@ -404,6 +407,12 @@ public:
                               array.size());
   }
 
+  template <typename T>
+  MutableArrayRef<T>
+  AllocateCopy(const std::vector<T> &vec,
+               AllocationArena arena = AllocationArena::Permanent) const {
+    return AllocateCopy(ArrayRef<T>(vec), arena);
+  }
 
   template<typename T>
   ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &vec,
@@ -706,6 +715,16 @@ public:
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                        bool isClang = false, bool isDWARF = false);
 
+  /// Retrieve the module dependencies for the module with the given name.
+  ///
+  /// \param isUnderlyingClangModule When true, only look for a Clang module
+  /// with the given name, ignoring any Swift modules.
+  Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName,
+      bool isUnderlyingClangModule,
+      ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate);
+
   /// Load extensions to the given nominal type from the external
   /// module loaders.
   ///
@@ -735,11 +754,13 @@ public:
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested. This list will be
   /// extended with any methods found in subsequent generations.
-  void loadObjCMethods(ClassDecl *classDecl,
-                       ObjCSelector selector,
-                       bool isInstanceMethod,
-                       unsigned previousGeneration,
-                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+  ///
+  /// \param swiftOnly If true, only loads methods from imported Swift modules,
+  /// skipping the Clang importer.
+  void loadObjCMethods(ClassDecl *classDecl, ObjCSelector selector,
+                       bool isInstanceMethod, unsigned previousGeneration,
+                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods,
+                       bool swiftOnly = false);
 
   /// Load derivative function configurations for the given
   /// AbstractFunctionDecl.
@@ -949,6 +970,11 @@ private:
                                        GenericSignatureBuilder &&builder);
   friend class GenericSignatureBuilder;
 
+private:
+  friend class IntrinsicInfo;
+  /// Retrieve an LLVMContext that is used for scratch space for intrinsic lookup.
+  llvm::LLVMContext &getIntrinsicScratchContext() const;
+
 public:
   /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
@@ -1005,6 +1031,10 @@ public:
 
   /// Retrieve the IRGen specific SIL passes.
   SILTransformCtors getIRGenSILTransforms() const;
+  
+  /// Check whether a given string would be considered "pure ASCII" by the
+  /// standard library's String implementation.
+  bool isASCIIString(StringRef s) const;
 
 private:
   friend Decl;

@@ -210,7 +210,7 @@ any future use of the function must take this into account.
 Although they are not a supported feature for arbitrary libraries at this time,
 public `transparent`_ functions are implicitly marked ``@inlinable``.
 
-.. _transparent: https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst
+.. _transparent: https://github.com/apple/swift/blob/master/docs/TransparentAttr.md
 
 
 Restrictions on Inlinable Functions
@@ -577,6 +577,8 @@ There are very few safe changes to make to protocols and their members:
   themselves).
 - The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
   be added to or removed from a function requirement.
+- A new ``associatedtype`` requirement may be added (with the appropriate
+  availability), as long as it has a default implementation.
 - A new non-type requirement may be added (with the appropriate availability),
   as long as it has an unconstrained default implementation. If the requirement
   uses ``Self`` and the protocol has no other requirements using ``Self`` and

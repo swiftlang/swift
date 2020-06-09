@@ -42,8 +42,8 @@ static bool swiftConformingMethodListImpl(
             ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
                                                           Consumer));
 
-        auto SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        auto *SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF, *callbacksFactory);
       });
 }
 
@@ -108,7 +108,7 @@ void SwiftLangSupport::getConformingMethodList(
 
         // Name.
         memberElem.DeclNameBegin = SS.size();
-        member->getFullName().print(OS);
+        member->getName().print(OS);
         memberElem.DeclNameLength = SS.size() - memberElem.DeclNameBegin;
 
         // Type name.

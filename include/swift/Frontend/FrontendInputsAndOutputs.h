@@ -17,7 +17,6 @@
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
 
 #include <string>
 #include <vector>
@@ -173,7 +172,7 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-  friend class ModuleInterfaceBuilder;
+  friend struct InterfaceSubContextDelegateImpl;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);

@@ -1,8 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftc_driver -O -wmo -save-optimization-record=bitstream %s -module-name optrecordmod -o %t/opt-record 2>&1 | %FileCheck -allow-empty %s
+// RUN: %target-swift-frontend -c -O -wmo -save-optimization-record=bitstream -save-optimization-record-path %t/optrecordmod.opt.bitstream %s -module-name optrecordmod -o %t/opt-record.o 2>&1 | %FileCheck -allow-empty %s
 // RUN: llvm-bcanalyzer -dump %t/optrecordmod.opt.bitstream | %FileCheck -check-prefix=BITSTREAM %s
+// RUN: otool -l %t/opt-record.o | %FileCheck -check-prefix=OBJ %s
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+
+// Ensure we emitted the appropriate section
+
+// OBJ: sectname __remarks
 
 // CHECK-NOT: remark
 

@@ -126,7 +126,9 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
   SuperclassNames(Info.SuperclassNames),
-  EnumRawTypeName(Info.EnumRawTypeName), IsExternal(Info.IsExternal),
+  EnumRawTypeName(Info.EnumRawTypeName),
+  IsExternal(Info.IsExternal),
+  IsEnumExhaustive(Info.IsEnumExhaustive),
   HasMissingDesignatedInitializers(Info.HasMissingDesignatedInitializers),
   InheritsConvenienceInitializers(Info.InheritsConvenienceInitializers) {}
 
@@ -1071,7 +1073,7 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
     llvm::SmallString<32> Result;
     Result.append(getSimpleName(VD));
     Result.append("(");
-    for (auto Arg : VD->getFullName().getArgumentNames()) {
+    for (auto Arg : VD->getName().getArgumentNames()) {
       Result.append(Arg.empty() ? "_" : Arg.str());
       Result.append(":");
     }
@@ -1426,6 +1428,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
+    IsEnumExhaustive = ED->isFormallyExhaustive(nullptr);
     if (auto RT = ED->getRawType()) {
       if (auto *D = RT->getNominalOrBoundGenericNominal()) {
         EnumRawTypeName = D->getName().str();
@@ -1981,6 +1984,7 @@ void SDKNodeDeclType::jsonize(json::Output &out) {
   output(out, KeyKind::KK_superclassUsr, SuperclassUsr);
   output(out, KeyKind::KK_enumRawTypeName, EnumRawTypeName);
   output(out, KeyKind::KK_isExternal, IsExternal);
+  output(out, KeyKind::KK_isEnumExhaustive, IsEnumExhaustive);
   output(out, KeyKind::KK_hasMissingDesignatedInitializers,
          HasMissingDesignatedInitializers);
   output(out, KeyKind::KK_inheritsConvenienceInitializers,

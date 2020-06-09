@@ -7,5 +7,5 @@
 // RUN: not %target-swift-frontend -typecheck %s -enable-source-import -I %S/Inputs -sdk "" -import-module NON_EXISTENT 2>&1 | %FileCheck -check-prefix=NON-EXISTENT %s
 // NON-EXISTENT: error: no such module 'NON_EXISTENT'
 
-var a: A? // expected-error {{use of undeclared type 'A'}}
-var qA: abcde.A? // expected-error {{use of undeclared type 'abcde'}}
+var a: A? // expected-error {{cannot find type 'A' in scope}}
+var qA: abcde.A? // expected-error {{cannot find type 'abcde' in scope}}

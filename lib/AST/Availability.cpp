@@ -132,9 +132,29 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   }
 }
 
+/// Returns true if the introduced version in \p newAttr should be used instead
+/// of the introduced version in \p prevAttr when both are attached to the same
+/// declaration and refer to the active platform.
+static bool isBetterThan(const AvailableAttr *newAttr,
+                         const AvailableAttr *prevAttr) {
+  assert(newAttr);
+
+  // If there is no prevAttr, newAttr of course wins.
+  if (!prevAttr)
+    return true;
+
+  // If they belong to the same platform, the one that introduces later wins.
+  if (prevAttr->Platform == newAttr->Platform)
+    return prevAttr->Introduced.getValue() < newAttr->Introduced.getValue();
+
+  // If the new attribute's platform inherits from the old one, it wins.
+  return inheritsAvailabilityFromPlatform(newAttr->Platform,
+                                          prevAttr->Platform);
+}
+
 Optional<AvailabilityContext>
 AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
-  Optional<AvailabilityContext> AnnotatedRange;
+  const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
@@ -145,21 +165,15 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
       continue;
     }
 
-    AvailabilityContext AttrRange{
-        VersionRange::allGTE(AvailAttr->Introduced.getValue())};
-
-    // If we have multiple introduction versions, we will conservatively
-    // assume the worst case scenario. We may want to be more precise here
-    // in the future or emit a diagnostic.
-
-    if (AnnotatedRange.hasValue()) {
-      AnnotatedRange.getValue().intersectWith(AttrRange);
-    } else {
-      AnnotatedRange = AttrRange;
-    }
+    if (isBetterThan(AvailAttr, bestAvailAttr))
+      bestAvailAttr = AvailAttr;
   }
 
-  return AnnotatedRange;
+  if (!bestAvailAttr)
+    return None;
+
+  return AvailabilityContext{
+    VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
 }
 
 AvailabilityContext AvailabilityInference::availableRange(const Decl *D,

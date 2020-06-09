@@ -8,8 +8,8 @@ CHECK: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
 CHECK-VERBOSE-DAG: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
 CHECK-VERBOSE-DAG: # (PASS) {{.+}}{{\\|/}}Good.swiftinterface
 
-PRINTS-ERROR: unresolved identifier 'garbage'
-HIDES-ERROR-NOT: unresolved identifier 'garbage'
+PRINTS-ERROR: cannot find 'garbage' in scope
+HIDES-ERROR-NOT: cannot find 'garbage' in scope
 
 RUN: %empty-directory(%t)
 RUN: echo '["Good"]' > %t/xfails-good.json

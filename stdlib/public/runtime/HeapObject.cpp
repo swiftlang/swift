@@ -20,8 +20,6 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Once.h"
 #include "swift/ABI/System.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MathExtras.h"
 #include "MetadataCache.h"
 #include "Private.h"
 #include "RuntimeInvocationsTracking.h"
@@ -245,7 +243,7 @@ public:
 
 } // end anonymous namespace
 
-static SimpleGlobalCache<BoxCacheEntry> Boxes;
+static SimpleGlobalCache<BoxCacheEntry, BoxesTag> Boxes;
 
 BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
                                     size_t alignMask) {
@@ -327,8 +325,8 @@ HeapObject *swift::swift_allocEmptyBox() {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED 
-void _swift_release_dealloc(HeapObject *object);
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+_swift_release_dealloc(HeapObject *object);
 
 static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
@@ -888,6 +886,23 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
 }
 
 #ifndef NDEBUG
+
+/// Returns true if the "immutable" flag is set on \p object.
+///
+/// Used for runtime consistency checking of COW buffers.
+SWIFT_RUNTIME_EXPORT
+bool _swift_isImmutableCOWBuffer(HeapObject *object) {
+  return object->refCounts.isImmutableCOWBuffer();
+}
+
+/// Sets the "immutable" flag on \p object to \p immutable and returns the old
+/// value of the flag.
+///
+/// Used for runtime consistency checking of COW buffers.
+SWIFT_RUNTIME_EXPORT
+bool _swift_setImmutableCOWBuffer(HeapObject *object, bool immutable) {
+  return object->refCounts.setIsImmutableCOWBuffer(immutable);
+}
 
 void HeapObject::dump() const {
   auto *Self = const_cast<HeapObject *>(this);

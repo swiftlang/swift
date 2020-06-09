@@ -238,9 +238,9 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                     genericSig);
 }
 
-bool SILFunction::isNoReturnFunction() const {
+bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
   return SILType::getPrimitiveObjectType(getLoweredFunctionType())
-      .isNoReturnFunction(getModule());
+      .isNoReturnFunction(getModule(), context);
 }
 
 const TypeLowering &
@@ -456,7 +456,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 
       EnumElementDecl *E =
           getCaseValueForBB<SwitchEnumInst, EnumElementDecl *>(SEIB, Succ);
-      OS << E->getFullName();
+      OS << E->getName();
       return OS.str();
     }
 
@@ -466,7 +466,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 
       EnumElementDecl *E =
           getCaseValueForBB<SwitchEnumAddrInst, EnumElementDecl *>(SEIB, Succ);
-      OS << E->getFullName();
+      OS << E->getName();
       return OS.str();
     }
 
@@ -516,7 +516,8 @@ void SILFunction::viewCFGOnly() const {
 
 
 bool SILFunction::hasSelfMetadataParam() const {
-  auto paramTypes = getConventions().getParameterSILTypes();
+  auto paramTypes =
+      getConventions().getParameterSILTypes(TypeExpansionContext::minimal());
   if (paramTypes.empty())
     return false;
 

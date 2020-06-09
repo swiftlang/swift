@@ -28,8 +28,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_19 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_20 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_21 | %FileCheck %s -check-prefix=UNRESOLVED_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22 | %FileCheck %s -check-prefix=UNRESOLVED_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22_noreturn | %FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22 | %FileCheck %s -check-prefix=UNRESOLVED_1_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22_noreturn | %FileCheck %s -check-prefix=UNRESOLVED_1_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_23 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_24 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_25 | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -45,9 +45,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_34 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_35 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_36 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_37 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_37 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_38 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_39 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_39 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_40 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_41 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_42 | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -78,7 +78,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_1 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_2 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_3 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_U
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_4 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_4 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT_NOTIDEAL
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_CLOSURE_1 | %FileCheck %s -check-prefix=STATIC_CLOSURE_1
 
@@ -109,9 +109,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_21 | %FileCheck %s -check-prefix=GENERICPARAM_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DECL_MEMBER_INIT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_1 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_2 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_3 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPEPARAM_IN_CONTEXTTYPE_1 | %FileCheck %s -check-prefix=TYPEPARAM_IN_CONTEXTTYPE_1
 
@@ -119,8 +119,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_4 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_5 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_5 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_6 | %FileCheck %s -check-prefix=UNRESOLVED_3_NOTIDEAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TERNARY_CONDITION | %FileCheck %s -check-prefix=TERNARY_CONDITION
 
 enum SomeEnum1 {
@@ -218,10 +218,18 @@ class C2 {
 // UNRESOLVED_1:  Begin completions
 // UNRESOLVED_1-NOT:  SomeEnum1
 // UNRESOLVED_1-NOT:  SomeEnum2
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
 // UNRESOLVED_1-NOT:  Not
+
+// UNRESOLVED_1_NOTIDEAL:  Begin completions
+// UNRESOLVED_1_NOTIDEAL-NOT:  SomeEnum1
+// UNRESOLVED_1_NOTIDEAL-NOT:  SomeEnum2
+// UNRESOLVED_1_NOTIDEAL-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_1_NOTIDEAL-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_1_NOTIDEAL-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_1_NOTIDEAL-NOT:  Not
 }
 
 class C3 {
@@ -234,9 +242,9 @@ class C3 {
 // UNRESOLVED_2:  Begin completions
 // UNRESOLVED_2-NOT:  SomeEnum1
 // UNRESOLVED_2-NOT:  SomeEnum2
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option4[#SomeOptions2#]; name=Option4
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option5[#SomeOptions2#]; name=Option5
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option6[#SomeOptions2#]; name=Option6
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option4[#SomeOptions2#]; name=Option4
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option5[#SomeOptions2#]; name=Option5
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option6[#SomeOptions2#]; name=Option6
 // UNRESOLVED_2-NOT:  Not
 }
 
@@ -269,21 +277,29 @@ class C4 {
 // UNRESOLVED_3-NOT: none
 // UNRESOLVED_3-NOT: some(
 
+// UNRESOLVED_3_NOTIDEAL: Begin completions, 2 items
+// UNRESOLVED_3_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// UNRESOLVED_3_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// UNRESOLVED_3_NOTIDEAL-NOT: SomeOptions1
+// UNRESOLVED_3_NOTIDEAL-NOT: SomeOptions2
+// UNRESOLVED_3_NOTIDEAL-NOT: none
+// UNRESOLVED_3_NOTIDEAL-NOT: some(
+
 // UNRESOLVED_3_OPT: Begin completions, 5 items
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
-// UNRESOLVED_3_OPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1?#]; name=nil
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific: none[#Optional<SomeEnum1>#]; name=none
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]: nil[#SomeEnum1?#]; name=nil
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<SomeEnum1>#]; name=none
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
 // UNRESOLVED_3_OPT-NOT: init({#(some):
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 
 // UNRESOLVED_3_OPTOPTOPT: Begin completions, 5 items
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#SomeEnum1???#]; name=nil
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<SomeEnum1??>#]; name=none
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]: nil[#SomeEnum1???#]; name=nil
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<SomeEnum1??>#]; name=none
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#(some):
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#nilLiteral:
 
@@ -299,10 +315,10 @@ func testOptionalWithCustomExtension() {
 // UNRESOLVED_OPT_4: Begin completions, 7 items
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     earth[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     mars[#Somewhere#];
-// UNRESOLVED_OPT_4-DAG: Keyword[nil]/ExprSpecific/Erase[1]: nil[#Somewhere?#]; name=nil
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Somewhere>#]; name=none
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific:     some({#Somewhere#})[#Optional<Somewhere>#];
-// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal:      init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
+// UNRESOLVED_OPT_4-DAG: Keyword[nil]/None/Erase[1]: nil[#Somewhere?#]; name=nil
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<Somewhere>#]; name=none
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#Somewhere#})[#Optional<Somewhere>#];
+// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal: init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
 // UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: nowhere[#Optional<Somewhere>#]; name=nowhere
 // UNRESOLVED_OPT_4-NOT: init({#(some):
 // UNRESOLVED_OPT_4-NOT: init({#nilLiteral:
@@ -336,9 +352,9 @@ Container.EnumTaker1(.#^UNRESOLVED_20^#
 func parserSync() {}
 
 // UNRESOLVED_4: Begin completions
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_4-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_4-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_4-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
 // UNRESOLVED_4-NOT: Option4
 // UNRESOLVED_4-NOT: Option5
 // UNRESOLVED_4-NOT: Option6
@@ -424,8 +440,8 @@ func testAvail2(_ x: OptionsAvail1) {
 }
 // OPTIONS_AVAIL_1: Begin completions
 // ENUM_AVAIL_1-NOT: AAA
-// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: aaa[#OptionsAvail1#];
-// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended/TypeRelation[Identical]: BBB[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: aaa[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/ExprSpecific/NotRecommended/TypeRelation[Identical]: BBB[#OptionsAvail1#];
 // OPTIONS_AVAIL_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#rawValue: Int#})[#OptionsAvail1#]
 // ENUM_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1: End completions
@@ -501,10 +517,10 @@ func testNonOptSet() {
   x = .#^NON_OPT_SET_1^#
 }
 // NON_OPT_SET_1: Begin completions, 4 items
-// NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]:    a[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]:    a[#NonOptSet#]
 // NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init({#x: Int#}, {#y: Int#})[#NonOptSet#]
 // NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init()[#NonOptSet#]
-// NON_OPT_SET_1-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: b()[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: b()[#NonOptSet#]
 // NON_OPT_SET_1: End completions
 
 func testNonOptSet() {
@@ -575,12 +591,18 @@ case let .#^GENERIC_4^#
 // GENERIC_1_INT: Begin completions
 // GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific: contains({#content: Int#})[#Generic<Int>#];
 // GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific: empty[#Generic<Int>#];
-// GENERIC_1_INT-DAG: Decl[StaticMethod]/CurrNominal: create({#Int#})[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[StaticMethod]/ExprSpecific: create({#Int#})[#Generic<Int>#];
 // GENERIC_1_INT: End completions
 
+// GENERIC_1_INT_NOTIDEAL: Begin completions
+// GENERIC_1_INT_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal: contains({#content: Int#})[#Generic<Int>#];
+// GENERIC_1_INT_NOTIDEAL-DAG: Decl[EnumElement]/CurrNominal: empty[#Generic<Int>#];
+// GENERIC_1_INT_NOTIDEAL-DAG: Decl[StaticMethod]/CurrNominal: create({#Int#})[#Generic<Int>#];
+// GENERIC_1_INT_NOTIDEAL: End completions
+
 // GENERIC_1_U: Begin completions
-// GENERIC_1_U-DAG: Decl[EnumElement]/ExprSpecific: contains({#content: U#})[#Generic<U>#];
-// GENERIC_1_U-DAG: Decl[EnumElement]/ExprSpecific: empty[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal: contains({#content: U#})[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal: empty[#Generic<U>#];
 // GENERIC_1_U-DAG: Decl[StaticMethod]/CurrNominal: create({#U#})[#Generic<U>#];
 // GENERIC_1_U: End completions
 
@@ -607,10 +629,10 @@ struct HasOverloaded {
 func testOverload(val: HasOverloaded) {
   let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
 // OVERLOADED_METHOD_1: Begin completions, 4 items
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
 // OVERLOADED_METHOD_1: End completions
 
   let _ = HasOverloaded.init(e: .#^OVERLOADED_INIT_1^#)
@@ -758,6 +780,6 @@ func testTernaryOperator2(cond: Bool) {
   func sync(){}
   let _: SomeEnum1 = .#^TERNARY_CONDITION^# ? .bogus : .bogus
 // TERNARY_CONDITION: Begin completions
-// TERNARY_CONDITION-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#Bool#]; name=init()
+// TERNARY_CONDITION-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init()[#Bool#]; name=init()
 // TERNARY_CONDITION: End completions
 }

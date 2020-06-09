@@ -43,6 +43,12 @@ namespace clang {
   class Type;
   class VisibleDeclConsumer;
   class DeclarationName;
+  class CompilerInvocation;
+namespace tooling {
+namespace dependencies {
+  struct FullDependenciesResult;
+}
+}
 }
 
 namespace swift {
@@ -148,6 +154,14 @@ public:
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
 
+  static std::vector<std::string>
+  getClangArguments(ASTContext &ctx, const ClangImporterOptions &importerOpts);
+
+  static std::unique_ptr<clang::CompilerInvocation>
+  createClangInvocation(ClangImporter *importer,
+                        const ClangImporterOptions &importerOpts,
+                        ArrayRef<std::string> invocationArgStrs,
+                        std::vector<std::string> *CC1Args = nullptr);
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
   ClangImporter &operator=(const ClangImporter &) = delete;
@@ -369,6 +383,27 @@ public:
 
   void verifyAllModules() override;
 
+  void recordModuleDependencies(
+      ModuleDependenciesCache &cache,
+      const clang::tooling::dependencies::FullDependenciesResult &clangDependencies);
+
+  Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate) override;
+
+  /// Add dependency information for the bridging header.
+  ///
+  /// \param moduleName the name of the Swift module whose dependency
+  /// information will be augmented with information about the given
+  /// bridging header.
+  ///
+  /// \param cache The module dependencies cache to update, with information
+  /// about new Clang modules discovered along the way.
+  ///
+  /// \returns \c true if an error occurred, \c false otherwise
+  bool addBridgingHeaderDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache);
+
   clang::TargetInfo &getTargetInfo() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
@@ -438,10 +473,17 @@ public:
 
   bool isSerializable(const clang::Type *type,
                       bool checkCanonical) const override;
+  ArrayRef<std::string> getExtraClangArgs() const;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
                              ArrayRef<clang::Module *> Exported);
+
+/// Extract the specified-or-defaulted -module-cache-path that winds up in
+/// the clang importer, for reuse as the .swiftmodule cache path when
+/// building a ModuleInterfaceLoader.
+std::string
+getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
 } // end namespace swift
 

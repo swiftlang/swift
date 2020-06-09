@@ -13,55 +13,55 @@
   1.#^LITERAL1^#
 }
 // LITERAL1:          Begin completions
-// LITERAL1-DAG:      Decl[InstanceVar]/Super:            bigEndian[#Int#]; name=bigEndian{{$}}
-// LITERAL1-DAG:      Decl[InstanceVar]/Super:            littleEndian[#Int#]; name=littleEndian{{$}}
-// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      byteSwapped[#Int#]; name=byteSwapped{{$}}
-// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      nonzeroBitCount[#Int#]; name=nonzeroBitCount{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/Super/IsSystem:       bigEndian[#Int#]; name=bigEndian{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/Super/IsSystem:       littleEndian[#Int#]; name=littleEndian{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal/IsSystem: byteSwapped[#Int#]; name=byteSwapped{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal/IsSystem: nonzeroBitCount[#Int#]; name=nonzeroBitCount{{$}}
 
 {
   1.1.#^LITERAL2^#
 }
 // LITERAL2:         Begin completions
-// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isNormal[#Bool#]; name=isNormal{{$}}
-// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isFinite[#Bool#]; name=isFinite{{$}}
-// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isZero[#Bool#]; name=isZero{{$}}
-// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isSubnormal[#Bool#]; name=isSubnormal{{$}}
-// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isInfinite[#Bool#]; name=isInfinite{{$}}
-// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isNaN[#Bool#]; name=isNaN{{$}}
+// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isNormal[#Bool#]; name=isNormal{{$}}
+// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isFinite[#Bool#]; name=isFinite{{$}}
+// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isZero[#Bool#]; name=isZero{{$}}
+// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isSubnormal[#Bool#]; name=isSubnormal{{$}}
+// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isInfinite[#Bool#]; name=isInfinite{{$}}
+// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isNaN[#Bool#]; name=isNaN{{$}}
 
 {
   true.#^LITERAL3^#
 }
 // LITERAL3:         Begin completions
-// LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal:      description[#String#]; name=description{{$}}
-// LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal:      hashValue[#Int#]; name=hashValue{{$}}
+// LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: description[#String#]; name=description{{$}}
+// LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: hashValue[#Int#]; name=hashValue{{$}}
 
 {
   "swift".#^LITERAL4^#
 }
 
 // LITERAL4:         Begin completions
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(body: (UnsafePointer<Int8>) throws -> Result) rethrows{{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(body: (UnsafePointer<Int8>) throws -> Result) rethrows{{$}}
 
 // FIXME: we should show the qualified String.Index type.
 // rdar://problem/20788802
-// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      startIndex[#String.Index#]; name=startIndex{{$}}
-// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#String.Index#]; name=endIndex{{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#contentsOf: Sequence#})[#Void#]; name=append(contentsOf: Sequence){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insert({#contentsOf: Collection#}, {#at: String.Index#})[#Void#]; name=insert(contentsOf: Collection, at: String.Index){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   remove({#at: String.Index#})[#Character#]; name=remove(at: String.Index){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:      lowercased()[#String#]; name=lowercased(){{$}}
+// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem:    startIndex[#String.Index#]; name=startIndex{{$}}
+// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem:    endIndex[#String.Index#]; name=endIndex{{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: append({#contentsOf: Sequence#})[#Void#]; name=append(contentsOf: Sequence){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: insert({#contentsOf: Collection#}, {#at: String.Index#})[#Void#]; name=insert(contentsOf: Collection, at: String.Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: remove({#at: String.Index#})[#Character#]; name=remove(at: String.Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: lowercased()[#String#]; name=lowercased(){{$}}
 
 func giveMeAString() -> Int {
   // rdar://22637799
   return "Here's a string".#^LITERAL5^# // try .characters.count here
 }
 
-// LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#String.Index#]{{; name=.+$}}
-// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
-// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
-// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: Sequence#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem:      endIndex[#String.Index#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: append({#contentsOf: Sequence#})[#Void#]{{; name=.+$}}
 
 struct MyColor: _ExpressibleByColorLiteral {
   init(_colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }
@@ -82,17 +82,17 @@ func testColor12() {
 func testArray(f1: Float) {
   _ = [1, 2, f1] #^LITERAL8^#
 }
-// LITERAL8-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
-// LITERAL8-DAG: Decl[InstanceVar]/Super:            .first[#Float?#]; name=first
+// LITERAL8-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .count[#Int#]; name=count
+// LITERAL8-DAG: Decl[InstanceVar]/Super/IsSystem:       .first[#Float?#]; name=first
 
 func testDict(f1: Float) {
   _ = ["foo": f1, "bar": "baz"] #^LITERAL9^#
 }
-// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal:      .keys[#Dictionary<String, Any>.Keys#]; name=keys
-// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal:      .isEmpty[#Bool#]; name=isEmpty
+// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .keys[#Dictionary<String, Any>.Keys#]; name=keys
+// LITERAL9-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .isEmpty[#Bool#]; name=isEmpty
 
 func testEditorPlaceHolder() {
   _ = <#T##foo##String#> #^LITERAL10^#
 }
-// LITERAL10-DAG: Decl[InstanceVar]/CurrNominal:      .utf16[#String.UTF16View#]; name=utf16
-// LITERAL10-DAG: Decl[InstanceVar]/CurrNominal:      .utf8[#String.UTF8View#]; name=utf8
+// LITERAL10-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .utf16[#String.UTF16View#]; name=utf16
+// LITERAL10-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .utf8[#String.UTF8View#]; name=utf8

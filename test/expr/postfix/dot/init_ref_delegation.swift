@@ -243,7 +243,7 @@ func init_tests() {
   var cs2a = C(x: 0)
   var cs3a = C()
 
-  var y = x.init() // expected-error{{use of unresolved identifier 'x'}}
+  var y = x.init() // expected-error{{cannot find 'x' in scope}}
 }
 
 protocol P {

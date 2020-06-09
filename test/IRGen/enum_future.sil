@@ -2660,7 +2660,7 @@ entry(%x : $*MyOptional):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s11enum_future16DynamicSingletonOMi"(%swift.type_descriptor* %0, i8** %1, i8* %2) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   [[T:%T]] = load %swift.type*, %swift.type** [[T0]],
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2, [[WORD]] {{4|8|16}})
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2, [[WORD]] {{4|8|12|16}})
 // CHECK-NEXT: ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$s11enum_future16DynamicSingletonOMr"

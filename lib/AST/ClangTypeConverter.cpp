@@ -155,6 +155,7 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   case AnyFunctionType::Representation::Thin:
     llvm_unreachable("Expected a C-compatible representation.");
   }
+  llvm_unreachable("invalid representation");
 }
 
 clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,
@@ -358,7 +359,7 @@ clang::QualType ClangTypeConverter::visitTupleType(TupleType *type) {
     return ClangASTContext.VoidTy;
 
   Type eltTy = type->getElementType(0);
-  for (unsigned i = 1; i < tupleNumElements; i++) {
+  for (unsigned i = 1; i < tupleNumElements; ++i) {
     if (!eltTy->isEqual(type->getElementType(i)))
       // Only tuples where all element types are equal map to fixed-size
       // arrays.

@@ -55,7 +55,7 @@ extension Unicode.UTF16 {
   /// pair*.
   ///
   ///     let apple: Unicode.Scalar = "🍎"
-  ///     print(UTF16.leadSurrogate(apple)
+  ///     print(UTF16.leadSurrogate(apple))
   ///     // Prints "55356"
   ///
   /// - Parameter x: A Unicode scalar value. `x` must be represented by a
@@ -79,7 +79,7 @@ extension Unicode.UTF16 {
   /// pair*.
   ///
   ///     let apple: Unicode.Scalar = "🍎"
-  ///     print(UTF16.trailSurrogate(apple)
+  ///     print(UTF16.trailSurrogate(apple))
   ///     // Prints "57166"
   ///
   /// - Parameter x: A Unicode scalar value. `x` must be represented by a
@@ -186,11 +186,11 @@ extension Unicode.UTF16 {
   ///     print(Array(bytes))
   ///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 240, 157, 132, 144]"
   ///
-  ///     let result = transcodedLength(of: bytes.makeIterator(),
-  ///                                   decodedAs: UTF8.self,
-  ///                                   repairingIllFormedSequences: false)
+  ///     let result = UTF16.transcodedLength(of: bytes.makeIterator(),
+  ///                                         decodedAs: UTF8.self,
+  ///                                         repairingIllFormedSequences: false)
   ///     print(result)
-  ///     // Prints "Optional((10, false))"
+  ///     // Prints "Optional((count: 10, isASCII: false))"
   ///
   /// - Parameters:
   ///   - input: An iterator of code units to be translated, encoded as

@@ -37,7 +37,7 @@ public:
   template<typename OtherT>
   NullablePtr(NullablePtr<OtherT> Other,
               typename std::enable_if<
-                std::is_convertible<OtherT, T>::value,
+                std::is_convertible<OtherT *, T *>::value,
                 PlaceHolder
               >::type = PlaceHolder()) : Ptr(Other.getPtrOrNull()) {}
   

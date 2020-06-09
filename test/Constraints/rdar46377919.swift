@@ -3,7 +3,7 @@
 class Foo {
   init(lhs: @autoclosure () -> Int,
        rhs: @autoclosure () -> Undefined) {
-     // expected-error@-1 {{use of undeclared type 'Undefined'}}
+     // expected-error@-1 {{cannot find type 'Undefined' in scope}}
   }
 }
 

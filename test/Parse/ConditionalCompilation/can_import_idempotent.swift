@@ -4,6 +4,6 @@
 // RUN: %target-swift-frontend -typecheck -verify -I %t %s
 
 #if canImport(DummyModule)
-print(DummyModule.dummyVar) // expected-error {{use of unresolved identifier 'DummyModule'}}
-print(dummyVar) // expected-error {{use of unresolved identifier 'dummyVar'}}
+print(DummyModule.dummyVar) // expected-error {{cannot find 'DummyModule' in scope}}
+print(dummyVar) // expected-error {{cannot find 'dummyVar' in scope}}
 #endif

@@ -27,6 +27,11 @@ module WinSDK [system] {
       export *
     }
 
+    module com {
+      header "combaseapi.h"
+      export *
+    }
+
     module compress {
       header "compressapi.h"
       export *
@@ -170,11 +175,23 @@ module WinSDK [system] {
     link "ShLwApi.Lib"
   }
 
+  module ShellCore {
+    header "ShellScalingApi.h"
+    export *
+
+    link "shcore.lib"
+  }
+
   module OLE32 {
     header "oaidl.h"
     export *
 
     link "OleAut32.Lib"
+  }
+
+  module RichEdit {
+    header "Richedit.h"
+    export *
   }
 
   module User {
@@ -196,11 +213,26 @@ module WinSDK [system] {
     link "DnsAPI.Lib"
   }
 
+  module WinGDI {
+    header "wingdi.h"
+    export *
+
+    link "Gdi32.Lib"
+  }
+
   module WinReg {
     header "winreg.h"
     export *
 
     link "AdvAPI32.Lib"
+  }
+
+  module WinRPC {
+    header "../shared/rpc.h"
+    header "../shared/rpcndr.h"
+    export *
+
+    link "RpcRT4.Lib"
   }
 }
 

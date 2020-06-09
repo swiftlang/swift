@@ -10,4 +10,4 @@ import E
 import F
 
 _ = REDEFINED // no-warning
-_ = x // expected-error {{use of unresolved identifier 'x'}}
+_ = x // expected-error {{cannot find 'x' in scope}}

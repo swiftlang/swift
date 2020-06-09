@@ -518,6 +518,7 @@ protected:
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
+  NodePointer demangleImplDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleMetatype();
   NodePointer demanglePrivateContextDescriptor();
@@ -564,8 +565,7 @@ protected:
   NodePointer demangleValueWitness();
 
   NodePointer demangleTypeMangling();
-  NodePointer demangleSymbolicReference(unsigned char rawKind,
-                                        const void *at);
+  NodePointer demangleSymbolicReference(unsigned char rawKind);
 
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);

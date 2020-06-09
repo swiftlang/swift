@@ -338,11 +338,12 @@ differences.
 Legal SIL Types
 ```````````````
 
-The type of a value in SIL shall be:
+The type of a value in SIL is either:
 
-- a loadable legal SIL type, ``$T``,
+- an *object type* ``$T``, where ``T`` is a legal loadable type, or
 
-- the address of a legal SIL type, ``$*T``, or
+- an *address type* ``$*T``, where ``T`` is a legal SIL type (loadable or
+  address-only).
 
 A type ``T`` is a *legal SIL type* if:
 
@@ -685,6 +686,16 @@ generic constraints:
   * Class protocol types
   * Archetypes constrained by a class protocol
 
+  Values of loadable types are loaded and stored by loading and storing
+  individual components of their representation. As a consequence:
+
+    * values of loadable types can be loaded into SIL SSA values and stored
+      from SSA values into memory without running any user-written code,
+      although compiler-generated reference counting operations can happen.
+
+    * values of loadable types can be take-initialized (moved between
+      memory locations) with a bitwise copy.
+
   A *loadable aggregate type* is a tuple or struct type that is loadable.
 
   A *trivial type* is a loadable type with trivial value semantics.
@@ -705,6 +716,25 @@ generic constraints:
   * Runtime-sized types
   * Non-class protocol types
   * @weak types
+  * Types that can't satisfy the requirements for being loadable because they
+    care about the exact location of their value in memory and need to run some
+    user-written code when they are copied or moved. Most commonly, types "care"
+    about the addresses of values because addresses of values are registered in
+    some global data structure, or because values may contain pointers into
+    themselves.  For example:
+
+    * Addresses of values of Swift ``@weak`` types are registered in a global
+      table. That table needs to be adjusted when a ``@weak`` value is copied
+      or moved to a new address.
+
+    * A non-COW collection type with a heap allocation (like ``std::vector`` in
+      C++) needs to allocate memory and copy the collection elements when the
+      collection is copied.
+
+    * A non-COW string type that implements a small string optimization (like
+      many implementations of ``std::string`` in C++) can contain a pointer
+      into the value itself. That pointer needs to be recomputed when the
+      string is copied or moved.
 
   Values of address-only type ("address-only values") must reside in
   memory and can only be referenced in SIL by address. Addresses of
@@ -771,14 +801,6 @@ types. Function types are transformed in order to encode additional attributes:
     implementation. The function's polymorphic convention is emitted in such
     a way as to guarantee that it is polymorphic across all possible
     implementors of the protocol.
-
-- The **fully uncurried representation** of the function type, with
-  all of the curried argument clauses flattened into a single argument
-  clause. For instance, a curried function ``func foo(_ x:A)(y:B) -> C``
-  might be emitted as a function of type ``((y:B), (x:A)) -> C``.  The
-  exact representation depends on the function's `calling
-  convention`_, which determines the exact ordering of currying
-  clauses.  Methods are treated as a form of curried function.
 
 Layout Compatible Types
 ```````````````````````
@@ -2085,6 +2107,94 @@ make the use of such types more convenient; it does not shift the
 ultimate responsibility for assuring the safety of unsafe
 language/library features away from the user.
 
+Copy-on-Write Representation
+----------------------------
+
+Copy-on-Write (COW) data structures are implemented by a reference to an object
+which is copied on mutation in case it's not uniquely referenced.
+
+A COW mutation sequence in SIL typically looks like::
+
+    (%uniq, %buffer) = begin_cow_mutation %immutable_buffer : $BufferClass
+    cond_br %uniq, bb_uniq, bb_not_unique
+  bb_uniq:
+    br bb_mutate(%buffer : $BufferClass)
+  bb_not_unique:
+    %copied_buffer = apply %copy_buffer_function(%buffer) : ...
+    br bb_mutate(%copied_buffer : $BufferClass)
+  bb_mutate(%mutable_buffer : $BufferClass):
+    %field = ref_element_addr %mutable_buffer : $BufferClass, #BufferClass.Field
+    store %value to %field : $ValueType
+    %new_immutable_buffer = end_cow_mutation %buffer : $BufferClass
+
+Loading from a COW data structure looks like::
+
+    %field1 = ref_element_addr [immutable] %immutable_buffer : $BufferClass, #BufferClass.Field
+    %value1 = load %field1 : $*FieldType
+    ...
+    %field2 = ref_element_addr [immutable] %immutable_buffer : $BufferClass, #BufferClass.Field
+    %value2 = load %field2 : $*FieldType
+
+The ``immutable`` attribute means that loading values from ``ref_element_addr``
+and ``ref_tail_addr`` instructions, which have the *same* operand, are
+equivalent.
+In other words, it's guaranteed that a buffer's properties are not mutated
+between two ``ref_element/tail_addr [immutable]`` as long as they have the
+same buffer reference as operand.
+This is even true if e.g. the buffer 'escapes' to an unknown function.
+
+
+In the example above, ``%value2`` is equal to ``%value1`` because the operand
+of both ``ref_element_addr`` instructions is the same ``%immutable_buffer``.
+Conceptually, the content of a COW buffer object can be seen as part of
+the same *static* (immutable) SSA value as the buffer reference.
+
+The lifetime of a COW value is strictly separated into *mutable* and
+*immutable* regions by ``begin_cow_mutation`` and
+``end_cow_mutation`` instructions::
+
+  %b1 = alloc_ref $BufferClass
+  // The buffer %b1 is mutable
+  %b2 = end_cow_mutation %b1 : $BufferClass
+  // The buffer %b2 is immutable
+  (%u1, %b3) = begin_cow_mutation %b1 : $BufferClass
+  // The buffer %b3 is mutable
+  %b4 = end_cow_mutation %b3 : $BufferClass
+  // The buffer %b4 is immutable
+  ...
+
+Both, ``begin_cow_mutation`` and ``end_cow_mutation``, consume their operand
+and return the new buffer as an *owned* value.
+The ``begin_cow_mutation`` will compile down to a uniqueness check and
+``end_cow_mutation`` will compile to a no-op.
+
+Although the physical pointer value of the returned buffer reference is the
+same as the operand, it's important to generate a *new* buffer reference in
+SIL. It prevents the optimizer from moving buffer accesses from a *mutable* into
+a *immutable* region and vice versa.
+
+Because the buffer *content* is conceptually part of the
+buffer *reference* SSA value, there must be a new buffer reference every time
+the buffer content is mutated.
+
+To illustrate this, let's look at an example, where a COW value is mutated in
+a loop. As with a scalar SSA value, also mutating a COW buffer will enforce a
+phi-argument in the loop header block (for simplicity the code for copying a
+non-unique buffer is not shown)::
+
+  header_block(%b_phi : $BufferClass):
+    (%u, %b_mutate) = begin_cow_mutation %b_phi : $BufferClass
+    // Store something to %b_mutate
+    %b_immutable = end_cow_mutation %b_mutate : $BufferClass
+    cond_br %loop_cond, exit_block, backedge_block
+  backedge_block:
+    br header_block(b_immutable : $BufferClass)
+  exit_block:
+
+Two adjacent ``begin_cow_mutation`` and ``end_cow_mutation`` instructions
+don't need to be in the same function.
+
+
 Instruction Set
 ---------------
 
@@ -3177,6 +3287,56 @@ strong reference count is greater than 1.
 A discussion of the semantics can be found here:
 :ref:`arcopts.is_unique`.
 
+begin_cow_mutation
+``````````````````
+
+::
+
+  sil-instruction ::= 'begin_cow_mutation' '[native]'? sil-operand
+
+  (%1, %2) = begin_cow_mutation %0 : $C
+  // $C must be a reference-counted type
+  // %1 will be of type Builtin.Int1
+  // %2 will be of type C
+
+Checks whether %0 is a unique reference to a memory object. Returns 1 in the
+first result if the strong reference count is 1, and 0 if the strong reference
+count is greater than 1.
+
+Returns the reference operand in the second result. The returned reference can
+be used to mutate the object. Technically, the returned reference is the same
+as the operand. But it's important that optimizations see the result as a
+different SSA value than the operand. This is important to ensure the
+correctness of ``ref_element_addr [immutable]``.
+
+The operand is consumed and the second result is returned as owned.
+
+The optional ``native`` attribute specifies that the operand has native Swift
+reference counting.
+
+end_cow_mutation
+````````````````
+
+::
+
+  sil-instruction ::= 'end_cow_mutation' '[keep_unique]'? sil-operand
+
+  %1 = end_cow_mutation %0 : $C
+  // $C must be a reference-counted type
+  // %1 will be of type C
+
+Marks the end of the mutation of a reference counted object.
+Returns the reference operand. Technically, the returned reference is the same
+as the operand. But it's important that optimizations see the result as a
+different SSA value than the operand. This is important to ensure the
+correctness of ``ref_element_addr [immutable]``.
+
+The operand is consumed and the result is returned as owned. The result is
+guaranteed to be uniquely referenced.
+
+The optional ``keep_unique`` attribute indicates that the optimizer must not
+replace this reference with a not uniquely reference object.
+
 is_escaping_closure
 ```````````````````
 
@@ -4171,7 +4331,7 @@ ref_element_addr
 ````````````````
 ::
 
-  sil-instruction ::= 'ref_element_addr' sil-operand ',' sil-decl-ref
+  sil-instruction ::= 'ref_element_addr' '[immutable]'? sil-operand ',' sil-decl-ref
 
   %1 = ref_element_addr %0 : $C, #C.field
   // %0 must be a value of class type $C
@@ -4183,11 +4343,15 @@ Given an instance of a class, derives the address of a physical instance
 variable inside the instance. It is undefined behavior if the class value
 is null.
 
+The ``immutable`` attribute specifies that all loads of the same instance
+variable from the same class reference operand are guaranteed to yield the
+same value.
+
 ref_tail_addr
 `````````````
 ::
 
-  sil-instruction ::= 'ref_tail_addr' sil-operand ',' sil-type
+  sil-instruction ::= 'ref_tail_addr' '[immutable]'? sil-operand ',' sil-type
 
   %1 = ref_tail_addr %0 : $C, $E
   // %0 must be a value of class type $C with tail-allocated elements $E
@@ -4199,6 +4363,10 @@ This instruction is used to project the first tail-allocated element from an
 object which is created by an ``alloc_ref`` with ``tail_elems``.
 It is undefined behavior if the class instance does not have tail-allocated
 arrays or if the element-types do not match.
+
+The ``immutable`` attribute specifies that all loads of the same instance
+variable from the same class reference operand are guaranteed to yield the
+same value.
 
 Enums
 ~~~~~
@@ -4566,11 +4734,11 @@ init_existential_value
 ``````````````````````
 ::
 
-  sil-instruction ::= 'init_existential_value' sil-operand ':' sil-type ','
-                                             sil-type
+  sil-instruction ::= 'init_existential_value' sil-operand ',' sil-type ','
+                                               sil-type
 
-  %1 = init_existential_value %0 : $L' : $C, $P
-  // %0 must be of loadable type $L', lowered from AST type $L, conforming to
+  %1 = init_existential_value %0 : $L, $C, $P
+  // %0 must be of loadable type $L, lowered from AST type $C, conforming to
   //    protocol(s) $P
   // %1 will be of type $P
 
@@ -5293,7 +5461,7 @@ unconditional_checked_cast_addr
                        sil-type 'in' sil-operand 'to'
                        sil-type 'in' sil-operand
 
-  unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in $*@thick B
+  unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in %1 : $*@thick B
   // $A and $B must be both addresses
   // %1 will be of type $*B
   // $A is destroyed during the conversion. There is no implicit copy.

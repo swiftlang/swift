@@ -131,10 +131,6 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
   
-def enable_experimental_diagnostic_formatting :
-  Flag<["-"], "enable-experimental-diagnostic-formatting">,
-  HelpText<"Enable experimental diagnostic formatting features.">;
-  
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
   HelpText<"Path to diagnostic documentation resources">;
@@ -218,6 +214,12 @@ def disable_objc_attr_requires_foundation_module :
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Deprecated, use -enable-library-evolution instead">;
 
+def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
+  HelpText<"Disable building Swift modules explicitly by the compiler">;
+
+def swift_module_file
+  : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module explicitly built from textual interface">;
 }
 
 
@@ -483,6 +485,14 @@ def disable_invalid_ephemeralness_as_error :
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 
+def enable_new_operator_lookup :
+  Flag<["-"], "enable-new-operator-lookup">,
+  HelpText<"Enable the new operator decl and precedencegroup lookup behavior">;
+
+def disable_new_operator_lookup :
+  Flag<["-"], "disable-new-operator-lookup">,
+  HelpText<"Disable the new operator decl and precedencegroup lookup behavior">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
@@ -549,6 +559,9 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
+  
+def sil_verify_none : Flag<["-"], "sil-verify-none">,
+  HelpText<"Completely disable SIL verification">;
   
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;
@@ -629,6 +642,10 @@ def experimental_print_full_convention :
  HelpText<"When emitting a module interface, emit additional @convention "
           "arguments, regardless of whether they were written in the source">;
 
+def experimental_one_way_closure_params :
+  Flag<["-"], "experimental-one-way-closure-params">,
+  HelpText<"Enable experimental support for one-way closure parameters">;
+
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;
@@ -699,4 +716,12 @@ def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
 def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
     HelpText<"Directory for bridging header to be printed in compatibility header">;
 
+def target_sdk_version : Separate<["-"], "target-sdk-version">,
+  HelpText<"The version of target SDK used for compilation">;
+
+def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
+  HelpText<"The version of target variant SDK used for compilation">;
+
+def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
+  HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

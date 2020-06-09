@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop  %s -emit-ir | %FileCheck --check-prefixes=CHECK,CHECK-objc %s
+// RUN: %target-swift-frontend -disable-objc-interop %s -emit-ir | %FileCheck --check-prefixes=CHECK,CHECK-native %s
 
 // REQUIRES: CPU=x86_64
 
@@ -36,13 +37,16 @@ entry(%x : $*Foo):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @generic_type_concrete_method_witness(%T19sil_witness_methods3BarC** noalias nocapture swiftself dereferenceable({{.*}}) %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
+// CHECK-objc:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
+// CHECK-native:  [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 7
 // CHECK:         %T = load %swift.type*, %swift.type** [[T1]], align 8
 // CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[U0]], i64 11
+// CHECK-objc:    [[U1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[U0]], i64 11
+// CHECK-native:  [[U1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[U0]], i64 8
 // CHECK:         %U = load %swift.type*, %swift.type** [[U1]], align 8
 // CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 12
+// CHECK-objc:    [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 12
+// CHECK-native:  [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 9
 // CHECK:         %V = load %swift.type*, %swift.type** [[V1]], align 8
 sil @generic_type_concrete_method_witness : $@convention(witness_method: P) <T, U, V> (@in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
 entry(%x : $*Bar<T, U, V>):
@@ -66,13 +70,16 @@ entry(%x : $@thick Foo.Type):
 //   The use of %0 or %Self here is irrelevant.
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @generic_type_concrete_static_method_witness(%swift.type* swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
+// CHECK-objc:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
+// CHECK-native:  [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 7
 // CHECK:         %T = load %swift.type*, %swift.type** [[T1]], align 8
 // CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[U0]], i64 11
+// CHECK-objc:    [[U1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[U0]], i64 11
+// CHECK-native:  [[U1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[U0]], i64 8
 // CHECK:         %U = load %swift.type*, %swift.type** [[U1]], align 8
 // CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 12
+// CHECK-objc:    [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 12
+// CHECK-native:  [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 9
 // CHECK:         %V = load %swift.type*, %swift.type** [[V1]], align 8
 sil @generic_type_concrete_static_method_witness : $@convention(witness_method: P) <T, U, V> (@thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {
 entry(%x : $@thick Bar<T, U, V>.Type):

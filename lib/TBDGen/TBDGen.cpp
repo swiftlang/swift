@@ -259,6 +259,7 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
   case swift::PlatformKind::macCatalystApplicationExtension:
     return LinkerPlatformId::macCatalyst;
   }
+  llvm_unreachable("invalid platform kind");
 }
 
 static StringRef
@@ -443,8 +444,8 @@ void TBDGenVisitor::addBaseConformanceDescriptor(
   addSymbol(entity);
 }
 
-void TBDGenVisitor::addConformances(DeclContext *DC) {
-  for (auto conformance : DC->getLocalConformances(
+void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
+  for (auto conformance : IDC->getLocalConformances(
                             ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
     auto needsWTable =
@@ -461,8 +462,9 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     // We cannot emit the witness table symbol if the protocol is imported from
     // another module and it's resilient, because initialization of that protocol
     // is necessary in this case
-    if (!rootConformance->getProtocol()->isResilient(DC->getParentModule(),
-                                                     ResilienceExpansion::Maximal))
+    if (!rootConformance->getProtocol()->isResilient(
+            IDC->getAsGenericContext()->getParentModule(),
+            ResilienceExpansion::Maximal))
       addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
     addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
@@ -473,10 +475,10 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
         rootConformance);
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
-      auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
+      auto witnessRef = SILDeclRef(witnessDecl);
       if (conformanceIsFixed &&
           (isa<SelfProtocolConformance>(rootConformance) ||
-           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage))) {
+           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef))) {
         Mangle::ASTMangler Mangler;
         addSymbol(
             Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
@@ -496,7 +498,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             addSymbolIfNecessary(reqtAccessor, witnessAccessor);
           });
         } else if (isa<EnumElementDecl>(witnessDecl)) {
-          addSymbolIfNecessary(valueReq, witnessDecl);
+          auto getter = storage->getSynthesizedAccessor(AccessorKind::Get);
+          addSymbolIfNecessary(getter, witnessDecl);
         }
       }
     });
@@ -620,7 +623,7 @@ void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
   for (auto *param : *PL) {
     if (param->isDefaultArgument())
       addSymbol(SILDeclRef::getDefaultArgGenerator(VD, index));
-    index++;
+    ++index;
   }
 }
 
@@ -1016,13 +1019,12 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
 void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
   visitNominalTypeDecl(ED);
-
-  if (!ED->isResilient())
-    return;
 }
 
 void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
-  addSymbol(LinkEntity::forEnumCase(EED));
+  if (EED->getParentEnum()->isResilient())
+    addSymbol(LinkEntity::forEnumCase(EED));
+
   if (auto *PL = EED->getParameterList())
     visitDefaultArguments(EED, PL);
 }

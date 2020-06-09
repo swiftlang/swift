@@ -8,4 +8,4 @@ let allocated = UnsafeMutableRawPointer.allocate(byteCount: 128, alignment: 1)
 allocated.deallocate()
 allocated.deallocate()
 
-// CHECK: ERROR: invalid chunk state
+// CHECK: {{ERROR: invalid chunk state|\*\*\* GWP-ASan detected a memory error \*\*\*}}

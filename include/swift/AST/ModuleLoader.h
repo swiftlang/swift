@@ -22,8 +22,8 @@
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "swift/AST/ModuleDependencies.h"
 
 namespace llvm {
 class FileCollector;
@@ -41,8 +41,12 @@ class ClangImporterOptions;
 class ClassDecl;
 class FileUnit;
 class ModuleDecl;
+class ModuleDependencies;
+class ModuleDependenciesCache;
 class NominalTypeDecl;
+class SourceFile;
 class TypeDecl;
+class CompilerInstance;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -78,6 +82,29 @@ public:
   /// Return the underlying clang::DependencyCollector that this
   /// class wraps.
   std::shared_ptr<clang::DependencyCollector> getClangCollector();
+};
+
+struct SubCompilerInstanceInfo {
+  StringRef CompilerVersion;
+  CompilerInstance* Instance;
+  StringRef Hash;
+  ArrayRef<StringRef> BuildArguments;
+};
+
+/// Abstract interface to run an action in a sub ASTContext.
+struct InterfaceSubContextDelegate {
+  virtual bool runInSubContext(StringRef moduleName,
+                               StringRef interfacePath,
+                               StringRef outputPath,
+                               SourceLoc diagLoc,
+  llvm::function_ref<bool(ASTContext&,ArrayRef<StringRef>, StringRef)> action) = 0;
+  virtual bool runInSubCompilerInstance(StringRef moduleName,
+                                        StringRef interfacePath,
+                                        StringRef outputPath,
+                                        SourceLoc diagLoc,
+                    llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) = 0;
+
+  virtual ~InterfaceSubContextDelegate() = default;
 };
 
 /// Abstract interface that loads named modules into the AST.
@@ -177,6 +204,13 @@ public:
   /// Discover overlays declared alongside this file and add infomation about
   /// them to it.
   void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
+
+  /// Retrieve the dependencies for the given, named module, or \c None
+  /// if no such module exists.
+  virtual Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName,
+      ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate) = 0;
 };
 
 } // namespace swift

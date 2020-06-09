@@ -22,6 +22,7 @@ namespace swift {
 class Decl;
 class Type;
 class TypeDecl;
+class GenericTypeDecl;
 
 namespace symbolgraphgen {
 
@@ -43,6 +44,7 @@ struct SymbolGraph;
 ///
 /// Will have fragments representing the `func foo()` part.
 class DeclarationFragmentPrinter : public ASTPrinter {
+public:
   enum class FragmentKind {
     None,
     Keyword,
@@ -52,9 +54,11 @@ class DeclarationFragmentPrinter : public ASTPrinter {
     Identifier,
     TypeIdentifier,
     GenericParameter,
+    ExternalParam,
+    InternalParam,
     Text,
   };
-
+private:
   /// The output stream to print fragment objects to.
   llvm::json::OStream &OS;
 
@@ -90,6 +94,16 @@ public:
     }
   }
 
+  /// Print an abridged form of a nominal type declaration, as:
+  /// keyword text(" ") typeIdentifier.
+  ///
+  /// Subheadings for types don't include the complete declaration line
+  /// including generics and inheritance.
+  ///
+  /// \param TD The type declaration to print.
+  /// \param PrintKeyword Print the corresponding keyword introducer if `true`.
+  void printAbridgedType(const GenericTypeDecl *TD, bool PrintKeyword);
+
   void printDeclLoc(const Decl *D) override;
 
   void printDeclNameEndLoc(const Decl *D) override {
@@ -107,6 +121,8 @@ public:
   void printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
                     PrintNameContext NameContext) override;
 
+  /// Print plain text to the current fragment, opening a new text fragment
+  /// if there isn't an open fragment.
   void printText(StringRef Text) override;
 
   ~DeclarationFragmentPrinter() {

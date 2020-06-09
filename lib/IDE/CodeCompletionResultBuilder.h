@@ -40,6 +40,9 @@ struct ExpectedTypeContext {
   /// Possible types of the code completion expression.
   llvm::SmallVector<Type, 4> possibleTypes;
 
+  /// Pre typechecked type of the expression at the completion position.
+  Type idealType;
+
   /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
   /// `foo({ here })`.
   ///
@@ -77,13 +80,6 @@ class CodeCompletionResultBuilder {
   bool IsNotRecommended = false;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
     CodeCompletionResult::NotRecommendedReason::NoReason;
-
-  /// Annotated results are requested by the client.
-  ///
-  /// This affects the structure of the CodeCompletionString.
-  bool shouldAnnotateResults() {
-    return Sink.annotateResult;
-  }
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -123,6 +119,13 @@ public:
     Cancelled = true;
   }
 
+  /// Annotated results are requested by the client.
+  ///
+  /// This affects the structure of the CodeCompletionString.
+  bool shouldAnnotateResults() {
+    return Sink.annotateResult;
+  }
+
   void setNumBytesToErase(unsigned N) {
     NumBytesToErase = N;
   }
@@ -136,10 +139,17 @@ public:
     NotRecReason = Reason;
   }
 
+  void setSemanticContext(SemanticContextKind Kind) {
+    SemanticContext = Kind;
+  }
+
   void
   setExpectedTypeRelation(CodeCompletionResult::ExpectedTypeRelation relation) {
     ExpectedTypeRelation = relation;
   }
+
+  void withNestedGroup(CodeCompletionString::Chunk::ChunkKind Kind,
+                  llvm::function_ref<void()> body);
 
   void addAccessControlKeyword(AccessLevel Access) {
     switch (Access) {
@@ -350,42 +360,43 @@ public:
   }
 
   void addSimpleNamedParameter(StringRef name) {
-    CurrentNestingLevel++;
-    addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-    // Use internal, since we don't want the name to be outside the placeholder.
-    addChunkWithText(
-        CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-        name);
-    CurrentNestingLevel--;
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin, [&] {
+      // Use internal, since we don't want the name to be outside the
+      // placeholder.
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
+          name);
+    });
   }
 
   void addSimpleTypedParameter(StringRef Annotation, bool IsVarArg = false) {
-    CurrentNestingLevel++;
-    addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
-                     Annotation);
-    if (IsVarArg)
-      addEllipsis();
-    CurrentNestingLevel--;
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin, [&] {
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterType,
+          Annotation);
+      if (IsVarArg)
+        addEllipsis();
+    });
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
                         Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                        bool isAutoClosure);
+                        bool isAutoClosure, bool useUnderscoreLabel,
+                        bool isLabeledTrailingClosure);
 
   void addCallParameter(Identifier Name, Type Ty, Type ContextTy = Type()) {
     addCallParameter(Name, Identifier(), Ty, ContextTy,
                      /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
-                     /*isAutoClosure=*/false);
+                     /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
+                     /*isLabeledTrailingClosure=*/false);
   }
 
   void addGenericParameter(StringRef Name) {
-    CurrentNestingLevel++;
-    addSimpleChunk(
-       CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin);
-    addChunkWithText(
-      CodeCompletionString::Chunk::ChunkKind::GenericParameterName, Name);
-    CurrentNestingLevel--;
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin,
+               [&] {
+      addChunkWithText(
+        CodeCompletionString::Chunk::ChunkKind::GenericParameterName, Name);
+    });
   }
 
   void addDynamicLookupMethodCallTail() {
@@ -405,6 +416,8 @@ public:
         CodeCompletionString::Chunk::ChunkKind::TypeAnnotation, Type);
     getLastChunk().setIsAnnotation();
   }
+
+  void addTypeAnnotation(Type T, PrintOptions PO, StringRef suffix = "");
 
   void addBraceStmtWithCursor(StringRef Description = "") {
     addChunkWithText(

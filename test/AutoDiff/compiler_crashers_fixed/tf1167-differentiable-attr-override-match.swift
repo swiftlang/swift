@@ -10,7 +10,7 @@
 
 public protocol Base {
   associatedtype Input
-  // expected-error @+1 {{use of undeclared type 'Differentiable'}}
+  // expected-error @+1 {{cannot find type 'Differentiable' in scope}}
   associatedtype Output: Differentiable
 
   // expected-error @+1 {{@differentiable attribute used without importing module '_Differentiation'}}

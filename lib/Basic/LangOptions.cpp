@@ -361,7 +361,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // Set the "targetEnvironment" platform condition if targeting a simulator
   // environment. Otherwise _no_ value is present for targetEnvironment; it's
   // an optional disambiguating refinement of the triple.
-  if (swift::tripleIsAnySimulator(Target))
+  if (Target.isSimulatorEnvironment())
     addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
                               "simulator");
 

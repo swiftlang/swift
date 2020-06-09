@@ -9,7 +9,7 @@
 // Compile the module.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -working-directory %t -parse-as-library -emit-module -module-name external -emit-module-path %t/external.swiftmodule -emit-library -static %S/Inputs/loadable_by_address_cross_module.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(external)) %S/Inputs/loadable_by_address_cross_module.swift -emit-module -emit-module-path %t/external.swiftmodule -module-name external
 
 // Next, check that differentiability_witness_functions in the client get
 // correctly modified by LBA.
@@ -26,8 +26,10 @@
 
 // Finally, execute the test.
 
-// RUN: %target-build-swift -I%t -L%t %s -o %t/a.out -lm -lexternal
-// RUN: %target-run %t/a.out
+// RUN: %target-build-swift -I%t -L%t %s -o %t/a.out %target-rpath(%t) -L%t -lexternal
+// RUN: %target-codesign %t/a.out
+// RUN: %target-codesign %t/%target-library-name(external)
+// RUN: %target-run %t/a.out %t/%target-library-name(external)
 
 // REQUIRES: executable_test
 

@@ -37,6 +37,7 @@ class SourceFileSyntax;
 } // namespace swift
 
 namespace SourceKit {
+class GlobalConfig;
 
 struct EntityInfo {
   UIdent Kind;
@@ -92,6 +93,7 @@ struct CodeCompletionInfo {
   UIdent TypeRelation;
   Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
+  bool IsSystem;
   unsigned NumBytesToErase;
 
   struct IndexRange {
@@ -145,7 +147,8 @@ public:
   virtual void failed(StringRef ErrDescription) = 0;
 
   virtual void setCompletionKind(UIdent kind) {};
-  virtual void setReusingASTContext(bool) {};
+  virtual void setReusingASTContext(bool) = 0;
+  virtual void setAnnotatedTypename(bool) = 0;
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
@@ -650,6 +653,8 @@ public:
   const static std::string SynthesizedUSRSeparator;
 
   virtual ~LangSupport() { }
+
+  virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,

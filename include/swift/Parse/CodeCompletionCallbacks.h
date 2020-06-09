@@ -198,6 +198,9 @@ public:
 
   virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
 
+  virtual void completeLabeledTrailingClosure(CodeCompletionExpr *E,
+                                              bool isAtStartOfLine) {};
+
   virtual void completeReturnStmt(CodeCompletionExpr *E) {};
 
   /// Complete a yield statement.  A missing yield index means that the
@@ -218,6 +221,8 @@ public:
   virtual void completeAfterIfStmt(bool hasElse) {};
 
   virtual void completeGenericRequirement() {};
+
+  virtual void completeStmtLabel(StmtKind ParentKind) {};
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

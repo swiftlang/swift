@@ -83,6 +83,14 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
 
+  Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
+
+  // Always track system dependencies when scanning dependencies.
+  if (const Arg *ModeArg = Args.getLastArg(OPT_modes_Group)) {
+    if (ModeArg->getOption().matches(OPT_scan_dependencies))
+      Opts.TrackSystemDeps = true;
+  }
+
   Opts.SerializeModuleInterfaceDependencyHashes |=
     Args.hasArg(OPT_serialize_module_interface_dependency_hashes);
 
@@ -96,13 +104,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeTBDOptions();
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
-
-  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
-
-  computePlaygroundOptions();
-
-  // This can be enabled independently of the playground transform.
-  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
@@ -255,15 +256,6 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
   }
 }
 
-void ArgsToFrontendOptionsConverter::computePlaygroundOptions() {
-  using namespace options;
-  Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
-  if (Args.hasArg(OPT_disable_playground_transform))
-    Opts.PlaygroundTransform = false;
-  Opts.PlaygroundHighPerformance |=
-      Args.hasArg(OPT_playground_high_performance);
-}
-
 void ArgsToFrontendOptionsConverter::computeHelpOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
@@ -345,6 +337,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitPCH;
   if (Opt.matches(OPT_emit_imported_modules))
     return FrontendOptions::ActionType::EmitImportedModules;
+  if (Opt.matches(OPT_scan_dependencies))
+    return FrontendOptions::ActionType::ScanDependencies;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
   if (Opt.matches(OPT_resolve_imports))
@@ -413,8 +407,6 @@ bool ArgsToFrontendOptionsConverter::setUpInputKindAndImmediateArgs() {
     Opts.InputKind = InputFileKind::SwiftModuleInterface;
   else if (Args.hasArg(OPT_parse_as_library))
     Opts.InputKind = InputFileKind::SwiftLibrary;
-  else if (Opts.RequestedAction == FrontendOptions::ActionType::REPL)
-    Opts.InputKind = InputFileKind::SwiftREPL;
   else
     Opts.InputKind = InputFileKind::Swift;
 
@@ -564,7 +556,13 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
   using namespace options;
   for (const Arg *A : Args.filtered(OPT_import_module)) {
-    Opts.ImplicitImportModuleNames.push_back(A->getValue());
+    auto *moduleStr = A->getValue();
+    if (!Lexer::isIdentifier(moduleStr)) {
+      Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleStr,
+                     /*suggestModuleNameFlag*/ false);
+      continue;
+    }
+    Opts.ImplicitImportModuleNames.push_back(moduleStr);
   }
 }
 void ArgsToFrontendOptionsConverter::computeLLVMArgs() {

@@ -223,3 +223,101 @@ TEST(FrozenMultiMapCustomTest, RandomAgainstStdMultiMap) {
     }
   }
 }
+
+TEST(FrozenMultiMapCustomTest, SimpleErase1) {
+  Canary::resetIDs();
+  FrozenMultiMap<Canary, Canary> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+
+  EXPECT_TRUE(map.erase(key2));
+  EXPECT_FALSE(map.erase(key2));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 1);
+
+    {
+      auto begin = range.begin();
+      auto end = range.end();
+      ++begin;
+      EXPECT_EQ(std::distance(begin, end), 0);
+    }
+
+    auto iter = range.begin();
+    {
+      auto p = *iter;
+      EXPECT_EQ(p.first.getID(), key1.getID());
+      EXPECT_EQ(p.second.size(), 3u);
+      EXPECT_EQ(p.second[0].getID(), 2u);
+      EXPECT_EQ(p.second[1].getID(), 3u);
+      EXPECT_EQ(p.second[2].getID(), 4u);
+    }
+  }
+
+  EXPECT_TRUE(map.erase(key1));
+  EXPECT_FALSE(map.erase(key1));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 0);
+  }
+}
+
+TEST(FrozenMultiMapCustomTest, SimpleErase2) {
+  Canary::resetIDs();
+  FrozenMultiMap<Canary, Canary> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+
+  EXPECT_TRUE(map.erase(key1));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 1);
+
+    {
+      auto begin = range.begin();
+      auto end = range.end();
+      ++begin;
+      EXPECT_EQ(std::distance(begin, end), 0);
+    }
+
+    auto iter = range.begin();
+    {
+      auto p = *iter;
+      EXPECT_EQ(p.first.getID(), key2.getID());
+      EXPECT_EQ(p.second.size(), 2u);
+      EXPECT_EQ(p.second[0].getID(), 5u);
+      EXPECT_EQ(p.second[1].getID(), 6u);
+    }
+  }
+
+  EXPECT_TRUE(map.erase(key2));
+  EXPECT_FALSE(map.erase(key2));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 0);
+  }
+}

@@ -13,6 +13,7 @@
 import SwiftShims
 
 %{
+from __future__ import division
 from SwiftIntTypes import all_integer_types
 from SwiftFloatingPointTypes import all_floating_point_types
 
@@ -903,7 +904,7 @@ extension ${Self}: _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLite
 }
 
 % if bits != 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 
 % builtinFloatLiteralBits = 80
@@ -981,7 +982,7 @@ extension ${Self}: Hashable {
   %elif bits == 64:
     return Hasher._hash(seed: seed, v.bitPattern)
   %elif bits < 64:
-    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: ${bits/8})
+    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: ${bits//8})
   %else:
     #error("Unimplemented")
   %end

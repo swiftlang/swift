@@ -164,7 +164,6 @@
 #include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -225,26 +224,6 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     Return
   };
 
-  /// Indicates to what a value escapes. Note: the order of values is important.
-  enum class EscapeState : char {
-
-    /// The node's value does not escape.
-    /// The value points to a locally allocated object who's lifetime ends in
-    /// the same function.
-    None,
-    
-    /// The node's value escapes through the return value.
-    /// The value points to a locally allocated object which escapes via the
-    /// return instruction.
-    Return,
-
-    /// The node's value escapes through a function argument.
-    Arguments,
-
-    /// The node's value escapes to any global or unidentified memory.
-    Global
-  };
-
   // Must be ordered from most precise to least precise. A meet across memory
   // locations (such as aggregate fields) always moves down.
   enum PointerKind { NoPointer, ReferenceOnly, AnyPointer };
@@ -276,6 +255,27 @@ private:
   };
 
 public:
+  
+  /// Indicates to what a value escapes. Note: the order of values is important.
+  enum class EscapeState : char {
+
+    /// The node's value does not escape.
+    /// The value points to a locally allocated object who's lifetime ends in
+    /// the same function.
+    None,
+    
+    /// The node's value escapes through the return value.
+    /// The value points to a locally allocated object which escapes via the
+    /// return instruction.
+    Return,
+
+    /// The node's value escapes through a function argument.
+    Arguments,
+
+    /// The node's value escapes to any global or unidentified memory.
+    Global
+  };
+
 
   /// A node in the connection graph.
   /// A node basically represents a "pointer" or the "memory content" where a
@@ -652,6 +652,9 @@ public:
     /// True if this is a summary graph.
     bool isSummaryGraph;
 
+    /// True if the graph could be computed.
+    bool valid = true;
+
     /// Track the currently active intrusive worklist -- one at a time.
     CGNodeWorklist *activeWorklist = nullptr;
 
@@ -859,6 +862,22 @@ public:
     bool forwardTraverseDefer(CGNode *startNode, CGNodeVisitor &&visitor);
 
   public:
+  
+    /// Returns true if the graph could be computed.
+    ///
+    /// For very large functions (> 10000 nodes), graphs are not cumputed to
+    /// avoid quadratic complexity of the node merging algorithm.
+    bool isValid() const {
+      assert((valid || isEmpty()) && "invalid graph must not contain nodes");
+      return valid;
+    }
+    
+    /// Invalides the graph in case it's getting too large.
+    void invalidate() {
+      clear();
+      valid = false;
+    }
+  
     /// Get the content node pointed to by \p ptrVal.
     ///
     /// If \p ptrVal cannot be mapped to a node, return nullptr.
@@ -1045,8 +1064,7 @@ private:
   /// If \p ai is an optimizable @_semantics("array.uninitialized") call, return
   /// valid call information.
   ArrayUninitCall
-  canOptimizeArrayUninitializedCall(ApplyInst *ai,
-                                    const ConnectionGraph *conGraph);
+  canOptimizeArrayUninitializedCall(ApplyInst *ai);
 
   /// Return true of this tuple_extract is the result of an optimizable
   /// @_semantics("array.uninitialized") call.

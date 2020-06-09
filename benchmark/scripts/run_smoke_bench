@@ -272,6 +272,7 @@ def report_code_size(opt_level, old_dir, new_dir, platform, output_file):
     old_lines = ""
     new_lines = ""
     for oldfile in files:
+        new_dir = os.path.join(new_dir, '')
         newfile = oldfile.replace(old_dir, new_dir, 1)
         if os.path.isfile(newfile):
             oldsize = get_codesize(oldfile)

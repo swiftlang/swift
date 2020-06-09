@@ -1,4 +1,3 @@
-// REQUIRES: OS=macosx
 // RUN: %empty-directory(%t.mod)
 // RUN: %empty-directory(%t.sdk)
 // RUN: %empty-directory(%t.module-cache)

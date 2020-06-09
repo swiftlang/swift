@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_NAME_LOOKUP_H
 #define SWIFT_AST_NAME_LOOKUP_H
 
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Identifier.h"
@@ -419,7 +418,7 @@ public:
     // to avoid circular validation.
     if (isTypeLookup && !isa<TypeDecl>(VD))
       return;
-    if (VD->getFullName().matchesRef(name.getFullName()))
+    if (VD->getName().matchesRef(name.getFullName()))
       results.push_back(LookupResultEntry(VD));
   }
 };
@@ -455,6 +454,26 @@ bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                          const DeclContext *dc);
 
+/// Remove any operators in the given set that are shadowed by
+/// other operators in that set.
+///
+/// \param decls The set of operators being considered.
+/// \param dc The DeclContext from which the lookup was performed.
+///
+/// \returns true if any shadowed declarations were removed.
+bool removeShadowedDecls(TinyPtrVector<OperatorDecl *> &decls,
+                         const DeclContext *dc);
+
+/// Remove any precedence groups in the given set that are shadowed by
+/// other precedence groups in that set.
+///
+/// \param decls The set of precedence groups being considered.
+/// \param dc The DeclContext from which the lookup was performed.
+///
+/// \returns true if any shadowed declarations were removed.
+bool removeShadowedDecls(TinyPtrVector<PrecedenceGroupDecl *> &decls,
+                         const DeclContext *dc);
+
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
 /// the SourceLoc is used to determine which declarations in that function
@@ -473,6 +492,7 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC,
                               bool includeInstanceMembers,
                               bool includeDerivedRequirements,
+                              bool includeProtocolExtensionMembers,
                               GenericSignatureBuilder *GSB = nullptr);
 
 namespace namelookup {

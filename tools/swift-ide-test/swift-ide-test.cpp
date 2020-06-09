@@ -794,8 +794,8 @@ static bool doCodeCompletionImpl(
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
       [&](CompilerInstance &CI, bool reusingASTContext) {
         assert(!reusingASTContext && "reusing AST context without enabling it");
-        auto SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        auto *SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF, *callbacksFactory);
       });
   return isSuccess ? 0 : 1;
 }
@@ -888,7 +888,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(InputFileKind::SwiftREPL);
+  Invocation.setInputKind(InputFileKind::Swift);
 
   CompilerInstance CI;
 
@@ -897,13 +897,21 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  auto &ctx = CI.getASTContext();
+  registerIDERequestFunctions(ctx.evaluator);
 
-  SourceFile &SF = CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL);
+  // Create an initial empty SourceFile. This only exists to feed in the
+  // implicit stdlib import.
+  ImplicitImportInfo importInfo;
+  importInfo.StdlibKind = ImplicitStdlibKind::Stdlib;
+  auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
+                               ctx, importInfo);
+  auto *SF = new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ None);
+  M->addFile(*SF);
+  performImportResolution(*SF);
 
   REPLCompletions REPLCompl;
-  REPLCompl.populate(SF, BufferText);
+  REPLCompl.populate(*SF, BufferText);
   llvm::outs() << "Begin completions\n";
   for (StringRef S : REPLCompl.getCompletionList()) {
     llvm::outs() << S << "\n";
@@ -1524,7 +1532,7 @@ private:
   void printLoc(SourceLoc Loc, raw_ostream &OS) {
     OS << '@';
     if (Loc.isValid() && SM.findBufferContainingLoc(Loc) == BufferID) {
-      auto LineCol = SM.getLineAndColumn(Loc, BufferID);
+      auto LineCol = SM.getPresumedLineAndColumnForLoc(Loc, BufferID);
       OS  << LineCol.first << ':' << LineCol.second;
     }
   }
@@ -1656,7 +1664,7 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
   if (isSourceInputComplete(std::move(FileBuf),
-                            SourceFileKind::REPL).IsComplete) {
+                            SourceFileKind::Main).IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
@@ -1699,6 +1707,9 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
+  if (!RunTypeChecker)
+    Invocation.getLangOptions().DisablePoundIfEvaluation = true;
+
   CompilerInstance CI;
 
   // Display diagnostics to stderr.
@@ -1716,9 +1727,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     CI.getMainModule()->setDebugClient(DebuggerClient.get());
   }
 
-  if (!RunTypeChecker)
-    CI.performParseOnly();
-  else
+  if (RunTypeChecker)
     CI.performSema();
 
   if (MangledNameToFind.empty()) {
@@ -2174,34 +2183,13 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    // Split the module path.
-    std::vector<StringRef> ModuleName;
-    while (!ModuleToPrint.empty()) {
-      StringRef SubModuleName;
-      std::tie(SubModuleName, ModuleToPrint) = ModuleToPrint.split('.');
-      ModuleName.push_back(SubModuleName);
-    }
-    assert(!ModuleName.empty());
-
-    // FIXME: If ModuleToPrint is a submodule, get its top-level module, which
-    // will be the DeclContext for all of its Decls since we don't have first-
-    // class submodules.
-    if (ModuleName.size() > 1) {
-      M = getModuleByFullName(Context, ModuleName[0]);
-      if (!M) {
-        llvm::errs() << "error: could not find module '" << ModuleName[0]
-                     << "'\n";
-        ExitCode = 1;
-        continue;
-      }
-    }
     std::vector<StringRef> GroupNames;
     for (StringRef G : GroupsToPrint) {
       GroupNames.push_back(G);
     }
 
-    printSubmoduleInterface(M, ModuleName, GroupNames, TraversalOptions,
-                            *Printer, Options, SynthesizeExtensions);
+    printModuleInterface(M, GroupNames, TraversalOptions, *Printer, Options,
+                         SynthesizeExtensions);
   }
 
   return ExitCode;
@@ -2386,7 +2374,8 @@ public:
       SourceCode = SM.extractText({ SR.Start,
                                     SM.getByteDistance(SR.Start, EndCharLoc) });
       unsigned Column;
-      std::tie(Line, Column) = SM.getLineAndColumn(SR.Start, BufferID);
+      std::tie(Line, Column) =
+          SM.getPresumedLineAndColumnForLoc(SR.Start, BufferID);
     }
 
     OS.indent(IndentLevel * 2);
@@ -2610,7 +2599,7 @@ public:
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
-        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << SM.getDisplayNameForLoc(Loc)
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       } else {
@@ -2629,7 +2618,7 @@ public:
     } else if (isa<ExtensionDecl>(D)) {
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
-        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << SM.getDisplayNameForLoc(Loc)
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       } else {
@@ -2766,22 +2755,22 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
 
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
     for (auto next : namelookup::getAllImports(M)) {
-      llvm::outs() << next.second->getName();
-      if (next.second->isClangModule())
+      llvm::outs() << next.importedModule->getName();
+      if (next.importedModule->isClangModule())
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.second->getImportedModules(scratch,
-                                      ModuleDecl::ImportFilterKind::Public);
+      next.importedModule->getImportedModules(
+          scratch, ModuleDecl::ImportFilterKind::Public);
       // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
       for (auto &import : scratch) {
-        llvm::outs() << "\t" << import.second->getName();
-        for (auto accessPathPiece : import.first) {
+        llvm::outs() << "\t" << import.importedModule->getName();
+        for (auto accessPathPiece : import.accessPath) {
           llvm::outs() << "." << accessPathPiece.Item;
         }
 
-        if (import.second->isClangModule())
+        if (import.importedModule->isClangModule())
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
@@ -2908,7 +2897,7 @@ private:
 
   void printLoc(SourceLoc Loc) {
     if (Loc.isValid()) {
-      auto LineCol = SM.getLineAndColumn(Loc, BufferID);
+      auto LineCol = SM.getPresumedLineAndColumnForLoc(Loc, BufferID);
       OS << LineCol.first << ':' << LineCol.second;
     }
   }
@@ -3236,7 +3225,7 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
+static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args, bool ForceNoOutputs) {
   PrintingDiagnosticConsumer PDC;
   SourceManager SM;
   DiagnosticEngine Diags(SM);
@@ -3245,8 +3234,13 @@ static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
   CompilerInvocation CI;
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
       Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    llvm::outs() << "Frontend Arguments BEGIN\n";
+    for (const char *arg : FrontendArgs) {
+      llvm::outs() << arg << "\n";
+    }
+    llvm::outs() << "Frontend Arguments END\n";
     return CI.parseArgs(FrontendArgs, Diags);
-  });
+  }, ForceNoOutputs);
 
   if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
@@ -3284,8 +3278,13 @@ int main(int argc, char *argv[]) {
     // llvm::cl::ParseCommandLineOptions.
     StringRef FirstArg(argv[1]);
     if (FirstArg == "-test-createCompilerInvocation") {
+      bool ForceNoOutputs = false;
       ArrayRef<const char *> Args(argv + 2, argc - 2);
-      return doTestCreateCompilerInvocation(Args);
+      if (argc > 2 && StringRef(argv[2]) == "-force-no-outputs") {
+        ForceNoOutputs = true;
+        Args = Args.drop_front();
+      }
+      return doTestCreateCompilerInvocation(Args, ForceNoOutputs);
     }
   }
 

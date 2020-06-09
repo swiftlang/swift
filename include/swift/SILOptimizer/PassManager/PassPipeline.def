@@ -24,7 +24,6 @@
 
 PASSPIPELINE(Diagnostic, "Guaranteed Passes")
 PASSPIPELINE(OwnershipEliminator, "Utility pass to just run the ownership eliminator pass")
-PASSPIPELINE(SILOptPrepare, "Passes that prepare SIL for -O")
 PASSPIPELINE(Performance, "Passes run at -O")
 PASSPIPELINE(Onone, "Passes run at -Onone")
 PASSPIPELINE(InstCount, "Utility pipeline to just run the inst count pass")

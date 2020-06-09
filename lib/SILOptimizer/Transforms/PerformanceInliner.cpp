@@ -284,8 +284,8 @@ bool SILPerformanceInliner::isProfitableToInline(
 
     // Don't inline class methods.
     if (Callee->hasSelfParam()) {
-      auto SelfTy = Callee->getLoweredFunctionType()
-                          ->getSelfInstanceType(FuncBuilder.getModule());
+      auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType(
+          FuncBuilder.getModule(), AI.getFunction()->getTypeExpansionContext());
       if (SelfTy->mayHaveSuperclass() &&
           Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
         isClassMethodAtOsize = true;
@@ -881,7 +881,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   for (auto AI : InitialCandidates) {
     SILFunction *Callee = AI.getReferencedFunctionOrNull();
     assert(Callee && "apply_inst does not have a direct callee anymore");
-    CalleeCount[Callee]++;
+    ++CalleeCount[Callee];
   }
 
   // Now copy each candidate callee that has a small enough number of
@@ -948,7 +948,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // will assert, so we are safe making this assumption.
     SILInliner::inlineFullApply(AI, SILInliner::InlineKind::PerformanceInline,
                                 FuncBuilder);
-    NumFunctionsInlined++;
+    ++NumFunctionsInlined;
   }
   // The inliner splits blocks at call sites. Re-merge trivial branches to
   // reestablish a canonical CFG.

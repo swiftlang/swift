@@ -81,3 +81,8 @@ class Sub2 : Super2 { //// expected-error{{inheritance from a final class 'Super
 
   final override init() {} // expected-error {{'final' modifier cannot be applied to this declaration}} {{3-9=}}
 }
+
+struct Box<T> {
+  final class Super3 {}
+}
+class Sub3: Box<Int>.Super3 {} // expected-error{{inheritance from a final class 'Box.Super3'}}

@@ -10,7 +10,7 @@
 // CHECK-FATAL: failed to import bridging header
 
 // CHECK-INCLUDE: error: 'this-header-does-not-exist.h' file not found
-// CHECK-INCLUDE: error: use of unresolved identifier 'MyPredicate'
+// CHECK-INCLUDE: error: cannot find 'MyPredicate' in scope
 
 // REQUIRES: objc_interop
 

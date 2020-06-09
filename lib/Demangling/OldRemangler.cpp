@@ -1201,7 +1201,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
   auto i = node->begin(), e = node->end();
   if (i != e && (*i)->getKind() == Node::Kind::ImplConvention) {
     StringRef text = (*i)->getText();
-    i++;
+    ++i;
     if (text == "@callee_unowned") {
       Buffer << 'd';
     } else if (text == "@callee_guaranteed") {
@@ -1224,7 +1224,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
     Buffer << ((*i)->getKind() == Node::Kind::DependentGenericSignature
               ? 'G' : 'g');
     mangleDependentGenericSignature((*i));
-    i++;
+    ++i;
   }
   Buffer << '_';
   for (; i != e && (*i)->getKind() == Node::Kind::ImplParameter; ++i) {
@@ -1324,6 +1324,19 @@ void Remangler::mangleImplConvention(Node *node) {
   } else {
     unreachable("invalid impl convention");
   }
+}
+
+void Remangler::mangleImplDifferentiability(Node *node) {
+  assert(node->getKind() == Node::Kind::ImplDifferentiability);
+  StringRef text = node->getText();
+  // Empty string represents default differentiability.
+  if (text.empty())
+    return;
+  if (text == "@noDerivative") {
+    Buffer << 'w';
+    return;
+  }
+  unreachable("Invalid impl differentiability");
 }
 
 void Remangler::mangleDynamicSelf(Node *node) {
@@ -2118,6 +2131,17 @@ void Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node) {
 }
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
+}
+
+void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
+  Buffer << "MM";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mb";
 }
 
 /// The top-level interface to the remangler.

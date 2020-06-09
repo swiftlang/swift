@@ -40,6 +40,14 @@ typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint8_t _swift_shims_UInt8;
 typedef __swift_uint32_t _swift_shims_CFStringEncoding;
 
+/* This is layout-compatible with constant CFStringRefs on Darwin */
+typedef struct __swift_shims_builtin_CFString {
+  const void * _Nonnull isa; // point to __CFConstantStringClassReference
+  unsigned long flags;
+  const __swift_uint8_t * _Nonnull str;
+  unsigned long length;
+} _swift_shims_builtin_CFString;
+
 SWIFT_RUNTIME_STDLIB_API
 __swift_uint8_t _swift_stdlib_isNSString(id _Nonnull obj);
 
@@ -62,6 +70,10 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
                                            _swift_shims_UInt8 *_Nonnull buffer,
                                            _swift_shims_CFIndex maxLength,
                                            unsigned long encoding);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_uint8_t
+_swift_stdlib_dyld_is_objc_constant_string(const void * _Nonnull addr);
   
 #endif // __OBJC2__
 

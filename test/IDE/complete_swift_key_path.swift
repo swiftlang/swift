@@ -29,6 +29,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_GENERICRESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_ROOT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_NONROOT | %FileCheck %s -check-prefix=OBJ-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_INOUT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_VARIADIC | %FileCheck %s -check-prefix=ARRAYTYPE-DOT
 
 class Person {
     var name: String
@@ -60,16 +62,16 @@ let _ = \Person.#^TYPE_DOT^#
 
 let _ = \Person.friends#^ARRAY_NODOT^#
 // ARRAY-NODOT: Begin completions
-// ARRAY-NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Person#]; name=[index: Int]
-// ARRAY-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
-// ARRAY-NODOT-DAG: Decl[InstanceVar]/Super:            .first[#Person?#]; name=first
+// ARRAY-NODOT-DAG: Decl[Subscript]/CurrNominal/IsSystem:   [{#(index): Int#}][#Person#]; name=[index: Int]
+// ARRAY-NODOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .count[#Int#]; name=count
+// ARRAY-NODOT-DAG: Decl[InstanceVar]/Super/IsSystem:       .first[#Person?#]; name=first
 
 let _ = \Person.friends.#^ARRAY_DOT^#
 // ARRAY-DOT: Begin completions
-// ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Element#]; name=[Int]
-// ARRAY-DOT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-// ARRAY-DOT-DAG: Decl[InstanceVar]/Super:            first[#Person?#]; name=first
-// ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Element#]; name=[Int]
+// ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal/IsSystem:     [{#(index): Int#}][#Element#]; name=[Int]
+// ARRAY-DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem:   count[#Int#]; name=count
+// ARRAY-DOT-DAG: Decl[InstanceVar]/Super/IsSystem:         first[#Person?#]; name=first
+// ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal/IsSystem:     [{#(index): Int#}][#Element#]; name=[Int]
 
 let _ = \Person.friends[0]#^OBJ_NODOT^#
 // OBJ-NODOT: Begin completions, 5 items
@@ -93,7 +95,7 @@ let _ = \Person.bestFriend#^OPTIONAL_NODOT^#
 // OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.bestFriend[#Person?#]; name=bestFriend
 // OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.itself[#Person#]; name=itself
 // OPTIONAL-NODOT-NEXT: Decl[Subscript]/CurrNominal:        ?[{#(index): Int#}][#Int#]; name=[index: Int]
-// OPTIONAL-NODOT: Decl[InstanceVar]/CurrNominal:      .unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
+// OPTIONAL-NODOT: Decl[InstanceVar]/CurrNominal/IsSystem:  .unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
 
 let _ = \Person.bestFriend.#^OPTIONAL_DOT^#
 // OPTIONAL-DOT: Begin completions
@@ -101,7 +103,7 @@ let _ = \Person.bestFriend.#^OPTIONAL_DOT^#
 // OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.friends[#[Person]#]; name=friends
 // OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.bestFriend[#Person?#]; name=bestFriend
 // OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.itself[#Person#]; name=itself
-// OPTIONAL-DOT: Decl[InstanceVar]/CurrNominal:      unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
+// OPTIONAL-DOT: Decl[InstanceVar]/CurrNominal/IsSystem:      unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
 
 let _ = \Person.bestFriend?#^UNWRAPPED_NODOT^#
 // Same as OBJ_NODOT.
@@ -117,15 +119,15 @@ let _ = \Person.bestFriend?.itself.#^CHAIN_DOT^#
 
 let _ = \[Person]#^ARRAYTYPE_NODOT^#
 // ARRAYTYPE-NODOT: Begin completions
-// ARRAYTYPE-NODOT-DAG: Decl[Subscript]/CurrNominal:        .[{#(index): Int#}][#Person#]; name=[index: Int]
-// ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
-// ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/Super:            .first[#Person?#]; name=first
+// ARRAYTYPE-NODOT-DAG: Decl[Subscript]/CurrNominal/IsSystem:   .[{#(index): Int#}][#Person#]; name=[index: Int]
+// ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .count[#Int#]; name=count
+// ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/Super/IsSystem:       .first[#Person?#]; name=first
 
 let _ = \[Person].#^ARRAYTYPE_DOT^#
 // ARRAYTYPE-DOT: Begin completions
-// ARRAYTYPE-DOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Person#]; name=[index: Int]
-// ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-// ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/Super:            first[#Person?#]; name=first
+// ARRAYTYPE-DOT-DAG: Decl[Subscript]/CurrNominal/IsSystem:   [{#(index): Int#}][#Person#]; name=[index: Int]
+// ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: count[#Int#]; name=count
+// ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       first[#Person?#]; name=first
 
 func test(_ p: Person) {
   let _ = p[keyPath: \Person.#^APPLY_TYPE_DOT^#]
@@ -163,10 +165,16 @@ func recvFuncGeneric<T>(_ fn: (Person) -> T) {
 
 struct Wrap<T> {
   func map<U>(_ fn: (T) -> U) -> U { fatalError() }
+  func _inout<U>(_ fn: (inout T) -> U) -> U { fatalError() }
+  func variadic<U>(_ fn: (T...) -> U) -> U { fatalError() }
 }
 func testKeyPathAsFunctions(wrapped: Wrap<Person>) {
   let _ = wrapped.map(\.#^CONTEXT_FUNC_ROOT^#)
   // Same as TYPE_DOT.
   let _ = wrapped.map(\.friends[0].#^CONTEXT_FUNC_NONROOT^#)
   // Same as OBJ_DOT.
+  let _ = wrapped._inout(\.#^CONTEXT_FUNC_INOUT^#)
+  // Same as TYPE_DOT.
+  let _ = wrapped.variadic(\.#^CONTEXT_FUNC_VARIADIC^#)
+  // Same as ARRAYTYPE_DOT.
 }

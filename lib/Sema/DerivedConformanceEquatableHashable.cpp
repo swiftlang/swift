@@ -55,7 +55,7 @@ storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
       nonconformingProperties.push_back(propertyDecl);
 
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC, None)) {
+                                         DC)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -253,7 +253,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // the same case, binding variables for the left- and right-hand associated
   // values.
   for (auto elt : enumDecl->getAllElements()) {
-    elementCount++;
+    ++elementCount;
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
@@ -294,9 +294,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     }
 
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))
-    auto caseTuplePattern = TuplePattern::create(C, SourceLoc(), {
-      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) },
-                                                 SourceLoc());
+    auto caseTuplePattern = TuplePattern::createImplicit(C, {
+      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) });
     caseTuplePattern->setImplicit();
 
     auto labelItem = CaseLabelItem(caseTuplePattern);
@@ -306,7 +305,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     // constructing long lists of autoclosure-wrapped conditions connected by
     // &&, which the type checker has more difficulty processing.)
     SmallVector<ASTNode, 6> statementsInCase;
-    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
+    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
                                          /*implicit*/true);
@@ -338,8 +337,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // We only generate this if the enum has more than one case. If it has exactly
   // one case, then that single case statement is already exhaustive.
   if (elementCount > 1) {
-    auto defaultPattern = new (C) AnyPattern(SourceLoc());
-    defaultPattern->setImplicit();
+    auto defaultPattern = AnyPattern::createImplicit(C);
     auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                 /*implicit*/ true);
@@ -954,7 +952,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
   if (TypeChecker::conformsToProtocol(
-          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC, None)
+          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC)
           .isInvalid()) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
@@ -962,7 +960,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC, None)
+  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC)
           .isInvalid()) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
@@ -999,7 +997,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
-  Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
+  Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
   hashValuePat->setType(intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
   hashValuePat->setType(intType);
@@ -1026,11 +1024,11 @@ getHashValueRequirement(ASTContext &C) {
 }
 
 static ProtocolConformance *
-getHashableConformance(Decl *parentDecl) {
+getHashableConformance(const Decl *parentDecl) {
   ASTContext &C = parentDecl->getASTContext();
-  auto DC = cast<DeclContext>(parentDecl);
+  const auto IDC = cast<IterableDeclContext>(parentDecl);
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  for (auto conformance: DC->getLocalConformances()) {
+  for (auto conformance: IDC->getLocalConformances()) {
     if (conformance->getProtocol() == hashableProto) {
       return conformance;
     }

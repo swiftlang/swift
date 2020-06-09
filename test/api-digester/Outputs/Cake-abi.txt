@@ -53,8 +53,6 @@ cake: Accessor GlobalLetChangedToVar.Modify() is a new API without @available at
 cake: Accessor GlobalLetChangedToVar.Set() is a new API without @available attribute
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API without @available attribute
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
-cake: AssociatedType RequiementChanges.addedTypeWithDefault is a new API without @available attribute
-cake: AssociatedType RequiementChanges.addedTypeWithoutDefault is a new API without @available attribute
 cake: Class C0 is a new API without @available attribute
 cake: Class C5 is now without @objc
 cake: Class C8 is a new API without @available attribute
@@ -67,6 +65,7 @@ cake: Func C1.foo1() is now not static
 cake: Func C5.dy_foo() is now with dynamic
 cake: Func FinalFuncContainer.NewFinalFunc() is now with final
 cake: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
+cake: Func Float.floatHigher() is a new API without @available attribute
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
 cake: Func RequiementChanges.addedFunc() is a new API without @available attribute
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating

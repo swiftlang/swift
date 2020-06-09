@@ -11,17 +11,17 @@ func f1() {
 func labeledFunc(aa: Int, bb: Int) {}
 
 func test0Fixits() {
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}}
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}}
 
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{2-2=b}}
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}} {{2-2=b}}
 
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{none}}
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{none}}
 
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{none}}
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}} {{none}}
 
-  undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}} {{1-1=a}} {{2-2=b}} {{none}}
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}} {{2-2=b}} {{none}}
 }
 
 func test1Fixits() {

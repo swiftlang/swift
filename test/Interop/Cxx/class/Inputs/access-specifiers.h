@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_CLASS_INPUTS_ACCESS_SPECIFIERS_H
+#define TEST_INTEROP_CXX_CLASS_INPUTS_ACCESS_SPECIFIERS_H
+
 class PublicPrivate {
 public:
   int PublicMemberVar;
@@ -33,3 +36,5 @@ private:
   } __attribute__((enum_extensibility(open)));
   enum PrivateFlagEnum {} __attribute__((flag_enum));
 };
+
+#endif

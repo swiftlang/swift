@@ -1,16 +1,16 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module
 
 class Foo {
-  func bar(_: bar) {} // expected-error{{use of undeclared type 'bar'}}
+  func bar(_: bar) {} // expected-error{{cannot find type 'bar' in scope}}
 }
 
 class C {
-	var triangle : triangle  // expected-error{{use of undeclared type 'triangle'}}
+	var triangle : triangle  // expected-error{{cannot find type 'triangle' in scope}}
 
 	init() {}
 }
 
-typealias t = t // expected-error {{type alias 't' references itself}} expected-note {{through reference here}}
+typealias t = t // expected-error {{type alias 't' references itself}} expected-note {{while resolving type 't'}} expected-note {{through reference here}}
 
 extension Foo {
   convenience init() {} // expected-error{{invalid redeclaration of synthesized 'init()'}}

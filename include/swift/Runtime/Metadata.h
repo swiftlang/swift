@@ -25,6 +25,35 @@ namespace swift {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
+// Tags used to denote different kinds of allocations made with the metadata
+// allocator. This is encoded in a header on each allocation when metadata
+// iteration is enabled, and allows tools to know where each allocation came
+// from.
+//
+// Some of these values are also declared in SwiftRemoteMirrorTypes.h. Those
+// values must be kept stable to preserve compatibility.
+enum MetadataAllocatorTags : uint16_t {
+  UnusedTag = 0,
+  BoxesTag,
+  ObjCClassWrappersTag,
+  FunctionTypesTag,
+  MetatypeTypesTag,
+  ExistentialMetatypeValueWitnessTablesTag,
+  ExistentialMetatypesTag,
+  ExistentialTypesTag,
+  OpaqueExistentialValueWitnessTablesTag,
+  ClassExistentialValueWitnessTablesTag,
+  ForeignWitnessTablesTag,
+  ResilientMetadataAllocatorTag,
+  MetadataTag,
+  TupleCacheTag,
+  GenericMetadataCacheTag,
+  ForeignMetadataCacheTag,
+  GenericWitnessTableCacheTag,
+  GenericClassMetadataTag,
+  GenericValueMetadataTag,
+};
+
 /// The buffer used by a yield-once coroutine (such as the generalized
 /// accessors `read` and `modify`).
 struct YieldOnceBuffer {

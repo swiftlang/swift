@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <functional>
@@ -91,13 +92,18 @@ class SILModule::SerializationCallback final
   }
 };
 
-SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
-                     const SILOptions &Options, const DeclContext *associatedDC,
-                     bool wholeModule)
-    : TheSwiftModule(SwiftModule),
-      AssociatedDeclContext(associatedDC),
-      Stage(SILStage::Raw), wholeModule(wholeModule), Options(Options),
-      serialized(false), SerializeSILAction(), Types(TC) {
+SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+                     Lowering::TypeConverter &TC, const SILOptions &Options)
+    : Stage(SILStage::Raw), Options(Options), serialized(false),
+      SerializeSILAction(), Types(TC) {
+  assert(!context.isNull());
+  if (auto *file = context.dyn_cast<FileUnit *>()) {
+    AssociatedDeclContext = file;
+  } else {
+    AssociatedDeclContext = context.get<ModuleDecl *>();
+  }
+  TheSwiftModule = AssociatedDeclContext->getParentModule();
+
   // We always add the base SILModule serialization callback.
   std::unique_ptr<DeserializationNotificationHandler> callback(
       new SILModule::SerializationCallback());
@@ -121,11 +127,10 @@ SILModule::~SILModule() {
   }
 }
 
-std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, const SILOptions &Options,
-                             bool WholeModule) {
-  return std::unique_ptr<SILModule>(
-      new SILModule(M, TC, Options, M, WholeModule));
+std::unique_ptr<SILModule> SILModule::createEmptyModule(
+    llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+    Lowering::TypeConverter &TC, const SILOptions &Options) {
+  return std::unique_ptr<SILModule>(new SILModule(context, TC, Options));
 }
 
 ASTContext &SILModule::getASTContext() const {
@@ -350,6 +355,7 @@ bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
 
 SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   assert((Linkage == SILLinkage::Public ||
+          Linkage == SILLinkage::SharedExternal ||
           Linkage == SILLinkage::PublicExternal) &&
          "Only a lookup of public functions is supported currently");
 
@@ -400,6 +406,9 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   // compilation, simply convert it into an external declaration,
   // so that a compiled version from the shared library is used.
   if (F->isDefinition() &&
+      // Don't eliminate bodies of _alwaysEmitIntoClient functions
+      // (PublicNonABI linkage is de-serialized as SharedExternal)
+      F->getLinkage() != SILLinkage::SharedExternal &&
       !F->getModule().getOptions().shouldOptimize()) {
     F->convertToDeclaration();
   }
@@ -645,7 +654,9 @@ void SILModule::notifyDeleteHandlers(SILNode *node) {
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   const auto &IntrinsicInfo = getIntrinsicInfo(Name);
   if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return IntrinsicInfo.hasAttribute(llvm::Attribute::NoReturn);
+    return IntrinsicInfo
+              .getOrCreateAttributes(getASTContext())
+              .hasFnAttribute(llvm::Attribute::NoReturn);
   }
   const auto &BuiltinInfo = getBuiltinInfo(Name);
   switch (BuiltinInfo.ID) {
@@ -698,11 +709,9 @@ void SILModule::serialize() {
   setSerialized();
 }
 
-void SILModule::setSILRemarkStreamer(
-    std::unique_ptr<llvm::raw_fd_ostream> &&remarkStream,
-    std::unique_ptr<swift::SILRemarkStreamer> &&remarkStreamer) {
-  silRemarkStream = std::move(remarkStream);
-  silRemarkStreamer = std::move(remarkStreamer);
+void SILModule::installSILRemarkStreamer() {
+  assert(!silRemarkStreamer && "SIL Remark Streamer is already installed!");
+  silRemarkStreamer = SILRemarkStreamer::create(*this);
 }
 
 bool SILModule::isStdlibModule() const {

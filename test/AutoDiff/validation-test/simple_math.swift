@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // NOTE(TF-813): verify that enabling forward-mode does not affect reverse-mode.
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
-// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -202,6 +202,9 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     }
   }
 
+  // Test direct `init` reference.
+  expectEqual(10, pullback(at: 4, in: Foo.init)(.init(stored: 10)))
+
   let 𝛁foo = pullback(at: Float(4), in: { input -> Foo in
     let foo = Foo(stored: input)
     let foo2 = foo + foo
@@ -227,7 +230,6 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     // Custom initializer with `@differentiable`.
     @differentiable
     init(x: Float) {
-      print(x)
       self.x = x
     }
   }
@@ -366,8 +368,22 @@ SimpleMathTests.test("ForceUnwrapping") {
   expectEqual((1, 2), forceUnwrap(Float(2)))
 }
 
-// CHECK-LABEL: sil private [ossa] @AD__${{.*}}jumpTimesTwo{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__$s4nullyycfU18_12jumpTimesTwoL_5modelSfAAyycfU18_14SmallTestModelL_V_tF_bb0__PB__src_0_wrt_0) -> SmallTestModel.TangentVector {
-// CHECK: bb0([[DX:%.*]] : $Float,  [[PB_STRUCT:%.*]] : {{.*}}):
+SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete rhs") {
+  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.
+  struct SmallTestModel : Differentiable {
+    public var stored: Float = 3.0
+    @differentiable public func callAsFunction() -> Float { return stored }
+  }
+
+  func doubled(_ model: SmallTestModel) -> Float{
+    return model() + model.stored
+  }
+  let grads = gradient(at: SmallTestModel(), in: doubled)
+  expectEqual(2.0, grads.stored)
+}
+
+// CHECK-LABEL: sil private [ossa] @AD__${{.*}}doubled{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
+// CHECK: bb0([[DX:%.*]] : $Float, [[PB_STRUCT:%.*]] : {{.*}}):
 // CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
 // CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
 // CHECK:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
@@ -384,19 +400,5 @@ SimpleMathTests.test("ForceUnwrapping") {
 // CHECK:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
 // CHECK:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
 // CHECK: }
-
-SimpleMathTests.test("Struct") {
-  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.
-  struct SmallTestModel : Differentiable {
-    public var jump: Float = 3.0
-    @differentiable public func callAsFunction() -> Float { return jump }
-  }
-
-  func jumpTimesTwo(model: SmallTestModel) -> Float{
-    return model() + model.jump
-  }
-  let grads = gradient(at: SmallTestModel(), in: jumpTimesTwo)
-  expectEqual(2.0, grads.jump)
-}
 
 runAllTests()

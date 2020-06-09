@@ -42,11 +42,8 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
   auto *module = ModuleDecl::create(stdlibID, Ctx);
   Ctx.LoadedModules[stdlibID] = module;
 
-  using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
   FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
-                                        /*buffer*/None,
-                                        ImplicitModuleImportKind::None,
-                                        /*keeps token*/false);
+                                        /*buffer*/ None);
   module->addFile(*FileForLookups);
 
   if (optionals == DeclareOptionalTypes) {
@@ -56,7 +53,11 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
     optionalTypes.push_back(createOptionalType(
         Ctx, FileForLookups, Ctx.getIdentifier("ImplicitlyUnwrappedOptional")));
 
+    auto result = SourceFileParsingResult{
+        Ctx.AllocateCopy(optionalTypes), /*tokens*/ None,
+        /*interfaceHash*/ None, /*syntaxRoot*/ None};
+
     Ctx.evaluator.cacheOutput(ParseSourceFileRequest{FileForLookups},
-                              Ctx.AllocateCopy(optionalTypes));
+                              std::move(result));
   }
 }

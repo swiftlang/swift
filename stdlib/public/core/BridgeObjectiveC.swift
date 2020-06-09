@@ -485,7 +485,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to		
   ///   the underlying memory's bound type is undefined.		
   @_transparent		
-  public init<U>(_ from: UnsafeMutablePointer<U>) {		
+  public init<U>(@_nonEphemeral _ from: UnsafeMutablePointer<U>) {		
    self._rawValue = from._rawValue		
   }		
 
@@ -500,7 +500,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to		
   ///   the underlying memory's bound type is undefined.		
   @_transparent		
-  public init?<U>(_ from: UnsafeMutablePointer<U>?) {		
+  public init?<U>(@_nonEphemeral _ from: UnsafeMutablePointer<U>?) {
    guard let unwrapped = from else { return nil }		
    self.init(unwrapped)		
   }

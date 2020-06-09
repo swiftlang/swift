@@ -1,0 +1,15 @@
+struct Adder {
+    var base: Int
+
+    func callAsFunction(x: Int, y: Int) -> Int {
+        return base + x + y
+    }
+}
+
+let /*test:def*/<base>add3</base> = Adder(base: 3)
+/*test:ref*/<base>add3</base>(x: 10, y: 11)
+let blah = /*test:ref*/<base>add3</base>.callAsFunction(x:y:)
+
+
+
+

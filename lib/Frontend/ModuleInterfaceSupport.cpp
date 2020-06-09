@@ -28,6 +28,7 @@
 #include "swift/Serialization/Validation.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
@@ -47,9 +48,9 @@ version::Version swift::InterfaceFormatVersion({1, 0});
 static void diagnoseScopedImports(DiagnosticEngine &diags,
                                   ArrayRef<ModuleDecl::ImportedModule> imports){
   for (const ModuleDecl::ImportedModule &importPair : imports) {
-    if (importPair.first.empty())
+    if (importPair.accessPath.empty())
       continue;
-    diags.diagnose(importPair.first.front().Loc,
+    diags.diagnose(importPair.accessPath.front().Loc,
                    diag::module_interface_scoped_import_unsupported);
   }
 }
@@ -115,10 +116,11 @@ static void printImports(raw_ostream &out,
   M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Public);
   llvm::SmallSet<ModuleDecl::ImportedModule, 8,
                  ModuleDecl::OrderImportedModules> publicImportSet;
+
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   for (auto import : allImports) {
-    auto importedModule = import.second;
+    auto importedModule = import.importedModule;
     if (importedModule->isOnoneSupportModule() ||
         importedModule->isBuiltinModule()) {
       continue;
@@ -129,7 +131,7 @@ static void printImports(raw_ostream &out,
 
     // SPI attribute on imports
     if (Opts.PrintSPIs) {
-      SmallVector<Identifier, 4> spis;
+      llvm::SmallSetVector<Identifier, 4> spis;
       M->lookupImportedSPIGroups(importedModule, spis);
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";
@@ -140,9 +142,9 @@ static void printImports(raw_ostream &out,
 
     // Write the access path we should be honoring but aren't.
     // (See diagnoseScopedImports above.)
-    if (!import.first.empty()) {
+    if (!import.accessPath.empty()) {
       out << "/*";
-      for (const auto &accessPathElem : import.first)
+      for (const auto &accessPathElem : import.accessPath)
         out << "." << accessPathElem.Item;
       out << "*/";
     }
@@ -344,10 +346,16 @@ public:
   /// in \p map.
   ///
   /// \sa recordConditionalConformances
-  static void collectSkippedConditionalConformances(PerTypeMap &map,
-                                                    const Decl *D) {
+  static void collectSkippedConditionalConformances(
+                                            PerTypeMap &map,
+                                            const Decl *D,
+                                            const PrintOptions &printOptions) {
     auto *extension = dyn_cast<ExtensionDecl>(D);
     if (!extension || !extension->isConstrainedExtension())
+      return;
+
+    // Skip SPI extensions in the public interface.
+    if (!printOptions.PrintSPIs && extension->isSPI())
       return;
 
     const NominalTypeDecl *nominal = extension->getExtendedNominal();
@@ -453,10 +461,12 @@ public:
     out << "@available(*, unavailable)\nextension ";
     nominal->getDeclaredType().print(out, printOptions);
     out << " : ";
-    swift::interleave(ConditionalConformanceProtocols,
-                      [&out, &printOptions](const ProtocolType *protoTy) {
-                        protoTy->print(out, printOptions);
-                      }, [&out] { out << ", "; });
+    llvm::interleave(
+        ConditionalConformanceProtocols,
+        [&out, &printOptions](const ProtocolType *protoTy) {
+          protoTy->print(out, printOptions);
+        },
+        [&out] { out << ", "; });
     out << " where "
         << nominal->getGenericSignature()->getGenericParams().front()->getName()
         << " : " << DummyProtocolName << " {}\n";
@@ -494,8 +504,9 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
     if (!D->shouldPrintInContext(printOptions) ||
         !printOptions.shouldPrint(D)) {
+
       InheritedProtocolCollector::collectSkippedConditionalConformances(
-          inheritedProtocolMap, D);
+          inheritedProtocolMap, D, printOptions);
       continue;
     }
 

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import XPC
-import _SwiftXPCOverlayShims
+@_implementationOnly import _SwiftXPCOverlayShims
 
 //===----------------------------------------------------------------------===//
 // XPC Types

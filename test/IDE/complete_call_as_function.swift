@@ -114,7 +114,7 @@ func testCallAsFunctionOverloaded(fn: Functor) {
 //OVERLOADED_ARG2_VALUE: Begin completions, 4 items
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: up[#Functor.Vertical#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: down[#Functor.Vertical#];
-//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: left[#Functor.Horizontal#];
-//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: right[#Functor.Horizontal#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: left[#Functor.Horizontal#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: right[#Functor.Horizontal#];
 //OVERLOADED_ARG2_VALUE: End completions
 }

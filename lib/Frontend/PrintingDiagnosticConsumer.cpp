@@ -297,7 +297,7 @@ namespace {
 
   static void printNumberedGutter(unsigned LineNumber,
                                   unsigned LineNumberIndent, raw_ostream &Out) {
-    Out.changeColor(ColoredStream::Colors::BLUE, true);
+    Out.changeColor(ColoredStream::Colors::CYAN);
     Out << llvm::formatv(
         "{0} | ",
         llvm::fmt_align(LineNumber, llvm::AlignStyle::Right, LineNumberIndent));
@@ -305,7 +305,7 @@ namespace {
   }
 
   static void printEmptyGutter(unsigned LineNumberIndent, raw_ostream &Out) {
-    Out.changeColor(ColoredStream::Colors::BLUE, true);
+    Out.changeColor(ColoredStream::Colors::CYAN);
     Out << std::string(LineNumberIndent + 1, ' ') << "| ";
     Out.resetColor();
   }
@@ -381,6 +381,9 @@ namespace {
     };
 
     unsigned LineNumber;
+    // The line number displayed to the user. This may differ from the actual
+    // line number if #sourceLocation is used.
+    unsigned DisplayLineNumber;
     std::string LineText;
     SmallVector<Message, 1> Messages;
     SmallVector<Highlight, 1> Highlights;
@@ -402,7 +405,7 @@ namespace {
       if (shouldDelete != Deleted) {
         Out.resetColor();
         if (shouldDelete) {
-          Out.changeColor(ColoredStream::Colors::RED);
+          Out.changeColor(ColoredStream::Colors::RED, /*bold*/ true);
         }
       }
       Deleted = shouldDelete;
@@ -448,8 +451,10 @@ namespace {
     }
 
   public:
-    AnnotatedLine(unsigned LineNumber, StringRef LineText)
-        : LineNumber(LineNumber), LineText(LineText) {}
+    AnnotatedLine(unsigned LineNumber, unsigned DisplayLineNumber,
+                  StringRef LineText)
+        : LineNumber(LineNumber), DisplayLineNumber(DisplayLineNumber),
+          LineText(LineText) {}
 
     unsigned getLineNumber() { return LineNumber; }
 
@@ -469,7 +474,7 @@ namespace {
     }
 
     void render(unsigned LineNumberIndent, raw_ostream &Out) {
-      printNumberedGutter(LineNumber, LineNumberIndent, Out);
+      printNumberedGutter(DisplayLineNumber, LineNumberIndent, Out);
 
       // Determine if the line is all-ASCII. This will determine a number of
       // later formatting decisions.
@@ -604,15 +609,16 @@ namespace {
         printEmptyGutter(LineNumberIndent, Out);
         if (isASCII) {
           Out << std::string(byteToColumnMap[msg.Byte], ' ') << "^ ";
-          printDiagnosticKind(msg.Kind, Out);
-          Out << " " << msg.Text << "\n";
         } else {
-          Out.changeColor(ColoredStream::Colors::BLUE, /*bold*/true);
+          Out.changeColor(ColoredStream::Colors::CYAN);
           Out << "--> ";
           Out.resetColor();
-          printDiagnosticKind(msg.Kind, Out);
-          Out << " " << msg.Text << "\n";
         }
+        printDiagnosticKind(msg.Kind, Out);
+        Out.resetColor();
+        Out.changeColor(ColoredStream::Colors::WHITE, /*bold*/ true);
+        Out << " " << msg.Text << "\n";
+        Out.resetColor();
       }
       delete[] byteToColumnMap;
     }
@@ -627,14 +633,17 @@ namespace {
     /// diagnostic message. This is printed alongside the file path so it can be
     /// parsed by editors and other tooling.
     SourceLoc PrimaryLoc;
+    /// Whether the excerpt is from a virtual file (e.g. one introduced using
+    /// #sourceLocation).
+    bool FromVirtualFile;
     std::vector<AnnotatedLine> AnnotatedLines;
 
     /// Return the AnnotatedLine for a given SourceLoc, creating it if it
     /// doesn't already exist.
     AnnotatedLine &lineForLoc(SourceLoc Loc) {
-      // FIXME: This call to `getLineAndColumn` is expensive.
-      unsigned lineNo = SM.getLineAndColumn(Loc).first;
-      AnnotatedLine newLine(lineNo, "");
+      // FIXME: This call to `getLineNumber` is expensive.
+      unsigned lineNo = SM.getLineAndColumnInBuffer(Loc).first;
+      AnnotatedLine newLine(lineNo, 0, "");
       auto iter =
           std::lower_bound(AnnotatedLines.begin(), AnnotatedLines.end(),
                            newLine, [](AnnotatedLine l1, AnnotatedLine l2) {
@@ -642,17 +651,12 @@ namespace {
                            });
       if (iter == AnnotatedLines.end() || iter->getLineNumber() != lineNo) {
         newLine.LineText = SM.getLineString(BufferID, lineNo);
+        newLine.DisplayLineNumber =
+            SM.getPresumedLineAndColumnForLoc(Loc).first;
         return *AnnotatedLines.insert(iter, newLine);
       } else {
         return *iter;
       }
-    }
-
-    unsigned getLineNumberIndent() {
-      // The lines are already in sorted ascending order, and we render one line
-      // after the last one for context. Use the last line number plus one to
-      // determine the indent.
-      return floor(1 + log10(AnnotatedLines.back().getLineNumber() + 1));
     }
 
     void printNumberedLine(SourceManager &SM, unsigned BufferID,
@@ -664,10 +668,9 @@ namespace {
 
     void lineRangesForRange(CharSourceRange Range,
                             SmallVectorImpl<CharSourceRange> &LineRanges) {
-      // FIXME: The calls to `getLineAndColumn` and `getLocForLineCol` are
-      // expensive.
-      unsigned startLineNo = SM.getLineAndColumn(Range.getStart()).first;
-      unsigned endLineNo = SM.getLineAndColumn(Range.getEnd()).first;
+      unsigned startLineNo =
+          SM.getLineAndColumnInBuffer(Range.getStart()).first;
+      unsigned endLineNo = SM.getLineAndColumnInBuffer(Range.getEnd()).first;
 
       if (startLineNo == endLineNo) {
         LineRanges.push_back(Range);
@@ -693,10 +696,26 @@ namespace {
       LineRanges.push_back(CharSourceRange(SM, lastLineStart, Range.getEnd()));
     }
 
+    void printLineEllipsis(raw_ostream &Out) {
+      Out.changeColor(ColoredStream::Colors::CYAN, true);
+      Out << llvm::formatv("{0}...\n",
+                           llvm::fmt_repeat(" ", getPreferredLineNumberIndent()));
+      Out.resetColor();
+    }
+
   public:
     AnnotatedFileExcerpt(SourceManager &SM, unsigned BufferID,
                          SourceLoc PrimaryLoc)
-        : SM(SM), BufferID(BufferID), PrimaryLoc(PrimaryLoc) {}
+        : SM(SM), BufferID(BufferID), PrimaryLoc(PrimaryLoc) {
+      FromVirtualFile = SM.isLocInVirtualFile(PrimaryLoc);
+    }
+
+    unsigned getPreferredLineNumberIndent() {
+      // The lines are already in sorted ascending order, and we render one line
+      // after the last one for context. Use the last line number plus one to
+      // determine the indent.
+      return floor(1 + log10(AnnotatedLines.back().getLineNumber() + 1));
+    }
 
     void addMessage(SourceLoc Loc, DiagnosticKind Kind, StringRef Message) {
       lineForLoc(Loc).addMessage(SM, Loc, Kind, Message);
@@ -720,24 +739,27 @@ namespace {
         lineForLoc(lineRange.getStart()).addFixIt(SM, lineRange, "");
     }
 
-    void render(raw_ostream &Out) {
+    void render(unsigned MinimumLineNumberIndent, raw_ostream &Out) {
       // Tha maximum number of intermediate lines without annotations to render
       // between annotated lines before using an ellipsis.
       static const unsigned maxIntermediateLines = 3;
 
       assert(!AnnotatedLines.empty() && "File excerpt has no lines");
-      unsigned lineNumberIndent = getLineNumberIndent();
+      unsigned lineNumberIndent =
+          std::max(getPreferredLineNumberIndent(), MinimumLineNumberIndent);
 
       // Print the file name at the top of each excerpt.
-      auto primaryLineAndColumn = SM.getLineAndColumn(PrimaryLoc);
-      Out.changeColor(ColoredStream::Colors::MAGENTA, /*bold*/ true);
-      Out << SM.getIdentifierForBuffer(BufferID) << ":"
+      auto primaryLineAndColumn = SM.getPresumedLineAndColumnForLoc(PrimaryLoc);
+      Out.changeColor(ColoredStream::Colors::CYAN);
+      Out << std::string(lineNumberIndent + 1, '=') << " "
+          << SM.getDisplayNameForLoc(PrimaryLoc) << ":"
           << primaryLineAndColumn.first << ":" << primaryLineAndColumn.second
-          << "\n";
+          << " " << std::string(lineNumberIndent + 1, '=') << "\n";
       Out.resetColor();
 
-      // Print one extra line at the top for context.
-      if (AnnotatedLines.front().getLineNumber() > 1)
+      // Print one extra line at the top for context, so long as this isn't an
+      // excerpt from a virtual file.
+      if (AnnotatedLines.front().getLineNumber() > 1 && !FromVirtualFile)
         printNumberedLine(SM, BufferID,
                           AnnotatedLines.front().getLineNumber() - 1,
                           lineNumberIndent, Out);
@@ -751,14 +773,18 @@ namespace {
       for (auto line = AnnotatedLines.begin() + 1; line != AnnotatedLines.end();
            ++line) {
         unsigned lineNumber = line->getLineNumber();
-        if (lineNumber - lastLineNumber > maxIntermediateLines) {
+        if (FromVirtualFile) {
+          // Don't print intermediate lines in virtual files, as they may not
+          // make sense in context. Instead, just print an ellipsis between them
+          // if they're not consecutive in the actual source file.
+          if (lineNumber - lastLineNumber > 1) {
+            printLineEllipsis(Out);
+          }
+        } else if (lineNumber - lastLineNumber > maxIntermediateLines) {
           // Use an ellipsis to denote an ommitted part of the file.
           printNumberedLine(SM, BufferID, lastLineNumber + 1, lineNumberIndent,
                             Out);
-          Out.changeColor(ColoredStream::Colors::BLUE, true);
-          Out << llvm::formatv("{0}...\n",
-                               llvm::fmt_repeat(" ", lineNumberIndent));
-          Out.resetColor();
+          printLineEllipsis(Out);
           printNumberedLine(SM, BufferID, lineNumber - 1, lineNumberIndent,
                             Out);
         } else {
@@ -771,11 +797,14 @@ namespace {
         line->render(lineNumberIndent, Out);
         lastLineNumber = lineNumber;
       }
-      // Print one extra line at the bottom for context.
-      printNumberedLine(
-          SM, BufferID,
-          AnnotatedLines[AnnotatedLines.size() - 1].getLineNumber() + 1,
-          lineNumberIndent, Out);
+      // Print one extra line at the bottom for context, so long as the excerpt
+      // isn't from a virtual file.
+      if (!FromVirtualFile) {
+        printNumberedLine(
+            SM, BufferID,
+            AnnotatedLines[AnnotatedLines.size() - 1].getLineNumber() + 1,
+            lineNumberIndent, Out);
+      }
     }
   };
 } // end anonymous namespace
@@ -785,14 +814,17 @@ namespace swift {
 /// complete diagnostic message.
 class AnnotatedSourceSnippet {
   SourceManager &SM;
-  std::map<unsigned, AnnotatedFileExcerpt> FileExcerpts;
+  std::map<StringRef, AnnotatedFileExcerpt> FileExcerpts;
   SmallVector<std::pair<DiagnosticKind, std::string>, 1>
       UnknownLocationMessages;
 
   AnnotatedFileExcerpt &excerptForLoc(SourceLoc Loc) {
+    StringRef bufName = SM.getDisplayNameForLoc(Loc);
     unsigned bufID = SM.findBufferContainingLoc(Loc);
-    FileExcerpts.emplace(bufID, AnnotatedFileExcerpt(SM, bufID, Loc));
-    return FileExcerpts.find(bufID)->second;
+    // Use the buffer display name as the key in the excerpt map instead of the
+    // buffer identifier to respect #sourceLocation directives.
+    FileExcerpts.emplace(bufName, AnnotatedFileExcerpt(SM, bufID, Loc));
+    return FileExcerpts.find(bufName)->second;
   }
 
 public:
@@ -820,19 +852,32 @@ public:
 
   void render(raw_ostream &Out) {
     // Print the excerpt for each file.
+    unsigned lineNumberIndent =
+        std::max_element(FileExcerpts.begin(), FileExcerpts.end(),
+                         [](auto &a, auto &b) {
+                           return a.second.getPreferredLineNumberIndent() <
+                                  b.second.getPreferredLineNumberIndent();
+                         })
+            ->second.getPreferredLineNumberIndent();
     for (auto excerpt : FileExcerpts)
-      excerpt.second.render(Out);
+      excerpt.second.render(lineNumberIndent, Out);
 
     // Handle messages with invalid locations.
-    if (!UnknownLocationMessages.empty()) {
-      Out.changeColor(ColoredStream::Colors::MAGENTA, /*bold*/ true);
+    if (UnknownLocationMessages.size() == 1) {
+      Out.changeColor(ColoredStream::Colors::CYAN);
+      Out << "Unknown Location: ";
+      Out.resetColor();
+      printDiagnosticKind(UnknownLocationMessages[0].first, Out);
+      Out << " " << UnknownLocationMessages[0].second << "\n";
+    } else if (UnknownLocationMessages.size() > 1) {
+      Out.changeColor(ColoredStream::Colors::CYAN);
       Out << "Unknown Location\n";
       Out.resetColor();
-    }
-    for (auto unknownMessage : UnknownLocationMessages) {
-      printEmptyGutter(2, Out);
-      printDiagnosticKind(unknownMessage.first, Out);
-      Out << " " << unknownMessage.second << "\n";
+      for (auto unknownMessage : UnknownLocationMessages) {
+        printEmptyGutter(2, Out);
+        printDiagnosticKind(unknownMessage.first, Out);
+        Out << " " << unknownMessage.second << "\n";
+      }
     }
   }
 };
@@ -889,7 +934,8 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   if (Info.IsChildNote)
     return;
 
-  if (ExperimentalFormattingEnabled) {
+  switch (FormattingStyle) {
+  case DiagnosticOptions::FormattingStyle::Swift:
     if (Info.Kind == DiagnosticKind::Note && currentSnippet) {
       // If this is a note and we have an in-flight message, add it to that
       // instead of emitting it separately.
@@ -907,7 +953,9 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
           BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
       }
     }
-  } else {
+    break;
+
+  case DiagnosticOptions::FormattingStyle::LLVM:
     printDiagnostic(SM, Info);
 
     if (PrintEducationalNotes) {
@@ -922,6 +970,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     for (auto ChildInfo : Info.ChildDiagnosticInfo) {
       printDiagnostic(SM, *ChildInfo);
     }
+    break;
   }
 }
 
@@ -931,12 +980,12 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
       ColoredStream colorStream{Stream};
       currentSnippet->render(colorStream);
       if (includeTrailingBreak)
-        colorStream << "\n\n";
+        colorStream << "\n";
     } else {
       NoColorStream noColorStream{Stream};
       currentSnippet->render(noColorStream);
       if (includeTrailingBreak)
-        noColorStream << "\n\n";
+        noColorStream << "\n";
     }
     currentSnippet.reset();
   }
@@ -1058,7 +1107,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                          R.End.getPointer()-LineStart));
     }
 
-    LineAndCol = getLineAndColumn(Loc);
+    LineAndCol = getPresumedLineAndColumnForLoc(Loc);
   }
 
   return llvm::SMDiagnostic(LLVMSourceMgr, Loc.Value, BufferID,

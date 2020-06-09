@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -77,7 +77,7 @@ public func checkSequence<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where S.Element == Expected.Element {
-  let expectedCount: Int = numericCast(expected.count)
+  let expectedCount: Int = expected.count
   checkIterator(
     expected, sequence.makeIterator(), message(),
   stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
@@ -170,7 +170,7 @@ public func checkSequence<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where S.Element == Element {
-  let expectedCount: Int = numericCast(expected.count)
+  let expectedCount: Int = expected.count
   checkIterator(
     expected, sequence.makeIterator(), message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),

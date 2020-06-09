@@ -337,9 +337,9 @@ var extraTokensInAccessorBlock7: X { // expected-error{{non-member observing pro
 }
 
 var extraTokensInAccessorBlock8: X {
-  foo // expected-error {{use of unresolved identifier 'foo'}}
-  get {} // expected-error{{use of unresolved identifier 'get'}}
-  set {} // expected-error{{use of unresolved identifier 'set'}}
+  foo // expected-error {{cannot find 'foo' in scope}}
+  get {} // expected-error{{cannot find 'get' in scope}}
+  set {} // expected-error{{cannot find 'set' in scope}}
 }
 
 var extraTokensInAccessorBlock9: Int {
@@ -379,6 +379,12 @@ var x12: X {
 }
 
 var x13: X {} // expected-error {{computed property must have accessors specified}}
+
+struct X14 {}
+extension X14 {
+  var x14: X {
+  } // expected-error {{computed property must have accessors specified}}
+}
 
 // Type checking problems
 struct Y { }

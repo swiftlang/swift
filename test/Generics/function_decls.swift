@@ -11,7 +11,7 @@ func f3<T : () -> ()>(x: Int, y: Int, t: T) { } // expected-error{{expected a cl
 func f4<T>(x: T, y: T) { }
 
 // Non-protocol type constraints.
-func f6<T : Wonka>(x: T) {} // expected-error{{use of undeclared type 'Wonka'}}
+func f6<T : Wonka>(x: T) {} // expected-error{{cannot find type 'Wonka' in scope}}
 
 func f7<T : Int>(x: T) {} // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}}
 

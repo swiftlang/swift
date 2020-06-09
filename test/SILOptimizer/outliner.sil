@@ -1,0 +1,107 @@
+// RUN: %target-sil-opt -outliner %s -enable-sil-verify-all | %FileCheck %s
+
+// REQUIRES: OS=macosx
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import Foundation
+
+
+@objc  class MyObject {
+  @objc static func take(arg: Data?) -> Data?
+}
+
+sil @getData : $@convention(thin) () -> @owned Data
+sil @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+sil @$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+
+// We used to have a use-after release failure.
+
+// CHECK-LABEL: sil [Osize] @test : $@convention(thin) (@owned MyObject) -> () {
+// CHECK: bb0([[ARG:%.*]] : $MyObject):
+// CHECK:  [[META:%.*]] = metatype $@objc_metatype MyObject.Type
+// CHECK:  [[FUN1:%.*]] = function_ref @getData : $@convention(thin) () -> @owned Data
+// CHECK:  [[DATA:%.*]] = apply [[FUN1]]() : $@convention(thin) () -> @owned Data
+// CHECK:  release_value [[ARG]] : $MyObject
+// CHECK:  [[OUTLINED:%.*]] = function_ref @$s4main8MyObjectC4take3arg10Foundation4DataVSgAI_tFZToTembnb_ : $@convention(thin) (@owned Data, @objc_metatype MyObject.Type) -> @owned Optional<Data>
+// CHECK:  [[RES:%.*]] = apply [[OUTLINED]]([[DATA]], [[META]]) : $@convention(thin) (@owned Data, @objc_metatype MyObject.Type) -> @owned Optional<Data>
+// CHECK:  br bb1
+
+// CHECK: bb1:
+// CHECK:   release_value [[RES]]
+// CHECK:   [[T:%.*]] = tuple ()
+// CHECK:   return [[T]] : $()
+// CHECK: } // end sil function 'test'
+
+sil [Osize] @test : $@convention(thin) (@owned MyObject) -> () {
+bb0(%0: $MyObject):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %41 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %43 = apply %41() : $@convention(thin) () -> @owned Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%43) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  release_value %0 : $MyObject
+  release_value %43 : $Data
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  release_value %46 : $Optional<NSData>
+  switch_enum %51 : $Optional<NSData>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb5(%54 : $NSData):
+  %55 = function_ref @$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %56 = enum $Optional<NSData>, #Optional.some!enumelt, %54 : $NSData
+  %57 = metatype $@thin Data.Type
+  %58 = apply %55(%56, %57) : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %59 = enum $Optional<Data>, #Optional.some!enumelt, %58 : $Data
+  release_value %56 : $Optional<NSData>
+  br bb7(%59 : $Optional<Data>)
+
+bb6:
+  %62 = enum $Optional<Data>, #Optional.none!enumelt
+  br bb7(%62 : $Optional<Data>)
+
+bb7(%64 : $Optional<Data>):
+  release_value %64 : $Optional<Data>
+  %102 = tuple ()
+  return %102 : $()
+}
+
+sil [Osize] @test_dont_crash : $@convention(thin) (@owned MyObject) -> () {
+bb0(%0: $MyObject):
+  %35 = metatype $@objc_metatype MyObject.Type
+  %41 = function_ref @getData : $@convention(thin) () -> @owned Data
+  %43 = apply %41() : $@convention(thin) () -> @owned Data
+  %44 = function_ref @$s10Foundation4DataV19_bridgeToObjectiveCSo6NSDataCyF : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %45 = apply %44(%43) : $@convention(method) (@guaranteed Data) -> @owned NSData
+  %46 = enum $Optional<NSData>, #Optional.some!enumelt, %45 : $NSData
+  br bb4
+
+bb4:
+  release_value %0 : $MyObject
+  release_value %43 : $Data
+  %50 = objc_method %35 : $@objc_metatype MyObject.Type, #MyObject.take!foreign : (MyObject.Type) -> (Data?) -> Data?, $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  %51 = apply %50(%46, %35) : $@convention(objc_method) (Optional<NSData>, @objc_metatype MyObject.Type) -> @autoreleased Optional<NSData>
+  release_value %46 : $Optional<NSData>
+  switch_enum %51 : $Optional<NSData>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
+
+bb5(%54 : $NSData):
+  %55 = function_ref @$s10Foundation4DataV36_unconditionallyBridgeFromObjectiveCyACSo6NSDataCSgFZ : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %56 = enum $Optional<NSData>, #Optional.some!enumelt, %54 : $NSData
+  %57 = metatype $@thin Data.Type
+  %58 = apply %55(%56, %57) : $@convention(method) (@guaranteed Optional<NSData>, @thin Data.Type) -> @owned Data
+  %59 = enum $Optional<Data>, #Optional.some!enumelt, %58 : $Data
+  release_value %56 : $Optional<NSData>
+  br bb7(%59 : $Optional<Data>)
+
+bb6:
+  %62 = enum $Optional<Data>, #Optional.none!enumelt
+  br bb7(%62 : $Optional<Data>)
+
+bb7(%64 : $Optional<Data>):
+  release_value %64 : $Optional<Data>
+  %102 = tuple ()
+  return %102 : $()
+}

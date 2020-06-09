@@ -12,7 +12,7 @@
 
 @_exported import os
 @_exported import os.log
-import _SwiftOSOverlayShims
+@_implementationOnly import _SwiftOSOverlayShims
 
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public func os_log(

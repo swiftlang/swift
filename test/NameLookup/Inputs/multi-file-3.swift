@@ -5,7 +5,7 @@ func ~~~(x: Int, y: Int) -> Bool { // expected-error{{operator implementation wi
 }
 
 func test3() {
-  var a = funcOrVar // expected-error{{use of unresolved identifier 'funcOrVar'}}
+  var a = funcOrVar // expected-error{{cannot find 'funcOrVar' in scope}}
 
   var s = SomeStruct(value: 42) // use the SomeStruct from multi-file.swift
 

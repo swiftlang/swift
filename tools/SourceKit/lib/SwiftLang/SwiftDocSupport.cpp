@@ -630,7 +630,7 @@ static void reportAttributes(ASTContext &Ctx,
       case PlatformKind::iOS:
         PlatformUID = PlatformIOS; break;
       case PlatformKind::macCatalyst:
-        PlatformUID = PlatformIOS; break;
+        PlatformUID = PlatformMacCatalyst; break;
       case PlatformKind::OSX:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
@@ -808,15 +808,13 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::Swift);
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
-  if (CI.setup(Invocation))
-    return true;
-  CI.performParseOnly();
-  return false;
+  return CI.setup(Invocation);
 }
 
 static void collectFuncEntities(std::vector<TextEntity> &Ents,
@@ -869,7 +867,7 @@ static void addParameters(const AbstractFunctionDecl *FD,
                           SourceManager &SM,
                           unsigned BufferID) {
   ArrayRef<Identifier> ArgNames;
-  DeclName Name = FD->getFullName();
+  DeclName Name = FD->getName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
@@ -882,7 +880,7 @@ static void addParameters(const SubscriptDecl *D,
                           SourceManager &SM,
                           unsigned BufferID) {
   ArrayRef<Identifier> ArgNames;
-  DeclName Name = D->getFullName();
+  DeclName Name = D->getName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
@@ -983,8 +981,9 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
-  printModuleInterface(M, None, TraversalOptions, Printer, Options,
-                       true);
+
+  printModuleInterface(M, None, TraversalOptions, Printer, Options, true);
+
   Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);
@@ -1184,25 +1183,29 @@ public:
   void accept(SourceManager &SM, RegionType RegionType,
               ArrayRef<Replacement> Replacements) {
     unsigned Start = AllEdits.size();
-    std::transform(Replacements.begin(), Replacements.end(),
-                   std::back_inserter(AllEdits),
-                   [&](const Replacement &R) -> Edit {
-      std::pair<unsigned, unsigned>
-        Start = SM.getLineAndColumn(R.Range.getStart()),
-        End = SM.getLineAndColumn(R.Range.getEnd());
-      SmallVector<NoteRegion, 4> SubRanges;
-      auto RawRanges = R.RegionsWorthNote;
-      std::transform(RawRanges.begin(), RawRanges.end(),
-                     std::back_inserter(SubRanges),
-                     [](swift::ide::NoteRegion R) -> SourceKit::NoteRegion {
-                       return {
-                         SwiftLangSupport::getUIDForRefactoringRangeKind(R.Kind),
-                         R.StartLine, R.StartColumn, R.EndLine, R.EndColumn,
-                         R.ArgIndex
-                       }; });
-      return {Start.first, Start.second, End.first,
-              End.second,  R.Text.str(), std::move(SubRanges)};
-    });
+    std::transform(
+        Replacements.begin(), Replacements.end(), std::back_inserter(AllEdits),
+        [&](const Replacement &R) -> Edit {
+          std::pair<unsigned, unsigned> Start =
+                                            SM.getPresumedLineAndColumnForLoc(
+                                                R.Range.getStart()),
+                                        End = SM.getPresumedLineAndColumnForLoc(
+                                            R.Range.getEnd());
+          SmallVector<NoteRegion, 4> SubRanges;
+          auto RawRanges = R.RegionsWorthNote;
+          std::transform(
+              RawRanges.begin(), RawRanges.end(), std::back_inserter(SubRanges),
+              [](swift::ide::NoteRegion R) -> SourceKit::NoteRegion {
+                return {SwiftLangSupport::getUIDForRefactoringRangeKind(R.Kind),
+                        R.StartLine,
+                        R.StartColumn,
+                        R.EndLine,
+                        R.EndColumn,
+                        R.ArgIndex};
+              });
+          return {Start.first, Start.second, End.first,
+                  End.second,  R.Text.str(), std::move(SubRanges)};
+        });
     unsigned End = AllEdits.size();
     StartEnds.emplace_back(Start, End);
     UIds.push_back(SwiftLangSupport::getUIDForRegionType(RegionType));
@@ -1255,9 +1258,9 @@ public:
     for (const auto &R : Ranges) {
       SourceKit::RenameRangeDetail Result;
       std::tie(Result.StartLine, Result.StartColumn) =
-          SM.getLineAndColumn(R.Range.getStart());
+          SM.getPresumedLineAndColumnForLoc(R.Range.getStart());
       std::tie(Result.EndLine, Result.EndColumn) =
-          SM.getLineAndColumn(R.Range.getEnd());
+          SM.getPresumedLineAndColumnForLoc(R.Range.getEnd());
       Result.ArgIndex = R.Index;
       Result.Kind =
           SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);
@@ -1401,7 +1404,6 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation set up failed";
     return nullptr;
   }
-  ParseCI.performParseOnly(/*EvaluateConditionals*/true);
 
   SourceFile *SF = nullptr;
   unsigned BufferID = ParseCI.getInputBufferIDs().back();

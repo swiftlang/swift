@@ -131,7 +131,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   // the same case, binding variables for the left- and right-hand associated
   // values.
   for (auto elt : enumDecl->getAllElements()) {
-    elementCount++;
+    ++elementCount;
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 4> lhsPayloadVars;
@@ -172,9 +172,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     }
 
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))
-    auto caseTuplePattern = TuplePattern::create(C, SourceLoc(), {
-      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) },
-                                                 SourceLoc());
+    auto caseTuplePattern = TuplePattern::createImplicit(C, {
+      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) });
     caseTuplePattern->setImplicit();
 
     auto labelItem = CaseLabelItem(caseTuplePattern);
@@ -183,7 +182,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     // breaking out early if any pair is unequal. (same as Equatable synthesis.)
     // the else statement performs the lexicographic comparison.
     SmallVector<ASTNode, 8> statementsInCase;
-    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
+    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
                                          /*implicit*/true);
@@ -215,8 +214,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   // We only generate this if the enum has more than one case. If it has exactly
   // one case, then that single case statement is already exhaustive.
   if (elementCount > 1) {
-    auto defaultPattern = new (C) AnyPattern(SourceLoc());
-    defaultPattern->setImplicit();
+    auto defaultPattern = AnyPattern::createImplicit(C);
     auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto body = deriveBodyComparable_enum_noAssociatedValues_lt(ltDecl, nullptr).first;
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),

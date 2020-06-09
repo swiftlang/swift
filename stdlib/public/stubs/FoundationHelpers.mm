@@ -25,12 +25,18 @@
 #include "swift/Runtime/Once.h"
 #include <dlfcn.h>
 
+typedef enum {
+    dyld_objc_string_kind
+} DyldObjCConstantKind;
+
 using namespace swift;
 
 static CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
 static CFHashCode(*_CFStringHashNSString)(id str);
 static CFTypeID(*_CFGetTypeID)(CFTypeRef obj);
 static CFTypeID _CFStringTypeID = 0;
+static bool(*dyld_is_objc_constant)(DyldObjCConstantKind kind,
+                                    const void *addr);
 static swift_once_t initializeBridgingFuncsOnce;
 
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
@@ -46,6 +52,11 @@ static void _initializeBridgingFunctionsImpl(void *ctxt) {
   _CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(
                                                    RTLD_DEFAULT,
                                                    "CFStringHashCString");
+  if (dlsym(RTLD_NEXT, "objc_debug_tag60_permutations") /* tagged constant strings available */) {
+  dyld_is_objc_constant = (bool(*)(DyldObjCConstantKind, const void *))dlsym(
+                                                   RTLD_NEXT,
+                                                   "_dyld_is_objc_constant");
+  }
 }
 
 static inline void initializeBridgingFunctions() {
@@ -97,6 +108,13 @@ swift::_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
   
   return imp(obj, sel, buffer, maxLength, encoding);
 
+}
+
+__swift_uint8_t
+swift::_swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
+  initializeBridgingFunctions();
+  if (!dyld_is_objc_constant) return false;
+  return dyld_is_objc_constant(dyld_objc_string_kind, addr) ? 1 : 0;
 }
 
 #endif

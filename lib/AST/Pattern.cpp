@@ -367,15 +367,12 @@ Identifier NamedPattern::getBoundName() const {
 
 /// Allocate a new pattern that matches a tuple.
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
-                                   ArrayRef<TuplePatternElt> elts, SourceLoc rp,
-                                   Optional<bool> implicit) {
-  if (!implicit.hasValue())
-    implicit = !lp.isValid();
-
+                                   ArrayRef<TuplePatternElt> elts,
+                                   SourceLoc rp) {
   unsigned n = elts.size();
   void *buffer = C.Allocate(totalSizeToAlloc<TuplePatternElt>(n),
                             alignof(TuplePattern));
-  TuplePattern *pattern = ::new (buffer) TuplePattern(lp, n, rp, *implicit);
+  TuplePattern *pattern = ::new (buffer) TuplePattern(lp, n, rp);
   std::uninitialized_copy(elts.begin(), elts.end(),
                           pattern->getTrailingObjects<TuplePatternElt>());
   return pattern;
@@ -383,17 +380,16 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
 
 Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
                                     ArrayRef<TuplePatternElt> elements,
-                                    SourceLoc rp,
-                                    Optional<bool> implicit) {
+                                    SourceLoc rp) {
   assert(lp.isValid() == rp.isValid());
 
   if (elements.size() == 1 &&
       elements[0].getPattern()->getBoundName().empty()) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
-    return new (C) ParenPattern(lp, first.getPattern(), rp, implicit);
+    return new (C) ParenPattern(lp, first.getPattern(), rp);
   }
 
-  return create(C, lp, elements, rp, implicit);
+  return create(C, lp, elements, rp);
 }
 
 SourceRange TuplePattern::getSourceRange() const {
@@ -406,11 +402,8 @@ SourceRange TuplePattern::getSourceRange() const {
            Fields.back().getPattern()->getEndLoc() };
 }
 
-TypedPattern::TypedPattern(Pattern *pattern, TypeRepr *tr,
-                           Optional<bool> implicit)
+TypedPattern::TypedPattern(Pattern *pattern, TypeRepr *tr)
   : Pattern(PatternKind::Typed), SubPattern(pattern), PatTypeRepr(tr) {
-  if (implicit ? *implicit : tr && !tr->getSourceRange().isValid())
-    setImplicit();
   Bits.TypedPattern.IsPropagatedType = false;
 }
 
@@ -450,13 +443,10 @@ SourceRange TypedPattern::getSourceRange() const {
 
 /// Construct an ExprPattern.
 ExprPattern::ExprPattern(Expr *e, bool isResolved, Expr *matchExpr,
-                         VarDecl *matchVar,
-                         Optional<bool> implicit)
+                         VarDecl *matchVar)
   : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
     MatchExpr(matchExpr), MatchVar(matchVar) {
   assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
-  if (implicit.hasValue() ? *implicit : e->isImplicit())
-    setImplicit();
 }
 
 SourceLoc ExprPattern::getLoc() const {

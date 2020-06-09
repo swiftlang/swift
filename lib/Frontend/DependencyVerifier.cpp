@@ -239,6 +239,7 @@ public:
     case Expectation::Scope::Cascading:
       return "cascading";
     }
+    llvm_unreachable("invalid expectation scope");
   }
 
   StringRef renderAsFixit(ASTContext &Ctx) const {
@@ -278,11 +279,9 @@ public:
 /// in the referenced name trackers associated with that file.
 class DependencyVerifier {
   SourceManager &SM;
-  const DependencyTracker &DT;
 
 public:
-  explicit DependencyVerifier(SourceManager &SM, const DependencyTracker &DT)
-      : SM(SM), DT(DT) {}
+  explicit DependencyVerifier(SourceManager &SM) : SM(SM) {}
 
   bool verifyFile(const SourceFile *SF);
 
@@ -337,11 +336,11 @@ private:
   }
 
 private:
-  StringRef copyDemangledTypeName(ASTContext &Ctx, StringRef str) {
-    Demangle::DemangleOptions Opts;
-    Opts.ShowPrivateDiscriminators = false;
-    Opts.DisplayModuleNames = true;
-    return Ctx.AllocateCopy(Demangle::demangleTypeAsString(str, Opts));
+  StringRef copyQualifiedTypeName(ASTContext &Ctx, NominalTypeDecl *subject) {
+    auto printOptions = PrintOptions();
+    printOptions.FullyQualifiedTypes = true;
+    auto key = subject->getDeclaredInterfaceType()->getString(printOptions);
+    return Ctx.AllocateCopy(key);
   }
 
 private:
@@ -427,34 +426,27 @@ bool DependencyVerifier::parseExpectations(
 
 bool DependencyVerifier::constructObligations(const SourceFile *SF,
                                               ObligationMap &Obligations) {
-  auto *tracker = SF->getConfiguredReferencedNameTracker();
-  assert(tracker && "Constructed source file without referenced name tracker!");
-
   auto &Ctx = SF->getASTContext();
-  tracker->enumerateAllUses(
-      /*includeIntrafileDeps*/ true, DT,
-      [&](const fine_grained_dependencies::NodeKind kind, StringRef context,
-          StringRef name, const bool isCascadingUse) {
-        using NodeKind = fine_grained_dependencies::NodeKind;
-        switch (kind) {
-        case NodeKind::externalDepend:
-          // We only care about the referenced name trackers for now. The set of
-          // external dependencies is often quite a large subset of the SDK.
-          return;
-        case NodeKind::nominal:
-          // Nominals duplicate member entries. We care about the member itself.
-          return;
-        case NodeKind::potentialMember: {
-          auto key = copyDemangledTypeName(Ctx, context);
-          auto nameCpy = Ctx.AllocateCopy(name);
+  Ctx.evaluator.enumerateReferencesInFile(
+      SF, [&](const auto &reference) {
+        const auto isCascadingUse = reference.cascades;
+        using NodeKind = evaluator::DependencyCollector::Reference::Kind;
+        switch (reference.kind) {
+        case NodeKind::Empty:
+        case NodeKind::Tombstone:
+          llvm_unreachable("Cannot enumerate dead dependency!");
+
+        case NodeKind::PotentialMember: {
+          auto key = copyQualifiedTypeName(Ctx, reference.subject);
           Obligations.insert({Obligation::Key::forPotentialMember(key),
-                              {nameCpy, Expectation::Kind::PotentialMember,
+                              {"", Expectation::Kind::PotentialMember,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
         }
           break;
-        case NodeKind::member: {
-          auto demContext = copyDemangledTypeName(Ctx, context);
+        case NodeKind::UsedMember: {
+          auto demContext = copyQualifiedTypeName(Ctx, reference.subject);
+          auto name = reference.name.userFacingName();
           auto key = Ctx.AllocateCopy((demContext + "." + name).str());
           Obligations.insert({Obligation::Key::forMember(key),
                               {key, Expectation::Kind::Member,
@@ -462,25 +454,21 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
                                               : Expectation::Scope::Private}});
         }
           break;
-        case NodeKind::dynamicLookup: {
-          auto contextCpy = Ctx.AllocateCopy(context);
-          auto key = Ctx.AllocateCopy(name);
+        case NodeKind::Dynamic: {
+          auto key = Ctx.AllocateCopy(reference.name.userFacingName());
           Obligations.insert({Obligation::Key::forDynamicMember(key),
-                              {contextCpy, Expectation::Kind::DynamicMember,
+                              {"", Expectation::Kind::DynamicMember,
                                isCascadingUse ? Expectation::Scope::Cascading
                                               : Expectation::Scope::Private}});
-          break;
         }
-        case NodeKind::topLevel:
-        case NodeKind::sourceFileProvide: {
-          auto key = Ctx.AllocateCopy(name);
+          break;
+        case NodeKind::TopLevel: {
+          auto key = Ctx.AllocateCopy(reference.name.userFacingName());
           Obligations.insert({Obligation::Key::forProvides(key),
                               {key, Expectation::Kind::Provides,
                                Expectation::Scope::None}});
-          break;
         }
-        case NodeKind::kindCount:
-          llvm_unreachable("Given count node?");
+          break;
         }
       });
 
@@ -490,8 +478,6 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
 bool DependencyVerifier::verifyObligations(
     const SourceFile *SF, const std::vector<Expectation> &ExpectedDependencies,
     ObligationMap &OM, llvm::StringMap<Expectation> &NegativeExpectations) {
-  auto *tracker = SF->getConfiguredReferencedNameTracker();
-  assert(tracker && "Constructed source file without referenced name tracker!");
   auto &diags = SF->getASTContext().Diags;
   for (auto &expectation : ExpectedDependencies) {
     const bool wantsCascade = expectation.isCascading();
@@ -644,10 +630,9 @@ bool DependencyVerifier::verifyFile(const SourceFile *SF) {
 // MARK: Main entrypoints
 //===----------------------------------------------------------------------===//
 
-bool swift::verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
-                               ArrayRef<FileUnit *> SFs) {
+bool swift::verifyDependencies(SourceManager &SM, ArrayRef<FileUnit *> SFs) {
   bool HadError = false;
-  DependencyVerifier Verifier{SM, DT};
+  DependencyVerifier Verifier{SM};
   for (const auto *FU : SFs) {
     if (const auto *SF = dyn_cast<SourceFile>(FU))
       HadError |= Verifier.verifyFile(SF);
@@ -655,10 +640,9 @@ bool swift::verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
   return HadError;
 }
 
-bool swift::verifyDependencies(SourceManager &SM, const DependencyTracker &DT,
-                               ArrayRef<SourceFile *> SFs) {
+bool swift::verifyDependencies(SourceManager &SM, ArrayRef<SourceFile *> SFs) {
   bool HadError = false;
-  DependencyVerifier Verifier{SM, DT};
+  DependencyVerifier Verifier{SM};
   for (const auto *SF : SFs) {
     HadError |= Verifier.verifyFile(SF);
   }

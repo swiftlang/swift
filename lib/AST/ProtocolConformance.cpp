@@ -120,11 +120,6 @@ ProtocolConformanceRef::subst(Type origType,
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(subs, conformances, options);
 
-  // Opened existentials trivially conform and do not need to go through
-  // substitution map lookup.
-  if (substType->isOpenedExistential())
-    return *this;
-
   auto *proto = getRequirement();
 
   // If the type is an existential, it must be self-conforming.
@@ -501,7 +496,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
   };
 
   CRState = ConditionalRequirementsState::Computing;
-  auto success = [this](ArrayRef<Requirement> reqs) {
+  auto success = [this](ArrayRef<Requirement> reqs = {}) {
     ConditionalRequirements = reqs;
     assert(CRState == ConditionalRequirementsState::Computing);
     CRState = ConditionalRequirementsState::Complete;
@@ -510,30 +505,23 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     assert(CRState == ConditionalRequirementsState::Computing);
     CRState = ConditionalRequirementsState::Uncomputed;
   };
-  
-  auto &ctxt = getProtocol()->getASTContext();
-  auto DC = getDeclContext();
+
   // A non-extension conformance won't have conditional requirements.
-  if (!isa<ExtensionDecl>(DC)) {
-    success({});
-    return;
-  }
-
-  auto *ext = cast<ExtensionDecl>(DC);
-  auto nominal = ext->getExtendedNominal();
-  auto typeSig = nominal->getGenericSignature();
-
-  // A non-generic type won't have conditional requirements.
-  if (!typeSig) {
-    success({});
-    return;
+  const auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
+  if (!ext) {
+    return success();
   }
 
   // If the extension is invalid, it won't ever get a signature, so we
   // "succeed" with an empty result instead.
   if (ext->isInvalid()) {
-    success({});
-    return;
+    return success();
+  }
+
+  // A non-generic type won't have conditional requirements.
+  const auto typeSig = ext->getExtendedNominal()->getGenericSignature();
+  if (!typeSig) {
+    return success();
   }
 
   // Recursively validating the signature comes up frequently as expanding
@@ -542,28 +530,26 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
   //
   // FIXME: In the long run, break this cycle in a more principled way.
   if (ext->isComputingGenericSignature()) {
-    failure();
-    return;
+    return failure();
   }
 
-  auto extensionSig = ext->getGenericSignature();
-  auto canExtensionSig = extensionSig.getCanonicalSignature();
-  auto canTypeSig = typeSig.getCanonicalSignature();
-  if (canTypeSig == canExtensionSig) {
-    success({});
-    return;
-  }
+  const auto extensionSig = ext->getGenericSignature();
 
   // The extension signature should be a superset of the type signature, meaning
   // every thing in the type signature either is included too or is implied by
   // something else. The most important bit is having the same type
   // parameters. (NB. if/when Swift gets parameterized extensions, this needs to
   // change.)
-  assert(canTypeSig.getGenericParams() == canExtensionSig.getGenericParams());
+  assert(typeSig->getCanonicalSignature().getGenericParams() ==
+         extensionSig->getCanonicalSignature().getGenericParams());
 
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
-  success(ctxt.AllocateCopy(extensionSig->requirementsNotSatisfiedBy(typeSig)));
+  const auto unsatReqs = extensionSig->requirementsNotSatisfiedBy(typeSig);
+  if (unsatReqs.empty())
+    return success();
+
+  return success(getProtocol()->getASTContext().AllocateCopy(unsatReqs));
 }
 
 void NormalProtocolConformance::setSignatureConformances(
@@ -1327,11 +1313,12 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 }
 
 SmallVector<ProtocolDecl *, 2>
-DeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
+IterableDeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   SmallVector<ProtocolDecl *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
+  const auto dc = getAsGenericContext();
+  const auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
     return result;
   }
@@ -1340,7 +1327,7 @@ DeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
-    const_cast<DeclContext *>(this),
+    const_cast<GenericContext *>(dc),
     lookupKind,
     &result,
     nullptr,
@@ -1350,11 +1337,13 @@ DeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
 }
 
 SmallVector<ProtocolConformance *, 2>
-DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
+IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
+    const {
   SmallVector<ProtocolConformance *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
+  const auto dc = getAsGenericContext();
+  const auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
     return result;
   }
@@ -1373,7 +1362,7 @@ DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
   nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
-    const_cast<DeclContext *>(this),
+    const_cast<GenericContext *>(dc),
     lookupKind,
     nullptr,
     &result,
@@ -1383,25 +1372,27 @@ DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
 }
 
 SmallVector<ConformanceDiagnostic, 4>
-DeclContext::takeConformanceDiagnostics() const {
+IterableDeclContext::takeConformanceDiagnostics() const {
   SmallVector<ConformanceDiagnostic, 4> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
+  const auto dc = getAsGenericContext();
+  const auto nominal = dc->getSelfNominalTypeDecl();
+
   if (!nominal) {
-    return { };
+    return result;
   }
 
   // Protocols are not subject to the checks for supersession.
   if (isa<ProtocolDecl>(nominal)) {
-    return { };
+    return result;
   }
 
   // Update to record all potential conformances.
   nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
-    const_cast<DeclContext *>(this),
+    const_cast<GenericContext *>(dc),
     ConformanceLookupKind::All,
     nullptr,
     nullptr,

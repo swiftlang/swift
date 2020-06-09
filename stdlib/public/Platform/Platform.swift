@@ -382,14 +382,21 @@ internal var _ignore = _UnsupportedPlatformError()
 //===----------------------------------------------------------------------===//
 
 #if !os(Windows) 
+
+#if os(OpenBSD)
+public typealias Semaphore = UnsafeMutablePointer<sem_t?>
+#else
+public typealias Semaphore = UnsafeMutablePointer<sem_t>
+#endif
+
 /// The value returned by `sem_open()` in the case of failure.
-public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
+public var SEM_FAILED: Semaphore? {
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
-  return UnsafeMutablePointer<sem_t>(bitPattern: -1)
+  return Semaphore(bitPattern: -1)
 #elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   // The value is ABI.  Value verified to be correct on Glibc.
-  return UnsafeMutablePointer<sem_t>(bitPattern: 0)
+  return Semaphore(bitPattern: 0)
 #else
   _UnsupportedPlatformError()
 #endif
@@ -398,7 +405,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 public func sem_open(
   _ name: UnsafePointer<CChar>,
   _ oflag: Int32
-) -> UnsafeMutablePointer<sem_t>? {
+) -> Semaphore? {
   return _stdlib_sem_open2(name, oflag)
 }
 
@@ -407,9 +414,10 @@ public func sem_open(
   _ oflag: Int32,
   _ mode: mode_t,
   _ value: CUnsignedInt
-) -> UnsafeMutablePointer<sem_t>? {
+) -> Semaphore? {
   return _stdlib_sem_open4(name, oflag, mode, value)
 }
+
 #endif
 
 //===----------------------------------------------------------------------===//

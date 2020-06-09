@@ -171,6 +171,8 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
+CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, BeginCOWMutation)
+CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndCOWMutation)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginAccess)
@@ -1021,6 +1023,7 @@ ANY_OWNERSHIP_BUILTIN(TypePtrAuthDiscriminator)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
+CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

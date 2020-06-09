@@ -121,6 +121,7 @@ static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
   case CaseParentKind::DoCatch:
     return caseStmt->getBody();
   }
+  llvm_unreachable("invalid parent kind");
 }
 
 /// Check that the input AST has at least been type-checked.
@@ -883,8 +884,8 @@ public:
       assert(Region.hasStartLoc() && "invalid region");
       assert(Region.hasEndLoc() && "incomplete region");
 
-      auto Start = SM.getLineAndColumn(Region.getStartLoc());
-      auto End = SM.getLineAndColumn(Region.getEndLoc());
+      auto Start = SM.getLineAndColumnInBuffer(Region.getStartLoc());
+      auto End = SM.getLineAndColumnInBuffer(Region.getEndLoc());
       assert(Start.first <= End.first && "region start and end out of order");
 
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,

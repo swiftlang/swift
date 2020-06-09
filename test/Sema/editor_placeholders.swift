@@ -10,7 +10,7 @@ if (true) {
   <#code#> // expected-error {{editor placeholder}}
 }
 
-foo(<#T##x: Undeclared##Undeclared#>) // expected-error {{editor placeholder}} expected-error {{use of undeclared type 'Undeclared'}}
+foo(<#T##x: Undeclared##Undeclared#>) // expected-error {{editor placeholder}} expected-error {{cannot find type 'Undeclared' in scope}}
 
 func f(_ n: Int) {}
 let a1 = <#T#> // expected-error{{editor placeholder in source file}}

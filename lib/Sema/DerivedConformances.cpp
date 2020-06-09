@@ -74,8 +74,11 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
+  // Eagerly return true here. Actual synthesis conditions are checked in
+  // `DerivedConformance::deriveDifferentiable`: they are complicated and depend
+  // on the requirement being derived.
   if (*derivableKind == KnownDerivableProtocolKind::Differentiable)
-    return canDeriveDifferentiable(Nominal, DC);
+    return true;
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*derivableKind) {
@@ -179,7 +182,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
   ASTContext &ctx = nominal->getASTContext();
-  auto name = requirement->getFullName();
+  const auto name = requirement->getName();
 
   // Local function that retrieves the requirement with the same name as
   // the provided requirement, but within the given known protocol.
@@ -188,9 +191,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    auto conformance = TypeChecker::conformsToProtocol(
-        nominal->getDeclaredInterfaceType(), proto, nominal,
-        ConformanceCheckFlags::SkipConditionalRequirements);
+    auto conformance = nominal->getParentModule()->lookupConformance(
+        nominal->getDeclaredInterfaceType(), proto);
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
@@ -227,6 +229,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // CodingKey.intValue
     if (name.isSimpleName(ctx.Id_intValue))
       return getRequirement(KnownProtocolKind::CodingKey);
+
+    // Differentiable.zeroTangentVectorInitializer
+    if (name.isSimpleName(ctx.Id_zeroTangentVectorInitializer))
+      return getRequirement(KnownProtocolKind::Differentiable);
 
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
@@ -375,7 +381,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
 
-  Pattern *propPat = new (Context) NamedPattern(propDecl, /*implicit*/ true);
+  Pattern *propPat = NamedPattern::createImplicit(Context, propDecl);
   propPat->setType(propertyContextType);
 
   propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
@@ -415,7 +421,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
         isa<ExtensionDecl>(ConformanceDecl)) {
       ConformanceDecl->diagnose(
           diag::cannot_synthesize_init_in_extension_of_nonfinal,
-          getProtocolType(), synthesizing->getFullName());
+          getProtocolType(), synthesizing->getName());
       return true;
     }
   }
@@ -531,7 +537,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   indexVar->setImplicit();
 
   // generate: var indexVar
-  Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
+  Pattern *indexPat = NamedPattern::createImplicit(C, indexVar);
   indexPat->setType(intType);
   indexPat = TypedPattern::createImplicit(C, indexPat, intType);
   indexPat->setType(intType);
@@ -599,7 +605,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, Enu
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
       if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC, None)
+                                          protocol, DC)
               .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
@@ -652,14 +658,13 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
 
       auto namedPattern = new (C) NamedPattern(payloadVar);
       namedPattern->setImplicit();
-      auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                           namedPattern);
+      auto letPattern = VarPattern::createImplicit(C, /*isLet*/ true,
+                                                   namedPattern);
       elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
                                                 SourceLoc(), letPattern));
     }
 
-    auto pat = TuplePattern::create(C, SourceLoc(), elementPatterns,
-                                    SourceLoc());
+    auto pat = TuplePattern::createImplicit(C, elementPatterns);
     pat->setImplicit();
     return pat;
   }
@@ -675,9 +680,7 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
   namedPattern->setImplicit();
   auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
                                        namedPattern);
-  auto pat = new (C) ParenPattern(SourceLoc(), letPattern, SourceLoc());
-  pat->setImplicit();
-  return pat;
+  return ParenPattern::createImplicit(C, letPattern);
 }
 
 

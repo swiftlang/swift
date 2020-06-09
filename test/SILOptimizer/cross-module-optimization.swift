@@ -118,6 +118,9 @@ func testMisc() {
   // CHECK-OUTPUT: 42
   // CHECK-SIL-DAG: sil shared {{.*}} @$s4Test13callUnrelatedyxxlFSi_Tg5
   print(callUnrelated(42))
+
+  // CHECK-OUTPUT: 27
+  print(classWithPublicProperty(33))
 }
 
 testNestedTypes()

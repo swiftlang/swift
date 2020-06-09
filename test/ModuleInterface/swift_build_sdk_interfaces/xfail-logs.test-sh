@@ -4,7 +4,7 @@ RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/logs/Bad-Bad-err.txt
 
 CHECK: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
 
-PRINTS-ERROR: unresolved identifier 'garbage'
+PRINTS-ERROR: cannot find 'garbage' in scope
 
 RUN: %empty-directory(%t)
 RUN: echo '["Good"]' > %t/xfails-good.json

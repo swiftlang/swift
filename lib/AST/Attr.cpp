@@ -758,11 +758,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Custom: {
     if (!Options.IsForSwiftInterface)
       break;
-    // For Swift interface, we should only print function builder attribute
-    // on parameter decls. Printing the attribute elsewhere isn't ABI relevant.
+    // For Swift interface, we should print function builder attributes
+    // on parameter decls and on protocol requirements.
+    // Printing the attribute elsewhere isn't ABI relevant.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->getAttachedFunctionBuilder() == this) {
-        if (!isa<ParamDecl>(D))
+        if (!isa<ParamDecl>(D) &&
+            !(isa<VarDecl>(D) && isa<ProtocolDecl>(D->getDeclContext())))
           return false;
       }
     }
@@ -1850,8 +1852,7 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
       initContext(initContext) {
   hasArgLabelLocs = !argLabelLocs.empty();
   numArgLabels = argLabels.size();
-  initializeCallArguments(argLabels, argLabelLocs,
-                          /*hasTrailingClosure=*/false);
+  initializeCallArguments(argLabels, argLabelLocs);
 }
 
 CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
@@ -1868,16 +1869,15 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
   Expr *arg = nullptr;
   if (hasInitializer) {
     arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                             rParenLoc, nullptr, implicit, argLabelsScratch,
-                             argLabelLocsScratch);
+                             rParenLoc, /*trailingClosures=*/{}, implicit,
+                             argLabelsScratch, argLabelLocsScratch);
   }
 
   SourceRange range(atLoc, type.getSourceRange().End);
   if (arg)
     range.End = arg->getEndLoc();
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
-                                 /*hasTrailingClosure=*/false);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
   void *mem = ctx.Allocate(size, alignof(CustomAttr));
   return new (mem) CustomAttr(atLoc, range, type, initContext, arg, argLabels,
                               argLabelLocs, implicit);

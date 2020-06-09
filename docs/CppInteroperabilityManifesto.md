@@ -183,7 +183,7 @@ that pick different sides, forcing the user to choose.
 
 Swift/C++ interoperability builds on top of the Swift/C interoperability, so it
 helps to be familiar with [Swift's strategy for importing C
-modules](HowSwiftImportsCModules.md).
+modules](HowSwiftImportsCAPIs.md).
 
 # Importing C++ APIs into Swift
 
@@ -2406,7 +2406,7 @@ unambiguously to C++.
 // C++ support module in the Swift standard library.
 
 typealias CxxPointer<T> = UnsafeMutablePointer<T>      // T*
-typealias CxxConstPointer<T> = UnsafeMutablePointer<T> // const T*
+typealias CxxConstPointer<T> = UnsafePointer<T>        // const T*
 
 typealias CxxRef<T> = UnsafeMutablePointer<T>          // T&
 typealias CxxConstRef<T> = UnsafePointer<T>            // const T&

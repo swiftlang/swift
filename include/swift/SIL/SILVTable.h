@@ -53,6 +53,9 @@ public:
     enum Kind : uint8_t {
       /// The vtable entry is for a method defined directly in this class.
       Normal,
+      /// The vtable entry is for a method defined directly in this class, and is never overridden
+      /// by subclasses.
+      NormalNonOverridden,
       /// The vtable entry is inherited from the superclass.
       Inherited,
       /// The vtable entry is inherited from the superclass, and overridden
@@ -124,6 +127,9 @@ public:
 
   /// Return all of the method entries.
   ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }
+
+  /// Return all of the method entries mutably.
+  MutableArrayRef<Entry> getMutableEntries() { return {Entries, NumEntries}; }
 
   /// Look up the implementation function for the given method.
   Optional<Entry> getEntry(SILModule &M, SILDeclRef method) const;

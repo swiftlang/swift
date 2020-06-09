@@ -70,8 +70,8 @@ do {
 }
 // VOID_VOID: Begin completions
 // VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Identical]: voidToVoid;
-// VOID_VOID-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
-// VOID_VOID-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
+// VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
+// VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
 // VOID_VOID-DAG: Decl{{.*}}:      anyToAny({#a: Any#})[#Any#];
 // VOID_VOID-DAG: Decl{{.*}}:      intToAny({#a: Int#})[#Any#];
 // VOID_VOID-DAG: Decl{{.*}}:      voidToInt()[#Int#];
@@ -122,9 +122,9 @@ do {
 
 // ANY_INT: Begin completions
 // ANY_INT_DAG: Decl{{.*}}/TypeRelation[Identical]: anyToInt(a:); name=anyToInt(a:)
-// ANY_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
-// ANY_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
-// ANY_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: voidToVoid()[#Void#];
+// ANY_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
+// ANY_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
+// ANY_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: voidToVoid()[#Void#];
 // ANY_INT-DAG: Decl{{.*}}:      voidToAny()[#Any#];
 // ANY_INT-DAG: Decl{{.*}}:      intToInt({#a: Int#})[#Int#];
 // ANY_INT-DAG: Decl{{.*}}:      intToAny({#a: Int#})[#Any#];
@@ -135,9 +135,9 @@ do {
 
 // ANY_INT_STATIC_CURRY: Begin completions
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: anyToInt({#(self): S0#})[#(a: Any) -> Int#];
-// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: voidToVoid({#(self): S0#})[#() -> Void#];
-// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: intToVoid({#(self): S0#})[#(a: Int) -> Void#];
-// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: anyToVoid({#(self): S0#})[#(a: Any) -> Void#];
+// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: voidToVoid({#(self): S0#})[#() -> Void#];
+// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: intToVoid({#(self): S0#})[#(a: Int) -> Void#];
+// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: anyToVoid({#(self): S0#})[#(a: Any) -> Void#];
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   voidToInt({#(self): S0#})[#() -> Int#];
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   intToInt({#(self): S0#})[#(a: Int) -> Int#];
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   voidToAny({#(self): S0#})[#() -> Any#];
@@ -159,7 +159,7 @@ do {
 // INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToInt(a:);
 // INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToVoid(a:);
 // INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: returnsIntToInt()[#(Int) -> Int#];
-// INT_ANY-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: voidToVoid()[#Void#];
+// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Invalid]: voidToVoid()[#Void#];
 // INT_ANY-DAG: Decl{{.*}}:      voidToInt()[#Int#];
 // INT_ANY-DAG: Decl{{.*}}:      voidToAny()[#Any#];
 // INT_ANY: End completions
@@ -202,9 +202,9 @@ do {
   take(S0.#^VOID_INT_INT_2^#)
 }
 // VOID_INT_INT-DAG: Decl{{.*}}/TypeRelation[Identical]: returnsIntToInt;
-// VOID_INT_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
-// VOID_INT_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
-// VOID_INT_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: voidToVoid()[#Void#];
+// VOID_INT_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
+// VOID_INT_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
+// VOID_INT_INT-DAG: Decl{{.*}}/TypeRelation[Invalid]: voidToVoid()[#Void#];
 // VOID_INT_INT-DAG: Decl{{.*}}:      voidToAny()[#Any#];
 // VOID_INT_INT-DAG: Decl{{.*}}:      intToAny({#a: Int#})[#Any#];
 // VOID_INT_INT-DAG: Decl{{.*}}:      anyToAny({#a: Any#})[#Any#];

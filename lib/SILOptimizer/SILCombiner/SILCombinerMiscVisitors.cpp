@@ -222,7 +222,7 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
     if (elementDecl.isNonNull()) {
       // Construct a new instruction by copying all the case entries.
       SmallVector<std::pair<EnumElementDecl *, SILValue>, 4> CaseValues;
-      for (int idx = 0, numIdcs = SEAI->getNumCases(); idx < numIdcs; idx++) {
+      for (int idx = 0, numIdcs = SEAI->getNumCases(); idx < numIdcs; ++idx) {
         CaseValues.push_back(SEAI->getCase(idx));
       }
       // Add the default-entry of the original instruction as case-entry.
@@ -699,6 +699,7 @@ static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
       case ValueKind::UpcastInst:
       case ValueKind::RawPointerToRefInst:
       case ValueKind::AddressToPointerInst:
+      case ValueKind::EndCOWMutationInst:
         addr = cast<SingleValueInstruction>(addr)->getOperand(0);
         break;
       default:
@@ -781,10 +782,13 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
     }
   }
 
-  // ReleaseValueInst of an unowned type is an unowned_release.
-  if (OperandTy.is<UnownedStorageType>())
-    return Builder.createUnownedRelease(RVI->getLoc(), Operand,
+  // ReleaseValueInst of a loadable reference storage type needs the
+  // corresponding release instruction.
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  if (OperandTy.is<Name##StorageType>())                                       \
+    return Builder.create##Name##Release(RVI->getLoc(), Operand,               \
                                         RVI->getAtomicity());
+#include "swift/AST/ReferenceStorage.def"
 
   // ReleaseValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule()))
@@ -821,10 +825,13 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
     }
   }
 
-  // RetainValueInst of an unowned type is an unowned_retain.
-  if (OperandTy.is<UnownedStorageType>())
-    return Builder.createUnownedRetain(RVI->getLoc(), Operand,
+  // RetainValueInst of a loadable reference storage type needs the
+  // corresponding retain instruction.
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  if (OperandTy.is<Name##StorageType>())                                       \
+    return Builder.create##Name##Retain(RVI->getLoc(), Operand,                \
                                        RVI->getAtomicity());
+#include "swift/AST/ReferenceStorage.def"
 
   // RetainValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule())) {
@@ -1021,6 +1028,7 @@ static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
     // Just return anything not null for the dry-run.
     return elems[0];
   }
+  llvm_unreachable("invalid kind");
 }
 
 /// Simplify the following two frontend patterns:
@@ -1573,9 +1581,9 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
         if (isa<IntegerLiteralInst>(Pair.second)) {
           bool isFalse = match(Pair.second, Zero);
           if (!isFalse) {
-            TrueBBCases++;
+            ++TrueBBCases;
           } else {
-            FalseBBCases++;
+            ++FalseBBCases;
           }
           continue;
         }
@@ -1594,9 +1602,9 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     unsigned NumFalseBBCases = 0;
 
     if (DefaultBB == CBI->getFalseBB())
-      NumFalseBBCases++;
+      ++NumFalseBBCases;
     else
-      NumTrueBBCases++;
+      ++NumTrueBBCases;
 
     // We can now convert cond_br(select_enum) into switch_enum.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> Cases;
@@ -1611,11 +1619,11 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
       bool isFalse = match(Pair.second, Zero);
       if (!isFalse && DefaultBB != CBI->getTrueBB()) {
         Cases.push_back(std::make_pair(Pair.first, CBI->getTrueBB()));
-        NumTrueBBCases++;
+        ++NumTrueBBCases;
       }
       if (isFalse && DefaultBB != CBI->getFalseBB()) {
         Cases.push_back(std::make_pair(Pair.first, CBI->getFalseBB()));
-        NumFalseBBCases++;
+        ++NumFalseBBCases;
       }
     }
 
@@ -1641,7 +1649,7 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
     if (elementDecl.isNonNull()) {
       // Construct a new instruction by copying all the case entries.
       SmallVector<std::pair<EnumElementDecl *, SILValue>, 4> CaseValues;
-      for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; idx++) {
+      for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; ++idx) {
         CaseValues.push_back(SEI->getCase(idx));
       }
       // Add the default-entry of the original instruction as case-entry.

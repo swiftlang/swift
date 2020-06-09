@@ -14,11 +14,6 @@ import SwiftShims
 
 #if _runtime(_ObjC)
 
-@_effects(readonly)
-private func _isNSString(_ str:AnyObject) -> UInt8 {
-  return _swift_stdlib_isNSString(str)
-}
-
 internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
 internal let _cocoaUTF8Encoding:UInt = 4 /* NSUTF8StringEncoding */
 
@@ -96,7 +91,6 @@ extension _AbstractStringStorage {
     // Handle the case where both strings were bridged from Swift.
     // We can't use String.== because it doesn't match NSString semantics.
     let knownOther = _KnownCocoaString(other)
-    var otherIsTagged = false
     switch knownOther {
     case .storage:
       return _nativeIsEqual(
@@ -104,39 +98,26 @@ extension _AbstractStringStorage {
     case .shared:
       return _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
-#if !(arch(i386) || arch(arm))
-    case .tagged:
-      // Tagged means ASCII. If we're equal, our UTF-8 length is the same as our
-      // UTF-16 length, so just compare the UTF-8 length (which is faster).
-      otherIsTagged = true
-      fallthrough
-#endif
-    case .cocoa:
-      // We're allowed to crash, but for compatibility reasons NSCFString allows
+    default:
+          // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
-      if _isNSString(other) != 1 {
+      if !_isNSString(other) {
         return 0
       }
-      // At this point we've proven that it is an NSString of some sort, but not
-      // one of ours.
 
-      defer { _fixLifetime(other) }
-
-
+      // At this point we've proven that it is a non-Swift NSString
       let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
-      if otherIsTagged && self.count != otherUTF16Length {
-        return 0
-      }
 
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let otherStart = _cocoaASCIIPointer(other) {
-        //We know that otherUTF16Length is also its byte count at this point
-        if count != otherUTF16Length {
-          return 0
+      if let asciiEqual = withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
+        // UTF16 length == UTF8 length iff ASCII
+        if otherUTF16Length == self.count {
+          return (start == ascii || (memcmp(start, ascii, self.count) == 0))
         }
-        return (start == otherStart ||
-          (memcmp(start, otherStart, count) == 0)) ? 1 : 0
+        return false
+      }) {
+        return asciiEqual ? 1 : 0
       }
 
       if self.UTF16Length != otherUTF16Length {
@@ -144,9 +125,9 @@ extension _AbstractStringStorage {
       }
 
       /*
-       The abstract implementation of -isEqualToString: falls back to -compare:
-       immediately, so when we run out of fast options to try, do the same.
-       We can likely be more clever here if need be
+      The abstract implementation of -isEqualToString: falls back to -compare:
+      immediately, so when we run out of fast options to try, do the same.
+      We can likely be more clever here if need be
       */
       return _cocoaStringCompare(self, other) == 0 ? 1 : 0
     }

@@ -81,12 +81,12 @@ extension Container.Inner {
     obj.privateExtensionMethod()
 
     // FIXME: Unqualified lookup won't look into Container from here.
-    _ = PrivateInner() // expected-error {{use of unresolved identifier 'PrivateInner'}}
+    _ = PrivateInner() // expected-error {{cannot find 'PrivateInner' in scope}}
     _ = Container.PrivateInner()
   }
 
   // FIXME: Unqualified lookup won't look into Container from here.
-  var inner: PrivateInner? { return nil } // expected-error {{use of undeclared type 'PrivateInner'}}
+  var inner: PrivateInner? { return nil } // expected-error {{cannot find type 'PrivateInner' in scope}}
   var innerQualified: Container.PrivateInner? { return nil } // expected-error {{invalid redeclaration of 'innerQualified'}} expected-error {{property must be declared private because its type uses a private type}}
 }
 

@@ -16,8 +16,8 @@ func use(_: C3_NestingCRTPish) {}
 func use(_: C4_ExtensionNestingCRTPish) {}
 
 // FIXME: Better to import the class and make it unavailable.
-func use(_: A1_Sub) {} // expected-error {{use of undeclared type 'A1_Sub'}}
-func use(_: A2_Grandchild) {} // expected-error {{use of undeclared type 'A2_Grandchild'}}
+func use(_: A1_Sub) {} // expected-error {{cannot find type 'A1_Sub' in scope}}
+func use(_: A2_Grandchild) {} // expected-error {{cannot find type 'A2_Grandchild' in scope}}
 
 #else // TEST
 

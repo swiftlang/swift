@@ -478,7 +478,7 @@ void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
 template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
-  ++NamesSeen[VD->getFullName()];
+  ++NamesSeen[VD->getName()];
   SmallVector<LookupResultEntry, 8> RelatedDecls;
 
   if (isa<ParamDecl>(VD))
@@ -499,7 +499,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
       continue;
 
     if (RelatedVD != VD) {
-      ++NamesSeen[RelatedVD->getFullName()];
+      ++NamesSeen[RelatedVD->getName()];
       RelatedDecls.push_back(result);
     }
   }
@@ -509,7 +509,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   for (auto Related : RelatedDecls) {
     ValueDecl *RelatedVD = Related.getValueDecl();
     bool SameBase = Related.getBaseDecl() && Related.getBaseDecl() == OriginalBase;
-    Fn(RelatedVD, SameBase, NamesSeen[RelatedVD->getFullName()] > 1);
+    Fn(RelatedVD, SameBase, NamesSeen[RelatedVD->getName()] > 1);
   }
 }
 
@@ -641,11 +641,13 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
 
 static void
 collectAvailableRenameInfo(const ValueDecl *VD,
+                           Optional<RenameRefInfo> RefInfo,
                            std::vector<UIdent> &RefactoringIds,
                            DelayedStringRetriever &RefactroingNameOS,
                            DelayedStringRetriever &RefactoringReasonOS) {
   std::vector<ide::RenameAvailabiliyInfo> Scratch;
-  for (auto Info : ide::collectRenameAvailabilityInfo(VD, Scratch)) {
+  for (auto Info : ide::collectRenameAvailabilityInfo(VD, RefInfo,
+                                                      Scratch)){
     RefactoringIds.push_back(SwiftLangSupport::
       getUIDForRefactoringKind(Info.Kind));
     RefactroingNameOS.startPiece();
@@ -837,8 +839,13 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   std::vector<UIdent> RefactoringIds;
   DelayedStringRetriever RefactoringNameOS(SS);
   DelayedStringRetriever RefactoringReasonOS(SS);
+
   if (RetrieveRefactoring) {
-    collectAvailableRenameInfo(VD, RefactoringIds, RefactoringNameOS,
+    Optional<RenameRefInfo> RefInfo;
+    if (TheTok.IsRef)
+      RefInfo = {TheTok.SF, TheTok.Loc, TheTok.IsKeywordArgument};
+    collectAvailableRenameInfo(VD, RefInfo,
+                               RefactoringIds, RefactoringNameOS,
                                RefactoringReasonOS);
     collectAvailableRefactoringsOtherThanRename(SF, TheTok, RefactoringIds,
       RefactoringNameOS, RefactoringReasonOS);
@@ -1045,7 +1052,7 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
                                  NameTranslatingInfo &Info) {
   auto &Ctx = VD->getDeclContext()->getASTContext();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
-  DeclName OrigName = VD->getFullName();
+  const DeclName OrigName = VD->getName();
   DeclBaseName BaseName = Info.BaseName.empty()
                               ? OrigName.getBaseName()
                               : DeclBaseName(
@@ -1155,7 +1162,7 @@ class CursorRangeInfoConsumer : public SwiftASTConsumer {
 protected:
   SwiftLangSupport &Lang;
   SwiftInvocationRef ASTInvok;
-  StringRef InputFile;
+  std::string InputFile;
   unsigned Offset;
   unsigned Length;
 
@@ -1174,7 +1181,7 @@ public:
   CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
                           bool TryExistingAST, bool CancelOnSubsequentRequest)
-    : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile), Offset(Offset),
+    : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile.str()), Offset(Offset),
       Length(Length), TryExistingAST(TryExistingAST),
       CancelOnSubsequentRequest(CancelOnSubsequentRequest) {}
 
@@ -1288,7 +1295,7 @@ static void resolveCursor(
         std::vector<RefactoringKind> Scratch;
         RangeConfig Range;
         Range.BufferId = BufferID;
-        auto Pair = SM.getLineAndColumn(Loc);
+        auto Pair = SM.getPresumedLineAndColumnForLoc(Loc);
         Range.Line = Pair.first;
         Range.Column = Pair.second;
         Range.Length = Length;

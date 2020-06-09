@@ -27,10 +27,10 @@ func makeCollection(elements: [OpaqueValue<Int>])
   let base = DefaultedRangeReplaceableBidirectionalCollection(elements: baseElements)
   let startIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count))
+    offsetBy: prefix.count)
   let endIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count + elements.count))
+    offsetBy: prefix.count + elements.count)
   return Slice(base: base, bounds: startIndex..<endIndex)
 }
 
@@ -42,10 +42,10 @@ func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
   let base = DefaultedRangeReplaceableBidirectionalCollection(elements: baseElements)
   let startIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count))
+    offsetBy: prefix.count)
   let endIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count + elements.count))
+    offsetBy: prefix.count + elements.count)
   return Slice(base: base, bounds: startIndex..<endIndex)
 }
 
@@ -57,10 +57,10 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
   let base = DefaultedRangeReplaceableBidirectionalCollection(elements: baseElements)
   let startIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count))
+    offsetBy: prefix.count)
   let endIndex = base.index(
     base.startIndex,
-    offsetBy: numericCast(prefix.count + elements.count))
+    offsetBy: prefix.count + elements.count)
   return Slice(base: base, bounds: startIndex..<endIndex)
 }
 

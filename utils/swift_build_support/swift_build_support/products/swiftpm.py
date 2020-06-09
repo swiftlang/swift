@@ -12,7 +12,16 @@
 
 import os
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import xctest
 from .. import shell
 
 
@@ -32,7 +41,7 @@ class SwiftPM(product.Product):
         script_path = os.path.join(
             self.source_dir, 'Utilities', 'bootstrap')
         toolchain_path = self.install_toolchain_path()
-        swiftc = os.path.join(toolchain_path, "usr", "bin", "swiftc")
+        swiftc = os.path.join(toolchain_path, "bin", "swiftc")
 
         # FIXME: We require llbuild build directory in order to build. Is
         # there a better way to get this?
@@ -53,6 +62,25 @@ class SwiftPM(product.Product):
             "--build-dir", self.build_dir,
             "--llbuild-build-dir", llbuild_build_dir
         ]
+
+        # Pass Dispatch directory down if we built it
+        dispatch_build_dir = os.path.join(
+            build_root, '%s-%s' % ("libdispatch", host_target))
+
+        if os.path.exists(dispatch_build_dir):
+            helper_cmd += [
+                "--dispatch-build-dir", dispatch_build_dir
+            ]
+
+        # Pass Foundation directory down if we built it
+        foundation_build_dir = os.path.join(
+            build_root, '%s-%s' % ("foundation", host_target))
+
+        if os.path.exists(foundation_build_dir):
+            helper_cmd += [
+                "--foundation-build-dir", foundation_build_dir
+            ]
+
         helper_cmd.extend(additional_params)
 
         shell.call(helper_cmd)
@@ -74,3 +102,15 @@ class SwiftPM(product.Product):
         self.run_bootstrap_script('install', host_target, [
             '--prefix', install_prefix
         ])
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild]

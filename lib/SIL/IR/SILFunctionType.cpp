@@ -42,12 +42,13 @@ using namespace swift;
 using namespace swift::Lowering;
 
 SILType SILFunctionType::substInterfaceType(SILModule &M,
-                                            SILType interfaceType) const {
+                                            SILType interfaceType,
+                                            TypeExpansionContext context) const {
   // Apply pattern substitutions first, then invocation substitutions.
   if (auto subs = getPatternSubstitutions())
-    interfaceType = interfaceType.subst(M, subs);
+    interfaceType = interfaceType.subst(M, subs, context);
   if (auto subs = getInvocationSubstitutions())
-    interfaceType = interfaceType.subst(M, subs);
+    interfaceType = interfaceType.subst(M, subs, context);
   return interfaceType;
 }
 
@@ -102,33 +103,39 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
 }
 
 CanType SILParameterInfo::getArgumentType(SILModule &M,
-                                          const SILFunctionType *t) const {
+                                          const SILFunctionType *t,
+                                          TypeExpansionContext context) const {
   // TODO: We should always require a function type.
   if (t)
-    return t->substInterfaceType(M,
-                          SILType::getPrimitiveAddressType(getInterfaceType()))
-            .getASTType();
-  
+    return t
+        ->substInterfaceType(
+            M, SILType::getPrimitiveAddressType(getInterfaceType()), context)
+        .getASTType();
+
   return getInterfaceType();
 }
 
 CanType SILResultInfo::getReturnValueType(SILModule &M,
-                                          const SILFunctionType *t) const {
+                                          const SILFunctionType *t,
+                                          TypeExpansionContext context) const {
   // TODO: We should always require a function type.
   if (t)
-    return t->substInterfaceType(M,
-                          SILType::getPrimitiveAddressType(getInterfaceType()))
-            .getASTType();
+    return t
+        ->substInterfaceType(
+            M, SILType::getPrimitiveAddressType(getInterfaceType()), context)
+        .getASTType();
 
   return getInterfaceType();
 }
 
-SILType SILFunctionType::getDirectFormalResultsType(SILModule &M) {
+SILType
+SILFunctionType::getDirectFormalResultsType(SILModule &M,
+                                            TypeExpansionContext context) {
   CanType type;
   if (getNumDirectFormalResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
   } else if (getNumDirectFormalResults() == 1) {
-    type = getSingleDirectFormalResult().getReturnValueType(M, this);
+    type = getSingleDirectFormalResult().getReturnValueType(M, this, context);
   } else {
     auto &cache = getMutableFormalResultsCache();
     if (cache) {
@@ -137,7 +144,7 @@ SILType SILFunctionType::getDirectFormalResultsType(SILModule &M) {
       SmallVector<TupleTypeElt, 4> elts;
       for (auto result : getResults())
         if (!result.isFormalIndirect())
-          elts.push_back(result.getReturnValueType(M, this));
+          elts.push_back(result.getReturnValueType(M, this, context));
       type = CanType(TupleType::get(elts, getASTContext()));
       cache = type;
     }
@@ -166,18 +173,21 @@ SILType SILFunctionType::getAllResultsInterfaceType() {
   return SILType::getPrimitiveObjectType(type);
 }
 
-SILType SILFunctionType::getAllResultsSubstType(SILModule &M) {
-  return substInterfaceType(M, getAllResultsInterfaceType());
+SILType SILFunctionType::getAllResultsSubstType(SILModule &M,
+                                                TypeExpansionContext context) {
+  return substInterfaceType(M, getAllResultsInterfaceType(), context);
 }
 
 SILType SILFunctionType::getFormalCSemanticResult(SILModule &M) {
   assert(getLanguage() == SILFunctionLanguage::C);
   assert(getNumResults() <= 1);
-  return getDirectFormalResultsType(M);
+  return getDirectFormalResultsType(M, TypeExpansionContext::minimal());
 }
 
-CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
-  auto selfTy = getSelfParameter().getArgumentType(M, this);
+CanType
+SILFunctionType::getSelfInstanceType(SILModule &M,
+                                     TypeExpansionContext context) const {
+  auto selfTy = getSelfParameter().getArgumentType(M, this, context);
 
   // If this is a static method, get the instance type.
   if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
@@ -187,10 +197,11 @@ CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
 }
 
 ClassDecl *
-SILFunctionType::getWitnessMethodClass(SILModule &M) const {
+SILFunctionType::getWitnessMethodClass(SILModule &M,
+                                       TypeExpansionContext context) const {
   // TODO: When witnesses use substituted types, we'd get this from the
   // substitution map.
-  auto selfTy = getSelfInstanceType(M);
+  auto selfTy = getSelfInstanceType(M, context);
   auto genericSig = getSubstGenericSignature();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
@@ -205,17 +216,36 @@ SILFunctionType::getWitnessMethodClass(SILModule &M) const {
 IndexSubset *
 SILFunctionType::getDifferentiabilityParameterIndices() {
   assert(isDifferentiable() && "Must be a differentiable function");
-  SmallVector<unsigned, 8> result;
-  for (auto valueAndIndex : enumerate(getParameters()))
-    if (valueAndIndex.value().getDifferentiability() !=
-            SILParameterDifferentiability::NotDifferentiable)
-      result.push_back(valueAndIndex.index());
-  return IndexSubset::get(getASTContext(), getNumParameters(), result);
+  SmallVector<unsigned, 8> paramIndices;
+  for (auto paramAndIndex : enumerate(getParameters()))
+    if (paramAndIndex.value().getDifferentiability() !=
+        SILParameterDifferentiability::NotDifferentiable)
+      paramIndices.push_back(paramAndIndex.index());
+  return IndexSubset::get(getASTContext(), getNumParameters(), paramIndices);
+}
+
+IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
+  assert(isDifferentiable() && "Must be a differentiable function");
+  SmallVector<unsigned, 8> resultIndices;
+  // Check formal results.
+  for (auto resultAndIndex : enumerate(getResults()))
+    if (resultAndIndex.value().getDifferentiability() !=
+        SILResultDifferentiability::NotDifferentiable)
+      resultIndices.push_back(resultAndIndex.index());
+  // Check `inout` parameters.
+  for (auto inoutParamAndIndex : enumerate(getIndirectMutatingParameters()))
+    if (inoutParamAndIndex.value().getDifferentiability() !=
+        SILParameterDifferentiability::NotDifferentiable)
+      resultIndices.push_back(getNumResults() + inoutParamAndIndex.index());
+  auto numSemanticResults =
+      getNumResults() + getNumIndirectMutatingParameters();
+  return IndexSubset::get(getASTContext(), numSemanticResults, resultIndices);
 }
 
 CanSILFunctionType
 SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
-                                          IndexSubset *parameterIndices) {
+                                          IndexSubset *parameterIndices,
+                                          IndexSubset *resultIndices) {
   assert(kind != DifferentiabilityKind::NonDifferentiable &&
          "Differentiability kind must be normal or linear");
   SmallVector<SILParameterInfo, 8> newParameters;
@@ -228,9 +258,18 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
             ? SILParameterDifferentiability::DifferentiableOrNotApplicable
             : SILParameterDifferentiability::NotDifferentiable));
   }
+  SmallVector<SILResultInfo, 8> newResults;
+  for (auto resultAndIndex : enumerate(getResults())) {
+    auto &result = resultAndIndex.value();
+    unsigned index = resultAndIndex.index();
+    newResults.push_back(result.getWithDifferentiability(
+        index < resultIndices->getCapacity() && resultIndices->contains(index)
+            ? SILResultDifferentiability::DifferentiableOrNotApplicable
+            : SILResultDifferentiability::NotDifferentiable));
+  }
   auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
   return get(getInvocationGenericSignature(), newExtInfo, getCoroutineKind(),
-             getCalleeConvention(), newParameters, getYields(), getResults(),
+             getCalleeConvention(), newParameters, getYields(), newResults,
              getOptionalErrorResult(), getPatternSubstitutions(),
              getInvocationSubstitutions(), getASTContext(),
              getWitnessMethodConformanceOrInvalid());
@@ -245,13 +284,15 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
   for (auto &param : getParameters())
     newParams.push_back(param.getWithDifferentiability(
         SILParameterDifferentiability::DifferentiableOrNotApplicable));
-  return SILFunctionType::get(getInvocationGenericSignature(), nondiffExtInfo,
-                              getCoroutineKind(), getCalleeConvention(),
-                              newParams, getYields(), getResults(),
-                              getOptionalErrorResult(),
-                              getPatternSubstitutions(),
-                              getInvocationSubstitutions(),
-                              getASTContext());
+  SmallVector<SILResultInfo, 8> newResults;
+  for (auto &result : getResults())
+    newResults.push_back(result.getWithDifferentiability(
+        SILResultDifferentiability::DifferentiableOrNotApplicable));
+  return SILFunctionType::get(
+      getInvocationGenericSignature(), nondiffExtInfo, getCoroutineKind(),
+      getCalleeConvention(), newParams, getYields(), newResults,
+      getOptionalErrorResult(), getPatternSubstitutions(),
+      getInvocationSubstitutions(), getASTContext());
 }
 
 /// Collects the differentiability parameters of the given original function
@@ -300,10 +341,61 @@ getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
 
 /// Returns the differential type for the given original function type,
 /// parameter indices, and result index.
-static CanSILFunctionType
-getAutoDiffDifferentialType(SILFunctionType *originalFnTy,
-                            IndexSubset *parameterIndices, unsigned resultIndex,
-                            LookupConformanceFn lookupConformance) {
+static CanSILFunctionType getAutoDiffDifferentialType(
+    SILFunctionType *originalFnTy, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices, LookupConformanceFn lookupConformance,
+    TypeConverter &TC) {
+  // Given the tangent type and the corresponding original parameter's
+  // convention, returns the tangent parameter's convention.
+  auto getTangentParameterConvention =
+      [&](CanType tanType,
+          ParameterConvention origParamConv) -> ParameterConvention {
+    tanType =
+        tanType->getCanonicalType(originalFnTy->getSubstGenericSignature());
+    AbstractionPattern pattern(originalFnTy->getSubstGenericSignature(),
+                               tanType);
+    auto &tl =
+        TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
+    // When the tangent type is address only, we must ensure that the tangent
+    // parameter's convention is indirect.
+    if (tl.isAddressOnly() && !isIndirectFormalParameter(origParamConv)) {
+      switch (origParamConv) {
+      case ParameterConvention::Direct_Guaranteed:
+        return ParameterConvention::Indirect_In_Guaranteed;
+      case ParameterConvention::Direct_Owned:
+      case ParameterConvention::Direct_Unowned:
+        return ParameterConvention::Indirect_In;
+      default:
+        llvm_unreachable("unhandled parameter convention");
+      }
+    }
+    return origParamConv;
+  };
+
+  // Given the tangent type and the corresponding original result's convention,
+  // returns the tangent result's convention.
+  auto getTangentResultConvention =
+      [&](CanType tanType,
+          ResultConvention origResConv) -> ResultConvention {
+    tanType =
+        tanType->getCanonicalType(originalFnTy->getSubstGenericSignature());
+    AbstractionPattern pattern(originalFnTy->getSubstGenericSignature(),
+                               tanType);
+    auto &tl =
+        TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
+    // When the tangent type is address only, we must ensure that the tangent
+    // result's convention is indirect.
+    if (tl.isAddressOnly() && !isIndirectFormalResult(origResConv)) {
+      switch (origResConv) {
+      case ResultConvention::Owned:
+        return ResultConvention::Indirect;
+      default:
+        llvm_unreachable("unhandled result convention");
+      }
+    }
+    return origResConv;
+  };
+
   auto &ctx = originalFnTy->getASTContext();
   SmallVector<GenericTypeParamType *, 4> substGenericParams;
   SmallVector<Requirement, 4> substRequirements;
@@ -324,33 +416,40 @@ getAutoDiffDifferentialType(SILFunctionType *originalFnTy,
         param.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
     assert(paramTan && "Parameter type does not have a tangent space?");
     auto paramTanType = paramTan->getCanonicalType();
+    auto paramConv = getTangentParameterConvention(paramTanType,
+                                                   param.getConvention());
     if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
       differentialParams.push_back(
-          {paramTan->getCanonicalType(), param.getConvention()});
+          {paramTan->getCanonicalType(), paramConv});
     } else {
       auto gpIndex = substGenericParams.size();
       auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
       substGenericParams.push_back(gpType);
       substReplacements.push_back(paramTanType);
-      differentialParams.push_back({gpType, param.getConvention()});
+      differentialParams.push_back({gpType, paramConv});
     }
   }
   SmallVector<SILResultInfo, 1> differentialResults;
   if (!inoutParam || !isWrtInoutParameter) {
-    auto &result = originalResults[resultIndex];
-    auto resultTan =
-        result.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
-    assert(resultTan && "Result type does not have a tangent space?");
-    auto resultTanType = resultTan->getCanonicalType();
-    if (!resultTanType->hasArchetype() && !resultTanType->hasTypeParameter()) {
-      differentialResults.push_back(
-          {resultTan->getCanonicalType(), result.getConvention()});
-    } else {
-      auto gpIndex = substGenericParams.size();
-      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
-      substGenericParams.push_back(gpType);
-      substReplacements.push_back(resultTanType);
-      differentialResults.push_back({gpType, result.getConvention()});
+    for (auto resultIndex : resultIndices->getIndices()) {
+      auto &result = originalResults[resultIndex];
+      auto resultTan =
+          result.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
+      assert(resultTan && "Result type does not have a tangent space?");
+      auto resultTanType = resultTan->getCanonicalType();
+      auto resultConv =
+          getTangentResultConvention(resultTanType, result.getConvention());
+      if (!resultTanType->hasArchetype() &&
+          !resultTanType->hasTypeParameter()) {
+        differentialResults.push_back(
+            {resultTan->getCanonicalType(), resultConv});
+      } else {
+        auto gpIndex = substGenericParams.size();
+        auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+        substGenericParams.push_back(gpType);
+        substReplacements.push_back(resultTanType);
+        differentialResults.push_back({gpType, resultConv});
+      }
     }
   }
   SubstitutionMap substitutions;
@@ -371,11 +470,10 @@ getAutoDiffDifferentialType(SILFunctionType *originalFnTy,
 
 /// Returns the pullback type for the given original function type, parameter
 /// indices, and result index.
-static CanSILFunctionType
-getAutoDiffPullbackType(SILFunctionType *originalFnTy,
-                        IndexSubset *parameterIndices, unsigned resultIndex,
-                        LookupConformanceFn lookupConformance,
-                        TypeConverter &TC) {
+static CanSILFunctionType getAutoDiffPullbackType(
+    SILFunctionType *originalFnTy, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices, LookupConformanceFn lookupConformance,
+    TypeConverter &TC) {
   auto &ctx = originalFnTy->getASTContext();
   SmallVector<GenericTypeParamType *, 4> substGenericParams;
   SmallVector<Requirement, 4> substRequirements;
@@ -473,22 +571,25 @@ getAutoDiffPullbackType(SILFunctionType *originalFnTy,
       pullbackParams.push_back({gpType, paramTanConvention});
     }
   } else {
-    auto &origRes = originalResults[resultIndex];
-    auto resultTan =
-        origRes.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
-    assert(resultTan && "Result type does not have a tangent space?");
-    auto resultTanType = resultTan->getCanonicalType();
-    auto paramTanConvention = getTangentParameterConventionForOriginalResult(
-        resultTanType, origRes.getConvention());
-    if (!resultTanType->hasArchetype() && !resultTanType->hasTypeParameter()) {
+    for (auto resultIndex : resultIndices->getIndices()) {
+      auto &origRes = originalResults[resultIndex];
+      auto resultTan = origRes.getInterfaceType()->getAutoDiffTangentSpace(
+          lookupConformance);
+      assert(resultTan && "Result type does not have a tangent space?");
       auto resultTanType = resultTan->getCanonicalType();
-      pullbackParams.push_back({resultTanType, paramTanConvention});
-    } else {
-      auto gpIndex = substGenericParams.size();
-      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
-      substGenericParams.push_back(gpType);
-      substReplacements.push_back(resultTanType);
-      pullbackParams.push_back({gpType, paramTanConvention});
+      auto paramTanConvention = getTangentParameterConventionForOriginalResult(
+          resultTanType, origRes.getConvention());
+      if (!resultTanType->hasArchetype() &&
+          !resultTanType->hasTypeParameter()) {
+        auto resultTanType = resultTan->getCanonicalType();
+        pullbackParams.push_back({resultTanType, paramTanConvention});
+      } else {
+        auto gpIndex = substGenericParams.size();
+        auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+        substGenericParams.push_back(gpType);
+        substReplacements.push_back(resultTanType);
+        pullbackParams.push_back({gpType, paramTanConvention});
+      }
     }
   }
   SmallVector<SILParameterInfo, 4> diffParams;
@@ -588,16 +689,16 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
-    IndexSubset *parameterIndices, unsigned resultIndex,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnInvocationGenSig,
     bool isReabstractionThunk) {
+  assert(parameterIndices);
+  assert(resultIndices);
   auto &ctx = getASTContext();
 
   // Look up result in cache.
-  auto *resultIndices = IndexSubset::get(
-      ctx, getNumResults() + getNumIndirectMutatingParameters(), {resultIndex});
   SILAutoDiffDerivativeFunctionKey key{this,
                                        parameterIndices,
                                        resultIndices,
@@ -620,12 +721,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   case AutoDiffDerivativeFunctionKind::JVP:
     closureType =
         getAutoDiffDifferentialType(constrainedOriginalFnTy, parameterIndices,
-                                    resultIndex, lookupConformance);
+                                    resultIndices, lookupConformance, TC);
     break;
   case AutoDiffDerivativeFunctionKind::VJP:
     closureType =
         getAutoDiffPullbackType(constrainedOriginalFnTy, parameterIndices,
-                                resultIndex, lookupConformance, TC);
+                                resultIndices, lookupConformance, TC);
     break;
   }
   // Compute the derivative function parameters.
@@ -644,7 +745,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     auto fnParamType = dyn_cast<SILFunctionType>(fnParam.getInterfaceType());
     assert(fnParamType);
     auto diffFnType = fnParamType->getWithDifferentiability(
-        DifferentiabilityKind::Normal, parameterIndices);
+        DifferentiabilityKind::Normal, parameterIndices, resultIndices);
     newParameters.back() = fnParam.getWithInterfaceType(diffFnType);
   }
 
@@ -1537,7 +1638,7 @@ private:
     // Assume the error parameter doesn't have interesting lowering.
     Inputs.push_back(SILParameterInfo(foreignErrorTy,
                                       ParameterConvention::Direct_Unowned));
-    NextOrigParamIndex++;
+    ++NextOrigParamIndex;
     return true;
   }
 
@@ -3088,40 +3189,46 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
   // If the constant refers to a derivative function, get the SIL type of the
   // original function and use it to compute the derivative SIL type.
   //
-  // This is necessary because the "lowered AST derivative function type" (BC)
+  // This is necessary because the "lowered AST derivative function type" (bc)
   // may differ from the "derivative type of the lowered original function type"
-  // (AD):
+  // (ad):
   //
-  // +--------------------+       lowering      +--------------------+
-  // | AST orig.  fn type |  -------(A)------>  | SIL orig.  fn type |
-  // +--------------------+                     +--------------------+
-  //         |                                                |
-  //    (B, Sema)   getAutoDiffDerivativeFunctionType     (D, here)
-  //         V                                                V
-  // +--------------------+       lowering      +--------------------+
-  // | AST deriv. fn type |  -------(C)------>  | SIL deriv. fn type |
-  // +--------------------+                     +--------------------+
+  // ┌────────────────────┐       lowering      ┌────────────────────┐
+  // │ AST orig.  fn type │  ───────(a)──────►  │ SIL orig.  fn type │
+  // └────────────────────┘                     └────────────────────┘
+  //         │                                                │
+  //    (b, Sema)   getAutoDiffDerivativeFunctionType     (d, here)
+  //         │                                                │
+  //         ▼                                                ▼
+  // ┌────────────────────┐       lowering      ┌────────────────────┐
+  // │ AST deriv. fn type │  ───────(c)──────►  │ SIL deriv. fn type │
+  // └────────────────────┘                     └────────────────────┘
   //
-  // (AD) does not always commute with (BC):
-  // - (BC) is the result of computing the AST derivative type (Sema), then
+  // (ad) does not always commute with (bc):
+  // - (bc) is the result of computing the AST derivative type (Sema), then
   //   lowering it via SILGen. This is the default lowering behavior, but may
   //   break SIL typing invariants because expected lowered derivative types are
   //   computed from lowered original function types.
-  // - (AD) is the result of lowering the original function type, then computing
+  // - (ad) is the result of lowering the original function type, then computing
   //   its derivative type. This is the expected lowered derivative type,
   //   preserving SIL typing invariants.
   //
-  // Always use (AD) to compute lowered derivative function types.
+  // Always use (ad) to compute lowered derivative function types.
   if (auto *derivativeId = constant.derivativeFunctionIdentifier) {
     // Get lowered original function type.
     auto origFnConstantInfo = getConstantInfo(
         TypeExpansionContext::minimal(), constant.asAutoDiffOriginalFunction());
     // Use it to compute lowered derivative function type.
-    auto *loweredIndices = autodiff::getLoweredParameterIndices(
+    auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
         derivativeId->getParameterIndices(), formalInterfaceType);
+    auto numResults =
+        origFnConstantInfo.SILFnType->getNumResults() +
+        origFnConstantInfo.SILFnType->getNumIndirectMutatingParameters();
+    auto *loweredResultIndices = IndexSubset::getDefault(
+        M.getASTContext(), numResults, /*includeAll*/ true);
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
-        loweredIndices, /*resultIndex*/ 0, derivativeId->getKind(), *this,
-        LookUpConformanceInModule(&M));
+        loweredParamIndices, loweredResultIndices, derivativeId->getKind(),
+        *this, LookUpConformanceInModule(&M));
   }
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
@@ -3234,7 +3341,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       auto derivedParams = derivedFunc.getParams();
       auto baseParams = baseFunc.getParams();
       assert(derivedParams.size() == baseParams.size());
-      for (unsigned i = 0, e = derivedParams.size(); i < e; i++) {
+      for (unsigned i = 0, e = derivedParams.size(); i < e; ++i) {
         assert(derivedParams[i].getParameterFlags() ==
                baseParams[i].getParameterFlags());
 
@@ -3520,7 +3627,10 @@ public:
           auto witnessConformance = substWitnessConformance(origType);
           substType = substType->withPatternSpecialization(nullptr, subs,
                                                            witnessConformance);
-
+          if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
+            substType =
+              substType->substituteOpaqueArchetypes(TC, typeExpansionContext);
+          }
           return substType;
         }
         // else fall down to component substitution
@@ -3747,6 +3857,25 @@ SILType SILType::subst(TypeConverter &tc, SubstitutionMap subs) const {
 }
 SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
   return subst(M.Types, subs);
+}
+
+SILType SILType::subst(SILModule &M, SubstitutionMap subs,
+                       TypeExpansionContext context) const {
+  if (!hasArchetype() && !hasTypeParameter() &&
+      !getASTType()->hasOpaqueArchetype())
+    return *this;
+
+  // Pass the TypeSubstitutionFn and LookupConformanceFn as arguments so that
+  // the llvm::function_ref value's scope spans the STST.subst call since
+  // SILTypeSubstituter captures these functions.
+  auto result = [&](TypeSubstitutionFn subsFn,
+                    LookupConformanceFn conformancesFn) -> SILType {
+    SILTypeSubstituter STST(M.Types, context, subsFn, conformancesFn,
+                            subs.getGenericSignature().getCanonicalSignature(),
+                            false);
+    return STST.subst(*this);
+  }(QuerySubstitutionMap{subs}, LookUpConformanceInSubstitutionMap(subs));
+  return result;
 }
 
 /// Apply a substitution to this polymorphic SILFunctionType so that
@@ -4177,9 +4306,11 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
       return ABICompatibilityCheckResult::DifferentReturnValueConventions;
 
     if (!areABICompatibleParamsOrReturns(
-                         result1.getSILStorageType(context.getModule(), this),
-                         result2.getSILStorageType(context.getModule(), other),
-                         &context)) {
+            result1.getSILStorageType(context.getModule(), this,
+                                      context.getTypeExpansionContext()),
+            result2.getSILStorageType(context.getModule(), other,
+                                      context.getTypeExpansionContext()),
+            &context)) {
       return ABICompatibilityCheckResult::ABIIncompatibleReturnValues;
     }
   }
@@ -4194,9 +4325,11 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
       return ABICompatibilityCheckResult::DifferentErrorResultConventions;
 
     if (!areABICompatibleParamsOrReturns(
-                           error1.getSILStorageType(context.getModule(), this),
-                           error2.getSILStorageType(context.getModule(), other),
-                           &context))
+            error1.getSILStorageType(context.getModule(), this,
+                                     context.getTypeExpansionContext()),
+            error2.getSILStorageType(context.getModule(), other,
+                                     context.getTypeExpansionContext()),
+            &context))
       return ABICompatibilityCheckResult::ABIIncompatibleErrorResults;
   }
 
@@ -4213,9 +4346,11 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
     if (param1.getConvention() != param2.getConvention())
       return {ABICompatibilityCheckResult::DifferingParameterConvention, i};
     if (!areABICompatibleParamsOrReturns(
-                           param1.getSILStorageType(context.getModule(), this),
-                           param2.getSILStorageType(context.getModule(), other),
-                           &context))
+            param1.getSILStorageType(context.getModule(), this,
+                                     context.getTypeExpansionContext()),
+            param2.getSILStorageType(context.getModule(), other,
+                                     context.getTypeExpansionContext()),
+            &context))
       return {ABICompatibilityCheckResult::ABIIncompatibleParameterType, i};
   }
 

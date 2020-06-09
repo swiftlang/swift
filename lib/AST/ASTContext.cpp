@@ -32,6 +32,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -43,7 +44,6 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -56,6 +56,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
@@ -473,11 +474,20 @@ struct ASTContext::Implementation {
 
   /// The IRGen specific SIL transforms that have been registered.
   SILTransformCtors IRGenSILPasses;
+
+#if !SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  /// The scratch context used to allocate intrinsic data on behalf of \c swift::IntrinsicInfo
+  std::unique_ptr<llvm::LLVMContext> IntrinsicScratchContext;
+#endif
 };
 
 ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
-      TheSyntaxArena(new syntax::SyntaxArena()) {}
+      TheSyntaxArena(new syntax::SyntaxArena())
+#if !SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+      , IntrinsicScratchContext(new llvm::LLVMContext())
+#endif
+      {}
 ASTContext::Implementation::~Implementation() {
   for (auto &cleanup : Cleanups)
     cleanup();
@@ -539,13 +549,10 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
   : LangOpts(langOpts),
     TypeCheckerOpts(typeckOpts),
     SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
-    evaluator(Diags,
-              langOpts.DebugDumpCycles,
-              langOpts.BuildRequestDependencyGraph),
+    evaluator(Diags, langOpts),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
-    TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(
       new (*this, AllocationArena::Permanent)
         ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
@@ -1449,6 +1456,22 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
   getImpl().ModuleLoaders.push_back(std::move(loader));
 }
 
+Optional<ModuleDependencies> ASTContext::getModuleDependencies(
+    StringRef moduleName, bool isUnderlyingClangModule,
+    ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate) {
+  for (auto &loader : getImpl().ModuleLoaders) {
+    if (isUnderlyingClangModule &&
+        loader.get() != getImpl().TheClangModuleLoader)
+      continue;
+
+    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                          delegate))
+      return dependencies;
+  }
+
+  return None;
+}
+
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
                                 unsigned previousGeneration) {
   PrettyStackTraceDecl stackTrace("loading extensions for", nominal);
@@ -1458,14 +1481,16 @@ void ASTContext::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void ASTContext::loadObjCMethods(
-       ClassDecl *classDecl,
-       ObjCSelector selector,
-       bool isInstanceMethod,
-       unsigned previousGeneration,
-       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+    ClassDecl *classDecl, ObjCSelector selector, bool isInstanceMethod,
+    unsigned previousGeneration,
+    llvm::TinyPtrVector<AbstractFunctionDecl *> &methods, bool swiftOnly) {
   PrettyStackTraceSelector stackTraceSelector("looking for", selector);
   PrettyStackTraceDecl stackTraceDecl("...in", classDecl);
   for (auto &loader : getImpl().ModuleLoaders) {
+    // Ignore the Clang importer if we've been asked for Swift-only results.
+    if (swiftOnly && loader.get() == getClangModuleLoader())
+      continue;
+
     loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
                             previousGeneration, methods);
   }
@@ -1487,11 +1512,6 @@ void ASTContext::verifyAllLoadedModules() const {
   FrontendStatsTracer tracer(Stats, "verify-all-loaded-modules");
   for (auto &loader : getImpl().ModuleLoaders)
     loader->verifyAllModules();
-
-  for (auto &topLevelModulePair : LoadedModules) {
-    ModuleDecl *M = topLevelModulePair.second;
-    assert(!M->getFiles().empty() || M->failedToLoad());
-  }
 #endif
 }
 
@@ -3344,14 +3364,22 @@ SILFunctionType::SILFunctionType(
     }
   }
 
-  // Check that `@noDerivative` parameters only exist on `@differentiable`
-  // functions.
-  if (!ext.isDifferentiable())
-    for (auto param : getParameters())
+  // Check that `@noDerivative` parameters and results only exist in
+  // `@differentiable` function types.
+  if (!ext.isDifferentiable()) {
+    for (auto param : getParameters()) {
       assert(param.getDifferentiability() ==
                  SILParameterDifferentiability::DifferentiableOrNotApplicable &&
-             "non-`@differentiable` function should not have NotDifferentiable "
-             "parameter");
+             "non-`@differentiable` function type should not have "
+             "`@noDerivative` parameter");
+    }
+    for (auto result : getResults()) {
+      assert(result.getDifferentiability() ==
+                 SILResultDifferentiability::DifferentiableOrNotApplicable &&
+             "non-`@differentiable` function type should not have "
+             "`@noDerivative` result");
+    }
+  }
 #endif
 }
 
@@ -3695,11 +3723,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
       superclass = superclass.subst(Substitutions);
     }
   #endif
-  SmallVector<ProtocolDecl*, 4> protos;
-  for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
-    protos.push_back(proto);
-  }
-  
+  const auto protos = signature->getRequiredProtocols(opaqueInterfaceTy);
+
   auto mem = ctx.Allocate(
     OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
       protos.size(), superclass ? 1 : 0, layout ? 1 : 0),
@@ -3808,45 +3833,6 @@ void TypeLoc::setInvalidType(ASTContext &C) {
   Ty = ErrorType::get(C);
 }
 
-namespace {
-class raw_capturing_ostream : public raw_ostream {
-  std::string Message;
-  uint64_t Pos;
-  CapturingTypeCheckerDebugConsumer &Listener;
-
-public:
-  raw_capturing_ostream(CapturingTypeCheckerDebugConsumer &Listener)
-      : Listener(Listener) {}
-
-  ~raw_capturing_ostream() override {
-    flush();
-  }
-
-  void write_impl(const char *Ptr, size_t Size) override {
-    Message.append(Ptr, Size);
-    Pos += Size;
-
-    // Check if we have at least one complete line.
-    size_t LastNewline = StringRef(Message).rfind('\n');
-    if (LastNewline == StringRef::npos)
-      return;
-    Listener.handleMessage(StringRef(Message.data(), LastNewline + 1));
-    Message.erase(0, LastNewline + 1);
-  }
-
-  uint64_t current_pos() const override {
-    return Pos;
-  }
-};
-} // unnamed namespace
-
-TypeCheckerDebugConsumer::~TypeCheckerDebugConsumer() { }
-
-CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
-    : Log(new raw_capturing_ostream(*this)) {
-  Log->SetUnbuffered();
-}
-
 void SubstitutionMap::Storage::Profile(
                                llvm::FoldingSetNodeID &id,
                                GenericSignature genericSig,
@@ -3865,7 +3851,7 @@ void SubstitutionMap::Storage::Profile(
       id.AddPointer(replacementTypes[i].getPointer());
     else
       id.AddPointer(nullptr);
-    i++;
+    ++i;
   });
 
   // Conformances.
@@ -4791,4 +4777,19 @@ AutoDiffDerivativeFunctionIdentifier *AutoDiffDerivativeFunctionIdentifier::get(
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
+}
+
+llvm::LLVMContext &ASTContext::getIntrinsicScratchContext() const {
+#if !SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return *getImpl().IntrinsicScratchContext.get();
+#endif
+}
+
+bool ASTContext::isASCIIString(StringRef s) const {
+  for (unsigned char c : s) {
+    if (c > 127) {
+      return false;
+    }
+  }
+  return true;
 }

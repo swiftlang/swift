@@ -178,7 +178,7 @@ llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
 void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
                                       llvm::Value *&box,
                                       llvm::Value *&valueAddress) {
-  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+  auto attrs = llvm::AttributeList::get(IGM.getLLVMContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
 
@@ -195,7 +195,7 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
                                           llvm::Value *alignMask,
                                           llvm::Value *&outBox,
                                           llvm::Value *&outValueAddress) {
-  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+  auto attrs = llvm::AttributeList::get(IGM.getLLVMContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
 
@@ -210,7 +210,7 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
 
 void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
                                         llvm::Value *typeMetadata) {
-  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+  auto attrs = llvm::AttributeList::get(IGM.getLLVMContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
 
@@ -227,7 +227,7 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
     llvm::Attribute::ReadNone,
   };
   auto attrs = llvm::AttributeList::get(
-      IGM.LLVMContext, llvm::AttributeList::FunctionIndex, attrKinds);
+      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, attrKinds);
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getProjectBoxFn(), box);
   call->setCallingConv(IGM.DefaultCC);
@@ -236,7 +236,7 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
 }
 
 llvm::Value *IRGenFunction::emitAllocEmptyBoxCall() {
-  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+  auto attrs = llvm::AttributeList::get(IGM.getLLVMContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
   llvm::CallInst *call =

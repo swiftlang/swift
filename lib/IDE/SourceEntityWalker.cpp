@@ -86,10 +86,15 @@ private:
   bool shouldIgnore(Decl *D, bool &ShouldVisitChildren);
 
   ValueDecl *extractDecl(Expr *Fn) const {
+    Fn = Fn->getSemanticsProvidingExpr();
     if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
       return DRE->getDecl();
     if (auto ApplyE = dyn_cast<ApplyExpr>(Fn))
       return extractDecl(ApplyE->getFn());
+    if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
+      if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
+        return extractDecl(Unwrapped);
+    }
     return nullptr;
   }
 };
@@ -114,8 +119,12 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   bool IsExtension = false;
 
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->hasName() && !VD->isImplicit())
+    if (VD->hasName() && !VD->isImplicit()) {
+      SourceManager &SM = VD->getASTContext().SourceMgr;
       NameLen = VD->getBaseName().userFacingName().size();
+      if (Loc.isValid() && SM.extractText({Loc, 1}) == "`")
+        NameLen += 2;
+    }
 
     auto ReportParamList = [&](ParameterList *PL) {
       for (auto *PD : *PL) {
@@ -502,6 +511,17 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
       return doSkipChildren();
     }
+  } else if (auto DMRE = dyn_cast<DynamicMemberRefExpr>(E)) {
+    // Visit in source order.
+    if (!DMRE->getBase()->walk(*this))
+        return stopTraversal;
+    if (!passReference(DMRE->getMember().getDecl(), DMRE->getType(),
+                       DMRE->getNameLoc(),
+                       ReferenceMetaData(SemaReferenceKind::DynamicMemberRef,
+                                         OpAccess)))
+        return stopTraversal;
+    // We already visited the children.
+    return doSkipChildren();
   }
 
   return { true, E };
@@ -665,7 +685,11 @@ bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
 
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
-  return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
+  SourceManager &SM = D->getASTContext().SourceMgr;
+  SourceLoc BaseStart = Loc.getBaseNameLoc(), BaseEnd = BaseStart;
+  if (SM.extractText({BaseStart, 1}) == "`")
+    BaseEnd = Lexer::getLocForEndOfToken(SM, BaseStart.getAdvancedLoc(1));
+  return passReference(D, Ty, BaseStart, {BaseStart, BaseEnd}, Data);
 }
 
 bool SemaAnnotator::

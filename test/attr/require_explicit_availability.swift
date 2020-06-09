@@ -1,3 +1,5 @@
+// Test the -require-explicit-availability flag
+
 // RUN: %swiftc_driver -typecheck -parse-stdlib -target x86_64-apple-macosx10.10 -Xfrontend -verify -require-explicit-availability -require-explicit-availability-target "macOS 10.10"  %s
 // RUN: %swiftc_driver -typecheck -parse-stdlib -target x86_64-apple-macosx10.10 -warnings-as-errors %s
 
@@ -43,8 +45,21 @@ public class C { } // expected-warning {{public declarations should have an avai
 
 public protocol P { } // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
 
+private protocol PrivateProto { }
+
 extension S { // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
-  func ok() { }
+  public func warnForPublicMembers() { } // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{3-3=@available(macOS 10.10, *)\n  }}
+}
+
+extension S {
+  internal func dontWarnWithoutPublicMembers() { }
+  private func dontWarnWithoutPublicMembers1() { }
+}
+
+extension S : P { // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
+}
+
+extension S : PrivateProto {
 }
 
 open class OpenClass { } // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}

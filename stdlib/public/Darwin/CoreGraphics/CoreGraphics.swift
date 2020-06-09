@@ -100,9 +100,11 @@ extension CGColorSpace {
   public var colorTable: [UInt8]? {
     guard self.model == .indexed else { return nil }
     let components = self.baseColorSpace?.numberOfComponents ?? 1
-    var table = [UInt8](repeating: 0, count: self.__colorTableCount * components)
-    self.__unsafeGetColorTable(&table)
-    return table
+    let count = self.__colorTableCount * components
+    return [UInt8](unsafeUninitializedCapacity: count) { buf, initializedCount in
+        self.__unsafeGetColorTable(buf.baseAddress!)
+        initializedCount = count
+    }
   }
 }
 

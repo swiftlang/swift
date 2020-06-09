@@ -6,10 +6,10 @@ class HasFunc {
   func HasFunc() -> HasFunc {
     return HasFunc()
   }
-  func SomethingElse(_: SomethingElse) { // expected-error {{use of undeclared type 'SomethingElse'}}
+  func SomethingElse(_: SomethingElse) { // expected-error {{cannot find type 'SomethingElse' in scope}}
     return nil // expected-error {{unexpected non-void return value in void function}}
   }
-  func SomethingElse() -> SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
+  func SomethingElse() -> SomethingElse? { // expected-error {{cannot find type 'SomethingElse' in scope}}
     return nil
   }
 }
@@ -28,7 +28,7 @@ class HasProp { // expected-note {{'HasProp' declared here}}
     return HasProp() // expected-error {{use of 'HasProp' refers to instance method rather than class 'HasProp' in module 'circular_decl_checking'}}
     // expected-note@-1 {{use 'circular_decl_checking.' to reference the class in module 'circular_decl_checking'}} {{12-12=circular_decl_checking.}}
   }
-  var SomethingElse: SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
+  var SomethingElse: SomethingElse? { // expected-error {{cannot find type 'SomethingElse' in scope}}
     return nil
   }
 }
@@ -38,10 +38,10 @@ protocol ReferenceSomeProtocol {
   var SomeProtocol: SomeProtocol { get } 
 }
 
-func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error 2 {{use of undeclared type 'TopLevelFunc'}}'
+func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error 2 {{cannot find type 'TopLevelFunc' in scope}}'
 func TopLevelGenericFunc<TopLevelGenericFunc : TopLevelGenericFunc>(x: TopLevelGenericFunc) -> TopLevelGenericFunc { return x } // expected-error {{type 'TopLevelGenericFunc' constrained to non-protocol, non-class type 'TopLevelGenericFunc'}}
-func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(x: T) -> T { return x} // expected-error {{use of undeclared type 'TopLevelGenericFunc2'}}
-var TopLevelVar: TopLevelVar? { return nil } // expected-error {{use of undeclared type 'TopLevelVar'}}
+func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(x: T) -> T { return x} // expected-error {{cannot find type 'TopLevelGenericFunc2' in scope}}
+var TopLevelVar: TopLevelVar? { return nil } // expected-error {{cannot find type 'TopLevelVar' in scope}}
 
 
 protocol AProtocol {
@@ -66,7 +66,7 @@ class X {
 // <rdar://problem/17144076> recursive typealias causes a segfault in the type checker
 struct SomeStruct<A> {
   typealias A = A // this is OK now -- the underlying type is the generic parameter 'A'
-  typealias B = B // expected-error {{type alias 'B' references itself}}
+  typealias B = B // expected-error {{type alias 'B' references itself}} expected-note {{while resolving type 'B'}}
 }
 
 // <rdar://problem/27680407> Infinite recursion when using fully-qualified associatedtype name that has not been defined with typealias

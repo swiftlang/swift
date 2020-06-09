@@ -92,9 +92,10 @@ bool SILType::isReferenceCounted(SILModule &M) const {
     .isReferenceCounted();
 }
 
-bool SILType::isNoReturnFunction(SILModule &M) const {
+bool SILType::isNoReturnFunction(SILModule &M,
+                                 TypeExpansionContext context) const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getASTType()))
-    return funcTy->isNoReturnFunction(M);
+    return funcTy->isNoReturnFunction(M, context);
 
   return false;
 }
@@ -425,7 +426,8 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
                                 CanSILFunctionType FTy) const {
   auto &M = F.getModule();
 
-  bool IsTrivial = getSILStorageType(M, FTy).isTrivial(F);
+  bool IsTrivial =
+      getSILStorageType(M, FTy, TypeExpansionContext::minimal()).isTrivial(F);
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return SILModuleConventions(M).isSILIndirect(*this)
@@ -469,10 +471,10 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
   return false;
 }
 
-
-bool SILFunctionType::isNoReturnFunction(SILModule &M) const {
+bool SILFunctionType::isNoReturnFunction(SILModule &M,
+                                         TypeExpansionContext context) const {
   for (unsigned i = 0, e = getNumResults(); i < e; ++i) {
-    if (getResults()[i].getReturnValueType(M, this)->isUninhabited())
+    if (getResults()[i].getReturnValueType(M, this, context)->isUninhabited())
       return true;
   }
 

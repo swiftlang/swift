@@ -1031,7 +1031,7 @@ class ExistentialTypeInfoBuilder {
           continue;
         case FieldDescriptorKind::ClassProtocol:
           Representation = ExistentialTypeRepresentation::Class;
-          WitnessTableCount++;
+          ++WitnessTableCount;
 
           if (auto *Superclass = TC.getBuilder().lookupSuperclass(P)) {
             auto *SuperclassTI = TC.getTypeInfo(Superclass);
@@ -1057,7 +1057,7 @@ class ExistentialTypeInfoBuilder {
 
           continue;
         case FieldDescriptorKind::Protocol:
-          WitnessTableCount++;
+          ++WitnessTableCount;
           continue;
         case FieldDescriptorKind::ObjCClass:
         case FieldDescriptorKind::Struct:
@@ -1118,7 +1118,7 @@ public:
       switch (FD->Kind) {
       case FieldDescriptorKind::Class:
         Refcounting = ReferenceCounting::Native;
-        LLVM_FALLTHROUGH;
+        SWIFT_FALLTHROUGH;
 
       case FieldDescriptorKind::ObjCClass:
         addAnyObject();
@@ -1203,7 +1203,7 @@ public:
       break;
     }
 
-    for (unsigned i = 0; i < WitnessTableCount; i++)
+    for (unsigned i = 0; i < WitnessTableCount; ++i)
       builder.addField("wtable", TC.getRawPointerTypeRef());
 
     return builder.build();
@@ -1227,7 +1227,7 @@ public:
     RecordTypeInfoBuilder builder(TC, RecordKind::ExistentialMetatype);
 
     builder.addField("metadata", TC.getAnyMetatypeTypeRef());
-    for (unsigned i = 0; i < WitnessTableCount; i++)
+    for (unsigned i = 0; i < WitnessTableCount; ++i)
       builder.addField("wtable", TC.getRawPointerTypeRef());
 
     return builder.build();
@@ -1584,6 +1584,10 @@ public:
   bool visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return false;
   }
+
+  bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    return false;
+  }
 };
 
 bool TypeConverter::hasFixedSize(const TypeRef *TR) {
@@ -1705,6 +1709,10 @@ public:
   MetatypeRepresentation visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return MetatypeRepresentation::Unknown;
   }
+
+  MetatypeRepresentation visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    return MetatypeRepresentation::Unknown;
+  }
 };
 
 class EnumTypeInfoBuilder {
@@ -1764,7 +1772,7 @@ public:
 
     for (auto Case : Fields) {
       if (Case.TR == nullptr) {
-        NoPayloadCases++;
+        ++NoPayloadCases;
         addCase(Case.Name);
       } else {
         PayloadCases.push_back(Case);
@@ -2151,6 +2159,13 @@ public:
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     DEBUG_LOG(fprintf(stderr, "Can't lower opaque TypeRef"));
+    return nullptr;
+  }
+
+  const TypeInfo *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    // TODO: Provide a hook for the client to try to resolve the opaque archetype
+    // with additional information?
+    DEBUG_LOG(fprintf(stderr, "Can't lower unresolved opaque archetype TypeRef"));
     return nullptr;
   }
 };

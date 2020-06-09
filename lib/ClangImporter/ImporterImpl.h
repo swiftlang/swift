@@ -135,9 +135,10 @@ enum class ImportTypeKind {
 
   /// Import the type of a function parameter.
   ///
-  /// This provides special treatment for C++ references (which become
-  /// [inout] parameters) and C pointers (which become magic [inout]-able types),
-  /// among other things, and enables the conversion of bridged types.
+  /// Special handling:
+  /// * C and C++ pointers become `UnsafePointer?` or `UnsafeMutablePointer?`
+  /// * C++ references become `UnsafePointer` or `UnsafeMutablePointer`
+  /// * Bridging that requires type conversions is allowed.
   /// Parameters are always considered CF-audited.
   Parameter,
 
@@ -254,7 +255,7 @@ public:
   /// API is now unavailable.
   std::string deprecatedAsUnavailableMessage;
 
-  PlatformAvailability(LangOptions &opts);
+  PlatformAvailability(const LangOptions &opts);
 
 private:
   PlatformAvailability(const PlatformAvailability&) = delete;
@@ -389,6 +390,11 @@ private:
   /// Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::MangleContext> Mangler;
 
+  /// Clang arguments used to create the Clang invocation.
+  std::vector<std::string> ClangArgs;
+
+  /// Extra clang args specified via "-Xcc"
+  std::vector<std::string> ExtraClangArgs;
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
@@ -437,12 +443,6 @@ public:
   // Mapping from macro to value for macros that expand to constant values.
   llvm::DenseMap<const clang::MacroInfo *, std::pair<clang::APValue, Type>>
     ImportedMacroConstants;
-
-  /// Keeps track of active selector-based lookups, so that we don't infinitely
-  /// recurse when checking whether a method with a given selector has already
-  /// been imported.
-  llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
-    ActiveSelectors;
 
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
@@ -925,12 +925,12 @@ public:
 
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
-  ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
+  ClangModuleUnit *getWrapperForModule(const clang::Module *underlying,
+                                       SourceLoc importLoc = SourceLoc());
 
   /// Constructs a Swift module for the given Clang module.
-  ModuleDecl *finishLoadingClangModule(SourceLoc importLoc,
-                                       const clang::Module *clangModule,
-                                       bool preferOverlay);
+  ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
+                                       SourceLoc importLoc);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.
@@ -1427,6 +1427,16 @@ bool shouldSuppressDeclImport(const clang::Decl *decl);
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
+/// Add command-line arguments for a normal import of Clang code.
+void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
+                                  ASTContext &ctx,
+                                  const ClangImporterOptions &importerOpts);
+
+/// Add command-line arguments common to all imports of Clang code.
+void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
+                                  ASTContext &ctx,
+                                  const ClangImporterOptions &importerOpts);
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>

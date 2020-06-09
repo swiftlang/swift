@@ -212,12 +212,6 @@ namespace {
         }
         return Space(T, H, SP);
       }
-      static Space forConstructor(Type T, DeclName H,
-                                  std::forward_list<Space> SP) {
-        // No need to filter SP here; this is only used to copy other
-        // Constructor spaces.
-        return Space(T, H, SP);
-      }
       static Space forBool(bool C) {
         return Space(C);
       }
@@ -686,7 +680,7 @@ namespace {
             llvm_unreachable("Attempted to display disjunct to user!");
           } else {
             buffer << "DISJOIN(";
-            interleave(Spaces, [&](const Space &sp) {
+            llvm::interleave(Spaces, [&](const Space &sp) {
               sp.show(buffer, forDisplay);
             }, [&buffer]() { buffer << " |\n"; });
             buffer << ")";
@@ -716,7 +710,7 @@ namespace {
             if (args != argEnd) {
               labelSpaces.push_back(
                   std::pair<Identifier, Space>(*args, param));
-              args++;
+              ++args;
             } else
               labelSpaces.push_back(
                   std::pair<Identifier, Space>(Identifier(), param));
@@ -816,7 +810,7 @@ namespace {
                     Space::forType(TTy->getUnderlyingType(), Identifier()));
               }
             }
-            return Space::forConstructor(tp, eed->getFullName(),
+            return Space::forConstructor(tp, eed->getName(),
                                          constElemSpaces);
           });
 
@@ -1342,7 +1336,7 @@ namespace {
 
             for (size_t rowIdx = 0, colIdx = 0; rowIdx < matrix.size(); ++rowIdx) {
               if (rowIdx != 0 && (rowIdx % stride) == 0) {
-                colIdx++;
+                ++colIdx;
               }
 
               matrix[rowIdx].push_back(columnVect[colIdx]);
@@ -1441,7 +1435,7 @@ namespace {
         if (subSpace.getKind() == SpaceKind::Constructor &&
             subSpace.getHead().getBaseIdentifier().empty()) {
           return Space::forConstructor(item->getType(), name,
-                                       std::move(subSpace.getSpaces()));
+                                       {subSpace});
         }
         return Space::forConstructor(item->getType(), name, subSpace);
       }

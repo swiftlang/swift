@@ -45,8 +45,20 @@
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
-      key.not_recommended: 1,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO17intanceReturnVoidyyF",
+      key.modulename: "complete_typerelation"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "intanceReturnVoidDeprecated(:)",
+      key.sourcetext: "intanceReturnVoidDeprecated(<#T##self: MyEnum##MyEnum#>)",
+      key.description: "intanceReturnVoidDeprecated(self: MyEnum)",
+      key.typename: "() -> Void",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.invalid,
+      key.num_bytes_to_erase: 0,
+      key.not_recommended: 1,
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO27intanceReturnVoidDeprecatedyyF",
       key.modulename: "complete_typerelation"
     },
     {
@@ -80,7 +92,6 @@
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
-      key.not_recommended: 1,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO16staticReturnVoidyyFZ",
       key.modulename: "complete_typerelation"
     },

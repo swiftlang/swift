@@ -676,6 +676,11 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     SmallVector<ASTNode, 16> Elements;
     llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
                                  InInactiveClauseEnvironment || !isActive);
+    // Disable updating the interface hash inside inactive blocks.
+    Optional<llvm::SaveAndRestore<Optional<llvm::MD5>>> T;
+    if (!isActive)
+      T.emplace(CurrentTokenHash, None);
+
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
     } else if (SyntaxContext->isEnabled()) {

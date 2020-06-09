@@ -131,7 +131,9 @@ public:
   }
 
   void notifyHasNewUsers(SILValue value) override {
-    Worklist.addUsersToWorklist(value);
+    if (Worklist.size() < 10000) {
+      Worklist.addUsersToWorklist(value);
+    }
     changed = true;
   }
 
@@ -227,7 +229,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   // Perform iterations until we do not make any changes.
   while (doOneIteration(F, Iteration)) {
     Changed = true;
-    Iteration++;
+    ++Iteration;
   }
 
   if (invalidatedStackNesting) {

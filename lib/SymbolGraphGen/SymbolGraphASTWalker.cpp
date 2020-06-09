@@ -46,16 +46,17 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
   if (this->M.getNameStr().equals(M->getNameStr())) {
     return &MainGraph;
   }
-  auto Found = ExtendedModuleGraphs.find(M);
+  auto Found = ExtendedModuleGraphs.find(M->getNameStr());
   if (Found != ExtendedModuleGraphs.end()) {
-    return Found->getSecond();
+    return Found->getValue();
   }
   auto *Memory = Ctx.allocate(sizeof(SymbolGraph), alignof(SymbolGraph));  
   auto *SG = new (Memory) SymbolGraph(*this,
                                       MainGraph.M,
                                       Optional<ModuleDecl *>(M),
                                       Ctx);
-  ExtendedModuleGraphs.insert({M, SG});
+
+  ExtendedModuleGraphs.insert({M->getNameStr(), SG});
   return SG;
 }
 
@@ -107,8 +108,9 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   // potentially with generic requirements.
   if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     const auto *ExtendedNominal = Extension->getExtendedNominal();
-    // Ignore effecively private decls.
-    if (ExtendedNominal->hasUnderscoredNaming()) {
+    auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
+    // Ignore effectively private decls.
+    if (ExtendedSG->isImplicitlyPrivate(Extension)) {
       return false;
     }
 
@@ -119,8 +121,6 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     // If there are some protocol conformances on this extension, we'll
     // grab them for some new conformsTo relationships.
     if (!Extension->getInherited().empty()) {
-      auto ExtendedSG =
-          getModuleSymbolGraph(ExtendedNominal);
 
       // The symbol graph to use to record these relationships.
       SmallVector<const ProtocolDecl *, 4> Protocols;
@@ -137,7 +137,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
         }
       };
 
-      for (const auto InheritedLoc : Extension->getInherited()) {
+      for (const auto &InheritedLoc : Extension->getInherited()) {
         auto InheritedTy = InheritedLoc.getType();
         if (!InheritedTy) {
           continue;
@@ -147,7 +147,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
       while (!UnexpandedCompositions.empty()) {
         const auto *Comp = UnexpandedCompositions.pop_back_val();
-        for (const auto Member : Comp->getMembers()) {
+        for (const auto &Member : Comp->getMembers()) {
           HandleProtocolOrComposition(Member);
         }
       }

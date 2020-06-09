@@ -3614,24 +3614,11 @@ extension SignedInteger where Self: FixedWidthInteger {
 /// Returns the given integer as the equivalent value in a different integer
 /// type.
 ///
-/// The `numericCast(_:)` function traps on overflow in `-O` and `-Onone`
-/// builds.
+/// Calling the `numericCast(_:)` function is equivalent to calling an
+/// initializer for the destination type. `numericCast(_:)` traps on overflow 
+/// in `-O` and `-Onone` builds.
 ///
-/// You can use `numericCast(_:)` to convert a value when the destination type
-/// can be inferred from the context. In the following example, the
-/// `random(in:)` function uses `numericCast(_:)` twice to convert the
-/// argument and return value of the `arc4random_uniform(_:)` function to the
-/// appropriate type.
-///
-///     func random(in range: Range<Int>) -> Int {
-///         return numericCast(arc4random_uniform(numericCast(range.count)))
-///             + range.lowerBound
-///     }
-///
-///     let number = random(in: -10...<10)
-///     // number == -3, perhaps
-///
-/// - Parameter x: The integer to convert, and instance of type `T`.
+/// - Parameter x: The integer to convert, an instance of type `T`.
 /// - Returns: The value of `x` converted to type `U`.
 @inlinable
 public func numericCast<T: BinaryInteger, U: BinaryInteger>(_ x: T) -> U {

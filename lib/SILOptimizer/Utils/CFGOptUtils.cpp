@@ -417,12 +417,42 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     return;
   }
 
+  case TermKind::TryApplyInst: {
+    auto *tai = cast<TryApplyInst>(t);
+    SILBasicBlock *normalBB =
+        (oldDest == tai->getNormalBB() ? newDest : tai->getNormalBB());
+    SILBasicBlock *errorBB =
+        (oldDest == tai->getErrorBB() ? newDest : tai->getErrorBB());
+    SmallVector<SILValue, 8> args;
+    for (SILValue arg : tai->getArguments()) {
+      args.push_back(arg);
+    }
+    builder.createTryApply( tai->getLoc(), tai->getCallee(),
+                tai->getSubstitutionMap(), args, normalBB, errorBB,
+                tai->getSpecializationInfo());
+    tai->eraseFromParent();
+    return;
+  }
+  
+  case TermKind::YieldInst: {
+    auto *yi = cast<YieldInst>(t);
+    SILBasicBlock *resumeBB =
+        (oldDest == yi->getResumeBB() ? newDest : yi->getResumeBB());
+    SILBasicBlock *unwindBB =
+        (oldDest == yi->getUnwindBB() ? newDest : yi->getUnwindBB());
+    SmallVector<SILValue, 8> args;
+    for (SILValue arg : yi->getYieldedValues()) {
+      args.push_back(arg);
+    }
+    builder.createYield(yi->getLoc(), args,resumeBB, unwindBB);
+    yi->eraseFromParent();
+    return;
+  }
+
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
-  case TermKind::TryApplyInst:
   case TermKind::UnreachableInst:
   case TermKind::UnwindInst:
-  case TermKind::YieldInst:
     llvm_unreachable(
         "Branch target cannot be replaced for this terminator instruction!");
   }

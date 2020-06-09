@@ -194,6 +194,7 @@ public:
              left.AssociatedConformanceEntry.Protocol ==
                  right.AssociatedConformanceEntry.Protocol;
     }
+    llvm_unreachable("invalid witness kind");
   }
 };
 

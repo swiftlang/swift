@@ -32,10 +32,11 @@ extension Character {
   ///
   ///     let chars: [Character] = ["a", " ", "™"]
   ///     for ch in chars {
-  ///         print(ch, "-->", ch.properties.numericValue)
+  ///         print(ch, "-->", ch.asciiValue)
   ///     }
-  ///     // a --> 97
-  ///     //   --> 32
+  ///     // Prints:
+  ///     // a --> Optional(97)
+  ///     //   --> Optional(32)
   ///     // ™ --> nil
   ///
   /// A character with the value "\r\n" (CR-LF) is normalized to "\n" (LF) and
@@ -125,11 +126,12 @@ extension Character {
   ///
   ///     let chars: [Character] = ["4", "④", "万", "a"]
   ///     for ch in chars {
-  ///         print(ch, "-->", ch.properties.numericValue)
+  ///         print(ch, "-->", ch.wholeNumberValue)
   ///     }
-  ///     // 4 --> 4
-  ///     // ④ --> 4
-  ///     // 万 --> 10000
+  ///     // Prints:
+  ///     // 4 --> Optional(4)
+  ///     // ④ --> Optional(4)
+  ///     // 万 --> Optional(10000)
   ///     // a --> nil
   public var wholeNumberValue: Int? {
     guard _isSingleScalar else { return nil }
@@ -158,9 +160,10 @@ extension Character {
   ///     for ch in chars {
   ///         print(ch, "-->", ch.hexDigitValue)
   ///     }
-  ///     // 1 --> 1
-  ///     // a --> 10
-  ///     // Ｆ --> 15
+  ///     // Prints:
+  ///     // 1 --> Optional(1)
+  ///     // a --> Optional(10)
+  ///     // Ｆ --> Optional(15)
   ///     // g --> nil
   public var hexDigitValue: Int? {
     guard _isSingleScalar else { return nil }
@@ -206,6 +209,7 @@ extension Character {
   ///     for ch in chars {
   ///         print(ch, "-->", ch.uppercased())
   ///     }
+  ///     // Prints:
   ///     // e --> E
   ///     // é --> É
   ///     // и --> И
@@ -223,6 +227,7 @@ extension Character {
   ///     for ch in chars {
   ///         print(ch, "-->", ch.lowercased())
   ///     }
+  ///     // Prints:
   ///     // E --> e
   ///     // É --> é
   ///     // И --> и

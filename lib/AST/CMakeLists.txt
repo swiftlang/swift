@@ -56,17 +56,18 @@ add_swift_host_library(swiftAST STATIC
   InlinableText.cpp
   LayoutConstraint.cpp
   Module.cpp
+  ModuleDependencies.cpp
   ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
   NameLookupRequests.cpp
+  OperatorNameLookup.cpp
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
-  ReferencedNameTracker.cpp
   RequirementEnvironment.cpp
   SyntaxASTMap.cpp
   SILLayout.cpp

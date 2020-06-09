@@ -84,7 +84,7 @@ func testImportCFTypes() {
 }
 
 func testImportSEL() {
-  var t1 : SEL // expected-error {{use of undeclared type 'SEL'}} {{12-15=Selector}}
+  var t1 : SEL // expected-error {{cannot find type 'SEL' in scope}} {{12-15=Selector}}
   var t2 : ctypes.SEL // expected-error {{no type named 'SEL' in module 'ctypes'}}
 }
 

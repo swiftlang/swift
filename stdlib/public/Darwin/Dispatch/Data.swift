@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _SwiftDispatchOverlayShims
+@_implementationOnly import _SwiftDispatchOverlayShims
 
 public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public typealias Iterator = DispatchDataIterator

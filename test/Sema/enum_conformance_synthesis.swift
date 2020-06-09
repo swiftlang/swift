@@ -61,7 +61,7 @@ func customHashable() {
 enum InvalidCustomHashable {
   case A, B
 
-  var hashValue: String { return "" } // expected-note {{previously declared here}}
+  var hashValue: String { return "" } // expected-error {{invalid redeclaration of synthesized implementation for protocol requirement 'hashValue'}}
 }
 func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
@@ -178,7 +178,7 @@ enum NoCases: Hashable, Comparable {}
 
 // rdar://19773050
 private enum Bar<T> {
-  case E(Unknown<T>)  // expected-error {{use of undeclared type 'Unknown'}}
+  case E(Unknown<T>)  // expected-error {{cannot find type 'Unknown' in scope}}
 
   mutating func value() -> T {
     switch self {
@@ -369,7 +369,6 @@ func canEatHotChip(_ birthyear:Birthyear) -> Bool {
   return birthyear > .nineties(3)
 }
 // FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '<T> (Generic<T>, Generic<T>) -> Bool'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(InvalidCustomHashable, InvalidCustomHashable) -> Bool'

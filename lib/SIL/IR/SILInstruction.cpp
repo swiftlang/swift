@@ -383,6 +383,16 @@ namespace {
       }
       return true;
     }
+    
+    bool visitBeginCOWMutationInst(const BeginCOWMutationInst *RHS) {
+      auto *left = cast<BeginCOWMutationInst>(LHS);
+      return left->isNative() == RHS->isNative();
+    }
+
+    bool visitEndCOWMutationInst(const EndCOWMutationInst *RHS) {
+      auto *left = cast<EndCOWMutationInst>(LHS);
+      return left->doKeepUnique() == RHS->doKeepUnique();
+    }
 
     bool visitAllocRefDynamicInst(const AllocRefDynamicInst *RHS) {
       return true;
@@ -978,13 +988,14 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
     // Handle LLVM intrinsic functions.
     const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
+      auto IAttrs = IInfo.getOrCreateAttributes(getModule().getASTContext());
       // Read-only.
-      if (IInfo.hasAttribute(llvm::Attribute::ReadOnly) &&
-          IInfo.hasAttribute(llvm::Attribute::NoUnwind))
+      if (IAttrs.hasFnAttribute(llvm::Attribute::ReadOnly) &&
+          IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind))
         return MemoryBehavior::MayRead;
       // Read-none?
-      return IInfo.hasAttribute(llvm::Attribute::ReadNone) &&
-                     IInfo.hasAttribute(llvm::Attribute::NoUnwind)
+      return IAttrs.hasFnAttribute(llvm::Attribute::ReadNone) &&
+                     IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind)
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
@@ -999,6 +1010,22 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
+  }
+
+  if (auto *ga = dyn_cast<GlobalAddrInst>(this)) {
+    // Global variables with resilient types might be allocated into a buffer
+    // and not statically in the data segment.
+    // In this case, the global_addr depends on alloc_global being executed
+    // first. We model this by letting global_addr have a side effect.
+    // It prevents e.g. LICM to move a global_addr out of a loop while keeping
+    // the alloc_global inside the loop.
+    SILModule &M = ga->getFunction()->getModule();
+    auto expansion = TypeExpansionContext::maximal(M.getAssociatedContext(),
+                                                   M.isWholeModule());
+    const TypeLowering &tl =
+      M.Types.getTypeLowering(ga->getType().getObjectType(), expansion);
+    return tl.isFixedABI() ? MemoryBehavior::None :
+                             MemoryBehavior::MayHaveSideEffects;
   }
 
   switch (getKind()) {
@@ -1109,6 +1136,7 @@ bool SILInstruction::mayRelease() const {
 bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::IsEscapingClosureInst:
     return true;
   default:

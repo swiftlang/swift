@@ -606,7 +606,7 @@ extension Unicode.Scalar.Properties {
   ///
   ///     let scalars: [Unicode.Scalar] = ["😎", "$", "0"]
   ///     for s in scalars {
-  ///         print(s, "-->", s.isEmoji)
+  ///         print(s, "-->", s.properties.isEmoji)
   ///     }
   ///     // 😎 --> true
   ///     // $ --> false
@@ -692,15 +692,14 @@ extension Unicode.Scalar.Properties {
   /// all current case mappings. In the event more space is needed, it will be
   /// allocated on the heap.
   internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
-    // TODO(String performance): Stack buffer first and then detect real count
-    let count = 64
-    var array = Array<UInt16>(repeating: 0, count: count)
-    let len: Int = array.withUnsafeMutableBufferPointer { bufPtr in
+    // Allocate 16 code units on the stack.
+    var fixedArray = _FixedArray16<UInt16>(allZeros: ())
+    let count: Int = fixedArray.withUnsafeMutableBufferPointer { buf in
       return _scalar.withUTF16CodeUnits { utf16 in
         var err = __swift_stdlib_U_ZERO_ERROR
         let correctSize = u_strTo(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(bufPtr.count),
+          buf.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(buf.count),
           utf16.baseAddress._unsafelyUnwrappedUnchecked,
           Int32(utf16.count),
           "",
@@ -708,13 +707,36 @@ extension Unicode.Scalar.Properties {
         guard err.isSuccess else {
           fatalError("Unexpected error case-converting Unicode scalar.")
         }
-        // TODO: _internalInvariant(count == correctSize, "inconsistent ICU behavior")
         return Int(correctSize)
       }
     }
-    // TODO: replace `len` with `count`
-    return array[..<len].withUnsafeBufferPointer {
-      return String._uncheckedFromUTF16($0)
+    if _fastPath(count <= 16) {
+      fixedArray.count = count
+      return fixedArray.withUnsafeBufferPointer {
+        String._uncheckedFromUTF16($0)
+      }
+    }
+    // Allocate `count` code units on the heap.
+    let array = Array<UInt16>(unsafeUninitializedCapacity: count) {
+      buf, initializedCount in
+      _scalar.withUTF16CodeUnits { utf16 in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          buf.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(buf.count),
+          utf16.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(utf16.count),
+          "",
+          &err)
+        guard err.isSuccess else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
+        }
+        _internalInvariant(count == correctSize, "inconsistent ICU behavior")
+        initializedCount = count
+      }
+    }
+    return array.withUnsafeBufferPointer {
+      String._uncheckedFromUTF16($0)
     }
   }
 
@@ -1365,9 +1387,9 @@ extension Unicode.Scalar.Properties {
   ///     for scalar in scalars {
   ///         print(scalar, "-->", scalar.properties.numericType)
   ///     }
-  ///     // 4 --> decimal
-  ///     // ④ --> digit
-  ///     // ⅕ --> numeric
+  ///     // 4 --> Optional(Swift.Unicode.NumericType.decimal)
+  ///     // ④ --> Optional(Swift.Unicode.NumericType.digit)
+  ///     // ⅕ --> Optional(Swift.Unicode.NumericType.numeric)
   ///     // X --> nil
   ///
   /// This property corresponds to the "Numeric_Type" property in the
@@ -1389,9 +1411,9 @@ extension Unicode.Scalar.Properties {
   ///     for scalar in scalars {
   ///         print(scalar, "-->", scalar.properties.numericValue)
   ///     }
-  ///     // 4 --> 4.0
-  ///     // ④ --> 4.0
-  ///     // ⅕ --> 0.2
+  ///     // 4 --> Optional(4.0)
+  ///     // ④ --> Optional(4.0)
+  ///     // ⅕ --> Optional(0.2)
   ///     // X --> nil
   ///
   /// This property corresponds to the "Numeric_Value" property in the [Unicode

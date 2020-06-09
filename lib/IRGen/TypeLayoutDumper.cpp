@@ -152,15 +152,13 @@ void TypeLayoutDumper::write(ArrayRef<ModuleDecl *> AllModules,
   }
 }
 
-bool swift::performDumpTypeInfo(const IRGenOptions &Opts,
-                                SILModule &SILMod,
-                                llvm::LLVMContext &LLVMContext) {
+bool swift::performDumpTypeInfo(const IRGenOptions &Opts, SILModule &SILMod) {
   auto &Ctx = SILMod.getASTContext();
   assert(!Ctx.hadError());
   (void)Ctx;
 
   IRGenerator IRGen(Opts, SILMod);
-  IRGenModule IGM(IRGen, IRGen.createTargetMachine(), LLVMContext);
+  IRGenModule IGM(IRGen, IRGen.createTargetMachine());
 
   // We want to bypass resilience.
   LoweringModeScope scope(IGM, TypeConverter::Mode::CompletelyFragile);

@@ -40,7 +40,7 @@ func notAProtocol() {}
 
 // MARK: - Type eraser must be a concrete nominal type
 
-@_typeEraser(Undeclared) // expected-error {{use of undeclared type 'Undeclared'}}
+@_typeEraser(Undeclared) // expected-error {{cannot find type 'Undeclared' in scope}}
 protocol B1 {}
 
 @_typeEraser((Int, Int)) // expected-error {{type eraser must be a class, struct, or enum}}

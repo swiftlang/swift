@@ -103,14 +103,14 @@ struct Y1 {
 }
 
 struct Y2 {
-  subscript(idx: Int) -> TypoType { // expected-error {{use of undeclared type 'TypoType'}}
+  subscript(idx: Int) -> TypoType { // expected-error {{cannot find type 'TypoType' in scope}}
     get { repeat {} while true }
     set {}
   }
 }
 
 class Y3 {
-  subscript(idx: Int) -> TypoType { // expected-error {{use of undeclared type 'TypoType'}}
+  subscript(idx: Int) -> TypoType { // expected-error {{cannot find type 'TypoType' in scope}}
     get { repeat {} while true }
     set {}
   }
@@ -420,13 +420,13 @@ func testSubscript1(_ s2 : SubscriptTest2) {
 
 class Foo {
     subscript(key: String) -> String { // expected-note {{'subscript(_:)' previously declared here}}
-        get { a } // expected-error {{use of unresolved identifier 'a'}}
-        set { b } // expected-error {{use of unresolved identifier 'b'}}
+        get { a } // expected-error {{cannot find 'a' in scope}}
+        set { b } // expected-error {{cannot find 'b' in scope}}
     }
     
     subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript(_:)'}}
-        get { _ = 0; a } // expected-error {{use of unresolved identifier 'a'}}
-        set { b } // expected-error {{use of unresolved identifier 'b'}}
+        get { _ = 0; a } // expected-error {{cannot find 'a' in scope}}
+        set { b } // expected-error {{cannot find 'b' in scope}}
     }
 }
 

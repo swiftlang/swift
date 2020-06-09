@@ -389,95 +389,7 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
 //===----------------------------------------------------------------------===//
 
 if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
-    
-    Accelerate_vDSPFourierTransformTests.test("vDSP/SinglePrecisionComplexConversions") {
-        func convert(splitComplexVector: DSPSplitComplex,
-                     toInterleavedComplexVector interleavedComplexVector: inout [DSPComplex]) {
-            
-            withUnsafePointer(to: splitComplexVector) {
-                vDSP_ztoc($0, 1,
-                          &interleavedComplexVector, 2,
-                          vDSP_Length(interleavedComplexVector.count))
-            }
-        }
-        
-        func convert(interleavedComplexVector: [DSPComplex],
-                     toSplitComplexVector splitComplexVector: inout DSPSplitComplex) {
-            
-            vDSP_ctoz(interleavedComplexVector, 2,
-                      &splitComplexVector, 1,
-                      vDSP_Length(interleavedComplexVector.count))
-        }
-        
-        var realSrc: [Float] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        var imagSrc: [Float] = realSrc.reversed()
-        
-        let splitSrc = DSPSplitComplex(realp: &realSrc,
-                                       imagp: &imagSrc)
-        
-        var interleavedDest = [DSPComplex](repeating: DSPComplex(),
-                                           count:  realSrc.count)
-        
-        convert(splitComplexVector: splitSrc,
-                toInterleavedComplexVector: &interleavedDest)
-        
-        var realDest = [Float](repeating: .nan, count: realSrc.count)
-        var imagDest = [Float](repeating: .nan, count: realSrc.count)
-        
-        var splitDest = DSPSplitComplex(realp: &realDest,
-                                        imagp: &imagDest)
-        
-        convert(interleavedComplexVector: interleavedDest,
-                toSplitComplexVector: &splitDest)
-        
-        expectTrue(realSrc.elementsEqual(realDest))
-        expectTrue(imagSrc.elementsEqual(imagDest))
-    }
-    
-    Accelerate_vDSPFourierTransformTests.test("vDSP/DoublePrecisionComplexConversions") {
-        func convert(splitComplexVector: DSPDoubleSplitComplex,
-                     toInterleavedComplexVector interleavedComplexVector: inout [DSPDoubleComplex]) {
-            
-            withUnsafePointer(to: splitComplexVector) {
-                vDSP_ztocD($0, 1,
-                           &interleavedComplexVector, 2,
-                           vDSP_Length(interleavedComplexVector.count))
-            }
-        }
-        
-        func convert(interleavedComplexVector: [DSPDoubleComplex],
-                     toSplitComplexVector splitComplexVector: inout DSPDoubleSplitComplex) {
-            
-            vDSP_ctozD(interleavedComplexVector, 2,
-                       &splitComplexVector, 1,
-                       vDSP_Length(interleavedComplexVector.count))
-        }
-        
-        var realSrc: [Double] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        var imagSrc: [Double] = realSrc.reversed()
-        
-        let splitSrc = DSPDoubleSplitComplex(realp: &realSrc,
-                                             imagp: &imagSrc)
-        
-        var interleavedDest = [DSPDoubleComplex](repeating: DSPDoubleComplex(),
-                                                 count:  realSrc.count)
-        
-        convert(splitComplexVector: splitSrc,
-                toInterleavedComplexVector: &interleavedDest)
-        
-        var realDest = [Double](repeating: .nan, count: realSrc.count)
-        var imagDest = [Double](repeating: .nan, count: realSrc.count)
-        
-        var splitDest = DSPDoubleSplitComplex(realp: &realDest,
-                                              imagp: &imagDest)
-        
-        convert(interleavedComplexVector: interleavedDest,
-                toSplitComplexVector: &splitDest)
-        
-        expectTrue(realSrc.elementsEqual(realDest))
-        expectTrue(imagSrc.elementsEqual(imagDest))
-    }
-    
+  
     Accelerate_vDSPFourierTransformTests.test("vDSP/2DSinglePrecision") {
         let width = 256
         let height = 256
@@ -491,57 +403,74 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         var sourceImageReal = [Float](repeating: 0, count: n)
         var sourceImageImaginary = [Float](repeating: 0, count: n)
         
-        var sourceImage = DSPSplitComplex(fromInputArray: pixels,
-                                          realParts: &sourceImageReal,
-                                          imaginaryParts: &sourceImageImaginary)
-        
-        let pixelsRecreated = [Float](fromSplitComplex: sourceImage,
-                                      scale: 1, count: pixelCount)
-        
-        expectTrue(pixelsRecreated.elementsEqual(pixels))
-        
-        // Create FFT2D object
-        let fft2D = vDSP.FFT2D(width: 256,
-                               height: 256,
-                               ofType: DSPSplitComplex.self)!
-        
-        // New style transform
-        var transformedImageReal = [Float](repeating: 0,
-                                           count: n)
-        var transformedImageImaginary = [Float](repeating: 0,
-                                                count: n)
-        var transformedImage = DSPSplitComplex(
-            realp: &transformedImageReal,
-            imagp: &transformedImageImaginary)
-        
-        fft2D.transform(input: sourceImage,
-                        output: &transformedImage,
-                        direction: .forward)
-        
-        // Legacy 2D FFT
-        
-        let log2n = vDSP_Length(log2(Float(width * height)))
-        let legacySetup = vDSP_create_fftsetup(
-            log2n,
-            FFTRadix(kFFTRadix2))!
-        
-        var legacyTransformedImageReal = [Float](repeating: -1,
-                                                 count: n)
-        var legacyTransformedImageImaginary = [Float](repeating: -1,
-                                                      count: n)
-        var legacyTransformedImage = DSPSplitComplex(
-            realp: &legacyTransformedImageReal,
-            imagp: &legacyTransformedImageImaginary)
-        
-        vDSP_fft2d_zrop(legacySetup,
-                        &sourceImage, 1, 0,
-                        &legacyTransformedImage, 1, 0,
-                        vDSP_Length(log2(Float(width))),
-                        vDSP_Length(log2(Float(height))),
-                        FFTDirection(kFFTDirection_Forward))
-        
-        expectTrue(transformedImageReal.elementsEqual(legacyTransformedImageReal))
-        expectTrue(transformedImageImaginary.elementsEqual(legacyTransformedImageImaginary))
+        sourceImageReal.withUnsafeMutableBufferPointer { sourceImageRealPtr in
+            sourceImageImaginary.withUnsafeMutableBufferPointer { sourceImageImaginaryPtr in
+                
+                var sourceImage = DSPSplitComplex(realp: sourceImageRealPtr.baseAddress!,
+                                                  imagp: sourceImageImaginaryPtr.baseAddress!)
+                
+                pixels.withUnsafeBytes{
+                    vDSP_ctoz([DSPComplex]($0.bindMemory(to: DSPComplex.self)), 2,
+                              &sourceImage, 1,
+                              vDSP_Length(pixels.count / 2))
+                }
+                
+                // Create FFT2D object
+                let fft2D = vDSP.FFT2D(width: 256,
+                                       height: 256,
+                                       ofType: DSPSplitComplex.self)!
+                
+                // New style transform
+                var transformedImageReal = [Float](repeating: 0,
+                                                   count: n)
+                var transformedImageImaginary = [Float](repeating: 0,
+                                                        count: n)
+                
+                transformedImageReal.withUnsafeMutableBufferPointer { transformedImageRealPtr in
+                    transformedImageImaginary.withUnsafeMutableBufferPointer { transformedImageImaginaryPtr in
+                        
+                        var transformedImage = DSPSplitComplex(
+                            realp: transformedImageRealPtr.baseAddress!,
+                            imagp: transformedImageImaginaryPtr.baseAddress!)
+                        
+                        fft2D.transform(input: sourceImage,
+                                        output: &transformedImage,
+                                        direction: .forward)
+                    }
+                }
+  
+                // Legacy 2D FFT
+                
+                let log2n = vDSP_Length(log2(Float(width * height)))
+                let legacySetup = vDSP_create_fftsetup(
+                    log2n,
+                    FFTRadix(kFFTRadix2))!
+                
+                var legacyTransformedImageReal = [Float](repeating: -1,
+                                                         count: n)
+                var legacyTransformedImageImaginary = [Float](repeating: -1,
+                                                              count: n)
+                
+                legacyTransformedImageReal.withUnsafeMutableBufferPointer { legacyTransformedImageRealPtr in
+                    legacyTransformedImageImaginary.withUnsafeMutableBufferPointer { legacyTransformedImageImaginaryPtr in
+                        
+                        var legacyTransformedImage = DSPSplitComplex(
+                            realp: legacyTransformedImageRealPtr.baseAddress!,
+                            imagp: legacyTransformedImageImaginaryPtr.baseAddress!)
+                        
+                        vDSP_fft2d_zrop(legacySetup,
+                                        &sourceImage, 1, 0,
+                                        &legacyTransformedImage, 1, 0,
+                                        vDSP_Length(log2(Float(width))),
+                                        vDSP_Length(log2(Float(height))),
+                                        FFTDirection(kFFTDirection_Forward))
+                    }
+                }
+                
+                expectTrue(transformedImageReal.elementsEqual(legacyTransformedImageReal))
+                expectTrue(transformedImageImaginary.elementsEqual(legacyTransformedImageImaginary))
+            }
+        }
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/2DDoublePrecision") {
@@ -557,119 +486,156 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         var sourceImageReal = [Double](repeating: 0, count: n)
         var sourceImageImaginary = [Double](repeating: 0, count: n)
         
-        var sourceImage = DSPDoubleSplitComplex(fromInputArray: pixels,
-                                                realParts: &sourceImageReal,
-                                                imaginaryParts: &sourceImageImaginary)
-        
-        let pixelsRecreated = [Double](fromSplitComplex: sourceImage,
-                                       scale: 1, count: pixelCount)
-        expectTrue(pixelsRecreated.elementsEqual(pixels))
-        
-        // Create FFT2D object
-        let fft2D = vDSP.FFT2D(width: width,
-                               height: height,
-                               ofType: DSPDoubleSplitComplex.self)!
-        
-        // New style transform
-        var transformedImageReal = [Double](repeating: 0,
-                                            count: n)
-        var transformedImageImaginary = [Double](repeating: 0,
-                                                 count: n)
-        var transformedImage = DSPDoubleSplitComplex(
-            realp: &transformedImageReal,
-            imagp: &transformedImageImaginary)
-        
-        fft2D.transform(input: sourceImage,
-                        output: &transformedImage,
-                        direction: .forward)
-        
-        // Legacy 2D FFT
-        
-        let log2n = vDSP_Length(log2(Float(width * height)))
-        let legacySetup = vDSP_create_fftsetupD(
-            log2n,
-            FFTRadix(kFFTRadix2))!
-        
-        var legacyTransformedImageReal = [Double](repeating: -1,
-                                                  count: n)
-        var legacyTransformedImageImaginary = [Double](repeating: -1,
-                                                       count: n)
-        var legacyTransformedImage = DSPDoubleSplitComplex(
-            realp: &legacyTransformedImageReal,
-            imagp: &legacyTransformedImageImaginary)
-        
-        vDSP_fft2d_zropD(legacySetup,
-                         &sourceImage, 1, 0,
-                         &legacyTransformedImage, 1, 0,
-                         vDSP_Length(log2(Float(width))),
-                         vDSP_Length(log2(Float(height))),
-                         FFTDirection(kFFTDirection_Forward))
-        
-        expectTrue(transformedImageReal.elementsEqual(legacyTransformedImageReal))
-        expectTrue(transformedImageImaginary.elementsEqual(legacyTransformedImageImaginary))
+        sourceImageReal.withUnsafeMutableBufferPointer { sourceImageRealPtr in
+            sourceImageImaginary.withUnsafeMutableBufferPointer { sourceImageImaginaryPtr in
+                
+                var sourceImage = DSPDoubleSplitComplex(realp: sourceImageRealPtr.baseAddress!,
+                                                        imagp: sourceImageImaginaryPtr.baseAddress!)
+                
+                pixels.withUnsafeBytes{
+                    vDSP_ctozD([DSPDoubleComplex]($0.bindMemory(to: DSPDoubleComplex.self)), 2,
+                               &sourceImage, 1,
+                               vDSP_Length(pixels.count / 2))
+                }
+                
+                // Create FFT2D object
+                let fft2D = vDSP.FFT2D(width: 256,
+                                       height: 256,
+                                       ofType: DSPDoubleSplitComplex.self)!
+                
+                // New style transform
+                var transformedImageReal = [Double](repeating: 0,
+                                                    count: n)
+                var transformedImageImaginary = [Double](repeating: 0,
+                                                         count: n)
+                
+                transformedImageReal.withUnsafeMutableBufferPointer { transformedImageRealPtr in
+                    transformedImageImaginary.withUnsafeMutableBufferPointer { transformedImageImaginaryPtr in
+                        
+                        var transformedImage = DSPDoubleSplitComplex(
+                            realp: transformedImageRealPtr.baseAddress!,
+                            imagp: transformedImageImaginaryPtr.baseAddress!)
+                        
+                        fft2D.transform(input: sourceImage,
+                                        output: &transformedImage,
+                                        direction: .forward)
+                    }
+                }
+   
+                // Legacy 2D FFT
+                
+                let log2n = vDSP_Length(log2(Float(width * height)))
+                let legacySetup = vDSP_create_fftsetupD(
+                    log2n,
+                    FFTRadix(kFFTRadix2))!
+                
+                var legacyTransformedImageReal = [Double](repeating: -1,
+                                                          count: n)
+                var legacyTransformedImageImaginary = [Double](repeating: -1,
+                                                               count: n)
+                
+                legacyTransformedImageReal.withUnsafeMutableBufferPointer { legacyTransformedImageRealPtr in
+                    legacyTransformedImageImaginary.withUnsafeMutableBufferPointer { legacyTransformedImageImaginaryPtr in
+                        
+                        var legacyTransformedImage = DSPDoubleSplitComplex(
+                            realp: legacyTransformedImageRealPtr.baseAddress!,
+                            imagp: legacyTransformedImageImaginaryPtr.baseAddress!)
+                        
+                        vDSP_fft2d_zropD(legacySetup,
+                                         &sourceImage, 1, 0,
+                                         &legacyTransformedImage, 1, 0,
+                                         vDSP_Length(log2(Float(width))),
+                                         vDSP_Length(log2(Float(height))),
+                                         FFTDirection(kFFTDirection_Forward))
+                    }
+                }
+                
+                expectTrue(transformedImageReal.elementsEqual(legacyTransformedImageReal))
+                expectTrue(transformedImageImaginary.elementsEqual(legacyTransformedImageImaginary))
+            }
+        }
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/1DSinglePrecision") {
         let n = vDSP_Length(2048)
-        
-        let frequencies: [Float] = [1, 5, 25, 30, 75, 100,
-                                    300, 500, 512, 1023]
-        
-        let tau: Float = .pi * 2
-        let signal: [Float] = (0 ... n).map { index in
-            frequencies.reduce(0) { accumulator, frequency in
-                let normalizedIndex = Float(index) / Float(n)
-                return accumulator + sin(normalizedIndex * frequency * tau)
-            }
-        }
-        
-        let halfN = Int(n / 2)
-        
-        var forwardInputReal = [Float](repeating: 0, count: halfN)
-        var forwardInputImag = [Float](repeating: 0, count: halfN)
-        
-        var forwardInput = DSPSplitComplex(fromInputArray: signal,
-                                           realParts: &forwardInputReal,
-                                           imaginaryParts: &forwardInputImag)
-        
-        let log2n = vDSP_Length(log2(Float(n)))
-        
-        // New API
-        
-        guard let fft = vDSP.FFT(log2n: log2n,
-                                 radix: .radix2,
-                                 ofType: DSPSplitComplex.self) else {
-                                    fatalError("Can't create FFT.")
-        }
-        
-        var outputReal = [Float](repeating: 0, count: halfN)
-        var outputImag = [Float](repeating: 0, count: halfN)
-        var forwardOutput = DSPSplitComplex(realp: &outputReal,
-                                            imagp: &outputImag)
-        
-        fft.transform(input: forwardInput,
-                      output: &forwardOutput,
-                      direction: .forward)
-        
-        // Legacy Style
-        
-        let legacySetup = vDSP_create_fftsetup(log2n,
-                                               FFTRadix(kFFTRadix2))!
-        
-        var legacyoutputReal = [Float](repeating: -1, count: halfN)
-        var legacyoutputImag = [Float](repeating: -1, count: halfN)
-        var legacyForwardOutput = DSPSplitComplex(realp: &legacyoutputReal,
-                                                  imagp: &legacyoutputImag)
-        
-        
-        vDSP_fft_zrop(legacySetup,
-                      &forwardInput, 1,
-                      &legacyForwardOutput, 1,
-                      log2n,
-                      FFTDirection(kFFTDirection_Forward))
-        
-        expectTrue(outputReal.elementsEqual(legacyoutputReal))
-        expectTrue(outputImag.elementsEqual(legacyoutputImag))
+          
+          let frequencies: [Float] = [1, 5, 25, 30, 75, 100,
+                                      300, 500, 512, 1023]
+          
+          let tau: Float = .pi * 2
+          let signal: [Float] = (0 ... n).map { index in
+              frequencies.reduce(0) { accumulator, frequency in
+                  let normalizedIndex = Float(index) / Float(n)
+                  return accumulator + sin(normalizedIndex * frequency * tau)
+              }
+          }
+          
+          let halfN = Int(n / 2)
+          
+          var forwardInputReal = [Float](repeating: 0, count: halfN)
+          var forwardInputImag = [Float](repeating: 0, count: halfN)
+          
+          forwardInputReal.withUnsafeMutableBufferPointer { forwardInputRealPtr in
+              forwardInputImag.withUnsafeMutableBufferPointer { forwardInputImagPtr in
+                  
+                  var forwardInput = DSPSplitComplex(realp: forwardInputRealPtr.baseAddress!,
+                                                     imagp: forwardInputImagPtr.baseAddress!)
+                  
+                  signal.withUnsafeBytes{
+                      vDSP_ctoz([DSPComplex]($0.bindMemory(to: DSPComplex.self)), 2,
+                                &forwardInput, 1,
+                                vDSP_Length(signal.count / 2))
+                  }
+                  
+                  let log2n = vDSP_Length(log2(Float(n)))
+                  
+                  // New API
+                  
+                  guard let fft = vDSP.FFT(log2n: log2n,
+                                           radix: .radix2,
+                                           ofType: DSPSplitComplex.self) else {
+                                              fatalError("Can't create FFT.")
+                  }
+                  
+                  var outputReal = [Float](repeating: 0, count: halfN)
+                  var outputImag = [Float](repeating: 0, count: halfN)
+                  
+                  outputReal.withUnsafeMutableBufferPointer { outputRealPtr in
+                      outputImag.withUnsafeMutableBufferPointer { outputImagPtr in
+                          var forwardOutput = DSPSplitComplex(realp: outputRealPtr.baseAddress!,
+                                                              imagp: outputImagPtr.baseAddress!)
+                          
+                          fft.transform(input: forwardInput,
+                                        output: &forwardOutput,
+                                        direction: .forward)
+                      }
+                  }
+                  
+                  // Legacy Style
+                  
+                  let legacySetup = vDSP_create_fftsetup(log2n,
+                                                         FFTRadix(kFFTRadix2))!
+                  
+                  var legacyOutputReal = [Float](repeating: -1, count: halfN)
+                  var legacyOutputImag = [Float](repeating: -1, count: halfN)
+                  
+                  legacyOutputReal.withUnsafeMutableBufferPointer { legacyOutputRealPtr in
+                      legacyOutputImag.withUnsafeMutableBufferPointer { legacyOutputImagPtr in
+                          var legacyForwardOutput = DSPSplitComplex(realp: legacyOutputRealPtr.baseAddress!,
+                                                                    imagp: legacyOutputImagPtr.baseAddress!)
+                          
+                          vDSP_fft_zrop(legacySetup,
+                                        &forwardInput, 1,
+                                        &legacyForwardOutput, 1,
+                                        log2n,
+                                        FFTDirection(kFFTDirection_Forward))
+                      }
+                  }
+                  
+                  expectTrue(outputReal.elementsEqual(legacyOutputReal))
+                  expectTrue(outputImag.elementsEqual(legacyOutputImag))
+              }
+          }
     }
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/1DDoublePrecision") {
@@ -691,49 +657,69 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         var forwardInputReal = [Double](repeating: 0, count: halfN)
         var forwardInputImag = [Double](repeating: 0, count: halfN)
         
-        var forwardInput = DSPDoubleSplitComplex(fromInputArray: signal,
-                                                 realParts: &forwardInputReal,
-                                                 imaginaryParts: &forwardInputImag)
-        
-        let log2n = vDSP_Length(log2(Double(n)))
-        
-        // New API
-        
-        guard let fft = vDSP.FFT(log2n: log2n,
-                                 radix: .radix2,
-                                 ofType: DSPDoubleSplitComplex.self) else {
-                                    fatalError("Can't create FFT.")
+        forwardInputReal.withUnsafeMutableBufferPointer { forwardInputRealPtr in
+            forwardInputImag.withUnsafeMutableBufferPointer { forwardInputImagPtr in
+                
+                var forwardInput = DSPDoubleSplitComplex(realp: forwardInputRealPtr.baseAddress!,
+                                                         imagp: forwardInputImagPtr.baseAddress!)
+                
+                signal.withUnsafeBytes{
+                    vDSP_ctozD([DSPDoubleComplex]($0.bindMemory(to: DSPDoubleComplex.self)), 2,
+                               &forwardInput, 1,
+                               vDSP_Length(signal.count / 2))
+                }
+                
+                let log2n = vDSP_Length(log2(Float(n)))
+                
+                // New API
+                
+                guard let fft = vDSP.FFT(log2n: log2n,
+                                         radix: .radix2,
+                                         ofType: DSPDoubleSplitComplex.self) else {
+                                            fatalError("Can't create FFT.")
+                }
+                
+                var outputReal = [Double](repeating: 0, count: halfN)
+                var outputImag = [Double](repeating: 0, count: halfN)
+                
+                outputReal.withUnsafeMutableBufferPointer { outputRealPtr in
+                    outputImag.withUnsafeMutableBufferPointer { outputImagPtr in
+                        var forwardOutput = DSPDoubleSplitComplex(realp: outputRealPtr.baseAddress!,
+                                                                  imagp: outputImagPtr.baseAddress!)
+                        
+                        fft.transform(input: forwardInput,
+                                      output: &forwardOutput,
+                                      direction: .forward)
+                    }
+                }
+                
+                // Legacy Style
+                
+                let legacySetup = vDSP_create_fftsetupD(log2n,
+                                                        FFTRadix(kFFTRadix2))!
+                
+                var legacyOutputReal = [Double](repeating: -1, count: halfN)
+                var legacyOutputImag = [Double](repeating: -1, count: halfN)
+                
+                legacyOutputReal.withUnsafeMutableBufferPointer { legacyOutputRealPtr in
+                    legacyOutputImag.withUnsafeMutableBufferPointer { legacyOutputImagPtr in
+                        var legacyForwardOutput = DSPDoubleSplitComplex(realp: legacyOutputRealPtr.baseAddress!,
+                                                                        imagp: legacyOutputImagPtr.baseAddress!)
+                        
+                        vDSP_fft_zropD(legacySetup,
+                                       &forwardInput, 1,
+                                       &legacyForwardOutput, 1,
+                                       log2n,
+                                       FFTDirection(kFFTDirection_Forward))
+                    }
+                }
+                
+                expectTrue(outputReal.elementsEqual(legacyOutputReal))
+                expectTrue(outputImag.elementsEqual(legacyOutputImag))
+            }
         }
-        
-        var outputReal = [Double](repeating: 0, count: halfN)
-        var outputImag = [Double](repeating: 0, count: halfN)
-        var forwardOutput = DSPDoubleSplitComplex(realp: &outputReal,
-                                                  imagp: &outputImag)
-        
-        fft.transform(input: forwardInput,
-                      output: &forwardOutput,
-                      direction: .forward)
-        
-        // Legacy Style
-        
-        let legacySetup = vDSP_create_fftsetupD(log2n,
-                                                FFTRadix(kFFTRadix2))!
-        
-        var legacyoutputReal = [Double](repeating: 0, count: halfN)
-        var legacyoutputImag = [Double](repeating: 0, count: halfN)
-        var legacyForwardOutput = DSPDoubleSplitComplex(realp: &legacyoutputReal,
-                                                        imagp: &legacyoutputImag)
-        
-        
-        vDSP_fft_zropD(legacySetup,
-                       &forwardInput, 1,
-                       &legacyForwardOutput, 1,
-                       log2n,
-                       FFTDirection(kFFTDirection_Forward))
-        
-        expectTrue(outputReal.elementsEqual(legacyoutputReal))
-        expectTrue(outputImag.elementsEqual(legacyoutputImag))
     }
+    
 }
 
 runAllTests()

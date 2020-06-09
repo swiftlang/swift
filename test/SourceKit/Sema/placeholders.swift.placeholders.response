@@ -5,7 +5,7 @@
     key.column: 19,
     key.filepath: placeholders.swift,
     key.severity: source.diagnostic.severity.error,
-    key.description: "use of undeclared type '<#OtherClass#>'",
+    key.description: "cannot find type '<#OtherClass#>' in scope",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.ranges: [
       {

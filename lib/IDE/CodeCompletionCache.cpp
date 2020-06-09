@@ -215,6 +215,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto opKind = static_cast<CodeCompletionOperatorKind>(*cursor++);
     auto context = static_cast<SemanticContextKind>(*cursor++);
     auto notRecommended = static_cast<bool>(*cursor++);
+    auto isSystem = static_cast<bool>(*cursor++);
     auto numBytesToErase = static_cast<unsigned>(*cursor++);
     auto oldCursor = cursor;
     auto chunkIndex = read32le(cursor);
@@ -248,10 +249,11 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     CodeCompletionResult *result = nullptr;
     if (kind == CodeCompletionResult::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, numBytesToErase, string, declKind, moduleName,
+          context, numBytesToErase, string, declKind, isSystem, moduleName,
           notRecommended, CodeCompletionResult::NotRecommendedReason::NoReason,
           briefDocComment, copyStringArray(*V.Sink.Allocator, assocUSRs),
-          copyStringPairArray(*V.Sink.Allocator, declKeywords), opKind);
+          copyStringPairArray(*V.Sink.Allocator, declKeywords),
+          CodeCompletionResult::Unknown, opKind);
     } else {
       result = new (*V.Sink.Allocator)
           CodeCompletionResult(kind, context, numBytesToErase, string,
@@ -370,6 +372,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
         LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
       LE.write(static_cast<uint8_t>(R->getSemanticContext()));
       LE.write(static_cast<uint8_t>(R->isNotRecommended()));
+      LE.write(static_cast<uint8_t>(R->isSystem()));
       LE.write(static_cast<uint8_t>(R->getNumBytesToErase()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));

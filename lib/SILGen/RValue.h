@@ -35,6 +35,7 @@ class Initialization;
 class Scope;
 class SILGenFunction;
 class TypeLowering;
+class CleanupCloner;
 
 /// An "exploded" SIL rvalue, in which tuple values are recursively
 /// destructured.
@@ -71,6 +72,7 @@ class TypeLowering;
 class RValue {
   friend class swift::Lowering::Scope;
   friend class swift::Lowering::ArgumentSource;
+  friend class swift::Lowering::CleanupCloner;
 
   std::vector<ManagedValue> values;
   CanType type;

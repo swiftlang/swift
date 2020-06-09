@@ -113,7 +113,7 @@ func testFuncStructDisambiguation() {
 }
 
 func testVoid() {
-  var x: MyVoid // expected-error{{use of undeclared type 'MyVoid'}}
+  var x: MyVoid // expected-error{{cannot find type 'MyVoid' in scope}}
   returnsMyVoid()
 }
 

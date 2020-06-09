@@ -490,12 +490,13 @@ public:
   }
   
   SILFunction &getFunction() { return F; }
+  const SILFunction &getFunction() const { return F; }
   SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
   const SILOptions &getOptions() { return getModule().getOptions(); }
 
   // Returns the type expansion context for types in this function.
-  TypeExpansionContext getTypeExpansionContext() {
+  TypeExpansionContext getTypeExpansionContext() const {
     return TypeExpansionContext(getFunction());
   }
 
@@ -531,17 +532,19 @@ public:
   }
 
   SILType getSILInterfaceType(SILParameterInfo param) const {
-    return silConv.getSILType(param, CanSILFunctionType());
+    return silConv.getSILType(param, CanSILFunctionType(),
+                              getTypeExpansionContext());
   }
   SILType getSILInterfaceType(SILResultInfo result) const {
-    return silConv.getSILType(result, CanSILFunctionType());
+    return silConv.getSILType(result, CanSILFunctionType(),
+                              getTypeExpansionContext());
   }
 
   SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
-    return silConv.getSILType(param, fnTy);
+    return silConv.getSILType(param, fnTy, getTypeExpansionContext());
   }
   SILType getSILType(SILResultInfo result, CanSILFunctionType fnTy) const {
-    return silConv.getSILType(result, fnTy);
+    return silConv.getSILType(result, fnTy, getTypeExpansionContext());
   }
 
   SILType getSILTypeInContext(SILResultInfo result, CanSILFunctionType fnTy) {
@@ -607,9 +610,9 @@ public:
   void emitDestroyingDestructor(DestructorDecl *dd);
 
   /// Generates code for an artificial top-level function that starts an
-  /// application based on a main class.
-  void emitArtificialTopLevel(ClassDecl *mainClass);
-  
+  /// application based on a main type and optionally a main type.
+  void emitArtificialTopLevel(Decl *mainDecl);
+
   /// Generates code for a class deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingDestructor(DestructorDecl *dd);
@@ -1184,10 +1187,13 @@ public:
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
+  ManagedValue emitUninitializedArrayFinalization(SILLocation loc, SILValue array);
 
-  CleanupHandle enterDelegateInitSelfWritebackCleanup(SILLocation loc,
-                                                      SILValue address,
-                                                      SILValue newValue);
+  /// Emit a cleanup for an owned value that should be written back at end of
+  /// scope if the value is not forwarded.
+  CleanupHandle enterOwnedValueWritebackCleanup(SILLocation loc,
+                                                SILValue address,
+                                                SILValue newValue);
 
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);

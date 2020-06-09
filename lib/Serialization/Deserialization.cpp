@@ -167,6 +167,8 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 void ModuleFile::fatal(llvm::Error error) {
   if (FileContext) {
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Name);
+    getContext().Diags.diagnose(SourceLoc(), diag::serialization_misc_version,
+      Name, MiscVersion);
 
     if (!CompatibilityVersion.empty()) {
       if (getContext().LangOpts.EffectiveLanguageVersion
@@ -313,15 +315,9 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
   switch (kind) {
   case decls_block::PAREN_PATTERN: {
-    bool isImplicit;
-    ParenPatternLayout::readRecord(scratch, isImplicit);
-
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
-    auto result = new (getContext()) ParenPattern(SourceLoc(),
-                                                  subPattern,
-                                                  SourceLoc(),
-                                                  isImplicit);
+    auto result = ParenPattern::createImplicit(getContext(), subPattern);
 
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(ParenType::get(getContext(),
@@ -334,9 +330,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   case decls_block::TUPLE_PATTERN: {
     TypeID tupleTypeID;
     unsigned count;
-    bool isImplicit;
 
-    TuplePatternLayout::readRecord(scratch, tupleTypeID, count, isImplicit);
+    TuplePatternLayout::readRecord(scratch, tupleTypeID, count);
 
     SmallVector<TuplePatternElt, 8> elements;
     for ( ; count > 0; --count) {
@@ -356,8 +351,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
     }
 
-    auto result = TuplePattern::create(getContext(), SourceLoc(),
-                                       elements, SourceLoc(), isImplicit);
+    auto result = TuplePattern::createImplicit(getContext(), elements);
     recordPatternType(result, getType(tupleTypeID));
     restoreOffset.reset();
     return result;
@@ -365,8 +359,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   case decls_block::NAMED_PATTERN: {
     DeclID varID;
     TypeID typeID;
-    bool isImplicit;
-    NamedPatternLayout::readRecord(scratch, varID, typeID, isImplicit);
+    NamedPatternLayout::readRecord(scratch, varID, typeID);
 
     auto deserialized = getDeclChecked(varID);
     if (!deserialized) {
@@ -376,25 +369,23 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
     }
 
     auto var = cast<VarDecl>(deserialized.get());
-    auto result = new (getContext()) NamedPattern(var, isImplicit);
+    auto result = NamedPattern::createImplicit(getContext(), var);
     recordPatternType(result, getType(typeID));
     restoreOffset.reset();
     return result;
   }
   case decls_block::ANY_PATTERN: {
     TypeID typeID;
-    bool isImplicit;
 
-    AnyPatternLayout::readRecord(scratch, typeID, isImplicit);
-    auto result = new (getContext()) AnyPattern(SourceLoc(), isImplicit);
+    AnyPatternLayout::readRecord(scratch, typeID);
+    auto result = AnyPattern::createImplicit(getContext());
     recordPatternType(result, getType(typeID));
     restoreOffset.reset();
     return result;
   }
   case decls_block::TYPED_PATTERN: {
     TypeID typeID;
-    bool isImplicit;
-    TypedPatternLayout::readRecord(scratch, typeID, isImplicit);
+    TypedPatternLayout::readRecord(scratch, typeID);
 
     Expected<Pattern *> subPattern = readPattern(owningDC);
     if (!subPattern) {
@@ -403,21 +394,19 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
     }
 
     auto type = getType(typeID);
-    auto result = new (getContext()) TypedPattern(subPattern.get(),
-                                                  /*typeRepr*/nullptr,
-                                                  isImplicit);
+    auto result = TypedPattern::createImplicit(getContext(),
+                                               subPattern.get(), type);
     recordPatternType(result, type);
     restoreOffset.reset();
     return result;
   }
   case decls_block::VAR_PATTERN: {
-    bool isImplicit, isLet;
-    VarPatternLayout::readRecord(scratch, isLet, isImplicit);
+    bool isLet;
+    VarPatternLayout::readRecord(scratch, isLet);
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
-    auto result = new (getContext()) VarPattern(SourceLoc(), isLet, subPattern,
-                                                isImplicit);
+    auto result = VarPattern::createImplicit(getContext(), isLet, subPattern);
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(interfaceType, owningDC);
     else
@@ -489,7 +478,7 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
   if (auto *Stats = getContext().Stats)
-    Stats->getFrontendCounters().NumConformancesDeserialized++;
+    ++Stats->getFrontendCounters().NumConformancesDeserialized;
 
   unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
   switch (kind) {
@@ -1375,19 +1364,35 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     Identifier opName = getIdentifier(IID);
     pathTrace.addOperator(opName);
 
+    auto &ctx = getContext();
+    auto desc = OperatorLookupDescriptor::forModule(baseModule, opName);
     switch (rawOpKind) {
     case OperatorKind::Infix:
-      return baseModule->lookupInfixOperator(opName);
     case OperatorKind::Prefix:
-      return baseModule->lookupPrefixOperator(opName);
-    case OperatorKind::Postfix:
-      return baseModule->lookupPostfixOperator(opName);
-    case OperatorKind::PrecedenceGroup:
-      return baseModule->lookupPrecedenceGroup(opName);
+    case OperatorKind::Postfix: {
+      auto req = DirectOperatorLookupRequest{
+          desc, getASTOperatorFixity(static_cast<OperatorKind>(rawOpKind))};
+      auto results = evaluateOrDefault(ctx.evaluator, req, {});
+      if (results.size() != 1) {
+        return llvm::make_error<XRefError>("operator not found", pathTrace,
+                                           opName);
+      }
+      return results[0];
+    }
+    case OperatorKind::PrecedenceGroup: {
+      auto results = evaluateOrDefault(
+          ctx.evaluator, DirectPrecedenceGroupLookupRequest{desc}, {});
+      if (results.size() != 1) {
+        return llvm::make_error<XRefError>("precedencegroup not found",
+                                           pathTrace, opName);
+      }
+      return results[0];
+    }
     default:
       // Unknown operator kind.
       fatal();
     }
+    llvm_unreachable("Unhandled case in switch!");
   }
 
   case XREF_GENERIC_PARAM_PATH_PIECE:
@@ -2482,9 +2487,9 @@ public:
                                                         depth,
                                                         index);
 
-    // Always create GenericTypeParamDecls in the associated module;
-    // the real context will reparent them.
-    auto DC = MF.getAssociatedModule();
+    // Always create GenericTypeParamDecls in the associated file; the real
+    // context will reparent them.
+    auto *DC = MF.getFile();
     auto genericParam = MF.createDecl<GenericTypeParamDecl>(
         DC, MF.getIdentifier(nameID), SourceLoc(), depth, index);
     declOrOffset = genericParam;
@@ -3230,11 +3235,11 @@ public:
     TypeID interfaceTypeID;
     GenericSignatureID genericSigID;
     SubstitutionMapID underlyingTypeID;
-    
+    uint8_t rawAccessLevel;
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
                                               interfaceTypeID, genericSigID,
-                                              underlyingTypeID);
+                                              underlyingTypeID, rawAccessLevel);
     
     auto declContext = MF.getDeclContext(contextID);
     auto interfaceSig = MF.getGenericSignature(interfaceSigID);
@@ -3253,6 +3258,11 @@ public:
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     opaqueDecl->setNamingDecl(namingDecl);
+
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
+      opaqueDecl->setAccess(*accessLevel);
+    else
+      MF.fatal();
 
     if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl)) {
       ctx.evaluator.cacheOutput(GenericParamListRequest{opaqueDecl},
@@ -3474,7 +3484,7 @@ public:
 
     auto result = MF.createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), name, SourceLoc(), SourceLoc(),
-        ArrayRef<Identifier>{}, ArrayRef<SourceLoc>{});
+        ArrayRef<Located<Identifier>>{});
     result->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
     ctx.evaluator.cacheOutput(
         OperatorPrecedenceGroupRequest{result},
@@ -4500,7 +4510,7 @@ DeclDeserializer::getDeclCheckedImpl(
   }
 
   if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumDeclsDeserialized++;
+    ++s->getFrontendCounters().NumDeclsDeserialized;
 
   // FIXME: @_dynamicReplacement(for:) includes a reference to another decl,
   // usually in the same type, and that can result in this decl being
@@ -4749,6 +4759,21 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   return None;
 }
 
+/// Translate from the serialization SILResultDifferentiability enumerators,
+/// which are guaranteed to be stable, to the AST ones.
+static Optional<swift::SILResultDifferentiability>
+getActualSILResultDifferentiability(uint8_t raw) {
+  switch (serialization::SILResultDifferentiability(raw)) {
+#define CASE(ID)                                                               \
+  case serialization::SILResultDifferentiability::ID:                          \
+    return swift::SILResultDifferentiability::ID;
+    CASE(DifferentiableOrNotApplicable)
+    CASE(NotDifferentiable)
+#undef CASE
+  }
+  return None;
+}
+
 Type ModuleFile::getType(TypeID TID) {
   Expected<Type> deserialized = getTypeChecked(TID);
   if (!deserialized) {
@@ -4854,7 +4879,9 @@ public:
     auto substitutedType = substitutedTypeOrError.get();
 
     // Read the substitutions.
-    auto subMap = MF.getSubstitutionMap(substitutionsID);
+    auto subMapOrError = MF.getSubstitutionMapChecked(substitutionsID);
+    if (!subMapOrError)
+      return subMapOrError.takeError();
 
     auto parentTypeOrError = MF.getTypeChecked(parentTypeID);
     if (!parentTypeOrError)
@@ -4864,11 +4891,12 @@ public:
     if (alias &&
         alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingType().subst(subMap);
+      return alias->getUnderlyingType().subst(subMapOrError.get());
     }
 
     auto parentType = parentTypeOrError.get();
-    return TypeAliasType::get(alias, parentType, subMap, substitutedType);
+    return TypeAliasType::get(alias, parentType, subMapOrError.get(),
+                              substitutedType);
   }
 
   Expected<Type> deserializeNominalType(ArrayRef<uint64_t> scratch,
@@ -4913,7 +4941,8 @@ public:
     auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
     if (!nominal) {
       XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
-      DeclName fullName = cast<ValueDecl>(nominalOrError.get())->getFullName();
+      const DeclName fullName =
+          cast<ValueDecl>(nominalOrError.get())->getName();
       tinyTrace.addValue(fullName.getBaseIdentifier());
       return llvm::make_error<XRefError>("declaration is not a nominal type",
                                          tinyTrace, fullName);
@@ -5185,9 +5214,11 @@ public:
       return opaqueTypeOrError.takeError();
 
     auto opaqueDecl = cast<OpaqueTypeDecl>(opaqueTypeOrError.get());
-    auto subs = MF.getSubstitutionMap(subsID);
+    auto subsOrError = MF.getSubstitutionMapChecked(subsID);
+    if (!subsOrError)
+      return subsOrError.takeError();
 
-    return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+    return OpaqueTypeArchetypeType::get(opaqueDecl, subsOrError.get());
   }
       
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
@@ -5322,8 +5353,11 @@ public:
     if (!layout)
       return nullptr;
 
-    auto subMap = MF.getSubstitutionMap(subMapID);
-    return SILBoxType::get(ctx, layout, subMap);
+    auto subMapOrError = MF.getSubstitutionMapChecked(subMapID);
+    if (!subMapOrError)
+      return subMapOrError.takeError();
+
+    return SILBoxType::get(ctx, layout, subMapOrError.get());
   }
 
   Expected<Type> deserializeSILFunctionType(ArrayRef<uint64_t> scratch,
@@ -5398,7 +5432,7 @@ public:
 
     auto processParameter =
         [&](TypeID typeID, uint64_t rawConvention,
-            uint64_t ramDifferentiability) -> llvm::Expected<SILParameterInfo> {
+            uint64_t rawDifferentiability) -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
       if (!convention)
         MF.fatal();
@@ -5409,7 +5443,7 @@ public:
           swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
       if (diffKind != DifferentiabilityKind::NonDifferentiable) {
         auto differentiabilityOpt =
-            getActualSILParameterDifferentiability(ramDifferentiability);
+            getActualSILParameterDifferentiability(rawDifferentiability);
         if (!differentiabilityOpt)
           MF.fatal();
         differentiability = *differentiabilityOpt;
@@ -5429,15 +5463,26 @@ public:
       return SILYieldInfo(type.get()->getCanonicalType(), *convention);
     };
 
-    auto processResult = [&](TypeID typeID, uint64_t rawConvention)
-                               -> llvm::Expected<SILResultInfo> {
+    auto processResult =
+        [&](TypeID typeID, uint64_t rawConvention,
+            uint64_t rawDifferentiability) -> llvm::Expected<SILResultInfo> {
       auto convention = getActualResultConvention(rawConvention);
       if (!convention)
         MF.fatal();
       auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
-      return SILResultInfo(type.get()->getCanonicalType(), *convention);
+      auto differentiability =
+          swift::SILResultDifferentiability::DifferentiableOrNotApplicable;
+      if (diffKind != DifferentiabilityKind::NonDifferentiable) {
+        auto differentiabilityOpt =
+            getActualSILResultDifferentiability(rawDifferentiability);
+        if (!differentiabilityOpt)
+          MF.fatal();
+        differentiability = *differentiabilityOpt;
+      }
+      return SILResultInfo(type.get()->getCanonicalType(), *convention,
+                           differentiability);
     };
 
     // Bounds check.  FIXME: overflow
@@ -5457,10 +5502,11 @@ public:
     for (unsigned i = 0; i != numParams; ++i) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      uint64_t differentiability = 0;
+      uint64_t rawDifferentiability = 0;
       if (diffKind != DifferentiabilityKind::NonDifferentiable)
-        differentiability = variableData[nextVariableDataIndex++];
-      auto param = processParameter(typeID, rawConvention, differentiability);
+        rawDifferentiability = variableData[nextVariableDataIndex++];
+      auto param =
+          processParameter(typeID, rawConvention, rawDifferentiability);
       if (!param)
         return param.takeError();
       allParams.push_back(param.get());
@@ -5484,7 +5530,10 @@ public:
     for (unsigned i = 0; i != numResults; ++i) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      auto result = processResult(typeID, rawConvention);
+      uint64_t rawDifferentiability = 0;
+      if (diffKind != DifferentiabilityKind::NonDifferentiable)
+        rawDifferentiability = variableData[nextVariableDataIndex++];
+      auto result = processResult(typeID, rawConvention, rawDifferentiability);
       if (!result)
         return result.takeError();
       allResults.push_back(result.get());
@@ -5495,7 +5544,9 @@ public:
     if (hasErrorResult) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      auto maybeErrorResult = processResult(typeID, rawConvention);
+      uint64_t rawDifferentiability = 0;
+      auto maybeErrorResult =
+          processResult(typeID, rawConvention, rawDifferentiability);
       if (!maybeErrorResult)
         return maybeErrorResult.takeError();
       errorResult = maybeErrorResult.get();
@@ -5508,16 +5559,19 @@ public:
 
     GenericSignature invocationSig =
       MF.getGenericSignature(rawInvocationGenericSig);
-    SubstitutionMap invocationSubs =
-      MF.getSubstitutionMap(rawInvocationSubs).getCanonical();
-    SubstitutionMap patternSubs =
-      MF.getSubstitutionMap(rawPatternSubs).getCanonical();
+    auto invocationSubsOrErr = MF.getSubstitutionMapChecked(rawInvocationSubs);
+    if (!invocationSubsOrErr)
+      return invocationSubsOrErr.takeError();
+    auto patternSubsOrErr = MF.getSubstitutionMapChecked(rawPatternSubs);
+    if (!patternSubsOrErr)
+      return patternSubsOrErr.takeError();
 
     return SILFunctionType::get(invocationSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,
-                                patternSubs, invocationSubs,
+                                patternSubsOrErr.get().getCanonical(),
+                                invocationSubsOrErr.get().getCanonical(),
                                 ctx, witnessMethodConformance);
   }
 
@@ -5615,7 +5669,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   if (auto s = ctx.Stats)
-    s->getFrontendCounters().NumTypesDeserialized++;
+    ++s->getFrontendCounters().NumTypesDeserialized;
 
   llvm::BitstreamEntry entry =
       MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());

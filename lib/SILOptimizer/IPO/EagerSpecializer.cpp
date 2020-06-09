@@ -169,8 +169,9 @@ emitApplyWithRethrow(SILBuilder &Builder,
   {
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
-    SILValue Error = ErrorBB->createPhiArgument(fnConv.getSILErrorType(),
-                                                ValueOwnershipKind::Owned);
+    SILValue Error = ErrorBB->createPhiArgument(
+        fnConv.getSILErrorType(F.getTypeExpansionContext()),
+        ValueOwnershipKind::Owned);
 
     EmitCleanup(Builder, Loc);
     addThrowValue(ErrorBB, Error);
@@ -179,8 +180,9 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createPhiArgument(fnConv.getSILResultType(),
-                                                     ValueOwnershipKind::Owned);
+  return Builder.getInsertionBB()->createPhiArgument(
+      fnConv.getSILResultType(F.getTypeExpansionContext()),
+      ValueOwnershipKind::Owned);
 }
 
 /// Emits code to invoke the specified specialized CalleeFunc using the
@@ -403,10 +405,12 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     Result = Builder.createTuple(Loc, VoidTy, { });
 
   // Function marked as @NoReturn must be followed by 'unreachable'.
-  if (NewFunc->isNoReturnFunction() || !OldReturnBB)
+  if (NewFunc->isNoReturnFunction(Builder.getTypeExpansionContext()) ||
+      !OldReturnBB)
     Builder.createUnreachable(Loc);
   else {
-    auto resultTy = GenericFunc->getConventions().getSILResultType();
+    auto resultTy = GenericFunc->getConventions().getSILResultType(
+        Builder.getTypeExpansionContext());
     auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
     auto CastResult = Builder.createUncheckedBitCast(Loc, Result, GenResultTy);
     addReturnValue(Builder.getInsertionBB(), OldReturnBB, CastResult);
@@ -592,7 +596,8 @@ SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
                                          unsigned Idx) {
   SILFunctionConventions substConv(CalleeSubstFnTy,
                                    Builder.getModule());
-  auto CastTy = substConv.getSILArgumentType(Idx);
+  auto CastTy =
+      substConv.getSILArgumentType(Idx, Builder.getTypeExpansionContext());
   assert(CastTy.isAddress()
              == (OrigArg->isIndirectResult()
                  || substConv.isSILIndirect(OrigArg->getKnownParameterInfo()))
@@ -768,11 +773,6 @@ void EagerSpecializerTransform::run() {
       auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
 
       SpecializedFuncs.push_back(NewFunc);
-
-      if (SA->isExported()) {
-        NewFunc->setLinkage(SILLinkage::Public);
-        continue;
-      }
     }
 
     // TODO: Optimize the dispatch code to minimize the amount

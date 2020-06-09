@@ -140,10 +140,10 @@ namespace {
           }
         }
 
-        // If the closure has a single expression body or has had a function
-        // builder applied to it, we need to walk into it with a new sequence.
+        // If the closure was type checked within its enclosing context,
+        // we need to walk into it with a new sequence.
         // Otherwise, it'll have been separately type-checked.
-        if (CE->hasSingleExpressionBody() || CE->hasAppliedFunctionBuilder())
+        if (!CE->wasSeparatelyTypeChecked())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
         TypeChecker::computeCaptures(CE);
@@ -167,10 +167,10 @@ namespace {
   };
 
   static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
-    DeclName name = AFD->getFullName();
+    DeclName name = AFD->getName();
     if (!name) {
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        name = accessor->getStorage()->getFullName();
+        name = accessor->getStorage()->getName();
       }
     }
     return name;
@@ -318,11 +318,7 @@ public:
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
   FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
 
-  SourceLoc EndTypeCheckLoc;
-
-  /// Used to check for discarded expression values: in the REPL top-level
-  /// expressions are not discarded.
-  bool IsREPL;
+  SourceLoc TargetTypeCheckLoc;
 
   /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
@@ -369,20 +365,16 @@ public:
   };
 
   StmtChecker(AbstractFunctionDecl *AFD)
-      : Ctx(AFD->getASTContext()), TheFunc(AFD), DC(AFD), IsREPL(false),
+      : Ctx(AFD->getASTContext()), TheFunc(AFD), DC(AFD),
         IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(ClosureExpr *TheClosure)
       : Ctx(TheClosure->getASTContext()), TheFunc(TheClosure),
-        DC(TheClosure), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) {}
+        DC(TheClosure), IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(DeclContext *DC)
-      : Ctx(DC->getASTContext()), TheFunc(), DC(DC), IsREPL(false),
+      : Ctx(DC->getASTContext()), TheFunc(), DC(DC),
         IsBraceStmtFromTopLevelDecl(false) {
-    if (const SourceFile *SF = DC->getParentSourceFile())
-      if (SF->Kind == SourceFileKind::REPL)
-        IsREPL = true;
-
     IsBraceStmtFromTopLevelDecl = isa<TopLevelCodeDecl>(DC);
   }
 
@@ -495,7 +487,7 @@ public:
                                        diag::return_non_failable_init)
           .highlight(E->getSourceRange());
         getASTContext().Diags.diagnose(ctor->getLoc(), diag::make_init_failable,
-                    ctor->getFullName())
+                    ctor->getName())
           .fixItInsertAfter(ctor->getLoc(), "?");
         RS->setResult(nullptr);
         return RS;
@@ -509,7 +501,7 @@ public:
     
     TypeCheckExprOptions options = {};
     
-    if (EndTypeCheckLoc.isValid()) {
+    if (TargetTypeCheckLoc.isValid()) {
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
       options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
@@ -524,7 +516,7 @@ public:
     }
 
     auto exprTy = TypeChecker::typeCheckExpression(E, DC,
-                                                   TypeLoc::withoutLoc(ResultTy),
+                                                   ResultTy,
                                                    ctp, options);
     RS->setResult(E);
 
@@ -585,7 +577,7 @@ public:
       }
 
       TypeChecker::typeCheckExpression(exprToCheck, DC,
-                                       TypeLoc::withoutLoc(contextType),
+                                       contextType,
                                        contextTypePurpose);
 
       // Propagate the change into the inout expression we stripped before.
@@ -608,7 +600,7 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredType();
     if (!exnType) return TS;
 
-    TypeChecker::typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType),
+    TypeChecker::typeCheckExpression(E, DC, exnType,
                                      CTP_ThrowStmt);
     TS->setSubExpr(E);
     
@@ -633,9 +625,7 @@ public:
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    StmtCondition C = IS->getCond();
-    TypeChecker::typeCheckStmtCondition(C, DC, diag::if_always_true);
-    IS->setCond(C);
+    TypeChecker::typeCheckConditionForStatement(IS, DC);
 
     AddLabeledStmt ifNest(*this, IS);
 
@@ -652,10 +642,8 @@ public:
   }
   
   Stmt *visitGuardStmt(GuardStmt *GS) {
-    StmtCondition C = GS->getCond();
-    TypeChecker::typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
-    GS->setCond(C);
-    
+    TypeChecker::typeCheckConditionForStatement(GS, DC);
+
     AddLabeledStmt ifNest(*this, GS);
     
     Stmt *S = GS->getBody();
@@ -666,16 +654,14 @@ public:
 
   Stmt *visitDoStmt(DoStmt *DS) {
     AddLabeledStmt loopNest(*this, DS);
-    Stmt *S = DS->getBody();
+    BraceStmt *S = DS->getBody();
     typeCheckStmt(S);
     DS->setBody(S);
     return DS;
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
-    StmtCondition C = WS->getCond();
-    TypeChecker::typeCheckStmtCondition(C, DC, diag::while_always_true);
-    WS->setCond(C);
+    TypeChecker::typeCheckConditionForStatement(WS, DC);
 
     AddLabeledStmt loopNest(*this, WS);
     Stmt *S = WS->getBody();
@@ -1533,10 +1519,10 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       }
 
       auto diagID = diag::expression_unused_result_call;
-      if (callee->getFullName().isOperator())
+      if (callee->getName().isOperator())
         diagID = diag::expression_unused_result_operator;
       
-      DE.diagnose(fn->getLoc(), diagID, callee->getFullName())
+      DE.diagnose(fn->getLoc(), diagID, callee->getName())
         .highlight(SR1).highlight(SR2);
     } else
       DE.diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
@@ -1571,28 +1557,34 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   }
 
   for (auto &elem : BS->getElements()) {
-    if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
-      SourceLoc Loc = SubExpr->getStartLoc();
-      if (EndTypeCheckLoc.isValid() &&
-          (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
+    if (TargetTypeCheckLoc.isValid()) {
+      if (SM.isBeforeInBuffer(TargetTypeCheckLoc, elem.getStartLoc()))
         break;
 
+      // NOTE: We need to check the character loc here because the target loc
+      // can be inside the last token of the node. i.e. string interpolation.
+      SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, elem.getEndLoc());
+      if (endLoc == TargetTypeCheckLoc ||
+          SM.isBeforeInBuffer(endLoc, TargetTypeCheckLoc))
+        continue;
+    }
+
+    if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
       // Type check the expression.
       TypeCheckExprOptions options = TypeCheckExprFlags::IsExprStmt;
-      bool isDiscarded = !(IsREPL && isa<TopLevelCodeDecl>(DC))
-        && !getASTContext().LangOpts.Playground
-        && !getASTContext().LangOpts.DebuggerSupport;
+      bool isDiscarded = (!getASTContext().LangOpts.Playground &&
+                          !getASTContext().LangOpts.DebuggerSupport);
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
 
-      if (EndTypeCheckLoc.isValid()) {
+      if (TargetTypeCheckLoc.isValid()) {
         assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
                "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
         options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
       }
 
       auto resultTy =
-          TypeChecker::typeCheckExpression(SubExpr, DC, TypeLoc(),
+          TypeChecker::typeCheckExpression(SubExpr, DC, Type(),
                                            CTP_Unused, options);
 
       // If a closure expression is unused, the user might have intended
@@ -1616,22 +1608,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     }
 
     if (auto *SubStmt = elem.dyn_cast<Stmt*>()) {
-      SourceLoc Loc = SubStmt->getStartLoc();
-      if (EndTypeCheckLoc.isValid() &&
-          (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
-        break;
-
       typeCheckStmt(SubStmt);
       elem = SubStmt;
       continue;
     }
 
     Decl *SubDecl = elem.get<Decl *>();
-    SourceLoc Loc = SubDecl->getStartLoc();
-    if (EndTypeCheckLoc.isValid() &&
-        (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
-      break;
-
     TypeChecker::typeCheckDecl(SubDecl);
   }
 
@@ -1653,7 +1635,8 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  auto res = TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  auto res = evaluateOrDefault(AFD->getASTContext().evaluator,
+                               TypeCheckFunctionBodyRequest{AFD}, true);
   TypeChecker::checkFunctionErrorHandling(AFD);
   TypeChecker::computeCaptures(AFD);
   return res;
@@ -1673,7 +1656,7 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
 
   DiagnosticSuppression suppression(ctor->getASTContext().Diags);
   auto resultTy =
-      TypeChecker::typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
+      TypeChecker::typeCheckExpression(r, ctor, Type(), CTP_Unused,
                                        TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
@@ -1733,14 +1716,11 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
-    if (fromCtor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      TypeChecker::FragileFunctionKind fragileKind;
-      bool treatUsableFromInlineAsPublic;
-      std::tie(fragileKind, treatUsableFromInlineAsPublic) =
-          TypeChecker::getFragileFunctionKind(fromCtor);
+    auto fragileKind = fromCtor->getFragileFunctionKind();
+    if (fragileKind.kind != FragileFunctionKind::None) {
       TypeChecker::diagnoseInlinableDeclRef(
-          fromCtor->getLoc(), ctor, fromCtor, fragileKind,
-          treatUsableFromInlineAsPublic);
+          fromCtor->getLoc(), ctor, fromCtor,
+          fragileKind);
     }
   }
 
@@ -1811,12 +1791,13 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   // rule for classes in non-resilient modules so that they can have inlinable
   // constructors, as long as those constructors don't reference private
   // declarations.
-  if (!isDelegating && classDecl->isResilient() &&
-      ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-    auto kind = TypeChecker::getFragileFunctionKind(ctor);
-    ctor->diagnose(diag::class_designated_init_inlinable_resilient,
-                   classDecl->getDeclaredInterfaceType(),
-                   static_cast<unsigned>(kind.first));
+  if (!isDelegating && classDecl->isResilient()) {
+    auto kind = ctor->getFragileFunctionKind();
+    if (kind.kind != FragileFunctionKind::None) {
+      ctor->diagnose(diag::class_designated_init_inlinable_resilient,
+                     classDecl->getDeclaredInterfaceType(),
+                     static_cast<unsigned>(kind.kind));
+    }
   }
 
   // If we don't want a super.init call, we're done.
@@ -1854,10 +1835,41 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   }
 }
 
+bool TypeCheckFunctionBodyAtLocRequest::evaluate(Evaluator &evaluator,
+                                                 AbstractFunctionDecl *AFD,
+                                                 SourceLoc Loc) const {
+  ASTContext &ctx = AFD->getASTContext();
+
+  BraceStmt *body = AFD->getBody();
+  if (!body || AFD->isBodyTypeChecked())
+    return false;
+
+  // Function builder doesn't support partial type checking.
+  if (auto *func = dyn_cast<FuncDecl>(AFD)) {
+    if (Type builderType = getFunctionBuilderType(func)) {
+      auto optBody =
+          TypeChecker::applyFunctionBuilderBodyTransform(func, builderType);
+      if (!optBody || !*optBody)
+        return true;
+      // Wire up the function body now.
+      AFD->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
+      return false;
+    }
+  }
+
+  if (ctx.LangOpts.EnableASTScopeLookup)
+    ASTScope::expandFunctionBody(AFD);
+
+  StmtChecker SC(AFD);
+  SC.TargetTypeCheckLoc = Loc;
+  bool hadError = SC.typeCheckBody(body);
+  AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+  return hadError;
+}
+
 bool
-TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
-                                            AbstractFunctionDecl *AFD,
-                                            SourceLoc endTypeCheckLoc) const {
+TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
+                                       AbstractFunctionDecl *AFD) const {
   ASTContext &ctx = AFD->getASTContext();
 
   Optional<FunctionBodyTimer> timer;
@@ -1873,7 +1885,8 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
       if (auto optBody =
-            TypeChecker::applyFunctionBuilderBodyTransform(func, builderType)) {
+              TypeChecker::applyFunctionBuilderBodyTransform(
+                func, builderType)) {
         if (!*optBody)
           return true;
 
@@ -1913,7 +1926,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   bool hadError = false;
   if (!alreadyTypeChecked) {
     StmtChecker SC(AFD);
-    SC.EndTypeCheckLoc = endTypeCheckLoc;
     hadError = SC.typeCheckBody(body);
   }
 
@@ -1944,18 +1956,10 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
 
   // If nothing went wrong yet, perform extra checking.
-  if (!hadError && endTypeCheckLoc.isInvalid())
+  if (!hadError)
     performAbstractFuncDeclDiagnostics(AFD);
 
   return hadError;
-}
-
-bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                                     SourceLoc EndTypeCheckLoc) {
-  return evaluateOrDefault(
-             AFD->getASTContext().evaluator,
-             TypeCheckFunctionBodyUntilRequest{AFD, EndTypeCheckLoc},
-             true);
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
@@ -1972,6 +1976,7 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
+  closure->setSeparatelyTypeChecked();
   return HadError;
 }
 

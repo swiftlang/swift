@@ -973,37 +973,32 @@ void SwiftLookupTable::dump(raw_ostream &os) const {
       printStoredContext(entry.Context, os);
       os << ": ";
 
-      interleave(entry.DeclsOrMacros.begin(), entry.DeclsOrMacros.end(),
-                 [this, &os](uint64_t entry) {
-                   printStoredEntry(this, entry, os);
-                 },
-                 [&os] {
-                   os << ", ";
-                 });
+      llvm::interleave(
+          entry.DeclsOrMacros.begin(), entry.DeclsOrMacros.end(),
+          [this, &os](uint64_t entry) { printStoredEntry(this, entry, os); },
+          [&os] { os << ", "; });
       os << "\n";
     }
   }
 
   if (!Categories.empty()) {
     os << "Categories: ";
-    interleave(Categories.begin(), Categories.end(),
-               [&os](clang::ObjCCategoryDecl *category) {
-                 os << category->getClassInterface()->getName()
-                    << "(" << category->getName() << ")";
-               },
-               [&os] {
-                 os << ", ";
-               });
+    llvm::interleave(
+        Categories.begin(), Categories.end(),
+        [&os](clang::ObjCCategoryDecl *category) {
+          os << category->getClassInterface()->getName() << "("
+             << category->getName() << ")";
+        },
+        [&os] { os << ", "; });
     os << "\n";
   } else if (Reader && !Reader->categories().empty()) {
     os << "Categories: ";
-    interleave(Reader->categories().begin(), Reader->categories().end(),
-               [&os](clang::serialization::DeclID declID) {
-                 os << "decl ID #" << declID;
-               },
-               [&os] {
-                 os << ", ";
-               });
+    llvm::interleave(
+        Reader->categories().begin(), Reader->categories().end(),
+        [&os](clang::serialization::DeclID declID) {
+          os << "decl ID #" << declID;
+        },
+        [&os] { os << ", "; });
     os << "\n";
   }
 
@@ -1020,13 +1015,10 @@ void SwiftLookupTable::dump(raw_ostream &os) const {
       os << ": ";
 
       const auto &entries = GlobalsAsMembersIndex.find(context)->second;
-      interleave(entries.begin(), entries.end(),
-                 [this, &os](uint64_t entry) {
-                   printStoredEntry(this, entry, os);
-                 },
-                 [&os] {
-                   os << ", ";
-                 });
+      llvm::interleave(
+          entries.begin(), entries.end(),
+          [this, &os](uint64_t entry) { printStoredEntry(this, entry, os); },
+          [&os] { os << ", "; });
       os << "\n";
     }
   }

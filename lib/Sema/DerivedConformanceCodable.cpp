@@ -88,7 +88,7 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
                                  false, proto);
   }
 
-  auto conf = TypeChecker::conformsToProtocol(target, proto, context, None);
+  auto conf = TypeChecker::conformsToProtocol(target, proto, context);
   return conf.isInvalid() ? DoesNotConform : Conforms;
 }
 
@@ -264,7 +264,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   if (!TypeChecker::conformsToProtocol(codingKeysType, codingKeyProto,
-                                       derived.getConformanceContext(), None)) {
+                                       derived.getConformanceContext())) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -372,7 +372,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     return nullptr;
 
   // Forcibly derive conformance to CodingKey.
-  TypeChecker::checkConformancesInContext(enumDecl, enumDecl);
+  TypeChecker::checkConformancesInContext(enumDecl);
 
   // Add to the type.
   target->addMember(enumDecl);
@@ -468,10 +468,9 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                                         paramList);
 
   // CodingKeys.self expr
-  auto *codingKeysExpr = TypeExpr::createForDecl(DeclNameLoc(),
-                                                 param,
-                                                 param->getDeclContext(),
-                                                 /*Implicit=*/true);
+  auto *codingKeysExpr = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), param, param->getDeclContext(),
+      DC->mapTypeIntoContext(param->getInterfaceType()));
   auto *codingKeysMetaTypeExpr = new (C) DotSelfExpr(codingKeysExpr,
                                                      SourceLoc(), SourceLoc());
 
@@ -597,8 +596,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
 
   // Full `let container = encoder.container(keyedBy: CodingKeys.self)`
   // binding.
-  auto *containerPattern = new (C) NamedPattern(containerDecl,
-                                                /*implicit=*/true);
+  auto *containerPattern = NamedPattern::createImplicit(C, containerDecl);
   auto *bindingDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, containerPattern, callExpr, funcDC);
   statements.push_back(bindingDecl);
@@ -816,8 +814,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
     // Full `let container = decoder.container(keyedBy: CodingKeys.self)`
     // binding.
-    auto *containerPattern = new (C) NamedPattern(containerDecl,
-                                                  /*implicit=*/true);
+    auto *containerPattern = NamedPattern::createImplicit(C, containerDecl);
     auto *bindingDecl = PatternBindingDecl::createImplicit(
         C, StaticSpellingKind::None, containerPattern, tryExpr, funcDC);
     statements.push_back(bindingDecl);
@@ -847,10 +844,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
             });
         auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
         bool conformsToEncodable =
-            TypeChecker::conformsToProtocol(
-                targetDecl->getDeclaredInterfaceType(), encodableProto,
-                conformanceDC,
-                ConformanceCheckFlags::SkipConditionalRequirements) != nullptr;
+            conformanceDC->getParentModule()->lookupConformance(
+                targetDecl->getDeclaredInterfaceType(), encodableProto) != nullptr;
 
         // Strategy to use for CodingKeys enum diagnostic part - this is to
         // make the behaviour more explicit:
@@ -927,7 +922,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
       auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
       auto *varExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
-                                                        varDecl->getFullName());
+                                                        varDecl->getName());
       auto *assignExpr = new (C) AssignExpr(varExpr, SourceLoc(), tryExpr,
                                             /*Implicit=*/true);
       statements.push_back(assignExpr);
@@ -1091,10 +1086,9 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (TypeChecker::conformsToProtocol(superType, proto, superclassDecl,
-                                          None)) {
+      if (TypeChecker::conformsToProtocol(superType, proto, superclassDecl)) {
         // super.init(from:) must be accessible.
-        memberName = cast<ConstructorDecl>(requirement)->getFullName();
+        memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {
         // super.init() must be accessible.
         // Passing an empty params array constructs a compound name with no
@@ -1111,7 +1105,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
       if (result.empty()) {
         // No super initializer for us to call.
         superclassDecl->diagnose(diag::decodable_no_super_init_here,
-                                 requirement->getFullName(), memberName);
+                                 requirement->getName(), memberName);
         return false;
       } else if (result.size() > 1) {
         // There are multiple results for this lookup. We'll end up producing a
@@ -1125,20 +1119,20 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
         if (!initializer->isDesignatedInit()) {
           // We must call a superclass's designated initializer.
           initializer->diagnose(diag::decodable_super_init_not_designated_here,
-                                requirement->getFullName(), memberName);
+                                requirement->getName(), memberName);
           return false;
         } else if (!initializer->isAccessibleFrom(conformanceDC)) {
           // Cannot call an inaccessible method.
           auto accessScope = initializer->getFormalAccessScope(conformanceDC);
           initializer->diagnose(diag::decodable_inaccessible_super_init_here,
-                                requirement->getFullName(), memberName,
+                                requirement->getName(), memberName,
                                 accessScope.accessLevelForDiagnostics());
           return false;
         } else if (initializer->isFailable()) {
           // We can't call super.init() if it's failable, since init(from:)
           // isn't failable.
           initializer->diagnose(diag::decodable_super_init_is_failable_here,
-                                requirement->getFullName(), memberName);
+                                requirement->getName(), memberName);
           return false;
         }
       }
@@ -1196,7 +1190,7 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Func,
-                        requirement->getFullName(), getProtocolType(),
+                        requirement->getName(), getProtocolType(),
                         /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.
@@ -1232,7 +1226,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Constructor,
-                        requirement->getFullName(), getProtocolType(),
+                        requirement->getName(), getProtocolType(),
                         /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.

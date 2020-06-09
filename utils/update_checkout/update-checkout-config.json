@@ -8,6 +8,10 @@
             "remote": { "id": "apple/swift-cmark" } },
         "llbuild": {
             "remote": { "id": "apple/swift-llbuild" } },
+        "swift-argument-parser": {
+            "remote": { "id": "apple/swift-argument-parser" } },
+        "swift-driver": {
+            "remote": { "id": "apple/swift-driver" } },
         "swift-tools-support-core": {
             "remote": { "id": "apple/swift-tools-support-core" } },
         "swiftpm": {
@@ -31,6 +35,9 @@
         "icu": {
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
+        },
+        "yams": {
+            "remote": { "id": "jpsim/Yams" }
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
@@ -62,6 +69,8 @@
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
+                "swift-argument-parser": "0.0.6",
+                "swift-driver": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
                 "swift-corelibs-xctest": "master",
@@ -71,6 +80,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
+                "yams": "3.0.1",
                 "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
@@ -81,6 +91,7 @@
         },
         "next" : {
             "aliases": ["next", "master-next",
+                        "swift/master-next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
@@ -90,6 +101,8 @@
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
+                "swift-argument-parser": "0.0.6",
+                "swift-driver": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
                 "swift-corelibs-xctest": "master",
@@ -99,6 +112,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
+                "yams": "3.0.1",
                 "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
@@ -282,19 +296,19 @@
        "release/5.3": {
             "aliases": ["release/5.3", "swift/release/5.3"],
             "repos": {
-                "llvm-project": "swift/master",
-                "swift": "master",
-                "cmark": "master",
+                "llvm-project": "swift/release/5.3",
+                "swift": "release/5.3",
+                "cmark": "release/5.3",
                 "llbuild": "release/5.3",
                 "swift-tools-support-core": "release/5.3",
                 "swiftpm": "release/5.3",
-                "swift-syntax": "master",
-                "swift-stress-tester": "master",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master",
+                "swift-syntax": "release/5.3",
+                "swift-stress-tester": "release/5.3",
+                "swift-corelibs-xctest": "release/5.3",
+                "swift-corelibs-foundation": "release/5.3",
+                "swift-corelibs-libdispatch": "release/5.3",
+                "swift-integration-tests": "release/5.3",
+                "swift-xcode-playground-support": "release/5.3",
                 "ninja": "release",
                 "icu": "release-65-1",
                 "cmake": "v3.16.5",

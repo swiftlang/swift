@@ -8,9 +8,8 @@ add_swift_host_library(swiftSyntax STATIC
   RawSyntax.cpp
   Syntax.cpp
   SyntaxData.cpp
-  UnknownSyntax.cpp
-
-  GYB_SOURCES
+  UnknownSyntax.cpp)
+_swift_gyb_target_sources(swiftSyntax PRIVATE
     SyntaxNodes.cpp.gyb
     SyntaxBuilders.cpp.gyb
     SyntaxKind.cpp.gyb

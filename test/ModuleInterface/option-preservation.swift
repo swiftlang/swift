@@ -11,7 +11,7 @@
 
 // Make sure flags show up when filelists are enabled
 
-// RUN: %target-build-swift %s -driver-filelist-threshold=0 -emit-module-interface -o %t/foo -module-name foo -module-link-name fooCore -force-single-frontend-invocation -Ounchecked -enforce-exclusivity=unchecked -autolink-force-load 2>&1
+// RUN: %target-build-swift %s -driver-filelist-threshold=0 -emit-module-interface -o %t/foo -module-name foo -module-link-name fooCore -whole-module-optimization -Ounchecked -enforce-exclusivity=unchecked -autolink-force-load 2>&1
 // RUN: %FileCheck %s < %t/foo.swiftinterface --check-prefix CHECK-FILELIST-INTERFACE
 
 // CHECK-FILELIST-INTERFACE: swift-module-flags:

@@ -61,6 +61,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::DumpTypeInfo:
   case ActionType::EmitPCM:
+  case ActionType::ScanDependencies:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -99,6 +100,7 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
   case ActionType::DumpTypeInfo:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return false;
   }
   llvm_unreachable("Unknown ActionType");
@@ -111,6 +113,7 @@ bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
   case FrontendOptions::ActionType::EmitSyntax:
   case FrontendOptions::ActionType::DumpInterfaceHash:
   case FrontendOptions::ActionType::EmitImportedModules:
+  case FrontendOptions::ActionType::ScanDependencies:
     return true;
   default:
     return false;
@@ -204,6 +207,9 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
 
   case ActionType::EmitPCM:
     return TY_ClangModuleFile;
+
+  case ActionType::ScanDependencies:
+    return TY_JSONDependencies;
   }
   llvm_unreachable("unhandled action");
 }
@@ -240,6 +246,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCM:
+  case ActionType::ScanDependencies:
     return true;
   }
   llvm_unreachable("unhandled action");
@@ -263,6 +270,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -309,6 +317,7 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -344,6 +353,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return false;
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
@@ -385,6 +395,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return false;
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
@@ -427,6 +438,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::REPL:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -470,6 +482,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::DumpTypeInfo:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return true;
 
   case ActionType::NoneAction:
@@ -513,6 +526,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::EmitIR:
   case ActionType::DumpTypeInfo:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return true;
   }
   llvm_unreachable("unhandled action");
@@ -536,6 +550,7 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::CompileModuleFromInterface:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return false;
   case ActionType::EmitSILGen:
   case ActionType::EmitSIBGen:
@@ -580,6 +595,7 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
     return false;
   case ActionType::Immediate:
   case ActionType::REPL:

@@ -202,7 +202,7 @@ public protocol SetAlgebra: Equatable, ExpressibleByArrayLiteral {
   /// - Parameter member: The element of the set to remove.
   /// - Returns: For ordinary sets, an element equal to `member` if `member` is
   ///   contained in the set; otherwise, `nil`. In some cases, a returned
-  ///   element may be distinguishable from `newMember` by identity comparison
+  ///   element may be distinguishable from `member` by identity comparison
   ///   or some other means.
   ///
   ///   For sets where the set type and element type are the same, like
@@ -409,6 +409,8 @@ extension SetAlgebra {
   public init<S: Sequence>(_ sequence: __owned S)
     where S.Element == Element {
     self.init()
+    // Needed to fully optimize OptionSet literals.
+    _onFastPath()
     for e in sequence { insert(e) }
   }
 
@@ -494,7 +496,7 @@ extension SetAlgebra {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     let nonNeighbors = employees.subtract(neighbors)
+  ///     let nonNeighbors = employees.subtracting(neighbors)
   ///     print(nonNeighbors)
   ///     // Prints "["Diana", "Chris", "Alicia"]"
   ///

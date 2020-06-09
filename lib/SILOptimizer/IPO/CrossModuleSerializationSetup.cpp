@@ -15,14 +15,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
+#include "swift/AST/Module.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILCloner.h"
-#include "swift/AST/Module.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -128,7 +129,8 @@ static void makeDeclUsableFromInline(ValueDecl *decl, SILModule &M) {
   if (decl->getEffectiveAccess() >= AccessLevel::Public)
     return;
 
-  if (!decl->isUsableFromInline()) {
+  if (decl->getFormalAccess() < AccessLevel::Public &&
+      !decl->isUsableFromInline()) {
     // Mark the nominal type as "usableFromInline".
     // TODO: find a way to do this without modifying the AST. The AST should be
     // immutable at this point.
@@ -181,12 +183,19 @@ makeSubstUsableFromInline(const SubstitutionMap &substs) {
     }
   }
 }
+static llvm::cl::opt<bool> SerializeEverything(
+    "sil-cross-module-serialize-all", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Serialize everything when performing cross module optimization in "
+        "order to investigate performance differences caused by different "
+        "@inlinable, @usableFromInline choices."),
+    llvm::cl::Hidden);
 
 /// Decide whether to serialize a function.
 static bool shouldSerialize(SILFunction *F) {
   // The basic heursitic: serialize all generic functions, because it makes a
   // huge difference if generic functions can be specialized or not.
-  if (!F->getLoweredFunctionType()->isPolymorphic())
+  if (!F->getLoweredFunctionType()->isPolymorphic() && !SerializeEverything)
     return false;
 
   // Check if we already handled this function before.
@@ -236,15 +245,15 @@ prepareInstructionForSerialization(SILInstruction *inst) {
 void CrossModuleSerializationSetup::handleReferencedFunction(SILFunction *func) {
   if (!func->isDefinition() || func->isAvailableExternally())
     return;
+  if (func->isSerialized() == IsSerialized)
+    return;
+
   if (func->getLinkage() == SILLinkage::Shared) {
     assert(func->isThunk() != IsNotThunk &&
       "only thunks are accepted to have shared linkage");
     assert(canSerialize(func, /*lookIntoThunks*/ false) &&
       "we should already have checked that the thunk is serializable");
     
-    if (func->isSerialized() == IsSerialized)
-      return;
-
     // We cannot make shared functions "usableFromInline", i.e. make them Public
     // because this could result in duplicate-symbol errors. Instead we make
     // them "@alwaysEmitIntoClient"

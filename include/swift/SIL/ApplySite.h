@@ -23,6 +23,7 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILFunction.h"
 
 namespace swift {
 
@@ -180,7 +181,10 @@ public:
   }
 
   /// Return the type.
-  SILType getType() const { return getSubstCalleeConv().getSILResultType(); }
+  SILType getType() const {
+    return getSubstCalleeConv().getSILResultType(
+        getFunction()->getTypeExpansionContext());
+  }
 
   /// Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
@@ -519,6 +523,7 @@ public:
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(getInstruction())->getInoutArguments();
     }
+    llvm_unreachable("invalid apply kind");
   }
 
   /// Returns true if \p op is the callee operand of this apply site
@@ -531,6 +536,18 @@ public:
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const {
     return getCalleeArgIndex(op) < getNumIndirectSILResults();
+  }
+
+  /// Is this an ApplySite that begins the evaluation of a coroutine.
+  bool beginsCoroutineEvaluation() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::TryApplyInst:
+      return false;
+    case FullApplySiteKind::BeginApplyInst:
+      return true;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
   /// If this is a terminator apply site, then pass the first instruction of

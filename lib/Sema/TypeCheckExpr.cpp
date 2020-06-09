@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -130,32 +131,18 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
                                                              Identifier name,
                                                              SourceLoc loc) {
-  auto desc = OperatorLookupDescriptor::forFile(
-      DC->getParentSourceFile(), name, DC->isCascadingContextForLookup(true),
-      loc);
-  auto &Ctx = DC->getASTContext();
-  if (auto op = evaluateOrDefault(Ctx.evaluator,
-                                  LookupInfixOperatorRequest{desc},
-                                  nullptr)) {
-    return op->getPrecedenceGroup();
-  } else {
-    Ctx.Diags.diagnose(loc, diag::unknown_binop);
-  }
-  return nullptr;
+  auto *op = DC->lookupInfixOperator(name).getSingleOrDiagnose(loc);
+  return op ? op->getPrecedenceGroup() : nullptr;
 }
 
 PrecedenceGroupDecl *
 TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   /// Look up the builtin precedence group with the given name.
 
-  auto getBuiltinPrecedenceGroup = [](DeclContext *DC, Identifier name,
-                                      SourceLoc loc) {
-    auto group = TypeChecker::lookupPrecedenceGroup(DC, name, loc);
-    if (!group) {
-      DC->getASTContext().Diags.diagnose(
-          loc, diag::missing_builtin_precedence_group, name);
-    }
-    return group;
+  auto getBuiltinPrecedenceGroup = [&](DeclContext *DC, Identifier name,
+                                       SourceLoc loc) -> PrecedenceGroupDecl * {
+    auto groups = TypeChecker::lookupPrecedenceGroup(DC, name, loc);
+    return groups.getSingleOrDiagnose(loc, /*forBuiltin*/ true);
   };
   
   auto &Context = DC->getASTContext();
@@ -788,7 +775,8 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
   auto paramTy = defaultExpr->getType();
 
   // Re-create the default argument using the location info of the call site.
-  auto *initExpr = synthesizeCallerSideDefault(param, defaultExpr->getLoc());
+  auto *initExpr =
+      synthesizeCallerSideDefault(param, defaultExpr->getLoc());
   auto *dc = defaultExpr->ContextOrCallerSideExpr.get<DeclContext *>();
   assert(dc && "Expected a DeclContext before type-checking caller-side arg");
 

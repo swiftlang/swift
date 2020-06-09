@@ -1510,7 +1510,8 @@ void LoadableStorageAllocation::convertApplyResults() {
         continue;
       }
       auto resultContextTy = origSILFunctionType->substInterfaceType(
-                                       pass.F->getModule(), resultStorageType);
+          pass.F->getModule(), resultStorageType,
+          pass.F->getTypeExpansionContext());
       auto newSILType = pass.getNewSILType(origSILFunctionType,
                                            resultContextTy);
       auto *newVal = allocateForApply(currIns, newSILType.getObjectType());
@@ -1623,7 +1624,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
   SILInstruction *FirstNonAllocStack = &*BBIter;
   while (isa<AllocStackInst>(FirstNonAllocStack) &&
          BBIter != pass.F->begin()->end()) {
-    BBIter++;
+    ++BBIter;
     FirstNonAllocStack = &*BBIter;
   }
   SILBuilderWithScope allocBuilder(&*pass.F->begin()->begin(),
@@ -2840,7 +2841,7 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
     auto instr = cast<DifferentiableFunctionInst>(convInstr);
     newInstr = convBuilder.createDifferentiableFunction(
         instr->getLoc(), instr->getParameterIndices(),
-        instr->getOriginalFunction(),
+        instr->getResultIndices(), instr->getOriginalFunction(),
         instr->getOptionalDerivativeFunctionPair());
     break;
   }

@@ -1,0 +1,184 @@
+import SwiftOnoneSupport
+
+func deprecatedInFutureVersion_catalyst()
+
+func deprecatedInFutureVersion_iOS()
+
+func deprecatedInPastVersion_catalyst()
+
+func deprecatedInPastVersion_iOS()
+
+func isAlwaysDeprecated_catalyst()
+
+func isAlwaysDeprecated_iOS()
+
+
+[
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 0,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 7,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 26,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 31,
+    key.length: 34
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 69,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 74,
+    key.length: 29
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 107,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 112,
+    key.length: 32
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 148,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 153,
+    key.length: 27
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 184,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 189,
+    key.length: 27
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 220,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 225,
+    key.length: 22
+  }
+]
+[
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "deprecatedInFutureVersion_catalyst()",
+    key.usr: "s:12availability34deprecatedInFutureVersion_catalystyyF",
+    key.offset: 26,
+    key.length: 41,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>deprecatedInFutureVersion_catalyst</decl.name>()</decl.function.free>",
+    key.attributes: [
+      {
+        key.kind: source.lang.swift.attribute.availability,
+        key.platform: source.availability.platform.maccatalyst,
+        key.deprecated: "20.0"
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "deprecatedInFutureVersion_iOS()",
+    key.usr: "s:12availability29deprecatedInFutureVersion_iOSyyF",
+    key.offset: 69,
+    key.length: 36,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>deprecatedInFutureVersion_iOS</decl.name>()</decl.function.free>",
+    key.attributes: [
+      {
+        key.kind: source.lang.swift.attribute.availability,
+        key.platform: source.availability.platform.ios,
+        key.deprecated: "20.0"
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "deprecatedInPastVersion_catalyst()",
+    key.usr: "s:12availability32deprecatedInPastVersion_catalystyyF",
+    key.offset: 107,
+    key.length: 39,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>deprecatedInPastVersion_catalyst</decl.name>()</decl.function.free>",
+    key.attributes: [
+      {
+        key.kind: source.lang.swift.attribute.availability,
+        key.platform: source.availability.platform.maccatalyst,
+        key.deprecated: "1.0"
+      }
+    ],
+    key.is_deprecated: 1
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "deprecatedInPastVersion_iOS()",
+    key.usr: "s:12availability27deprecatedInPastVersion_iOSyyF",
+    key.offset: 148,
+    key.length: 34,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>deprecatedInPastVersion_iOS</decl.name>()</decl.function.free>",
+    key.attributes: [
+      {
+        key.kind: source.lang.swift.attribute.availability,
+        key.platform: source.availability.platform.ios,
+        key.deprecated: "1.0"
+      }
+    ],
+    key.is_deprecated: 1
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "isAlwaysDeprecated_catalyst()",
+    key.usr: "s:12availability27isAlwaysDeprecated_catalystyyF",
+    key.offset: 184,
+    key.length: 34,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isAlwaysDeprecated_catalyst</decl.name>()</decl.function.free>",
+    key.attributes: [
+      {
+        key.kind: source.lang.swift.attribute.availability,
+        key.platform: source.availability.platform.maccatalyst,
+        key.is_deprecated: 1
+      }
+    ],
+    key.is_deprecated: 1
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.name: "isAlwaysDeprecated_iOS()",
+    key.usr: "s:12availability22isAlwaysDeprecated_iOSyyF",
+    key.doc.full_as_xml: "<Function><Name>isAlwaysDeprecated_iOS()</Name><USR>s:12availability22isAlwaysDeprecated_iOSyyF</USR><Declaration>@available(iOS, deprecated)\nfunc isAlwaysDeprecated_iOS()</Declaration><CommentParts><Abstract><Para>Some doc</Para></Abstract></CommentParts></Function>",
+    key.offset: 220,
+    key.length: 29,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isAlwaysDeprecated_iOS</decl.name>()</decl.function.free>",
+    key.attributes: [
+      {
+        key.kind: source.lang.swift.attribute.availability,
+        key.platform: source.availability.platform.ios,
+        key.is_deprecated: 1
+      }
+    ],
+    key.is_deprecated: 1
+  }
+]

@@ -29,7 +29,7 @@ class SturdyBranch: Trunk.Branch {
 }
 
 // FIXME: Odd that name lookup can't find this...
-class NormalBranch: Branch { // expected-error {{use of undeclared type 'Branch'}}
+class NormalBranch: Branch { // expected-error {{cannot find type 'Branch' in scope}}
   func flower() {}
 }
 

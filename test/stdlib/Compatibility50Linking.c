@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang %s -all_load %test-resource-dir/%target-sdk-name/libswiftCompatibility50.a -lobjc -o %t/main
+// RUN: %target-clang %s -all_load %test-resource-dir/%target-sdk-name/libswiftCompatibility50.a %test-resource-dir/%target-sdk-name/libswiftCompatibility51.a -lobjc -o %t/main
 // RUN: %target-run %t/main
 // REQUIRES: objc_interop
 // REQUIRES: executable_test

@@ -6,7 +6,7 @@
 // FIXME: Semantic analysis should not recommend 'x' or 'y' here, because they
 // are not actually available.
 func functionParamScopes(x: Int, y: Int = x) -> Int {
-  // expected-error@-1 {{use of unresolved identifier 'x'}}
+  // expected-error@-1 {{cannot find 'x' in scope}}
   // expected-note@-2 {{did you mean 'x'?}}
   // expected-note@-2 {{did you mean 'y'?}}
   return x + y

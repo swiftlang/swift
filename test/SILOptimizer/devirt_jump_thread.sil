@@ -54,17 +54,17 @@ bb0(%0 : $Int32, %1 : $FooClass):
 //
 // CHECK-LABEL: sil @_TF18devirt_jump_thread26jumpthread_checked_cast_brFCS_8FooClassSi
 // CHECK: checked_cast_br
-// CHECK: bb2(%{{.*}} : $FooClass):
+// CHECK: bb1(%{{.*}} : $FooClass):
 // CHECK: function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi
 // CHECK-NOT: function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi
 // CHECK-NOT: class_method
-// CHECK: br bb1
+// CHECK: br bb2
 // CHECK-NOT: checked_cast_br
 // CHECK: bb3:
 // CHECK-NOT: function_ref
 // CHECK: class_method
 // CHECK-NOT: function_ref
-// CHECK: br bb1
+// CHECK: br bb2
 // CHECK: }
 // devirt_jump_thread.jumpthread_checked_cast_br (devirt_jump_thread.FooClass) -> Swift.Int32
 sil @_TF18devirt_jump_thread26jumpthread_checked_cast_brFCS_8FooClassSi : $@convention(thin) (@guaranteed FooClass) -> Int32 {
@@ -169,13 +169,13 @@ bb12:                                             // Preds: bb3
 // Check that checked_cast_br gets jump threaded
 // CHECK-LABEL: sil @_TF18devirt_jump_thread6doubleFCS_8FooClassSi
 // CHECK: checked_cast_br
-// CHECK: bb2(%{{.*}} : $FooClass):
+// CHECK: bb2
+// CHECK: class_method
+// CHECK: br bb4
+// CHECK: bb3(%{{.*}} : $FooClass):
 // CHECK-NOT: class_method
 // CHECK: br bb1
 // CHECK-NOT: checked_cast_br
-// CHECK: bb3
-// CHECK: class_method
-// CHECK: br bb1
 // CHECK: }
 // devirt_jump_thread.double (devirt_jump_thread.FooClass) -> Swift.Int32
 sil @_TF18devirt_jump_thread6doubleFCS_8FooClassSi : $@convention(thin) (@guaranteed FooClass) -> Int32 {

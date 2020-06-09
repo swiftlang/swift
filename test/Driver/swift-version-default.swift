@@ -7,37 +7,37 @@
 // it can't use the %swiftc_driver or %target-build-swift substitutions.
 
 #if swift(>=3)
-asdf // expected-error {{use of unresolved identifier}}
+asdf // expected-error {{cannot find 'asdf' in scope}}
 #else
 jkl
 #endif
 
 #if swift(>=3.1)
-asdf // expected-error {{use of unresolved identifier}}
+asdf // expected-error {{cannot find 'asdf' in scope}}
 #else
 jkl
 #endif
 
 #if swift(>=4)
-aoeu // expected-error {{use of unresolved identifier}}
+aoeu // expected-error {{cannot find 'aoeu' in scope}}
 #else
 htn 
 #endif
 
 #if swift(>=4.1)
-aoeu // expected-error {{use of unresolved identifier}}
+aoeu // expected-error {{cannot find 'aoeu' in scope}}
 #else
 htn 
 #endif
 
 #if swift(>=4.2)
-aoeu // expected-error {{use of unresolved identifier}}
+aoeu // expected-error {{cannot find 'aoeu' in scope}}
 #else
 htn 
 #endif
 
 #if swift(>=5)
-aoeu // expected-error {{use of unresolved identifier}}
+aoeu // expected-error {{cannot find 'aoeu' in scope}}
 #else
 htn 
 #endif
@@ -45,5 +45,5 @@ htn
 #if swift(>=6)
 aoeu
 #else
-htn // expected-error {{use of unresolved identifier}}
+htn // expected-error {{cannot find 'htn' in scope}}
 #endif

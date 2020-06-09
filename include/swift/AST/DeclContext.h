@@ -51,9 +51,13 @@ namespace swift {
   class Expr;
   class GenericParamList;
   class LazyMemberLoader;
+  class GenericContext;
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
+  class InfixOperatorDecl;
+  class InfixOperatorLookupResult;
+  class PrecedenceGroupDecl;
   class ProtocolDecl;
   class Requirement;
   class SourceFile;
@@ -61,6 +65,9 @@ namespace swift {
   class ModuleDecl;
   class GenericTypeDecl;
   class NominalTypeDecl;
+  class PrecedenceGroupLookupResult;
+  class PostfixOperatorDecl;
+  class PrefixOperatorDecl;
   class ProtocolConformance;
   class ValueDecl;
   class Initializer;
@@ -177,6 +184,26 @@ struct ConformanceDiagnostic {
   /// The explicitly-specified protocol whose conformance implied the
   /// existing conflicting conformance.
   ProtocolDecl *ExistingExplicitProtocol;
+};
+
+/// Used in diagnostic %selects.
+struct FragileFunctionKind {
+  enum Kind : unsigned {
+    Transparent,
+    Inlinable,
+    AlwaysEmitIntoClient,
+    DefaultArgument,
+    PropertyInitializer,
+    None
+  };
+
+  Kind kind = None;
+  bool allowUsableFromInline = false;
+
+  friend bool operator==(FragileFunctionKind lhs, FragileFunctionKind rhs) {
+    return (lhs.kind == rhs.kind &&
+            lhs.allowUsableFromInline == rhs.allowUsableFromInline);
+  }
 };
 
 /// A DeclContext is an AST object which acts as a semantic container
@@ -469,6 +496,10 @@ public:
   /// are used.
   ResilienceExpansion getResilienceExpansion() const;
 
+  /// Get the fragile function kind for the code in this context, which
+  /// is used for diagnostics.
+  FragileFunctionKind getFragileFunctionKind() const;
+
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.
   bool mayContainMembersAccessedByDynamicLookup() const;
@@ -537,45 +568,33 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
+  /// Looks up an infix operator with a given \p name.
+  ///
+  /// This returns a vector of results, as it's possible to find multiple infix
+  /// operators with different precedence groups.
+  InfixOperatorLookupResult lookupInfixOperator(Identifier name) const;
+
+  /// Looks up an prefix operator with a given \p name.
+  ///
+  /// If multiple results are found, one is chosen in a stable manner, as
+  /// prefix operator decls cannot differ other than in name. If no results are
+  /// found, returns \c nullptr.
+  PrefixOperatorDecl *lookupPrefixOperator(Identifier name) const;
+
+  /// Looks up an postfix operator with a given \p name.
+  ///
+  /// If multiple results are found, one is chosen in a stable manner, as
+  /// postfix operator decls cannot differ other than in name. If no results are
+  /// found, returns \c nullptr.
+  PostfixOperatorDecl *lookupPostfixOperator(Identifier name) const;
+
+  /// Looks up a precedence group with a given \p name.
+  PrecedenceGroupLookupResult lookupPrecedenceGroup(Identifier name) const;
+
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
   LLVM_READONLY
   ASTContext &getASTContext() const;
-
-  /// Retrieve the set of protocols whose conformances will be
-  /// associated with this declaration context.
-  ///
-  /// This function differs from \c getLocalConformances() in that it
-  /// returns protocol declarations, not protocol conformances, and
-  /// therefore does not require the protocol conformances to be
-  /// formed.
-  ///
-  /// \param lookupKind The kind of lookup to perform.
-  ///
-  /// FIXME: This likely makes more sense on IterableDeclContext or
-  /// something similar.
-  SmallVector<ProtocolDecl *, 2>
-  getLocalProtocols(ConformanceLookupKind lookupKind
-                      = ConformanceLookupKind::All) const;
-
-  /// Retrieve the set of protocol conformances associated with this
-  /// declaration context.
-  ///
-  /// \param lookupKind The kind of lookup to perform.
-  ///
-  /// FIXME: This likely makes more sense on IterableDeclContext or
-  /// something similar.
-  SmallVector<ProtocolConformance *, 2>
-  getLocalConformances(ConformanceLookupKind lookupKind
-                         = ConformanceLookupKind::All) const;
-
-  /// Retrieve diagnostics discovered while expanding conformances for this
-  /// declaration context. This operation then removes those diagnostics from
-  /// consideration, so subsequent calls to this function with the same
-  /// declaration context that have not had any new extensions bound
-  /// will see an empty array.
-  SmallVector<ConformanceDiagnostic, 4>
-  takeConformanceDiagnostics() const;
 
   /// Retrieves a list of separately imported overlays which are shadowing
   /// \p declaring. If any \p overlays are returned, qualified lookups into
@@ -791,8 +810,42 @@ public:
   /// valid).
   bool wasDeserialized() const;
 
+  /// Retrieve the set of protocols whose conformances will be
+  /// associated with this declaration context.
+  ///
+  /// This function differs from \c getLocalConformances() in that it
+  /// returns protocol declarations, not protocol conformances, and
+  /// therefore does not require the protocol conformances to be
+  /// formed.
+  ///
+  /// \param lookupKind The kind of lookup to perform.
+  SmallVector<ProtocolDecl *, 2>
+  getLocalProtocols(ConformanceLookupKind lookupKind
+                      = ConformanceLookupKind::All) const;
+
+  /// Retrieve the set of protocol conformances associated with this
+  /// declaration context.
+  ///
+  /// \param lookupKind The kind of lookup to perform.
+  SmallVector<ProtocolConformance *, 2>
+  getLocalConformances(ConformanceLookupKind lookupKind
+                         = ConformanceLookupKind::All) const;
+
+  /// Retrieve diagnostics discovered while expanding conformances for this
+  /// declaration context. This operation then removes those diagnostics from
+  /// consideration, so subsequent calls to this function with the same
+  /// declaration context that have not had any new extensions bound
+  /// will see an empty array.
+  SmallVector<ConformanceDiagnostic, 4> takeConformanceDiagnostics() const;
+
   /// Return 'this' as a \c Decl.
   const Decl *getDecl() const;
+
+  /// Return 'this' as a \c GenericContext.
+  GenericContext *getAsGenericContext();
+  const GenericContext *getAsGenericContext() const {
+    return const_cast<IterableDeclContext *>(this)->getAsGenericContext();
+  }
 
   /// Get the DeclID this Decl was deserialized from.
   serialization::DeclID getDeclID() const {

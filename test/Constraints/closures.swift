@@ -63,7 +63,7 @@ var evenOrOdd : (Int) -> String = {$0 % 2 == 0 ? "even" : "odd"}
 
 // <rdar://problem/15367882>
 func foo() {
-  not_declared({ $0 + 1 }) // expected-error{{use of unresolved identifier 'not_declared'}}
+  not_declared({ $0 + 1 }) // expected-error{{cannot find 'not_declared' in scope}}
 }
 
 // <rdar://problem/15536725>
@@ -504,7 +504,7 @@ struct S_3520 {
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
 sr3520_set_via_closure({ $0.number1 = $1 })
 // expected-error@-1 {{generic parameter 'S' could not be inferred}}
-// expected-error@-2 {{generic parameter 'T' could not be inferred}}
+// expected-error@-2 {{unable to infer type of a closure parameter $1 in the current context}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -588,7 +588,7 @@ extension A_SR_5030 {
 }
 
 // rdar://problem/33296619
-let u = rdar33296619().element //expected-error {{use of unresolved identifier 'rdar33296619'}}
+let u = rdar33296619().element //expected-error {{cannot find 'rdar33296619' in scope}}
 
 [1].forEach { _ in
   _ = "\(u)"
@@ -614,7 +614,7 @@ _ = "".withCString { UnsafeMutableRawPointer(mutating: $0) }
 
 // rdar://problem/34077439 - Crash when pre-checking bails out and
 // leaves us with unfolded SequenceExprs inside closure body.
-_ = { (offset) -> T in // expected-error {{use of undeclared type 'T'}}
+_ = { (offset) -> T in // expected-error {{cannot find type 'T' in scope}}
   return offset ? 0 : 0
 }
 
@@ -972,6 +972,7 @@ func test_correct_inference_of_closure_result_in_presence_of_optionals() {
   }
 }
 
+
 // rdar://problem/59741308 - inference fails with tuple element has to joined to supertype
 func rdar_59741308() {
   class Base {
@@ -1016,3 +1017,21 @@ func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T
 
 overloaded_with_default_and_autoclosure { 42 } // Ok
 overloaded_with_default_and_autoclosure(42) // Ok
+
+// SR-12815 - `error: type of expression is ambiguous without more context` in many cases where methods are missing
+func sr12815() {
+  let _ = { a, b in }
+  // expected-error@-1 {{unable to infer type of a closure parameter 'a' in the current context}}
+  // expected-error@-2 {{unable to infer type of a closure parameter 'b' in the current context}}
+
+  _ = .a { b in } // expected-error {{cannot infer contextual base in reference to member 'a'}}
+
+  struct S {}
+
+  func test(s: S) {
+    S.doesntExist { b in } // expected-error {{type 'S' has no member 'doesntExist'}}
+    s.doesntExist { b in } // expected-error {{value of type 'S' has no member 'doesntExist'}}
+    s.doesntExist1 { v in } // expected-error {{value of type 'S' has no member 'doesntExist1'}}
+     .doesntExist2() { $0 }
+  }
+}

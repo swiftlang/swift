@@ -481,8 +481,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) { return E; }
   Expr *visitTypeExpr(TypeExpr *E) {
     if (!E->isImplicit())
-      if (doIt(E->getTypeLoc()))
-        return nullptr;
+      if (auto *typerepr = E->getTypeRepr())
+        if (doIt(typerepr))
+          return nullptr;
 
     return E;
   }
@@ -507,6 +508,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
+
+  Expr *visitPropertyWrapperValuePlaceholderExpr(
+      PropertyWrapperValuePlaceholderExpr *E) {
+    if (auto *placeholder = doIt(E->getOpaqueValuePlaceholder()))
+      E->setOpaqueValuePlaceholder(dyn_cast<OpaqueValueExpr>(placeholder));
+    else
+      return nullptr;
+
+    if (E->getOriginalWrappedValue()) {
+      if (auto *newValue = doIt(E->getOriginalWrappedValue()))
+        E->setOriginalWrappedValue(newValue);
+      else
+        return nullptr;
+    }
+
+    return E;
+  }
 
   Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
 
@@ -792,25 +810,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitClosureExpr(ClosureExpr *expr) {
     visit(expr->getParameters());
 
-    if (expr->hasExplicitResultType())
-      if (doIt(expr->getExplicitResultTypeLoc()))
+    if (expr->hasExplicitResultType()) {
+      if (doIt(expr->getExplicitResultTypeRepr()))
         return nullptr;
-
-    // Handle single-expression closures.
-    if (expr->hasSingleExpressionBody()) {
-      if (Expr *body = doIt(expr->getSingleExpressionBody())) {
-        expr->setSingleExpressionBody(body);
-        return expr;
-      }
-      return nullptr;
     }
 
-    if (!Walker.shouldWalkIntoNonSingleExpressionClosure(expr))
+    // If the closure was separately type checked and we don't want to
+    // visit separately-checked closure bodies, bail out now.
+    if (expr->wasSeparatelyTypeChecked() &&
+        !Walker.shouldWalkIntoSeparatelyCheckedClosure(expr))
       return expr;
 
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
-      expr->setBody(body, false);
+      expr->setBody(body, expr->hasSingleExpressionBody());
       return expr;
     }
     return nullptr;
@@ -1474,7 +1487,7 @@ Stmt *Traversal::visitGuardStmt(GuardStmt *US) {
 }
 
 Stmt *Traversal::visitDoStmt(DoStmt *DS) {
-  if (Stmt *S2 = doIt(DS->getBody()))
+  if (BraceStmt *S2 = cast_or_null<BraceStmt>(doIt(DS->getBody())))
     DS->setBody(S2);
   else
     return nullptr;

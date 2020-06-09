@@ -31,7 +31,9 @@ func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' is '@_spi' a
 @_spi(S) public struct SPIStruct {} // expected-note 2 {{struct 'SPIStruct' is not '@usableFromInline' or public}}
 
 @frozen public struct FrozenStruct {
-  @_spi(S) public var asdf = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
+  @_spi(S) public var spiInFrozen = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
+  // expected-error @-1 {{stored property 'spiInFrozen' cannot be declared '@_spi' in a '@frozen' struct}}
+
   var asdf = SPIStruct() // expected-error {{struct 'SPIStruct' is '@_spi' and cannot be referenced from a property initializer in a '@frozen' type}}
 }
 
@@ -45,3 +47,6 @@ public class BadPublicClass : SPIClass {} // expected-error {{class cannot be de
 @_spi(s) public func genFunc<T: PrivateProtocol>(_ t: T) {} // expected-error {{global function cannot be declared public because its generic parameter uses a private type}}
 public func genFuncBad<T: SPIProtocol>(_ t: T) {} // expected-error {{global function cannot be declared public because its generic parameter uses an '@_spi' type}}
 @_spi(S) public func genFuncSPI<T: SPIProtocol>(_ t: T) {} // OK
+
+@_spi(S) private func privateCantBeSPI() {} // expected-error{{private global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}} {{1-10=}}
+@_spi(S) func internalCantBeSPI() {} // expected-error{{internal global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}} {{1-10=}}

@@ -233,7 +233,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
 
   // Native function-local declarations have shared linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
-  // of marking them "used" other than making them external. 
+  // of marking them "used" other than making them external.
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
@@ -333,6 +333,10 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (fn->hasForcedStaticDispatch()) {
       limit = Limit::OnDemand;
     }
+  }
+
+  if (isEnumElement()) {
+    limit = Limit::OnDemand;
   }
 
   auto effectiveAccess = d->getEffectiveAccess();
@@ -442,12 +446,9 @@ bool SILDeclRef::isTransparent() const {
 
 /// True if the function should have its body serialized.
 IsSerialized_t SILDeclRef::isSerialized() const {
-  DeclContext *dc;
   if (auto closure = getAbstractClosureExpr()) {
-    dc = closure->getLocalContext();
-
-    // Otherwise, ask the AST if we're inside an @inlinable context.
-    if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+    // Ask the AST if we're inside an @inlinable context.
+    if (closure->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       if (isForeign)
         return IsSerializable;
 
@@ -465,6 +466,13 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // Default argument generators are serialized if the containing
   // declaration is public.
   if (isDefaultArgGenerator()) {
+    // Ask the AST if we're inside an @inlinable context.
+    if (d->getDeclContext()->getResilienceExpansion()
+          == ResilienceExpansion::Minimal) {
+      return IsSerialized;
+    }
+
+    // Otherwise, check if the owning declaration is public.
     auto scope =
       d->getFormalAccessScope(/*useDC=*/nullptr,
                               /*treatUsableFromInlineAsPublic=*/true);
@@ -490,7 +498,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   // Note: if 'd' is a function, then 'dc' is the function itself, not
   // its parent context.
-  dc = d->getInnermostDeclContext();
+  auto *dc = d->getInnermostDeclContext();
 
   // Local functions are serializable if their parent function is
   // serializable.
@@ -806,7 +814,12 @@ bool SILDeclRef::requiresNewVTableEntry() const {
   if (derivativeFunctionIdentifier)
     if (derivativeFunctionRequiresNewVTableEntry(*this))
       return true;
-  if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
+  if (!hasDecl())
+    return false;
+  auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
+  if (!fnDecl)
+    return false;
+  if (fnDecl->needsNewVTableEntry())
     return true;
   return false;
 }

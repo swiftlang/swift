@@ -21,7 +21,7 @@ default:
 }
 
 switch (1, 2) {
-case (var a, a): // expected-error {{use of unresolved identifier 'a'}}
+case (var a, a): // expected-error {{cannot find 'a' in scope}}
   ()
 }
 
@@ -260,7 +260,7 @@ if case .foo = sr2057 { } // Ok
 // Invalid 'is' pattern
 class SomeClass {}
 if case let doesNotExist as SomeClass:AlsoDoesNotExist {}
-// expected-error@-1 {{use of undeclared type 'AlsoDoesNotExist'}}
+// expected-error@-1 {{cannot find type 'AlsoDoesNotExist' in scope}}
 // expected-error@-2 {{variable binding in a condition requires an initializer}}
 
 // `.foo` and `.bar(...)` pattern syntax should also be able to match
@@ -476,5 +476,22 @@ func rdar_60048356() {
     // expected-warning@-1 {{enum case 'bar' has 2 associated values; matching them as a tuple is deprecated}}
       _ = tuple.0 == tuple.1
     }
+  }
+}
+
+// rdar://problem/63510989 - valid pattern doesn't type-check
+func rdar63510989() {
+  enum Value : P {
+    func p() {}
+  }
+
+  enum E {
+    case foo(P?)
+  }
+
+  func test(e: E) {
+    if case .foo(_ as Value) = e {} // Ok
+    if case .foo(let v as Value) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
   }
 }

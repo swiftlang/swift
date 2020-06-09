@@ -1,0 +1,55 @@
+// RUN: %target-swift-frontend -parse-sil -emit-ir %s -module-name test | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-ptrauth
+
+import Builtin
+
+sil @test_strip : $@convention(thin) (Builtin.Int64) -> Builtin.Int64  {
+bb0(%ptr : $Builtin.Int64):
+  %key = integer_literal $Builtin.Int32, 0
+  %result = builtin "int_ptrauth_strip_Int64"(%ptr : $Builtin.Int64, %key : $Builtin.Int32) : $Builtin.Int64
+  return %result : $Builtin.Int64
+}
+// CHECK-LABEL:        define{{ protected | dllexport | }}swiftcc i64 @test_strip(i64 %0)
+// CHECK:              entry:
+// CHECK-ptrauth-NEXT:   %1 = call i64 @llvm.ptrauth.strip.i64(i64 %0, i32 0)
+// CHECK-ptrauth-NEXT:   ret i64 %1
+// CHECK-noptrauth-NEXT: ret i64 %0
+// CHECK-NEXT:         }
+
+sil @test_sign : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64  {
+bb0(%ptr : $Builtin.Int64, %disc : $Builtin.Int64):
+  %key = integer_literal $Builtin.Int32, 0
+  %result = builtin "int_ptrauth_sign_Int64"(%ptr : $Builtin.Int64, %key : $Builtin.Int32, %disc : $Builtin.Int64) : $Builtin.Int64
+  return %result : $Builtin.Int64
+}
+// CHECK-LABEL:        define{{ protected | dllexport | }}swiftcc i64 @test_sign(i64 %0, i64 %1)
+// CHECK:              entry:
+// CHECK-ptrauth-NEXT:   %2 = call i64 @llvm.ptrauth.sign.i64(i64 %0, i32 0, i64 %1)
+// CHECK-ptrauth-NEXT:   ret i64 %2
+// CHECK-noptrauth-NEXT: ret i64 %0
+// CHECK-NEXT:         }
+
+sil @test_auth : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64  {
+bb0(%ptr : $Builtin.Int64, %disc : $Builtin.Int64):
+  %key = integer_literal $Builtin.Int32, 0
+  %result = builtin "int_ptrauth_auth_Int64"(%ptr : $Builtin.Int64, %key : $Builtin.Int32, %disc : $Builtin.Int64) : $Builtin.Int64
+  return %result : $Builtin.Int64
+}
+// CHECK-LABEL:        define{{ protected | dllexport | }}swiftcc i64 @test_auth(i64 %0, i64 %1)
+// CHECK:              entry:
+// CHECK-ptrauth-NEXT:   %2 = call i64 @llvm.ptrauth.auth.i64(i64 %0, i32 0, i64 %1)
+// CHECK-ptrauth-NEXT:   ret i64 %2
+// CHECK-noptrauth-NEXT: ret i64 %0
+// CHECK-NEXT:         }
+
+sil @test_resign : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> Builtin.Int64  {
+bb0(%ptr : $Builtin.Int64, %oldDisc : $Builtin.Int64, %newDisc : $Builtin.Int64):
+  %key = integer_literal $Builtin.Int32, 0
+  %result = builtin "int_ptrauth_resign_Int64"(%ptr : $Builtin.Int64, %key : $Builtin.Int32, %oldDisc : $Builtin.Int64, %key : $Builtin.Int32, %newDisc : $Builtin.Int64) : $Builtin.Int64
+  return %result : $Builtin.Int64
+}
+// CHECK-LABEL:        define{{ protected | dllexport | }}swiftcc i64 @test_resign(i64 %0, i64 %1, i64 %2)
+// CHECK:              entry:
+// CHECK-ptrauth-NEXT:   %3 = call i64 @llvm.ptrauth.resign.i64(i64 %0, i32 0, i64 %1, i32 0, i64 %2)
+// CHECK-ptrauth-NEXT:   ret i64 %3
+// CHECK-noptrauth-NEXT: ret i64 %0
+// CHECK-NEXT:         }

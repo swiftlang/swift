@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+
 import External
 import External2
 import External3

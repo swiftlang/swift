@@ -229,3 +229,12 @@ func sr_12398(arr1: [Int], arr2: [(a: Int, b: String)]) {
   for (x, y, _) in arr2 {}
   // expected-error@-1 {{pattern cannot match values of type '(a: Int, b: String)'}}
 }
+
+// rdar://62339835
+func testForEachWhereWithClosure(_ x: [Int]) {
+  func foo<T>(_ fn: () -> T) -> Bool { true }
+
+  for i in x where foo({ i }) {}
+  for i in x where foo({ i.byteSwapped == 5 }) {}
+  for i in x where x.contains(where: { $0.byteSwapped == i }) {}
+}

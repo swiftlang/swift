@@ -228,6 +228,8 @@ enum E7: String {
     case b = "\u{66}"
 }
 
+func checkAnyIsAKeyword(x: Any) {}
+
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.tmp)
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -765,3 +767,7 @@ enum E7: String {
 
 // RUN: %sourcekitd-test -req=cursor -pos=227:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK94 %s
 // CHECK94: <empty cursor info; internal diagnostic: "Resolved to incomplete expression or statement.">
+
+// RUN:  %sourcekitd-test -req=cursor -pos=231:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK95 %s
+// CHECK95: <Declaration>func checkAnyIsAKeyword(x: Any)</Declaration>
+// CHECK95-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>checkAnyIsAKeyword</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><syntaxtype.keyword>Any</syntaxtype.keyword></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>

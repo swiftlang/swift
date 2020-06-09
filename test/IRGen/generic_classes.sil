@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_classes.sil
-// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -check-prefix CHECK-%target-import-type
+// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -enable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-objc,CHECK-%target-import-type,CHECK-%target-import-type-objc
+// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -disable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-native,CHECK-%target-import-type
 // RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
 
 // REQUIRES: CPU=x86_64
@@ -22,13 +23,15 @@ import Swift
 // --       negative size in words
 // CHECK-SAME:   i32 2,
 // --       positive size in words
-// CHECK-SAME:   i32 18,
+// CHECK-objc-SAME:   i32 18,
+// CHECK-native-SAME:   i32 15,
 // --       num immediate members
 // CHECK-SAME:   i32 8,
 // --       num fields
 // CHECK-SAME:   i32 3,
 // --       field offset vector offset
-// CHECK-SAME:   i32 11,
+// CHECK-objc-SAME:   i32 11,
+// CHECK-native-SAME:   i32 8,
 // --       template instantiation cache
 // CHECK-SAME:   [16 x i8*]* @"$s15generic_classes11RootGenericCMI"
 // --       template instantiation pattern
@@ -36,7 +39,8 @@ import Swift
 // --       generic parameters, requirements, key arguments, extra arguments
 // CHECK-SAME:   i16 1, i16 0, i16 1, i16 0
 // --       vtable offset
-// CHECK-SAME:   i32 14,
+// CHECK-objc-SAME:   i32 14,
+// CHECK-native-SAME:   i32 11,
 // --       vtable size
 // CHECK-SAME:   i32 4
 // CHECK-SAME: }
@@ -52,21 +56,20 @@ import Swift
 // --       flags
 // CHECK_SAME:   i32 3,
 // --       immediate pattern size
-// CHECK-SAME:   i16 0,
+// CHECK-native-SAME:   i16 0,
+// CHECK-objc-SAME:     i16 5,
 // --       immediate pattern target offset
-// CHECK-SAME:   i16 0,
+// CHECK-SAME:          i16 0,
 // --       extra data size
-// CHECK-SAME-native:   i16 0,
-// CHECK-SAME-objc:     i16 23,
+// CHECK-native-SAME:   i16 0,
+// CHECK-objc-SAME:     i16 14,
 // --       class ro-data offset
-// CHECK-SAME-native:   i16 0,
-// CHECK-SAME-objc:     i16 5,
+// CHECK-native-SAME:   i16 0
+// CHECK-objc-SAME:     i16 0,
 // --       metaclass object offset
-// CHECK-SAME-native:   i16 0,
-// CHECK-SAME-objc:     i16 0,
+// CHECK-objc-SAME:     i16 0,
 // --       class ro-data offset
-// CHECK-SAME-native:   i16 0
-// CHECK-SAME-objc:     i16 14,
+// CHECK-objc-SAME:     i16 23
 // CHECK-SAME: }>
 
 // -- Check that offset vars are emitted for fixed-layout generics
@@ -91,22 +94,28 @@ import Swift
 // CHECK-SAME: }>
 
 // CHECK: @"$s15generic_classes14RootNonGenericCMf" = internal global <{ {{.*}} }> <{
-// CHECK-SAME:   void (%T15generic_classes14RootNonGenericC*)* @"$s15generic_classes14RootNonGenericCfD",
-// CHECK-DIRECT-SAME:   i8** @"$sBoWV",
-// CHECK-INDIRECT-SAME:   i8** null,
-// CHECK-SAME-native: i64 0,
-// CHECK-SAME-native: %swift.type* null,
-// CHECK-SAME-native: %swift.opaque* null,
-// CHECK-SAME-objc:   i64 ptrtoint (%objc_class* @"$s15generic_classes14RootNonGenericCMm" to i64),
-// CHECK-SAME-objc:   %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
-// CHECK-SAME-objc:   %swift.opaque* @_objc_empty_cache,
-// CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME-native: i64 1,
-// CHECK-SAME-objc:   @_DATA__TtC15generic_classes14RootNonGeneric
-// CHECK-SAME:   i32 33,
-// CHECK-SAME:   i16 7,
-// CHECK-SAME:   i16 0,
-// CHECK-SAME:   {{.*}}* @"$s15generic_classes14RootNonGenericCMn"
+// -- destructor
+// CHECK-SAME:                void (%T15generic_classes14RootNonGenericC*)* @"$s15generic_classes14RootNonGenericCfD",
+// -- witness table pointer
+// CHECK-DIRECT-SAME:         i8** @"$sBoWV",
+// CHECK-INDIRECT-SAME:       i8** null,
+// -- swift object type
+// CHECK-objc-SAME:           i64 ptrtoint (%objc_class* @"$s15generic_classes14RootNonGenericCMm" to i64),
+// CHECK-native-SAME:         i64 0,
+// -- superclass
+// CHECK-DIRECT-objc-SAME:    %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
+// CHECK-INDIRECT-objc-SAME:  %swift.type* null,
+// CHECK-native-SAME:         %swift.type* null,
+// -- objc only fields
+// CHECK-objc-SAME:           %swift.opaque* @_objc_empty_cache,
+// CHECK-objc-SAME:           %swift.opaque* null,
+// CHECK-objc-SAME:           @_DATA__TtC15generic_classes14RootNonGeneric
+// -- flags, sizes, and offsets...
+// CHECK-SAME:                i32 33,
+// CHECK-SAME:                i16 7,
+// CHECK-SAME:                i16 0,
+// -- nominal type descriptor
+// CHECK-SAME:                {{.*}}* @"$s15generic_classes14RootNonGenericCMn"
 // CHECK-SAME: }>
 
 // CHECK: @"$s15generic_classes015GenericInheritsC0CMn" = hidden constant
@@ -117,8 +126,8 @@ import Swift
 // --       template instantiation function
 // CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8*)* @"$s15generic_classes015GenericInheritsC0CMi"
 // --       pattern flags (1 == has extra data pattern)
-// CHECK-SAME-native: i32 0,
-// CHECK-SAME-objc:   i32 1,
+// CHECK-native-SAME: i32 0,
+// CHECK-objc-SAME:   i32 1,
 // --       heap destructor
 // CHECK-SAME:   @"$s15generic_classes015GenericInheritsC0CfD"
 // --       ivar destroyer
@@ -126,20 +135,21 @@ import Swift
 // --       class flags
 // CHECK_SAME:   i32 3,
 // --       extra data pattern offset
-// CHECK-SAME-objc:     i16 0,
+// CHECK-objc-SAME:     i16 5,
 // --       extra data pattern size
-// CHECK-SAME-objc:     i16 23,
+// CHECK-objc-SAME:     i16 0,
 // --       class ro-data offset
-// CHECK-SAME-native:   i16 0,
-// CHECK-SAME-objc:     i16 5,
+// CHECK-native-SAME:   i16 0,
+// CHECK-objc-SAME:     i16 14,
 // --       metaclass object offset
-// CHECK-SAME-native:   i16 0,
-// CHECK-SAME-objc:     i16 0,
+// CHECK-native-SAME:   i16 0,
+// CHECK-objc-SAME:     i16 0,
 // --       class ro-data offset
-// CHECK-SAME-native:   i16 0,
-// CHECK-SAME-objc:     i16 14,
+// CHECK-native-SAME:   i16 0,
+// CHECK-objc-SAME:     i16 0,
 // --       reserved
-// CHECK-SAME:          i16 0
+// CHECK-native-SAME:   i16 0
+// CHECK-objc-SAME:     i16 23
 // CHECK-SAME: }
 
 // CHECK: @"$s15generic_classes018GenericInheritsNonC0CMP"
@@ -248,11 +258,13 @@ sil @$s15generic_classes024RecursiveGenericInheritsD0CfD : $@convention(method) 
 // CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64 0, %swift.type* %G)
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 48
+// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 48
+// CHECK-native: [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 24
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
 // CHECK:   [[SIZE32:%.*]] = load i32, i32* [[T1]], align 8
 // CHECK:   [[SIZE:%.*]] = zext i32 [[SIZE32]] to i64
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 52
+// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 52
+// CHECK-native: [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 28
 // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i16*
 // CHECK:   [[ALIGN16:%.*]] = load i16, i16* [[T1]], align 4
 // CHECK:   [[ALIGN:%.*]] = zext i16 [[ALIGN16]] to i64
@@ -276,7 +288,8 @@ entry(%c : $RootGeneric<F>):
 // RootGeneric.y has dependent layout; load the offset from the metadata
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @RootGeneric_concrete_fragile_dependent_member_access_y
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 12
+// CHECK-objc:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 12
+// CHECK-native: [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 9
 // CHECK:   [[Y_OFFSET:%.*]] = load i64, i64* [[Y_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
@@ -303,7 +316,8 @@ entry(%z : $*Int, %c : $RootGeneric<Int>):
 // RootGeneric.z has dependent layout; load the offset from the metadata
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_z
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
-// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 13
+// CHECK-objc:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 13
+// CHECK-native: [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 10
 // CHECK:   [[Z_OFFSET:%.*]] = load i64, i64* [[Z_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
@@ -373,7 +387,8 @@ entry(%c : $RootGeneric<Int32>):
 
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-// CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i64 20
+// CHECK-objc:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i64 20
+// CHECK-native: [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i64 17
 // CHECK:   [[FIELDS_ADDR:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %classFields, i32 0, i32 0
 // CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState(i64 319, %swift.type* %B)
 // CHECK:   [[B_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0

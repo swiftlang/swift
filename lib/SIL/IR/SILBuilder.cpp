@@ -78,10 +78,10 @@ SILType SILBuilder::getPartialApplyResultType(
   results.append(FTI->getResults().begin(), FTI->getResults().end());
   for (auto &result : results) {
     if (result.getConvention() == ResultConvention::UnownedInnerPointer)
-      result = SILResultInfo(result.getReturnValueType(M, FTI),
+      result = SILResultInfo(result.getReturnValueType(M, FTI, context),
                              ResultConvention::Unowned);
     else if (result.getConvention() == ResultConvention::Autoreleased)
-      result = SILResultInfo(result.getReturnValueType(M, FTI),
+      result = SILResultInfo(result.getReturnValueType(M, FTI, context),
                              ResultConvention::Owned);
   }
   

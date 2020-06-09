@@ -4,4 +4,4 @@
 
 @testable import single_int // CHECK: module 'single_int' was not compiled for testing
 
-x = 8 // CHECK-NOT: unresolved identifier
+x = 8 // CHECK-NOT: cannot find 'x' in scope

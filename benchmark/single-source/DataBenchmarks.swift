@@ -13,7 +13,7 @@
 import TestsUtils
 import Foundation
 
-let d: [BenchmarkCategory] =  [.validation, .api, .Data]
+let d: [BenchmarkCategory] =  [.validation, .api, .Data, .cpubench]
 
 public let DataBenchmarks = [
   BenchmarkInfo(name: "DataCreateEmpty",

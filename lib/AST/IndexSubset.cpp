@@ -80,12 +80,14 @@ IndexSubset *IndexSubset::extendingCapacity(
 
 void IndexSubset::print(llvm::raw_ostream &s) const {
   s << '{';
-  interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
-             [&s] { s << ", "; });
+  llvm::interleave(
+      range(capacity), [this, &s](unsigned i) { s << contains(i); },
+      [&s] { s << ", "; });
   s << '}';
 }
 
-void IndexSubset::dump(llvm::raw_ostream &s) const {
+void IndexSubset::dump() const {
+  auto &s = llvm::errs();
   s << "(index_subset capacity=" << capacity << " indices=(";
   interleave(getIndices(), [&s](unsigned i) { s << i; },
              [&s] { s << ", "; });

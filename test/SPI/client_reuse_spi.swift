@@ -24,6 +24,6 @@
 var a = foo() // OK
 a.bar() // expected-error{{'bar' is inaccessible due to '@_spi' protection level}}
 
-var b = SecretStruct() // expected-error{{use of unresolved identifier}}
+var b = SecretStruct() // expected-error{{cannot find 'SecretStruct' in scope}}
 
 #endif

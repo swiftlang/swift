@@ -138,20 +138,24 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
 
     // Check array semantic calls.
     ArraySemanticsCall ArrayOp(User);
-    if (ArrayOp) {
-      if (ArrayOp.getKind() == ArrayCallKind::kAppendContentsOf) {
+    switch (ArrayOp.getKind()) {
+      case ArrayCallKind::kNone:
+        return false;
+      case ArrayCallKind::kAppendContentsOf:
         AppendContentsOfCalls.push_back(ArrayOp);
-        continue;
-      } else if (ArrayOp.getKind() == ArrayCallKind::kGetElement) {
+        break;
+      case ArrayCallKind::kGetElement:
         GetElementCalls.insert(ArrayOp);
-        continue;
-      } else if (ArrayOp.doesNotChangeArray()) {
-        continue;
-      }
+        break;
+      case ArrayCallKind::kArrayFinalizeIntrinsic:
+        if (!recursivelyCollectUses(cast<SingleValueInstruction>(User)))
+          return false;
+        break;
+      default:
+        if (ArrayOp.doesNotChangeArray())
+          break;
+        return false;
     }
-
-    // An operation that escapes or modifies the array value.
-    return false;
   }
   return true;
 }

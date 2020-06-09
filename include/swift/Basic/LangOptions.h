@@ -75,6 +75,12 @@ namespace swift {
     /// performed.
     llvm::Optional<llvm::Triple> TargetVariant;
 
+    /// The SDK version, if known.
+    Optional<llvm::VersionTuple> SDKVersion;
+
+    /// The target variant SDK version, if known.
+    Optional<llvm::VersionTuple> VariantSDKVersion;
+
     ///
     /// Language features
     ///
@@ -133,9 +139,26 @@ namespace swift {
     /// Allow throwing call expressions without annotation with 'try'.
     bool EnableThrowWithoutTry = false;
 
+    /// If set, inserts instrumentation useful for testing the debugger.
+    bool DebuggerTestingTransform = false;
+
+    /// Indicates whether the AST should be instrumented to simulate a
+    /// debugger's program counter. Similar to the PlaygroundTransform, this
+    /// will instrument the AST with function calls that get called when you
+    /// would see a program counter move in a debugger. To adopt this implement
+    /// the __builtin_pc_before and __builtin_pc_after functions.
+    bool PCMacro = false;
+
     /// Enable features useful for running playgrounds.
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;
+
+    /// Indicates whether the playground transformation should be applied.
+    bool PlaygroundTransform = false;
+
+    /// Indicates whether the playground transformation should omit
+    /// instrumentation that has a high runtime performance impact.
+    bool PlaygroundHighPerformance = false;
 
     /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
@@ -244,6 +267,10 @@ namespace swift {
     /// Build the ASTScope tree lazily
     bool LazyASTScopes = true;
 
+    /// Whether to enable the new operator decl and precedencegroup lookup
+    /// behavior. This is a staging flag, and will be removed in the future.
+    bool EnableNewOperatorLookup = false;
+
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
@@ -308,9 +335,9 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
-    /// Emit the newer, finer-grained swiftdeps file. Eventually will support
-    /// faster rebuilds.
-    bool EnableFineGrainedDependencies = true;
+    /// Whether to disable the evaluation of '#if' decls, such that the bodies
+    /// of active clauses aren't hoisted into the enclosing scope.
+    bool DisablePoundIfEvaluation = false;
 
     /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
     /// the interface hash, hash them into per-iterable-decl-context
@@ -338,11 +365,12 @@ namespace swift {
     /// conformances.
     bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;
 
+    /// Whether to enable a more aggressive mode of incremental dependency
+    /// gathering that never captures cascading edges.
+    bool EnableExperientalPrivateIntransitiveDependencies = false;
+
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
-
-    /// If set to \c false, fall back to the legacy manual reference name tracking code.
-    bool EnableRequestBasedIncrementalDependencies = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -464,11 +492,7 @@ namespace swift {
     /// 4.2 GHz Intel Core i7.
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
-
-    /// Whether to delay checking that benefits from having the entire
-    /// module parsed, e.g., Objective-C method override checking.
-    bool DelayWholeModuleChecking = false;
-
+    
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;
@@ -476,11 +500,6 @@ namespace swift {
     /// If true, the time it takes to type-check each expression will be
     /// dumped to llvm::errs().
     bool DebugTimeExpressions = false;
-
-    /// Indicate that the type checker is checking code that will be
-    /// immediately executed. This will suppress certain warnings
-    /// when executing scripts.
-    bool InImmediateMode = false;
 
     /// Indicate that the type checker should skip type-checking non-inlinable
     /// function bodies.
@@ -534,7 +553,10 @@ namespace swift {
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
-    
+
+    /// Enable experimental support for one-way constraints for the
+    /// parameters of closures.
+    bool EnableOneWayClosureParameters = false;
   };
 } // end namespace swift
 

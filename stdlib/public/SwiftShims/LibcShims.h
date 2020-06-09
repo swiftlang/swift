@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_LIBCSHIMS_H
 #define SWIFT_STDLIB_SHIMS_LIBCSHIMS_H
 
+#include "SwiftStdbool.h"
 #include "SwiftStdint.h"
 #include "SwiftStddef.h"
 #include "Visibility.h"
@@ -104,12 +105,14 @@ static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
 
 // Non-standard extensions
 #if defined(__APPLE__)
+#define HAS_MALLOC_SIZE 1
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   extern __swift_size_t malloc_size(const void *);
   return malloc_size(ptr);
 }
 #elif defined(__linux__) || defined(__CYGWIN__) || defined(__ANDROID__) \
    || defined(__HAIKU__) || defined(__FreeBSD__) || defined(__wasi__)
+#define HAS_MALLOC_SIZE 1
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
 #if defined(__ANDROID__)
 #if !defined(__ANDROID_API__) || __ANDROID_API__ >= 17
@@ -121,13 +124,22 @@ static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(CONST_CAST(void *, ptr));
 }
 #elif defined(_WIN32)
+#define HAS_MALLOC_SIZE 1
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   extern __swift_size_t _msize(void *ptr);
   return _msize(CONST_CAST(void *, ptr));
 }
 #else
-#error No malloc_size analog known for this platform/libc.
+#define HAS_MALLOC_SIZE 0
+
+static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
+  return 0;
+}
 #endif
+
+static inline __swift_bool _swift_stdlib_has_malloc_size() {
+  return HAS_MALLOC_SIZE != 0;
+}
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE

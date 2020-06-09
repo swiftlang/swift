@@ -26,7 +26,6 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
 
@@ -275,10 +274,6 @@ public:
   const bool OnlyOneDependencyFile;
 
 private:
-  /// Scaffolding to permit experimentation with finer-grained dependencies and
-  /// faster rebuilds.
-  const bool EnableFineGrainedDependencies;
-
   /// Is the parser recording token hashes for each type body?
   const bool EnableTypeFingerprints;
 
@@ -331,8 +326,6 @@ public:
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
               bool OnlyOneDependencyFile = false,
-              bool EnableFineGrainedDependencies
-                = LangOptions().EnableFineGrainedDependencies,
               bool EnableTypeFingerprints =
                 LangOptions().EnableTypeFingerprints,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
@@ -398,10 +391,6 @@ public:
     return EnableIncrementalBuild;
   }
   void disableIncrementalBuild(Twine why);
-
-  bool getEnableFineGrainedDependencies() const {
-    return EnableFineGrainedDependencies;
-  }
 
   bool getEnableTypeFingerprints() const { return EnableTypeFingerprints; }
 

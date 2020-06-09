@@ -103,7 +103,8 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
 
   auto &II = BInst->getIntrinsicInfo();
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
-    if (II.hasAttribute(llvm::Attribute::ReadNone)) {
+    auto attrs = II.getOrCreateAttributes(F->getASTContext());
+    if (attrs.hasFnAttribute(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
         if (!Op.get()->getType().isTrivial(*F)) {
           return true;
@@ -473,6 +474,10 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
       // FIXME: this is overly conservative. It should return true only of the
       // RC identity of the single operand matches Ptr.
       return true;
+    case SILInstructionKind::BeginCOWMutationInst:
+      // begin_cow_mutation takes the argument as owned and produces a new
+      // owned result.
+      return false;
     default:
       llvm_unreachable("Unexpected check-ref-count instruction.");
     }

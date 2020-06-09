@@ -1196,9 +1196,7 @@ public:
       // it should be parented by the innermost function.
       auto enclosingScope = Scopes[Scopes.size() - 2];
       auto enclosingDC = enclosingScope.dyn_cast<DeclContext*>();
-      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)
-          && !(isa<SourceFile>(enclosingDC)
-               && cast<SourceFile>(enclosingDC)->Kind == SourceFileKind::REPL)){
+      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)){
         auto parentDC = E->getParent();
         if (!isa<Initializer>(parentDC)) {
           Out << "a closure in non-local context should be parented "
@@ -1694,7 +1692,7 @@ public:
           // Look through optional evaluations.
           if (auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
             subExpr = optionalEval->getSubExpr();
-            optionalDepth++;
+            ++optionalDepth;
             continue;
           }
 
@@ -2734,7 +2732,18 @@ public:
       PrettyStackTraceDecl debugStack("verifying GenericTypeParamDecl", GTPD);
 
       const DeclContext *DC = GTPD->getDeclContext();
-      if (!GTPD->getDeclContext()->isInnermostContextGeneric()) {
+
+      // Skip verification of deserialized generic param decls that have the
+      // file set as their parent. This happens when they have not yet had their
+      // correct parent set.
+      // FIXME: This is a hack to workaround the fact that we don't necessarily
+      // parent a GenericTypeParamDecl if we just deserialize its type.
+      if (auto *fileDC = dyn_cast<FileUnit>(DC)) {
+        if (fileDC->getKind() == FileUnitKind::SerializedAST)
+          return;
+      }
+
+      if (!DC->isInnermostContextGeneric()) {
         Out << "DeclContext of GenericTypeParamDecl does not have "
                "generic params\n";
         abort();
@@ -2814,8 +2823,8 @@ public:
 
       // All of the parameter names should match.
       if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
-        auto paramNames = AFD->getFullName().getArgumentNames();
-        bool checkParamNames = (bool)AFD->getFullName();
+        auto paramNames = AFD->getName().getArgumentNames();
+        bool checkParamNames = (bool)AFD->getName();
         auto *firstParams = AFD->getParameters();
 
         if (checkParamNames &&
@@ -3156,7 +3165,7 @@ public:
         unsigned NumDestructors = 0;
         for (auto Member : CD->getMembers()) {
           if (isa<DestructorDecl>(Member)) {
-            NumDestructors++;
+            ++NumDestructors;
           }
         }
         if (NumDestructors > 1) {

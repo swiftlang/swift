@@ -15,7 +15,8 @@ func test() {
 // UNSUPPORTED: OS=windows-msvc
 
 // -----------------------------------------------------------------------------
-// Test that modifications for frameworks in '-Fsystem' doesn't affect the result.
+// Test that modifications for frameworks in '-Fsystem' doesn't affect the result
+// within a session, and that they are propagated after restarting SourceKit.
 
 // RUN: %empty-directory(%t/ModuleCache)
 // RUN: %empty-directory(%t/System/Frameworks)
@@ -43,15 +44,15 @@ func test() {
 
 // CHECK_SYSTEM_2-LABEL: ## THREE
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooSubFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooSubFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooHelperFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooHelperSubFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperSubFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
-// CHECK_SYSTEM_2-NEXT: key.description: "use of unresolved identifier 'fooHelperExplicitFunc'",
+// CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperExplicitFunc' in scope",
 
 // -----------------------------------------------------------------------------
 // Test that modifications for frameworks in '-F' are immidiately propagated
@@ -69,7 +70,7 @@ func test() {
 // RUN:   -shell -- cp -R %S/../Inputs/build_session/Frameworks_modified/FooHelper.framework %t/System/Frameworks/ == \
 // RUN:   -shell -- echo '## TWO' == \
 // RUN:   -req=sema %s -- %s -D TWO -F %t/Frameworks -Fsystem %t/System/Frameworks -module-cache-path %t/ModuleCache  \
-// RUN:   | tee %t.reponse | %FileCheck %s --check-prefix=CHECK_USER
+// RUN:   | %FileCheck %s --check-prefix=CHECK_USER
 
 // CHECK_USER-LABEL: ## ONE
 // CHECK_USER-NOT: key.description
@@ -77,7 +78,39 @@ func test() {
 // CHECK_USER-LABEL: ## TWO
 // CHECK_USER-NOT: key.severity: 
 // CHECK_USER: key.severity: source.diagnostic.severity.error,
-// CHECK_USER-NEXT: key.description: "use of unresolved identifier 'fooFunc'",
+// CHECK_USER-NEXT: key.description: "cannot find 'fooFunc' in scope",
 // CHECK_USER: key.severity: source.diagnostic.severity.error,
-// CHECK_USER-NEXT: key.description: "use of unresolved identifier 'fooSubFunc'",
+// CHECK_USER-NEXT: key.description: "cannot find 'fooSubFunc' in scope",
 // CHECK_USER-NOT: key.severity: 
+
+// -----------------------------------------------------------------------------
+// Test that modifications for frameworks in '-Fsystem' doesn't affect the result
+// across SourceKit sessions *if* '-disable-modules-validate-system-headers' is
+// passed.
+
+// RUN: %empty-directory(%t/ModuleCache)
+// RUN: %empty-directory(%t/System/Frameworks)
+// RUN: cp -R %S/../Inputs/build_session/Frameworks/Foo.framework %t/System/Frameworks/
+// RUN: cp -R %S/../Inputs/build_session/Frameworks/FooHelper.framework %t/System/Frameworks/
+// RUN: %sourcekitd-test \
+// RUN:   -shell -- echo '## ONE' == \
+// RUN:   -req=sema %s -- %s -D ONE -Fsystem %t/System/Frameworks -module-cache-path %t/ModuleCache -Xfrontend -disable-modules-validate-system-headers == \
+// RUN:   -shell -- cp -R %S/../Inputs/build_session/Frameworks_modified/Foo.framework %t/System/Frameworks/ == \
+// RUN:   -shell -- cp -R %S/../Inputs/build_session/Frameworks_modified/FooHelper.framework %t/System/Frameworks/ == \
+// RUN:   -shell -- echo '## TWO' == \
+// RUN:   -req=sema %s -- %s -D TWO -Fsystem %t/System/Frameworks -module-cache-path %t/ModuleCache -Xfrontend -disable-modules-validate-system-headers \
+// RUN:   | %FileCheck %s --check-prefix=CHECK_DISABLED
+// RUN: sleep 2
+// RUN: %sourcekitd-test \
+// RUN:   -shell -- echo '## THREE' == \
+// RUN:   -req=sema %s -- %s -D THREE -Fsystem %t/System/Frameworks -module-cache-path %t/ModuleCache -Xfrontend -disable-modules-validate-system-headers \
+// RUN:   | %FileCheck %s --check-prefix=CHECK_DISABLED_2
+
+// CHECK_DISABLED-LABEL: ## ONE
+// CHECK_DISABLED-NOT: key.description
+
+// CHECK_DISABLED-LABEL: ## TWO
+// CHECK_DISABLED-NOT: key.description
+
+// CHECK_DISABLED_2-LABEL: ## THREE
+// CHECK_DISABLED_2-NOT: key.description

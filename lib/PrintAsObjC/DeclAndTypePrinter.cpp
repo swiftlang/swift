@@ -210,7 +210,7 @@ private:
       if (isa<AccessorDecl>(VD))
         continue;
       if (!AllowDelayed && owningPrinter.delayedMembers.count(VD)) {
-        os << "// '" << VD->getFullName() << "' below\n";
+        os << "// '" << VD->getName() << "' below\n";
         continue;
       }
       if (VD->getAttrs().hasAttribute<OptionalAttr>() !=
@@ -1020,7 +1020,7 @@ private:
     printEncodedString(nominal->getName().str(), /*includeQuotes=*/false);
     os << ".";
     SmallString<32> scratch;
-    printEncodedString(VD->getFullName().getString(scratch),
+    printEncodedString(VD->getName().getString(scratch),
                        /*includeQuotes=*/false);
     os << "' uses '@objc' inference deprecated in Swift 4; add '@objc' to "
        <<   "provide an Objective-C entrypoint\")";

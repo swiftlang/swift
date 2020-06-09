@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Casting.h"
@@ -31,9 +30,7 @@
 using namespace swift;
 
 #ifndef NDEBUG
-template <>
-LLVM_ATTRIBUTE_USED
-void ProtocolDescriptor::dump() const {
+template <> SWIFT_USED void ProtocolDescriptor::dump() const {
   printf("TargetProtocolDescriptor.\n"
          "Name: \"%s\".\n",
          Name.get());
@@ -95,9 +92,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
 #endif
 
 #ifndef NDEBUG
-template<>
-LLVM_ATTRIBUTE_USED
-void ProtocolConformanceDescriptor::verify() const {
+template <> SWIFT_USED void ProtocolConformanceDescriptor::verify() const {
   auto typeKind = unsigned(getTypeKind());
   assert(((unsigned(TypeReferenceKind::First_Kind) <= typeKind) &&
           (unsigned(TypeReferenceKind::Last_Kind) >= typeKind)) &&
@@ -167,7 +162,7 @@ template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
   // If needed, check the conditional requirements.
-  SmallVector<const void *, 8> conditionalArgs;
+  llvm::SmallVector<const void *, 8> conditionalArgs;
   if (hasConditionalRequirements()) {
     SubstGenericParametersFromMetadata substitutions(type);
     bool failed =
@@ -196,11 +191,10 @@ namespace {
   };
 
   struct ConformanceCacheKey {
-    /// Either a Metadata* or a NominalTypeDescriptor*.
-    const void *Type;
+    const Metadata *Type;
     const ProtocolDescriptor *Proto;
 
-    ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto)
+    ConformanceCacheKey(const Metadata *type, const ProtocolDescriptor *proto)
         : Type(type), Proto(proto) {
       assert(type);
     }
@@ -208,7 +202,7 @@ namespace {
 
   struct ConformanceCacheEntry {
   private:
-    const void *Type; 
+    const Metadata *Type; 
     const ProtocolDescriptor *Proto;
     std::atomic<const ProtocolConformanceDescriptor *> Description;
     std::atomic<size_t> FailureGeneration;
@@ -272,7 +266,7 @@ struct ConformanceState {
     initializeProtocolConformanceLookup();
   }
 
-  void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
+  void cacheSuccess(const Metadata *type, const ProtocolDescriptor *proto,
                     const ProtocolConformanceDescriptor *description) {
     auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
                                     description, 0);
@@ -283,7 +277,7 @@ struct ConformanceState {
     }
   }
 
-  void cacheFailure(const void *type, const ProtocolDescriptor *proto,
+  void cacheFailure(const Metadata *type, const ProtocolDescriptor *proto,
                     size_t failureGeneration) {
     auto result =
       Cache.getOrInsert(ConformanceCacheKey(type, proto),
@@ -296,13 +290,13 @@ struct ConformanceState {
     }
   }
 
-  ConformanceCacheEntry *findCached(const void *type,
+  ConformanceCacheEntry *findCached(const Metadata *type,
                                     const ProtocolDescriptor *proto) {
     return Cache.find(ConformanceCacheKey(type, proto));
   }
 
 #ifndef NDEBUG
-  void verify() const LLVM_ATTRIBUTE_USED;
+  void verify() const SWIFT_USED;
 #endif
 };
 
@@ -320,6 +314,9 @@ void ConformanceState::verify() const {
 #endif
 
 static Lazy<ConformanceState> Conformances;
+
+const void * const swift::_swift_debug_protocolConformanceStatePointer =
+  &Conformances;
 
 static void
 _registerProtocolConformances(ConformanceState &C,
@@ -391,15 +388,6 @@ struct ConformanceCacheResult {
   }
 };
 
-/// Retrieve the type key from the given metadata, to be used when looking
-/// into the conformance cache.
-static const void *getConformanceCacheTypeKey(const Metadata *type) {
-  if (auto description = type->getTypeContextDescriptor())
-    return description;
-
-  return type;
-}
-
 /// Search for a conformance descriptor in the ConformanceCache.
 static
 ConformanceCacheResult
@@ -445,22 +433,6 @@ recur:
 
       // Negative cache entry is out-of-date.
       // Continue searching for a better result.
-    }
-  }
-
-  {
-    // For generic and resilient types, nondependent conformances
-    // are keyed by the nominal type descriptor rather than the
-    // metadata, so try that.
-    auto typeKey = getConformanceCacheTypeKey(type);
-
-    // Hash and lookup the type-protocol pair in the cache.
-    if (auto *Value = C.findCached(typeKey, protocol)) {
-      if (Value->isSuccessful())
-        return ConformanceCacheResult::cachedSuccess(Value->getDescription());
-
-      // We don't try to cache negative responses for generic
-      // patterns.
     }
   }
 
@@ -604,7 +576,7 @@ swift_conformsToSwiftProtocolImpl(const Metadata * const type,
   }
 
   // Really scan conformance records.
-  for (size_t i = startIndex; i < endIndex; i++) {
+  for (size_t i = startIndex; i < endIndex; ++i) {
     auto &section = snapshot.Start[i];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
@@ -798,7 +770,7 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
 
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                      SmallVectorImpl<const void *> &extraArguments,
+                      llvm::SmallVectorImpl<const void *> &extraArguments,
                       SubstGenericParameterFn substGenericParam,
                       SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {

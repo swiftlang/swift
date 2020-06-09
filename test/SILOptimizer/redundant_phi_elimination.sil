@@ -5,6 +5,8 @@ sil_stage canonical
 import Builtin
 import Swift
 
+class X {}
+
 // CHECK-LABEL: sil @test_simple
 // CHECK: bb1:
 // CHECK:   br bb3(%0 : $Builtin.Int64)
@@ -153,3 +155,21 @@ bb3:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @test_allocation_inst
+// CHECK:   alloc_ref
+// CHECK:   alloc_ref
+// CHECK: bb1([[ARG1:%[0-9]+]] : $X, [[ARG2:%[0-9]+]] : $X):
+// CHECK:   tuple ([[ARG1]] : $X, [[ARG2]] : $X)
+// CHECK: } // end sil function 'test_allocation_inst'
+sil @test_allocation_inst : $@convention(thin) () -> (X, X) {
+bb0:
+  %1 = alloc_ref $X
+  %2 = alloc_ref $X
+  br bb1(%1 : $X, %2 : $X)
+
+bb1(%3 : $X, %4 : $X):
+  %r = tuple (%3 : $X, %4 : $X)
+  return %r : $(X, X)
+}
+

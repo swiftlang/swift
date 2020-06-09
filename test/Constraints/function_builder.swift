@@ -6,6 +6,10 @@ enum Either<T,U> {
   case second(U)
 }
 
+struct Do<T> {
+  var value: T
+}
+
 @_functionBuilder
 struct TupleBuilder {
   static func buildBlock<T1>(_ t1: T1) -> (T1) {
@@ -32,7 +36,19 @@ struct TupleBuilder {
     return (t1, t2, t3, t4, t5)
   }
 
-  static func buildDo<T>(_ value: T) -> T { return value }
+  static func buildDo<T1>(_ t1: T1) -> Do<(T1)> {
+    .init(value: t1)
+  }
+
+  static func buildDo<T1, T2>(_ t1: T1, _ t2: T2) -> Do<(T1, T2)> {
+    .init(value: (t1, t2))
+  }
+  
+  static func buildDo<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
+      -> Do<(T1, T2, T3)> {
+    .init(value: (t1, t2, t3))
+  }
+
   static func buildIf<T>(_ value: T?) -> T? { return value }
 
   static func buildEither<T,U>(first value: T) -> Either<T,U> {
@@ -41,13 +57,15 @@ struct TupleBuilder {
   static func buildEither<T,U>(second value: U) -> Either<T,U> {
     return .second(value)
   }
+
+  static func buildArray<T>(_ array: [T]) -> [T] { return array }
 }
 
 func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
   print(body(cond))
 }
 
-// CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6), Optional((2.71828, ["if", "stmt"])))
+// CHECK: (17, 3.14159, "Hello, DSL", main.Do<(Swift.Array<Swift.String>, Swift.Int)>(value: (["nested", "do"], 6)), Optional((2.71828, ["if", "stmt"])))
 let name = "dsl"
 tuplify(true) {
   17
@@ -664,3 +682,26 @@ tuplifyWithOpt(true) { c in
   "1"
   3.14159
 }
+
+// Test for-each loops with buildArray.
+// CHECK: testForEach
+// CHECK-SAME: (1, "separator")
+// CHECK-SAME: (2, "separator")
+// CHECK-SAME: (3, "separator")
+// CHECK-SAME: (4, "separator")
+// CHECK-SAME: (5, "separator")
+// CHECK-SAME: (6, "separator")
+// CHECK-SAME: (7, "separator")
+// CHECK-SAME: (8, "separator")
+// CHECK-SAME: (9, "separator")
+// CHECK-SAME: (10, "separator")
+tuplify(true) { c in
+  "testForEach"
+  for i in 0 ..< (c ? 10 : 5) {
+    i + 1
+    "separator"
+  }
+}
+
+
+

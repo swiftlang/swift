@@ -98,13 +98,13 @@ class BadConformingClass1 : ProtoRefinesClass {
   // expected-error@-1 {{'ProtoRefinesClass' requires that 'BadConformingClass1' inherit from 'Generic<Int>'}}
   // expected-note@-2 {{requirement specified as 'Self' : 'Generic<Int>' [with Self = BadConformingClass1]}}
   func requirementUsesClassTypes(_: ConcreteAlias, _: GenericAlias) {
-    // expected-error@-1 {{use of undeclared type 'ConcreteAlias'}}
-    // expected-error@-2 {{use of undeclared type 'GenericAlias'}}
+    // expected-error@-1 {{cannot find type 'ConcreteAlias' in scope}}
+    // expected-error@-2 {{cannot find type 'GenericAlias' in scope}}
 
     _ = ConcreteAlias.self
-    // expected-error@-1 {{use of unresolved identifier 'ConcreteAlias'}}
+    // expected-error@-1 {{cannot find 'ConcreteAlias' in scope}}
     _ = GenericAlias.self
-    // expected-error@-1 {{use of unresolved identifier 'GenericAlias'}}
+    // expected-error@-1 {{cannot find 'GenericAlias' in scope}}
   }
 }
 

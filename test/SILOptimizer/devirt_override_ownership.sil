@@ -70,9 +70,9 @@ sil_vtable Hash {
 sil_vtable MD5 {
   // vtable should be keyed with the least-derived method, otherwise
   // devirtualizer will choose the wrong function ref.
-  #Hash.hash: @_TFC4test3MD54hashfS0_FT3MsgVs5UInt8_T_
+  #Hash.hash: @_TFC4test3MD54hashfS0_FT3MsgVs5UInt8_T_ [override]
   #MD5.init!initializer: @_TFC4test3MD5cfMS0_FT_S0_
-  #Hash.update: @_TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_
+  #Hash.update: @_TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_ [override]
 }
 
 class C {
@@ -129,9 +129,9 @@ sil_vtable C {
 }
 
 sil_vtable D {
-  #C.doIt: @_TFC1b1D4doItfS0_FT_T_
+  #C.doIt: @_TFC1b1D4doItfS0_FT_T_ [override]
 }
 
 sil_vtable E {
-  #C.doIt: @_TFC1b1E4doItfS0_FT_T_
+  #C.doIt: @_TFC1b1E4doItfS0_FT_T_ [override]
 }

@@ -34,18 +34,43 @@ public:
     return true;
   }
 };
+
+// If any (re)declaration of `decl` contains executable code, returns that
+// redeclaration; otherwise, returns nullptr.
+// In the case of a function, executable code is contained in the function
+// definition. In the case of a variable, executable code can be contained in
+// the initializer of the variable.
+clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
+  if (auto fd = dyn_cast<clang::FunctionDecl>(decl)) {
+    const clang::FunctionDecl *definition;
+    if (fd->hasBody(definition)) {
+      return const_cast<clang::FunctionDecl *>(definition);
+    }
+  } else if (auto vd = dyn_cast<clang::VarDecl>(decl)) {
+    clang::VarDecl *initializingDecl = vd->getInitializingDeclaration();
+    if (initializingDecl) {
+      return initializingDecl;
+    }
+  }
+
+  return nullptr;
+}
+
 } // end anonymous namespace
 
 void IRGenModule::emitClangDecl(const clang::Decl *decl) {
-  auto valueDecl = dyn_cast<clang::ValueDecl>(decl);
-  if (!valueDecl || valueDecl->isExternallyVisible()) {
+  // Ignore this decl if we've seen it before.
+  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
+    return;
+
+  // Fast path for the case where `decl` doesn't contain executable code, so it
+  // can't reference any other declarations that we would need to emit.
+  if (getDeclWithExecutableCode(const_cast<clang::Decl *>(decl)) == nullptr) {
     ClangCodeGen->HandleTopLevelDecl(
                           clang::DeclGroupRef(const_cast<clang::Decl*>(decl)));
     return;
   }
 
-  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
-    return;
   SmallVector<const clang::Decl *, 8> stack;
   stack.push_back(decl);
 
@@ -69,12 +94,9 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
 
   while (!stack.empty()) {
     auto *next = const_cast<clang::Decl *>(stack.pop_back_val());
-    if (auto fn = dyn_cast<clang::FunctionDecl>(next)) {
-      const clang::FunctionDecl *definition;
-      if (fn->hasBody(definition)) {
-        refFinder.TraverseDecl(const_cast<clang::FunctionDecl *>(definition));
-        next = const_cast<clang::FunctionDecl *>(definition);
-      }
+    if (clang::Decl *executableDecl = getDeclWithExecutableCode(next)) {
+        refFinder.TraverseDecl(executableDecl);
+        next = executableDecl;
     }
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
@@ -91,6 +113,17 @@ IRGenModule::getAddrOfClangGlobalDecl(clang::GlobalDecl global,
 }
 
 void IRGenModule::finalizeClangCodeGen() {
+  // Ensure that code is emitted for any `PragmaCommentDecl`s. (These are
+  // always guaranteed to be directly below the TranslationUnitDecl.)
+  // In Clang, this happens automatically during the Sema phase, but here we
+  // need to take care of it manually because our Clang CodeGenerator is not
+  // attached to Clang Sema as an ASTConsumer.
+  for (const auto *D : ClangASTContext->getTranslationUnitDecl()->decls()) {
+    if (const auto *PCD = dyn_cast<clang::PragmaCommentDecl>(D)) {
+      emitClangDecl(PCD);
+    }
+  }
+
   ClangCodeGen->HandleTranslationUnit(
       *const_cast<clang::ASTContext *>(ClangASTContext));
 }

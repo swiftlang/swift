@@ -29,15 +29,15 @@ markUsed(accessibility.b)
 markUsed(accessibility.c) // expected-error {{module 'accessibility' has no member named 'c'}}
 
 markUsed(x)
-markUsed(y) // expected-error {{use of unresolved identifier 'y'}}
-markUsed(z) // expected-error {{use of unresolved identifier 'z'}}
+markUsed(y) // expected-error {{cannot find 'y' in scope}}
+markUsed(z) // expected-error {{cannot find 'z' in scope}}
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
-// TESTABLE: :[[@LINE-3]]:10: error: use of unresolved identifier 'z'
+// TESTABLE: :[[@LINE-3]]:10: error: cannot find 'z' in scope
 
 markUsed(a)
 markUsed(b)
-markUsed(c) // expected-error {{use of unresolved identifier 'c'}}
+markUsed(c) // expected-error {{cannot find 'c' in scope}}
 
 Foo.x()
 Foo.y() // expected-error {{'y' is inaccessible due to 'internal' protection level}}
@@ -161,9 +161,9 @@ internal struct FooImpl: Fooable, HasDefaultImplementation {} // expected-error 
 public struct PublicFooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'PublicFooImpl' does not conform to protocol 'Fooable'}}
 // TESTABLE-NOT: method 'foo()'
 
-internal class TestableSub: InternalBase {} // expected-error {{undeclared type 'InternalBase'}}
-public class TestablePublicSub: InternalBase {} // expected-error {{undeclared type 'InternalBase'}}
-// TESTABLE-NOT: undeclared type 'InternalBase'
+internal class TestableSub: InternalBase {} // expected-error {{cannot find type 'InternalBase' in scope}}
+public class TestablePublicSub: InternalBase {} // expected-error {{cannot find type 'InternalBase' in scope}}
+// TESTABLE-NOT: cannot find type 'InternalBase' in scope
 #endif
 
 // FIXME: Remove -verify-ignore-unknown.

@@ -388,6 +388,22 @@ extension String {
 }
 
 extension String {
+  // This force type-casts element to UInt8, since we cannot currently
+  // communicate to the type checker that we proved this with our dynamic
+  // check in String(decoding:as:).
+  @_alwaysEmitIntoClient
+  @inline(never) // slow-path
+  private static func _fromNonContiguousUnsafeBitcastUTF8Repairing<
+    C: Collection
+  >(_ input: C) -> (result: String, repairsMade: Bool) {
+    _internalInvariant(C.Element.self == UInt8.self)
+    return Array(input).withUnsafeBufferPointer {
+      let raw = UnsafeRawBufferPointer($0)
+      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self))
+    }
+  }
+
+
   /// Creates a string from the given Unicode code units in the specified
   /// encoding.
   ///
@@ -407,8 +423,27 @@ extension String {
       return
     }
 
+    // Fast path for user-defined Collections and typed contiguous collections.
+    //
+    // Note: this comes first, as the optimizer nearly always has insight into
+    // wCSIA, but cannot prove that a type does not have conformance to
+    // _HasContiguousBytes.
+    if let str = codeUnits.withContiguousStorageIfAvailable({
+      (buffer: UnsafeBufferPointer<C.Element>) -> String in
+      Builtin.onFastPath() // encourage SIL Optimizer to inline this closure :-(
+      let rawBufPtr = UnsafeRawBufferPointer(buffer)
+      return String._fromUTF8Repairing(
+        UnsafeBufferPointer(
+          start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+          count: rawBufPtr.count)).0
+    }) {
+      self = str
+      return
+    }
+
+    // Fast path for untyped raw storage and known stdlib types
     if let contigBytes = codeUnits as? _HasContiguousBytes,
-       contigBytes._providesContiguousBytesNoCopy
+      contigBytes._providesContiguousBytesNoCopy
     {
       self = contigBytes.withUnsafeBytes { rawBufPtr in
         return String._fromUTF8Repairing(
@@ -419,15 +454,9 @@ extension String {
       return
     }
 
-    // Just copying to an Array is significantly faster than performing
-    // generic operations
-    self = Array(codeUnits).withUnsafeBufferPointer {
-      let raw = UnsafeRawBufferPointer($0)
-      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self)).0
-    }
-    return
+    self = String._fromNonContiguousUnsafeBitcastUTF8Repairing(codeUnits).0
   }
-  
+
   /// Creates a new string with the specified capacity in UTF-8 code units, and
   /// then calls the given closure with a buffer covering the string's
   /// uninitialized memory.
@@ -484,7 +513,7 @@ extension String {
       initializingUTF8With: initializer
     )
   }
-  
+
   @inline(__always)
   internal init(
     _uninitializedCapacity capacity: Int,
@@ -503,7 +532,7 @@ extension String {
       }
       return
     }
-    
+
     self = try String._fromLargeUTF8Repairing(
       uninitializedCapacity: capacity,
       initializingWith: initializer)
@@ -809,31 +838,32 @@ extension String {
     // make UTF-16 array beforehand
     let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
       (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
-      var result = Array<UInt16>(repeating: 0, count: uChars.count)
-      let len = result.withUnsafeMutableBufferPointer {
-        (output) -> Int in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        return Int(truncatingIfNeeded:
+      var length: Int = 0
+      let result = Array<UInt16>(unsafeUninitializedCapacity: uChars.count) {
+        buffer, initializedCount in
+        var error = __swift_stdlib_U_ZERO_ERROR
+        length = Int(truncatingIfNeeded:
           __swift_stdlib_u_strToLower(
-            output.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(output.count),
+            buffer.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(buffer.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
             "",
-            &err))
+            &error))
+        initializedCount = min(length, uChars.count)
       }
-      if len > uChars.count {
-        var err = __swift_stdlib_U_ZERO_ERROR
-        result = Array<UInt16>(repeating: 0, count: len)
-        result.withUnsafeMutableBufferPointer {
-          output -> Void in
+      if length > uChars.count {
+        var error = __swift_stdlib_U_ZERO_ERROR
+        return Array<UInt16>(unsafeUninitializedCapacity: length) {
+          buffer, initializedCount in
           __swift_stdlib_u_strToLower(
-            output.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(output.count),
+            buffer.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(buffer.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
             "",
-            &err)
+            &error)
+          initializedCount = length
         }
       }
       return result
@@ -869,31 +899,32 @@ extension String {
     // make UTF-16 array beforehand
     let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
       (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
-      var result = Array<UInt16>(repeating: 0, count: uChars.count)
-      let len = result.withUnsafeMutableBufferPointer {
-        (output) -> Int in
+      var length: Int = 0
+      let result = Array<UInt16>(unsafeUninitializedCapacity: uChars.count) {
+        buffer, initializedCount in
         var err = __swift_stdlib_U_ZERO_ERROR
-        return Int(truncatingIfNeeded:
+        length = Int(truncatingIfNeeded:
           __swift_stdlib_u_strToUpper(
-            output.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(output.count),
+            buffer.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(buffer.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
             "",
             &err))
+        initializedCount = min(length, uChars.count)
       }
-      if len > uChars.count {
+      if length > uChars.count {
         var err = __swift_stdlib_U_ZERO_ERROR
-        result = Array<UInt16>(repeating: 0, count: len)
-        result.withUnsafeMutableBufferPointer {
-          output -> Void in
+        return Array<UInt16>(unsafeUninitializedCapacity: length) {
+          buffer, initializedCount in
           __swift_stdlib_u_strToUpper(
-            output.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(output.count),
+            buffer.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(buffer.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
             "",
             &err)
+          initializedCount = length
         }
       }
       return result
@@ -968,12 +999,12 @@ extension _StringGutsSlice {
     var outputBuffer = outputBuffer
     var icuInputBuffer = icuInputBuffer
     var icuOutputBuffer = icuOutputBuffer
-  
+
     var index = range.lowerBound
     let cachedEndIndex = range.upperBound
-  
+
     var hasBufferOwnership = false
-    
+
     defer {
       if hasBufferOwnership {
         outputBuffer.deallocate()
@@ -981,7 +1012,7 @@ extension _StringGutsSlice {
         icuOutputBuffer.deallocate()
       }
     }
-    
+
     while index < cachedEndIndex {
       let result = _foreignNormalize(
         readIndex: index,
@@ -1017,9 +1048,9 @@ internal func _fastWithNormalizedCodeUnitsImpl(
 
   var index = String.Index(_encodedOffset: 0)
   let cachedEndIndex = String.Index(_encodedOffset: sourceBuffer.count)
-  
+
   var hasBufferOwnership = false
-  
+
   defer {
     if hasBufferOwnership {
       outputBuffer.deallocate()
@@ -1027,7 +1058,7 @@ internal func _fastWithNormalizedCodeUnitsImpl(
       icuOutputBuffer.deallocate()
     }
   }
-  
+
   while index < cachedEndIndex {
     let result = _fastNormalize(
       readIndex: index,

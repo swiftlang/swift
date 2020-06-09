@@ -19,6 +19,7 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/Syntax/SyntaxNodes.h"
 
 namespace swift {
 
@@ -81,10 +82,17 @@ public:
   void cacheResult(BraceStmt *value) const;
 };
 
+struct SourceFileParsingResult {
+  ArrayRef<Decl *> TopLevelDecls;
+  Optional<ArrayRef<Token>> CollectedTokens;
+  Optional<llvm::MD5> InterfaceHash;
+  Optional<syntax::SourceFileSyntax> SyntaxRoot;
+};
+
 /// Parse the top-level decls of a SourceFile.
 class ParseSourceFileRequest
     : public SimpleRequest<
-          ParseSourceFileRequest, ArrayRef<Decl *>(SourceFile *),
+          ParseSourceFileRequest, SourceFileParsingResult(SourceFile *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -93,16 +101,17 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Decl *> evaluate(Evaluator &evaluator, SourceFile *SF) const;
+  SourceFileParsingResult evaluate(Evaluator &evaluator, SourceFile *SF) const;
 
 public:
   // Caching.
   bool isCached() const { return true; }
-  Optional<ArrayRef<Decl *>> getCachedResult() const;
-  void cacheResult(ArrayRef<Decl *> decls) const;
+  Optional<SourceFileParsingResult> getCachedResult() const;
+  void cacheResult(SourceFileParsingResult result) const;
 
 public:
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 void simple_display(llvm::raw_ostream &out,
@@ -123,7 +132,8 @@ private:
                 CodeCompletionCallbacksFactory *Factory) const;
 
 public:
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// The zone number for the parser.

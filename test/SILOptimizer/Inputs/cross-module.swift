@@ -162,6 +162,25 @@ public class FooClass: PrivateProto {
   }
 }
 
+final class Internalclass {
+  public var publicint: Int = 27
+}
+
+final public class Outercl {
+  var ic: Internalclass = Internalclass()
+}
+
+@inline(never)
+public func classWithPublicProperty<T>(_ t: T) -> Int {
+  return createInternal().ic.publicint
+}
+
+@inline(never)
+func createInternal() -> Outercl {
+  return Outercl()
+}
+
+
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
 fileprivate func callProtocolFoo<T: PrivateProto>(_ t: T) {

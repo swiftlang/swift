@@ -6,7 +6,7 @@
 // marker is also represented in escape sequence.
 
 // RUN: cat %s | sed -f %S/Inputs/invalid.sed > %t
-// RUN: %{python} -c "import sys; t = open(sys.argv[1], 'rb').read().replace('\r\n', '\n'); open(sys.argv[1], 'wb').write(t)" %t
+// RUN: %{python} -c "import sys; t = open(sys.argv[1], 'rb').read().replace(b'\r\n', b'\n'); open(sys.argv[1], 'wb').write(t)" %t
 // RUN: %swift-syntax-test -input-source-filename %t -dump-full-tokens 2>&1 | %FileCheck %t
 // RUN: %round-trip-syntax-test --swift-syntax-test %swift-syntax-test --file %t
 

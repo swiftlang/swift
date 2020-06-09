@@ -147,7 +147,7 @@ enum class SubstFlags {
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x02,
   /// Substitute types involving opaque type archetypes.
-  SubstituteOpaqueArchetypes = 0x04,
+  SubstituteOpaqueArchetypes = 0x04
 };
 
 /// Options for performing substitutions into a type.
@@ -381,11 +381,12 @@ SourceLoc extractNearestSourceLoc(Type ty);
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
+  static bool isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
                                   bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
+  static bool isTypeErasedGenericClassTypeImpl(CanType type);
   static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
@@ -433,7 +434,7 @@ public:
   ///   - existentials with class or class protocol bounds
   /// But not:
   ///   - function types
-  bool allowsOwnership(GenericSignatureImpl *sig) const {
+  bool allowsOwnership(const GenericSignatureImpl *sig) const {
     return isReferenceTypeImpl(*this, sig,
                                /*functions count*/ false);
   }
@@ -470,6 +471,11 @@ public:
   /// Is this an ObjC-compatible existential type?
   bool isObjCExistentialType() const {
     return isObjCExistentialTypeImpl(*this);
+  }
+
+  // Is this an ObjC generic class.
+  bool isTypeErasedGenericClassType() const {
+    return isTypeErasedGenericClassTypeImpl(*this);
   }
 
   ClassDecl *getClassOrBoundGenericClass() const; // in Types.h

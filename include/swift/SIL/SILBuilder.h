@@ -1031,9 +1031,9 @@ public:
   createUncheckedRefCastAddr(SILLocation Loc,
                              SILValue src, CanType sourceFormalType,
                              SILValue dest, CanType targetFormalType) {
-    return insert(new (getModule()) UncheckedRefCastAddrInst(
+    return insert(UncheckedRefCastAddrInst::create(
         getSILDebugLocation(Loc), src, sourceFormalType,
-        dest, targetFormalType));
+        dest, targetFormalType, getFunction(), C.OpenedArchetypes));
   }
 
   UncheckedAddrCastInst *createUncheckedAddrCast(SILLocation Loc, SILValue Op,
@@ -1152,9 +1152,9 @@ public:
   createUnconditionalCheckedCastAddr(SILLocation Loc,
                                      SILValue src, CanType sourceFormalType,
                                      SILValue dest, CanType targetFormalType) {
-    return insert(new (getModule()) UnconditionalCheckedCastAddrInst(
+    return insert(UnconditionalCheckedCastAddrInst::create(
         getSILDebugLocation(Loc), src, sourceFormalType,
-        dest, targetFormalType));
+        dest, targetFormalType, getFunction(), C.OpenedArchetypes));
   }
 
   UnconditionalCheckedCastValueInst *
@@ -1422,9 +1422,10 @@ public:
   }
 
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
-                                           VarDecl *Field, SILType ResultTy) {
+                                           VarDecl *Field, SILType ResultTy,
+                                           bool IsImmutable = false) {
     return insert(new (getModule()) RefElementAddrInst(
-        getSILDebugLocation(Loc), Operand, Field, ResultTy));
+        getSILDebugLocation(Loc), Operand, Field, ResultTy, IsImmutable));
   }
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
                                            VarDecl *Field) {
@@ -1434,9 +1435,10 @@ public:
   }
 
   RefTailAddrInst *createRefTailAddr(SILLocation Loc, SILValue Ref,
-                                     SILType ResultTy) {
+                                     SILType ResultTy,
+                                     bool IsImmutable = false) {
     return insert(new (getModule()) RefTailAddrInst(getSILDebugLocation(Loc),
-                                                      Ref, ResultTy));
+                                                  Ref, ResultTy, IsImmutable));
   }
 
   DestructureStructInst *createDestructureStruct(SILLocation Loc,
@@ -1722,6 +1724,17 @@ public:
     return insert(new (getModule()) IsUniqueInst(getSILDebugLocation(Loc),
                                                    operand, Int1Ty));
   }
+  BeginCOWMutationInst *createBeginCOWMutation(SILLocation Loc,
+                                    SILValue operand, bool isNative) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(BeginCOWMutationInst::create(getSILDebugLocation(Loc), operand,
+                                        Int1Ty, getFunction(), isNative));
+  }
+  EndCOWMutationInst *createEndCOWMutation(SILLocation Loc, SILValue operand,
+                                           bool keepUnique = false) {
+    return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
+                                                  operand, keepUnique));
+  }
   IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
                                                  SILValue operand,
                                                  unsigned VerificationType) {
@@ -1989,9 +2002,10 @@ public:
                               SILBasicBlock *failureBB,
                               ProfileCounter Target1Count = ProfileCounter(),
                               ProfileCounter Target2Count = ProfileCounter()) {
-    return insertTerminator(new (getModule()) CheckedCastAddrBranchInst(
+    return insertTerminator(CheckedCastAddrBranchInst::create(
         getSILDebugLocation(Loc), consumption, src, sourceFormalType, dest,
-        targetFormalType, successBB, failureBB, Target1Count, Target2Count));
+        targetFormalType, successBB, failureBB, Target1Count, Target2Count,
+        getFunction(), C.OpenedArchetypes));
   }
 
   //===--------------------------------------------------------------------===//
@@ -2165,10 +2179,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   DifferentiableFunctionInst *createDifferentiableFunction(
-      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      SILLocation Loc, IndexSubset *ParameterIndices,
+      IndexSubset *ResultIndices, SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     return insert(DifferentiableFunctionInst::create(
-        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        getModule(), getSILDebugLocation(Loc), ParameterIndices, ResultIndices,
         OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
   }
 

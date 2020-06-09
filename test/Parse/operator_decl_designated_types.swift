@@ -30,18 +30,18 @@ infix operator **>> : UndeclaredPrecedence
 // expected-error@-1 {{unknown precedence group 'UndeclaredPrecedence'}}
 
 infix operator **+> : MediumPrecedence, UndeclaredProtocol
-// expected-error@-1 {{use of undeclared type 'UndeclaredProtocol'}}
+// expected-error@-1 {{cannot find type 'UndeclaredProtocol' in scope}}
 
 prefix operator *+*> : MediumPrecedence
-// expected-error@-1 {{use of undeclared type 'MediumPrecedence'}}
+// expected-error@-1 {{cannot find type 'MediumPrecedence' in scope}}
 
 postfix operator ++*> : MediumPrecedence
-// expected-error@-1 {{use of undeclared type 'MediumPrecedence'}}
+// expected-error@-1 {{cannot find type 'MediumPrecedence' in scope}}
 
 prefix operator *++> : UndeclaredProtocol
-// expected-error@-1 {{use of undeclared type 'UndeclaredProtocol'}}
+// expected-error@-1 {{cannot find type 'UndeclaredProtocol' in scope}}
 postfix operator +*+> : UndeclaredProtocol
-// expected-error@-1 {{use of undeclared type 'UndeclaredProtocol'}}
+// expected-error@-1 {{cannot find type 'UndeclaredProtocol' in scope}}
 
 struct Struct {}
 class Class {}
@@ -65,9 +65,9 @@ infix operator ^%*%% : Struct, Class
 prefix operator %^*^^ : Struct, Class
 postfix operator ^^*^% : Struct, Class
 prefix operator %%*^^ : LowPrecedence, Class
-// expected-error@-1{{use of undeclared type 'LowPrecedence'}}
+// expected-error@-1{{cannot find type 'LowPrecedence' in scope}}
 postfix operator ^^*%% : MediumPrecedence, Class
-// expected-error@-1{{use of undeclared type 'MediumPrecedence'}}
+// expected-error@-1{{cannot find type 'MediumPrecedence' in scope}}
 
 // expected-error@+1 {{trailing comma in operator declaration}}
 infix operator <*<>*> : AdditionPrecedence,

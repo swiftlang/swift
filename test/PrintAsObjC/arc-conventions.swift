@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -c %s -parse-as-library -force-single-frontend-invocation -o %t/swift.o -emit-objc-header-path %t/swift.h
+// RUN: %target-build-swift -c %s -parse-as-library -whole-module-optimization -o %t/swift.o -emit-objc-header-path %t/swift.h
 
 // RUN: %clang -c %target-cc-options -isysroot %sdk -Weverything -Werror -Wno-unused-macros -Wno-incomplete-module -fobjc-arc -fmodules %S/Inputs/arc-conventions.m -o %t/main.o -I %t
 // RUN: %target-build-swift %t/swift.o %t/main.o -o %t/main

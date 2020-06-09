@@ -25,11 +25,11 @@ import ucrt
 extension Collection {
   internal func index(_nth n: Int) -> Index {
     precondition(n >= 0)
-    return index(startIndex, offsetBy: numericCast(n))
+    return index(startIndex, offsetBy: n)
   }
   internal func index(_nthLast n: Int) -> Index {
     precondition(n >= 0)
-    return index(endIndex, offsetBy: -numericCast(n))
+    return index(endIndex, offsetBy: -n)
   }
 }
 

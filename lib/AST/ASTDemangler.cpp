@@ -304,7 +304,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   auto *aliasDecl = cast<TypeAliasDecl>(decl);
 
   auto genericSig = aliasDecl->getGenericSignature();
-  for (unsigned i = 0, e = args.size(); i < e; i++) {
+  for (unsigned i = 0, e = args.size(); i < e; ++i) {
     auto origTy = genericSig->getInnermostGenericParams()[i];
     auto substTy = args[i];
 
@@ -444,6 +444,17 @@ getParameterConvention(ImplParameterConvention conv) {
   llvm_unreachable("covered switch");
 }
 
+static SILParameterDifferentiability
+getParameterDifferentiability(ImplParameterDifferentiability diffKind) {
+  switch (diffKind) {
+  case ImplParameterDifferentiability::DifferentiableOrNotApplicable:
+    return SILParameterDifferentiability::DifferentiableOrNotApplicable;
+  case ImplParameterDifferentiability::NotDifferentiable:
+    return SILParameterDifferentiability::NotDifferentiable;
+  }
+  llvm_unreachable("unknown differentiability kind");
+}
+
 static ResultConvention getResultConvention(ImplResultConvention conv) {
   switch (conv) {
   case Demangle::ImplResultConvention::Indirect:
@@ -458,6 +469,17 @@ static ResultConvention getResultConvention(ImplResultConvention conv) {
     return ResultConvention::Autoreleased;
   }
   llvm_unreachable("covered switch");
+}
+
+static SILResultDifferentiability
+getResultDifferentiability(ImplResultDifferentiability diffKind) {
+  switch (diffKind) {
+  case ImplResultDifferentiability::DifferentiableOrNotApplicable:
+    return SILResultDifferentiability::DifferentiableOrNotApplicable;
+  case ImplResultDifferentiability::NotDifferentiable:
+    return SILResultDifferentiability::NotDifferentiable;
+  }
+  llvm_unreachable("unknown differentiability kind");
 }
 
 Type ASTBuilder::createImplFunctionType(
@@ -526,13 +548,15 @@ Type ASTBuilder::createImplFunctionType(
   for (const auto &param : params) {
     auto type = param.getType()->getCanonicalType();
     auto conv = getParameterConvention(param.getConvention());
-    funcParams.emplace_back(type, conv);
+    auto diffKind = getParameterDifferentiability(param.getDifferentiability());
+    funcParams.emplace_back(type, conv, diffKind);
   }
 
   for (const auto &result : results) {
     auto type = result.getType()->getCanonicalType();
     auto conv = getResultConvention(result.getConvention());
-    funcResults.emplace_back(type, conv);
+    auto diffKind = getResultDifferentiability(result.getDifferentiability());
+    funcResults.emplace_back(type, conv, diffKind);
   }
 
   if (errorResult) {
@@ -597,20 +621,35 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base) {
-  if (!base->isTypeParameter())
-    return Type();
+  auto identifier = Ctx.getIdentifier(member);
 
-  return DependentMemberType::get(base, Ctx.getIdentifier(member));
+  if (auto *archetype = base->getAs<ArchetypeType>()) {
+    if (archetype->hasNestedType(identifier))
+      return archetype->getNestedType(identifier);
+
+  }
+
+  if (base->isTypeParameter()) {
+    return DependentMemberType::get(base, identifier);
+  }
+
+  return Type();
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base,
                                            ProtocolDecl *protocol) {
-  if (!base->isTypeParameter())
-    return Type();
+  auto identifier = Ctx.getIdentifier(member);
 
-  if (auto assocType = protocol->getAssociatedType(Ctx.getIdentifier(member)))
-    return DependentMemberType::get(base, assocType);
+  if (auto *archetype = base->getAs<ArchetypeType>()) {
+    if (archetype->hasNestedType(identifier))
+      return archetype->getNestedType(identifier);
+  }
+
+  if (base->isTypeParameter()) {
+    if (auto assocType = protocol->getAssociatedType(identifier))
+      return DependentMemberType::get(base, assocType);
+  }
 
   return Type();
 }

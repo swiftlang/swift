@@ -72,14 +72,18 @@ class ARCEntryPointBuilder {
   llvm::CallingConv::ID DefaultCC;
 
   llvm::CallInst *CreateCall(Constant *Fn, Value *V) {
-    CallInst *CI = B.CreateCall(Fn, V);
+    CallInst *CI = B.CreateCall(
+        cast<llvm::FunctionType>(Fn->getType()->getPointerElementType()), Fn,
+        V);
     if (auto Fun = llvm::dyn_cast<llvm::Function>(Fn))
       CI->setCallingConv(Fun->getCallingConv());
     return CI;
   }
 
   llvm::CallInst *CreateCall(Constant *Fn, llvm::ArrayRef<Value *> Args) {
-    CallInst *CI = B.CreateCall(Fn, Args);
+    CallInst *CI = B.CreateCall(
+        cast<llvm::FunctionType>(Fn->getType()->getPointerElementType()), Fn,
+        Args);
     if (auto Fun = llvm::dyn_cast<llvm::Function>(Fn))
       CI->setCallingConv(Fun->getCallingConv());
     return CI;
