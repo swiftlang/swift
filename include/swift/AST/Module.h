@@ -391,6 +391,11 @@ public:
   /// Add a file declaring a cross-import overlay.
   void addCrossImportOverlayFile(StringRef file);
 
+  /// Collect cross-import overlay names from a given YAML file path.
+  static llvm::SmallSetVector<Identifier, 4>
+  collectCrossImportOverlay(ASTContext &ctx, StringRef file,
+                            StringRef moduleName, StringRef& bystandingModule);
+
   /// If this method returns \c false, the module does not declare any
   /// cross-import overlays.
   ///
