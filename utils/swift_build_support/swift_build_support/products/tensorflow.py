@@ -18,7 +18,6 @@ from . import libcxx
 from . import libdispatch
 from . import libicu
 from . import llbuild
-from . import lldb
 from . import llvm
 from . import product
 from . import swift
@@ -98,7 +97,6 @@ class TensorFlowSwiftAPIs(product.Product):
                 libcxx.LibCXX,
                 libicu.LibICU,
                 swift.Swift,
-                lldb.LLDB,
                 libdispatch.LibDispatch,
                 foundation.Foundation,
                 xctest.XCTest,
