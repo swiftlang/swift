@@ -11,8 +11,8 @@
 // RUN: %target-swift-frontend  -fine-grained-dependency-include-intrafile -typecheck -disable-direct-intramodule-dependencies -primary-file %t/main.swift %S/../Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
 
 // Merge each entry onto one line and sort to overcome order differences
-// RUN: %S/../../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
-// RUN: %S/../../Inputs/process_fine_grained_swiftdeps.sh <%t-2.swiftdeps >%t-2-processed.swiftdeps
+// RUN: %S/../../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.swiftdeps %t-processed.swiftdeps
+// RUN: %S/../../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t-2.swiftdeps %t-2-processed.swiftdeps
 // RUN: diff %t-processed.swiftdeps %t-2-processed.swiftdeps
 
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t-processed.swiftdeps
