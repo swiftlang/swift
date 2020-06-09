@@ -46,3 +46,7 @@ class Foundation(product.Product):
                 swift.Swift,
                 lldb.LLDB,
                 libdispatch.LibDispatch]
+
+    @classmethod
+    def is_nondarwin_only_build_product(cls):
+        return True
