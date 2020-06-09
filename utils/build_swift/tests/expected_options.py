@@ -237,6 +237,7 @@ EXPECTED_DEFAULTS = {
     'verbose_build': False,
     'watchos': False,
     'watchos_all': False,
+    'llvm_install_components': defaults.llvm_install_components(),
 }
 
 
@@ -675,4 +676,6 @@ EXPECTED_OPTIONS = [
     IgnoreOption('--ios-all'),
     IgnoreOption('--tvos-all'),
     IgnoreOption('--watchos-all'),
+
+    StrOption('--llvm-install-components'),
 ]
