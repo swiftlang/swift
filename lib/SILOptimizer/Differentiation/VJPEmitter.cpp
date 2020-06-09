@@ -842,15 +842,16 @@ bool VJPEmitter::run() {
   // `-enable-strip-ownership-after-serialization` is true.
   mergeBasicBlocks(vjp);
 
+  LLVM_DEBUG(getADDebugStream()
+             << "Generated VJP for " << original->getName() << ":\n"
+             << *vjp);
+
   // Generate pullback code.
   PullbackEmitter PullbackEmitter(*this);
   if (PullbackEmitter.run()) {
     errorOccurred = true;
     return true;
   }
-  LLVM_DEBUG(getADDebugStream()
-             << "Generated VJP for " << original->getName() << ":\n"
-             << *vjp);
   return errorOccurred;
 }
 
