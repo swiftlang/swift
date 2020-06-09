@@ -328,9 +328,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
-      SourceFile(*tmpM, oldSF->Kind, tmpBufferID, /*KeepParsedTokens=*/false,
-                 /*BuildSyntaxTree=*/false, oldSF->getParsingOptions());
-  tmpSF->enableInterfaceHash();
+      SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes
@@ -441,10 +439,9 @@ bool CompletionInstance::performCachedOperationIfPossible(
     auto &Ctx = oldM->getASTContext();
     auto *newM = ModuleDecl::createMainModule(Ctx, oldM->getName(),
                                               oldM->getImplicitImportInfo());
-    auto *newSF =
-        new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID);
+    auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
+                                       oldSF->getParsingOptions());
     newM->addFile(*newSF);
-    newSF->enableInterfaceHash();
 
     // Tell the compiler instance we've replaced the main module.
     CI.setMainModule(newM);

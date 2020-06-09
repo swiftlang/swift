@@ -1174,12 +1174,11 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
-
-  Instance->performParseOnly();
 
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();
