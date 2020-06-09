@@ -107,7 +107,6 @@ func dont_return<T>(_ argument: T) throws -> T {
 
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: debug_value
 // CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK-NEXT: end_borrow [[BORROWED_T0]]
@@ -314,7 +313,6 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH_ATE]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: debug_value
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
@@ -325,7 +323,6 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 
 //   Catch HomeworkError.CatHidIt.
 // CHECK:    [[MATCH_HID]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: debug_value
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
@@ -335,6 +332,7 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 // CHECK-NEXT: br [[EXTRACT]]([[T0_COPY]] : $Cat)
 
 // CHECK:    [[EXTRACT]]([[CAT:%.*]] : @owned $Cat):
+// CHECK-NEXT: debug_value [[CAT]] : $Cat, let, name "theCat"
 // CHECK-NEXT: [[BORROWED_CAT:%.*]] = begin_borrow [[CAT]] : $Cat
 // CHECK-NEXT: [[COPIED_CAT:%.*]] = copy_value [[BORROWED_CAT]] : $Cat
 // CHECK-NEXT: end_borrow [[BORROWED_CAT]] : $Cat
