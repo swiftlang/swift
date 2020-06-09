@@ -275,6 +275,12 @@ std::error_code SerializedModuleLoaderBase::openModuleDocFileIfPresent(
   return std::error_code();
 }
 
+std::unique_ptr<llvm::MemoryBuffer>
+SerializedModuleLoaderBase::getModuleName(ASTContext &Ctx, StringRef modulePath,
+                                          std::string &Name) {
+  return ModuleFile::getModuleName(Ctx, modulePath, Name);
+}
+
 std::error_code
 SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
     AccessPathElem ModuleID,

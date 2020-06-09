@@ -590,6 +590,8 @@ static void extendDepthMap(
    Expr *expr,
    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
   class RecordingTraversal : public ASTWalker {
+    SmallVector<ClosureExpr *, 4> Closures;
+
   public:
     llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &DepthMap;
     unsigned Depth = 0;
@@ -601,12 +603,36 @@ static void extendDepthMap(
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       DepthMap[E] = {Depth, Parent.getAsExpr()};
       ++Depth;
+
+      if (auto CE = dyn_cast<ClosureExpr>(E))
+        Closures.push_back(CE);
+
       return { true, E };
     }
 
     Expr *walkToExprPost(Expr *E) override {
+      if (auto CE = dyn_cast<ClosureExpr>(E)) {
+        assert(Closures.back() == CE);
+        Closures.pop_back();
+      }
+
       --Depth;
       return E;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      if (auto RS = dyn_cast<ReturnStmt>(S)) {
+        // For return statements, treat the parent of the return expression
+        // as the closure itself.
+        if (RS->hasResult() && !Closures.empty()) {
+          llvm::SaveAndRestore<ParentTy> SavedParent(Parent, Closures.back());
+          auto E = RS->getResult();
+          E->walk(*this);
+          return { false, S };
+        }
+      }
+
+      return { true, S };
     }
   };
 
@@ -927,6 +953,72 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
     return nullptr;
 
   return *member;
+}
+
+static Optional<std::pair<VarDecl *, Type>>
+getPropertyWrapperInformationFromOverload(
+    SelectedOverload resolvedOverload, DeclContext *DC,
+    llvm::function_ref<Optional<std::pair<VarDecl *, Type>>(VarDecl *)>
+        getInformation) {
+  if (auto *decl =
+          dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull())) {
+    if (auto declInformation = getInformation(decl)) {
+      Type type;
+      VarDecl *memberDecl;
+      std::tie(memberDecl, type) = *declInformation;
+      if (Type baseType = resolvedOverload.choice.getBaseType()) {
+        type =
+            baseType->getTypeOfMember(DC->getParentModule(), memberDecl, type);
+      }
+      return std::make_pair(decl, type);
+    }
+  }
+  return None;
+}
+
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getStorageWrapperInformation(
+    SelectedOverload resolvedOverload) {
+  return getPropertyWrapperInformationFromOverload(
+      resolvedOverload, DC,
+      [](VarDecl *decl) -> Optional<std::pair<VarDecl *, Type>> {
+        if (!decl->hasAttachedPropertyWrapper())
+          return None;
+
+        auto storageWrapper = decl->getPropertyWrapperStorageWrapper();
+        if (!storageWrapper)
+          return None;
+
+        return std::make_pair(storageWrapper,
+                              storageWrapper->getInterfaceType());
+      });
+}
+
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getPropertyWrapperInformation(
+    SelectedOverload resolvedOverload) {
+  return getPropertyWrapperInformationFromOverload(
+      resolvedOverload, DC,
+      [](VarDecl *decl) -> Optional<std::pair<VarDecl *, Type>> {
+        if (!decl->hasAttachedPropertyWrapper())
+          return None;
+
+        return std::make_pair(decl,
+                              decl->getPropertyWrapperBackingPropertyType());
+      });
+}
+
+Optional<std::pair<VarDecl *, Type>>
+ConstraintSystem::getWrappedPropertyInformation(
+    SelectedOverload resolvedOverload) {
+  return getPropertyWrapperInformationFromOverload(
+      resolvedOverload, DC,
+      [](VarDecl *decl) -> Optional<std::pair<VarDecl *, Type>> {
+        if (auto wrapped = decl->getOriginalWrappedProperty())
+          return std::make_pair(decl, wrapped->getInterfaceType());
+
+        return None;
+      });
 }
 
 /// Does a var or subscript produce an l-value?

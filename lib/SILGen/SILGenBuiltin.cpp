@@ -1237,11 +1237,14 @@ static ManagedValue emitBuiltinDifferentiableFunction(
   assert(args.size() == 3);
   auto origFn = args.front();
   auto origType = origFn.getType().castTo<SILFunctionType>();
+  auto numResults =
+      origType->getNumResults() + origType->getNumIndirectMutatingParameters();
   auto diffFn = SGF.B.createDifferentiableFunction(
       loc,
-      IndexSubset::getDefault(
-          SGF.getASTContext(), origType->getNumParameters(),
-          /*includeAll*/ true),
+      IndexSubset::getDefault(SGF.getASTContext(), origType->getNumParameters(),
+                              /*includeAll*/ true),
+      IndexSubset::getDefault(SGF.getASTContext(), numResults,
+                              /*includeAll*/ true),
       origFn.forward(SGF),
       std::make_pair(args[1].forward(SGF), args[2].forward(SGF)));
   return SGF.emitManagedRValueWithCleanup(diffFn);

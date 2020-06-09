@@ -347,13 +347,7 @@ bb0(%0 : @guaranteed $StructMemberTest):
   return %7 : $Builtin.Int32
 }
 
-// Make sure that in a case where we have multiple non-trivial values passed to
-// a forwarding instruction we do not optimize... but if we only have one (and
-// multiple trivial arguments), we can.
-//
 // CHECK-LABEL: sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
-// CHECK: copy_value
-// CHECK: copy_value
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'multiple_arg_forwarding_inst_test'
 sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
@@ -2547,4 +2541,30 @@ bb1:
 
 bb2(%39 : @owned $Klass):
   unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @struct_with_multiple_nontrivial_operands : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'struct_with_multiple_nontrivial_operands'
+sil [ossa] @struct_with_multiple_nontrivial_operands : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %1a = copy_value %1 : $Builtin.NativeObject
+  %2 = struct $NativeObjectPair(%0a : $Builtin.NativeObject, %1a : $Builtin.NativeObject)
+  destroy_value %2 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_with_multiple_nontrivial_operands : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'tuple_with_multiple_nontrivial_operands'
+sil [ossa] @tuple_with_multiple_nontrivial_operands : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %1a = copy_value %1 : $Builtin.NativeObject
+  %2 = tuple (%0a : $Builtin.NativeObject, %1a : $Builtin.NativeObject)
+  destroy_value %2 : $(Builtin.NativeObject, Builtin.NativeObject)
+  %9999 = tuple()
+  return %9999 : $()
 }

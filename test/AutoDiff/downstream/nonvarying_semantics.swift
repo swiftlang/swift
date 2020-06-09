@@ -28,7 +28,7 @@ func id(_ x: Float) -> Float {
   return Float(x.int)
 }
 
-// CHECK-LABEL: [AD] Activity info for id at (source=0 parameters=(0))
+// CHECK-LABEL: [AD] Activity info for id at (parameters=(0) results=(0))
 // CHECK: bb0:
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [USEFUL]   %2 = metatype $@thin Float.Type
@@ -43,7 +43,7 @@ func idWithoutDerivativeAt(_ x: Float) -> Float {
   return Float(withoutDerivative(at: x.int))
 }
 
-// CHECK-LABEL: [AD] Activity info for idWithoutDerivativeAt at (source=0 parameters=(0))
+// CHECK-LABEL: [AD] Activity info for idWithoutDerivativeAt at (parameters=(0) results=(0))
 // CHECK: bb0:
 // CHECK: [VARIED] %0 = argument of bb0 : $Float
 // CHECK: [USEFUL]   %2 = metatype $@thin Float.Type
@@ -63,7 +63,7 @@ func idNoDerivative(_ x: Float) -> Float {
   return Float(x.intNoDerivative)
 }
 
-// CHECK-LABEL: [AD] Activity info for idNoDerivative at (source=0 parameters=(0))
+// CHECK-LABEL: [AD] Activity info for idNoDerivative at (parameters=(0) results=(0))
 // CHECK: bb0:
 // CHECK: [VARIED] %0 = argument of bb0 : $Float
 // CHECK: [USEFUL]   %2 = metatype $@thin Float.Type
@@ -78,7 +78,7 @@ func idNonvaryingSemantics(_ x: Float) -> Float {
   return Float(x.intNonvarying)
 }
 
-// CHECK-LABEL: [AD] Activity info for idNonvaryingSemantics at (source=0 parameters=(0))
+// CHECK-LABEL: [AD] Activity info for idNonvaryingSemantics at (parameters=(0) results=(0))
 // CHECK: bb0:
 // CHECK: [VARIED] %0 = argument of bb0 : $Float
 // CHECK: [USEFUL]   %2 = metatype $@thin Float.Type

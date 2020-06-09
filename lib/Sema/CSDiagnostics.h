@@ -219,7 +219,6 @@ protected:
   }
 
   bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
-  Type isRawRepresentable(Type type, KnownProtocolKind protocol) const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -620,23 +619,6 @@ public:
 
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
-
-  /// Attempts to add fix-its for these two mistakes:
-  ///
-  /// - Passing an integer where a type conforming to RawRepresentable is
-  ///   expected, by wrapping the expression in a call to the contextual
-  ///   type's initializer
-  ///
-  /// - Passing a type conforming to RawRepresentable where an integer is
-  ///   expected, by wrapping the expression in a call to the rawValue
-  ///   accessor
-  ///
-  /// - Return true on the fixit is added, false otherwise.
-  ///
-  /// This helps migration with SDK changes.
-  bool
-  tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
-                            KnownProtocolKind rawRepresentablePrococol) const;
 
   /// Attempts to add fix-its for these two mistakes:
   ///
@@ -2100,6 +2082,85 @@ public:
   : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;
+};
+
+class AbstractRawRepresentableFailure : public FailureDiagnostic {
+protected:
+  Type RawReprType;
+  Type ExpectedType;
+
+  AbstractRawRepresentableFailure(const Solution &solution, Type rawReprType,
+                                  Type expectedType, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        RawReprType(resolveType(rawReprType)),
+        ExpectedType(resolveType(expectedType)) {}
+
+public:
+  virtual Type getFromType() const = 0;
+  virtual Type getToType() const = 0;
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+protected:
+  Optional<Diag<Type, Type>> getDiagnostic() const;
+
+  virtual void fixIt(InFlightDiagnostic &diagnostic) const = 0;
+};
+
+/// Diagnose an attempt to initialize raw representable type or convert to it
+/// a value of some other type that matches its `RawValue` type.
+///
+/// ```swift
+/// enum E : Int {
+///   case a, b, c
+/// }
+///
+/// let _: E = 0
+/// ```
+///
+/// `0` has to be wrapped into `E(rawValue: 0)` and either defaulted via `??` or
+/// force unwrapped to constitute a valid binding.
+class MissingRawRepresentableInitFailure final
+    : public AbstractRawRepresentableFailure {
+public:
+  MissingRawRepresentableInitFailure(const Solution &solution, Type rawReprType,
+                                     Type expectedType,
+                                     ConstraintLocator *locator)
+      : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
+                                        locator) {}
+
+  Type getFromType() const override { return ExpectedType; }
+  Type getToType() const override { return RawReprType; }
+
+protected:
+  void fixIt(InFlightDiagnostic &diagnostic) const override;
+};
+
+/// Diagnose an attempt to pass raw representable type where its raw value
+/// is expected instead.
+///
+/// ```swift
+/// enum E : Int {
+///   case one = 1
+/// }
+///
+/// let _: Int = E.one
+/// ```
+///
+/// `E.one` has to use `.rawValue` to match `Int` expected by pattern binding.
+class MissingRawValueFailure final : public AbstractRawRepresentableFailure {
+public:
+  MissingRawValueFailure(const Solution &solution, Type rawReprType,
+                         Type expectedType, ConstraintLocator *locator)
+      : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
+                                        locator) {}
+
+  Type getFromType() const override { return RawReprType; }
+  Type getToType() const override { return ExpectedType; }
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic) const override;
 };
 
 } // end namespace constraints

@@ -64,6 +64,17 @@ func _deallocateUninitializedArray<Element>(
   array._deallocateUninitialized()
 }
 
+@_alwaysEmitIntoClient
+@_semantics("array.finalize_intrinsic")
+@_effects(readnone)
+public // COMPILER_INTRINSIC
+func _finalizeUninitializedArray<Element>(
+  _ array: __owned Array<Element>
+) -> Array<Element> {
+  var mutableArray = array
+  mutableArray._endMutation()
+  return mutableArray
+}
 
 extension Collection {  
   // Utility method for collections that wish to implement

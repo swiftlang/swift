@@ -169,20 +169,31 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
 
   llvm::SmallString<256> buffer;
 
+  // collect everything in memory to avoid redundant work
+  // when there are multiple targets
+  std::string dependencyString;
+  
+  // First include all other files in the module. Make-style dependencies
+  // need to be conservative!
+  auto inputPaths =
+    reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames());
+  for (auto const &path : inputPaths) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+  }
+  // Then print dependencies we've picked up during compilation.
+  auto dependencyPaths =
+    reversePathSortedFilenames(depTracker->getDependencies());
+  for (auto const &path : dependencyPaths) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer));
+  }
+  
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.
   opts.forAllOutputPaths(input, [&](const StringRef targetName) {
-    out << swift::frontend::utils::escapeForMake(targetName, buffer) << " :";
-    // First include all other files in the module. Make-style dependencies
-    // need to be conservative!
-    for (auto const &path :
-         reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames()))
-      out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
-    // Then print dependencies we've picked up during compilation.
-    for (auto const &path :
-           reversePathSortedFilenames(depTracker->getDependencies()))
-      out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
-    out << '\n';
+    auto targetNameEscaped = frontend::utils::escapeForMake(targetName, buffer);
+    out << targetNameEscaped << " :" << dependencyString << '\n';
   });
 
   return false;
@@ -499,11 +510,6 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 
 /// Writes the Syntax tree to the given file
 static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
-  auto bufferID = SF->getBufferID();
-  assert(bufferID && "frontend should have a buffer ID "
-         "for the main source file");
-  (void)bufferID;
-
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
@@ -778,15 +784,16 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
+      Invocation.getClangImporterOptions(),
       Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface,
-      FEOpts.DisableInterfaceFileLock);
+      FEOpts.TrackSystemDeps, LoaderOpts);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {
@@ -872,12 +879,13 @@ static void dumpAST(CompilerInstance &Instance) {
       auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
       auto OutputFilename = PSPs.OutputFilename;
       auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
-      sourceFile->dump(*OS);
+      sourceFile->dump(*OS, /*parseIfNeeded*/ true);
     }
   } else {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
-    getPrimaryOrMainSourceFile(Instance)->dump(llvm::outs());
+    auto *SF = getPrimaryOrMainSourceFile(Instance);
+    SF->dump(llvm::outs(), /*parseIfNeeded*/ true);
   }
 }
 
@@ -1214,9 +1222,20 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 /// before or after LLVM depending on when the ASTContext gets freed.
 static void performEndOfPipelineActions(CompilerInstance &Instance) {
   assert(Instance.hasASTContext());
+  auto &ctx = Instance.getASTContext();
+
+  // Make sure we didn't load a module during a parse-only invocation, unless
+  // it's -emit-imported-modules, which can load modules.
+  auto action = Instance.getInvocation().getFrontendOptions().RequestedAction;
+  if (FrontendOptions::shouldActionOnlyParse(action) &&
+      action != FrontendOptions::ActionType::EmitImportedModules) {
+    assert(ctx.LoadedModules.size() == 1 &&
+           "Loaded a module during parse-only");
+    assert(ctx.LoadedModules.front().second == Instance.getMainModule());
+  }
 
   // Verify the AST for all the modules we've loaded.
-  Instance.getASTContext().verifyAllLoadedModules();
+  ctx.verifyAllLoadedModules();
 
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
@@ -1250,15 +1269,33 @@ static bool performCompile(CompilerInstance &Instance,
   if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Instance);
 
+  // If we aren't in a parse-only context and expect an implicit stdlib import,
+  // load in the standard library. If we either fail to find it or encounter an
+  // error while loading it, bail early. Continuing the compilation will at best
+  // trigger a bunch of other errors due to the stdlib being missing, or at
+  // worst crash downstream as many call sites don't currently handle a missing
+  // stdlib.
+  if (!FrontendOptions::shouldActionOnlyParse(Action)) {
+    if (Instance.loadStdlibIfNeeded())
+      return true;
+  }
+
+  SWIFT_DEFER {
+    // We might have freed the ASTContext already, but in that case we would
+    // have already performed these actions.
+    if (Instance.hasASTContext())
+      performEndOfPipelineActions(Instance);
+  };
+
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
-    // Disable delayed parsing of type and function bodies when we've been
-    // asked to dump the resulting AST.
-    bool CanDelayBodies = Action != FrontendOptions::ActionType::DumpParse;
-    bool EvaluateConditionals =
-        Action == FrontendOptions::ActionType::EmitImportedModules
-        || Action == FrontendOptions::ActionType::ScanDependencies;
-    Instance.performParseOnly(EvaluateConditionals,
-                              CanDelayBodies);
+    // Parsing gets triggered lazily, but let's make sure we have the right
+    // input kind.
+    auto kind = Invocation.getInputKind();
+    assert((kind == InputFileKind::Swift ||
+            kind == InputFileKind::SwiftLibrary ||
+            kind == InputFileKind::SwiftModuleInterface) &&
+           "Only supports parsing .swift files");
+    (void)kind;
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
   } else {
@@ -1266,8 +1303,15 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   ASTContext &Context = Instance.getASTContext();
-  if (Action == FrontendOptions::ActionType::Parse)
+  if (Action == FrontendOptions::ActionType::Parse) {
+    // A -parse invocation only cares about the side effects of parsing, so
+    // force the parsing of all the source files.
+    for (auto *file : Instance.getMainModule()->getFiles()) {
+      if (auto *SF = dyn_cast<SourceFile>(file))
+        (void)SF->getTopLevelDecls();
+    }
     return Context.hadError();
+  }
 
   if (Action == FrontendOptions::ActionType::ScanDependencies) {
     scanDependencies(Instance);
@@ -1313,13 +1357,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
-
-  SWIFT_DEFER {
-    // We might have freed the ASTContext already, but in that case we would
-    // have already performed these actions.
-    if (Instance.hasASTContext())
-      performEndOfPipelineActions(Instance);
-  };
 
   if (Context.hadError())
     return true;

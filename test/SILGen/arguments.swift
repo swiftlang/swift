@@ -14,6 +14,10 @@ func _allocateUninitializedArray<T>(_: Builtin.Word)
   Builtin.int_trap()
 }
 
+func _finalizeUninitializedArray<T>(_ a: Array<T>) -> Array<T> {
+  return a
+}
+
 func _deallocateUninitializedArray<T>(_: Array<T>) {}
 
 var i:Int, f:Float, c:UnicodeScalar

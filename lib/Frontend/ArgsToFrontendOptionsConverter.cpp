@@ -83,6 +83,8 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
 
+  Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
+
   // Always track system dependencies when scanning dependencies.
   if (const Arg *ModeArg = Args.getLastArg(OPT_modes_Group)) {
     if (ModeArg->getOption().matches(OPT_scan_dependencies))

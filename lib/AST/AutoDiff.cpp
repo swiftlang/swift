@@ -98,10 +98,13 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
 }
 
 void SILAutoDiffIndices::print(llvm::raw_ostream &s) const {
-  s << "(source=" << source << " parameters=(";
+  s << "(parameters=(";
   interleave(
       parameters->getIndices(), [&s](unsigned p) { s << p; },
       [&s] { s << ' '; });
+  s << ") results=(";
+  interleave(
+      results->getIndices(), [&s](unsigned p) { s << p; }, [&s] { s << ' '; });
   s << "))";
 }
 
@@ -111,8 +114,7 @@ void SILAutoDiffIndices::dump() const {
 }
 
 SILAutoDiffIndices AutoDiffConfig::getSILAutoDiffIndices() const {
-  assert(resultIndices->getNumIndices() == 1);
-  return SILAutoDiffIndices(*resultIndices->begin(), parameterIndices);
+  return SILAutoDiffIndices(parameterIndices, resultIndices);
 }
 
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
@@ -368,25 +370,6 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
     return false;
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
   return operationName.empty();
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-// Not-yet-upstreamed `tensorflow` branch additions are below.
-
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
-#include "swift/SIL/SILLinkage.h"
-#include "llvm/ADT/StringSwitch.h"
-
-using namespace swift;
-
-bool SILAutoDiffIndices::operator==(const SILAutoDiffIndices &other) const {
-  return source == other.source && parameters == other.parameters;
-}
-
-void AutoDiffConfig::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
 }
 
 Type TangentSpace::getType() const {

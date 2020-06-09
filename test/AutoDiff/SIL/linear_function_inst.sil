@@ -35,7 +35,7 @@ bb0(%0 : $Float, %1 : $Float):
   return %2 : $(Float, Float)
 }
 
-sil @make_diff_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float {
+sil @make_linear_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float {
 bb0:
   %orig = function_ref @foo : $@convention(thin) (Float, Float, Float) -> Float
   %linear_orig = linear_function [parameters 0] %orig : $@convention(thin) (Float, Float, Float) -> Float
@@ -47,7 +47,7 @@ bb0:
 }
 
 
-// CHECK-SIL-LABEL: sil @make_diff_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float {
+// CHECK-SIL-LABEL: sil @make_linear_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float {
 // CHECK-SIL: bb0:
 // CHECK-SIL:   [[ORIG:%.*]] = function_ref @foo : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK-SIL:   [[LIN_ORIG:%.*]] = linear_function [parameters 0] [[ORIG]] : $@convention(thin) (Float, Float, Float) -> Float

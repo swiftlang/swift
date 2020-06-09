@@ -75,6 +75,12 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     return _isUnique(&rawValue)
   }
 
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func beginCOWMutationNative() -> Bool {
+    return Bool(Builtin.beginCOWMutation(&rawValue))
+  }
+
   @inlinable
   internal var isNative: Bool {
     @inline(__always) get {
@@ -129,6 +135,20 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   internal mutating func isUniquelyReferencedUnflaggedNative() -> Bool {
     _internalInvariant(isNative)
     return _isUnique_native(&rawValue)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func beginCOWMutationUnflaggedNative() -> Bool {
+    _internalInvariant(isNative)
+    return Bool(Builtin.beginCOWMutation_native(&rawValue))
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func endCOWMutation() {
+    _internalInvariant(isNative)
+    Builtin.endCOWMutation(&rawValue)
   }
 
   @inlinable

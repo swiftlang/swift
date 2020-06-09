@@ -53,17 +53,17 @@ func calls_diff_of_nested(_ x: Float) -> Float {
 // Multiple results
 //===----------------------------------------------------------------------===//
 
+// TODO(TF-983): Enable this test.
+/*
 func multipleResults(_ x: Float) -> (Float, Float) {
   return (x, x)
 }
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func usesMultipleResults(_ x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate through multiple results}}
   let tuple = multipleResults(x)
   return tuple.0 + tuple.1
 }
+*/
 
 //===----------------------------------------------------------------------===//
 // Inout arguments

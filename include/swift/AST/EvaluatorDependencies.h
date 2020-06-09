@@ -267,9 +267,15 @@ private:
   void realize(const DependencyCollector::Reference &ref);
 
 public:
-  void replay(const swift::ActiveRequest &req);
+  void replay(const llvm::SetVector<swift::ActiveRequest> &stack,
+              const swift::ActiveRequest &req);
   void record(const llvm::SetVector<swift::ActiveRequest> &stack,
               llvm::function_ref<void(DependencyCollector &)> rec);
+
+private:
+  void
+  unionNearestCachedRequest(ArrayRef<swift::ActiveRequest> stack,
+                            const DependencyCollector::ReferenceSet &scratch);
 
 public:
   using ReferenceEnumerator =
@@ -298,7 +304,12 @@ public:
   SourceFile *getActiveDependencySourceOrNull() const {
     if (dependencySources.empty())
       return nullptr;
-    return dependencySources.back().getPointer();
+    switch (mode) {
+    case Mode::StatusQuo:
+      return dependencySources.back().getPointer();
+    case Mode::ExperimentalPrivateDependencies:
+      return dependencySources.front().getPointer();
+    }
   }
 
 public:
@@ -331,14 +342,6 @@ public:
   };
 
 private:
-  /// Returns the first dependency source registered with the tracker, or
-  /// \c nullptr if no dependency sources have been registered.
-  SourceFile *getFirstDependencySourceOrNull() const {
-    if (dependencySources.empty())
-      return nullptr;
-    return dependencySources.front().getPointer();
-  }
-
   /// Returns \c true if the scope of the current active source cascades.
   ///
   /// If there is no active scope, the result always cascades.

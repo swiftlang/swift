@@ -1898,19 +1898,6 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
   return body.get<Expr *>();
 }
 
-void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
-  assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getFirstElement();
-  if (auto stmt = body.dyn_cast<Stmt *>()) {
-    if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
-      braceStmt->getFirstElement() = NewBody;
-    else
-      cast<ReturnStmt>(stmt)->setResult(NewBody);
-    return;
-  }
-  getBody()->setFirstElement(NewBody);
-}
-
 bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
 }
@@ -1923,7 +1910,8 @@ bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
 
 void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable());
-  ExplicitResultType->setType(MetatypeType::get(ty));
+  ExplicitResultTypeAndSeparatelyChecked.getPointer()
+      ->setType(MetatypeType::get(ty));
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -2364,11 +2352,7 @@ void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
     return;
   }
 
-  if (CE->hasSingleExpressionBody()) {
-    out << "single expression closure";
-  } else {
-    out << "closure";
-  }
+  out << "closure";
 }
 
 void swift::simple_display(llvm::raw_ostream &out,

@@ -451,7 +451,13 @@ class BuildScriptInvocation(object):
         ]
 
         # Compute any product specific cmake arguments.
-        for product_class in self.compute_product_classes():
+        #
+        # NOTE: The sum(list(...)) is b/c compute_product_classes returns a
+        # tuple of lists of which the first is the build-script-impl products
+        # and the second is the non-build-script-impl-products. It guarantees
+        # that when we concatenate these two lists together we get a valid
+        # dependency graph.
+        for product_class in sum(list(self.compute_product_classes()), []):
             if not product_class.is_build_script_impl_product():
                 continue
 
@@ -746,6 +752,11 @@ class BuildScriptInvocation(object):
                 os.path.abspath(args.coverage_db)
             ]
 
+        if args.llvm_install_components:
+            impl_args += [
+                "--llvm-install-components=%s" % args.llvm_install_components
+            ]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
@@ -793,33 +804,41 @@ class BuildScriptInvocation(object):
         return options
 
     def compute_product_classes(self):
-        """compute_product_classes() -> list
+        """compute_product_classes() -> (list, list)
 
-        Compute the list of all Product classes used in this build. This list
-        is constructed in dependency order.
+        Compute the list first of all build-script-impl products and then all
+        non-build-script-impl products. It is assumed that concatenating the two
+        lists together will result in a valid dependency graph for the
+        compilation.
+
         """
 
         # FIXME: This is a weird division (returning a list of class objects),
         # but it matches the existing structure of the `build-script-impl`.
+        impl_product_classes = []
+        impl_product_classes.append(products.CMark)
+        impl_product_classes.append(products.LLVM)
+        if self.args.build_libcxx:
+            impl_product_classes.append(products.LibCXX)
+        if self.args.build_libicu:
+            impl_product_classes.append(products.LibICU)
+        impl_product_classes.append(products.Swift)
+        if self.args.build_lldb:
+            impl_product_classes.append(products.LLDB)
+        if self.args.build_libdispatch:
+            impl_product_classes.append(products.LibDispatch)
+        if self.args.build_foundation:
+            impl_product_classes.append(products.Foundation)
+        if self.args.build_xctest:
+            impl_product_classes.append(products.XCTest)
+        if self.args.build_llbuild:
+            impl_product_classes.append(products.LLBuild)
+        # Sanity check that all of our impl classes are actually
+        # build_script_impl products.
+        for prod in impl_product_classes:
+            assert(prod.is_build_script_impl_product())
 
         product_classes = []
-        product_classes.append(products.CMark)
-        product_classes.append(products.LLVM)
-        if self.args.build_libcxx:
-            product_classes.append(products.LibCXX)
-        if self.args.build_libicu:
-            product_classes.append(products.LibICU)
-        product_classes.append(products.Swift)
-        if self.args.build_lldb:
-            product_classes.append(products.LLDB)
-        if self.args.build_libdispatch:
-            product_classes.append(products.LibDispatch)
-        if self.args.build_foundation:
-            product_classes.append(products.Foundation)
-        if self.args.build_xctest:
-            product_classes.append(products.XCTest)
-        if self.args.build_llbuild:
-            product_classes.append(products.LLBuild)
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
         if self.args.build_swiftsyntax:
@@ -844,7 +863,12 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SwiftInspect)
         if self.args.tsan_libdispatch_test:
             product_classes.append(products.TSanLibDispatch)
-        return product_classes
+        # Sanity check that all of our non-impl classes are actually
+        # not build_script_impl products.
+        for prod in product_classes:
+            assert(not prod.is_build_script_impl_product())
+
+        return (impl_product_classes, product_classes)
 
     def execute(self):
         """Execute the invocation with the configured arguments."""
@@ -872,10 +896,7 @@ class BuildScriptInvocation(object):
         #
         # FIXME: This should really be per-host, but the current structure
         # matches that of `build-script-impl`.
-        product_classes = self.compute_product_classes()
-
-        impl_product_classes = [cls for cls in product_classes
-                                if cls.is_build_script_impl_product()]
+        (impl_product_classes, product_classes) = self.compute_product_classes()
 
         # Execute each "pass".
 

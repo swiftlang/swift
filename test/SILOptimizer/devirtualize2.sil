@@ -119,7 +119,7 @@ sil_vtable Bar {
 }
 
 sil_vtable Foo {
-  #Bar.ping: @_TFC4main3Foo4pingfS0_FT_T_
+  #Bar.ping: @_TFC4main3Foo4pingfS0_FT_T_ [override]
 }
 
 

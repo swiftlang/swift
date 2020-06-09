@@ -128,6 +128,9 @@ public:
   /// Return all of the method entries.
   ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }
 
+  /// Return all of the method entries mutably.
+  MutableArrayRef<Entry> getMutableEntries() { return {Entries, NumEntries}; }
+
   /// Look up the implementation function for the given method.
   Optional<Entry> getEntry(SILModule &M, SILDeclRef method) const;
 

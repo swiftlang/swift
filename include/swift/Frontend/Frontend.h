@@ -441,8 +441,9 @@ class CompilerInstance {
   std::vector<unsigned> InputSourceCodeBufferIDs;
 
   /// Contains \c MemoryBuffers for partial serialized module files and
-  /// corresponding partial serialized module documentation files.
-  std::vector<ModuleBuffers> PartialModules;
+  /// corresponding partial serialized module documentation files. This is
+  /// \c mutable as it is consumed by \c loadPartialModulesAndImplicitImports.
+  mutable std::vector<ModuleBuffers> PartialModules;
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
@@ -450,14 +451,6 @@ class CompilerInstance {
   /// Identifies the set of input buffers in the SourceManager that are
   /// considered primaries.
   llvm::SetVector<unsigned> PrimaryBufferIDs;
-
-  /// Identifies the set of SourceFiles that are considered primaries. An
-  /// invariant is that any SourceFile in this set with an associated
-  /// buffer will also have its buffer ID in PrimaryBufferIDs.
-  std::vector<SourceFile *> PrimarySourceFiles;
-
-  /// The file that has been registered for code completion.
-  NullablePtr<SourceFile> CodeCompletionFile;
 
   /// Return whether there is an entry in PrimaryInputs for buffer \p BufID.
   bool isPrimaryInput(unsigned BufID) const {
@@ -468,7 +461,7 @@ class CompilerInstance {
   /// If \p BufID is already in the set, do nothing.
   void recordPrimaryInputBuffer(unsigned BufID);
 
-  bool isWholeModuleCompilation() { return PrimaryBufferIDs.empty(); }
+  bool isWholeModuleCompilation() const { return PrimaryBufferIDs.empty(); }
 
 public:
   // Out of line to avoid having to import SILModule.h.
@@ -514,7 +507,12 @@ public:
 
   UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
 
+  /// Retrieve the main module containing the files being compiled.
   ModuleDecl *getMainModule() const;
+
+  /// Replace the current main module with a new one. This is used for top-level
+  /// cached code completion.
+  void setMainModule(ModuleDecl *newMod);
 
   MemoryBufferSerializedModuleLoader *
   getMemoryBufferSerializedModuleLoader() const {
@@ -536,7 +534,7 @@ public:
   /// Gets the set of SourceFiles which are the primary inputs for this
   /// CompilerInstance.
   ArrayRef<SourceFile *> getPrimarySourceFiles() const {
-    return PrimarySourceFiles;
+    return getMainModule()->getPrimarySourceFiles();
   }
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
@@ -546,11 +544,12 @@ public:
   /// FIXME: This should be removed eventually, once there are no longer any
   /// codepaths that rely on a single primary file.
   SourceFile *getPrimarySourceFile() const {
-    if (PrimarySourceFiles.empty()) {
+    auto primaries = getPrimarySourceFiles();
+    if (primaries.empty()) {
       return nullptr;
     } else {
-      assert(PrimarySourceFiles.size() == 1);
-      return *PrimarySourceFiles.begin();
+      assert(primaries.size() == 1);
+      return *primaries.begin();
     }
   }
 
@@ -561,12 +560,7 @@ public:
 
   /// If a code completion buffer has been set, returns the corresponding source
   /// file.
-  NullablePtr<SourceFile> getCodeCompletionFile() { return CodeCompletionFile; }
-
-  /// Set a new file that we're performing code completion on.
-  void setCodeCompletionFile(SourceFile *file) {
-    CodeCompletionFile = file;
-  }
+  SourceFile *getCodeCompletionFile() const;
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
@@ -622,10 +616,6 @@ public:
   /// Parses and type-checks all input files.
   void performSema();
 
-  /// Parses the input file but does no type-checking or module imports.
-  void performParseOnly(bool EvaluateConditionals = false,
-                        bool CanDelayBodies = true);
-
   /// Parses and performs import resolution on all input files.
   ///
   /// This is similar to a parse-only invocation, but module imports will also
@@ -638,26 +628,35 @@ public:
   bool performSILProcessing(SILModule *silModule);
 
 private:
-  SourceFile *
-  createSourceFileForMainModule(SourceFileKind FileKind,
-                                Optional<unsigned> BufferID,
-                                SourceFile::ParsingOptions options = {});
+  /// Creates a new source file for the main module.
+  SourceFile *createSourceFileForMainModule(ModuleDecl *mod,
+                                            SourceFileKind FileKind,
+                                            Optional<unsigned> BufferID) const;
+
+  /// Creates all the files to be added to the main module, appending them to
+  /// \p files. If a loading error occurs, returns \c true.
+  bool createFilesForMainModule(ModuleDecl *mod,
+                                SmallVectorImpl<FileUnit *> &files) const;
 
 public:
   void freeASTContext();
 
+  /// If an implicit standard library import is expected, loads the standard
+  /// library, returning \c false if we should continue, i.e. no error.
+  bool loadStdlibIfNeeded();
+
 private:
-  /// Load stdlib & return true if should continue, i.e. no error
-  bool loadStdlib();
+  /// Compute the parsing options for a source file in the main module.
+  SourceFile::ParsingOptions getSourceFileParsingOptions(bool forPrimary) const;
 
   /// Retrieve a description of which modules should be implicitly imported.
   ImplicitImportInfo getImplicitImportInfo() const;
 
-  void performSemaUpTo(SourceFile::ASTStage_t LimitStage,
-                       SourceFile::ParsingOptions POpts = {});
-
-  /// Return true if had load error
-  bool loadPartialModulesAndImplicitImports();
+  /// For any serialized AST inputs, loads them in as partial module files,
+  /// appending them to \p partialModules. If a loading error occurs, returns
+  /// \c true.
+  bool loadPartialModulesAndImplicitImports(
+      ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const;
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 

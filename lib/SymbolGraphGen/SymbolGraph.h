@@ -226,6 +226,11 @@ struct SymbolGraph {
   /// Returns `true` if the declaration is a requirement of a protocol
   /// or is a default implementation of a protocol
   bool isRequirementOrDefaultImplementation(const ValueDecl *VD) const;
+
+  /// Returns `true` if there are no nodes or edges in this graph.
+  bool empty() const {
+    return Nodes.empty() && Edges.empty();
+  }
 };
 
 } // end namespace symbolgraphgen
