@@ -808,10 +808,10 @@ TEST(ModuleDepGraph, UseFingerprints) {
   {
     const auto jobs =
         simulateReload(graph, &job0, {{NodeKind::nominal, {"A1@11", "A2@2"}}});
-    EXPECT_EQ(2u, jobs.size());
+    EXPECT_EQ(3u, jobs.size());
     EXPECT_TRUE(contains(jobs, &job0));
     EXPECT_TRUE(contains(jobs, &job1));
-    EXPECT_FALSE(contains(jobs, &job2));
+    EXPECT_TRUE(contains(jobs, &job2));
     EXPECT_FALSE(contains(jobs, &job3));
   }
 }
