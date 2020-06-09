@@ -146,9 +146,9 @@ public:
   bool IgnoreSwiftSourceInfo = false;
 
   /// When true, emitted module files will always contain options for the
-  /// debugger to use. When unset, the options will only be present if the
-  /// module appears to not be a public module.
-  Optional<bool> SerializeOptionsForDebugging;
+  /// debugger and LTO plugin to use. When unset, the options will only be
+  /// present if the module appears to not be a public module.
+  Optional<bool> SerializeOptions;
 
   /// When true, check if all required SwiftOnoneSupport symbols are present in
   /// the module.

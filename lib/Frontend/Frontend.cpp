@@ -170,9 +170,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   // Options contain information about the developer's computer,
   // so only serialize them if the module isn't going to be shipped to
   // the public.
-  serializationOpts.SerializeOptionsForDebugging =
-      opts.SerializeOptionsForDebugging.getValueOr(
-          !isModuleExternallyConsumed(module));
+  serializationOpts.SerializeOptions =
+      opts.SerializeOptions.getValueOr(!isModuleExternallyConsumed(module));
 
   return serializationOpts;
 }

@@ -174,7 +174,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
                                      OPT_no_serialize_debugging_options)) {
-    Opts.SerializeOptionsForDebugging =
+    Opts.SerializeOptions =
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 

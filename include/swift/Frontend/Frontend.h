@@ -396,7 +396,7 @@ public:
   /// serialization options.
   ///
   /// FIXME: The \p module parameter supports the
-  /// \c SerializeOptionsForDebugging hack.
+  /// \c SerializeOptions hack.
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
                               const ModuleDecl *module) const;
@@ -406,7 +406,7 @@ public:
   ///
   /// FIXME: The scope of this computation should be limited entirely to
   /// PrintAsObjC. Unfortunately, it has been co-opted to support the
-  /// \c SerializeOptionsForDebugging hack. Once this information can be
+  /// \c SerializeOptions hack. Once this information can be
   /// transferred from module files to the dSYMs, remove this.
   bool isModuleExternallyConsumed(const ModuleDecl *mod) const;
 };

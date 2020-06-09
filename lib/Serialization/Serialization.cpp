@@ -908,7 +908,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         Strategy.emit(ScratchRecord, unsigned(M->getResilienceStrategy()));
       }
 
-      if (options.SerializeOptionsForDebugging) {
+      if (options.SerializeOptions) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
 
@@ -981,7 +981,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::DependencyDirectoryLayout DependencyDirectory(Out);
   input_block::ModuleInterfaceLayout ModuleInterface(Out);
 
-  if (options.SerializeOptionsForDebugging) {
+  if (options.SerializeOptions) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.

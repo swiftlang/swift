@@ -129,7 +129,7 @@ namespace swift {
 
     bool AutolinkForceLoad = false;
     bool SerializeAllSIL = false;
-    bool SerializeOptionsForDebugging = false;
+    bool SerializeOptions = false;
     bool IsSIB = false;
   };
 
