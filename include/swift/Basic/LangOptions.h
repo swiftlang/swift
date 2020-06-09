@@ -316,7 +316,7 @@ namespace swift {
 
     /// Emit the newer, finer-grained swiftdeps file. Eventually will support
     /// faster rebuilds.
-    bool EnableFineGrainedDependencies = true;
+    bool EnableFineGrainedDependencies = false;
 
     /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
     /// the interface hash, hash them into per-iterable-decl-context
