@@ -497,6 +497,10 @@ def create_argument_parser():
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
 
+    option('--llvm-install-components', store,
+           default=defaults.llvm_install_components(),
+           help='A semi-colon split list of llvm components to install')
+
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
 
