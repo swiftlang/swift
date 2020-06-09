@@ -373,8 +373,14 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
       OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
-      addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
-                        /*LinkerDirective*/true);
+      // Sometimes we can end up with duplicate symbols when emitting
+      // enum case symbols (for compatibility reasons, we emit both old
+      // and new symbols) so we need to make sure we're not adding a
+      // symbol more than once.
+      auto symbolStr = OS.str();
+      if (!StringSymbols->count(symbolStr))
+        addSymbolInternal(symbolStr, llvm::MachO::SymbolKind::GlobalSymbol,
+                          /*LinkerDirective*/ true);
     }
   }
 }
