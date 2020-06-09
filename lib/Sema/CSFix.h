@@ -884,6 +884,33 @@ public:
   }
 };
 
+class DefineMemberBasedOnUnintendedGenericParam final : public ConstraintFix {
+  Type BaseType;
+  DeclNameRef Name;
+  Identifier ParamName;
+
+  DefineMemberBasedOnUnintendedGenericParam(ConstraintSystem &cs, Type baseType,
+                                            DeclNameRef member,
+                                            Identifier paramName,
+                                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
+        BaseType(baseType), Name(member), ParamName(paramName) {}
+
+public:
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = Name.getString(scratch);
+    return "allow access to invalid member '" + memberName.str() +
+           "' on archetype presumed intended to conform to protocol";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static DefineMemberBasedOnUnintendedGenericParam *
+  create(ConstraintSystem &cs, Type baseType, DeclNameRef member,
+         Identifier paramName, ConstraintLocator *locator);
+};
+
 class AllowInvalidMemberRef : public ConstraintFix {
   Type BaseType;
   ValueDecl *Member;

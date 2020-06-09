@@ -1039,7 +1039,7 @@ protected:
 ///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
 /// }
 /// ```
-class MissingMemberFailure final : public InvalidMemberRefFailure {
+class MissingMemberFailure : public InvalidMemberRefFailure {
 public:
   MissingMemberFailure(const Solution &solution, Type baseType,
                        DeclNameRef memberName, ConstraintLocator *locator)
@@ -1066,6 +1066,22 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
+};
+
+class UnintendedExtraGenericParamMemberFailure final
+    : public MissingMemberFailure {
+  Identifier ParamName;
+
+public:
+  UnintendedExtraGenericParamMemberFailure(const Solution &solution,
+                                           Type baseType,
+                                           DeclNameRef memberName,
+                                           Identifier paramName,
+                                           ConstraintLocator *locator)
+      : MissingMemberFailure(solution, baseType, memberName, locator),
+        ParamName(paramName) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose cases where a member only accessible on generic constraints
