@@ -15,13 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CSFix.h"
 #include "CSDiagnostics.h"
+#include "CSFix.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -6926,6 +6927,54 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                      SolutionKind::Solved;
             })) {
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
+    // If base is an archetype or metatype of archetype, check for an unintended
+    // extra generic parameter.
+    if (auto archetype =
+            baseTy->getMetatypeInstanceType()->getAs<ArchetypeType>()) {
+      if (auto genericTy =
+              archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
+        for (auto param :
+             archetype->getGenericEnvironment()->getGenericParams()) {
+          // Find a param at the same depth and one index past the type we're
+          // dealing with
+          if (param->getDepth() != genericTy->getDepth() ||
+              param->getIndex() != genericTy->getIndex() + 1)
+            continue;
+          auto paramDecl = param->getDecl();
+          if (!paramDecl)
+            continue;
+
+          auto descriptor = UnqualifiedLookupDescriptor(
+              DeclNameRef(param->getName()),
+              paramDecl->getDeclContext()->getParentForLookup(),
+              paramDecl->getStartLoc(),
+              UnqualifiedLookupFlags::KnownPrivate |
+                  UnqualifiedLookupFlags::TypeLookup);
+          auto lookup = evaluateOrDefault(
+              Context.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+          for (auto &result : lookup) {
+            if (auto proto =
+                    dyn_cast_or_null<ProtocolDecl>(result.getValueDecl())) {
+              auto result =
+                  baseTy->is<MetatypeType>()
+                      ? solveWithNewBaseOrName(ExistentialMetatypeType::get(
+                                                   proto->getDeclaredType()),
+                                               member)
+                      : solveWithNewBaseOrName(proto->getDeclaredType(),
+                                               member);
+              if (result == SolutionKind::Solved)
+                return recordFix(
+                           DefineMemberBasedOnUnintendedGenericParam::create(
+                               *this, baseTy, member, param->getName(),
+                               locator))
+                           ? SolutionKind::Error
+                           : SolutionKind::Solved;
+            }
+          }
+        }
+      }
     }
 
     if (auto *funcType = baseTy->getAs<FunctionType>()) {
