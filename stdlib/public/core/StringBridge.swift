@@ -423,19 +423,26 @@ private var expectedConstantTagValue:UInt {
 }
 #endif
 
+private enum ConstantTaggedStringValidationResult {
+  case notApplicable
+  case valid
+  case invalid
+}
+
 @inline(__always)
-private func validateConstantTaggedCocoa(_ cocoaString: _CocoaString) -> Bool? {
+private func validateConstantTaggedCocoa(_ cocoaString: _CocoaString) ->
+  ConstantTaggedStringValidationResult {
   #if !arch(arm64)
-    return nil
+  return .notApplicable
   #else
   guard _isObjCTaggedPointer(cocoaString) else {
-    return nil
+    return .notApplicable
   }
 
   let taggedValue = unsafeBitCast(cocoaString, to: UInt.self)
 
   guard taggedValue & constantTagMask == expectedConstantTagValue else {
-    return nil
+    return .notApplicable
   }
 
   let payloadMask = ~constantTagMask
@@ -444,7 +451,8 @@ private func validateConstantTaggedCocoa(_ cocoaString: _CocoaString) -> Bool? {
     UnsafePointer<_swift_shims_builtin_CFString>(bitPattern: payload)
   )!
 
-  return _swift_stdlib_dyld_is_objc_constant_string(ivarPointer) == 1
+  return _swift_stdlib_dyld_is_objc_constant_string(ivarPointer) == 1 ?
+    .valid : .invalid
   #endif
 }
 
@@ -622,7 +630,7 @@ extension String {
       "Unknown non-bridgeable object case")
     let result = _guts._object.objCBridgeableObject
     
-    if let validity = validateConstantTaggedCocoa(result), !validity {
+    if case let .invalid(_) = validateConstantTaggedCocoa(result) {
       fatalError("Invalid bridged constant NSString detected")
     }
     
