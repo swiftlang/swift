@@ -412,7 +412,8 @@ void LinearMapInfo::generateDifferentiationDataStructures(
         // Add linear map field to struct for active `apply` instructions.
         // Skip array literal intrinsic applications since array literal
         // initialization is linear and handled separately.
-        if (!shouldDifferentiateApplySite(ai) || isArrayLiteralIntrinsic(ai))
+        if (!shouldDifferentiateApplySite(ai) ||
+            ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC))
           continue;
         if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC))
           continue;
@@ -476,7 +477,9 @@ bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
 
   // TODO: Pattern match to make sure there is at least one `store` to the
   // array's active buffer.
-  if (isArrayLiteralIntrinsic(applySite) && hasActiveResults)
+  if (ArraySemanticsCall(applySite.getInstruction(),
+                         semantics::ARRAY_UNINITIALIZED_INTRINSIC) &&
+      hasActiveResults)
     return true;
 
   auto arguments = applySite.getArgumentsWithoutIndirectResults();

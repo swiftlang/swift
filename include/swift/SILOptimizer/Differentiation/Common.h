@@ -37,15 +37,6 @@ namespace autodiff {
 /// This is being used to print short debug messages within the AD pass.
 raw_ostream &getADDebugStream();
 
-/// Returns true if this is an full apply site whose callee has
-/// `array.uninitialized_intrinsic` semantics.
-bool isArrayLiteralIntrinsic(FullApplySite applySite);
-
-/// If the given value `v` corresponds to an `ApplyInst` with
-/// `array.uninitialized_intrinsic` semantics, returns the corresponding
-/// `ApplyInst`. Otherwise, returns `nullptr`.
-ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v);
-
 /// Given an element address from an `array.uninitialized_intrinsic` `apply`
 /// instruction, returns the `apply` instruction. The element address is either
 /// a `pointer_to_address` or `index_addr` instruction to the `RawPointer`
@@ -57,6 +48,8 @@ ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v);
 ///     %index_1 = integer_literal $Builtin.Word, 1
 ///     %elt1 = index_addr %elt0, %index_1           // element address
 ///     ...
+// TODO(SR-12894): Find a better name and move this general utility to
+// ArraySemantic.h.
 ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v);
 
 /// Given a value, finds its single `destructure_tuple` user if the value is
