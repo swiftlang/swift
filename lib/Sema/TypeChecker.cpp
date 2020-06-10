@@ -375,16 +375,20 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
-
-  // Fine to have unbound generic types.
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
   if (isSILMode) {
     options |= TypeResolutionFlags::SILMode;
   }
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
-  auto resolution = TypeResolution::forContextual(DC, GenericEnv, options);
+  const auto resolution =
+      TypeResolution::forContextual(DC, GenericEnv, options,
+                                    [](auto unboundTy) {
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        return unboundTy;
+      });
+
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);

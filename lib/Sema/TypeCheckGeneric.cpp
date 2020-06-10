@@ -127,14 +127,15 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
     }
   }
-  
+
   // Try to resolve the constraint repr. It should be some kind of existential
-  // type.
-  TypeResolutionOptions options(TypeResolverContext::GenericRequirement);
-  // Pass along the error type if resolving the repr failed.
+  // type. Pass along the error type if resolving the repr failed.
   auto constraintType = TypeResolution::forInterface(
-                            dc, dc->getGenericSignatureOfContext(), options)
+                            dc, TypeResolverContext::GenericRequirement,
+                            // Unbound generics are meaningless in opaque types.
+                            /*unboundTyOpener*/ nullptr)
                             .resolveType(repr->getConstraint());
+
   if (constraintType->hasError())
     return nullptr;
   
@@ -652,25 +653,27 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // For functions and subscripts, resolve the parameter and result types and
     // note them as inference sources.
     if (subscr || func) {
-      // Gather requirements from the parameter list.
-      TypeResolutionOptions options =
-          (func ? TypeResolverContext::AbstractFunctionDecl
-                : TypeResolverContext::SubscriptDecl);
+      const auto baseOptions =
+          TypeResolutionOptions(func ? TypeResolverContext::AbstractFunctionDecl
+                                     : TypeResolverContext::SubscriptDecl);
 
-      auto resolution = TypeResolution::forStructural(GC, options);
+      const auto resolution =
+          TypeResolution::forStructural(GC, baseOptions,
+                                        /*unboundTyOpener*/ nullptr);
       auto params = func ? func->getParameters() : subscr->getIndices();
       for (auto param : *params) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
           continue;
 
-        auto paramOptions = options;
+        auto paramOptions = baseOptions;
         paramOptions.setContext(param->isVariadic()
                                     ? TypeResolverContext::VariadicFunctionInput
                                     : TypeResolverContext::FunctionInput);
         paramOptions |= TypeResolutionFlags::Direct;
 
-        auto type = resolution.withOptions(paramOptions).resolveType(typeRepr);
+        const auto type =
+            resolution.withOptions(paramOptions).resolveType(typeRepr);
 
         if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
           typeRepr = specifier->getBase();
@@ -689,7 +692,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         }
       }();
       if (resultTypeRepr && !isa<OpaqueReturnTypeRepr>(resultTypeRepr)) {
-        auto resultType =
+        const auto resultType =
             resolution.withOptions(TypeResolverContext::FunctionResult)
                 .resolveType(resultTypeRepr);
 
@@ -916,15 +919,18 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                              unsigned index,
                              TypeResolutionStage stage) const {
   // Figure out the type resolution.
-  TypeResolutionOptions options = TypeResolverContext::GenericRequirement;
+  const auto options =
+      TypeResolutionOptions(TypeResolverContext::GenericRequirement);
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
-    resolution = TypeResolution::forStructural(owner.dc, options);
+    resolution = TypeResolution::forStructural(owner.dc, options,
+                                               /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
-    resolution = TypeResolution::forInterface(owner.dc, options);
+    resolution = TypeResolution::forInterface(owner.dc, options,
+                                              /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Contextual:
@@ -975,8 +981,9 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(ctx);
   }
 
-  auto resolution = TypeResolution::forStructural(typeAlias, options);
-  auto type = resolution.resolveType(underlyingTypeRepr);
+  const auto type = TypeResolution::forStructural(typeAlias, options,
+                                                  /*unboundTyOpener*/ nullptr)
+                        .resolveType(underlyingTypeRepr);
 
   auto genericSig = typeAlias->getGenericSignature();
   SubstitutionMap subs;
