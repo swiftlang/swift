@@ -362,8 +362,10 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
   auto mutableAttr = const_cast<CustomAttr*>(attr);
   auto dc = decl->getDeclContext();
   auto &ctx = dc->getASTContext();
-  Type type = resolveCustomAttrType(mutableAttr, dc,
-                                    CustomAttrTypeKind::NonGeneric);
+  Type type = evaluateOrDefault(
+      evaluator,
+      CustomAttrTypeRequest{mutableAttr, dc, CustomAttrTypeKind::NonGeneric},
+      Type());
   if (!type) return Type();
 
   auto nominal = type->getAnyNominal();

@@ -556,16 +556,15 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   if (!customAttr)
     return Type();
 
-  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
-
-  auto resolution =
-      TypeResolution::forContextual(var->getDeclContext(), options);
-  if (TypeChecker::validateType(customAttr->getTypeLoc(), resolution)) {
+  auto ty = evaluateOrDefault(
+      evaluator,
+      CustomAttrTypeRequest{customAttr, var->getDeclContext(),
+                            CustomAttrTypeKind::PropertyDelegate},
+      Type());
+  if (!ty || ty->hasError()) {
     return ErrorType::get(var->getASTContext());
   }
-
-  return customAttr->getTypeLoc().getType();
+  return ty;
 }
 
 Type
@@ -720,12 +719,16 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
                          : var->getAttachedPropertyWrapperType(i);
     if (!wrapperType)
       return nullptr;
-    
-    auto typeExpr = TypeExpr::createImplicitHack(
-        wrapperAttrs[i]->getTypeLoc().getLoc(),
-        wrapperType, ctx);
 
-    SourceLoc startLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().Start;
+    auto reprRange = SourceRange();
+    if (auto *repr = wrapperAttrs[i]->getTypeRepr()) {
+      reprRange = repr->getSourceRange();
+    }
+
+    auto typeExpr =
+        TypeExpr::createImplicitHack(reprRange.Start, wrapperType, ctx);
+
+    SourceLoc startLoc = reprRange.Start;
 
     // If there were no arguments provided for the attribute at this level,
     // call `init(wrappedValue:)` directly.
@@ -745,7 +748,7 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
 
       auto endLoc = initializer->getEndLoc();
       if (endLoc.isInvalid() && startLoc.isValid())
-        endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
+        endLoc = reprRange.End;
 
       auto *init =
           CallExpr::create(ctx, typeExpr, startLoc, {initializer}, {argName},
@@ -781,7 +784,7 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
     
     auto endLoc = attr->getArg()->getEndLoc();
     if (endLoc.isInvalid() && startLoc.isValid())
-      endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
+      endLoc = reprRange.End;
 
     auto *init = CallExpr::create(ctx, typeExpr, startLoc, elements,
                                    elementNames, elementLocs, endLoc,

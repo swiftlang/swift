@@ -3882,8 +3882,9 @@ void TypeChecker::checkUnsupportedProtocolType(
   visitor.visitRequirements(genericParams->getRequirements());
 }
 
-Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
-                                  CustomAttrTypeKind typeKind) {
+Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
+                                     DeclContext *dc,
+                                     CustomAttrTypeKind typeKind) const {
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   // Property delegates allow their type to be an unbound generic.
@@ -3891,12 +3892,10 @@ Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   ASTContext &ctx = dc->getASTContext();
-  auto resolution = TypeResolution::forContextual(dc, options);
-  if (TypeChecker::validateType(attr->getTypeLoc(), resolution))
-    return Type();
+  auto type = TypeResolution::forContextual(dc, options)
+                  .resolveType(attr->getTypeRepr());
 
   // We always require the type to resolve to a nominal type.
-  Type type = attr->getTypeLoc().getType();
   if (!type->getAnyNominal()) {
     assert(ctx.Diags.hadAnyError());
     return Type();

@@ -2479,7 +2479,11 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   result.Getter = getGetterMutatingness(firstWrapper.*varMember);
   result.Setter = getSetterMutatingness(firstWrapper.*varMember,
                                         var->getInnermostDeclContext());
-  
+
+  auto getCustomAttrTypeLoc = [](const CustomAttr *CA) -> TypeLoc {
+    return { CA->getTypeRepr(), CA->getType() };
+  };
+
   // Compose the traits of the following wrappers.
   for (unsigned i = 1; i < numWrappers && !isProjectedValue; ++i) {
     assert(var == originalVar);
@@ -2496,8 +2500,8 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
       auto &ctx = var->getASTContext();
       ctx.Diags.diagnose(var->getAttachedPropertyWrappers()[i]->getLocation(),
                diag::property_wrapper_mutating_get_composed_to_get_only,
-               var->getAttachedPropertyWrappers()[i]->getTypeLoc(),
-               var->getAttachedPropertyWrappers()[i-1]->getTypeLoc());
+               getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i]),
+               getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i-1]));
 
       return None;
     }

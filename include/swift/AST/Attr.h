@@ -1125,7 +1125,7 @@ class TypeEraserAttr final : public DeclAttribute {
 public:
   static TypeEraserAttr *create(ASTContext &ctx,
                                 SourceLoc atLoc, SourceRange range,
-                                TypeLoc typeEraserLoc);
+                                TypeRepr *typeEraserRepr);
 
   static TypeEraserAttr *create(ASTContext &ctx,
                                 LazyMemberLoader *Resolver,
@@ -1628,8 +1628,8 @@ public:
   unsigned getNumArguments() const { return numArgLabels; }
   bool hasArgumentLabelLocs() const { return hasArgLabelLocs; }
 
-  TypeLoc &getTypeLoc() { return type; }
-  const TypeLoc &getTypeLoc() const { return type; }
+  TypeRepr *getTypeRepr() const { return type.getTypeRepr(); }
+  Type getType() const { return type.getType(); }
 
   Expr *getArg() const { return arg; }
   void setArg(Expr *newArg) { arg = newArg; }
@@ -1642,6 +1642,14 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Custom;
   }
+
+private:
+  friend class CustomAttrNominalRequest;
+  void resetTypeInformation(TypeRepr *repr) { type = TypeLoc(repr); }
+
+private:
+  friend class CustomAttrTypeRequest;
+  void setType(Type ty) { type = TypeLoc(getTypeRepr(), ty); }
 };
 
 /// Relates a property to its projection value property, as described by a property wrapper. For

@@ -2850,8 +2850,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-    auto resolution = TypeResolution::forContextual(DC, options);
-    T = resolution.resolveType(ProtoTypeLoc.getTypeRepr());
+    T = TypeResolution::forContextual(DC, options)
+          .resolveType(ProtoTypeLoc.getTypeRepr());
     ProtoTypeLoc.setType(T);
   }
 
@@ -2925,11 +2925,11 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // an unknown attribute.
   if (!nominal) {
     std::string typeName;
-    if (auto typeRepr = attr->getTypeLoc().getTypeRepr()) {
+    if (auto typeRepr = attr->getTypeRepr()) {
       llvm::raw_string_ostream out(typeName);
       typeRepr->print(out);
     } else {
-      typeName = attr->getTypeLoc().getType().getString();
+      typeName = attr->getType().getString();
     }
 
     diagnose(attr->getLocation(), diag::unknown_attribute, typeName);

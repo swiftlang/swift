@@ -1022,11 +1022,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Custom: {
     Printer.callPrintNamePre(PrintNameContext::Attribute);
     Printer << "@";
-    const TypeLoc &typeLoc = cast<CustomAttr>(this)->getTypeLoc();
-    if (auto type = typeLoc.getType())
-      type->print(Printer, Options);
+    auto *attr = cast<CustomAttr>(this);
+    if (auto type = attr->getType())
+      type.print(Printer, Options);
     else
-      typeLoc.getTypeRepr()->print(Printer, Options);
+      attr->getTypeRepr()->print(Printer, Options);
     Printer.printNamePost(PrintNameContext::Attribute);
     break;
   }
@@ -1386,8 +1386,8 @@ SourceLoc DynamicReplacementAttr::getRParenLoc() const {
 
 TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
                                        SourceLoc atLoc, SourceRange range,
-                                       TypeLoc typeEraserLoc) {
-  return new (ctx) TypeEraserAttr(atLoc, range, typeEraserLoc, nullptr, 0);
+                                       TypeRepr *typeEraserRepr) {
+  return new (ctx) TypeEraserAttr(atLoc, range, typeEraserRepr, nullptr, 0);
 }
 
 TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,

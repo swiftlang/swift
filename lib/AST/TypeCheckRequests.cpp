@@ -1498,3 +1498,33 @@ SourceLoc swift::extractNearestSourceLoc(const TypeRepr *repr) {
     return SourceLoc();
   return repr->getLoc();
 }
+
+//----------------------------------------------------------------------------//
+// CustomAttrTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
+  switch (value) {
+  case CustomAttrTypeKind::NonGeneric:
+    out << "non-generic";
+    return;
+
+  case CustomAttrTypeKind::PropertyDelegate:
+    out << "property-delegate";
+    return;
+  }
+  llvm_unreachable("bad kind");
+}
+
+Optional<Type> CustomAttrTypeRequest::getCachedResult() const {
+  auto *attr = std::get<0>(getStorage());
+  if (auto ty = attr->getType()) {
+    return ty;
+  }
+  return None;
+}
+
+void CustomAttrTypeRequest::cacheResult(Type value) const {
+  auto *attr = std::get<0>(getStorage());
+  attr->setType(value);
+}
