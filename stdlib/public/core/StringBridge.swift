@@ -630,7 +630,7 @@ extension String {
       "Unknown non-bridgeable object case")
     let result = _guts._object.objCBridgeableObject
     
-    if case let .invalid(_) = validateConstantTaggedCocoa(result) {
+    if case .invalid = validateConstantTaggedCocoa(result) {
       fatalError("Invalid bridged constant NSString detected")
     }
     
