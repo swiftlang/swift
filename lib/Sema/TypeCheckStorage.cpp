@@ -2684,16 +2684,21 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     pbd->setInit(0, initializer);
     pbd->setInitializerChecked(0);
     wrappedValue = findWrappedValuePlaceholder(initializer);
-  } else if (!parentPBD->isInitialized(patternNumber) &&
-             wrapperInfo.defaultInit) {
-    // FIXME: Record this expression somewhere so that DI can perform the
-    // initialization itself.
-    auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
-    Expr *initializer = CallExpr::createImplicit(ctx, typeExpr, {}, { });
-    typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
-                                           initializer);
-    pbd->setInit(0, initializer);
-    pbd->setInitializerChecked(0);
+  } else {
+    if (!parentPBD->isInitialized(patternNumber) && wrapperInfo.defaultInit) {
+      // FIXME: Record this expression somewhere so that DI can perform the
+      // initialization itself.
+      auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
+      Expr *initializer = CallExpr::createImplicit(ctx, typeExpr, {}, { });
+      typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
+                                             initializer);
+      pbd->setInit(0, initializer);
+      pbd->setInitializerChecked(0);
+    }
+
+    if (var->getOpaqueResultTypeDecl()) {
+      var->diagnose(diag::opaque_type_var_no_underlying_type);
+    }
   }
 
   // If there is a projection property (projectedValue) in the wrapper,
