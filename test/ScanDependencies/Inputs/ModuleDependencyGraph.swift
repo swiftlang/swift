@@ -69,6 +69,11 @@ struct SwiftModuleDetails: Codable {
   /// The Swift command line arguments that need to be passed through
   /// to the -compile-module-from-interface action to build this module.
   var commandLine: [String]?
+
+  /// To build a PCM to be used by this Swift module, we need to append these
+  /// arguments to the generic PCM build arguments reported from the dependency
+  /// graph.
+  var extraPcmArgs: [String]?
 }
 
 /// Details specific to Clang modules.

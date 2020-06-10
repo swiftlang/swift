@@ -229,9 +229,18 @@ void ClangImporter::recordModuleDependencies(
       swiftArgs.push_back(arg.str());
     };
     // Add all args inheritted from creating the importer.
-    for (auto arg: allArgs) {
-      addClangArg(arg);
+    auto It = allArgs.begin();
+    while(It != allArgs.end()) {
+      // Remove the -target arguments because we should use the target triple
+      // from the depending Swift modules.
+      if (*It == "-target") {
+        It += 2;
+        continue;
+      }
+      addClangArg(*It);
+      ++ It;
     }
+
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");

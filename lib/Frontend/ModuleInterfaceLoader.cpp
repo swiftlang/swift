@@ -1323,10 +1323,12 @@ bool InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                       StringRef interfacePath,
                                                       StringRef outputPath,
                                                       SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>, StringRef)> action) {
+    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>,
+                            ArrayRef<StringRef>, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, outputPath, diagLoc,
                                   [&](SubCompilerInstanceInfo &info){
     return action(info.Instance->getASTContext(), info.BuildArguments,
+                  info.ExtraPCMArgs,
                   info.Hash);
   });
 }
@@ -1398,6 +1400,10 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   }
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
+  std::array<StringRef, 4> ExtraPCMArgs = {"-Xcc", "-target", "-Xcc",
+    // PCMs should use the target tripe the interface will be using to build
+    *(std::find(BuildArgs.rbegin(), BuildArgs.rend(), "-target") - 1)};
+  info.ExtraPCMArgs = ExtraPCMArgs;
   // Run the action under the sub compiler instance.
   return action(info);
 }

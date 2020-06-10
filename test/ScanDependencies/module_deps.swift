@@ -83,6 +83,12 @@ import SubE
 // CHECK-NEXT: {
 // CHECK-NEXT:   "swift": "_cross_import_E"
 // CHECK-NEXT: }
+// CHECK-NEXT: ],
+
+// CHECK:      "extraPcmArgs": [
+// CHECK-NEXT:    "-Xcc",
+// CHECK-NEXT:    "-target",
+// CHECK-NEXT:    "-Xcc",
 
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":

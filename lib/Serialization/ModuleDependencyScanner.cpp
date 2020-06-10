@@ -108,10 +108,12 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
                                               moduleInterfacePath.str(),
                                               StringRef(),
                                               SourceLoc(),
-                [&](ASTContext &Ctx, ArrayRef<StringRef> Args, StringRef Hash) {
+                [&](ASTContext &Ctx, ArrayRef<StringRef> Args,
+                    ArrayRef<StringRef> PCMArgs, StringRef Hash) {
     Result = ModuleDependencies::forSwiftInterface(modulePath.str().str(),
                                                    moduleInterfacePath.str(),
                                                    Args,
+                                                   PCMArgs,
                                                    Hash);
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();
