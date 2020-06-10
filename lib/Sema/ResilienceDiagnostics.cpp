@@ -81,7 +81,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
-  if (D->isObjCDynamic() && !Context.isSwiftVersionAtLeast(5) &&
+  if (D->shouldUseObjCDispatch() && !Context.isSwiftVersionAtLeast(5) &&
       !DC->getParentModule()->isResilient()) {
     return false;
   }

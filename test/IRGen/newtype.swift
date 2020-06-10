@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir > %t/out.ll
+// RUN: %FileCheck %s -DINT=i%target-ptrsize < %t/out.ll
+// RUN: %FileCheck %s  -check-prefix=CHECK-CC -DINT=i%target-ptrsize < %t/out.ll
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -O | %FileCheck %s -check-prefix=OPT -DINT=i%target-ptrsize
 import CoreFoundation
 import Foundation
@@ -84,22 +86,6 @@ public func compareABIs() {
   takeMyABINewTypeNonNullNS(newNS!)
   takeMyABIOldTypeNonNullNS(oldNS!)
 
-  // Make sure that the calling conventions align correctly, that is we don't
-  // have double-indirection or anything else like that
-  // CHECK: declare %struct.__CFString* @getMyABINewType()
-  // CHECK: declare %struct.__CFString* @getMyABIOldType()
-  //
-  // CHECK: declare void @takeMyABINewType(%struct.__CFString*)
-  // CHECK: declare void @takeMyABIOldType(%struct.__CFString*)
-  //
-  // CHECK: declare void @takeMyABINewTypeNonNull(%struct.__CFString*)
-  // CHECK: declare void @takeMyABIOldTypeNonNull(%struct.__CFString*)
-  //
-  // CHECK: declare %0* @getMyABINewTypeNS()
-  // CHECK: declare %0* @getMyABIOldTypeNS()
-  //
-  // CHECK: declare void @takeMyABINewTypeNonNullNS(%0*)
-  // CHECK: declare void @takeMyABIOldTypeNonNullNS(%0*)
 }
 
 // OPT-LABEL: define swiftcc i1 @"$s7newtype12compareInitsSbyF"
@@ -233,4 +219,20 @@ public func mutateRef() {
   // OPT: ret void
 }
 
+// Make sure that the calling conventions align correctly, that is we don't
+// have double-indirection or anything else like that
+// CHECK-CC: declare %struct.__CFString* @getMyABINewType()
+// CHECK-CC: declare %struct.__CFString* @getMyABIOldType()
+//
+// CHECK-CC: declare void @takeMyABINewType(%struct.__CFString*)
+// CHECK-CC: declare void @takeMyABIOldType(%struct.__CFString*)
+//
+// CHECK-CC: declare void @takeMyABINewTypeNonNull(%struct.__CFString*)
+// CHECK-CC: declare void @takeMyABIOldTypeNonNull(%struct.__CFString*)
+//
+// CHECK-CC: declare %0* @getMyABINewTypeNS()
+// CHECK-CC: declare %0* @getMyABIOldTypeNS()
+//
+// CHECK-CC: declare void @takeMyABINewTypeNonNullNS(%0*)
+// CHECK-CC: declare void @takeMyABIOldTypeNonNullNS(%0*)
 

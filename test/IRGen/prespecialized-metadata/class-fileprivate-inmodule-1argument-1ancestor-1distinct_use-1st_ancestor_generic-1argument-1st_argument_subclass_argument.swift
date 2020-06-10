@@ -265,7 +265,7 @@ doit()
 
 //         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CySiGMb"
 //    CHECK-NEXT: entry:
-// CHECK-unknown:   [[SUPER_CLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CySiGMb"([[INT]] 0)
+//         CHECK:   [[SUPER_CLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CySiGMb"([[INT]] 0)
 //   CHECK-apple:  [[THIS_CLASS_METADATA:%[0-9]+]] = call %objc_class* @objc_opt_self(
 //   CHECK-apple:    %objc_class* bitcast (
 // CHECK-unknown:    ret
@@ -305,7 +305,6 @@ doit()
 //              :     )
 //              :   )
 //   CHECK-apple:   [[THIS_TYPE_METADATA:%[0-9]+]] = bitcast %objc_class* [[THIS_CLASS_METADATA]] to %swift.type*
-//   CHECK-apple:   [[SUPER_CLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CySiGMb"([[INT]] 0)
 //   CHECK-apple:   [[RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, %swift.type* [[THIS_TYPE_METADATA]], 0
 //   CHECK-apple:   [[COMPLETE_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[RESPONSE]], [[INT]] 0, 1
 //   CHECK-apple:   ret %swift.metadata_response [[COMPLETE_RESPONSE]]

@@ -360,6 +360,8 @@ def create_argument_parser():
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
            help='the path to use as the filesystem root for the installation')
+    option('--install-all', toggle_true,
+           help='Assume all built products should be installed')
 
     option(['-j', '--jobs'], store_int('build_jobs'),
            default=multiprocessing.cpu_count(),
@@ -512,6 +514,10 @@ def create_argument_parser():
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
 
+    option('--llvm-install-components', store,
+           default=defaults.llvm_install_components(),
+           help='A semi-colon split list of llvm components to install')
+
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
 
@@ -555,6 +561,9 @@ def create_argument_parser():
 
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
+
+    option('--infer', store_true('infer_dependencies'),
+           help='Infer any downstream dependencies from enabled projects')
 
     option(['-l', '--lldb'], store_true('build_lldb'),
            help='build LLDB')
@@ -1125,6 +1134,16 @@ def create_argument_parser():
 
     # -------------------------------------------------------------------------
     in_group('Build-script-impl arguments (for disambiguation)')
+
+    # We need to represent these options so that we can skip installing them if
+    # the user is running in install-all mode.
+    option('--skip-build-cmark', toggle_false('build_cmark'),
+           help='skip building cmark')
+    option('--skip-build-llvm', toggle_false('build_llvm'),
+           help='skip building llvm')
+    option('--skip-build-swift', toggle_false('build_swift'),
+           help='skip building swift')
+
     # We need to list --skip-test-swift explicitly because otherwise argparse
     # will auto-expand arguments like --skip-test-swift to the only known
     # argument --skip-test-swiftevolve.

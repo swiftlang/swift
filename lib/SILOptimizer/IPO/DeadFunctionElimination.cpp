@@ -440,8 +440,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
 
   void collectMethodImplementations() {
     // Collect vtable method implementations.
-    for (SILVTable &vTable : Module->getVTableList()) {
-      for (const SILVTable::Entry &entry : vTable.getEntries()) {
+    for (auto &vTable : Module->getVTables()) {
+      for (const SILVTable::Entry &entry : vTable->getEntries()) {
         // We don't need to collect destructors because we mark them as alive
         // anyway.
         if (entry.Method.kind == SILDeclRef::Kind::Deallocator ||
@@ -452,7 +452,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         auto *fd = getBaseMethod(cast<AbstractFunctionDecl>(
                                                     entry.Method.getDecl()));
         MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ false);
-        mi->addClassMethodImpl(F, vTable.getClass());
+        mi->addClassMethodImpl(F, vTable->getClass());
       }
     }
 
@@ -500,8 +500,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     collectMethodImplementations();
 
     // Check vtable methods.
-    for (SILVTable &vTable : Module->getVTableList()) {
-      for (const SILVTable::Entry &entry : vTable.getEntries()) {
+    for (auto &vTable : Module->getVTables()) {
+      for (const SILVTable::Entry &entry : vTable->getEntries()) {
         if (entry.Method.kind == SILDeclRef::Kind::Deallocator ||
             entry.Method.kind == SILDeclRef::Kind::IVarDestroyer) {
           // Destructors are alive because they are called from swift_release
@@ -600,9 +600,9 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   /// Removes all dead methods from vtables and witness tables.
   bool removeDeadEntriesFromTables() {
     bool changedTable = false;
-    for (SILVTable &vTable : Module->getVTableList()) {
-      vTable.removeEntries_if([this, &changedTable]
-                              (SILVTable::Entry &entry) -> bool {
+    for (auto &vTable : Module->getVTables()) {
+      vTable->removeEntries_if([this, &changedTable]
+                               (SILVTable::Entry &entry) -> bool {
         if (!isAlive(entry.Implementation)) {
           LLVM_DEBUG(llvm::dbgs() << "  erase dead vtable method "
                                   << entry.Implementation->getName() << "\n");

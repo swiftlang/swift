@@ -639,10 +639,12 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:       [[NORM_3]]([[CAT3:%.*]] : @owned $Cat):
 // CHECK-NEXT:    store [[CAT3]] to [init] [[ELT3]]
 //   Complete the call and return.
+// CHECK:         [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+// CHECK:         [[FIN_ARRAY:%.*]] = apply [[FIN_FN]]<Cat>([[ARRAY]])
 // CHECK:         [[TAKE_FN:%.*]] = function_ref @$s6errors14take_many_catsyyAA3CatCd_tKF : $@convention(thin) (@guaranteed Array<Cat>) -> @error Error
-// CHECK-NEXT:    try_apply [[TAKE_FN]]([[ARRAY]]) : $@convention(thin) (@guaranteed Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
+// CHECK-NEXT:    try_apply [[TAKE_FN]]([[FIN_ARRAY]]) : $@convention(thin) (@guaranteed Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
 // CHECK:       [[NORM_CALL]]([[T0:%.*]] : $()):
-// CHECK-NEXT:    destroy_value [[ARRAY]]
+// CHECK-NEXT:    destroy_value [[FIN_ARRAY]]
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return
 //   Failure from element 0.
@@ -671,7 +673,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Failure from call.
 // CHECK:       [[ERR_CALL]]([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT:    destroy_value [[ARRAY]]
+// CHECK-NEXT:    destroy_value [[FIN_ARRAY]]
 // CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Rethrow.
 // CHECK:       [[RETHROW]]([[ERROR:%.*]] : @owned $Error):

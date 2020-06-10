@@ -1890,6 +1890,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case iOSAny(/*reason:*/ String)
   case iOSMajor(Int, reason: String)
+  case iOSMajorRange(ClosedRange<Int>, reason: String)
   case iOSMinor(Int, Int, reason: String)
   case iOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case iOSBugFix(Int, Int, Int, reason: String)
@@ -1899,6 +1900,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case tvOSAny(/*reason:*/ String)
   case tvOSMajor(Int, reason: String)
+  case tvOSMajorRange(ClosedRange<Int>, reason: String)
   case tvOSMinor(Int, Int, reason: String)
   case tvOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case tvOSBugFix(Int, Int, Int, reason: String)
@@ -1908,6 +1910,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case watchOSAny(/*reason:*/ String)
   case watchOSMajor(Int, reason: String)
+  case watchOSMajorRange(ClosedRange<Int>, reason: String)
   case watchOSMinor(Int, Int, reason: String)
   case watchOSMinorRange(Int, ClosedRange<Int>, reason: String)
   case watchOSBugFix(Int, Int, Int, reason: String)
@@ -1959,6 +1962,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "iOS(*, reason: \(reason))"
     case .iOSMajor(let major, let reason):
       return "iOS(\(major).*, reason: \(reason))"
+    case .iOSMajorRange(let range, let reason):
+      return "iOS([\(range)], reason: \(reason))"
     case .iOSMinor(let major, let minor, let reason):
       return "iOS(\(major).\(minor), reason: \(reason))"
     case .iOSMinorRange(let major, let minorRange, let reason):
@@ -1975,6 +1980,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "tvOS(*, reason: \(reason))"
     case .tvOSMajor(let major, let reason):
       return "tvOS(\(major).*, reason: \(reason))"
+    case .tvOSMajorRange(let range, let reason):
+      return "tvOS([\(range)], reason: \(reason))"
     case .tvOSMinor(let major, let minor, let reason):
       return "tvOS(\(major).\(minor), reason: \(reason))"
     case .tvOSMinorRange(let major, let minorRange, let reason):
@@ -1991,6 +1998,8 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "watchOS(*, reason: \(reason))"
     case .watchOSMajor(let major, let reason):
       return "watchOS(\(major).*, reason: \(reason))"
+    case .watchOSMajorRange(let range, let reason):
+      return "watchOS([\(range)], reason: \(reason))"
     case .watchOSMinor(let major, let minor, let reason):
       return "watchOS(\(major).\(minor), reason: \(reason))"
     case .watchOSMinorRange(let major, let minorRange, let reason):
@@ -2105,6 +2114,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .iOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .iOS(let major, _, _):
+        return range.contains(major)
+      default:
+        return false
+      }
+
     case .iOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .iOS(major, minor, _):
@@ -2161,6 +2178,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .tvOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .tvOS(let major, _, _):
+        return range.contains(major)
+      default:
+        return false
+      }
+
     case .tvOSMinor(let major, let minor, _):
       switch _getRunningOSVersion() {
       case .tvOS(major, minor, _):
@@ -2213,6 +2238,14 @@ public enum TestRunPredicate : CustomStringConvertible {
       switch _getRunningOSVersion() {
       case .watchOS(major, _, _):
         return true
+      default:
+        return false
+      }
+
+    case .watchOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .watchOS(let major, _, _):
+        return range.contains(major)
       default:
         return false
       }

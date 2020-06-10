@@ -207,6 +207,13 @@ namespace {
     /// to compute FieldAccesses for them.
     void addFieldsForClass(ClassDecl *theClass, SILType classType,
                            bool superclass) {
+      addFieldsForClassImpl(theClass, classType, theClass, classType,
+                            superclass);
+    }
+
+    void addFieldsForClassImpl(ClassDecl *rootClass, SILType rootClassType,
+                               ClassDecl *theClass, SILType classType,
+                               bool superclass) {
       if (theClass->hasClangNode()) {
         Options |= ClassMetadataFlags::ClassHasObjCAncestry;
         return;
@@ -240,7 +247,8 @@ namespace {
         } else {
           // Otherwise, we are allowed to have total knowledge of the superclass
           // fields, so walk them to compute the layout.
-          addFieldsForClass(superclassDecl, superclassType, /*superclass=*/true);
+          addFieldsForClassImpl(rootClass, rootClassType, superclassDecl,
+                                superclassType, /*superclass=*/true);
         }
       }
 
@@ -259,11 +267,12 @@ namespace {
       }
 
       // Collect fields from this class and add them to the layout as a chunk.
-      addDirectFieldsFromClass(theClass, classType, superclass);
+      addDirectFieldsFromClass(rootClass, rootClassType, theClass, classType,
+                               superclass);
     }
 
-    void addDirectFieldsFromClass(ClassDecl *theClass,
-                                  SILType classType,
+    void addDirectFieldsFromClass(ClassDecl *rootClass, SILType rootClassType,
+                                  ClassDecl *theClass, SILType classType,
                                   bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule(),
@@ -287,9 +296,9 @@ namespace {
         bool isKnownEmpty = !addField(element, LayoutStrategy::Universal);
 
         bool isSpecializedGeneric =
-            (theClass->isGenericContext() && !classType.getASTType()
-                                                  ->getRecursiveProperties()
-                                                  .hasUnboundGeneric());
+            (rootClass->isGenericContext() && !rootClassType.getASTType()
+                                                   ->getRecursiveProperties()
+                                                   .hasUnboundGeneric());
 
         // The 'Elements' list only contains superclass fields when we're
         // building a layout for tail allocation.

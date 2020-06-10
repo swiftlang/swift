@@ -91,7 +91,10 @@ void SILFunctionBuilder::addFunctionAttributes(
   auto *decl = constant.getDecl();
 
   // Only emit replacements for the objc entry point of objc methods.
-  if (decl->isObjC() &&
+  // There is one exception: @_dynamicReplacement(for:) of @objc methods in
+  // generic classes. In this special case we use native replacement instead of
+  // @objc categories.
+  if (decl->isObjC() && !decl->isNativeMethodReplacement() &&
       F->getLoweredFunctionType()->getExtInfo().getRepresentation() !=
           SILFunctionTypeRepresentation::ObjCMethod)
     return;
@@ -103,7 +106,10 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (!replacedDecl)
     return;
 
-  if (decl->isObjC()) {
+  // For @objc method replacement we normally use categories to perform the
+  // replacement. Except for methods in generic class where we can't. Instead,
+  // we special case this and use the native swift replacement mechanism.
+  if (decl->isObjC() && !decl->isNativeMethodReplacement()) {
     F->setObjCReplacement(replacedDecl);
     return;
   }
