@@ -671,44 +671,47 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   return P;
 }
 
-static Type validateTypedPattern(TypeResolution resolution,
-                                 TypedPattern *TP,
-                                 TypeResolutionOptions options) {
-  TypeLoc TL = TP->getTypeLoc();
-  
-  bool hadError;
-  
+static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
+  if (TP->hasType()) {
+    return TP->getType();
+  }
+
   // If the pattern declares an opaque type, and applies to a single
   // variable binding, then we can bind the opaque return type from the
   // property definition.
   auto &Context = resolution.getASTContext();
-  auto *Repr = TL.getTypeRepr();
+  auto *Repr = TP->getTypeRepr();
   if (Repr && isa<OpaqueReturnTypeRepr>(Repr)) {
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
-    if (named) {
-      auto *var = named->getDecl();
-      auto opaqueDecl = var->getOpaqueResultTypeDecl();
-      auto opaqueTy = (opaqueDecl
-                       ? opaqueDecl->getDeclaredInterfaceType()
-                       : ErrorType::get(Context));
-      TL.setType(named->getDecl()->getDeclContext()
-                                 ->mapTypeIntoContext(opaqueTy));
-      hadError = opaqueTy->hasError();
-    } else {
-      Context.Diags.diagnose(TP->getLoc(), diag::opaque_type_unsupported_pattern);
-      hadError = true;
+    if (!named) {
+      Context.Diags.diagnose(TP->getLoc(),
+                             diag::opaque_type_unsupported_pattern);
+      return ErrorType::get(Context);
     }
-  } else {
-    hadError = TypeChecker::validateType(TL, resolution);
+
+    auto *var = named->getDecl();
+    auto opaqueDecl = var->getOpaqueResultTypeDecl();
+    if (!opaqueDecl) {
+      return ErrorType::get(Context);
+    }
+
+    auto opaqueTy = opaqueDecl->getDeclaredInterfaceType();
+    if (opaqueTy->hasError()) {
+      return ErrorType::get(Context);
+    }
+
+    return named->getDecl()->getDeclContext()->mapTypeIntoContext(opaqueTy);
   }
 
-  if (hadError) {
+  auto ty = resolution.resolveType(Repr);
+  if (!ty || ty->hasError()) {
     return ErrorType::get(Context);
   }
 
-  assert(!dyn_cast_or_null<SpecifierTypeRepr>(Repr));
-  return TL.getType();
+  assert(!dyn_cast_or_null<SpecifierTypeRepr>(Repr) &&
+         "Didn't resolve invalid type to error type!");
+  return ty;
 }
 
 Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
@@ -768,8 +771,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // that type.
   case PatternKind::Typed: {
     auto resolution = TypeResolution::forContextual(dc, options);
-    TypedPattern *TP = cast<TypedPattern>(P);
-    return validateTypedPattern(resolution, TP, options);
+    return validateTypedPattern(cast<TypedPattern>(P), resolution);
   }
 
   // A wildcard or name pattern cannot appear by itself in a context
@@ -824,7 +826,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     if (somePat->isImplicit() && isa<TypedPattern>(somePat->getSubPattern())) {
       auto resolution = TypeResolution::forContextual(dc, options);
       TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
-      auto type = validateTypedPattern(resolution, TP, options);
+      auto type = validateTypedPattern(TP, resolution);
       if (type && !type->hasError()) {
         return OptionalType::get(type);
       }

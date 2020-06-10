@@ -479,9 +479,9 @@ namespace {
     void visitTypedPattern(TypedPattern *P) {
       printCommon(P, "pattern_typed") << '\n';
       printRec(P->getSubPattern());
-      if (P->getTypeLoc().getTypeRepr()) {
+      if (auto *repr = P->getTypeRepr()) {
         OS << '\n';
-        printRec(P->getTypeLoc().getTypeRepr());
+        printRec(repr);
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
