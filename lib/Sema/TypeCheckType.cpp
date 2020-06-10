@@ -3412,7 +3412,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     break;
   }
 
-  if (doDiag) {
+  if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
     // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
     if (Context.isSwiftVersionAtLeast(5)) {
       diagnose(repr->getStartLoc(),

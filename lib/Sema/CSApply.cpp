@@ -3492,20 +3492,23 @@ namespace {
     Expr *visitIsExpr(IsExpr *expr) {
       // Turn the subexpression into an rvalue.
       auto &ctx = cs.getASTContext();
-      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       auto sub = cs.coerceToRValue(expr->getSubExpr());
-
       expr->setSubExpr(sub);
 
-      // Set the type we checked against.
-      expr->getCastTypeLoc().setType(toType);
-      auto fromType = cs.getType(sub);
+      // Simplify and update the type we checked against.
+      auto *const castTypeRepr = expr->getCastTypeRepr();
+
+      const auto fromType = cs.getType(sub);
+      const auto toType = simplifyType(cs.getType(castTypeRepr));
+      expr->setCastType(toType);
+      cs.setType(castTypeRepr, toType);
+
       auto castContextKind =
           SuppressDiagnostics ? CheckedCastContextKind::None
                               : CheckedCastContextKind::IsExpr;
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
-          expr->getCastTypeLoc().getSourceRange());
+          castTypeRepr->getSourceRange());
 
       switch (castKind) {
       case CheckedCastKind::Unresolved:
@@ -3556,13 +3559,9 @@ namespace {
           castKind == CheckedCastKind::ArrayDowncast ||
           castKind == CheckedCastKind::DictionaryDowncast ||
           castKind == CheckedCastKind::SetDowncast) {
-        auto toOptType = OptionalType::get(toType);
-        ConditionalCheckedCastExpr *cast = new (ctx) ConditionalCheckedCastExpr(
-            sub, expr->getLoc(), SourceLoc(), expr->getCastTypeLoc());
-        cs.setType(cast, toOptType);
-        cs.setType(cast->getCastTypeLoc(), toType);
-        if (expr->isImplicit())
-          cast->setImplicit();
+        auto *const cast = ConditionalCheckedCastExpr::createImplicit(
+            ctx, sub, castTypeRepr, toType);
+        cs.setType(cast, cast->getType());
 
         // Type-check this conditional case.
         Expr *result = handleConditionalCheckedCastExpr(cast, true);
@@ -3823,7 +3822,7 @@ namespace {
     }
 
     bool hasForcedOptionalResult(ExplicitCastExpr *expr) {
-      auto *TR = expr->getCastTypeLoc().getTypeRepr();
+      const auto *const TR = expr->getCastTypeRepr();
       if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
         auto *locator = cs.getConstraintLocator(
             expr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
@@ -3848,11 +3847,11 @@ namespace {
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr, Optional<unsigned> choice) {
-      // Simplify the type we're casting to.
-      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      expr->getCastTypeLoc().setType(toType);
-
-      auto &ctx = cs.getASTContext();
+      // Simplify and update the type we're coercing to.
+      assert(expr->getCastTypeRepr());
+      const auto toType = simplifyType(cs.getType(expr->getCastTypeRepr()));
+      expr->setCastType(toType);
+      cs.setType(expr->getCastTypeRepr(), toType);
 
       // If this is a literal that got converted into constructor call
       // lets put proper source information in place.
@@ -3872,7 +3871,8 @@ namespace {
             if (!type->isEqual(toType))
               return subExpr;
 
-            return cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(), toType, ctx));
+            return cs.cacheType(TypeExpr::createImplicitHack(
+                expr->getLoc(), toType, cs.getASTContext()));
           });
         }
 
@@ -3934,26 +3934,29 @@ namespace {
 
     // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
-      // Simplify the type we're casting to.
-      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      if (hasForcedOptionalResult(expr))
-        toType = toType->getOptionalObjectType();
-
-      expr->getCastTypeLoc().setType(toType);
-
       // The subexpression is always an rvalue.
       auto &ctx = cs.getASTContext();
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
+      // Simplify and update the type we're casting to.
+      auto *const castTypeRepr = expr->getCastTypeRepr();
+
+      const auto fromType = cs.getType(sub);
+      auto toType = simplifyType(cs.getType(castTypeRepr));
+      if (hasForcedOptionalResult(expr))
+        toType = toType->getOptionalObjectType();
+
+      expr->setCastType(toType);
+      cs.setType(castTypeRepr, toType);
+
       auto castContextKind =
           SuppressDiagnostics ? CheckedCastContextKind::None
                               : CheckedCastContextKind::ForcedCast;
 
-      auto fromType = cs.getType(sub);
-      auto castKind = TypeChecker::typeCheckCheckedCast(
+      const auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
-          expr->getCastTypeLoc().getSourceRange());
+          castTypeRepr->getSourceRange());
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -3962,8 +3965,8 @@ namespace {
       case CheckedCastKind::BridgingCoercion: {
         if (cs.getType(sub)->isEqual(toType)) {
           ctx.Diags.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
-              .fixItRemove(SourceRange(
-                  expr->getLoc(), expr->getCastTypeLoc().getSourceRange().End));
+              .fixItRemove(SourceRange(expr->getLoc(),
+                                       castTypeRepr->getSourceRange().End));
 
         } else {
           ctx.Diags
@@ -4008,14 +4011,18 @@ namespace {
 
     Expr *handleConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr,
                                            bool isInsideIsExpr = false) {
-      // Simplify the type we're casting to.
-      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      expr->getCastTypeLoc().setType(toType);
-
       // The subexpression is always an rvalue.
       auto &ctx = cs.getASTContext();
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
+
+      // Simplify and update the type we're casting to.
+      auto *const castTypeRepr = expr->getCastTypeRepr();
+
+      const auto fromType = cs.getType(sub);
+      const auto toType = simplifyType(cs.getType(castTypeRepr));
+      expr->setCastType(toType);
+      cs.setType(castTypeRepr, toType);
 
       bool isSubExprLiteral = isa<LiteralExpr>(sub);
       auto castContextKind =
@@ -4023,10 +4030,9 @@ namespace {
             ? CheckedCastContextKind::None
             : CheckedCastContextKind::ConditionalCast;
 
-      auto fromType = cs.getType(sub);
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
-          expr->getCastTypeLoc().getSourceRange());
+          castTypeRepr->getSourceRange());
       switch (castKind) {
       // Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -4048,7 +4054,7 @@ namespace {
                 .diagnose(expr->getLoc(), diag::downcast_to_unrelated, fromType,
                           toType)
                 .highlight(sub->getSourceRange())
-                .highlight(expr->getCastTypeLoc().getSourceRange());
+                .highlight(castTypeRepr->getSourceRange());
           }
         }
         expr->setCastKind(CheckedCastKind::ValueCast);
