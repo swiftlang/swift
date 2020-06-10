@@ -5367,8 +5367,8 @@ void SILVTable::verify(const SILModule &M) const {
   auto superclass = getClass()->getSuperclassDecl();
   if (superclass) {
     for (auto &vt : M.getVTables()) {
-      if (vt.getClass() == superclass) {
-        superVTable = &vt;
+      if (vt->getClass() == superclass) {
+        superVTable = vt;
         break;
       }
     }
@@ -5582,15 +5582,15 @@ void SILModule::verify() const {
   // Check all vtables and the vtable cache.
   llvm::DenseSet<ClassDecl*> vtableClasses;
   unsigned EntriesSZ = 0;
-  for (const SILVTable &vt : getVTables()) {
-    if (!vtableClasses.insert(vt.getClass()).second) {
-      llvm::errs() << "Vtable redefined: " << vt.getClass()->getName() << "!\n";
+  for (const auto &vt : getVTables()) {
+    if (!vtableClasses.insert(vt->getClass()).second) {
+      llvm::errs() << "Vtable redefined: " << vt->getClass()->getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    vt.verify(*this);
+    vt->verify(*this);
     // Check if there is a cache entry for each vtable entry
-    for (auto entry : vt.getEntries()) {
-      if (VTableEntryCache.find({&vt, entry.Method}) == VTableEntryCache.end()) {
+    for (auto entry : vt->getEntries()) {
+      if (VTableEntryCache.find({vt, entry.Method}) == VTableEntryCache.end()) {
         llvm::errs() << "Vtable entry for function: "
                      << entry.Implementation->getName() << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");

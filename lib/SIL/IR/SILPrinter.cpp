@@ -2797,15 +2797,15 @@ static void printSILFunctions(SILPrintContext &Ctx,
 static void printSILVTables(SILPrintContext &Ctx,
                             const SILModule::VTableListType &VTables) {
   if (!Ctx.sortSIL()) {
-    for (const SILVTable &vt : VTables)
-      vt.print(Ctx.OS(), Ctx.printVerbose());
+    for (const auto &vt : VTables)
+      vt->print(Ctx.OS(), Ctx.printVerbose());
     return;
   }
 
   std::vector<const SILVTable *> vtables;
   vtables.reserve(VTables.size());
-  for (const SILVTable &vt : VTables)
-    vtables.push_back(&vt);
+  for (const auto &vt : VTables)
+    vtables.push_back(vt);
   std::sort(vtables.begin(), vtables.end(),
     [] (const SILVTable *v1, const SILVTable *v2) -> bool {
       StringRef Name1 = v1->getClass()->getName().str();
@@ -3067,7 +3067,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILDifferentiabilityWitnesses(PrintCtx,
                                      getDifferentiabilityWitnessList());
   printSILFunctions(PrintCtx, getFunctionList());
-  printSILVTables(PrintCtx, getVTableList());
+  printSILVTables(PrintCtx, getVTables());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());

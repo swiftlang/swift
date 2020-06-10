@@ -110,7 +110,7 @@ class SILModule {
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
-  using VTableListType = llvm::ilist<SILVTable>;
+  using VTableListType = llvm::ArrayRef<SILVTable*>;
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
@@ -178,7 +178,7 @@ private:
   llvm::DenseMap<const ClassDecl *, SILVTable *> VTableMap;
 
   /// The list of SILVTables in the module.
-  VTableListType vtables;
+  std::vector<SILVTable*> vtables;
 
   /// This is a cache of vtable entries for quick look-up
   llvm::DenseMap<std::pair<const SILVTable *, SILDeclRef>, SILVTable::Entry>
@@ -404,20 +404,15 @@ public:
   const_iterator zombies_begin() const { return zombieFunctions.begin(); }
   const_iterator zombies_end() const { return zombieFunctions.end(); }
 
+  llvm::ArrayRef<SILVTable*> getVTables() const {
+    return llvm::ArrayRef<SILVTable*>(vtables);
+  }
   using vtable_iterator = VTableListType::iterator;
   using vtable_const_iterator = VTableListType::const_iterator;
-  VTableListType &getVTableList() { return vtables; }
-  const VTableListType &getVTableList() const { return vtables; }
-  vtable_iterator vtable_begin() { return vtables.begin(); }
-  vtable_iterator vtable_end() { return vtables.end(); }
-  vtable_const_iterator vtable_begin() const { return vtables.begin(); }
-  vtable_const_iterator vtable_end() const { return vtables.end(); }
-  iterator_range<vtable_iterator> getVTables() {
-    return {vtables.begin(), vtables.end()};
-  }
-  iterator_range<vtable_const_iterator> getVTables() const {
-    return {vtables.begin(), vtables.end()};
-  }
+  vtable_iterator vtable_begin() { return getVTables().begin(); }
+  vtable_iterator vtable_end() { return getVTables().end(); }
+  vtable_const_iterator vtable_begin() const { return getVTables().begin(); }
+  vtable_const_iterator vtable_end() const { return getVTables().end(); }
 
   using witness_table_iterator = WitnessTableListType::iterator;
   using witness_table_const_iterator = WitnessTableListType::const_iterator;

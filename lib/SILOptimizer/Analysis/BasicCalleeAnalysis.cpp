@@ -107,10 +107,10 @@ void CalleeCache::computeClassMethodCallees() {
   // This is a little bit more complicated than to just check the VTable
   // entry.Method itself, because an overridden method might be more accessible
   // than the base method (e.g. a public method overrides a private method).
-  for (auto &VTable : M.getVTableList()) {
-    assert(!VTable.getClass()->hasClangNode());
+  for (auto &VTable : M.getVTables()) {
+    assert(!VTable->getClass()->hasClangNode());
 
-    for (Decl *member : VTable.getClass()->getMembers()) {
+    for (Decl *member : VTable->getClass()->getMembers()) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
         // If a method implementation might be overridden in another translation
         // unit, also mark all the base methods as 'unknown'.
@@ -127,8 +127,8 @@ void CalleeCache::computeClassMethodCallees() {
   }
 
   // Second step: collect all implementations of a method.
-  for (auto &VTable : M.getVTableList()) {
-    for (const SILVTable::Entry &entry : VTable.getEntries()) {
+  for (auto &VTable : M.getVTables()) {
+    for (const SILVTable::Entry &entry : VTable->getEntries()) {
       if (auto *afd = entry.Method.getAbstractFunctionDecl()) {
         CalleesAndCanCallUnknown &callees = getOrCreateCalleesForMethod(entry.Method);
         if (unknownCallees.count(afd) != 0)
@@ -308,8 +308,8 @@ void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
     os << "<no cache>\n";
   }
   llvm::DenseSet<SILDeclRef> printed;
-  for (auto &VTable : M.getVTableList()) {
-    for (const SILVTable::Entry &entry : VTable.getEntries()) {
+  for (auto &VTable : M.getVTables()) {
+    for (const SILVTable::Entry &entry : VTable->getEntries()) {
       if (printed.insert(entry.Method).second) {
         os << "callees for " << entry.Method << ":\n";
         Cache->getCalleeList(entry.Method).print(os);
