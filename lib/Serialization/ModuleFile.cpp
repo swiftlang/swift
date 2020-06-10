@@ -152,6 +152,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::ARE_PRIVATE_IMPORTS_ENABLED:
       extendedInfo.setPrivateImportsEnabled(true);
       break;
+    case options_block::IS_IMPLICIT_DYNAMIC_ENABLED:
+      extendedInfo.setImplicitDynamicEnabled(true);
+      break;
     case options_block::RESILIENCE_STRATEGY:
       unsigned Strategy;
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
