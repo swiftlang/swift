@@ -299,8 +299,11 @@ public:
 static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
-  bool isOnMetaType = baseTy->is<AnyMetatypeType>();
   auto baseInstanceTy = baseTy->getMetatypeInstanceType();
+  if (!baseInstanceTy->mayHaveMembers())
+    return;
+
+  bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
   if (!DC.lookupQualified(baseInstanceTy,
@@ -389,8 +392,6 @@ static void collectPossibleCalleesByQualifiedLookup(
     baseTy = *baseTyOpt;
   }
   baseTy = baseTy->getWithoutSpecifierType();
-  if (!baseTy->getMetatypeInstanceType()->mayHaveMembers())
-    return;
 
   // Use metatype for lookup 'super.init' if it's inside constructors.
   if (isa<SuperRefExpr>(baseExpr) && isa<ConstructorDecl>(DC) &&
@@ -398,6 +399,22 @@ static void collectPossibleCalleesByQualifiedLookup(
     baseTy = MetatypeType::get(baseTy);
 
   collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
+
+  // Add virtual 'subscript<Value>(keyPath: KeyPath<Root, Value>) -> Value'.
+  if (name.getBaseName() == DeclBaseName::createSubscript() &&
+      (baseTy->getAnyNominal() || baseTy->is<ArchetypeType>() ||
+       baseTy->is<TupleType>())) {
+    auto &Ctx = DC.getASTContext();
+
+    auto *kpDecl = Ctx.getKeyPathDecl();
+    Type kpTy = kpDecl->mapTypeIntoContext(kpDecl->getDeclaredInterfaceType());
+    Type kpValueTy = kpTy->castTo<BoundGenericType>()->getGenericArgs()[1];
+    kpTy = BoundGenericType::get(kpDecl, Type(), {baseTy, kpValueTy});
+
+    Type fnTy = FunctionType::get(
+        {AnyFunctionType::Param(kpTy, Ctx.Id_keyPath)}, kpValueTy);
+    candidates.emplace_back(fnTy->castTo<AnyFunctionType>(), nullptr);
+  }
 }
 
 /// For the given \c callExpr, collect possible callee types and declarations.
