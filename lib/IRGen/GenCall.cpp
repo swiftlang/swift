@@ -1318,6 +1318,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   // Convert each parameter to a Clang type.
   for (auto param : params) {
     auto clangTy = IGM.getClangType(param, FnType);
+    // If a parameter type is lowered to void, this means it should be ignored.
+    // For example, this happens for thin metatypes.
     if (clangTy->isVoidType()) {
       continue;
     }
