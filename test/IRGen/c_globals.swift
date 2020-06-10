@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -Xcc -mno-omit-leaf-frame-pointer | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -Xcc -mno-omit-leaf-frame-pointer | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu-%target-abi
 
 import c_layout
 
@@ -31,5 +31,37 @@ public func testCaptureGlobal() {
   }) // CHECK: {{^}$}}
 }
 
-// CHECK-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
-// CHECK-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+// CHECK-i386-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-i386-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+// CHECK-i386-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-i386-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-x86_64-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-x86_64-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+// CHECK-x86_64-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-x86_64-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-armv7-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+// CHECK-armv7-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-armv7s-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7s-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+// CHECK-armv7s-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7s-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-armv7k-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7k-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+// CHECK-armv7k-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-armv7k-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+
+// CHECK-arm64-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="non-leaf"{{.*}}
+// CHECK-arm64-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="non-leaf" {{.*}}"target-cpu"
+// CHECK-arm64-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="non-leaf"{{.*}}
+// CHECK-arm64-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="non-leaf" {{.*}}"target-cpu"
+
+// CHECK-arm64e-SYSV-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="non-leaf"{{.*}}
+// CHECK-arm64e-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="non-leaf" {{.*}}"target-cpu"
+// CHECK-arm64e-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="non-leaf"{{.*}}
+// CHECK-arm64e-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="non-leaf" {{.*}}"target-cpu"
