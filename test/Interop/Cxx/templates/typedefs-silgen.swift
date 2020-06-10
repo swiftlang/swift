@@ -7,8 +7,8 @@ import Typedefs
 
 public func foo() -> CInt {
   let banana = Banana()
-  var peeled: PeeledBanana = PeeledBanana(t: banana)
-  return peeled.doPeel()
+  var peeled: PeeledBanana = PeeledBanana(fruit: banana)
+  return peeled.peeledTaste()
 }
 
 // CHECK: sil @$s4main3foos5Int32VyF : $@convention(thin) () -> Int32 {
@@ -16,8 +16,8 @@ public func foo() -> CInt {
 // CHECK: %2 = alloc_stack $__Peel__Banana__, var, name "peeled"
 // CHECK: %3 = struct $__Peel__Banana__ (%0 : $Banana)
 // CHECK: store %3 to %2 : $*__Peel__Banana__
-// CHECK: %6 = function_ref @_ZNK4PeelI6BananaE6doPeelEv : $@convention(c) (@inout __Peel__Banana__) -> Int32
+// CHECK: %6 = function_ref @_ZNK4PeelI6BananaE11peeledTasteEv : $@convention(c) (@inout __Peel__Banana__) -> Int32
 // CHECK: %7 = apply %6(%5) : $@convention(c) (@inout __Peel__Banana__) -> Int32
 
-// CHECK: // clang name: Peel<Banana>::doPeel
-// CHECK: sil [clang __Peel__Banana__.doPeel] @_ZNK4PeelI6BananaE6doPeelEv : $@convention(c) (@inout __Peel__Banana__) -> Int32
+// CHECK: // clang name: Peel<Banana>::peeledTaste
+// CHECK: sil [clang __Peel__Banana__.peeledTaste] @_ZNK4PeelI6BananaE11peeledTasteEv : $@convention(c) (@inout __Peel__Banana__) -> Int32

@@ -3477,20 +3477,28 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      Impl.getClangSema().InstantiateClassTemplateSpecialization(
-          decl->getLocation(),
-          const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
-          decl->getTemplateSpecializationKind());
+      assert(!decl->isInvalidDecl() && "Unexpected invalid decl");
+      assert(!decl->getCanonicalDecl()->isInvalidDecl() &&
+          "Unexpected invalid canonical decl");
+      if (!Impl.getClangSema().isCompleteType(
+              decl->getLocation(),
+              Impl.getClangASTContext().getRecordType(decl))) {
+        // Not importing incomplete types
+        return nullptr;
+      }
       auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
           decl->getDefinition());
+      assert(def && "Expected instantiation with definition, "\
+          "but definition wasn't found");
       Impl.getClangSema().InstantiateClassTemplateSpecializationMembers(
           def->getLocation(), def, clang::TSK_ExplicitInstantiationDefinition);
-      return VisitRecordDecl(decl);
+
+      return VisitRecordDecl(def);
     }
 
     Decl *VisitClassTemplatePartialSpecializationDecl(
-                 const clang::ClassTemplatePartialSpecializationDecl *decl) {
-      // Note: templates are not imported.
+        const clang::ClassTemplatePartialSpecializationDecl *decl) {
+      // Note: partial template specializations are not imported.
       return nullptr;
     }
 
