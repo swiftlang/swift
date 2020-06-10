@@ -1,3 +1,0 @@
-# Dependencies before compilation:
-depends-top-level: [x, !private a]
-provides-nominal: [b]
