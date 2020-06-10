@@ -115,6 +115,9 @@ SILModule::~SILModule() {
   for (SILGlobalVariable &v : silGlobals)
     v.dropAllReferences();
 
+  for (auto vt : vtables)
+    vt->~SILVTable();
+
   // Drop everything functions in this module reference.
   //
   // This is necessary since the functions may reference each other.  We don't

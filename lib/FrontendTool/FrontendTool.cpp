@@ -736,7 +736,7 @@ static void countStatsPostSILGen(UnifiedStatsReporter &Stats,
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time, via the dense maps.
   C.NumSILGenFunctions += Module.getFunctionList().size();
-  C.NumSILGenVtables += Module.getVTableList().size();
+  C.NumSILGenVtables += Module.getVTables().size();
   C.NumSILGenWitnessTables += Module.getWitnessTableList().size();
   C.NumSILGenDefaultWitnessTables += Module.getDefaultWitnessTableList().size();
   C.NumSILGenGlobalVariables += Module.getSILGlobalList().size();
