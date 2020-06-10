@@ -813,6 +813,10 @@ public:
       TypeArrayView<GenericTypeParamType> genericParams,
       ArrayRef<Requirement> requirements, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
+  void printSingleDepthOfGenericSignature(
+      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
+      llvm::function_ref<bool(const Requirement &)> filter);
   void printRequirement(const Requirement &req);
 
 private:
@@ -872,7 +876,12 @@ public:
       return false; // not needed for the parser library.
     #endif
 
-    if (!shouldPrint(D, true))
+    bool Synthesize =
+        Options.TransformContext &&
+        Options.TransformContext->isPrintingSynthesizedExtension() &&
+        isa<ExtensionDecl>(D);
+
+    if (!shouldPrint(D, true) && !Synthesize)
       return false;
 
     Decl *Old = Current;
@@ -890,10 +899,6 @@ public:
 
     SWIFT_DEFER { CurrentType = OldType; };
 
-    bool Synthesize =
-        Options.TransformContext &&
-        Options.TransformContext->isPrintingSynthesizedExtension() &&
-        isa<ExtensionDecl>(D);
     if (Synthesize) {
       Printer.setSynthesizedTarget(Options.TransformContext->getDecl());
     }
@@ -1456,6 +1461,15 @@ void PrintAST::printSingleDepthOfGenericSignature(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
+  bool isFirstReq = true;
+  printSingleDepthOfGenericSignature(genericParams, requirements, isFirstReq,
+                                     flags, filter);
+}
+
+void PrintAST::printSingleDepthOfGenericSignature(
+    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
+    llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
   printRequirements &= Options.PrintGenericRequirements;
@@ -1502,7 +1516,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
   }
 
   if (printRequirements || printInherited) {
-    bool isFirstReq = true;
     for (const auto &req : requirements) {
       if (!filter(req))
         continue;
@@ -1564,9 +1577,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
         }
       } else {
         Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-
-        // We don't substitute type for the printed requirement so that the
-        // printed requirement agrees with separately reported generic parameters.
         printRequirement(req);
         Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       }
@@ -1578,7 +1588,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
 }
 
 void PrintAST::printRequirement(const Requirement &req) {
-  printType(req.getFirstType());
+  printTransformedType(req.getFirstType());
   switch (req.getKind()) {
   case RequirementKind::Layout:
     Printer << " : ";
@@ -1592,7 +1602,7 @@ void PrintAST::printRequirement(const Requirement &req) {
     Printer << " == ";
     break;
   }
-  printType(req.getSecondType());
+  printTransformedType(req.getSecondType());
 }
 
 bool PrintAST::shouldPrintPattern(const Pattern *P) {
@@ -2183,8 +2193,52 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
   Ty->print(Printer, Options);
 }
 
+
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
+
+  auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
+    auto Sig = ED->getGenericSignature();
+    printSingleDepthOfGenericSignature(Sig->getGenericParams(),
+                                       Sig->getRequirements(),
+                                       IsFirst, PrintRequirements,
+                                       [](const Requirement &Req){
+      return true;
+    });
+  };
+
+  auto printCombinedRequirementsIfNeeded = [&]() -> bool {
+    if (!Options.TransformContext ||
+        !Options.TransformContext->isPrintingSynthesizedExtension())
+      return false;
+
+    // Combined requirements only needed if the transform context is an enabling
+    // extension of the protocol rather than a nominal (which can't have
+    // constraints of its own).
+    ExtensionDecl *Target = dyn_cast<ExtensionDecl>(
+      Options.TransformContext->getDecl().getAsDecl());
+    if (!Target || Target == ExtDecl)
+      return false;
+
+    bool IsFirst = true;
+    if (ExtDecl->isConstrainedExtension()) {
+      printRequirementsFrom(ExtDecl, IsFirst);
+    }
+    if (Target->isConstrainedExtension()) {
+      if (auto *NTD = Target->getExtendedNominal()) {
+        // Update the current decl and type transform for Target rather than
+        // ExtDecl.
+        PrintOptions Adjusted = Options;
+        Adjusted.initForSynthesizedExtension(NTD);
+        llvm::SaveAndRestore<Decl*> TempCurrent(Current, NTD);
+        llvm::SaveAndRestore<PrintOptions> TempOptions(Options, Adjusted);
+        printRequirementsFrom(Target, IsFirst);
+      }
+    }
+    return true;
+  };
+
+
   if (Options.BracketOptions.shouldOpenExtension(ExtDecl)) {
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
@@ -2192,7 +2246,25 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 
     printExtendedTypeName(ExtendedType, Printer, Options);
     printInherited(ExtDecl);
-    printDeclGenericRequirements(ExtDecl);
+
+    // We may need to combine requirements from ExtDecl (which has the members
+    // to print) and the TransformContexts' decl if it is an enabling extension
+    // of the base NominalDecl (which can have its own requirements) rather than
+    // base NominalDecl itself (which can't). E.g:
+    //
+    //   protocol Foo {}
+    //   extension Foo where <requirments from ExtDecl> { ... }
+    //   struct Bar {}
+    //   extension Bar: Foo where <requirments from TransformContext> { ... }
+    //
+    // should produce a synthesized extension of Bar with both sets of
+    // requirments:
+    //
+    //   extension Bar where <requirments from ExtDecl+TransformContext { ... }
+    //
+    if (!printCombinedRequirementsIfNeeded())
+      printDeclGenericRequirements(ExtDecl);
+
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(ExtDecl, false,
