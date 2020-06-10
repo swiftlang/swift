@@ -929,8 +929,8 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   assert(getProtocol() == cast<ProtocolDecl>(requirement->getDeclContext()) &&
          "requirement in wrong protocol");
-  assert(Mapping.count(requirement) == 0 && "Witness already known");
-  assert((!isComplete() || isInvalid() ||
+  assert(getProtocol()->getASTContext().LangOpts.EnableConformingExtensions ||
+         (!isComplete() || isInvalid() ||
           requirement->getAttrs().hasAttribute<OptionalAttr>() ||
           requirement->getAttrs().isUnavailable(
                                         requirement->getASTContext())) &&
@@ -1207,6 +1207,13 @@ ProtocolConformance *
 ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
   auto result =
     getAssociatedConformance(getProtocol()->getSelfInterfaceType(), protocol);
+  if (!result.isConcrete()) {
+    // Late conformance through protocol extension in different module
+    SmallVector<ProtocolConformance *, 1> conformances;
+    NominalTypeDecl *nominal = getType()->getAnyNominal();
+    if (nominal->lookupConformance(nullptr, protocol, conformances))
+      result = ProtocolConformanceRef(conformances.front());
+  }
   return result.isConcrete() ? result.getConcrete() : nullptr;
 }
 

@@ -1,4 +1,5 @@
-// RUN: %target-run-swift -enable-conforming-protocol-extensions %s | %FileCheck %s
+// RUN: %target-build-swift -enable-conforming-protocol-extensions %s -o %t.out
+// RUN: %target-run %t.out | %FileCheck %s
 
 public extension FixedWidthInteger: ExpressibleByUnicodeScalarLiteral {
     @_transparent

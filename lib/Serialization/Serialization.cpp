@@ -1339,8 +1339,10 @@ void Serializer::writeASTBlockEntity(
     return false;
   });
 
-  conformance->forEachValueWitness([&](ValueDecl *req, Witness witness) {
-      ++numValueWitnesses;
+  bool serializeSyntheticSubs = false;
+  auto seriaiseValueWitnesses = [&](ValueDecl *req, Witness witness) {
+      if (!serializeSyntheticSubs)
+        ++numValueWitnesses;
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
       assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
@@ -1364,7 +1366,32 @@ void Serializer::writeASTBlockEntity(
         subs = subs.mapReplacementTypesOutOfContext();
 
       data.push_back(addSubstitutionMapRef(subs));
-  });
+
+      if (!serializeSyntheticSubs)
+        return;
+
+      auto syntheticSubs = witness.getRequirementToSyntheticSubs();
+
+      // Canonicalize8away typealiases, since these substitutions aren't used
+      // for diagnostics and we reference fewer declarations that way.
+      syntheticSubs = syntheticSubs.getCanonical();
+
+      // Map archetypes to type parameters, since we always substitute them
+      // away. Note that in a merge-modules pass, we're serializing conformances
+      // that we deserialized, so they will already have their replacement types
+      // in terms of interface types; hence the hasArchetypes() check is
+      // necessary for correctness, not just as a fast path.
+      if (syntheticSubs.hasArchetypes())
+        syntheticSubs = syntheticSubs.mapReplacementTypesOutOfContext();
+
+      data.push_back(addSubstitutionMapRef(syntheticSubs));
+  };
+
+  conformance->forEachValueWitness(seriaiseValueWitnesses);
+
+  // serialize RequirementToSyntheticSubs to allow conforming protocl etensions
+  serializeSyntheticSubs = true;
+  conformance->forEachValueWitness(seriaiseValueWitnesses);
 
   unsigned numSignatureConformances =
       conformance->getSignatureConformances().size();
