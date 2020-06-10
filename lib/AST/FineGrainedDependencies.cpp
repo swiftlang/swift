@@ -52,21 +52,11 @@ Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
 
 Optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
-  if (false) {
-    SourceFileDepGraph fg;
-    llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), nullptr);
-    yamlReader >> fg;
-    if (yamlReader.error())
-      return None;
-    // return fg; compiles for Mac but not Linux, because it cannot be copied.
-    return Optional<SourceFileDepGraph>(std::move(fg));
-  } else {
-    SourceFileDepGraph fg;
-    if (swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
-        buffer, fg))
-      return None;
-    return Optional<SourceFileDepGraph>(std::move(fg));
-  }
+  SourceFileDepGraph fg;
+  if (swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
+      buffer, fg))
+    return None;
+  return Optional<SourceFileDepGraph>(std::move(fg));
 }
 
 //==============================================================================

@@ -292,18 +292,7 @@ bool fine_grained_dependencies::emitReferenceDependencies(
                              SF, outputPath, depTracker, alsoEmitDotFile)
                               .construct();
 
-  bool hadError = false;
-  if (false) {
-    hadError =
-      withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        out << g.yamlProlog(SF->getASTContext().hadError());
-        llvm::yaml::Output yamlWriter(out);
-        yamlWriter << g;
-        return false;
-      });
-  } else {
-    hadError = writeFineGrainedDependencyGraph(diags, outputPath, g);
-  }
+  bool hadError = writeFineGrainedDependencyGraph(diags, outputPath, g);
 
   // If path is stdout, cannot read it back, so check for "-"
   assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));

@@ -35,6 +35,7 @@ class Deserializer {
   SmallVector<uint64_t, 64> Scratch;
   StringRef BlobData;
 
+  // These all return true if there was an error.
   bool readSignature();
   bool enterTopLevelBlock();
   bool readMetadata();
@@ -63,6 +64,8 @@ bool Deserializer::readSignature() {
 }
 
 bool Deserializer::enterTopLevelBlock() {
+  // Read the BLOCKINFO_BLOCK, which contains metadata used when dumping
+  // the binary data with llvm-bcanalyzer.
   {
     auto next = Cursor.advance();
     if (!next) {
@@ -80,6 +83,7 @@ bool Deserializer::enterTopLevelBlock() {
       return true;
   }
 
+  // Enters our subblock, which contains the actual dependency information.
   {
     auto next = Cursor.advance();
     if (!next) {
