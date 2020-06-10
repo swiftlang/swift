@@ -4,7 +4,7 @@
 // CHECK: !DICompositeType(tag: DW_TAG_array_type, baseType: ![[FLOAT:[0-9]+]], size: 64, flags: DIFlagVector, elements: ![[ELTS:[0-9]+]])
 // CHECK: ![[FLOAT]] = !DIBasicType(name: "$sBf32_D", size: 32, encoding: DW_ATE_float)
 // CHECK: ![[ELTS]] = !{![[SR:[0-9]+]]}
-// CHECK: ![[SR]] = !DISubrange(count: 2)
+// CHECK: ![[SR]] = !DISubrange(count: 2, lowerBound: 0)
 
 
 import Swift
