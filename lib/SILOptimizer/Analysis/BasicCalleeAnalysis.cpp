@@ -129,11 +129,12 @@ void CalleeCache::computeClassMethodCallees() {
   // Second step: collect all implementations of a method.
   for (auto &VTable : M.getVTables()) {
     for (const SILVTable::Entry &entry : VTable->getEntries()) {
-      if (auto *afd = entry.Method.getAbstractFunctionDecl()) {
-        CalleesAndCanCallUnknown &callees = getOrCreateCalleesForMethod(entry.Method);
+      if (auto *afd = entry.getMethod().getAbstractFunctionDecl()) {
+        CalleesAndCanCallUnknown &callees =
+            getOrCreateCalleesForMethod(entry.getMethod());
         if (unknownCallees.count(afd) != 0)
           callees.setInt(1);
-        callees.getPointer()->push_back(entry.Implementation);
+        callees.getPointer()->push_back(entry.getImplementation());
       }
     }
   }
@@ -310,9 +311,9 @@ void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
   llvm::DenseSet<SILDeclRef> printed;
   for (auto &VTable : M.getVTables()) {
     for (const SILVTable::Entry &entry : VTable->getEntries()) {
-      if (printed.insert(entry.Method).second) {
-        os << "callees for " << entry.Method << ":\n";
-        Cache->getCalleeList(entry.Method).print(os);
+      if (printed.insert(entry.getMethod()).second) {
+        os << "callees for " << entry.getMethod() << ":\n";
+        Cache->getCalleeList(entry.getMethod()).print(os);
       }
     }
   }

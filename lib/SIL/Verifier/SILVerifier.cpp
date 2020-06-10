@@ -5378,10 +5378,10 @@ void SILVTable::verify(const SILModule &M) const {
     auto &entry = getEntries()[i];
     
     // All vtable entries must be decls in a class context.
-    assert(entry.Method.hasDecl() && "vtable entry is not a decl");
-    auto baseInfo =
-        M.Types.getConstantInfo(TypeExpansionContext::minimal(), entry.Method);
-    ValueDecl *decl = entry.Method.getDecl();
+    assert(entry.getMethod().hasDecl() && "vtable entry is not a decl");
+    auto baseInfo = M.Types.getConstantInfo(TypeExpansionContext::minimal(),
+                                            entry.getMethod());
+    ValueDecl *decl = entry.getMethod().getDecl();
 
     assert((!isa<AccessorDecl>(decl)
             || !cast<AccessorDecl>(decl)->isObservingAccessor())
@@ -5389,7 +5389,7 @@ void SILVTable::verify(const SILModule &M) const {
 
     // For ivar destroyers, the decl is the class itself.
     ClassDecl *theClass;
-    if (entry.Method.kind == SILDeclRef::Kind::IVarDestroyer)
+    if (entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer)
       theClass = dyn_cast<ClassDecl>(decl);
     else
       theClass = dyn_cast<ClassDecl>(decl->getDeclContext());
@@ -5401,29 +5401,29 @@ void SILVTable::verify(const SILModule &M) const {
            "vtable entry must refer to a member of the vtable's class");
 
     // Foreign entry points shouldn't appear in vtables.
-    assert(!entry.Method.isForeign && "vtable entry must not be foreign");
-    
+    assert(!entry.getMethod().isForeign && "vtable entry must not be foreign");
+
     // The vtable entry must be ABI-compatible with the overridden vtable slot.
     SmallString<32> baseName;
     {
       llvm::raw_svector_ostream os(baseName);
-      entry.Method.print(os);
+      entry.getMethod().print(os);
     }
 
     if (M.getStage() != SILStage::Lowered) {
-      SILVerifier(*entry.Implementation)
+      SILVerifier(*entry.getImplementation())
           .requireABICompatibleFunctionTypes(
               baseInfo.getSILType().castTo<SILFunctionType>(),
-              entry.Implementation->getLoweredFunctionType(),
+              entry.getImplementation()->getLoweredFunctionType(),
               "vtable entry for " + baseName + " must be ABI-compatible",
-              *entry.Implementation);
+              *entry.getImplementation());
     }
     
     // Validate the entry against its superclass vtable.
     if (!superclass) {
       // Root methods should not have inherited or overridden entries.
       bool validKind;
-      switch (entry.TheKind) {
+      switch (entry.getKind()) {
       case Entry::Normal:
       case Entry::NormalNonOverridden:
         validKind = true;
@@ -5441,13 +5441,14 @@ void SILVTable::verify(const SILModule &M) const {
 
       const Entry *superEntry = nullptr;
       for (auto &se : superVTable->getEntries()) {
-        if (se.Method.getOverriddenVTableEntry() == entry.Method.getOverriddenVTableEntry()) {
+        if (se.getMethod().getOverriddenVTableEntry() ==
+            entry.getMethod().getOverriddenVTableEntry()) {
           superEntry = &se;
           break;
         }
       }
-      
-      switch (entry.TheKind) {
+
+      switch (entry.getKind()) {
       case Entry::Normal:
       case Entry::NormalNonOverridden:
         assert(!superEntry && "non-root vtable entry must be inherited or override");
@@ -5461,8 +5462,9 @@ void SILVTable::verify(const SILModule &M) const {
           break;
 
         // The superclass entry must not prohibit overrides.
-        assert(superEntry->TheKind != Entry::NormalNonOverridden
-               && "vtable entry overrides an entry that claims to have no overrides");
+        assert(
+            superEntry->getKind() != Entry::NormalNonOverridden &&
+            "vtable entry overrides an entry that claims to have no overrides");
         // TODO: Check the root vtable entry for the method too.
         break;
       }
@@ -5590,9 +5592,11 @@ void SILModule::verify() const {
     vt->verify(*this);
     // Check if there is a cache entry for each vtable entry
     for (auto entry : vt->getEntries()) {
-      if (VTableEntryCache.find({vt, entry.Method}) == VTableEntryCache.end()) {
+      if (VTableEntryCache.find({vt, entry.getMethod()}) ==
+          VTableEntryCache.end()) {
         llvm::errs() << "Vtable entry for function: "
-                     << entry.Implementation->getName() << "not in cache!\n";
+                     << entry.getImplementation()->getName()
+                     << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
       ++EntriesSZ;
