@@ -1054,11 +1054,14 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
   if (FuncOptMode == OptimizationMode::ForSize)
     Attrs.addAttribute(llvm::Attribute::MinSize);
 
-  auto triple = llvm::Triple(ClangOpts.Triple);
-  if (triple.getArchName() == "arm64e") {
+  if (IRGen.Opts.PointerAuth.ReturnAddresses)
     Attrs.addAttribute("ptrauth-returns");
+  if (IRGen.Opts.PointerAuth.FunctionPointers)
     Attrs.addAttribute("ptrauth-calls");
-  }
+  if (IRGen.Opts.PointerAuth.IndirectGotos)
+    Attrs.addAttribute("ptrauth-indirect-gotos");
+  if (IRGen.Opts.PointerAuth.AuthTraps)
+    Attrs.addAttribute("ptrauth-auth-traps");
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
