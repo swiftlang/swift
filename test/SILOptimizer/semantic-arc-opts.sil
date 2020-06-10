@@ -59,6 +59,7 @@ class ClassLet {
   @_hasStorage let aLet: Klass
   @_hasStorage var aVar: Klass
   @_hasStorage let aLetTuple: (Klass, Klass)
+  @_hasStorage let anOptionalLet: FakeOptional<Klass>
 
   @_hasStorage let anotherLet: ClassLet
 }
@@ -2203,4 +2204,32 @@ bb5(%9 : @owned $Builtin.NativeObject):
 bb6:
   %9999 = tuple()
   return %9999 : $()
+}
+
+// Make sure that we do not promote the load [copy] to a load_borrow since it
+// has a use outside of the access scope.
+//
+// CHECK-LABEL: sil [ossa] @deadEndBlockDoNotPromote : $@convention(method) (@guaranteed ClassLet) -> () {
+// CHECK: load_borrow
+// CHECK: load [copy]
+// CHECK: } // end sil function 'deadEndBlockDoNotPromote'
+sil [ossa] @deadEndBlockDoNotPromote : $@convention(method) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %4 = ref_element_addr %0 : $ClassLet, #ClassLet.anotherLet
+  %5 = load [copy] %4 : $*ClassLet
+  %6 = begin_borrow %5 : $ClassLet
+  %7 = ref_element_addr %6 : $ClassLet, #ClassLet.anOptionalLet
+  %8 = begin_access [read] [dynamic] %7 : $*FakeOptional<Klass>
+  %9 = load [copy] %8 : $*FakeOptional<Klass>
+  end_access %8 : $*FakeOptional<Klass>
+  end_borrow %6 : $ClassLet
+  destroy_value %5 : $ClassLet
+  switch_enum %9 : $FakeOptional<Klass>, case #FakeOptional.none!enumelt: bb1, case #FakeOptional.some!enumelt: bb2
+
+bb1:
+  %107 = tuple ()
+  return %107 : $()
+
+bb2(%39 : @owned $Klass):
+  unreachable
 }
