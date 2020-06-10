@@ -91,8 +91,9 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
-  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(DeclNameLoc(), nominal,
-                                                  funcDecl, funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), nominal, funcDecl,
+      funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
 
   // Create array of key path expressions to stored properties.
   llvm::SmallVector<Expr *, 2> keyPathExprs;
@@ -115,8 +116,7 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
     auto keyPathInterfaceType =
         computeKeyPathType(nominal, member->getInterfaceType());
     auto keyPathType = parentDC->mapTypeIntoContext(keyPathInterfaceType);
-    keyPathExpr = new (C)
-        CoerceExpr(keyPathExpr, SourceLoc(), TypeLoc::withoutLoc(keyPathType));
+    keyPathExpr = CoerceExpr::createImplicit(C, keyPathExpr, keyPathType);
     keyPathExprs.push_back(keyPathExpr);
   }
   // Return array of all key path expressions.
