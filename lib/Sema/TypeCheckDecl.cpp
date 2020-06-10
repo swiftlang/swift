@@ -838,7 +838,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
+  if (decl->isFinal() || decl->shouldUseObjCDispatch() || decl->hasClangNode())
     return false;
 
   auto &ctx = dc->getASTContext();
@@ -868,7 +868,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 
   auto base = decl->getOverriddenDecl();
 
-  if (!base || base->hasClangNode() || base->isObjCDynamic())
+  if (!base || base->hasClangNode() || base->shouldUseObjCDispatch())
     return true;
 
   // As above, convenience initializers are not formally overridable in Swift

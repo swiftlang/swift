@@ -468,7 +468,7 @@ bool shouldUseOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
 
   // Don't emit accessors for functions that are not dynamic or dynamic
   // replacements.
-  return namingDecl->isNativeDynamic() ||
+  return namingDecl->shouldUseNativeDynamicDispatch() ||
          (bool)namingDecl->getDynamicallyReplacedDecl();
 }
 
