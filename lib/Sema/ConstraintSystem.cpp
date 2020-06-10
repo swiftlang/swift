@@ -3065,6 +3065,85 @@ diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
   return cs.diagnoseAmbiguity(solutions);
 }
 
+static bool diagnoseAmbiguityWithContextualType(
+    ConstraintSystem &cs, SolutionDiff &solutionDiff,
+    ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregateFix,
+    ArrayRef<Solution> solutions) {
+  // Diagnose only if contextual failure is associated with every solution.
+  if (aggregateFix.size() < solutions.size())
+    return false;
+
+  auto getResultType =
+      [](const std::pair<const Solution *, const ConstraintFix *> &entry)
+      -> Type {
+    auto &solution = *entry.first;
+    auto anchor = entry.second->getLocator()->getAnchor();
+    return solution.simplifyType(solution.getType(anchor));
+  };
+
+  auto resultType = getResultType(aggregateFix.front());
+  // If right-hand side of the conversion (result of the the AST node)
+  // is the same across all of the solutions let's diagnose it as if
+  // it it as a single failure.
+  if (llvm::all_of(
+          aggregateFix,
+          [&](const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            return resultType->isEqual(getResultType(entry));
+          })) {
+    auto &fix = aggregateFix.front();
+    return fix.second->diagnose(*fix.first, /*asNote=*/false);
+  }
+
+  // If result types are different it could only mean that this is an attempt
+  // to convert a reference to, or call of overloaded declaration to a
+  // particular type.
+
+  auto &solution = *aggregateFix.front().first;
+  auto *locator = aggregateFix.front().second->getLocator();
+  auto *calleeLocator = solution.getCalleeLocator(locator);
+
+  auto result =
+      llvm::find_if(solutionDiff.overloads,
+                    [&calleeLocator](const SolutionDiff::OverloadDiff &entry) {
+                      return entry.locator == calleeLocator;
+                    });
+
+  if (result == solutionDiff.overloads.end())
+    return false;
+
+  auto &DE = cs.getASTContext().Diags;
+
+  auto anchor = locator->getAnchor();
+  auto name = result->choices.front().getName();
+  DE.diagnose(getLoc(anchor), diag::no_candidates_match_result_type,
+              name.getBaseName().userFacingName(),
+              cs.getContextualType(anchor));
+
+  for (const auto &solution : solutions) {
+    auto overload = solution.getOverloadChoice(calleeLocator);
+    if (auto *decl = overload.choice.getDeclOrNull()) {
+      auto loc = decl->getLoc();
+      if (loc.isInvalid())
+        continue;
+
+      auto type = solution.simplifyType(overload.boundType);
+
+      if (isExpr<ApplyExpr>(anchor) || isExpr<SubscriptExpr>(anchor) ||
+          (isExpr<UnresolvedMemberExpr>(anchor) &&
+           castToExpr<UnresolvedMemberExpr>(anchor)->hasArguments())) {
+        auto fnType = type->castTo<FunctionType>();
+        DE.diagnose(
+            loc, diag::cannot_convert_candidate_result_to_contextual_type,
+            decl->getName(), fnType->getResult(), cs.getContextualType(anchor));
+      } else {
+        DE.diagnose(loc, diag::found_candidate_type, type);
+      }
+    }
+  }
+
+  return true;
+}
+
 static bool diagnoseAmbiguity(
     ConstraintSystem &cs, const SolutionDiff::OverloadDiff &ambiguity,
     ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregateFix,
@@ -3244,13 +3323,18 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   }
 
   llvm::MapVector<ConstraintLocator *, SmallVector<Fix, 4>> fixesByCallee;
+  llvm::SmallVector<Fix, 4> contextualFixes;
 
   for (const auto &entry : fixes) {
     const auto &solution = *entry.first;
     const auto *fix = entry.second;
 
-    auto *calleeLocator = solution.getCalleeLocator(fix->getLocator());
+    if (fix->getLocator()->isForContextualType()) {
+      contextualFixes.push_back({&solution, fix});
+      continue;
+    }
 
+    auto *calleeLocator = solution.getCalleeLocator(fix->getLocator());
     fixesByCallee[calleeLocator].push_back({&solution, fix});
   }
 
@@ -3268,6 +3352,12 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     diagnosed |= ::diagnoseAmbiguity(*this, ambiguity, aggregate, solutions);
 
     consideredFixes.insert(aggregate.begin(), aggregate.end());
+  }
+
+  if (diagnoseAmbiguityWithContextualType(*this, solutionDiff, contextualFixes,
+                                          solutions)) {
+    consideredFixes.insert(contextualFixes.begin(), contextualFixes.end());
+    diagnosed |= true;
   }
 
   // Remove all of the fixes which have been attached to ambiguous
