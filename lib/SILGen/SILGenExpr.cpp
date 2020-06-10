@@ -2117,7 +2117,7 @@ ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
   if (array.hasCleanup())
     SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Active);
 
-  return SGF.emitUninitializedArrayFinalization(loc, array.forward(SGF));
+  return SGF.emitUninitializedArrayFinalization(loc, std::move(array));
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
