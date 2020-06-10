@@ -1481,11 +1481,6 @@ namespace {
     Type resolveTypeReferenceInExpression(TypeRepr *repr,
                                           TypeResolverContext resCtx) {
       TypeLoc loc(repr);
-      return resolveTypeReferenceInExpression(loc, resCtx);
-    }
-
-    Type resolveTypeReferenceInExpression(TypeLoc &loc,
-                                          TypeResolverContext resCtx) {
       TypeResolutionOptions options(resCtx);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       bool hadError = TypeChecker::validateType(
@@ -2581,10 +2576,16 @@ namespace {
             CS.getConstraintLocator(locator),
             TVO_CanBindToLValue | TVO_CanBindToNoEscape);
         FunctionRefKind functionRefKind = FunctionRefKind::Compound;
-        if (!enumPattern->getParentType().isNull()) {
+        if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
-          Type parentType = resolveTypeReferenceInExpression(
-              enumPattern->getParentType(), TypeResolverContext::InExpression);
+          Type parentType = [&]() -> Type {
+            if (auto preTy = enumPattern->getParentType()) {
+              return preTy;
+            }
+            return resolveTypeReferenceInExpression(
+                enumPattern->getParentTypeRepr(),
+                TypeResolverContext::InExpression);
+          }();
 
           if (!parentType)
             return Type();

@@ -483,13 +483,13 @@ public:
       = lookupEnumMemberElement(DC, ty, ude->getName(), ude->getLoc());
     if (!referencedElement)
       return nullptr;
-    
-    // Build a TypeRepr from the head of the full path.
-    TypeLoc loc(repr);
-    loc.setType(ty);
-    return new (Context) EnumElementPattern(
-        loc, ude->getDotLoc(), ude->getNameLoc(), ude->getName(),
-        referencedElement, nullptr);
+
+    auto *base =
+        TypeExpr::createForMemberDecl(repr, ude->getNameLoc(), enumDecl);
+    base->setType(MetatypeType::get(ty));
+    return new (Context)
+        EnumElementPattern(base, ude->getDotLoc(), ude->getNameLoc(),
+                           ude->getName(), referencedElement, nullptr);
   }
   
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
@@ -499,9 +499,10 @@ public:
       return nullptr;
     
     // Use the type of the enum from context.
-    TypeLoc loc = TypeLoc::withoutLoc(
-                            elt->getParentEnum()->getDeclaredTypeInContext());
-    return new (Context) EnumElementPattern(loc, SourceLoc(), de->getNameLoc(),
+    auto enumTy = elt->getParentEnum()->getDeclaredTypeInContext();
+    auto *base = TypeExpr::createImplicit(enumTy, Context);
+
+    return new (Context) EnumElementPattern(base, SourceLoc(), de->getNameLoc(),
                                             elt->createNameRef(), elt, nullptr);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
@@ -515,11 +516,11 @@ public:
                                              ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
-      TypeLoc loc = TypeLoc::withoutLoc(enumTy);
+      auto *base = TypeExpr::createImplicit(enumTy, Context);
 
-      return new (Context) EnumElementPattern(
-          loc, SourceLoc(), ude->getNameLoc(), ude->getName(),
-          referencedElement, nullptr);
+      return new (Context)
+          EnumElementPattern(base, SourceLoc(), ude->getNameLoc(),
+                             ude->getName(), referencedElement, nullptr);
     }
       
     
@@ -549,7 +550,7 @@ public:
 
     auto tailComponent = components.pop_back_val();
     EnumElementDecl *referencedElement = nullptr;
-    TypeLoc loc;
+    TypeExpr *baseTE = nullptr;
 
     if (components.empty()) {
       // Only one component. Try looking up an enum element in context.
@@ -560,7 +561,8 @@ public:
         return nullptr;
 
       auto *enumDecl = referencedElement->getParentEnum();
-      loc = TypeLoc::withoutLoc(enumDecl->getDeclaredTypeInContext());
+      baseTE = TypeExpr::createImplicit(enumDecl->getDeclaredTypeInContext(),
+                                        Context);
     } else {
       TypeResolutionOptions options = None;
       options |= TypeResolutionFlags::AllowUnboundGenerics;
@@ -573,7 +575,8 @@ public:
       // See first if the entire repr resolves to a type.
       Type enumTy = TypeResolution::forContextual(DC, options)
                         .resolveType(prefixRepr);
-      if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
+      auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
+      if (!enumDecl)
         return nullptr;
 
       referencedElement
@@ -583,18 +586,19 @@ public:
       if (!referencedElement)
         return nullptr;
 
-      loc = TypeLoc(prefixRepr);
-      loc.setType(enumTy);
+      baseTE = TypeExpr::createForMemberDecl(
+          prefixRepr, tailComponent->getNameLoc(), enumDecl);
+      baseTE->setType(MetatypeType::get(enumTy));
     }
 
+    assert(baseTE && baseTE->getType() && "Didn't initialize base expression?");
     assert(!isa<GenericIdentTypeRepr>(tailComponent) &&
            "should be handled above");
 
     auto *subPattern = getSubExprPattern(ce->getArg());
     return new (Context) EnumElementPattern(
-        loc, SourceLoc(), tailComponent->getNameLoc(),
-        tailComponent->getNameRef(), referencedElement,
-        subPattern);
+        baseTE, SourceLoc(), tailComponent->getNameLoc(),
+        tailComponent->getNameRef(), referencedElement, subPattern);
   }
 };
 
@@ -1204,11 +1208,10 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       auto EP = cast<ExprPattern>(P);
       if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
         auto *NoneEnumElement = Context.getOptionalNoneDecl();
-        P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
-                                             NLE->getLoc(),
-                                             DeclNameLoc(NLE->getLoc()),
-                                             NoneEnumElement->createNameRef(),
-                                             NoneEnumElement, nullptr);
+        auto *BaseTE = TypeExpr::createImplicit(type, Context);
+        P = new (Context) EnumElementPattern(
+            BaseTE, NLE->getLoc(), DeclNameLoc(NLE->getLoc()),
+            NoneEnumElement->createNameRef(), NoneEnumElement, nullptr);
         return TypeChecker::coercePatternToType(
             pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
       }
@@ -1238,24 +1241,25 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     SmallVector<Type, 2> castTypeOptionals;
     castType->lookThroughAllOptionalTypes(castTypeOptionals);
 
-    // If we have extra optionals on the input type. Create ".Some" patterns
-    // wrapping the isa pattern to balance out the optionals.
+    // If we have extra optionals on the input type. Create ".some" patterns
+    // wrapping the is pattern to balance out the optionals.
     int numExtraOptionals = inputTypeOptionals.size()-castTypeOptionals.size();
     if (numExtraOptionals > 0) {
       Pattern *sub = IP;
-      for (int i = 0; i < numExtraOptionals; ++i) {
+      auto extraOpts =
+          llvm::drop_begin(inputTypeOptionals, castTypeOptionals.size());
+      for (auto extraOptTy : llvm::reverse(extraOpts)) {
         auto some = Context.getOptionalDecl()->getUniqueElement(/*hasVal*/true);
-        sub = new (Context) EnumElementPattern(TypeLoc(),
-                                               IP->getStartLoc(),
-                                               DeclNameLoc(IP->getEndLoc()),
-                                               some->createNameRef(),
-                                               nullptr, sub);
+        auto *base = TypeExpr::createImplicit(extraOptTy, Context);
+        sub = new (Context) EnumElementPattern(
+            base, IP->getStartLoc(), DeclNameLoc(IP->getEndLoc()),
+            some->createNameRef(), nullptr, sub);
         sub->setImplicit();
       }
 
       P = sub;
       return coercePatternToType(
-          pattern.forSubPattern(P, /*retainTopLevle=*/true), type, options);
+          pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
     }
 
     CheckedCastKind castKind = TypeChecker::typeCheckCheckedCast(
@@ -1405,7 +1409,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       // coercing to.
       assert(!EEP->getParentType().isNull()
              && "enum with resolved element doesn't specify parent type?!");
-      auto parentTy = EEP->getParentType().getType();
+      auto parentTy = EEP->getParentType();
       // If the type matches exactly, use it.
       if (parentTy->isEqual(type)) {
         enumTy = type;
@@ -1519,12 +1523,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
     EEP->setElementDecl(elt);
     EEP->setType(enumTy);
-    
-    // Ensure that the type of our TypeLoc is fully resolved. If an unbound
-    // generic type was spelled in the source (e.g. `case Optional.None:`) this
-    // will fill in the generic parameters.
-    EEP->getParentType().setType(enumTy);
-    
+    EEP->setParentType(enumTy);
+
     // If we needed a cast, wrap the pattern in a cast pattern.
     if (castKind) {
       auto isPattern =

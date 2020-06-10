@@ -1698,8 +1698,8 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
 }
 
 Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
-  if (!P->isParentTypeImplicit())
-    if (doIt(P->getParentType()))
+  if (auto *TR = P->getParentTypeRepr())
+    if (doIt(TR))
       return nullptr;
 
   if (!P->hasSubPattern())

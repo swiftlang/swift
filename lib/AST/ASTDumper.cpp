@@ -514,8 +514,7 @@ namespace {
     void visitEnumElementPattern(EnumElementPattern *P) {
       printCommon(P, "pattern_enum_element");
       OS << ' ';
-      P->getParentType().getType().print(
-        PrintWithColorRAII(OS, TypeColor).getOS());
+      P->getParentType().print(PrintWithColorRAII(OS, TypeColor).getOS());
       PrintWithColorRAII(OS, IdentifierColor) << '.' << P->getName();
       if (P->hasSubPattern()) {
         OS << '\n';
