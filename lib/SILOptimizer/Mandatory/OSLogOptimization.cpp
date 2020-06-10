@@ -539,14 +539,15 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
       module.findFunction(allocatorMangledName, SILLinkage::PublicExternal);
   assert(arrayAllocateFun);
 
-  FuncDecl *arrayFinalizeDecl = astContext.getFinalizeUninitializedArray();
-  assert(arrayFinalizeDecl);
-  std::string finalizeMangledName =
-      SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
-  SILFunction *arrayFinalizeFun =
-      module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
-  assert(arrayFinalizeFun);
-  module.linkFunction(arrayFinalizeFun);
+  SILFunction *arrayFinalizeFun = nullptr;
+  if (FuncDecl *arrayFinalizeDecl = astContext.getFinalizeUninitializedArray()) {
+    std::string finalizeMangledName =
+        SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
+    arrayFinalizeFun =
+        module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
+    assert(arrayFinalizeFun);
+    module.linkFunction(arrayFinalizeFun);
+  }
 
   // Call the _allocateUninitializedArray function with numElementsSIL. The
   // call returns a two-element tuple, where the first element is the newly
@@ -605,12 +606,13 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
                                   StoreOwnershipQualifier::Init);
     ++elementIndex;
   }
-  FunctionRefInst *arrayFinalizeRef =
-      builder.createFunctionRef(loc, arrayFinalizeFun);
-  ApplyInst *finalizedArray = builder.createApply(
-      loc, arrayFinalizeRef, subMap, ArrayRef<SILValue>(arraySIL));
-
-  return finalizedArray;
+  if (arrayFinalizeFun) {
+    FunctionRefInst *arrayFinalizeRef =
+        builder.createFunctionRef(loc, arrayFinalizeFun);
+    arraySIL = builder.createApply(loc, arrayFinalizeRef, subMap,
+                                   ArrayRef<SILValue>(arraySIL));
+  }
+  return arraySIL;
 }
 
 /// Given a SILValue \p value, return the instruction immediately following the
