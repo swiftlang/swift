@@ -4286,7 +4286,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       if (!property)
         return;
       auto propertyVar = cast<VarDecl>(property);
-      if (propertyVar->isObjCDynamic() ||
+      if (propertyVar->shouldUseObjCDispatch() ||
           (propertyVar->isObjC() &&
            propertyVar->getParsedAccessor(AccessorKind::Set)))
         return;
