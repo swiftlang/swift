@@ -38,15 +38,35 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
                                                 DeclContext *dc,
                                                 CanGenericSignature sig) {
   SmallVector<GenericTypeParamDecl *, 2> clonedParams;
+  GenericParamList *genericParams = nullptr;
+
+  // Collect `genericParams` into a new `GenericParamList`.
+  auto collectNewGenericParamList = [&]() {
+    auto *params =
+        GenericParamList::create(ctx, SourceLoc(), clonedParams, SourceLoc());
+    params->setOuterParameters(genericParams);
+    genericParams = params;
+    clonedParams.clear();
+  };
+
+  unsigned lastDepth = sig->getGenericParams().front()->getDepth();
   for (auto paramType : sig->getGenericParams()) {
+    // If a generic parameter type with a new depth has been found, create a new
+    // generic parameter list.
+    if (paramType->getDepth() > lastDepth)
+      collectNewGenericParamList();
     auto clonedParam = new (ctx)
         GenericTypeParamDecl(dc, paramType->getName(), SourceLoc(),
                              paramType->getDepth(), paramType->getIndex());
     clonedParam->setDeclContext(dc);
     clonedParam->setImplicit(true);
     clonedParams.push_back(clonedParam);
+    lastDepth = clonedParam->getDepth();
   }
-  return GenericParamList::create(ctx, SourceLoc(), clonedParams, SourceLoc());
+  // Create a final innermost generic parameter list.
+  collectNewGenericParamList();
+  assert(genericParams);
+  return genericParams;
 }
 
 //===----------------------------------------------------------------------===//
