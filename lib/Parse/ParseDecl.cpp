@@ -811,10 +811,10 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   }
 
   // FIXME(ModQual): Reject module qualification on MemberName.
-
+  auto *TE = new (Context) TypeExpr(ProtocolType.get());
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
-                           ProtocolType.get(), MemberName.getFullName(),
+                           TE, MemberName.getFullName(),
                            MemberNameLoc));
 }
 

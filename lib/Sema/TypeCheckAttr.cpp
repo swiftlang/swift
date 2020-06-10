@@ -2841,23 +2841,21 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
-  TypeLoc &ProtoTypeLoc = attr->getProtocolType();
-
   DeclContext *DC = D->getDeclContext();
 
-  Type T = ProtoTypeLoc.getType();
-  if (!T && ProtoTypeLoc.getTypeRepr()) {
+  Type T = attr->getProtocolType();
+  if (!T && attr->getProtocolTypeRepr()) {
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
     T = TypeResolution::forContextual(DC, options)
-          .resolveType(ProtoTypeLoc.getTypeRepr());
-    ProtoTypeLoc.setType(T);
+          .resolveType(attr->getProtocolTypeRepr());
   }
 
   // Definite error-types were already diagnosed in resolveType.
-  if (T->hasError())
+  if (!T || T->hasError())
     return;
+  attr->setProtocolType(T);
 
   // Check that we got a ProtocolType.
   if (auto PT = T->getAs<ProtocolType>()) {
@@ -2882,12 +2880,12 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_not_conformed_to,
                NTD->getName(), PD->getName())
-        .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
+        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
     }
 
   } else {
     diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
-      .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
+      .highlight(attr->getProtocolTypeRepr()->getSourceRange());
   }
 }
 

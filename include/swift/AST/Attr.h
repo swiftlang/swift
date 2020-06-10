@@ -56,6 +56,7 @@ class LazyConformanceLoader;
 class LazyMemberLoader;
 class PatternBindingInitializer;
 class TrailingWhereClause;
+class TypeExpr;
 
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
@@ -1464,25 +1465,26 @@ public:
 /// The @_implements attribute, which treats a decl as the implementation for
 /// some named protocol requirement (but otherwise not-visible by that name).
 class ImplementsAttr : public DeclAttribute {
-
-  TypeLoc ProtocolType;
+  TypeExpr *ProtocolType;
   DeclName MemberName;
   DeclNameLoc MemberNameLoc;
 
 public:
   ImplementsAttr(SourceLoc atLoc, SourceRange Range,
-                 TypeLoc ProtocolType,
+                 TypeExpr *ProtocolType,
                  DeclName MemberName,
                  DeclNameLoc MemberNameLoc);
 
   static ImplementsAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range,
-                                TypeLoc ProtocolType,
+                                TypeExpr *ProtocolType,
                                 DeclName MemberName,
                                 DeclNameLoc MemberNameLoc);
 
-  TypeLoc getProtocolType() const;
-  TypeLoc &getProtocolType();
+  void setProtocolType(Type ty);
+  Type getProtocolType() const;
+  TypeRepr *getProtocolTypeRepr() const;
+
   DeclName getMemberName() const { return MemberName; }
   DeclNameLoc getMemberNameLoc() const { return MemberNameLoc; }
 

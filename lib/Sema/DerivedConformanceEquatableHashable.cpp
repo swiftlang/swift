@@ -506,13 +506,13 @@ deriveEquatable_eq(
   if (generatedIdentifier != C.Id_EqualsOperator) {
     auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
     auto equatableTy = equatableProto->getDeclaredType();
-    auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
+    auto equatableTyExpr = TypeExpr::createImplicit(equatableTy, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
     eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
                                                   SourceRange(),
-                                                  equatableTypeLoc,
+                                                  equatableTyExpr,
                                                   equalsDeclName,
                                                   DeclNameLoc()));
   }

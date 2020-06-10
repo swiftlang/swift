@@ -975,7 +975,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_implements");
     Printer << "(";
     auto *attr = cast<ImplementsAttr>(this);
-    attr->getProtocolType().getType().print(Printer, Options);
+    attr->getProtocolType().print(Printer, Options);
     Printer << ", " << attr->getMemberName() << ")";
     break;
   }
@@ -1814,7 +1814,7 @@ TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeLoc ProtocolType,
+                               TypeExpr *ProtocolType,
                                DeclName MemberName,
                                DeclNameLoc MemberNameLoc)
     : DeclAttribute(DAK_Implements, atLoc, range, /*Implicit=*/false),
@@ -1826,7 +1826,7 @@ ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
 
 ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
-                                       TypeLoc ProtocolType,
+                                       TypeExpr *ProtocolType,
                                        DeclName MemberName,
                                        DeclNameLoc MemberNameLoc) {
   void *mem = Ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
@@ -1834,12 +1834,17 @@ ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                   MemberName, MemberNameLoc);
 }
 
-TypeLoc ImplementsAttr::getProtocolType() const {
-  return ProtocolType;
+void ImplementsAttr::setProtocolType(Type ty) {
+  assert(ty);
+  ProtocolType->setType(MetatypeType::get(ty));
 }
 
-TypeLoc &ImplementsAttr::getProtocolType() {
-  return ProtocolType;
+Type ImplementsAttr::getProtocolType() const {
+  return ProtocolType->getInstanceType();
+}
+
+TypeRepr *ImplementsAttr::getProtocolTypeRepr() const {
+  return ProtocolType->getTypeRepr();
 }
 
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
