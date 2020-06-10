@@ -2,8 +2,8 @@
 
 import Constructors
 
-// The most important thing to test here is that the constructor result is returned
-// with an @out attribute.
+// The most important thing to test here is that the constructor result is
+// returned with an @out attribute.
 // CHECK: [[VAR:%[0-9]+]] = alloc_stack $ConstructorWithParam
 // CHECK: [[TYPE:%[0-9]+]] = metatype $@thin ConstructorWithParam.Type
 // CHECK: [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int32, 42
