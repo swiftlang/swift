@@ -29,8 +29,6 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
-#include "llvm/ADT/ilist_node.h"
-#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/Optional.h"
 #include <algorithm>
 
@@ -44,8 +42,7 @@ class SILModule;
 /// A mapping from each dynamically-dispatchable method of a class to the
 /// SILFunction that implements the method for that class.
 /// Note that dead methods are completely removed from the vtable.
-class SILVTable : public llvm::ilist_node<SILVTable>,
-                  public SILAllocated<SILVTable> {
+class SILVTable : public SILAllocated<SILVTable> {
 public:
   // TODO: Entry should include substitutions needed to invoke an overridden
   // generic base class method.
