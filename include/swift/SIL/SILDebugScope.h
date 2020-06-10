@@ -37,9 +37,10 @@ class SILInstruction;
 /// the inlining information. In LLVM IR the inline info is part of
 /// DILocation.
 class SILDebugScope : public SILAllocated<SILDebugScope> {
-public:
   /// The AST node this lexical scope represents.
   SILLocation Loc;
+
+public:
   /// Always points to the parent lexical scope.
   /// For top-level scopes, this is the SILFunction.
   PointerUnion<const SILDebugScope *, SILFunction *> Parent;
@@ -56,6 +57,7 @@ public:
   /// Create a scope for an artificial function.
   SILDebugScope(SILLocation Loc);
 
+  /// Get the location for the scope.
   SILLocation getLoc() const { return Loc; }
 
   /// Return the function this scope originated from before being inlined.

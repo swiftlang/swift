@@ -846,7 +846,7 @@ public:
       printDebugScope(DS->InlinedCallSite, SM);
       unsigned ID = Ctx.assignScopeID(DS);
       *this << "sil_scope " << ID << " { ";
-      printDebugLocRef(DS->Loc, SM, false);
+      printDebugLocRef(DS->getLoc(), SM, false);
       *this << " parent ";
       if (auto *F = DS->Parent.dyn_cast<SILFunction *>())
         *this << "@" << F->getName() << " : $" << F->getLoweredFunctionType();
@@ -940,7 +940,7 @@ public:
       else
         *this << '?';
       *this << " perf_inlined_at ";
-      auto CallSite = CS->Loc;
+      auto CallSite = CS->getLoc();
       if (!CallSite.isNull() && CallSite.isASTNode())
         CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);

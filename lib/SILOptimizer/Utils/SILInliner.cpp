@@ -644,7 +644,7 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
 
   auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
   auto *InlinedScope = new (M) SILDebugScope(
-      CalleeScope->Loc, ParentFunction,
+      CalleeScope->getLoc(), ParentFunction,
       ParentScope ? getOrCreateInlineScope(ParentScope) : nullptr, InlinedAt);
   InlinedScopeCache.insert({CalleeScope, InlinedScope});
   return InlinedScope;

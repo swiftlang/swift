@@ -345,7 +345,7 @@ private:
     if (CachedInlinedAt != InlinedAtCache.end())
       return cast<llvm::MDNode>(CachedInlinedAt->second);
 
-    auto L = decodeDebugLoc(CS->Loc);
+    auto L = decodeDebugLoc(CS->getLoc());
     auto Scope = getOrCreateScope(CS->Parent.dyn_cast<const SILDebugScope *>());
     // Pretend transparent functions don't exist.
     if (!Scope)
@@ -2067,7 +2067,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     return Parent;
 
   assert(DS->Parent && "lexical block must have a parent subprogram");
-  auto L = getStartLocation(DS->Loc);
+  auto L = getStartLocation(DS->getLoc());
   llvm::DIFile *File = getOrCreateFile(L.Filename);
   auto *DScope = DBuilder.createLexicalBlock(Parent, File, L.Line, L.Column);
 
@@ -2126,10 +2126,10 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
 
   StringRef Name;
   if (DS) {
-    if (DS->Loc.isSILFile())
+    if (DS->getLoc().isSILFile())
       Name = SILFn->getName();
     else
-      Name = getName(DS->Loc);
+      Name = getName(DS->getLoc());
   }
 
   /// The source line used for the function prologue.
@@ -2139,14 +2139,14 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                         SILFn->isTransparent()))) {
     // Bare functions and thunks should not have any line numbers. This
     // is especially important for shared functions like reabstraction
-    // thunk helpers, where DS->Loc is an arbitrary location of whichever use
-    // was emitted first.
+    // thunk helpers, where DS->getLoc() is an arbitrary location of whichever
+    // use was emitted first.
     L = SILLocation::getCompilerGeneratedDebugLoc();
   } else {
-    L = decodeDebugLoc(DS->Loc);
+    L = decodeDebugLoc(DS->getLoc());
     ScopeLine = L.Line;
-    if (!DS->Loc.isDebugInfoLoc())
-      L = decodeSourceLoc(DS->Loc.getSourceLoc());
+    if (!DS->getLoc().isDebugInfoLoc())
+      L = decodeSourceLoc(DS->getLoc().getSourceLoc());
   }
 
   auto Line = L.Line;

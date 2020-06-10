@@ -821,16 +821,16 @@ static SILDebugLocation skipInternalLocations(SILDebugLocation loc) {
   // the user's code, not in the guts we inlined through.
   for (; auto ics = ds->InlinedCallSite; ds = ics) {
     // If we found a valid inlined-into location, then we are good.
-    if (ds->Loc.getSourceLoc().isValid())
-      return SILDebugLocation(ds->Loc, ds);
+    if (ds->getLoc().getSourceLoc().isValid())
+      return SILDebugLocation(ds->getLoc(), ds);
     if (SILFunction *F = ds->getInlinedFunction()) {
       if (F->getLocation().getSourceLoc().isValid())
         break;
     }
   }
 
-  if (ds->Loc.getSourceLoc().isValid())
-    return SILDebugLocation(ds->Loc, ds);
+  if (ds->getLoc().getSourceLoc().isValid())
+    return SILDebugLocation(ds->getLoc(), ds);
 
   return loc;
 }

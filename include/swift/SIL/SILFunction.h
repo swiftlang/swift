@@ -744,19 +744,19 @@ public:
   /// FIXME: All functions should have locations, so this method should not be
   /// necessary.
   bool hasLocation() const {
-    return DebugScope && !DebugScope->Loc.isNull();
+    return DebugScope && !DebugScope->getLoc().isNull();
   }
 
   /// Get the source location of the function.
   SILLocation getLocation() const {
     assert(DebugScope && "no scope/location");
-    return getDebugScope()->Loc;
+    return getDebugScope()->getLoc();
   }
 
   /// Initialize the debug scope of the function and also set the DeclCtxt.
   void setDebugScope(const SILDebugScope *DS) {
     DebugScope = DS;
-    DeclCtxt = (DS ? DebugScope->Loc.getAsDeclContext() : nullptr);
+    DeclCtxt = (DS ? DebugScope->getLoc().getAsDeclContext() : nullptr);
   }
 
   /// Initialize the debug scope for debug info on SIL level (-gsil).
