@@ -464,6 +464,9 @@ public:
   void printClangType(const clang::Type *type,
                       llvm::raw_ostream &os) const override;
 
+  SourceLoc
+  resolveSourceLocation(clang::SourceLocation clangLoc) const override;
+
   StableSerializationPath
   findStableSerializationPath(const clang::Decl *decl) const override;
 
@@ -473,6 +476,7 @@ public:
 
   bool isSerializable(const clang::Type *type,
                       bool checkCanonical) const override;
+
   ArrayRef<std::string> getExtraClangArgs() const;
 };
 
