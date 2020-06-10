@@ -7115,6 +7115,24 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = cast<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
+  // Determine whether a function builder will be applied.
+  Type functionBuilderType;
+  ConstraintLocator *calleeLocator = nullptr;
+  if (auto last = locator.last()) {
+    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
+      calleeLocator = getCalleeLocator(getConstraintLocator(locator));
+      functionBuilderType = getFunctionBuilderTypeFor(
+          *this, argToParam->getParamIdx(), calleeLocator);
+    }
+  }
+
+  // Determine whether to introduce one-way constraints between the parameter's
+  // type as seen in the body of the closure and the external parameter
+  // type.
+  bool oneWayConstraints =
+    getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters ||
+    functionBuilderType;
+
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
@@ -7128,9 +7146,6 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
 
     Type internalType;
-
-    bool oneWayConstraints =
-      getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters;
     if (paramList->get(i)->getTypeRepr()) {
       // Internal type is the type used in the body of the closure,
       // so "external" type translates to it as follows:
@@ -7181,17 +7196,12 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                         inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
-  if (auto last = locator.last()) {
-    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
-      auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
-      if (auto functionBuilderType = getFunctionBuilderTypeFor(
-              *this, argToParam->getParamIdx(), calleeLocator)) {
-        if (auto result = matchFunctionBuilder(
-                closure, functionBuilderType, closureType->getResult(),
-                ConstraintKind::Conversion, calleeLocator, locator)) {
-          return result->isSuccess();
-        }
-      }
+  // If there is a function builder to apply, do so now.
+  if (functionBuilderType) {
+    if (auto result = matchFunctionBuilder(
+            closure, functionBuilderType, closureType->getResult(),
+            ConstraintKind::Conversion, calleeLocator, locator)) {
+      return result->isSuccess();
     }
   }
 
