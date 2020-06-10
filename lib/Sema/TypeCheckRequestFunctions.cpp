@@ -210,44 +210,109 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
     lookupDecl = accessor->getStorage();
   }
 
+  // Find all of the potentially inferred function builder types.
+  struct Match {
+    enum Kind {
+      Conformance,
+      DynamicReplacement,
+    } kind;
+
+    union {
+      struct {
+        ProtocolConformance *conformance;
+        ValueDecl *requirement;
+      } conformanceMatch;
+
+      ValueDecl *dynamicReplacement;
+    };
+
+    Type functionBuilderType;
+
+    static Match forConformance(
+        ProtocolConformance *conformance,
+        ValueDecl *requirement,
+        Type functionBuilderType) {
+      Match match;
+      match.kind = Conformance;
+      match.conformanceMatch.conformance = conformance;
+      match.conformanceMatch.requirement = requirement;
+      match.functionBuilderType = functionBuilderType;
+      return match;
+    }
+
+    static Match forDynamicReplacement(
+        ValueDecl *dynamicReplacement, Type functionBuilderType) {
+      Match match;
+      match.kind = DynamicReplacement;
+      match.dynamicReplacement = dynamicReplacement;
+      match.functionBuilderType = functionBuilderType;
+      return match;
+    }
+
+    DeclName getSourceName() const {
+      switch (kind) {
+      case Conformance:
+        return conformanceMatch.conformance->getProtocol()->getName();
+
+      case DynamicReplacement:
+        return dynamicReplacement->getName();
+      }
+    }
+  };
+
+  // The set of matches from which we can infer function builder types.
+  SmallVector<Match, 2> matches;
+
   // Determine all of the conformances within the same context as
   // this declaration. If this declaration is a witness to any
   // requirement within one of those protocols that has a function builder
   // attached, use that function builder type.
-  auto conformances = evaluateOrDefault(
-      dc->getASTContext().evaluator,
-      LookupAllConformancesInContextRequest{dc}, { });
+  auto addConformanceMatches = [&matches](ValueDecl *lookupDecl) {
+    DeclContext *dc = lookupDecl->getDeclContext();
+    auto idc = cast<IterableDeclContext>(dc->getAsDecl());
+    auto conformances = evaluateOrDefault(
+        dc->getASTContext().evaluator,
+        LookupAllConformancesInContextRequest{dc}, { });
 
-  // Find all of the potentially inferred function builder types.
-  struct Match {
-    ProtocolConformance *conformance;
-    ValueDecl *requirement;
-    Type functionBuilderType;
+    for (auto conformance : conformances) {
+      auto protocol = conformance->getProtocol();
+      for (auto found : protocol->lookupDirect(lookupDecl->getName())) {
+        if (!isa<ProtocolDecl>(found->getDeclContext()))
+          continue;
+
+        auto requirement = dyn_cast<ValueDecl>(found);
+        if (!requirement)
+          continue;
+
+        Type functionBuilderType = requirement->getFunctionBuilderType();
+        if (!functionBuilderType)
+          continue;
+
+        auto witness = conformance->getWitnessDecl(requirement);
+        if (witness != lookupDecl)
+          continue;
+
+        // Substitute into the function builder type.
+        auto subs =
+            conformance->getSubstitutions(lookupDecl->getModuleContext());
+        Type subFunctionBuilderType = functionBuilderType.subst(subs);
+
+        matches.push_back(
+            Match::forConformance(
+              conformance, requirement, subFunctionBuilderType));
+      }
+    }
   };
-  SmallVector<Match, 2> matches;
-  for (auto conformance : conformances) {
-    auto protocol = conformance->getProtocol();
-    for (auto found : protocol->lookupDirect(lookupDecl->getName())) {
-      if (!isa<ProtocolDecl>(found->getDeclContext()))
-        continue;
 
-      auto requirement = dyn_cast<ValueDecl>(found);
-      if (!requirement)
-        continue;
+  addConformanceMatches(lookupDecl);
 
-      Type functionBuilderType = requirement->getFunctionBuilderType();
-      if (!functionBuilderType)
-        continue;
-
-      auto witness = conformance->getWitnessDecl(requirement);
-      if (witness != lookupDecl)
-        continue;
-
-      // Substitute into the function builder type.
-      auto subs = conformance->getSubstitutions(decl->getModuleContext());
-      Type subFunctionBuilderType = functionBuilderType.subst(subs);
-
-      matches.push_back({conformance, requirement, subFunctionBuilderType});
+  // Look for function builder types inferred through dynamic replacements.
+  if (auto replaced = lookupDecl->getDynamicallyReplacedDecl()) {
+    if (auto functionBuilderType = replaced->getFunctionBuilderType()) {
+      matches.push_back(
+        Match::forDynamicReplacement(replaced, functionBuilderType));
+    } else {
+      addConformanceMatches(replaced);
     }
   }
 
@@ -273,7 +338,8 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
       decl->diagnose(
           diag::function_builder_infer_pick_specific,
           match.functionBuilderType,
-          match.conformance->getProtocol()->getName())
+          static_cast<unsigned>(match.kind),
+          match.getSourceName())
         .fixItInsert(
           lookupDecl->getAttributeInsertionLoc(false),
           "@" + match.functionBuilderType.getString() + " ");

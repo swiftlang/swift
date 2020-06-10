@@ -5054,8 +5054,8 @@ ERROR(function_builder_infer_ambig, none,
 NOTE(function_builder_infer_add_return, none,
      "add an explicit 'return' statement to not use a function builder", ())
 NOTE(function_builder_infer_pick_specific, none,
-     "apply function builder %0 (inferred from protocol %1)",
-     (Type, DeclName))
+     "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
+     (Type, unsigned, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
