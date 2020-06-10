@@ -361,10 +361,16 @@ public:
     if (!cast)
       return nullptr;
 
-    const auto tyLoc = TypeLoc(cast->getCastTypeRepr(), cast->getCastType());
     Pattern *subPattern = getSubExprPattern(E->getElement(0));
-    return new (Context) IsPattern(cast->getLoc(), tyLoc, subPattern,
-                                   CheckedCastKind::Unresolved);
+    if (cast->isImplicit()) {
+      return IsPattern::createImplicit(Context, cast->getCastType(), subPattern,
+                                       CheckedCastKind::Unresolved);
+    }
+    auto *TE = new (Context) TypeExpr(cast->getCastTypeRepr());
+    if (auto castTy = cast->getType())
+      TE->setType(MetatypeType::get(castTy));
+    return new (Context)
+        IsPattern(cast->getLoc(), TE, subPattern, CheckedCastKind::Unresolved);
   }
   
   // Convert a paren expr to a pattern if it contains a pattern.
@@ -614,12 +620,10 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
     if (auto *TE = dyn_cast<TypeExpr>(EP->getSubExpr())) {
       Context.Diags.diagnose(TE->getStartLoc(), diag::type_pattern_missing_is)
         .fixItInsert(TE->getStartLoc(), "is ");
-      
-      P = new (Context) IsPattern(TE->getStartLoc(),
-                                  TypeLoc(TE->getTypeRepr(),
-                                          TE->getInstanceType()),
-                                  /*subpattern*/nullptr,
-                                  CheckedCastKind::Unresolved);
+
+      P = new (Context)
+          IsPattern(TE->getStartLoc(), TE,
+                    /*subpattern*/ nullptr, CheckedCastKind::Unresolved);
     }
   
   // Look through a TypedPattern if present.
@@ -1222,11 +1226,11 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
     // Type-check the type parameter.
     TypeResolutionOptions paramOptions(TypeResolverContext::InExpression);
-    TypeResolution resolution = TypeResolution::forContextual(dc, paramOptions);
-    if (validateType(IP->getCastTypeLoc(), resolution))
+    auto castType = TypeResolution::forContextual(dc, paramOptions)
+                        .resolveType(IP->getCastTypeRepr());
+    if (!castType || castType->hasError())
       return nullptr;
-
-    auto castType = IP->getCastTypeLoc().getType();
+    IP->setCastType(castType);
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
@@ -1254,15 +1258,11 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           pattern.forSubPattern(P, /*retainTopLevle=*/true), type, options);
     }
 
-    CheckedCastKind castKind
-      = TypeChecker::typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),
-                                          type->hasError()
-                                            ? CheckedCastContextKind::None
-                                            : CheckedCastContextKind::IsPattern,
-                                          dc,
-                                          IP->getLoc(),
-                                          nullptr,
-                                          IP->getCastTypeLoc().getSourceRange());
+    CheckedCastKind castKind = TypeChecker::typeCheckCheckedCast(
+        type, IP->getCastType(),
+        type->hasError() ? CheckedCastContextKind::None
+                         : CheckedCastContextKind::IsPattern,
+        dc, IP->getLoc(), nullptr, IP->getCastTypeRepr()->getSourceRange());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return nullptr;
@@ -1272,8 +1272,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       // it is "useful" because it is providing a different type to the
       // sub-pattern.  If this is an 'is' pattern or an 'as' pattern where the
       // types are the same, then produce a warning.
-      if (!IP->getSubPattern() ||
-          type->isEqual(IP->getCastTypeLoc().getType())) {
+      if (!IP->getSubPattern() || type->isEqual(IP->getCastType())) {
         diags.diagnose(IP->getLoc(), diag::isa_is_always_true,
                        IP->getSubPattern() ? "as" : "is");
       }
@@ -1286,7 +1285,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     case CheckedCastKind::SetDowncast: {
       diags.diagnose(IP->getLoc(),
                      diag::isa_collection_downcast_pattern_value_unimplemented,
-                     IP->getCastTypeLoc().getType());
+                     IP->getCastType());
       return P;
     }
 
@@ -1300,8 +1299,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     if (Pattern *sub = IP->getSubPattern()) {
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false),
-          IP->getCastTypeLoc().getType(),
-          subOptions|TypeResolutionFlags::FromNonInferredPattern);
+          IP->getCastType(),
+          subOptions | TypeResolutionFlags::FromNonInferredPattern);
       if (!sub)
         return nullptr;
 
@@ -1528,10 +1527,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     
     // If we needed a cast, wrap the pattern in a cast pattern.
     if (castKind) {
-      auto isPattern = new (Context) IsPattern(SourceLoc(),
-                                               TypeLoc::withoutLoc(enumTy),
-                                               EEP, *castKind);
-      isPattern->setImplicit();
+      auto isPattern =
+          IsPattern::createImplicit(Context, enumTy, EEP, *castKind);
       isPattern->setType(type);
       P = isPattern;
     }

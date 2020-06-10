@@ -2524,7 +2524,7 @@ namespace {
         auto isPattern = cast<IsPattern>(pattern);
 
         Type castType = resolveTypeReferenceInExpression(
-            isPattern->getCastTypeLoc(), TypeResolverContext::InExpression);
+            isPattern->getCastTypeRepr(), TypeResolverContext::InExpression);
 
         if (!castType)
           return Type();
@@ -2749,10 +2749,10 @@ namespace {
           // of is-patterns applied to an irrefutable pattern.
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
-            if (TypeChecker::validateType(
-                    isp->getCastTypeLoc(),
-                    TypeResolution::forContextual(
-                        CS.DC, TypeResolverContext::InExpression))) {
+            Type castType = TypeResolution::forContextual(
+                                CS.DC, TypeResolverContext::InExpression)
+                                .resolveType(isp->getCastTypeRepr());
+            if (!castType) {
               return false;
             }
 

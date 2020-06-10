@@ -441,6 +441,36 @@ SourceRange TypedPattern::getSourceRange() const {
            PatTypeRepr->getSourceRange().End };
 }
 
+IsPattern::IsPattern(SourceLoc IsLoc, TypeExpr *CastTy, Pattern *SubPattern,
+                     CheckedCastKind Kind)
+    : Pattern(PatternKind::Is), IsLoc(IsLoc), SubPattern(SubPattern),
+      CastKind(Kind), CastType(CastTy) {
+  assert(IsLoc.isValid() == CastTy->getLoc().isValid());
+}
+
+IsPattern *IsPattern::createImplicit(ASTContext &Ctx, Type castTy,
+                                     Pattern *SubPattern,
+                                     CheckedCastKind Kind) {
+  assert(castTy);
+  auto *CastTE = TypeExpr::createImplicit(castTy, Ctx);
+  auto *ip = new (Ctx) IsPattern(SourceLoc(), CastTE, SubPattern, Kind);
+  ip->setImplicit();
+  return ip;
+}
+
+SourceRange IsPattern::getSourceRange() const {
+  SourceLoc beginLoc = SubPattern ? SubPattern->getSourceRange().Start : IsLoc;
+  SourceLoc endLoc = (isImplicit() ? beginLoc : CastType->getEndLoc());
+  return {beginLoc, endLoc};
+}
+
+Type IsPattern::getCastType() const { return CastType->getInstanceType(); }
+void IsPattern::setCastType(Type type) {
+  CastType->setType(MetatypeType::get(type));
+}
+
+TypeRepr *IsPattern::getCastTypeRepr() const { return CastType->getTypeRepr(); }
+
 /// Construct an ExprPattern.
 ExprPattern::ExprPattern(Expr *e, bool isResolved, Expr *matchExpr,
                          VarDecl *matchVar)

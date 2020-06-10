@@ -966,7 +966,7 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
   
   // Try to perform the cast to the destination type, producing an optional that
   // indicates whether we succeeded.
-  auto destType = OptionalType::get(pattern->getCastTypeLoc().getType());
+  auto destType = OptionalType::get(pattern->getCastType());
 
   value =
       emitConditionalCheckedCast(SGF, loc, value, pattern->getType(), destType,

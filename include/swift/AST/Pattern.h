@@ -470,19 +470,14 @@ class IsPattern : public Pattern {
   CheckedCastKind CastKind;
 
   /// The type being checked for.
-  TypeLoc CastType;
+  TypeExpr *CastType;
 
 public:
-  IsPattern(SourceLoc IsLoc, TypeLoc CastTy,
-             Pattern *SubPattern,
-             CheckedCastKind Kind)
-    : Pattern(PatternKind::Is),
-      IsLoc(IsLoc),
-      SubPattern(SubPattern),
-      CastKind(Kind),
-      CastType(CastTy) {
-    assert(IsLoc.isValid() == CastTy.hasLocation());
-  }
+  IsPattern(SourceLoc IsLoc, TypeExpr *CastTy, Pattern *SubPattern,
+            CheckedCastKind Kind);
+
+  static IsPattern *createImplicit(ASTContext &Ctx, Type castTy,
+                                   Pattern *SubPattern, CheckedCastKind Kind);
 
   CheckedCastKind getCastKind() const { return CastKind; }
   void setCastKind(CheckedCastKind kind) { CastKind = kind; }
@@ -493,16 +488,11 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   SourceLoc getLoc() const { return IsLoc; }
-  SourceRange getSourceRange() const {
-    SourceLoc beginLoc =
-      SubPattern ? SubPattern->getSourceRange().Start : IsLoc;
-    SourceLoc endLoc =
-      (isImplicit() ? beginLoc : CastType.getSourceRange().End);
-    return { beginLoc, endLoc };
-  }
+  SourceRange getSourceRange() const;
 
-  TypeLoc &getCastTypeLoc() { return CastType; }
-  TypeLoc getCastTypeLoc() const { return CastType; }
+  void setCastType(Type castTy);
+  Type getCastType() const;
+  TypeRepr *getCastTypeRepr() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Is;
