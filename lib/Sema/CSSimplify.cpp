@@ -3881,7 +3881,7 @@ bool ConstraintSystem::repairFailures(
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
       conversionsOrFixes.push_back(
-          RemoveReturn::create(*this, getConstraintLocator(locator)));
+          RemoveReturn::create(*this, lhs, getConstraintLocator(locator)));
       return true;
     }
 

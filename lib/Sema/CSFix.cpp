@@ -894,14 +894,19 @@ RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs, Type lhs, Type rh
   return new (cs.getAllocator()) RemoveAddressOf(cs, lhs, rhs, locator);
 }
 
+RemoveReturn::RemoveReturn(ConstraintSystem &cs, Type resultTy,
+                           ConstraintLocator *locator)
+    : ContextualMismatch(cs, FixKind::RemoveReturn, resultTy,
+                         cs.getASTContext().TheEmptyTupleType, locator) {}
+
 bool RemoveReturn::diagnose(const Solution &solution, bool asNote) const {
   ExtraneousReturnFailure failure(solution, getLocator());
   return failure.diagnose(asNote);
 }
 
-RemoveReturn *RemoveReturn::create(ConstraintSystem &cs,
+RemoveReturn *RemoveReturn::create(ConstraintSystem &cs, Type resultTy,
                                    ConstraintLocator *locator) {
-  return new (cs.getAllocator()) RemoveReturn(cs, locator);
+  return new (cs.getAllocator()) RemoveReturn(cs, resultTy, locator);
 }
 
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,

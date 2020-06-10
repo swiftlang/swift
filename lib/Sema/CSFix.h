@@ -1405,16 +1405,16 @@ private:
                                           ConstraintLocator *locator);
 };
 
-class RemoveReturn final : public ConstraintFix {
-  RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
+class RemoveReturn final : public ContextualMismatch {
+  RemoveReturn(ConstraintSystem &cs, Type resultTy, ConstraintLocator *locator);
 
 public:
   std::string getName() const override { return "remove or omit return type"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
+  static RemoveReturn *create(ConstraintSystem &cs, Type resultTy,
+                              ConstraintLocator *locator);
 };
 
 class CollectionElementContextualMismatch final : public ContextualMismatch {
