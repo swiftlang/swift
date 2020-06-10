@@ -6,8 +6,8 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
-// CHECK: init_existential_addr
-// CHECK: inject_enum_addr
+// CHECK-NOT: init_existential_addr
+// CHECK-NOT: inject_enum_addr
 // CHECK-NOT: select_enum_addr
 // CHECK-NOT: bb1
 // CHECK-NOT: unchecked_take_enum_data_addr
@@ -42,8 +42,8 @@ bb2:
 
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
-// CHECK: init_existential_addr
-// CHECK: inject_enum_addr
+// CHECK-NOT: init_existential_addr
+// CHECK-NOT: inject_enum_addr
 // CHECK-NOT: switch_enum_addr
 // CHECK-NOT: bb1
 // CHECK-NOT: unchecked_take_enum_data_addr
