@@ -555,14 +555,13 @@ public:
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
     // Emit a debug_value[_addr] instruction to record the start of this value's
-    // lifetime.
+    // lifetime, if permitted to do so.
+    if (!EmitDebugValueOnInit)
+      return;
     SILLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
     SILDebugVariable DbgVar(vd->isLet(), /*ArgNo=*/0);
-    if (address)
-      SGF.B.createDebugValueAddr(PrologueLoc, value, DbgVar);
-    else
-      SGF.B.createDebugValue(PrologueLoc, value, DbgVar);
+    SGF.B.emitDebugDescription(PrologueLoc, value, DbgVar);
   }
   
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,

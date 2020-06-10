@@ -1193,6 +1193,17 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
 
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var, immutable);
+
+  // Do not emit debug descriptions at this stage.
+  //
+  // If there are multiple let bindings, the value is forwarded to the case
+  // block via a phi. Emitting duplicate debug values for the incoming values
+  // leads to bogus debug info -- we must emit the debug value only on the phi.
+  //
+  // If there's only one let binding, we still want to wait until we can nest
+  // the scope for the case body under the scope for the pattern match.
+  init->setEmitDebugValueOnInit(false);
+
   auto mv = value.getFinalManagedValue();
   if (shouldTake(value, isIrrefutable)) {
     mv.forwardInto(SGF, pattern, init.get());
@@ -2441,7 +2452,7 @@ void PatternMatchEmission::emitSharedCaseBlocks(
     // the order of variables that are the incoming BB arguments. Setup the
     // VarLocs to point to the incoming args and setup initialization so any
     // args needing Cleanup will get that as well.
-    Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
+    LexicalScope scope(SGF, CleanupLocation(caseBlock));
     unsigned argIndex = 0;
     for (auto *vd : caseBlock->getCaseBodyVariables()) {
       if (!vd->hasName())
@@ -2471,6 +2482,11 @@ void PatternMatchEmission::emitSharedCaseBlocks(
                arg.getOwnershipKind() == ValueOwnershipKind::None);
         mv = SGF.emitManagedRValueWithCleanup(arg);
       }
+
+      // Emit a debug description of the incoming arg, nested within the scope
+      // for the pattern match.
+      SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+      SGF.B.emitDebugDescription(vd, mv.getValue(), dbgVar);
 
       if (vd->isLet()) {
         // Just emit a let and leave the cleanup alone.
@@ -2608,6 +2624,10 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   // If we don't have a fallthrough or a multi-pattern 'case', we can emit the
   // body inline. Emit the statement here and bail early.
   if (!row.hasFallthroughTo() && caseBlock->getCaseLabelItems().size() == 1) {
+    // Debug values for case body variables must be nested within a scope for
+    // the case block to avoid name conflicts.
+    DebugScope scope(SGF, CleanupLocation(caseBlock));
+
     // If we have case body vars, set them up to point at the matching var
     // decls.
     if (caseBlock->hasCaseBodyVariables()) {
@@ -2628,6 +2648,11 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           // Ok, we found a match. Update the VarLocs for the case block.
           auto v = SGF.VarLocs[vd];
           SGF.VarLocs[expected] = v;
+
+          // Emit a debug description for the variable, nested within a scope
+          // for the pattern match.
+          SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+          SGF.B.emitDebugDescription(vd, v.value, dbgVar);
         }
       }
     }
@@ -2747,7 +2772,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
-  Scope switchScope(Cleanups, CleanupLocation(S));
+  LexicalScope switchScope(*this, CleanupLocation(S));
 
   // Enter a break/continue scope.  If we wanted a continue
   // destination, it would probably be out here.

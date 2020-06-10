@@ -3381,7 +3381,7 @@ void SILCoverageMap::dump() const {
 #pragma warning(disable : 4996)
 #endif
 
-void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
+void SILDebugScope::print(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
   OS.indent(Indent);
@@ -3391,7 +3391,7 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   OS.indent(Indent + 2);
   OS << " parent: ";
   if (auto *P = Parent.dyn_cast<const SILDebugScope *>()) {
-    P->dump(SM, OS, Indent + 2);
+    P->print(SM, OS, Indent + 2);
     OS.indent(Indent + 2);
   }
   else if (auto *F = Parent.dyn_cast<SILFunction *>())
@@ -3403,15 +3403,15 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   OS.indent(Indent + 2);
   if (auto *CS = InlinedCallSite) {
     OS << "inlinedCallSite: ";
-    CS->dump(SM, OS, Indent + 2);
+    CS->print(SM, OS, Indent + 2);
     OS.indent(Indent + 2);
   }
   OS << "}\n";
 }
 
-void SILDebugScope::dump(SILModule &Mod) const {
+void SILDebugScope::print(SILModule &Mod) const {
   // We just use the default indent and llvm::errs().
-  dump(Mod.getASTContext().SourceMgr);
+  print(Mod.getASTContext().SourceMgr);
 }
 
 #if SWIFT_COMPILER_IS_MSVC
