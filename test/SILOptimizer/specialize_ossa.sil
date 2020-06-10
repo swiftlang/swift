@@ -1,9 +1,11 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %/s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-partial-specialization -generic-specializer -sil-generic-specializer-enable-ownership  %s | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 import Swift
+
+class Klass {}
 
 sil [ossa] [transparent] @ossaTransparentCallee : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
@@ -12,9 +14,12 @@ bb0(%0 : $*T):
   return %9999 : $()
 }
 
+// We specialize this case today and just respect the already set ownership in
+// each function. This makes sense since ossa can be specialized.
+//
 // CHECK-LABEL: sil @caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: [[FUNC:%.*]] = function_ref @ossaTransparentCallee : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-// CHECK: apply [[FUNC]]<Builtin.NativeObject>(
+// CHECK: [[FUNC:%.*]] = function_ref @$s21ossaTransparentCalleeBo_Tg5 : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK: apply [[FUNC]](
 // CHECK: } // end sil function 'caller'
 sil @caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -23,6 +28,1225 @@ bb0(%0 : $Builtin.NativeObject):
   store %0 to %2 : $*Builtin.NativeObject
   apply %1<Builtin.NativeObject>(%2) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %2 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @exp1 : $@convention(thin) () -> () {
+// CHECK-NOT: apply
+// Call of specialized initializer: <Int32>
+// CHECK: [[CTOR:%[0-9]+]] = function_ref @$s8XXX_inits5Int32V_Tg5
+// CHECK: apply [[CTOR]]
+// CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @acceptsInt
+// Call of specialized XXX_foo: <Int32>
+// CHECK: [[FOO:%[0-9]+]] = function_ref @$s7XXX_foos5Int32V_Tg5
+// CHECK: apply [[FOO]]
+// CHECK: apply [[ACCEPTS_INT]]
+// CHECK: return
+// CHECK: } // end sil function 'exp1'
+
+// CHECK: sil [ossa] @exp2 : $@convention(thin) () -> () {
+// CHECK: } // end sil function 'exp2'
+
+struct XXX<T> {
+  init(t: T)
+  mutating func foo(t: T) -> Int32
+  var m_t: T
+}
+
+// specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
+sil [ossa] [noinline] @XXX_init : $@convention(thin) <T> (@in T, @thin XXX<T>.Type) -> @out XXX<T> {
+bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
+  %3 = alloc_stack $XXX<T>, var, name "sf"           // users: %7, %11, %13
+  debug_value_addr %1 : $*T, let, name "t" // id: %4
+  %5 = alloc_stack $T                             // users: %6, %8, %9
+  copy_addr %1 to [initialization] %5 : $*T     // id: %6
+  %7 = struct_element_addr %3 : $*XXX<T>, #XXX.m_t // user: %8
+  copy_addr [take] %5 to [initialization] %7 : $*T // id: %8
+  dealloc_stack %5 : $*T         // id: %9
+  destroy_addr %1 : $*T                           // id: %10
+  copy_addr [take] %3 to [initialization] %0 : $*XXX<T> // id: %11
+  %12 = tuple ()                                  // user: %14
+  dealloc_stack %3 : $*XXX<T>    // id: %13
+  return %12 : $()                                // id: %14
+}
+
+// specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
+sil [ossa] [noinline] @XXX_foo : $@convention(method) <T> (@in T, @inout XXX<T>) -> Int32 {
+bb0(%0 : $*T, %1 : $*XXX<T>):
+  debug_value_addr %0 : $*T, let, name "t" // id: %2
+  %3 = alloc_stack $T                             // users: %4, %6, %7
+  copy_addr %0 to [initialization] %3 : $*T     // id: %4
+  %5 = struct_element_addr %1 : $*XXX<T>, #XXX.m_t // user: %6
+  copy_addr [take] %3 to %5 : $*T               // id: %6
+  dealloc_stack %3 : $*T         // id: %7
+  %8 = integer_literal $Builtin.Int32, 4          // user: %9
+  %9 = struct $Int32 (%8 : $Builtin.Int32)        // user: %11
+  destroy_addr %0 : $*T                           // id: %10
+  return %9 : $Int32                              // id: %11
+}
+
+sil [ossa] [noinline] @XXX_init_guaranteed : $@convention(thin) <T> (@in_guaranteed T, @thin XXX<T>.Type) -> @out XXX<T> {
+bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
+  %3 = alloc_stack $XXX<T>, var, name "sf"           // users: %7, %11, %13
+  debug_value_addr %1 : $*T, let, name "t" // id: %4
+  %5 = alloc_stack $T                             // users: %6, %8, %9
+  copy_addr %1 to [initialization] %5 : $*T     // id: %6
+  %7 = struct_element_addr %3 : $*XXX<T>, #XXX.m_t // user: %8
+  copy_addr [take] %5 to [initialization] %7 : $*T // id: %8
+  dealloc_stack %5 : $*T         // id: %9
+  copy_addr [take] %3 to [initialization] %0 : $*XXX<T> // id: %11
+  %12 = tuple ()                                  // user: %14
+  dealloc_stack %3 : $*XXX<T>    // id: %13
+  return %12 : $()                                // id: %14
+}
+
+// specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
+sil [ossa] [noinline] @XXX_foo_guaranteed : $@convention(method) <T> (@in_guaranteed T, @inout XXX<T>) -> Int32 {
+bb0(%0 : $*T, %1 : $*XXX<T>):
+  debug_value_addr %0 : $*T, let, name "t" // id: %2
+  %3 = alloc_stack $T                             // users: %4, %6, %7
+  copy_addr %0 to [initialization] %3 : $*T     // id: %4
+  %5 = struct_element_addr %1 : $*XXX<T>, #XXX.m_t // user: %6
+  copy_addr [take] %3 to %5 : $*T               // id: %6
+  dealloc_stack %3 : $*T         // id: %7
+  %8 = integer_literal $Builtin.Int32, 4          // user: %9
+  %9 = struct $Int32 (%8 : $Builtin.Int32)        // user: %11
+  return %9 : $Int32                              // id: %11
+}
+
+// Swift.Int32._convertFromBuiltinIntegerLiteral (Swift.Int32.Type)(Builtin.IntLiteral) -> Swift.Int32
+sil public_external [ossa] [transparent] @$sSi33_convertFromBuiltinIntegerLiteralySiBI_cSimF : $@convention(thin) (Builtin.IntLiteral, @thin Int32.Type) -> Int32 {
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int32.Type):
+  %3 = builtin "s_to_s_checked_trunc_IntLiteral_Int32"(%0 : $Builtin.IntLiteral) : $(Builtin.Int32, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int32, Builtin.Int1), 0 // user: %5
+  %5 = struct $Int32 (%4 : $Builtin.Int32)           // user: %6
+  return %5 : $Int32                                // id: %6
+}
+
+// specialize.acceptsInt (Swift.Int32) -> ()
+sil [noinline] [ossa] @acceptsInt : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  debug_value %0 : $Int32, let, name "x" // id: %1
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+// specialize.exp1 () -> ()
+sil [ossa] @exp1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $XXX<Int32>, var, name "II"           // users: %7, %15, %19
+  // function_ref specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
+  %1 = function_ref @XXX_init : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
+  %2 = metatype $@thin XXX<Int32>.Type              // user: %7
+  %3 = alloc_stack $Int32                           // users: %6, %7, %8
+  %4 = integer_literal $Builtin.Int32, 5            // user: %5
+  %5 = struct $Int32 (%4 : $Builtin.Int32)          // user: %6
+  store %5 to [trivial] %3 : $*Int32                        // id: %6
+  %7 = apply %1<Int32>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
+  dealloc_stack %3 : $*Int32       // id: %8
+  // function_ref specialize.acceptsInt (Swift.Int32) -> ()
+  %9 = function_ref @acceptsInt : $@convention(thin) (Int32) -> () // user: %16
+  // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
+  %10 = function_ref @XXX_foo : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
+  %11 = alloc_stack $Int32                          // users: %14, %15, %17
+  %12 = integer_literal $Builtin.Int32, 4           // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)        // user: %14
+  store %13 to [trivial] %11 : $*Int32                      // id: %14
+  %15 = apply %10<Int32>(%11, %0) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %16
+  %16 = apply %9(%15) : $@convention(thin) (Int32) -> ()
+  dealloc_stack %11 : $*Int32      // id: %17
+  %18 = tuple ()                                    // user: %20
+  dealloc_stack %0 : $*XXX<Int32>  // id: %19
+  return %18 : $()                                  // id: %20
+}
+
+// specialize.exp2 () -> ()
+sil [ossa] @exp2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $XXX<UInt8>, var, name "I8"        // users: %7, %15, %19
+  // function_ref specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
+  %1 = function_ref @XXX_init : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
+  %2 = metatype $@thin XXX<UInt8>.Type            // user: %7
+  %3 = alloc_stack $UInt8                         // users: %6, %7, %8
+  %4 = integer_literal $Builtin.Int8, 5           // user: %5
+  %5 = struct $UInt8 (%4 : $Builtin.Int8)         // user: %6
+  store %5 to [trivial] %3 : $*UInt8                      // id: %6
+  %7 = apply %1<UInt8>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
+  dealloc_stack %3 : $*UInt8     // id: %8
+  // function_ref specialize.acceptsInt (Swift.Int32) -> ()
+  %9 = function_ref @acceptsInt : $@convention(thin) (Int32) -> () // user: %16
+  // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
+  %10 = function_ref @XXX_foo : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
+  %11 = alloc_stack $UInt8                        // users: %14, %15, %17
+  %12 = integer_literal $Builtin.Int8, 4          // user: %13
+  %13 = struct $UInt8 (%12 : $Builtin.Int8)       // user: %14
+  store %13 to [trivial] %11 : $*UInt8                    // id: %14
+  %15 = apply %10<UInt8>(%11, %0) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %16
+  %16 = apply %9(%15) : $@convention(thin) (Int32) -> ()
+  dealloc_stack %11 : $*UInt8    // id: %17
+  %18 = tuple ()                                  // user: %20
+  dealloc_stack %0 : $*XXX<UInt8> // id: %19
+  return %18 : $()                                // id: %20
+}
+
+sil [ossa] @exp2_nativeObject : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%arg : @guaranteed $Builtin.NativeObject):
+  %0 = alloc_stack $XXX<Builtin.NativeObject>
+  // function_ref specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
+  %1 = function_ref @XXX_init : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
+  %2 = metatype $@thin XXX<Builtin.NativeObject>.Type            // user: %7
+  %3 = alloc_stack $Builtin.NativeObject                         // users: %6, %7, %8
+  %arg1 = copy_value %arg : $Builtin.NativeObject
+  store %arg1 to [init] %3 : $*Builtin.NativeObject                      // id: %6
+  %7 = apply %1<Builtin.NativeObject>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
+  dealloc_stack %3 : $*Builtin.NativeObject     // id: %8
+
+  %1g = function_ref @XXX_init_guaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
+  %3g = alloc_stack $Builtin.NativeObject                         // users: %6, %7, %8
+  %3g_out = alloc_stack $XXX<Builtin.NativeObject>                         // users: %6, %7, %8
+  %arg1g = copy_value %arg : $Builtin.NativeObject
+  store %arg1g to [init] %3g : $*Builtin.NativeObject                      // id: %6
+  %7g = apply %1<Builtin.NativeObject>(%3g_out, %3g, %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
+  destroy_addr %3g_out : $*XXX<Builtin.NativeObject>
+  dealloc_stack %3g_out : $*XXX<Builtin.NativeObject>
+  dealloc_stack %3g : $*Builtin.NativeObject     // id: %8
+
+  // function_ref specialize.acceptsInt (Swift.Int32) -> ()
+  %9 = function_ref @acceptsInt : $@convention(thin) (Int32) -> () // user: %16
+  // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
+  %10 = function_ref @XXX_foo : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
+  %11 = alloc_stack $Builtin.NativeObject                        // users: %14, %15, %17
+  %arg2 = copy_value %arg : $Builtin.NativeObject
+  store %arg2 to [init] %11 : $*Builtin.NativeObject
+  %15 = apply %10<Builtin.NativeObject>(%11, %0) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %16
+  %16 = apply %9(%15) : $@convention(thin) (Int32) -> ()
+  dealloc_stack %11 : $*Builtin.NativeObject    // id: %17
+
+  %10g = function_ref @XXX_foo_guaranteed : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
+  %11g = alloc_stack $Builtin.NativeObject                        // users: %14, %15, %17
+  %arg2g = copy_value %arg : $Builtin.NativeObject
+  store %arg2g to [init] %11g : $*Builtin.NativeObject
+  %15g = apply %10g<Builtin.NativeObject>(%11g, %0) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %16
+  apply %9(%15g) : $@convention(thin) (Int32) -> ()
+  destroy_addr %11g : $*Builtin.NativeObject
+  dealloc_stack %11g : $*Builtin.NativeObject    // id: %17
+  destroy_addr %0 : $*XXX<Builtin.NativeObject>
+  dealloc_stack %0 : $*XXX<Builtin.NativeObject> // id: %19
+  %18 = tuple ()                                  // user: %20
+  return %18 : $()                                // id: %20
+}
+
+// specialize.useClosure <A>(fun : () -> A) -> A
+sil [ossa] @useClosure : $@convention(thin) <T> (@owned @callee_owned () -> @out T) -> @out T {
+bb0(%0 : $*T, %1 : @owned $@callee_owned () -> @out T):
+  debug_value %1 : $@callee_owned () -> @out T, let, name "fun" // id: %2
+  %2 = copy_value %1 : $@callee_owned () -> @out T // id: %3
+  %4 = apply %2(%0) : $@callee_owned () -> @out T
+  destroy_value %1 : $@callee_owned () -> @out T // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+}
+
+// specialize.getGenericClosure <A>(t : A) -> () -> A
+sil [ossa] @getGenericClosure : $@convention(thin) <T> (@in T) -> @owned @callee_owned () -> @out T {
+bb0(%0 : $*T):
+  debug_value_addr %0 : $*T, let, name "t" // id: %1
+  // function_ref specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())A
+  %2 = function_ref @getGenericClosure_closure : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %5
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %3b = begin_borrow %3 : $<τ_0_0> { var τ_0_0 } <T>
+  %3a = project_box %3b : $<τ_0_0> { var τ_0_0 } <T>, 0
+  copy_addr %0 to [initialization] %3a : $*T     // id: %4
+  end_borrow %3b : $<τ_0_0> { var τ_0_0 } <T>
+  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %7
+  destroy_addr %0 : $*T                           // id: %6
+  return %5 : $@callee_owned () -> @out T       // id: %7
+}
+
+// specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())
+sil shared [ossa] @getGenericClosure_closure : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
+bb0(%0 : $*T, %1 : @owned $<τ_0_0> { var τ_0_0 } <T>):
+  %1a = begin_borrow %1 : $<τ_0_0> { var τ_0_0 } <T>
+  %2 = project_box %1a : $<τ_0_0> { var τ_0_0 } <T>, 0
+  copy_addr %2 to [initialization] %0 : $*T       // id: %3
+  end_borrow %1a : $<τ_0_0> { var τ_0_0 } <T>
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <T>       // id: %4
+  %5 = tuple ()                                   // user: %6
+  return %5 : $()                                 // id: %6
+}
+
+// specialize.specializePartialApplies () -> Swift.UInt8
+sil [ossa] @specializePartialApplies : $@convention(thin) () -> UInt8 {
+bb0:
+  %0 = alloc_stack $UInt8, var, name "i"               // users: %3, %18
+  %1 = integer_literal $Builtin.Int8, 5           // user: %2
+  %2 = struct $UInt8 (%1 : $Builtin.Int8)         // users: %3, %7
+  store %2 to [trivial] %0 : $*UInt8                      // id: %3
+  // function_ref specialize.useClosure <A>(fun : () -> A) -> A
+  %4 = function_ref @useClosure : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> @out τ_0_0) -> @out τ_0_0 // user: %14
+  // function_ref specialize.getGenericClosure <A>(t : A) -> () -> A
+  %5 = function_ref @getGenericClosure : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0 // user: %8
+  %6 = alloc_stack $UInt8                         // users: %7, %8, %17
+  store %2 to [trivial] %6 : $*UInt8                      // id: %7
+  %8 = apply %5<UInt8>(%6) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0 // user: %10
+  // function_ref reabstraction thunk helper from @callee_owned () -> (@out Swift.UInt8) to @callee_owned () -> (@unowned Swift.UInt8)
+  %9 = function_ref @$ss5UInt8VIxr_ABIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 // user: %10
+  %10 = partial_apply %9(%8) : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 // user: %12
+  // function_ref reabstraction thunk helper from @callee_owned () -> (@unowned Swift.UInt8) to @callee_owned () -> (@out Swift.UInt8)
+  %11 = function_ref @$ss5UInt8VIxd_ABIxr_TR : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 // user: %12
+  %12 = partial_apply %11(%10) : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 // user: %14
+  %13 = alloc_stack $UInt8                        // users: %14, %15, %16
+  %14 = apply %4<UInt8>(%13, %12) : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> @out τ_0_0) -> @out τ_0_0
+  %15 = load [trivial] %13 : $*UInt8                      // user: %19
+  dealloc_stack %13 : $*UInt8    // id: %16
+  dealloc_stack %6 : $*UInt8     // id: %17
+  dealloc_stack %0 : $*UInt8     // id: %18
+  return %15 : $UInt8                             // id: %19
+}
+
+// reabstraction thunk helper from @callee_owned () -> (@out Swift.UInt8) to @callee_owned () -> (@unowned Swift.UInt8)
+sil shared [ossa] [transparent] @$ss5UInt8VIxr_ABIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 {
+bb0(%0 : @owned $@callee_owned () -> @out UInt8):
+  %1 = alloc_stack $UInt8                         // users: %2, %3, %4
+  %2 = apply %0(%1) : $@callee_owned () -> @out UInt8
+  %3 = load [trivial] %1 : $*UInt8                        // user: %5
+  dealloc_stack %1 : $*UInt8     // id: %4
+  return %3 : $UInt8                              // id: %5
+}
+
+// reabstraction thunk helper from @callee_owned () -> (@unowned Swift.UInt8) to @callee_owned () -> (@out Swift.UInt8)
+sil shared [ossa] [transparent] @$ss5UInt8VIxd_ABIxr_TR : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 {
+bb0(%0 : $*UInt8, %1 : @owned $@callee_owned () -> UInt8):
+  %2 = apply %1() : $@callee_owned () -> UInt8    // user: %3
+  store %2 to [trivial] %0 : $*UInt8                        // id: %3
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+}
+
+
+class Base {
+}
+sil_vtable Base {
+}
+
+sil [ossa] @generic_upcast : $@convention(thin) <T where T : Base> (@owned T) -> @owned Base {
+bb0(%0 : @owned $T):
+  %2 = upcast %0 : $T to $Base
+  return %2 : $Base
+}
+
+sil [ossa] @specialize_generic_upcast : $@convention(thin)(@owned Base) -> @owned Base {
+bb0(%0 : @owned $Base):
+  %1 = function_ref @generic_upcast : $@convention(thin)<T where T : Base> (@owned T) -> @owned Base
+  %2 = apply %1<Base>(%0) : $@convention(thin)<T where T : Base> (@owned T) -> @owned Base
+  return %2 : $Base
+}
+
+// CHECK-LABEL: sil shared [ossa] @{{.*}}generic_upcast{{.*}}Tg5 : $@convention(thin) (@owned Base) -> @owned Base {
+// CHECK: bb0(%0 : @owned $Base):
+// CHECK:  return %0 : $Base
+
+// Check generic specialization of partial_apply
+
+protocol P { func get() -> Int32 }
+
+struct C : P { func get() -> Int32 }
+
+// test4.C.get (test4.C)() -> Swift.Int32
+sil hidden [ossa] @C_get : $@convention(method) (C) -> Int32 {
+bb0(%0 : $C):
+  debug_value %0 : $C, let, name "self" // id: %1
+  %2 = integer_literal $Builtin.Int32, 1          // user: %3
+  %3 = struct $Int32 (%2 : $Builtin.Int32)        // user: %4
+  return %3 : $Int32                              // id: %4
+}
+
+// test4.C.init (test4.C.Type)() -> test4.C
+sil hidden [ossa][noinline] @C_init : $@convention(thin) (@thin C.Type) -> C {
+bb0(%0 : $@thin C.Type):
+  %1 = alloc_stack $C, var, name "sf"                // user: %3
+  %2 = struct $C ()                               // user: %4
+  dealloc_stack %1 : $*C         // id: %3
+  return %2 : $C                                  // id: %4
+}
+
+// protocol witness for test4.P.get <A : test4.P>(test4.P.Self)() -> Swift.Int32 in conformance test4.C : test4.P in test4
+sil hidden [ossa] [transparent] [thunk] @test4_P_get_witness_C : $@convention(witness_method: P) (@in_guaranteed C) -> Int32 {
+bb0(%0 : $*C):
+  %1 = load [trivial] %0 : $*C                              // user: %3
+  // function_ref test4.C.get (test4.C)() -> Swift.Int32
+  %2 = function_ref @C_get : $@convention(method) (C) -> Int32 // user: %3
+  %3 = apply %2(%1) : $@convention(method) (C) -> Int32 // user: %4
+  return %3 : $Int32                              // id: %4
+}
+
+// test4.boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32
+sil hidden [ossa] [noinline] @boo : $@convention(thin) <U, T where U : P> (@in U) -> @owned @callee_owned (Int32, @in T) -> Int32 {
+bb0(%0 : $*U):
+  debug_value_addr %0 : $*U, let, name "y" // id: %1
+  // function_ref test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
+  %2 = function_ref @boo_closure : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <U>                               // users: %4, %5, %5
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <U>, 0
+  copy_addr %0 to [initialization] %3a : $*U     // id: %4
+  %5 = partial_apply %2<U, T>(%3) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %7
+  destroy_addr %0 : $*U                           // id: %6
+  return %5 : $@callee_owned (Int32, @in T) -> Int32 // id: %7
+}
+
+// test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
+sil shared [ossa] [noinline] @boo_closure : $@convention(thin) <U, T where U : P> (Int32, @in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> Int32 {
+bb0(%0 : $Int32, %1 : $*T, %2 : @owned $<τ_0_0> { var τ_0_0 } <U>):
+  %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <U>, 0
+  debug_value %0 : $Int32, let, name "x" // id: %4
+  debug_value_addr %1 : $*T, let, name "z" // id: %5
+  %6 = witness_method $U, #P.get : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %7
+  %7 = apply %6<U>(%3) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %8
+  %8 = struct_extract %7 : $Int32, #Int32._value   // user: %11
+  %9 = struct_extract %0 : $Int32, #Int32._value   // user: %11
+  %10 = integer_literal $Builtin.Int1, -1         // user: %11
+  %11 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %12, %13
+  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0 // user: %15
+  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = struct $Int32 (%12 : $Builtin.Int32)      // user: %18
+  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <U>       // id: %16
+  destroy_addr %1 : $*T                           // id: %17
+  return %15 : $Int32                             // id: %18
+}
+
+// static Swift.+ infix (Swift.Int32, Swift.Int32) -> Swift.Int32
+sil public_external [ossa] [transparent] [serialized] @$ss1poiys5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = struct_extract %0 : $Int32, #Int32._value   // user: %5
+  %3 = struct_extract %1 : $Int32, #Int32._value   // user: %5
+  %4 = integer_literal $Builtin.Int1, -1          // user: %5
+  %5 = builtin "sadd_with_overflow_Int32"(%2 : $Builtin.Int32, %3 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %6, %7
+  %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0 // user: %9
+  %7 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1 // user: %8
+  cond_fail %7 : $Builtin.Int1                    // id: %8
+  %9 = struct $Int32 (%6 : $Builtin.Int32)        // user: %10
+  return %9 : $Int32                              // id: %10
+}
+
+// test4.foo <A : test4.P, B : test4.P>(A, B) -> (Swift.Int32, Swift.Float) -> Swift.Int32
+sil hidden [ossa] [noinline] @foo : $@convention(thin) <T, U where T : P, U : P> (@in T, @in U) -> @owned @callee_owned (Int32, Float) -> Int32 {
+bb0(%0 : $*T, %1 : $*U):
+  debug_value_addr %0 : $*T, let, name "x" // id: %2
+  debug_value_addr %1 : $*U, let, name "y" // id: %3
+  // function_ref test4.boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32
+  %4 = function_ref @boo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %7
+  %5 = alloc_stack $U                             // users: %6, %7, %10
+  copy_addr %1 to [initialization] %5 : $*U     // id: %6
+  %7 = apply %4<U, Float>(%5) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %9
+  // function_ref reabstraction thunk helper <T_0_0, T_0_1 where T_0_0: test4.P, T_0_1: test4.P> from @callee_owned (@unowned Swift.Int32, @in Swift.Float) -> (@unowned Swift.Int32) to @callee_owned (@unowned Swift.Int32, @unowned Swift.Float) -> (@unowned Swift.Int32)
+  %8 = function_ref @_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__XFo_dS1_dSf_dS1__ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (Int32, Float, @owned @callee_owned (Int32, @in Float) -> Int32) -> Int32 // user: %9
+  %9 = partial_apply %8<T, U>(%7) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (Int32, Float, @owned @callee_owned (Int32, @in Float) -> Int32) -> Int32 // user: %13
+  dealloc_stack %5 : $*U         // id: %10
+  destroy_addr %1 : $*U                           // id: %11
+  destroy_addr %0 : $*T                           // id: %12
+  return %9 : $@callee_owned (Int32, Float) -> Int32 // id: %13
+}
+
+// reabstraction thunk helper <T_0_0, T_0_1 where T_0_0: test4.P, T_0_1: test4.P> from @callee_owned (@unowned Swift.Int32, @in Swift.Float) -> (@unowned Swift.Int32) to @callee_owned (@unowned Swift.Int32, @unowned Swift.Float) -> (@unowned Swift.Int32)
+sil shared [ossa] [transparent] [thunk] @_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__XFo_dS1_dSf_dS1__ : $@convention(thin) <T, U where T : P, U : P> (Int32, Float, @owned @callee_owned (Int32, @in Float) -> Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Float, %2 : @owned $@callee_owned (Int32, @in Float) -> Int32):
+  %3 = alloc_stack $Float                         // users: %4, %5, %6
+  store %1 to [trivial] %3 : $*Float                      // id: %4
+  %5 = apply %2(%0, %3) : $@callee_owned (Int32, @in Float) -> Int32 // user: %7
+  dealloc_stack %3 : $*Float     // id: %6
+  return %5 : $Int32                              // id: %7
+}
+
+// test4.gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32
+sil hidden [ossa] [noinline] @gen1 : $@convention(thin) <T where T : P> (@in T) -> @owned @callee_owned (Int32) -> Int32 {
+bb0(%0 : $*T):
+  debug_value_addr %0 : $*T, let, name "x" // id: %1
+  // function_ref test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
+  %2 = function_ref @gen1_closure : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  copy_addr %0 to [initialization] %3a : $*T     // id: %4
+  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %7
+  destroy_addr %0 : $*T                           // id: %6
+  return %5 : $@callee_owned (Int32) -> Int32     // id: %7
+}
+
+// test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
+sil shared [ossa] [noinline] @gen1_closure : $@convention(thin) <T where T : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <T>) -> Int32 {
+bb0(%0 : $Int32, %1 : @owned $<τ_0_0> { var τ_0_0 } <T>):
+  %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  debug_value %0 : $Int32 , let, name "$0"              // id: %3
+  %4 = witness_method $T, #P.get : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %5
+  %5 = apply %4<T>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %6
+  %6 = struct_extract %5 : $Int32, #Int32._value   // user: %9
+  %7 = struct_extract %0 : $Int32, #Int32._value   // user: %9
+  %8 = integer_literal $Builtin.Int1, -1          // user: %9
+  %9 = builtin "sadd_with_overflow_Int32"(%6 : $Builtin.Int32, %7 : $Builtin.Int32, %8 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $Int32 (%10 : $Builtin.Int32)      // user: %15
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <T>       // id: %14
+  return %13 : $Int32                             // id: %15
+}
+
+// check that there is a generic specialization of boo
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s3booxs5Int32VSfACIexyid_4main1PRzSfRs_r0_lIetio_Tp5AD1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32, @in Float) -> Int32
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @$s11boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lIetyyxd_TP5AD1CV_TG5
+// CHECK: partial_apply [[CLOSURE_SPECIALIZATION:%[0-9]+]]
+// CHECK: return
+
+// Check that there is a generic specialization of a closure from boo
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s11boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lIetyyxd_Tp5AD1CV_Tg5
+// CHECK: return
+
+// Check that there is a generic specialization of foo
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s3foo4main1CV_ADTg5 : $@convention(thin) (C, C) -> @owned @callee_owned (Int32, Float) -> Int32
+// CHECK: function_ref @$s3booxs5Int32VSfACIexyid_4main1PRzSfRs_r0_lIetio_Tp5AD1CV_Tg5
+// check that it invokes a generic specialization of the reabstraction thunk helper which invokes a specialization boo
+// CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @$s053_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__f2_dj2_di2_dJ2__4main1CV_ADTg5
+// CHECK-NOT: apply
+// CHECK: partial_apply [[THUNK_SPECIALIZATION]]
+// CHECK-NOT: apply
+// CHECK: return
+
+
+// Check that there is a generic specialization of gen1
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s4gen14main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
+// check that it invokes a generic specialization of the closure by mean of partial_apply
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @$s12gen1_closure4main1CV_Tg5
+// CHECK-NOT: apply
+// CHECK: partial_apply [[CLOSURE_SPECIALIZATION]]
+// CHECK-NOT: apply
+// CHECK: return
+
+// Check that there is a generic specialization of a closure from gen1
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s12gen1_closure4main1CV_Tg5 : $@convention(thin) (Int32, @owned <τ_0_0> { var τ_0_0 } <C>) -> Int32
+// CHECK: return
+
+
+
+// test4.bar () -> Swift.Int32
+// CHECK-LABEL: sil hidden [ossa] @bar
+// check that it does not invoke a generic specialization of foo
+// CHECK-NOT:  function_ref @foo
+// check that it invokes a generic specialization of foo
+// CHECK: function_ref @$s3foo4main1CV_ADTg5
+sil hidden [ossa] @bar : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_stack $@callee_owned (Int32, Float) -> Int32, var, name "f" // users: %11, %22
+  // function_ref test4.C.init (test4.C.Type)() -> test4.C
+  %1 = function_ref @C_init : $@convention(thin) (@thin C.Type) -> C // user: %3
+  %2 = metatype $@thin C.Type                     // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin C.Type) -> C  // users: %4, %7, %9
+  debug_value %3 : $C, let, name "c" // id: %4
+  // function_ref test4.foo <A : test4.P, B : test4.P>(A, B) -> (Swift.Int32, Swift.Float) -> Swift.Int32
+  %5 = function_ref @foo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (@in τ_0_0, @in τ_0_1) -> @owned @callee_owned (Int32, Float) -> Int32 // user: %10
+  %6 = alloc_stack $C                             // users: %7, %10, %13
+  store %3 to [trivial] %6 : $*C                          // id: %7
+  %8 = alloc_stack $C                             // users: %9, %10, %12
+  store %3 to [trivial] %8 : $*C                          // id: %9
+  %10 = apply %5<C, C>(%6, %8) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (@in τ_0_0, @in τ_0_1) -> @owned @callee_owned (Int32, Float) -> Int32 // users: %11, %14, %20, %21
+  store %10 to [init] %0 : $*@callee_owned (Int32, Float) -> Int32 // id: %11
+  dealloc_stack %8 : $*C         // id: %12
+  dealloc_stack %6 : $*C         // id: %13
+  %11 = load [take] %0 : $*@callee_owned (Int32, Float) -> Int32 // id: %14
+  %15 = integer_literal $Builtin.Int32, 3         // user: %16
+  %16 = struct $Int32 (%15 : $Builtin.Int32)      // user: %20
+  %17 = float_literal $Builtin.FPIEEE80, 0x4000C8F5C28F5C28F5C3 // 3.1400000000000000001 // user: %18
+  %18 = builtin "fptrunc_FPIEEE80_FPIEEE32"(%17 : $Builtin.FPIEEE80) : $Builtin.FPIEEE32 // user: %19
+  %19 = struct $Float (%18 : $Builtin.FPIEEE32)   // user: %20
+  %20 = apply %11(%16, %19) : $@callee_owned (Int32, Float) -> Int32 // user: %23
+  dealloc_stack %0 : $*@callee_owned (Int32, Float) -> Int32 // id: %22
+  return %20 : $Int32                             // id: %23
+}
+
+// test4.testBar () -> Swift.Int32
+sil [ossa] @testBar : $@convention(thin) () -> Int32 {
+bb0:
+  // function_ref test4.bar () -> Swift.Int32
+  %0 = function_ref @bar : $@convention(thin) () -> Int32 // user: %1
+  %1 = apply %0() : $@convention(thin) () -> Int32            // user: %2
+  return %1 : $Int32                              // id: %2
+}
+
+// CHECK-LABEL: sil [ossa] @testGen1
+// Call of C_init
+// CHECK: function_ref @C_init
+// CHECK: apply
+// Reference to the generic specialization of gen1
+// CHECK-NOT: function_ref @gen1
+// CHECK: function_ref @$s4gen14main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
+sil [ossa] @testGen1 : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_stack $@callee_owned (Int32) -> Int32, var, name "f" // users: %9, %16
+  // function_ref test4.C.init (test4.C.Type)() -> test4.C
+  %1 = function_ref @C_init : $@convention(thin) (@thin C.Type) -> C // user: %3
+  %2 = metatype $@thin C.Type                     // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin C.Type) -> C  // users: %4, %7
+  debug_value %3 : $C, let, name "c" // id: %4
+  // function_ref test4.gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32
+  %5 = function_ref @gen1 : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32) -> Int32 // user: %8
+  %6 = alloc_stack $C                             // users: %7, %8, %10
+  store %3 to [trivial] %6 : $*C                          // id: %7
+  %8 = apply %5<C>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32) -> Int32 // users: %9, %11, %14, %15
+  store %8 to [init] %0 : $*@callee_owned (Int32) -> Int32 // id: %9
+  dealloc_stack %6 : $*C         // id: %10
+  %8a = load [take] %0 : $*@callee_owned (Int32) -> Int32 // id: %11
+  %12 = integer_literal $Builtin.Int32, 3         // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %14
+  %14 = apply %8a(%13) : $@callee_owned (Int32) -> Int32 // user: %17
+  dealloc_stack %0 : $*@callee_owned (Int32) -> Int32 // id: %16
+  return %14 : $Int32                             // id: %17
+}
+
+// test_bind<A> (Builtin.RawPointer, A.Type) -> ()
+// Check that this is specialized as T=Int.
+// CHECK-LABEL: sil shared [ossa] @$s9test_bindSi_Tg5 : $@convention(thin) (Builtin.RawPointer, @thick Int.Type) -> ()
+// CHECK: bind_memory %0 : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*Int
+// CHECK: return
+sil hidden [ossa] @test_bind : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $@thick T.Type):
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = metatype $@thick T.Type
+  bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $*T
+  %7 = tuple ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// Invoke test_bind with T=Int.
+sil [ossa] @call_bind : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  // function_ref test_bind<A> (Builtin.RawPointer, A.Type) -> ()
+  %2 = function_ref @test_bind : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @thick τ_0_0.Type) -> ()
+  %3 = metatype $@thick Int.Type
+  %4 = apply %2<Int>(%0, %3) : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @thick τ_0_0.Type) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// invokeGenericClosure<A>(todo:)
+sil [ossa] [noinline] @invokeGenericClosure : $@convention(thin) <R> (@owned @callee_owned () -> (@out R, @error Error)) -> (@out R, @error Error) {
+bb0(%0 : $*R, %1 : @owned $@callee_owned () -> (@out R, @error Error)):
+  debug_value %1 : $@callee_owned () -> (@out R, @error Error), let, name "todo", argno 1 // id: %2
+  debug_value undef : $Error, var, name "$error", argno 2 // id: %3
+  %1a = copy_value  %1 : $@callee_owned () -> (@out R, @error Error) // id: %4
+  try_apply %1a(%0) : $@callee_owned () -> (@out R, @error Error), normal bb1, error bb2 // id: %5
+
+bb1(%6 : $()):                                    // Preds: bb0
+  destroy_value %1 : $@callee_owned () -> (@out R, @error Error) // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+
+// %10                                            // user: %12
+bb2(%10 : @owned $Error):                                // Preds: bb0
+  destroy_value %1 : $@callee_owned () -> (@out R, @error Error) // id: %11
+  throw %10 : $Error                              // id: %12
+} // end sil function 'invokeGenericClosure'
+
+sil public_external @error : $@convention(thin) () -> Never
+
+// action()
+sil @action : $@convention(thin) () -> Never
+
+// thunk for @callee_owned () -> (@unowned Never, @error @owned Error)
+sil @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
+
+// Check that in a case where a generic specialization is a non-return function,
+// the return value is not stored after the call and an unreachable instruction
+// is inserted as a terminator of a basic block.
+//
+// CHECK-LABEL: sil [ossa] @testGenericClosureSpecialization
+// Call of the generic specialization of invokeGenericClosure<Never>
+// CHECK: function_ref @$s20invokeGenericClosures5NeverO_Tg5 : $@convention(thin) (@owned @callee_owned () -> (@out Never, @error Error)) -> (Never, @error Error)
+// CHECK: apply [nothrow]
+// CHECK: unreachable
+// CHECK: end sil function 'testGenericClosureSpecialization'
+sil [ossa] @testGenericClosureSpecialization : $@convention(thin) () -> @error Error {
+bb0:
+  // function_ref invokeGenericClosure<A>(todo:)
+  %1 = function_ref @invokeGenericClosure : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+  %2 = alloc_stack $Never
+  // function_ref action()
+  %3 = function_ref @action : $@convention(thin) () -> Never
+  %4 = thin_to_thick_function %3 : $@convention(thin) () -> Never to $@callee_owned () -> Never
+  %5 = convert_function %4 : $@callee_owned () -> Never to $@callee_owned () -> (Never, @error Error)
+  // function_ref thunk for @callee_owned () -> (@unowned Never, @error @owned Error)
+  %6 = function_ref @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
+  %7 = partial_apply %6(%5) : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
+  %8 = apply [nothrow] %1<Never>(%2, %7) : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+  unreachable
+} // end sil function 'testGenericClosureSpecialization'
+
+// Test a specialization of a self-recursive generic closure.
+
+// CHECK-LABEL: sil shared [ossa] @$s27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> () {
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$s27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
+// CHECK: partial_apply [[SPECIALIZED_FN]]{{.*}}({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
+
+// CHECK-LABEL: sil [ossa] @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> ()
+// Refer to the specialized version of the function
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$s27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
+// CHECK: partial_apply [[SPECIALIZED_FN]]<R, Builtin.Int64>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
+sil [ossa] @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> () {
+bb0(%0 : $*R, %1 : $*S, %2 : $Builtin.Int64):
+  %4 = integer_literal $Builtin.Int64, 100
+  %5 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %5, bb2, bb1
+
+bb1:
+  %val_storage = alloc_stack $Builtin.Int64
+  %val = integer_literal $Builtin.Int64, 4
+  store %val to [trivial] %val_storage : $*Builtin.Int64
+  %fn = function_ref @selfReferringGenericClosure : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, Builtin.Int64) -> () 
+  %7 = partial_apply %fn<R, Builtin.Int64>(%0, %val_storage, %4) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, Builtin.Int64) -> ()
+  dealloc_stack %val_storage : $*Builtin.Int64
+  destroy_value %7 : $@callee_owned () -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil [ossa] @selfReferringGenericClosure_nontrivial_guaranteed : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*R, %1 : $*S, %2 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb1
+
+bb1:
+  %val_storage = alloc_stack $Builtin.NativeObject
+  %val = copy_value %2 : $Builtin.NativeObject
+  %val2 = copy_value %2 : $Builtin.NativeObject
+  store %val to [init] %val_storage : $*Builtin.NativeObject
+  %fn = function_ref @selfReferringGenericClosure_nontrivial_guaranteed : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> () 
+  %7 = partial_apply %fn<R, Builtin.NativeObject>(%0, %val_storage, %val2) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> ()
+  dealloc_stack %val_storage : $*Builtin.NativeObject
+  destroy_value %7 : $@callee_owned () -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil [ossa] @selfReferringGenericClosure_nontrivial_guaranteed_applied : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*R, %1 : $*S, %2 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb1
+
+bb1:
+  %val_storage = alloc_stack $Builtin.NativeObject
+  %val = copy_value %2 : $Builtin.NativeObject
+  %val2 = copy_value %2 : $Builtin.NativeObject
+  store %val to [init] %val_storage : $*Builtin.NativeObject
+  %fn = function_ref @selfReferringGenericClosure_nontrivial_guaranteed_applied : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> () 
+  %7 = partial_apply %fn<R, Builtin.NativeObject>(%0, %val_storage, %val2) : $@convention(thin) <U, V> (@in_guaranteed U, @in_guaranteed V, @guaranteed Builtin.NativeObject) -> ()
+  apply %7() :$@callee_owned () -> ()
+  dealloc_stack %val_storage : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
+
+//----
+
+// CHECK-LABEL: sil [ossa] @selfReferringGenericClosure_nontrivial_owned : $@convention(thin) <R, S> (@in R, @in S, @owned Builtin.NativeObject) -> () {
+// CHECK:  [[FUNC:%.*]] = function_ref @$s44selfReferringGenericClosure_nontrivial_ownedxBoBoBoRs_r0_lIetixx_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.NativeObject> (@in τ_0_0, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> ()
+// CHECK:  [[PAI:%.*]] = partial_apply [[FUNC]]<
+// CHECK:  destroy_value [[PAI]]
+// CHECK: } // end sil function 'selfReferringGenericClosure_nontrivial_owned'
+sil [ossa] @selfReferringGenericClosure_nontrivial_owned : $@convention(thin) <R, S> (@in R, @in S, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*R, %1 : $*S, %2 : @owned $Builtin.NativeObject):
+  cond_br undef, bb2, bb1
+
+bb1:
+  %val_storage = alloc_stack $Builtin.NativeObject
+  %val = copy_value %2 : $Builtin.NativeObject
+  store %val to [init] %val_storage : $*Builtin.NativeObject
+  %fn = function_ref @selfReferringGenericClosure_nontrivial_owned : $@convention(thin) <U, V> (@in U, @in V, @owned Builtin.NativeObject) -> () 
+  %7 = partial_apply %fn<R, Builtin.NativeObject>(%0, %val_storage, %2) : $@convention(thin) <U, V> (@in U, @in V, @owned Builtin.NativeObject) -> ()
+  dealloc_stack %val_storage : $*Builtin.NativeObject
+  destroy_value %7 : $@callee_owned () -> ()
+  br bb3
+
+bb2:
+  destroy_value %2 : $Builtin.NativeObject
+  destroy_addr %0 : $*R
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*S
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil [ossa] @selfReferringGenericClosure_nontrivial_owned_applied : $@convention(thin) <R, S> (@in R, @in S, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*R, %1 : $*S, %2 : @owned $Builtin.NativeObject):
+  cond_br undef, bb2, bb1
+
+bb1:
+  %val_storage = alloc_stack $Builtin.NativeObject
+  %val = copy_value %2 : $Builtin.NativeObject
+  store %val to [init] %val_storage : $*Builtin.NativeObject
+  %fn = function_ref @selfReferringGenericClosure_nontrivial_owned_applied : $@convention(thin) <U, V> (@in U, @in V, @owned Builtin.NativeObject) -> () 
+  %7 = partial_apply %fn<R, Builtin.NativeObject>(%0, %val_storage, %2) : $@convention(thin) <U, V> (@in U, @in V, @owned Builtin.NativeObject) -> ()
+  apply %7() :$@callee_owned () -> ()
+  dealloc_stack %val_storage : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %2 : $Builtin.NativeObject
+  destroy_addr %0 : $*R
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*S
+  %8 = tuple ()
+  return %8 : $()
+}
+
+struct YYY<T> {
+}
+
+enum MyOptional<T> {
+  case none
+  case some(T)
+}
+
+// Check that a specialization of a self-recursive function is produced
+// and it is not crashing the compiler.
+// CHECK-LABEL: sil shared [ossa] @$s25testSelfRecursiveFunction4main10MyOptionalOyAB3YYYVyypGG_Tg5 : $@convention(thin) (MyOptional<YYY<Any>>) -> ()
+sil [ossa] @testSelfRecursiveFunction : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  %2 = function_ref @testSelfRecursiveFunction : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %3 = alloc_stack $MyOptional<YYY<Any>>
+  inject_enum_addr %3 : $*MyOptional<YYY<Any>>, #MyOptional.none!enumelt
+  %5 = tuple ()
+  %6 = load [trivial] %3 : $*MyOptional<YYY<Any>>
+  %7 = alloc_stack $MyOptional<YYY<Any>>
+  store %6 to [trivial] %7 : $*MyOptional<YYY<Any>>
+  %9 = apply %2<MyOptional<YYY<Any>>>(%7) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %7 : $*MyOptional<YYY<Any>>
+  dealloc_stack %3 : $*MyOptional<YYY<Any>>
+  destroy_addr %0 : $*T
+  %13 = tuple ()
+  return %13 : $()
+} // end sil function 'testSelfRecursiveFunction'
+
+sil [ossa] @id : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 :$*T):
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %t = tuple ()
+  return %t : $()
+}
+
+// This should not assert.
+// CHECK-LABEL: sil shared [ossa] @$s26specialize_no_return_applys5NeverO_Tg5
+// CHECK:      apply
+// CHECK-NEXT: unreachable
+
+sil [ossa] @specialize_no_return_apply: $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  %in = alloc_stack $T
+  copy_addr [take] undef to [initialization] %in : $*T
+  %out = alloc_stack $T
+  %f = function_ref @id : $@convention(thin) <T> (@in T) -> @out T
+  %r = apply %f<T>(%out, %in) : $@convention(thin) <T> (@in T) -> @out T
+  destroy_addr %out : $*T
+  dealloc_stack %out : $*T
+  dealloc_stack %in : $*T
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [ossa] @test_specialize_noreturn_apply : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @specialize_no_return_apply : $@convention(thin) <T> (@thick T.Type) -> ()
+  %m = metatype $@thick Never.Type
+  %r = apply %f<Never>(%m) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+////////////////////
+// TryApply Tests //
+////////////////////
+
+sil @getError : $@convention(thin) () -> @owned Error
+
+sil [ossa] @generic_try_apply_callee2 : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+bb0(%0 : $*T):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f = function_ref @getError : $@convention(thin) () -> @owned Error
+  %e = apply %f() : $@convention(thin) () -> @owned Error
+  throw %e : $Error
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @generic_try_apply_callee : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+bb0(%0 : $*T):
+  %f = function_ref @generic_try_apply_callee2 : $@convention(thin) <T> (@in_guaranteed T) -> @error Error
+  try_apply %f<T>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> @error Error, normal bb1, error bb2
+
+bb1(%result : $()):
+  %9999 = tuple()  
+  return %9999 : $()
+
+bb2(%e : @owned $Error):
+  throw %e : $Error
+}
+
+sil [ossa] @generic_try_apply_callee2_out_param : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @error Error) {
+bb0(%0 : $*T, %1 : $*T):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f = function_ref @getError : $@convention(thin) () -> @owned Error
+  %e = apply %f() : $@convention(thin) () -> @owned Error
+  throw %e : $Error
+
+bb2:
+  copy_addr %1 to [initialization] %0 : $*T
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+sil [ossa] @generic_try_apply_callee_out_param : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @error Error) {
+bb0(%0 : $*T, %1 : $*T):
+  %f = function_ref @generic_try_apply_callee2_out_param : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @error Error)
+  try_apply %f<T>(%0, %1) : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @error Error), normal bb1, error bb2
+
+bb1(%result : $()):
+  %9999 = tuple()  
+  return %9999 : $()
+
+bb2(%e : @owned $Error):
+  throw %e : $Error
+}
+
+// Just make sure we pass the verifiers.
+//
+// CHECK-LABEL: sil [ossa] @test_try_apply : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: try_apply {{%.*}}({{%.*}}) : $@convention(thin) (Builtin.Int32) -> @error Error, normal bb1, error bb2
+// CHECK: try_apply {{%.*}}({{%.*}}) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb4, error bb5
+// CHECK: } // end sil function 'test_try_apply'
+sil [ossa] @test_try_apply : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
+  %f = function_ref @generic_try_apply_callee : $@convention(thin) <T> (@in_guaranteed T) -> @error Error
+
+  %0a = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %0a : $*Builtin.Int32
+  try_apply %f<Builtin.Int32>(%0a) : $@convention(thin) <T> (@in_guaranteed T) -> @error Error, normal bb1, error bb2
+
+bb1(%result : $()):
+  br bb3
+
+bb2(%e : @owned $Error):
+  destroy_value %e : $Error
+  br bb3
+
+bb3:
+  dealloc_stack %0a : $*Builtin.Int32
+
+  %0b = alloc_stack $Builtin.NativeObject
+  store_borrow %1 to %0b : $*Builtin.NativeObject
+  try_apply %f<Builtin.NativeObject>(%0b) : $@convention(thin) <T> (@in_guaranteed T) -> @error Error, normal bb4, error bb5
+
+bb4(%result2 : $()):
+  br bb6
+
+bb5(%e2 : @owned $Error):
+  destroy_value %e2 : $Error
+  br bb6
+
+bb6:
+  dealloc_stack %0b : $*Builtin.NativeObject
+
+  %0c = alloc_stack $Builtin.NativeObject
+  store_borrow %1 to %0c : $*Builtin.NativeObject
+  %outParam = alloc_stack $Builtin.NativeObject
+  %f2 = function_ref @generic_try_apply_callee_out_param : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @error Error)
+  try_apply %f2<Builtin.NativeObject>(%outParam, %0c) : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @error Error), normal bb7, error bb8
+
+bb7(%result3 : $()):
+  destroy_addr %outParam : $*Builtin.NativeObject
+  br bb9  
+
+bb8(%error4 : @owned $Error):
+  destroy_value %error4 : $Error
+  br bb9
+
+bb9:
+  dealloc_stack %outParam : $*Builtin.NativeObject
+  dealloc_stack %0c : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test cases where we throw instead of catch.
+sil [ossa] @test_try_apply_throw_error : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> @error Error {
+bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
+  %f = function_ref @generic_try_apply_callee : $@convention(thin) <T> (@in_guaranteed T) -> @error Error
+
+  %0a = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %0a : $*Builtin.Int32
+  try_apply %f<Builtin.Int32>(%0a) : $@convention(thin) <T> (@in_guaranteed T) -> @error Error, normal bb1, error bb2
+
+bb1(%result : $()):
+  br bb3
+
+bb2(%e : @owned $Error):
+  dealloc_stack %0a : $*Builtin.Int32
+  br bbError(%e : $Error)
+
+bb3:
+  dealloc_stack %0a : $*Builtin.Int32
+  %0b = alloc_stack $Builtin.NativeObject
+  store_borrow %1 to %0b : $*Builtin.NativeObject
+  try_apply %f<Builtin.NativeObject>(%0b) : $@convention(thin) <T> (@in_guaranteed T) -> @error Error, normal bb4, error bb5
+
+bb4(%result2 : $()):
+  br bb6
+
+bb5(%e2 : @owned $Error):
+  dealloc_stack %0b : $*Builtin.NativeObject
+  br bbError(%e2 : $Error)
+
+bbError(%eOut : @owned $Error):
+  throw %eOut : $Error
+
+bb6:
+  dealloc_stack %0b : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @generic_try_apply_callee_loadable_2 : $@convention(thin) <T : AnyObject> (@inout T, @guaranteed T) -> @error Error {
+bb0(%0 : $*T, %1 : @guaranteed $T
+):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f = function_ref @getError : $@convention(thin) () -> @owned Error
+  %e = apply %f() : $@convention(thin) () -> @owned Error
+  throw %e : $Error
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @generic_try_apply_callee_loadable_1 : $@convention(thin) <T : AnyObject> (@inout T, @in_guaranteed T) -> @error Error {
+bb0(%0 : $*T, %1 : $*T):
+  %f = function_ref @generic_try_apply_callee_loadable_2 : $@convention(thin) <T : AnyObject> (@inout T, @guaranteed T) -> @error Error
+  %1b = load_borrow %1 : $*T
+  try_apply %f<T>(%0, %1b) : $@convention(thin) <T : AnyObject> (@inout T, @guaranteed T) -> @error Error, normal bb1, error bb2
+
+bb1(%result : $()):
+  end_borrow %1b : $T
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2(%e : @owned $Error):
+  end_borrow %1b : $T
+  throw %e : $Error
+}
+
+sil [ossa] @test_try_apply_loadable : $@convention(thin) (@inout Klass, @guaranteed Klass) -> () {
+bb0(%0 : $*Klass, %1 : @guaranteed $Klass):
+  %f = function_ref @generic_try_apply_callee_loadable_1 : $@convention(thin) <T : AnyObject> (@inout T, @in_guaranteed T) -> @error Error
+  %1b = alloc_stack $Klass
+  store_borrow %1 to %1b : $*Klass
+  try_apply %f<Klass>(%0, %1b) : $@convention(thin) <T : AnyObject> (@inout T, @in_guaranteed T) -> @error Error, normal bb4, error bb5
+
+bb4(%result2 : $()):
+  br bb6
+
+bb5(%e2 : @owned $Error):
+  destroy_value %e2 : $Error
+  br bb6
+
+bb6:
+  dealloc_stack %1b : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @loadable_partial_apply_user : $@convention(thin) (@guaranteed @callee_guaranteed (@inout Klass) -> @error Error) -> () {
+bb0(%0 : @guaranteed $@callee_guaranteed (@inout Klass) -> @error Error):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_try_apply_loadable_partial_apply : $@convention(thin) (@inout Klass, @guaranteed Klass) -> () {
+bb0(%0 : $*Klass, %1 : @guaranteed $Klass):
+  %f = function_ref @generic_try_apply_callee_loadable_1 : $@convention(thin) <T : AnyObject> (@inout T, @in_guaranteed T) -> @error Error
+  %1b = alloc_stack $Klass
+  %1a = copy_value %1 : $Klass
+  store %1a to [init] %1b : $*Klass
+  %f2 = partial_apply [callee_guaranteed] %f<Klass>(%1b) : $@convention(thin) <T : AnyObject> (@inout T, @in_guaranteed T) -> @error Error
+  %f3 = function_ref @loadable_partial_apply_user : $@convention(thin) (@guaranteed @callee_guaranteed (@inout Klass) -> @error Error) -> ()
+  apply %f3(%f2) : $@convention(thin) (@guaranteed @callee_guaranteed (@inout Klass) -> @error Error) -> ()
+  destroy_value %f2 : $@callee_guaranteed (@inout Klass) -> @error Error
+  dealloc_stack %1b : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+//////////////////////
+// BeginApply Tests //
+//////////////////////
+
+sil [ossa] @generic_begin_apply_callee_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in_guaranteed T {
+bb0(%0 : $*T):
+  %1 = alloc_stack $*T
+  copy_addr %0 to [initialization] %1 : $*T
+  yield %1 : $*T, resume bb1, unwind bb2
+
+bb1:
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2:
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  unwind
+}
+
+sil [ossa] @generic_begin_apply_callee_in : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in T {
+bb0(%0 : $*T):
+  %1 = alloc_stack $*T
+  copy_addr %0 to [initialization] %1 : $*T
+  yield %1 : $*T, resume bb1, unwind bb2
+
+bb1:
+  dealloc_stack %1 : $*T
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2:
+  dealloc_stack %1 : $*T
+  unwind
+}
+
+sil [ossa] @generic_begin_apply_callee_inout : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T {
+bb0(%0 : $*T):
+  %1 = alloc_stack $*T
+  copy_addr %0 to [initialization] %1 : $*T
+  yield %1 : $*T, resume bb1, unwind bb2
+
+bb1:
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2:
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  unwind
+}
+
+// Just make sure we pass the verifiers.
+//
+// CHECK-LABEL: sil [ossa] @test_begin_apply_inguaranteed : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: begin_apply {{%.*}}({{%.*}}) : $@yield_once @convention(thin) (Builtin.Int32) -> @yields @in_guaranteed Builtin.Int32
+// CHECK: begin_apply {{%.*}}({{%.*}}) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> @yields @in_guaranteed Builtin.NativeObject
+// CHECK: } // end sil function 'test_begin_apply_inguaranteed'
+sil [ossa] @test_begin_apply_inguaranteed : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
+  %f = function_ref @generic_begin_apply_callee_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in_guaranteed T
+
+  %0a = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %0a : $*Builtin.Int32
+  (%0r, %0token) = begin_apply %f<Builtin.Int32>(%0a) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in_guaranteed T
+  end_apply %0token
+  dealloc_stack %0a : $*Builtin.Int32
+
+  %1b = alloc_stack $Builtin.NativeObject
+  %1c = copy_value %1 : $Builtin.NativeObject
+  store %1c to [init] %1b : $*Builtin.NativeObject
+  (%1result, %1token) = begin_apply %f<Builtin.NativeObject>(%1b) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in_guaranteed T
+
+  end_apply %1token
+  destroy_addr %1b : $*Builtin.NativeObject
+  dealloc_stack %1b : $*Builtin.NativeObject
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_begin_apply_in : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: begin_apply {{%.*}}({{%.*}}) : $@yield_once @convention(thin) (Builtin.Int32) -> @yields @in Builtin.Int32
+// CHECK: begin_apply {{%.*}}({{%.*}}) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> @yields @in Builtin.NativeObject
+// CHECK: } // end sil function 'test_begin_apply_in'
+sil [ossa] @test_begin_apply_in : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
+  %f = function_ref @generic_begin_apply_callee_in : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in T
+
+  %0a = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %0a : $*Builtin.Int32
+  (%0r, %0token) = begin_apply %f<Builtin.Int32>(%0a) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in T
+  end_apply %0token
+  dealloc_stack %0a : $*Builtin.Int32
+
+  %1b = alloc_stack $Builtin.NativeObject
+  %1c = copy_value %1 : $Builtin.NativeObject
+  store %1c to [init] %1b : $*Builtin.NativeObject
+  (%1result, %1token) = begin_apply %f<Builtin.NativeObject>(%1b) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in T
+
+  end_apply %1token
+  destroy_addr %1b : $*Builtin.NativeObject
+  dealloc_stack %1b : $*Builtin.NativeObject
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_begin_apply_inout : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: begin_apply {{%.*}}({{%.*}}) : $@yield_once @convention(thin) (Builtin.Int32) -> @yields @inout Builtin.Int32
+// CHECK: begin_apply {{%.*}}({{%.*}}) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> @yields @inout Builtin.NativeObject
+// CHECK: } // end sil function 'test_begin_apply_inout'
+sil [ossa] @test_begin_apply_inout : $@convention(thin) (Builtin.Int32, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
+  %f = function_ref @generic_begin_apply_callee_inout : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+
+  %0a = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %0a : $*Builtin.Int32
+  (%0r, %0token) = begin_apply %f<Builtin.Int32>(%0a) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+  end_apply %0token
+  dealloc_stack %0a : $*Builtin.Int32
+
+  %1b = alloc_stack $Builtin.NativeObject
+  %1c = copy_value %1 : $Builtin.NativeObject
+  store %1c to [init] %1b : $*Builtin.NativeObject
+  (%1result, %1token) = begin_apply %f<Builtin.NativeObject>(%1b) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+
+  end_apply %1token
+  destroy_addr %1b : $*Builtin.NativeObject
+  dealloc_stack %1b : $*Builtin.NativeObject
+
   %9999 = tuple()
   return %9999 : $()
 }
