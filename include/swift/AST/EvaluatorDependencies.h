@@ -237,17 +237,19 @@ struct DependencyRecorder {
   friend DependencyCollector;
 
   enum class Mode {
-    // Enables the current "status quo" behavior of the dependency collector.
-    //
-    // By default, the dependency collector moves to register dependencies in
-    // the referenced name trackers at the top of the active dependency stack.
-    StatusQuo,
-    // Enables an experimental mode to only register private dependencies.
+    // Enables the status quo of recording direct dependencies.
     //
     // This mode restricts the dependency collector to ignore changes of
     // scope. This has practical effect of charging all unqualified lookups to
     // the primary file being acted upon instead of to the destination file.
-    ExperimentalPrivateDependencies,
+    DirectDependencies,
+    // Enables a legacy mode of dependency tracking that makes a distinction
+    // between private and cascading edges, and does not directly capture
+    // transitive dependencies.
+    //
+    // By default, the dependency collector moves to register dependencies in
+    // the referenced name trackers at the top of the active dependency stack.
+    LegacyCascadingDependencies,
   };
 
 private:
@@ -305,9 +307,9 @@ public:
     if (dependencySources.empty())
       return nullptr;
     switch (mode) {
-    case Mode::StatusQuo:
+    case Mode::LegacyCascadingDependencies:
       return dependencySources.back().getPointer();
-    case Mode::ExperimentalPrivateDependencies:
+    case Mode::DirectDependencies:
       return dependencySources.front().getPointer();
     }
   }
@@ -347,9 +349,9 @@ private:
   /// If there is no active scope, the result always cascades.
   bool isActiveSourceCascading() const {
     switch (mode) {
-    case Mode::StatusQuo:
+    case Mode::LegacyCascadingDependencies:
       return getActiveSourceScope() == evaluator::DependencyScope::Cascading;
-    case Mode::ExperimentalPrivateDependencies:
+    case Mode::DirectDependencies:
       return false;
     }
     llvm_unreachable("invalid mode");
