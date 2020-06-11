@@ -3530,7 +3530,9 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   Type ty = resolveType(repr->getBase(), options.withoutContext());
-  if (!ty || ty->hasError()) return ty;
+  if (!ty || ty->hasError()) {
+    return ErrorType::get(Context);
+  }
 
   Optional<MetatypeRepresentation> storedRepr;
   
@@ -3561,7 +3563,9 @@ Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   Type ty = resolveType(repr->getBase(), options.withoutContext());
-  if (!ty || ty->hasError()) return ty;
+  if (!ty || ty->hasError()) {
+    return ErrorType::get(Context);
+  }
 
   Optional<MetatypeRepresentation> storedRepr;
   
