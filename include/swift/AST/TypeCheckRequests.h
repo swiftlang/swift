@@ -441,7 +441,7 @@ class RequirementRequest :
     public SimpleRequest<RequirementRequest,
                          Requirement(WhereClauseOwner, unsigned,
                                      TypeResolutionStage),
-                         RequestFlags::SeparatelyCached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -464,10 +464,8 @@ public:
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
                            
-  // Separate caching.
+  // Caching.
   bool isCached() const;
-  Optional<Requirement> getCachedResult() const;
-  void cacheResult(Requirement value) const;
 };
 
 /// Generate the USR for the given declaration.
