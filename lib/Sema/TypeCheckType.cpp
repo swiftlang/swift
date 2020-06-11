@@ -2857,9 +2857,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       elementOptions.setContext(TypeResolverContext::FunctionInput);
       auto param = resolveSILParameter(elt.Type, elementOptions);
       params.push_back(param);
-      if (!param.getInterfaceType()) return nullptr;
 
-      if (param.getInterfaceType()->hasError())
+      if (!param.getInterfaceType() || param.getInterfaceType()->hasError())
         hasError = true;
     }
 
