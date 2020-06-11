@@ -2705,7 +2705,8 @@ Type TypeResolver::resolveASTFunctionType(
   switch (representation) {
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
-    if (!fnTy->isRepresentableIn(ForeignLanguage::ObjectiveC, DC)) {
+    if (!fnTy->hasError() &&
+        !fnTy->isRepresentableIn(ForeignLanguage::ObjectiveC, DC)) {
       StringRef strName =
         (representation == AnyFunctionType::Representation::Block)
         ? "block"
