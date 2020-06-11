@@ -374,7 +374,7 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   ASTContext &ctx = elementType->getASTContext();
   if (!ctx.getOptionalDecl()) {
     ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 1);
-    return Type();
+    return ErrorType::get(ctx);
   }
 
   return OptionalType::get(elementType);
@@ -3342,14 +3342,16 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
   TypeResolutionOptions elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::ImmediateOptionalTypeArgument);
 
-  // The T in T? is a generic type argument and therefore always an AST type.
-  // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), elementOptions);
-  if (!baseTy || baseTy->hasError()) return baseTy;
+  if (!baseTy || baseTy->hasError()) {
+    return ErrorType::get(Context);
+  }
 
   auto optionalTy = TypeChecker::getOptionalType(repr->getQuestionLoc(),
                                                  baseTy);
-  if (!optionalTy) return ErrorType::get(Context);
+  if (optionalTy->hasError()) {
+    return ErrorType::get(Context);
+  }
 
   return optionalTy;
 }
@@ -3412,17 +3414,16 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   TypeResolutionOptions elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::ImmediateOptionalTypeArgument);
 
-  // The T in T! is a generic type argument and therefore always an AST type.
-  // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), elementOptions);
-  if (!baseTy || baseTy->hasError()) return baseTy;
-
-  Type uncheckedOptionalTy;
-  uncheckedOptionalTy = TypeChecker::getOptionalType(repr->getExclamationLoc(),
-                                                     baseTy);
-
-  if (!uncheckedOptionalTy)
+  if (!baseTy || baseTy->hasError()) {
     return ErrorType::get(Context);
+  }
+
+  Type uncheckedOptionalTy =
+      TypeChecker::getOptionalType(repr->getExclamationLoc(), baseTy);
+  if (uncheckedOptionalTy->hasError()) {
+    return ErrorType::get(Context);
+  }
 
   return uncheckedOptionalTy;
 }
