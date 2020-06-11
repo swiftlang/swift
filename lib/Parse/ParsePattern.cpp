@@ -1184,9 +1184,9 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     ParserResult<TypeRepr> castType = parseType();
     if (castType.isNull() || castType.hasCodeCompletion())
       return nullptr;
-    return makeParserResult(new (Context) IsPattern(isLoc, castType.get(),
-                                                    nullptr,
-                                                    CheckedCastKind::Unresolved));
+    auto *CastTE = new (Context) TypeExpr(castType.get());
+    return makeParserResult(new (Context) IsPattern(
+        isLoc, CastTE, nullptr, CheckedCastKind::Unresolved));
   }
 
   // matching-pattern ::= expr

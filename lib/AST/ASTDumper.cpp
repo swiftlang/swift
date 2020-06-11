@@ -479,9 +479,9 @@ namespace {
     void visitTypedPattern(TypedPattern *P) {
       printCommon(P, "pattern_typed") << '\n';
       printRec(P->getSubPattern());
-      if (P->getTypeLoc().getTypeRepr()) {
+      if (auto *repr = P->getTypeRepr()) {
         OS << '\n';
-        printRec(P->getTypeLoc().getTypeRepr());
+        printRec(repr);
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -489,7 +489,7 @@ namespace {
     void visitIsPattern(IsPattern *P) {
       printCommon(P, "pattern_is")
         << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
-      P->getCastTypeLoc().getType().print(OS);
+      P->getCastType().print(OS);
       if (auto sub = P->getSubPattern()) {
         OS << '\n';
         printRec(sub);
@@ -514,8 +514,7 @@ namespace {
     void visitEnumElementPattern(EnumElementPattern *P) {
       printCommon(P, "pattern_enum_element");
       OS << ' ';
-      P->getParentType().getType().print(
-        PrintWithColorRAII(OS, TypeColor).getOS());
+      P->getParentType().print(PrintWithColorRAII(OS, TypeColor).getOS());
       PrintWithColorRAII(OS, IdentifierColor) << '.' << P->getName();
       if (P->hasSubPattern()) {
         OS << '\n';

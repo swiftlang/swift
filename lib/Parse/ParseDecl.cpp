@@ -5694,12 +5694,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   if (!PrimaryVar)
     return nullptr;
 
-  TypeLoc TyLoc;
-  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
-    TyLoc = TP->getTypeLoc();
-  }
-
-  if (!TyLoc.hasLocation()) {
+  if (!isa<TypedPattern>(pattern)) {
     if (accessors.Get || accessors.Set || accessors.Address ||
         accessors.MutableAddress) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(

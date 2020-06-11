@@ -1164,7 +1164,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(pattern);
     Printer << tok::kw_is << " ";
-    isa->getCastTypeLoc().getType().print(Printer, Options);
+    isa->getCastType().print(Printer, Options);
     break;
   }
 

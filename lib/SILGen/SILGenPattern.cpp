@@ -81,7 +81,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
   }
   case PatternKind::Is:
     os << "is ";
-    cast<IsPattern>(p)->getCastTypeLoc().getType()->print(os);
+    cast<IsPattern>(p)->getCastType()->print(os);
     break;
   case PatternKind::EnumElement: {
     auto eep = cast<EnumElementPattern>(p);
@@ -286,8 +286,7 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
     auto pIs = cast<IsPattern>(p);
     // 'is' patterns are only similar to matches to the same type.
     if (auto firstIs = dyn_cast<IsPattern>(first)) {
-      if (firstIs->getCastTypeLoc().getType()
-            ->isEqual(pIs->getCastTypeLoc().getType()))
+      if (firstIs->getCastType()->isEqual(pIs->getCastType()))
         return p;
     }
     return nullptr;
@@ -1592,7 +1591,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 }
 
 static CanType getTargetType(const RowToSpecialize &row) {
-  auto type = cast<IsPattern>(row.Pattern)->getCastTypeLoc().getType();
+  auto type = cast<IsPattern>(row.Pattern)->getCastType();
   return type->getCanonicalType();
 }
 

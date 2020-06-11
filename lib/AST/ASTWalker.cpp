@@ -1699,14 +1699,15 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
     }
   }
   if (!P->isImplicit())
-    if (doIt(P->getCastTypeLoc()))
-      return nullptr;
+    if (auto *TR = P->getCastTypeRepr())
+      if (doIt(TR))
+        return nullptr;
   return P;
 }
 
 Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
-  if (!P->isParentTypeImplicit())
-    if (doIt(P->getParentType()))
+  if (auto *TR = P->getParentTypeRepr())
+    if (doIt(TR))
       return nullptr;
 
   if (!P->hasSubPattern())
