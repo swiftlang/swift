@@ -43,4 +43,22 @@ OperatorsTestSuite.test("slash") {
   expectEqual(1, result.value)
 }
 
+OperatorsTestSuite.test("less less (<<)") {
+  let lhs = IntBox(value: 2)
+  let rhs = IntBox(value: 4)
+
+  let result = lhs << rhs
+
+  expectEqual(32, result.value)
+}
+
+OperatorsTestSuite.test("greater greater (>>)") {
+  let lhs = IntBox(value: 512)
+  let rhs = IntBox(value: 8)
+
+  let result = lhs >> rhs
+
+  expectEqual(2, result.value)
+}
+
 runAllTests()

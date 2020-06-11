@@ -1423,6 +1423,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Minus:
     case clang::OverloadedOperatorKind::OO_Star:
     case clang::OverloadedOperatorKind::OO_Slash:
+    case clang::OverloadedOperatorKind::OO_LessLess:
+    case clang::OverloadedOperatorKind::OO_GreaterGreater:
       if (auto FD = dyn_cast<clang::FunctionDecl>(D)) {
         baseName = clang::getOperatorSpelling(op);
         isFunction = true;
