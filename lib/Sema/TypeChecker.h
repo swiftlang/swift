@@ -346,8 +346,6 @@ enum class CheckedCastContextKind {
 namespace TypeChecker {
 Type getArraySliceType(SourceLoc loc, Type elementType);
 Type getOptionalType(SourceLoc loc, Type elementType);
-Type getStringType(ASTContext &ctx);
-Type getSubstringType(ASTContext &ctx);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used

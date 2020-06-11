@@ -2570,7 +2570,7 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (!getASTContext().getStdlibModule())
     return false;
 
-  auto String = TypeChecker::getStringType(getASTContext());
+  auto String = getASTContext().getStringDecl()->getDeclaredInterfaceType();
   auto Substring = getASTContext().getSubstringDecl()->getDeclaredInterfaceType();
 
   // Substring -> String conversion

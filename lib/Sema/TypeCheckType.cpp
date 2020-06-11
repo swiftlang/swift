@@ -380,16 +380,6 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-Type TypeChecker::getStringType(ASTContext &Context) {
-  if (auto typeDecl = Context.getStringDecl())
-    return typeDecl->getDeclaredInterfaceType();
-
-  return Type();
-}
-  llvm::report_fatal_error("Broken Standard library: Cannot resolve String");
-  return Type();
-}
-
 Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,

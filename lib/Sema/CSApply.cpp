@@ -4698,7 +4698,9 @@ namespace {
                                  StringRef(stringCopy, compatStringBuf.size()),
                                  SourceRange(),
                                  /*implicit*/ true);
-          cs.setType(stringExpr, TypeChecker::getStringType(cs.getASTContext()));
+          cs.setType(
+              stringExpr,
+              cs.getASTContext().getStringDecl()->getDeclaredInterfaceType());
           E->setObjCStringLiteralExpr(stringExpr);
         }
       }
