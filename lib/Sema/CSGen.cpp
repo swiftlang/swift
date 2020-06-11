@@ -1175,9 +1175,24 @@ namespace {
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
       CS.Options |= ConstraintSystemFlags::SuppressDiagnostics;
-      return CS.createTypeVariable(CS.getConstraintLocator(E),
-                                   TVO_CanBindToLValue |
-                                   TVO_CanBindToNoEscape);
+      auto locator = CS.getConstraintLocator(E);
+      auto ty = CS.createTypeVariable(locator,
+                                      TVO_CanBindToLValue |
+                                      TVO_CanBindToNoEscape);
+
+      // Defaults to the type of the base expression if we have a base
+      // expression.
+      // FIXME: This is just to keep the old behavior where `foo(base.<HERE>)`
+      // the argument is type checked to the type of the 'base'. Ideally, code
+      // completion expression should be defauled to 'UnresolvedType'
+      // regardless of the existence of the base expression. But the constraint
+      // system is simply not ready for that.
+      if (auto base = E->getBase()) {
+        CS.addConstraint(ConstraintKind::Defaultable, ty, CS.getType(base),
+                         locator);
+      }
+      
+      return ty;
     }
 
     Type visitNilLiteralExpr(NilLiteralExpr *expr) {

@@ -750,7 +750,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   if (Tok.is(tok::code_complete)) {
-    auto CCE = new (Context) CodeCompletionExpr(SourceRange(Tok.getLoc()));
+    auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
     auto Result = makeParserResult(new (Context) ReturnStmt(ReturnLoc, CCE));
     if (CodeCompletion) {
       CodeCompletion->completeReturnStmt(CCE);
@@ -818,7 +818,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
   SourceLoc yieldLoc = consumeToken(tok::kw_yield);
 
   if (Tok.is(tok::code_complete)) {
-    auto cce = new (Context) CodeCompletionExpr(SourceRange(Tok.getLoc()));
+    auto cce = new (Context) CodeCompletionExpr(Tok.getLoc());
     auto result = makeParserResult(
       YieldStmt::create(Context, yieldLoc, SourceLoc(), cce, SourceLoc()));
     if (CodeCompletion) {
