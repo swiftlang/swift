@@ -1,7 +1,7 @@
 // SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
 // UNSUPPORTED: tensorflow
 
-// XFAIL: freebsd, linux, windows
+// XFAIL: freebsd, openbsd, linux, windows
 
 // Test SDK detection for immediate mode.
 // RUN: %empty-directory(%t)

@@ -1199,7 +1199,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                              ExcludeNodeAtLocation).shouldContinue)
       return false;
     if (auto *CA = dyn_cast<CustomAttr>(D)) {
-      if (auto *Repr = CA->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = CA->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }

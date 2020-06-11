@@ -4407,9 +4407,12 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
       isImplicit = true;
     }
 
-    auto typeExpr = TypeExpr::createImplicitHack(
-        outermostWrapperAttr->getTypeLoc().getLoc(),
-        outermostWrapperType, ctx);
+    SourceLoc typeLoc;
+    if (auto *repr = outermostWrapperAttr->getTypeRepr()) {
+      typeLoc = repr->getLoc();
+    }
+    auto typeExpr =
+        TypeExpr::createImplicitHack(typeLoc, outermostWrapperType, ctx);
     backingInitializer = CallExpr::create(
         ctx, typeExpr, outermostArg,
         outermostWrapperAttr->getArgumentLabels(),
@@ -4423,7 +4426,8 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   // the initializer type later.
   expression.wrappedVar = singleVar;
   expression.expression = backingInitializer;
-  expression.convertType = outermostWrapperAttr->getTypeLoc();
+  expression.convertType = {outermostWrapperAttr->getTypeRepr(),
+                            outermostWrapperAttr->getType()};
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(

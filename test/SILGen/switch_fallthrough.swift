@@ -149,10 +149,10 @@ func test5() {
   case (foo(), let n):
     // CHECK:   cond_br {{%.*}}, [[YES_SECOND_CONDITION:bb[0-9]+]], {{bb[0-9]+}}
     // CHECK: [[YES_SECOND_CONDITION]]:
-    // CHECK:   debug_value [[SECOND_N:%.*]] : $Int, let, name "n"
-    // CHECK:   br [[CASE2]]([[SECOND_N]] : $Int)
+    // CHECK:   br [[CASE2]]([[SECOND_N:%.*]] : $Int)
     
     // CHECK: [[CASE2]]([[INCOMING_N:%.*]] : $Int):
+    // CHECK:   debug_value [[INCOMING_N]] : $Int, let, name "n"
     // CHECK:   [[Z:%.*]] = function_ref @$s18switch_fallthrough1zyySiF
     // CHECK:    apply [[Z]]([[INCOMING_N]]) : $@convention(thin) (Int) -> ()
     // CHECK:   br [[CONT:bb[0-9]+]]

@@ -526,7 +526,7 @@ public:
 
     // Check the property wrapper types.
     for (auto attr : anyVar->getAttachedPropertyWrappers()) {
-      checkTypeAccess(attr->getTypeLoc(), anyVar,
+      checkTypeAccess(attr->getType(), attr->getTypeRepr(), anyVar,
                       /*mayBeInferred=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
@@ -1152,7 +1152,7 @@ public:
         });
 
     for (auto attr : anyVar->getAttachedPropertyWrappers()) {
-      checkTypeAccess(attr->getTypeLoc(),
+      checkTypeAccess(attr->getType(), attr->getTypeRepr(),
                       fixedLayoutStructContext ? fixedLayoutStructContext
                                                : anyVar,
                       /*mayBeInferred*/false,
@@ -1827,7 +1827,7 @@ public:
 
     // Check the property wrapper types.
     for (auto attr : anyVar->getAttachedPropertyWrappers())
-      checkType(attr->getTypeLoc(), anyVar,
+      checkType(attr->getType(), attr->getTypeRepr(), anyVar,
                 getDiagnoser(anyVar, Reason::PropertyWrapper));
   }
 

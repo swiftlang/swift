@@ -14,6 +14,7 @@
 #define SWIFT_IDE_COMMENT_CONVERSION_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/TypeOrExtensionDecl.h"
 #include <memory>
 #include <string>
 
@@ -27,7 +28,9 @@ namespace ide {
 /// in Clang-like XML format.
 ///
 /// \returns true if the declaration has a documentation comment.
-bool getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS);
+bool getDocumentationCommentAsXML(
+  const Decl *D, raw_ostream &OS,
+  TypeOrExtensionDecl SynthesizedTarget = TypeOrExtensionDecl());
 
 /// If the declaration has a documentation comment and a localization key,
 /// print it into the given output stream and return true. Else, return false.
