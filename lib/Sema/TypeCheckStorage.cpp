@@ -2083,7 +2083,7 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
 
   } else if (dc->isModuleScopeContext()) {
     // Fixed-layout global variables don't require opaque accessors.
-    if (!var->isResilient() && !var->isNativeDynamic())
+    if (!var->isResilient() && !var->shouldUseNativeDynamicDispatch())
       return false;
 
   // Stored properties imported from Clang don't require opaque accessors.
@@ -2128,7 +2128,7 @@ RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
 
   // Dynamic storage does not have an opaque modify coroutine.
   if (dc->getSelfClassDecl())
-    if (storage->isObjCDynamic())
+    if (storage->shouldUseObjCDispatch())
       return false;
 
   // Requirements of ObjC protocols don't have an opaque modify coroutine.

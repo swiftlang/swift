@@ -571,7 +571,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
 
   if (ctor->hasClangNode() ||
-      ctor->isObjCDynamic() ||
+      ctor->shouldUseObjCDispatch() ||
       ctor->isConvenienceInit()) {
     assert(ctor->hasClangNode() || ctor->isObjC());
     // For an allocator thunk synthesized for an @objc convenience initializer

@@ -1551,7 +1551,7 @@ namespace {
       auto flags = getMethodDescriptorFlags<Flags>(func);
 
       // Remember if the declaration was dynamic.
-      if (func->isObjCDynamic())
+      if (func->shouldUseObjCDispatch())
         flags = flags.withIsDynamic(true);
 
       // Include the pointer-auth discriminator.

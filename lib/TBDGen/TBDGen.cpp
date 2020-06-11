@@ -636,7 +636,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
 
   // Add the global function pointer for a dynamically replaceable function.
-  if (AFD->isNativeDynamic()) {
+  if (AFD->shouldUseNativeMethodReplacement()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
@@ -681,7 +681,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
   if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
     assert(opaqueResult->getNamingDecl() == FD);
-    if (FD->isNativeDynamic()) {
+    if (FD->shouldUseNativeDynamicDispatch()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));

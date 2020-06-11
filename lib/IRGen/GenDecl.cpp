@@ -2539,7 +2539,7 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   // Don't emit accessors for functions that are not dynamic or dynamic
   // replacements.
   if (!abstractStorage) {
-    isNativeDynamic = namingDecl->isNativeDynamic();
+    isNativeDynamic = namingDecl->shouldUseNativeDynamicDispatch();
     if (!isNativeDynamic && !isDynamicReplacement)
       return;
   }
