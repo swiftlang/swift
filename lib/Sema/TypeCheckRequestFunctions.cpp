@@ -366,7 +366,7 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
       evaluator,
       CustomAttrTypeRequest{mutableAttr, dc, CustomAttrTypeKind::NonGeneric},
       Type());
-  if (!type) return Type();
+  if (!type || type->hasError()) return Type();
 
   auto nominal = type->getAnyNominal();
   if (!nominal) {

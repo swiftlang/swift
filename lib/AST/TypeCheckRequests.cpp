@@ -1410,16 +1410,22 @@ void LookupAllConformancesInContextRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 
 Optional<Type> ResolveTypeEraserTypeRequest::getCachedResult() const {
-  auto ty = std::get<1>(getStorage())->TypeEraserLoc.getType();
-  if (ty.isNull()) {
+  auto *TyExpr = std::get<1>(getStorage())->TypeEraserExpr;
+  if (!TyExpr || !TyExpr->getType()) {
     return None;
   }
-  return ty;
+  return TyExpr->getInstanceType();
 }
 
 void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
   assert(value && "Resolved type erasure type to null type!");
-  std::get<1>(getStorage())->TypeEraserLoc.setType(value);
+  auto *attr = std::get<1>(getStorage());
+  if (attr->TypeEraserExpr) {
+    attr->TypeEraserExpr->setType(MetatypeType::get(value));
+  } else {
+    attr->TypeEraserExpr = TypeExpr::createImplicit(value,
+                                                    value->getASTContext());
+  }
 }
 
 //----------------------------------------------------------------------------//

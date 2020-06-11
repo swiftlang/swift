@@ -1386,23 +1386,34 @@ SourceLoc DynamicReplacementAttr::getRParenLoc() const {
 
 TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
                                        SourceLoc atLoc, SourceRange range,
-                                       TypeRepr *typeEraserRepr) {
-  return new (ctx) TypeEraserAttr(atLoc, range, typeEraserRepr, nullptr, 0);
+                                       TypeExpr *typeEraserExpr) {
+  return new (ctx) TypeEraserAttr(atLoc, range, typeEraserExpr, nullptr, 0);
 }
 
 TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
                                        LazyMemberLoader *Resolver,
                                        uint64_t Data) {
   return new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
-                                  TypeLoc(), Resolver, Data);
+                                  nullptr, Resolver, Data);
 }
 
-bool
-TypeEraserAttr::hasViableTypeEraserInit(ProtocolDecl *protocol) const {
+bool TypeEraserAttr::hasViableTypeEraserInit(ProtocolDecl *protocol) const {
   return evaluateOrDefault(protocol->getASTContext().evaluator,
                            TypeEraserHasViableInitRequest{
                                const_cast<TypeEraserAttr *>(this), protocol},
                            false);
+}
+
+TypeRepr *TypeEraserAttr::getParsedTypeEraserTypeRepr() const {
+  return TypeEraserExpr ? TypeEraserExpr->getTypeRepr() : nullptr;
+}
+
+SourceLoc TypeEraserAttr::getLoc() const {
+  return TypeEraserExpr ? TypeEraserExpr->getLoc() : SourceLoc();
+}
+
+Type TypeEraserAttr::getTypeWithoutResolving() const {
+  return TypeEraserExpr ? TypeEraserExpr->getInstanceType() : Type();
 }
 
 Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
@@ -1847,20 +1858,21 @@ TypeRepr *ImplementsAttr::getProtocolTypeRepr() const {
   return ProtocolType->getTypeRepr();
 }
 
-CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
+CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
                        PatternBindingInitializer *initContext, Expr *arg,
                        ArrayRef<Identifier> argLabels,
                        ArrayRef<SourceLoc> argLabelLocs, bool implicit)
     : DeclAttribute(DAK_Custom, atLoc, range, implicit),
-      type(type),
+      typeExpr(type),
       arg(arg),
       initContext(initContext) {
+  assert(type);
   hasArgLabelLocs = !argLabelLocs.empty();
   numArgLabels = argLabels.size();
   initializeCallArguments(argLabels, argLabelLocs);
 }
 
-CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
                                bool hasInitializer,
                                PatternBindingInitializer *initContext,
                                SourceLoc lParenLoc,
@@ -1869,6 +1881,7 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
                                ArrayRef<SourceLoc> argLabelLocs,
                                SourceLoc rParenLoc,
                                bool implicit) {
+  assert(type);
   SmallVector<Identifier, 2> argLabelsScratch;
   SmallVector<SourceLoc, 2> argLabelLocsScratch;
   Expr *arg = nullptr;
@@ -1878,7 +1891,7 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
                              argLabelsScratch, argLabelLocsScratch);
   }
 
-  SourceRange range(atLoc, type.getSourceRange().End);
+  SourceRange range(atLoc, type->getSourceRange().End);
   if (arg)
     range.End = arg->getEndLoc();
 
@@ -1886,6 +1899,16 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
   void *mem = ctx.Allocate(size, alignof(CustomAttr));
   return new (mem) CustomAttr(atLoc, range, type, initContext, arg, argLabels,
                               argLabelLocs, implicit);
+}
+
+TypeRepr *CustomAttr::getTypeRepr() const { return typeExpr->getTypeRepr(); }
+Type CustomAttr::getType() const { return typeExpr->getInstanceType(); }
+
+void CustomAttr::resetTypeInformation(TypeExpr *info) { typeExpr = info; }
+
+void CustomAttr::setType(Type ty) {
+  assert(ty);
+  typeExpr->setType(MetatypeType::get(ty));
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

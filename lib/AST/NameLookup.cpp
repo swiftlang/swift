@@ -2347,7 +2347,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
               identTypeRepr
             };
 
-            attr->resetTypeInformation(IdentTypeRepr::create(ctx, components));
+            auto *newTE = new (ctx) TypeExpr(IdentTypeRepr::create(ctx, components));
+            attr->resetTypeInformation(newTE);
             return nominal;
           }
         }
