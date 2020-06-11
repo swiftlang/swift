@@ -9,3 +9,6 @@ let resultPlus = lhs + rhs
 let resultMinus = lhs - rhs
 let resultStar = lhs * rhs
 let resultSlash = lhs / rhs
+let resultPercent = lhs % rhs
+let resultAmp = lhs & rhs
+let resultPipe = lhs | rhs
