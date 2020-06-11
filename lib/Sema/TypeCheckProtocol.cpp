@@ -3642,8 +3642,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   }
 
   // Attempt to derive the witness.
-  auto derived =
-      TypeChecker::deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
+  auto derived = TypeChecker::deriveProtocolRequirement(
+      DC, derivingTypeDecl, requirement, Conformance);
   if (!derived)
     return ResolveWitnessResult::ExplicitFailed;
 
@@ -5506,9 +5506,21 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
   return known->second;
 }
 
-ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
-                                                  NominalTypeDecl *TypeDecl,
-                                                  ValueDecl *Requirement) {
+ValueDecl *TypeChecker::deriveProtocolRequirement(
+    DeclContext *DC, NominalTypeDecl *TypeDecl, ValueDecl *Requirement,
+    NormalProtocolConformance *conformance) {
+  auto evaluator = DC->getASTContext().evaluator;
+  auto request = DeriveProtocolRequirementRequest{DC, TypeDecl, Requirement};
+  if (evaluator.hasActiveRequest(request) &&
+      !conformance->hasWitness(Requirement)) {
+    return nullptr;
+  }
+  return evaluateOrDefault(evaluator, request, nullptr);
+}
+
+ValueDecl *DeriveProtocolRequirementRequest::evaluate(
+    Evaluator &evaluator, DeclContext *DC, NominalTypeDecl *TypeDecl,
+    ValueDecl *Requirement) const {
   // Note: whenever you update this function, also update
   // DerivedConformance::getDerivableRequirement.
   const auto protocol = cast<ProtocolDecl>(Requirement->getDeclContext());

@@ -268,3 +268,6 @@ SWIFT_REQUEST(TypeChecker, LookupAllConformancesInContextRequest,
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest, 
               bool(AccessorDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DeriveProtocolRequirementRequest,
+              ValueDecl*(DeclContext *, NominalTypeDecl *, ValueDecl *),
+              Uncached, NoLocationInfo)

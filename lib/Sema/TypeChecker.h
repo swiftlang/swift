@@ -931,9 +931,9 @@ ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 /// \returns nullptr if the derivation failed, or the derived declaration
 ///          if it succeeded. If successful, the derived declaration is added
 ///          to TypeDecl's body.
-ValueDecl *deriveProtocolRequirement(DeclContext *DC,
-                                     NominalTypeDecl *TypeDecl,
-                                     ValueDecl *Requirement);
+ValueDecl *deriveProtocolRequirement(DeclContext *DC, NominalTypeDecl *TypeDecl,
+                                     ValueDecl *Requirement,
+                                     NormalProtocolConformance *conformance);
 
 /// Derive an implicit type witness for the given associated type in
 /// the conformance of the given nominal type to some known
