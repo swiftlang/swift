@@ -364,7 +364,7 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   ASTContext &ctx = elementType->getASTContext();
   if (!ctx.getArrayDecl()) {
     ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 0);
-    return Type();
+    return ErrorType::get(ctx);
   }
 
   return ArraySliceType::get(elementType);
