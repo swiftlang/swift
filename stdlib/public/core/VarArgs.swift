@@ -66,7 +66,7 @@ protocol _CVarArgAligned: CVarArg {
 /// Some pointers require an alternate object to be retained.  The object
 /// that is returned will be used with _cVarArgEncoding and held until
 /// the closure is complete.  This is required since autoreleased storage
-/// is available on all platforms.
+/// is not available on all platforms.
 public protocol _CVarArgObject: CVarArg {
   /// Returns the alternate object that should be encoded.
   var _cVarArgObject: CVarArg { get }
