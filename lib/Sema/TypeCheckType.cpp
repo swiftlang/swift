@@ -387,10 +387,6 @@ Type TypeChecker::getStringType(ASTContext &Context) {
   return Type();
 }
 
-Type TypeChecker::getSubstringType(ASTContext &Context) {
-  if (auto typeDecl = Context.getSubstringDecl())
-    return typeDecl->getDeclaredInterfaceType();
-
   return Type();
 }
 

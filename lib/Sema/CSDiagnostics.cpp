@@ -2571,10 +2571,7 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
     return false;
 
   auto String = TypeChecker::getStringType(getASTContext());
-  auto Substring = TypeChecker::getSubstringType(getASTContext());
-
-  if (!String || !Substring)
-    return false;
+  auto Substring = getASTContext().getSubstringDecl()->getDeclaredInterfaceType();
 
   // Substring -> String conversion
   // Wrap in String.init
