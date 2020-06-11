@@ -819,7 +819,7 @@ static SILDebugLocation skipInternalLocations(SILDebugLocation loc) {
   // Zip through inlined call site information that came from the
   // implementation guts of the library.  We want to report the message inside
   // the user's code, not in the guts we inlined through.
-  for (; auto ics = ds->InlinedCallSite; ds = ics) {
+  for (; auto ics = ds->getInlinedAt(); ds = ics) {
     // If we found a valid inlined-into location, then we are good.
     if (ds->getLoc().getSourceLoc().isValid())
       return SILDebugLocation(ds->getLoc(), ds);

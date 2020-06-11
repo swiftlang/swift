@@ -3922,7 +3922,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (isa<SILUndef>(SILVal)) {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
-    if (!i->getDebugScope()->InlinedCallSite && VarInfo->Name == "$error") {
+    if (!i->getDebugScope()->getInlinedAt() && VarInfo->Name == "$error") {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }

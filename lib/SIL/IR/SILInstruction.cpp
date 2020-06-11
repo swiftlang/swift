@@ -42,8 +42,8 @@ const SILDebugScope *SILInstruction::getDebugScope() const {
 }
 
 void SILInstruction::setDebugScope(const SILDebugScope *DS) {
-  if (getDebugScope() && getDebugScope()->InlinedCallSite)
-    assert(DS->InlinedCallSite && "throwing away inlined scope info");
+  if (getDebugScope() && getDebugScope()->getInlinedAt())
+    assert(DS->getInlinedAt() && "throwing away inlined scope info");
 
   assert(DS->getParentFunction() == getFunction() &&
          "scope belongs to different function");

@@ -843,7 +843,7 @@ public:
 
     if (!Ctx.hasScopeID(DS)) {
       printDebugScope(DS->getImmediateParentScope(), SM);
-      printDebugScope(DS->InlinedCallSite, SM);
+      printDebugScope(DS->getInlinedAt(), SM);
       unsigned ID = Ctx.assignScopeID(DS);
       *this << "sil_scope " << ID << " { ";
       printDebugLocRef(DS->getLoc(), SM, false);
@@ -854,7 +854,7 @@ public:
         auto *PS = DS->getImmediateParentScope();
         *this << Ctx.getScopeID(PS);
       }
-      if (auto *CS = DS->InlinedCallSite)
+      if (auto *CS = DS->getInlinedAt())
         *this << " inlined_at " << Ctx.getScopeID(CS);
       *this << " }\n";
     }
@@ -933,7 +933,7 @@ public:
 
     // Print inlined-at location, if any.
     const SILDebugScope *CS = DS;
-    while ((CS = CS->InlinedCallSite)) {
+    while ((CS = CS->getInlinedAt())) {
       *this << ": ";
       if (auto *InlinedF = CS->getInlinedFunction())
         *this << demangleSymbol(InlinedF->getName());

@@ -44,13 +44,13 @@ class SILDebugScope : public SILAllocated<SILDebugScope> {
   /// For top-level scopes, this is the SILFunction.
   PointerUnion<const SILDebugScope *, SILFunction *> Parent;
 
-public:
   /// An optional chain of inlined call sites.
   ///
   /// If this scope is inlined, this points to a special "scope" that
   /// holds the location of the call site.
   const SILDebugScope *InlinedCallSite;
 
+public:
   SILDebugScope(SILLocation Loc, SILFunction *SILFn,
                 const SILDebugScope *ParentScope = nullptr,
                 const SILDebugScope *InlinedCallSite = nullptr);
@@ -78,6 +78,10 @@ public:
   const SILDebugScope *getImmediateParentScope() const {
     return Parent.dyn_cast<const SILDebugScope *>();
   }
+
+  /// Return the special scope pointing to the inlined call which produced
+  /// this scope.
+  const SILDebugScope *getInlinedAt() const { return InlinedCallSite; }
 
   void print(SourceManager &SM, llvm::raw_ostream &OS = llvm::errs(),
              unsigned Indent = 0) const;

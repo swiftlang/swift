@@ -337,7 +337,7 @@ private:
   }
 
   llvm::MDNode *createInlinedAt(const SILDebugScope *DS) {
-    auto *CS = DS->InlinedCallSite;
+    auto *CS = DS->getInlinedAt();
     if (!CS)
       return nullptr;
 
@@ -362,8 +362,8 @@ private:
   static bool parentScopesAreSane(const SILDebugScope *DS) {
     auto *Parent = DS;
     while ((Parent = Parent->getImmediateParentScope())) {
-      if (!DS->InlinedCallSite)
-        assert(!Parent->InlinedCallSite &&
+      if (!DS->getInlinedAt())
+        assert(!Parent->getInlinedAt() &&
                "non-inlined scope has an inlined parent");
     }
     return true;
@@ -2000,9 +2000,9 @@ void IRGenDebugInfoImpl::setInlinedTrapLocation(IRBuilder &Builder,
   // thought it was owned by Function B. Therefore, we need to find the last
   // inlined scope to point to.
   const SILDebugScope *TheLastScope = LastScope;
-  while (TheLastScope->InlinedCallSite &&
-         TheLastScope->InlinedCallSite != TheLastScope) {
-    TheLastScope = TheLastScope->InlinedCallSite;
+  while (TheLastScope->getInlinedAt() &&
+         TheLastScope->getInlinedAt() != TheLastScope) {
+    TheLastScope = TheLastScope->getInlinedAt();
   }
   auto LastLocation = llvm::DebugLoc::get(
       LastDebugLoc.Line, LastDebugLoc.Column, getOrCreateScope(TheLastScope));

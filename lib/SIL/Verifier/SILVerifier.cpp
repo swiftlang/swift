@@ -1124,7 +1124,7 @@ public:
     // for each argument slot. This catches SIL transformations
     // that accidentally remove inline information (stored in the SILDebugScope)
     // from debug-variable-carrying instructions.
-    if (!DS->InlinedCallSite) {
+    if (!DS->getInlinedAt()) {
       Optional<SILDebugVariable> VarInfo;
       if (auto *DI = dyn_cast<AllocStackInst>(I))
         VarInfo = DI->getVarInfo();

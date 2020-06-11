@@ -348,9 +348,9 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
 
   const SILDebugScope *ClonedInlinedCallSite = nullptr;
   const SILDebugScope *ClonedParent = nullptr;
-  if (OrigScope->InlinedCallSite) {
+  if (OrigScope->getInlinedAt()) {
     // For inlined functions, we need to rewrite the inlined call site.
-    ClonedInlinedCallSite = getOrCreateClonedScope(OrigScope->InlinedCallSite);
+    ClonedInlinedCallSite = getOrCreateClonedScope(OrigScope->getInlinedAt());
   } else {
     if (auto *ParentScope = OrigScope->getImmediateParentScope())
       ClonedParent = getOrCreateClonedScope(ParentScope);
