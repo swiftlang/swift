@@ -619,7 +619,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     
     // Open the type.
     Type openedWrapperType =
-      cs.openUnboundGenericType(rawWrapperType, emptyLocator);
+      cs.openUnboundGenericTypes(rawWrapperType, emptyLocator);
     if (!outermostOpenedWrapperType)
       outermostOpenedWrapperType = openedWrapperType;
     
