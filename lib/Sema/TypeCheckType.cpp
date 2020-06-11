@@ -120,7 +120,7 @@ GenericSignature TypeResolution::getGenericSignature() const {
     return dc->getGenericSignatureOfContext();
 
   case TypeResolutionStage::Structural:
-    return nullptr;
+    return GenericSignature();
   }
   llvm_unreachable("unhandled stage");
 }
@@ -781,8 +781,9 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (nominal->isOptionalDecl()) {
         // Validate the generic argument.
         Type objectType = resolution.resolveType(genericArgs[0]);
-        if (!objectType || objectType->hasError())
-          return nullptr;
+        if (!objectType || objectType->hasError()) {
+          return ErrorType::get(ctx);
+        }
 
         return BoundGenericType::get(nominal, /*parent*/ Type(), objectType);
       }
@@ -3205,7 +3206,9 @@ Type TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
                                        ComponentRange.end());
   Type result = resolveIdentTypeComponent(resolution.withOptions(options),
                                           Components);
-  if (!result) return nullptr;
+  if (!result || result->hasError()) {
+    return ErrorType::get(Context);
+  }
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
     // Allow module types only if flag is specified.
