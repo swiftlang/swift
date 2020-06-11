@@ -1725,12 +1725,9 @@ namespace {
                                   = nullptr,
                                 DifferentiabilityKind diffKind
                                   = DifferentiabilityKind::NonDifferentiable);
-    bool
-    resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
-                                 TypeResolutionOptions options,
-                                 bool requiresMappingOut,
-                                 DifferentiabilityKind diffKind,
-                                 SmallVectorImpl<AnyFunctionType::Param> &ps);
+    SmallVector<AnyFunctionType::Param, 8> resolveASTFunctionTypeParams(
+        TupleTypeRepr *inputRepr, TypeResolutionOptions options,
+        bool requiresMappingOut, DifferentiabilityKind diffKind);
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
@@ -2453,10 +2450,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   return ty;
 }
 
-bool TypeResolver::resolveASTFunctionTypeParams(
-    TupleTypeRepr *inputRepr, TypeResolutionOptions options,
-    bool requiresMappingOut, DifferentiabilityKind diffKind,
-    SmallVectorImpl<AnyFunctionType::Param> &elements) {
+SmallVector<AnyFunctionType::Param, 8>
+TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
+                                           TypeResolutionOptions options,
+                                           bool requiresMappingOut,
+                                           DifferentiabilityKind diffKind) {
+  SmallVector<AnyFunctionType::Param, 8> elements;
   elements.reserve(inputRepr->getNumElements());
 
   auto elementOptions = options.withoutContext(true);
@@ -2477,9 +2476,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
 
     Type ty = resolveType(eltTypeRepr, thisElementOptions);
-    if (!ty) return true;
-
-    if (ty->hasError()) {
+    if (!ty || ty->hasError()) {
       elements.emplace_back(ErrorType::get(Context));
       continue;
     }
@@ -2573,7 +2570,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     }
   }
 
-  return false;
+  return elements;
 }
 
 Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
@@ -2626,18 +2623,16 @@ Type TypeResolver::resolveASTFunctionType(
 
   TypeResolutionOptions options = None;
   options |= parentOptions.withoutContext().getFlags();
-
-  SmallVector<AnyFunctionType::Param, 8> params;
-  if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
-                                   repr->getGenericEnvironment() != nullptr,
-                                   diffKind, params)) {
-    return Type();
-  }
+  auto params = resolveASTFunctionTypeParams(
+      repr->getArgsTypeRepr(), options,
+      repr->getGenericEnvironment() != nullptr, diffKind);
 
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
   Type outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);
-  if (!outputTy || outputTy->hasError()) return outputTy;
+  if (!outputTy || outputTy->hasError()) {
+    return ErrorType::get(Context);
+  }
 
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
