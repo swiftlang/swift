@@ -330,12 +330,12 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::addGenericArgument(requirement, forClass);
     }
 
-    void addMethod(SILDeclRef fn) {
+    void addReifiedVTableEntry(SILDeclRef fn) {
       if (fn.getDecl()->getDeclContext() == Target) {
         ++Layout.NumImmediateMembers;
         Layout.MethodInfos.try_emplace(fn, getNextOffset());
       }
-      super::addMethod(fn);
+      super::addReifiedVTableEntry(fn);
     }
 
     void noteStartOfFieldOffsets(ClassDecl *forClass) {

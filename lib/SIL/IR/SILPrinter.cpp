@@ -3131,9 +3131,6 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     switch (entry.getKind()) {
     case SILVTable::Entry::Kind::Normal:
       break;
-    case SILVTable::Entry::Kind::NormalNonOverridden:
-      OS << " [nonoverridden]";
-      break;
     case SILVTable::Entry::Kind::Inherited:
       OS << " [inherited]";
       break;
@@ -3141,6 +3138,10 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << " [override]";
       break;
     }
+    if (entry.isNonOverridden()) {
+      OS << " [nonoverridden]";
+    }
+
     OS << "\t// " << demangleSymbol(entry.getImplementation()->getName());
     OS << "\n";
   }
