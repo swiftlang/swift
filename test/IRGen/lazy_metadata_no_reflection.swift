@@ -34,5 +34,5 @@ public func forceMetadata() {
   takeMetadata(HasPropertyType.self)
 }
 
-// CHECK-LABEL: @"$s4test1SVMn" = hidden constant
 // CHECK-LABEL: @"$s4test1SVSQAAMc" = hidden constant
+// CHECK-LABEL: @"$s4test1SVMn" = hidden constant
