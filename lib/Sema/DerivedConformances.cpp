@@ -548,9 +548,9 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     // generate: case .<Case>:
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), DeclNameLoc(),
-                                          DeclNameRef(), elt, nullptr);
+    auto pat = new (C)
+        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
+                           DeclNameLoc(), DeclNameRef(), elt, nullptr);
     pat->setImplicit();
     pat->setType(enumType);
 

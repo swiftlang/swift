@@ -24,7 +24,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/OptionSet.h"
@@ -35,6 +34,7 @@ namespace swift {
   class Expr;
   enum class CheckedCastKind : unsigned;
   class TypeExpr;
+  class TypeLoc;
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
@@ -470,19 +470,14 @@ class IsPattern : public Pattern {
   CheckedCastKind CastKind;
 
   /// The type being checked for.
-  TypeLoc CastType;
+  TypeExpr *CastType;
 
 public:
-  IsPattern(SourceLoc IsLoc, TypeLoc CastTy,
-             Pattern *SubPattern,
-             CheckedCastKind Kind)
-    : Pattern(PatternKind::Is),
-      IsLoc(IsLoc),
-      SubPattern(SubPattern),
-      CastKind(Kind),
-      CastType(CastTy) {
-    assert(IsLoc.isValid() == CastTy.hasLocation());
-  }
+  IsPattern(SourceLoc IsLoc, TypeExpr *CastTy, Pattern *SubPattern,
+            CheckedCastKind Kind);
+
+  static IsPattern *createImplicit(ASTContext &Ctx, Type castTy,
+                                   Pattern *SubPattern, CheckedCastKind Kind);
 
   CheckedCastKind getCastKind() const { return CastKind; }
   void setCastKind(CheckedCastKind kind) { CastKind = kind; }
@@ -493,16 +488,11 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   SourceLoc getLoc() const { return IsLoc; }
-  SourceRange getSourceRange() const {
-    SourceLoc beginLoc =
-      SubPattern ? SubPattern->getSourceRange().Start : IsLoc;
-    SourceLoc endLoc =
-      (isImplicit() ? beginLoc : CastType.getSourceRange().End);
-    return { beginLoc, endLoc };
-  }
+  SourceRange getSourceRange() const;
 
-  TypeLoc &getCastTypeLoc() { return CastType; }
-  TypeLoc getCastTypeLoc() const { return CastType; }
+  void setCastType(Type castTy);
+  Type getCastType() const;
+  TypeRepr *getCastTypeRepr() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Is;
@@ -513,7 +503,7 @@ public:
 /// case, then the value is extracted. If there is a subpattern, it is then
 /// matched against the associated value for the case.
 class EnumElementPattern : public Pattern {
-  TypeLoc ParentType;
+  TypeExpr *ParentType;
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclNameRef Name;
@@ -521,27 +511,23 @@ class EnumElementPattern : public Pattern {
   Pattern /*nullable*/ *SubPattern;
 
 public:
-  EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, DeclNameLoc NameLoc,
-                     DeclNameRef Name, EnumElementDecl *Element,
-                     Pattern *SubPattern)
-    : Pattern(PatternKind::EnumElement),
-      ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-      ElementDeclOrUnresolvedOriginalExpr(Element),
-      SubPattern(SubPattern) { }
+  EnumElementPattern(TypeExpr *ParentType, SourceLoc DotLoc,
+                     DeclNameLoc NameLoc, DeclNameRef Name,
+                     EnumElementDecl *Element, Pattern *SubPattern)
+      : Pattern(PatternKind::EnumElement), ParentType(ParentType),
+        DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
+        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern) {
+    assert(ParentType && "Missing parent type?");
+  }
 
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
-  EnumElementPattern(SourceLoc DotLoc,
-                     DeclNameLoc NameLoc,
-                     DeclNameRef Name,
-                     Pattern *SubPattern,
-                     Expr *UnresolvedOriginalExpr)
-    : Pattern(PatternKind::EnumElement),
-      ParentType(), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-      ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
-      SubPattern(SubPattern) {
-
-  }
+  EnumElementPattern(SourceLoc DotLoc, DeclNameLoc NameLoc, DeclNameRef Name,
+                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr)
+      : Pattern(PatternKind::EnumElement), ParentType(nullptr), DotLoc(DotLoc),
+        NameLoc(NameLoc), Name(Name),
+        ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
+        SubPattern(SubPattern) {}
 
   bool hasSubPattern() const { return SubPattern; }
 
@@ -551,10 +537,6 @@ public:
 
   Pattern *getSubPattern() {
     return SubPattern;
-  }
-
-  bool isParentTypeImplicit() {
-    return !ParentType.hasLocation();
   }
 
   void setSubPattern(Pattern *p) { SubPattern = p; }
@@ -577,21 +559,14 @@ public:
 
   DeclNameLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
-  SourceLoc getStartLoc() const {
-    return ParentType.hasLocation() ? ParentType.getSourceRange().Start :
-           DotLoc.isValid()         ? DotLoc
-                                    : NameLoc.getBaseNameLoc();
-  }
-  SourceLoc getEndLoc() const {
-    if (SubPattern && SubPattern->getSourceRange().isValid()) {
-      return SubPattern->getSourceRange().End;
-    }
-    return NameLoc.getEndLoc();
-  }
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
 
-  TypeLoc &getParentType() { return ParentType; }
-  TypeLoc getParentType() const { return ParentType; }
+  TypeRepr *getParentTypeRepr() const;
+
+  void setParentType(Type ty);
+  Type getParentType() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::EnumElement;
