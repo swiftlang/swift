@@ -3477,9 +3477,6 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      assert(!decl->isInvalidDecl() && "Unexpected invalid decl");
-      assert(!decl->getCanonicalDecl()->isInvalidDecl() &&
-          "Unexpected invalid canonical decl");
       if (!Impl.getClangSema().isCompleteType(
               decl->getLocation(),
               Impl.getClangASTContext().getRecordType(decl))) {
@@ -3488,8 +3485,7 @@ namespace {
       }
       auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
           decl->getDefinition());
-      assert(def && "Expected instantiation with definition, "\
-          "but definition wasn't found");
+      assert(def && "Class template instantiation didn't have definition");
       Impl.getClangSema().InstantiateClassTemplateSpecializationMembers(
           def->getLocation(), def, clang::TSK_ExplicitInstantiationDefinition);
 
