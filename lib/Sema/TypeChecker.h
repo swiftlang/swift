@@ -358,20 +358,6 @@ Type getUInt8Type(ASTContext &ctx);
 /// for the lookup.
 Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 
-/// Validate the given type.
-///
-/// Type validation performs name lookup, checking of generic arguments,
-/// and so on to determine whether the given type is well-formed and can
-/// be used as a type.
-///
-/// \param Loc The type (with source location information) to validate.
-/// If the type has already been validated, returns immediately.
-///
-/// \param resolution The type resolution being performed.
-///
-/// \returns true if type validation failed, or false otherwise.
-bool validateType(TypeLoc &Loc, TypeResolution resolution);
-
 /// Check for unsupported protocol types in the given declaration.
 void checkUnsupportedProtocolType(Decl *decl);
 
