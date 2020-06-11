@@ -1111,6 +1111,43 @@ bool IgnoreAssignmentDestinationType::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool IgnoreAssignmentDestinationType::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto &cs = getConstraintSystem();
+
+  // If all of the types are the same let's try to diagnose
+  // this as if there is no ambiguity.
+  if (ContextualMismatch::diagnoseForAmbiguity(commonFixes))
+    return true;
+
+  auto *commonLocator = getLocator();
+  auto *assignment = castToExpr<AssignExpr>(commonLocator->getAnchor());
+
+  auto &solution = *commonFixes.front().first;
+  auto *calleeLocator = solution.getCalleeLocator(
+      solution.getConstraintLocator(assignment->getSrc()));
+  auto overload = solution.getOverloadChoiceIfAvailable(calleeLocator);
+  if (!overload)
+    return false;
+
+  auto memberName = overload->choice.getName().getBaseName();
+  auto destType = solution.getType(assignment->getDest());
+
+  auto &DE = cs.getASTContext().Diags;
+  // TODO(diagnostics): It might be good to add a tailored diagnostic
+  // for cases like this instead of using "contextual" one.
+  DE.diagnose(assignment->getSrc()->getLoc(),
+              diag::no_candidates_match_result_type,
+              memberName.userFacingName(),
+              solution.simplifyType(destType)->getRValueType());
+
+  for (auto &entry : commonFixes) {
+    entry.second->diagnose(*entry.first, /*asNote=*/true);
+  }
+
+  return true;
+}
+
 IgnoreAssignmentDestinationType *
 IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
                                         Type destTy,
