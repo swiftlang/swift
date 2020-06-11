@@ -2088,6 +2088,10 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
             typedefDecl->getUnderlyingType())) {
       if (auto CTSD = dyn_cast<clang::ClassTemplateSpecializationDecl>(
               typedefType->getAsTagDecl())) {
+        // Adding template instantiation behind typedef as a top-level entry
+        // so the instantiation appears in the API.
+        assert(!isa<clang::ClassTemplatePartialSpecializationDecl>(CTSD) &&
+            "Class template partial specialization cannot appear behind typedef");
         addEntryToLookupTable(table, CTSD, nameImporter);
       }
     }
