@@ -1489,9 +1489,12 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
       return 10;
   }
 
-  // Increase the impact of a conformance fix for a standard library type,
-  // as it's unlikely to be a good suggestion. Also do the same for the builtin
-  // compiler types Any and AnyObject, which cannot conform to protocols.
+  // Increase the impact of a conformance fix for a standard library
+  // or foundation type, as it's unlikely to be a good suggestion.
+  //
+  // Also do the same for the builtin compiler types Any and AnyObject,
+  // which cannot conform to protocols.
+  //
   // FIXME: We ought not to have the is<TypeVariableType>() condition here, but
   // removing it currently regresses the diagnostic for the test case for
   // rdar://60727310. Once we better handle the separation of conformance fixes
@@ -1499,7 +1502,8 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   // remove it from the condition.
   auto resolvedTy = cs.simplifyType(requirementType);
   if ((requirementType->is<TypeVariableType>() && resolvedTy->isStdlibType()) ||
-      resolvedTy->isAny() || resolvedTy->isAnyObject()) {
+      resolvedTy->isAny() || resolvedTy->isAnyObject() ||
+      getKnownFoundationEntity(resolvedTy->getString())) {
     if (auto last = locator.last()) {
       if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
         auto kind = requirement->getRequirementKind();
