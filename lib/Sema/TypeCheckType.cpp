@@ -746,7 +746,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (nominal->isOptionalDecl()) {
         // Validate the generic argument.
         Type objectType = resolution.resolveType(genericArgs[0]);
-        if (!objectType || objectType->hasError()) {
+        if (objectType->hasError()) {
           return ErrorType::get(ctx);
         }
 

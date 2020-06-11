@@ -1499,7 +1499,7 @@ namespace {
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       auto result = TypeResolution::forContextual(CS.DC, options)
                         .resolveType(repr);
-      if (!result || result->hasError()) {
+      if (result->hasError()) {
         return Type();
       }
       return result;
@@ -2771,7 +2771,7 @@ namespace {
             Type castType = TypeResolution::forContextual(
                                 CS.DC, TypeResolverContext::InExpression)
                                 .resolveType(isp->getCastTypeRepr());
-            if (!castType) {
+            if (castType->hasError()) {
               return false;
             }
 
