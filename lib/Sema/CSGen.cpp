@@ -1176,9 +1176,24 @@ namespace {
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
       CS.Options |= ConstraintSystemFlags::SuppressDiagnostics;
-      return CS.createTypeVariable(CS.getConstraintLocator(E),
-                                   TVO_CanBindToLValue |
-                                   TVO_CanBindToNoEscape);
+      auto locator = CS.getConstraintLocator(E);
+      auto ty = CS.createTypeVariable(locator,
+                                      TVO_CanBindToLValue |
+                                      TVO_CanBindToNoEscape);
+
+      // Defaults to the type of the base expression if we have a base
+      // expression.
+      // FIXME: This is just to keep the old behavior where `foo(base.<HERE>)`
+      // the argument is type checked to the type of the 'base'. Ideally, code
+      // completion expression should be defauled to 'UnresolvedType'
+      // regardless of the existence of the base expression. But the constraint
+      // system is simply not ready for that.
+      if (auto base = E->getBase()) {
+        CS.addConstraint(ConstraintKind::Defaultable, ty, CS.getType(base),
+                         locator);
+      }
+      
+      return ty;
     }
 
     Type visitNilLiteralExpr(NilLiteralExpr *expr) {
@@ -1480,17 +1495,14 @@ namespace {
 
     Type resolveTypeReferenceInExpression(TypeRepr *repr,
                                           TypeResolverContext resCtx) {
-      TypeLoc loc(repr);
-      return resolveTypeReferenceInExpression(loc, resCtx);
-    }
-
-    Type resolveTypeReferenceInExpression(TypeLoc &loc,
-                                          TypeResolverContext resCtx) {
       TypeResolutionOptions options(resCtx);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      bool hadError = TypeChecker::validateType(
-          loc, TypeResolution::forContextual(CS.DC, options));
-      return hadError ? Type() : loc.getType();
+      auto result = TypeResolution::forContextual(CS.DC, options)
+                        .resolveType(repr);
+      if (!result || result->hasError()) {
+        return Type();
+      }
+      return result;
     }
 
     Type visitTypeExpr(TypeExpr *E) {
@@ -2524,7 +2536,7 @@ namespace {
         auto isPattern = cast<IsPattern>(pattern);
 
         Type castType = resolveTypeReferenceInExpression(
-            isPattern->getCastTypeLoc(), TypeResolverContext::InExpression);
+            isPattern->getCastTypeRepr(), TypeResolverContext::InExpression);
 
         if (!castType)
           return Type();
@@ -2581,10 +2593,16 @@ namespace {
             CS.getConstraintLocator(locator),
             TVO_CanBindToLValue | TVO_CanBindToNoEscape);
         FunctionRefKind functionRefKind = FunctionRefKind::Compound;
-        if (!enumPattern->getParentType().isNull()) {
+        if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
-          Type parentType = resolveTypeReferenceInExpression(
-              enumPattern->getParentType(), TypeResolverContext::InExpression);
+          Type parentType = [&]() -> Type {
+            if (auto preTy = enumPattern->getParentType()) {
+              return preTy;
+            }
+            return resolveTypeReferenceInExpression(
+                enumPattern->getParentTypeRepr(),
+                TypeResolverContext::InExpression);
+          }();
 
           if (!parentType)
             return Type();
@@ -2749,10 +2767,10 @@ namespace {
           // of is-patterns applied to an irrefutable pattern.
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
-            if (TypeChecker::validateType(
-                    isp->getCastTypeLoc(),
-                    TypeResolution::forContextual(
-                        CS.DC, TypeResolverContext::InExpression))) {
+            Type castType = TypeResolution::forContextual(
+                                CS.DC, TypeResolverContext::InExpression)
+                                .resolveType(isp->getCastTypeRepr());
+            if (!castType) {
               return false;
             }
 

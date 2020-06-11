@@ -486,12 +486,26 @@ func rdar63510989() {
   }
 
   enum E {
-    case foo(P?)
+    case single(P?)
+    case double(P??)
+    case triple(P???)
   }
 
   func test(e: E) {
-    if case .foo(_ as Value) = e {} // Ok
-    if case .foo(let v as Value) = e {} // Ok
+    if case .single(_ as Value) = e {} // Ok
+    if case .single(let v as Value) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .double(_ as Value) = e {} // Ok
+    if case .double(let v as Value) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .double(let v as Value?) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .triple(_ as Value) = e {} // Ok
+    if case .triple(let v as Value) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .triple(let v as Value?) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .triple(let v as Value??) = e {} // Ok
     // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
   }
 }

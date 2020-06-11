@@ -109,6 +109,14 @@ using DependencySource = llvm::PointerIntPair<SourceFile *, 1, DependencyScope>;
 
 struct DependencyRecorder;
 
+/// A \c DependencyCollector defines an abstract write-only buffer of
+/// \c Reference objects. References are added to a collector during the write
+/// phase of request evaluation (in \c writeDependencySink) with the various
+/// \c add* functions below..
+///
+/// A \c DependencyCollector cannot be created directly. You must invoke
+/// \c DependencyRecorder::record, which will wire a dependency collector into
+/// the provided continuation block.
 struct DependencyCollector {
   friend DependencyRecorder;
 
@@ -227,11 +235,15 @@ public:
   void addDynamicLookupName(DeclBaseName name);
 
 public:
+  /// Retrieves the dependency recorder that created this dependency collector.
   const DependencyRecorder &getRecorder() const { return parent; }
+
+  /// Returns \c true if this collector has not accumulated
+  /// any \c Reference objects.
   bool empty() const { return scratch.empty(); }
 };
 
-/// A \c DependencyCollector is an aggregator of named references discovered in a
+/// A \c DependencyRecorder is an aggregator of named references discovered in a
 /// particular \c DependencyScope during the course of request evaluation.
 struct DependencyRecorder {
   friend DependencyCollector;
@@ -266,15 +278,49 @@ public:
   explicit DependencyRecorder(Mode mode) : mode{mode}, isRecording{false} {};
 
 private:
+  /// Records the given \c Reference as a dependency of the current dependency
+  /// source.
+  ///
+  /// This is as opposed to merely collecting a \c Reference, which may just buffer
+  /// it for realization or replay later.
   void realize(const DependencyCollector::Reference &ref);
 
 public:
-  void replay(const llvm::SetVector<swift::ActiveRequest> &stack,
-              const swift::ActiveRequest &req);
+  /// Begins the recording of references by invoking the given continuation
+  /// with a fresh \c DependencyCollector object. This object should be used
+  /// to buffer dependency-relevant references to names looked up by a
+  /// given request.
+  ///
+  /// Recording only occurs for requests that are dependency sinks.
   void record(const llvm::SetVector<swift::ActiveRequest> &stack,
               llvm::function_ref<void(DependencyCollector &)> rec);
 
+  /// Replays the \c Reference objects collected by a given cached request and
+  /// its sub-requests into the current dependency scope.
+  ///
+  /// Dependency replay ensures that cached requests do not "hide" names from
+  /// the active dependency scope. This would otherwise occur frequently in
+  /// batch mode, where cached requests effectively block the re-evaluation of
+  /// a large quantity of computations that perform name lookups by design.
+  ///
+  /// Replay need only occur for requests that are (separately) cached.
+  void replay(const llvm::SetVector<swift::ActiveRequest> &stack,
+              const swift::ActiveRequest &req);
 private:
+  /// Given the current stack of requests and a buffer of \c Reference objects
+  /// walk the active stack looking for the next-innermost cached request. If
+  /// found, insert the buffer of references into that request's known reference
+  /// set.
+  ///
+  /// This algorithm ensures that references propagate lazily up the request
+  /// graph from cached sub-requests to their cached parents. Once this process
+  /// completes, all cached requests in the request graph will see the
+  /// union of all references recorded while evaluating their sub-requests.
+  ///
+  /// This algorithm *must* be tail-called during
+  /// \c DependencyRecorder::record or \c DependencyRecorder::replay
+  /// or the corresponding set of references for the active dependency scope
+  /// will become incoherent.
   void
   unionNearestCachedRequest(ArrayRef<swift::ActiveRequest> stack,
                             const DependencyCollector::ReferenceSet &scratch);
@@ -282,6 +328,12 @@ private:
 public:
   using ReferenceEnumerator =
       llvm::function_ref<void(const DependencyCollector::Reference &)>;
+
+  /// Enumerates the set of references associated with a given source file,
+  /// passing them to the given enumeration callback.
+  ///
+  /// The order of enumeration is completely undefined. It is the responsibility
+  /// of callers to ensure they are order-invariant or are sorting the result.
   void enumerateReferencesInFile(const SourceFile *SF,
                                  ReferenceEnumerator f) const ;
 

@@ -696,6 +696,29 @@ public:
     return !isa<llvm::Constant>(Storage);
   }
 
+#ifndef NDEBUG
+  /// Check if \p Val can be stored into \p Alloca, and emit some diagnostic
+  /// info if it can't.
+  bool canAllocaStoreValue(Address Alloca, llvm::Value *Val,
+                           SILDebugVariable VarInfo,
+                           const SILDebugScope *Scope) {
+    bool canStore =
+        cast<llvm::PointerType>(Alloca->getType())->getElementType() ==
+        Val->getType();
+    if (canStore)
+      return true;
+    llvm::errs() << "Invalid shadow copy:\n"
+                 << "  Value : " << *Val << "\n"
+                 << "  Alloca: " << *Alloca.getAddress() << "\n"
+                 << "---\n"
+                 << "Previous shadow copy into " << VarInfo.Name
+                 << " in the same scope!\n"
+                 << "Scope:\n";
+    Scope->print(getSILModule());
+    return false;
+  }
+#endif
+
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo, llvm::Optional<Alignment> _Align) {
@@ -706,7 +729,8 @@ public:
     if (!Alloca.isValid())
       Alloca = createAlloca(Storage->getType(), Align, VarInfo.Name + ".debug");
     zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
-
+    assert(canAllocaStoreValue(Alloca, Storage, VarInfo, Scope) &&
+           "bad scope?");
     ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();

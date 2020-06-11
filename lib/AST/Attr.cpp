@@ -975,7 +975,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_implements");
     Printer << "(";
     auto *attr = cast<ImplementsAttr>(this);
-    attr->getProtocolType().getType().print(Printer, Options);
+    attr->getProtocolType().print(Printer, Options);
     Printer << ", " << attr->getMemberName() << ")";
     break;
   }
@@ -1022,11 +1022,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Custom: {
     Printer.callPrintNamePre(PrintNameContext::Attribute);
     Printer << "@";
-    const TypeLoc &typeLoc = cast<CustomAttr>(this)->getTypeLoc();
-    if (auto type = typeLoc.getType())
-      type->print(Printer, Options);
+    auto *attr = cast<CustomAttr>(this);
+    if (auto type = attr->getType())
+      type.print(Printer, Options);
     else
-      typeLoc.getTypeRepr()->print(Printer, Options);
+      attr->getTypeRepr()->print(Printer, Options);
     Printer.printNamePost(PrintNameContext::Attribute);
     break;
   }
@@ -1386,23 +1386,34 @@ SourceLoc DynamicReplacementAttr::getRParenLoc() const {
 
 TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
                                        SourceLoc atLoc, SourceRange range,
-                                       TypeLoc typeEraserLoc) {
-  return new (ctx) TypeEraserAttr(atLoc, range, typeEraserLoc, nullptr, 0);
+                                       TypeExpr *typeEraserExpr) {
+  return new (ctx) TypeEraserAttr(atLoc, range, typeEraserExpr, nullptr, 0);
 }
 
 TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
                                        LazyMemberLoader *Resolver,
                                        uint64_t Data) {
   return new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
-                                  TypeLoc(), Resolver, Data);
+                                  nullptr, Resolver, Data);
 }
 
-bool
-TypeEraserAttr::hasViableTypeEraserInit(ProtocolDecl *protocol) const {
+bool TypeEraserAttr::hasViableTypeEraserInit(ProtocolDecl *protocol) const {
   return evaluateOrDefault(protocol->getASTContext().evaluator,
                            TypeEraserHasViableInitRequest{
                                const_cast<TypeEraserAttr *>(this), protocol},
                            false);
+}
+
+TypeRepr *TypeEraserAttr::getParsedTypeEraserTypeRepr() const {
+  return TypeEraserExpr ? TypeEraserExpr->getTypeRepr() : nullptr;
+}
+
+SourceLoc TypeEraserAttr::getLoc() const {
+  return TypeEraserExpr ? TypeEraserExpr->getLoc() : SourceLoc();
+}
+
+Type TypeEraserAttr::getTypeWithoutResolving() const {
+  return TypeEraserExpr ? TypeEraserExpr->getInstanceType() : Type();
 }
 
 Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
@@ -1814,7 +1825,7 @@ TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeLoc ProtocolType,
+                               TypeExpr *ProtocolType,
                                DeclName MemberName,
                                DeclNameLoc MemberNameLoc)
     : DeclAttribute(DAK_Implements, atLoc, range, /*Implicit=*/false),
@@ -1826,7 +1837,7 @@ ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
 
 ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
-                                       TypeLoc ProtocolType,
+                                       TypeExpr *ProtocolType,
                                        DeclName MemberName,
                                        DeclNameLoc MemberNameLoc) {
   void *mem = Ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
@@ -1834,28 +1845,34 @@ ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                   MemberName, MemberNameLoc);
 }
 
-TypeLoc ImplementsAttr::getProtocolType() const {
-  return ProtocolType;
+void ImplementsAttr::setProtocolType(Type ty) {
+  assert(ty);
+  ProtocolType->setType(MetatypeType::get(ty));
 }
 
-TypeLoc &ImplementsAttr::getProtocolType() {
-  return ProtocolType;
+Type ImplementsAttr::getProtocolType() const {
+  return ProtocolType->getInstanceType();
 }
 
-CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
+TypeRepr *ImplementsAttr::getProtocolTypeRepr() const {
+  return ProtocolType->getTypeRepr();
+}
+
+CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
                        PatternBindingInitializer *initContext, Expr *arg,
                        ArrayRef<Identifier> argLabels,
                        ArrayRef<SourceLoc> argLabelLocs, bool implicit)
     : DeclAttribute(DAK_Custom, atLoc, range, implicit),
-      type(type),
+      typeExpr(type),
       arg(arg),
       initContext(initContext) {
+  assert(type);
   hasArgLabelLocs = !argLabelLocs.empty();
   numArgLabels = argLabels.size();
   initializeCallArguments(argLabels, argLabelLocs);
 }
 
-CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
                                bool hasInitializer,
                                PatternBindingInitializer *initContext,
                                SourceLoc lParenLoc,
@@ -1864,6 +1881,7 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
                                ArrayRef<SourceLoc> argLabelLocs,
                                SourceLoc rParenLoc,
                                bool implicit) {
+  assert(type);
   SmallVector<Identifier, 2> argLabelsScratch;
   SmallVector<SourceLoc, 2> argLabelLocsScratch;
   Expr *arg = nullptr;
@@ -1873,7 +1891,7 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
                              argLabelsScratch, argLabelLocsScratch);
   }
 
-  SourceRange range(atLoc, type.getSourceRange().End);
+  SourceRange range(atLoc, type->getSourceRange().End);
   if (arg)
     range.End = arg->getEndLoc();
 
@@ -1881,6 +1899,16 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
   void *mem = ctx.Allocate(size, alignof(CustomAttr));
   return new (mem) CustomAttr(atLoc, range, type, initContext, arg, argLabels,
                               argLabelLocs, implicit);
+}
+
+TypeRepr *CustomAttr::getTypeRepr() const { return typeExpr->getTypeRepr(); }
+Type CustomAttr::getType() const { return typeExpr->getInstanceType(); }
+
+void CustomAttr::resetTypeInformation(TypeExpr *info) { typeExpr = info; }
+
+void CustomAttr::setType(Type ty) {
+  assert(ty);
+  typeExpr->setType(MetatypeType::get(ty));
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

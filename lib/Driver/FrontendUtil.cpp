@@ -19,6 +19,8 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ToolChain.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/StringSaver.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -45,6 +47,16 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
       std::to_string(Compilation::NEVER_USE_FILELIST);
   Args.push_back("-driver-filelist-threshold");
   Args.push_back(neverThreshold.c_str());
+
+  // Expand any file list args.
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver Saver(Allocator);
+  llvm::cl::ExpandResponseFiles(
+      Saver,
+      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()
+          ? llvm::cl::TokenizeWindowsCommandLine
+          : llvm::cl::TokenizeGNUCommandLine,
+      Args);
 
   // Force the driver into batch mode by specifying "swiftc" as the name.
   Driver TheDriver("swiftc", "swiftc", Args, Diags);
