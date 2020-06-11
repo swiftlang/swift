@@ -1,3 +1,0 @@
-# Dependencies before compilation:
-provides-nominal: [f]
-depends-nominal: [!private e]

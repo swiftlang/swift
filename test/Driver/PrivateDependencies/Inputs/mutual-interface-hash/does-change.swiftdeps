@@ -1,4 +1,0 @@
-# Dependencies before compilation:
-depends-top-level: [a]
-provides-top-level: [b]
-interface-hash: "before"
