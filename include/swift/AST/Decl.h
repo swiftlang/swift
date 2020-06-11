@@ -1044,16 +1044,16 @@ class RequirementRepr {
   StringRef AsWrittenString;
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeLoc FirstType, TypeLoc SecondType)
+                  TypeRepr *FirstType, TypeRepr *SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondType(SecondType) { }
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeLoc FirstType, LayoutConstraintLoc SecondLayout)
+                  TypeRepr *FirstType, LayoutConstraintLoc SecondLayout)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
-  void printImpl(ASTPrinter &OS, bool AsWritten) const;
+  void printImpl(ASTPrinter &OS) const;
 
 public:
   /// Construct a new type-constraint requirement.
