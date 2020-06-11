@@ -136,6 +136,8 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           auto *TE = bi->getSingleUserOfType<TupleExtractInst>();
           return TE && getOffsetSubtract(TE, M);
         }
+        case BuiltinValueKind::OnFastPath:
+          return true;
         default:
           break;
       }
