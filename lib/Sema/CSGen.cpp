@@ -1495,12 +1495,14 @@ namespace {
 
     Type resolveTypeReferenceInExpression(TypeRepr *repr,
                                           TypeResolverContext resCtx) {
-      TypeLoc loc(repr);
       TypeResolutionOptions options(resCtx);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      bool hadError = TypeChecker::validateType(
-          loc, TypeResolution::forContextual(CS.DC, options));
-      return hadError ? Type() : loc.getType();
+      auto result = TypeResolution::forContextual(CS.DC, options)
+                        .resolveType(repr);
+      if (!result || result->hasError()) {
+        return Type();
+      }
+      return result;
     }
 
     Type visitTypeExpr(TypeExpr *E) {

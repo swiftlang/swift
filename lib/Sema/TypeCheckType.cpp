@@ -1688,20 +1688,6 @@ static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
   return !isValid;
 }
 
-bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution) {
-  // If we've already validated this type, don't do so again.
-  if (Loc.wasValidated())
-    return Loc.isError();
-
-  if (auto *Stats = resolution.getASTContext().Stats)
-    ++Stats->getFrontendCounters().NumTypesValidated;
-
-  auto type = resolution.resolveType(Loc.getTypeRepr());
-  Loc.setType(type);
-
-  return type->hasError();
-}
-
 namespace {
   const auto DefaultParameterConvention = ParameterConvention::Direct_Unowned;
   const auto DefaultResultConvention = ResultConvention::Unowned;
@@ -3898,7 +3884,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   // We always require the type to resolve to a nominal type.
   if (!type->getAnyNominal()) {
     assert(ctx.Diags.hadAnyError());
-    return Type();
+    return ErrorType::get(ctx);
   }
 
   return type;
