@@ -164,7 +164,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                                      /*onlyClangModule=*/false,
                                                      cache,
                                                      ASTDelegate)) {
-            result.push_back({overlayName.str(), found->getKind()});
+            result.emplace_back(overlayName.str(), found->getKind());
           }
         }
       });
