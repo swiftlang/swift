@@ -655,9 +655,9 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
   return None;
 }
 
-Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
-                                              ConstraintLocatorBuilder locator,
-                                              OpenedTypeMap &replacements) {
+Type
+ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
+                                         ConstraintLocatorBuilder locator) {
   auto unboundDecl = unbound->getDecl();
   auto parentTy = unbound->getParent();
   if (parentTy) {
@@ -667,6 +667,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   }
 
   // Open up the generic type.
+  OpenedTypeMap replacements;
   openGeneric(unboundDecl->getDeclContext(), unboundDecl->getGenericSignature(),
               locator, replacements);
 
@@ -790,8 +791,7 @@ Type ConstraintSystem::openUnboundGenericType(
 
   type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
-        OpenedTypeMap replacements;
-        return openUnboundGenericType(unbound, locator, replacements);
+        return openUnboundGenericType(unbound, locator);
       }
 
       return type;
