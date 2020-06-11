@@ -6515,7 +6515,7 @@ ParamDecl::getDefaultValueStringRepresentation(
       if (wrapperAttrs.size() > 0) {
         auto attr = wrapperAttrs.front();
         if (auto arg = attr->getArg()) {
-          SourceRange fullRange(attr->getTypeLoc().getSourceRange().Start,
+          SourceRange fullRange(attr->getTypeRepr()->getSourceRange().Start,
                                 arg->getEndLoc());
           auto charRange = Lexer::getCharSourceRangeFromSourceRange(
               getASTContext().SourceMgr, fullRange);
