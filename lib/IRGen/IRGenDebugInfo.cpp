@@ -346,7 +346,7 @@ private:
       return cast<llvm::MDNode>(CachedInlinedAt->second);
 
     auto L = decodeDebugLoc(CS->getLoc());
-    auto Scope = getOrCreateScope(CS->Parent.dyn_cast<const SILDebugScope *>());
+    auto Scope = getOrCreateScope(CS->getImmediateParentScope());
     // Pretend transparent functions don't exist.
     if (!Scope)
       return createInlinedAt(CS);
@@ -361,7 +361,7 @@ private:
   /// Perform a couple of sanity checks on scopes.
   static bool parentScopesAreSane(const SILDebugScope *DS) {
     auto *Parent = DS;
-    while ((Parent = Parent->Parent.dyn_cast<const SILDebugScope *>())) {
+    while ((Parent = Parent->getImmediateParentScope())) {
       if (!DS->InlinedCallSite)
         assert(!Parent->InlinedCallSite &&
                "non-inlined scope has an inlined parent");
@@ -2037,7 +2037,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
 
   // If this is an (inlined) function scope, the function may
   // not have been created yet.
-  if (auto *SILFn = DS->Parent.dyn_cast<SILFunction *>()) {
+  if (auto *SILFn = DS->getImmediateParentFunction()) {
     auto *FnScope = SILFn->getDebugScope();
     // FIXME: This is a bug in the SIL deserialization.
     if (!FnScope)
@@ -2059,14 +2059,13 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     return SP;
   }
 
-  auto *ParentScope = DS->Parent.get<const SILDebugScope *>();
+  auto *ParentScope = DS->getImmediateParentScope();
   llvm::DIScope *Parent = getOrCreateScope(ParentScope);
-  assert(isa<llvm::DILocalScope>(Parent) && "not a local scope");
+  assert(ParentScope && isa<llvm::DILocalScope>(Parent) && "not a local scope");
 
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return Parent;
 
-  assert(DS->Parent && "lexical block must have a parent subprogram");
   auto L = getStartLocation(DS->getLoc());
   llvm::DIFile *File = getOrCreateFile(L.Filename);
   auto *DScope = DBuilder.createLexicalBlock(Parent, File, L.Line, L.Column);
@@ -2114,7 +2113,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
 
   // Some IRGen-generated helper functions don't have a corresponding
   // SIL function, hence the dyn_cast.
-  auto *SILFn = DS ? DS->Parent.dyn_cast<SILFunction *>() : nullptr;
+  auto *SILFn = DS ? DS->getImmediateParentFunction() : nullptr;
 
   StringRef LinkageName;
   if (Fn)

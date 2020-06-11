@@ -40,10 +40,11 @@ class SILDebugScope : public SILAllocated<SILDebugScope> {
   /// The AST node this lexical scope represents.
   SILLocation Loc;
 
-public:
   /// Always points to the parent lexical scope.
   /// For top-level scopes, this is the SILFunction.
   PointerUnion<const SILDebugScope *, SILFunction *> Parent;
+
+public:
   /// An optional chain of inlined call sites.
   ///
   /// If this scope is inlined, this points to a special "scope" that
@@ -67,6 +68,16 @@ public:
   /// inlined this recursively returns the function it was inlined
   /// into.
   SILFunction *getParentFunction() const;
+
+  /// Return the parent function of this scope, if it has one.
+  SILFunction *getImmediateParentFunction() const {
+    return Parent.dyn_cast<SILFunction *>();
+  }
+
+  /// Return the parent debug scope of this scope, if it has one.
+  const SILDebugScope *getImmediateParentScope() const {
+    return Parent.dyn_cast<const SILDebugScope *>();
+  }
 
   void print(SourceManager &SM, llvm::raw_ostream &OS = llvm::errs(),
              unsigned Indent = 0) const;

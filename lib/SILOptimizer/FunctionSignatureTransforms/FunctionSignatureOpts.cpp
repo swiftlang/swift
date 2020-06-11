@@ -630,7 +630,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Do the last bit work to finalize the thunk.
   OwnedToGuaranteedFinalizeThunkFunction(Builder, F);
 
-  assert(F->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
+  assert(F->getDebugScope()->getImmediateParentFunction() !=
+         NewF->getDebugScope()->getImmediateParentFunction());
 }
 
 // Run the optimization.

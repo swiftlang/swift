@@ -278,7 +278,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   });
   CapturePropagationCloner cloner(OrigF, NewF, PAI->getSubstitutionMap());
   cloner.cloneClosure(PAI->getArguments());
-  assert(OrigF->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
+  assert(OrigF->getDebugScope()->getImmediateParentFunction() !=
+         NewF->getDebugScope()->getImmediateParentFunction());
   return NewF;
 }
 

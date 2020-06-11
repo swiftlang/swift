@@ -891,7 +891,7 @@ public:
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
-    require(DebugScope->Parent.get<SILFunction *>() == &F,
+    require(DebugScope->getImmediateParentFunction() == &F,
             "Scope of SIL function points to different function");
   }
 
@@ -5142,9 +5142,7 @@ public:
         const SILDebugScope *Tmp = Previous;
         assert(Tmp && "scope can't be null");
         while (Tmp) {
-          PointerUnion<const SILDebugScope *, SILFunction *> Parent =
-              Tmp->Parent;
-          auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>();
+          auto *ParentScope = Tmp->getImmediateParentScope();
           if (!ParentScope)
             break;
           if (ParentScope == Cur)

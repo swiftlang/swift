@@ -330,7 +330,7 @@ ScopeCloner::ScopeCloner(SILFunction &NewFn) : NewFn(NewFn) {
   // debug scope. Create a new one here.
   // FIXME: Audit all call sites and make them create the function
   // debug scope.
-  auto *SILFn = NewFn.getDebugScope()->Parent.get<SILFunction *>();
+  auto *SILFn = NewFn.getDebugScope()->getImmediateParentFunction();
   if (SILFn != &NewFn) {
     SILFn->setInlined();
     NewFn.setDebugScope(getOrCreateClonedScope(NewFn.getDebugScope()));
@@ -346,17 +346,17 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
   if (it != ClonedScopeCache.end())
     return it->second;
 
-  auto ClonedScope = new (NewFn.getModule()) SILDebugScope(*OrigScope);
+  const SILDebugScope *ClonedInlinedCallSite = nullptr;
+  const SILDebugScope *ClonedParent = nullptr;
   if (OrigScope->InlinedCallSite) {
     // For inlined functions, we need to rewrite the inlined call site.
-    ClonedScope->InlinedCallSite =
-        getOrCreateClonedScope(OrigScope->InlinedCallSite);
+    ClonedInlinedCallSite = getOrCreateClonedScope(OrigScope->InlinedCallSite);
   } else {
-    if (auto *ParentScope = OrigScope->Parent.dyn_cast<const SILDebugScope *>())
-      ClonedScope->Parent = getOrCreateClonedScope(ParentScope);
-    else
-      ClonedScope->Parent = &NewFn;
+    if (auto *ParentScope = OrigScope->getImmediateParentScope())
+      ClonedParent = getOrCreateClonedScope(ParentScope);
   }
+  auto ClonedScope = new (NewFn.getModule()) SILDebugScope(
+      OrigScope->getLoc(), &NewFn, ClonedParent, ClonedInlinedCallSite);
   // Create an inline scope for the cloned instruction.
   assert(ClonedScopeCache.find(OrigScope) == ClonedScopeCache.end());
   ClonedScopeCache.insert({OrigScope, ClonedScope});

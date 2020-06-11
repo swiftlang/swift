@@ -842,16 +842,16 @@ public:
       return;
 
     if (!Ctx.hasScopeID(DS)) {
-      printDebugScope(DS->Parent.dyn_cast<const SILDebugScope *>(), SM);
+      printDebugScope(DS->getImmediateParentScope(), SM);
       printDebugScope(DS->InlinedCallSite, SM);
       unsigned ID = Ctx.assignScopeID(DS);
       *this << "sil_scope " << ID << " { ";
       printDebugLocRef(DS->getLoc(), SM, false);
       *this << " parent ";
-      if (auto *F = DS->Parent.dyn_cast<SILFunction *>())
+      if (auto *F = DS->getImmediateParentFunction())
         *this << "@" << F->getName() << " : $" << F->getLoweredFunctionType();
       else {
-        auto *PS = DS->Parent.get<const SILDebugScope *>();
+        auto *PS = DS->getImmediateParentScope();
         *this << Ctx.getScopeID(PS);
       }
       if (auto *CS = DS->InlinedCallSite)

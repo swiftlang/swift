@@ -177,7 +177,7 @@ const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
     return it->second;
 
   auto &M = getBuilder().getModule();
-  auto *ParentFunction = DS->Parent.dyn_cast<SILFunction *>();
+  auto *ParentFunction = DS->getImmediateParentFunction();
   if (ParentFunction == &Original)
     ParentFunction = getCloned();
   else if (ParentFunction)
@@ -185,7 +185,7 @@ const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
         FuncBuilder, M, ParentFunction, SubsMap,
         Original.getLoweredFunctionType()->getInvocationGenericSignature());
 
-  auto *ParentScope = DS->Parent.dyn_cast<const SILDebugScope *>();
+  auto *ParentScope = DS->getImmediateParentScope();
   auto *RemappedScope = new (M)
       SILDebugScope(DS->getLoc(), ParentFunction, remapScope(ParentScope),
                     remapScope(DS->InlinedCallSite));

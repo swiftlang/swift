@@ -320,7 +320,8 @@ ClosureCloner::ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
           *initCloned(FuncBuilder, Orig, Serialized, ClonedName,
                       PromotableIndices, resilienceExpansion)),
       Orig(Orig), PromotableIndices(PromotableIndices) {
-  assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
+  assert(Orig->getDebugScope()->getImmediateParentFunction() !=
+         getCloned()->getDebugScope()->getImmediateParentFunction());
 }
 
 /// Compute the SILParameterInfo list for the new cloned closure.

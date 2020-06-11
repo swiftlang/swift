@@ -634,7 +634,7 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   auto InlinedAt =
       getOrCreateInlineScope(CalleeScope->InlinedCallSite);
 
-  auto *ParentFunction = CalleeScope->Parent.dyn_cast<SILFunction *>();
+  auto *ParentFunction = CalleeScope->getImmediateParentFunction();
   if (ParentFunction)
     ParentFunction = remapParentFunction(
         FuncBuilder, M, ParentFunction, SubsMap,
@@ -642,7 +642,7 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
                            ->getInvocationGenericSignature(),
         ForInlining);
 
-  auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
+  auto *ParentScope = CalleeScope->getImmediateParentScope();
   auto *InlinedScope = new (M) SILDebugScope(
       CalleeScope->getLoc(), ParentFunction,
       ParentScope ? getOrCreateInlineScope(ParentScope) : nullptr, InlinedAt);

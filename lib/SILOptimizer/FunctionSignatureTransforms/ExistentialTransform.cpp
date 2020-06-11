@@ -633,7 +633,8 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   /// Step 2: Create the thunk with always_inline and populate its body.
   populateThunkBody();
 
-  assert(F->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
+  assert(F->getDebugScope()->getImmediateParentFunction() !=
+         NewF->getDebugScope()->getImmediateParentFunction());
 
   LLVM_DEBUG(llvm::dbgs() << "After ExistentialSpecializer Pass\n"; F->dump();
              NewF->dump(););
