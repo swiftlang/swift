@@ -1105,11 +1105,8 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     IGM->emitSILDifferentiabilityWitness(&dw);
   }
 
-  // Emit code coverage mapping data for all modules
-  for (auto Iter : *this) {
-    IRGenModule *IGM = Iter.second;
-    IGM->emitCoverageMapping();
-  }
+  // Emit code coverage mapping data.
+  PrimaryIGM->emitCoverageMapping();
 
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
