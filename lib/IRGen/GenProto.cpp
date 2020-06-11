@@ -2752,11 +2752,7 @@ static void addAbstractConditionalRequirements(
     auto archetype = dyn_cast<ArchetypeType>(ty);
     if (!archetype)
       continue;
-    auto *genericEnv = archetype->getGenericEnvironment();
-    auto conformance =
-        genericEnv->getForwardingSubstitutionMap().lookupConformance(ty, proto);
-    assert(conformance.isAbstract());
-    requirements.insert({ty, conformance.getAbstract()});
+    requirements.insert({ty, proto});
   }
   // Recursively add conditional requirements.
   for (auto &conf : subMap.getConformances()) {
