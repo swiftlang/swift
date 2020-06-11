@@ -1647,6 +1647,34 @@ namespace {
   const auto DefaultParameterConvention = ParameterConvention::Direct_Unowned;
   const auto DefaultResultConvention = ResultConvention::Unowned;
 
+  /// A wrapper that ensures that the returned type from
+  /// \c TypeResolver::resolveType is never the null \c Type. It otherwise
+  /// tries to behave like \c Type, so it provides the proper conversion and
+  /// arrow operators.
+  class NeverNullType final {
+  public:
+    /// Forbid default construction.
+    NeverNullType() = delete;
+    /// Forbid construction from \c nullptr.
+    NeverNullType(std::nullptr_t) = delete;
+
+  public:
+    /// Construct a never-null Type. If \p Ty is null, a fatal error is thrown.
+    NeverNullType(Type Ty) : WrappedTy(Ty) {
+      if (Ty.isNull()) {
+        llvm::report_fatal_error("Resolved to null type!");
+      }
+    }
+
+    operator Type() const { return WrappedTy; }
+    Type get() const { return WrappedTy; }
+
+    TypeBase *operator->() const { return WrappedTy.operator->(); }
+
+  private:
+    Type WrappedTy;
+  };
+
   class TypeResolver {
     ASTContext &Context;
     TypeResolution resolution;
@@ -1660,7 +1688,7 @@ namespace {
     {
     }
 
-    Type resolveType(TypeRepr *repr, TypeResolutionOptions options);
+    NeverNullType resolveType(TypeRepr *repr, TypeResolutionOptions options);
 
   private:
     template<typename ...ArgTypes>
@@ -1795,7 +1823,8 @@ Type ResolveTypeRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
-Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolveType(TypeRepr *repr,
+                                        TypeResolutionOptions options) {
   assert(repr && "Cannot validate null TypeReprs!");
 
   // If we know the type representation is invalid, just return an
@@ -1891,9 +1920,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     options |= TypeResolutionFlags::SilenceErrors;
     auto constraintType = resolveType(opaqueRepr->getConstraint(),
                                       options);
-    
-    return constraintType && !constraintType->hasError()
-      ? ErrorType::get(constraintType) : ErrorType::get(Context);
+
+    return !constraintType->hasError() ? ErrorType::get(constraintType)
+                                       : ErrorType::get(Context);
   }
 
   case TypeReprKind::Fixed:
@@ -1976,7 +2005,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           instanceOptions -= TypeResolutionFlags::SILType;
 
           auto instanceTy = resolveType(base, instanceOptions);
-          if (!instanceTy || instanceTy->hasError())
+          if (instanceTy->hasError())
             return instanceTy;
 
           // Check for @thin.
@@ -2440,8 +2469,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       variadic = true;
     }
 
-    Type ty = resolveType(eltTypeRepr, thisElementOptions);
-    if (!ty || ty->hasError()) {
+    auto ty = resolveType(eltTypeRepr, thisElementOptions);
+    if (ty->hasError()) {
       elements.emplace_back(ErrorType::get(Context));
       continue;
     }
@@ -2550,7 +2579,7 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
     for (auto argRepr : generic->getGenericArgs()) {
       auto argTy = resolveType(argRepr, options);
       // If we cannot resolve the generic parameter, propagate the error out.
-      if (!argTy || argTy->hasError()) {
+      if (argTy->hasError()) {
         return ErrorType::get(Context);
       }
       TypeArgsBuf.push_back(argTy);
@@ -2594,8 +2623,8 @@ Type TypeResolver::resolveASTFunctionType(
 
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
-  Type outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);
-  if (!outputTy || outputTy->hasError()) {
+  auto outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);
+  if (outputTy->hasError()) {
     return ErrorType::get(Context);
   }
 
@@ -3255,8 +3284,8 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
 
 Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                     TypeResolutionOptions options) {
-  Type baseTy = resolveType(repr->getBase(), options.withoutContext());
-  if (!baseTy || baseTy->hasError()) {
+  auto baseTy = resolveType(repr->getBase(), options.withoutContext());
+  if (baseTy->hasError()) {
     return ErrorType::get(Context);
   }
 
@@ -3272,13 +3301,13 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                          TypeResolutionOptions options) {
   options = adjustOptionsForGenericArgs(options);
 
-  Type keyTy = resolveType(repr->getKey(), options.withoutContext());
-  if (!keyTy || keyTy->hasError()) {
+  auto keyTy = resolveType(repr->getKey(), options.withoutContext());
+  if (keyTy->hasError()) {
     return ErrorType::get(Context);
   }
 
-  Type valueTy = resolveType(repr->getValue(), options.withoutContext());
-  if (!valueTy || valueTy->hasError()) {
+  auto valueTy = resolveType(repr->getValue(), options.withoutContext());
+  if (valueTy->hasError()) {
     return ErrorType::get(Context);
   }
 
@@ -3304,8 +3333,8 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
   TypeResolutionOptions elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::ImmediateOptionalTypeArgument);
 
-  Type baseTy = resolveType(repr->getBase(), elementOptions);
-  if (!baseTy || baseTy->hasError()) {
+  auto baseTy = resolveType(repr->getBase(), elementOptions);
+  if (baseTy->hasError()) {
     return ErrorType::get(Context);
   }
 
@@ -3376,12 +3405,12 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   TypeResolutionOptions elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::ImmediateOptionalTypeArgument);
 
-  Type baseTy = resolveType(repr->getBase(), elementOptions);
-  if (!baseTy || baseTy->hasError()) {
+  auto baseTy = resolveType(repr->getBase(), elementOptions);
+  if (baseTy->hasError()) {
     return ErrorType::get(Context);
   }
 
-  Type uncheckedOptionalTy =
+  auto uncheckedOptionalTy =
       TypeChecker::getOptionalType(repr->getExclamationLoc(), baseTy);
   if (uncheckedOptionalTy->hasError()) {
     return ErrorType::get(Context);
@@ -3416,8 +3445,8 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
-    Type ty = resolveType(tyR, elementOptions);
-    if (!ty || ty->hasError())
+    auto ty = resolveType(tyR, elementOptions);
+    if (ty->hasError())
       hadError = true;
 
     auto eltName = repr->getElementName(i);
@@ -3485,8 +3514,8 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   };
 
   for (auto tyR : repr->getTypes()) {
-    Type ty = resolveType(tyR, options.withoutContext());
-    if (!ty || ty->hasError()) return ty;
+    auto ty = resolveType(tyR, options.withoutContext());
+    if (ty->hasError()) return ty;
 
     auto nominalDecl = ty->getAnyNominal();
     if (nominalDecl && isa<ClassDecl>(nominalDecl)) {
@@ -3529,8 +3558,8 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
-  Type ty = resolveType(repr->getBase(), options.withoutContext());
-  if (!ty || ty->hasError()) {
+  auto ty = resolveType(repr->getBase(), options.withoutContext());
+  if (ty->hasError()) {
     return ErrorType::get(Context);
   }
 
@@ -3562,8 +3591,8 @@ Type TypeResolver::buildMetatypeType(
 Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
-  Type ty = resolveType(repr->getBase(), options.withoutContext());
-  if (!ty || ty->hasError()) {
+  auto ty = resolveType(repr->getBase(), options.withoutContext());
+  if (ty->hasError()) {
     return ErrorType::get(Context);
   }
 
