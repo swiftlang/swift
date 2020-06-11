@@ -446,7 +446,7 @@ private:
       }
     }
     for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-      if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }
@@ -1260,7 +1260,7 @@ private:
       }
     }
     for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-      if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }

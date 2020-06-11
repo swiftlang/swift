@@ -4329,9 +4329,8 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
           } else
             return deserialized.takeError();
         } else {
-          Attr = CustomAttr::create(ctx, SourceLoc(),
-                                    TypeLoc::withoutLoc(deserialized.get()),
-                                    isImplicit);
+          auto *TE = TypeExpr::createImplicit(deserialized.get(), ctx);
+          Attr = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
         }
         break;
       }

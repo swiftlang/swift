@@ -2513,6 +2513,41 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Kinds of types for CustomAttr.
+enum class CustomAttrTypeKind {
+  /// The type is required to not be expressed in terms of
+  /// any contextual type parameters.
+  NonGeneric,
+
+  /// Property delegates have some funky rules, like allowing
+  /// unbound generic types.
+  PropertyDelegate,
+};
+
+void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
+
+class CustomAttrTypeRequest
+    : public SimpleRequest<CustomAttrTypeRequest,
+                           Type(CustomAttr *, DeclContext *,
+                                CustomAttrTypeKind),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, CustomAttr *, DeclContext *,
+                CustomAttrTypeKind) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
