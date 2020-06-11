@@ -348,8 +348,6 @@ Type getArraySliceType(SourceLoc loc, Type elementType);
 Type getOptionalType(SourceLoc loc, Type elementType);
 Type getStringType(ASTContext &ctx);
 Type getSubstringType(ASTContext &ctx);
-Type getInt8Type(ASTContext &ctx);
-Type getUInt8Type(ASTContext &ctx);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used

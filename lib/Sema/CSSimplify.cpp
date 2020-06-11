@@ -2426,9 +2426,9 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 static bool isStringCompatiblePointerBaseType(ASTContext &ctx,
                                               Type baseType) {
   // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
-  if (baseType->isEqual(TypeChecker::getInt8Type(ctx)))
+  if (baseType->isEqual(ctx.getInt8Decl()->getDeclaredInterfaceType()))
     return true;
-  if (baseType->isEqual(TypeChecker::getUInt8Type(ctx)))
+  if (baseType->isEqual(ctx.getUInt8Decl()->getDeclaredInterfaceType()))
     return true;
   if (baseType->isEqual(ctx.TheEmptyTupleType))
     return true;
@@ -9213,11 +9213,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         auto &ctx = getASTContext();
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2,
-                                          TypeChecker::getInt8Type(ctx),
+                                          ctx.getInt8Decl()->getDeclaredInterfaceType(),
                                           getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                            baseType2,
-                                           TypeChecker::getUInt8Type(ctx),
+                                           ctx.getUInt8Decl()->getDeclaredInterfaceType(),
                                            getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2, ctx.TheEmptyTupleType,

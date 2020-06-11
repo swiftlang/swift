@@ -386,21 +386,7 @@ Type TypeChecker::getStringType(ASTContext &Context) {
 
   return Type();
 }
-
-  return Type();
-}
-
-Type TypeChecker::getInt8Type(ASTContext &Context) {
-  if (auto typeDecl = Context.getInt8Decl())
-    return typeDecl->getDeclaredInterfaceType();
-
-  return Type();
-}
-
-Type TypeChecker::getUInt8Type(ASTContext &Context) {
-  if (auto typeDecl = Context.getUInt8Decl())
-    return typeDecl->getDeclaredInterfaceType();
-
+  llvm::report_fatal_error("Broken Standard library: Cannot resolve String");
   return Type();
 }
 
