@@ -3411,8 +3411,7 @@ public:
   ///
   /// \returns The opened type.
   Type openUnboundGenericType(UnboundGenericType *unbound,
-                              ConstraintLocatorBuilder locator,
-                              OpenedTypeMap &replacements);
+                              ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of unbound
   /// generic types with bound generic types with fresh type variables as
