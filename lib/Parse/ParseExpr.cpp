@@ -3216,6 +3216,13 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
       if (!Tok.is(tok::code_complete))
         break;
 
+      // If the current completion mode doesn't support trailing closure
+      // completion, leave the token here and let "postfix completion" to
+      // handle it.
+      if (CodeCompletion &&
+          !CodeCompletion->canPerformCompleteLabeledTrailingClosure())
+        break;
+
       // foo() {} <token>
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
       if (CodeCompletion)
