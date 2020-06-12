@@ -79,8 +79,6 @@ static Optional<SILVTable::Entry::Kind>
 fromStableVTableEntryKind(unsigned value) {
   switch (value) {
   case SIL_VTABLE_ENTRY_NORMAL: return SILVTable::Entry::Kind::Normal;
-  case SIL_VTABLE_ENTRY_NORMAL_NON_OVERRIDDEN:
-    return SILVTable::Entry::Kind::NormalNonOverridden;
   case SIL_VTABLE_ENTRY_INHERITED: return SILVTable::Entry::Kind::Inherited;
   case SIL_VTABLE_ENTRY_OVERRIDE: return SILVTable::Entry::Kind::Override;
   default: return None;
@@ -3034,8 +3032,10 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
-    unsigned RawEntryKind;
-    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, ListOfValues);
+    unsigned RawEntryKind, IsNonOverridden;
+    VTableEntryLayout::readRecord(scratch, NameID,
+                                  RawEntryKind, IsNonOverridden,
+                                  ListOfValues);
 
     auto EntryKind = fromStableVTableEntryKind(RawEntryKind);
 
@@ -3043,7 +3043,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     if (Func) {
       unsigned NextValueIndex = 0;
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
-                                 Func, EntryKind.getValue());
+                                 Func, EntryKind.getValue(), (bool)IsNonOverridden);
     }
 
     // Fetch the next record.

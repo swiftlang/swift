@@ -595,7 +595,7 @@ public:
                                       bool deserializeLazily=true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
-  SILVTable *lookUpVTable(const ClassDecl *C);
+  SILVTable *lookUpVTable(const ClassDecl *C, bool deserializeLazily = true);
 
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.

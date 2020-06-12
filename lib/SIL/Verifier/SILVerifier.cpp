@@ -5425,7 +5425,6 @@ void SILVTable::verify(const SILModule &M) const {
       bool validKind;
       switch (entry.getKind()) {
       case Entry::Normal:
-      case Entry::NormalNonOverridden:
         validKind = true;
         break;
         
@@ -5450,21 +5449,26 @@ void SILVTable::verify(const SILModule &M) const {
 
       switch (entry.getKind()) {
       case Entry::Normal:
-      case Entry::NormalNonOverridden:
         assert(!superEntry && "non-root vtable entry must be inherited or override");
         break;
 
       case Entry::Inherited:
+        if (!superEntry)
+          break;
+
+        assert(entry.isNonOverridden() == superEntry->isNonOverridden()
+               && "inherited vtable entry must share overridden-ness of superclass entry");
         break;
           
       case Entry::Override:
+        assert(!entry.isNonOverridden()
+               && "override entry can't claim to be nonoverridden");
         if (!superEntry)
           break;
 
         // The superclass entry must not prohibit overrides.
-        assert(
-            superEntry->getKind() != Entry::NormalNonOverridden &&
-            "vtable entry overrides an entry that claims to have no overrides");
+        assert(!superEntry->isNonOverridden()
+               && "vtable entry overrides an entry that claims to have no overrides");
         // TODO: Check the root vtable entry for the method too.
         break;
       }
