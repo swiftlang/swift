@@ -1687,6 +1687,10 @@ public:
   void completeLabeledTrailingClosure(CodeCompletionExpr *E,
                                       bool isAtStartOfLine) override;
 
+  bool canPerformCompleteLabeledTrailingClosure() const override {
+    return true;
+  }
+
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;

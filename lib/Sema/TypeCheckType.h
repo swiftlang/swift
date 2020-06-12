@@ -366,7 +366,7 @@ public:
   ///
   /// \param TyR The type representation to check.
   ///
-  /// \returns a well-formed type or an ErrorType in case of an error.
+  /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR);
 
   /// Whether this type resolution uses archetypes (vs. generic parameters).

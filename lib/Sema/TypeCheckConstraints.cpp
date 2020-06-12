@@ -1397,7 +1397,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     auto resolution = TypeResolution::forContextual(DC, options);
     auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
-    if (BaseTy && BaseTy->mayHaveMembers()) {
+    if (BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
       if (isa<AbstractFunctionDecl>(DC) ||
           isa<AbstractClosureExpr>(DC))

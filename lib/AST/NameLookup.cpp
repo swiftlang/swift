@@ -857,8 +857,6 @@ SelfBoundsFromWhereClauseRequest::evaluate(
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
         isSelfLHS = (identTypeRepr->getNameRef().getBaseIdentifier() ==
                      ctx.Id_Self);
-    } else if (Type type = req.getSubject()) {
-      isSelfLHS = type->isEqual(dc->getSelfInterfaceType());
     }
     if (!isSelfLHS)
       continue;
@@ -867,8 +865,6 @@ SelfBoundsFromWhereClauseRequest::evaluate(
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
       rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, lookupDC);
-    } else if (Type type = req.getConstraint()) {
-      rhsDecls = directReferencesForType(type);
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
@@ -899,30 +895,24 @@ TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = ext->getASTContext();
 
   TinyPtrVector<TypeDecl *> result;
+  auto resolve = [&](TypeRepr *typeRepr) {
+    auto decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+    result.insert(result.end(), decls.begin(), decls.end());
+  };
   for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
-    auto resolve = [&](TypeLoc loc) {
-      DirectlyReferencedTypeDecls decls;
-      if (auto *typeRepr = loc.getTypeRepr())
-        decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-      else if (Type type = loc.getType())
-        decls = directReferencesForType(type);
-
-      result.insert(result.end(), decls.begin(), decls.end());
-    };
-
     switch (req.getKind()) {
     case RequirementReprKind::TypeConstraint:
-      resolve(req.getSubjectLoc());
-      resolve(req.getConstraintLoc());
+      resolve(req.getSubjectRepr());
+      resolve(req.getConstraintRepr());
       break;
 
     case RequirementReprKind::SameType:
-      resolve(req.getFirstTypeLoc());
-      resolve(req.getSecondTypeLoc());
+      resolve(req.getFirstTypeRepr());
+      resolve(req.getSecondTypeRepr());
       break;
 
     case RequirementReprKind::LayoutConstraint:
-      resolve(req.getSubjectLoc());
+      resolve(req.getSubjectRepr());
       break;
     }
   }

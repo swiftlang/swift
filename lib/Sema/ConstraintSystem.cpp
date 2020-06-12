@@ -655,18 +655,19 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
   return None;
 }
 
-Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
-                                              ConstraintLocatorBuilder locator,
-                                              OpenedTypeMap &replacements) {
+Type
+ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
+                                         ConstraintLocatorBuilder locator) {
   auto unboundDecl = unbound->getDecl();
   auto parentTy = unbound->getParent();
   if (parentTy) {
-    parentTy = openUnboundGenericType(parentTy, locator);
+    parentTy = openUnboundGenericTypes(parentTy, locator);
     unbound = UnboundGenericType::get(unboundDecl, parentTy,
                                       getASTContext());
   }
 
   // Open up the generic type.
+  OpenedTypeMap replacements;
   openGeneric(unboundDecl->getDeclContext(), unboundDecl->getGenericSignature(),
               locator, replacements);
 
@@ -781,7 +782,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
-Type ConstraintSystem::openUnboundGenericType(
+Type ConstraintSystem::openUnboundGenericTypes(
     Type type, ConstraintLocatorBuilder locator) {
   assert(!type->getCanonicalType()->hasTypeParameter());
 
@@ -790,8 +791,7 @@ Type ConstraintSystem::openUnboundGenericType(
 
   type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
-        OpenedTypeMap replacements;
-        return openUnboundGenericType(unbound, locator, replacements);
+        return openUnboundGenericType(unbound, locator);
       }
 
       return type;
@@ -1235,7 +1235,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     checkNestedTypeConstraints(*this, type, locator);
 
     // Open the type.
-    type = openUnboundGenericType(type, locator);
+    type = openUnboundGenericTypes(type, locator);
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
@@ -1494,7 +1494,7 @@ ConstraintSystem::getTypeOfMemberReference(
     checkNestedTypeConstraints(*this, memberTy, locator);
 
     // Open the type if it was a reference to a generic type.
-    memberTy = openUnboundGenericType(memberTy, locator);
+    memberTy = openUnboundGenericTypes(memberTy, locator);
 
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);

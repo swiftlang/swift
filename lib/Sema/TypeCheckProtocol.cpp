@@ -3103,43 +3103,57 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
 ///
 /// \returns None if there is no such constraint; a non-empty optional that
 /// may have the \c RequirementRepr for the actual constraint.
-static Optional<RequirementRepr *>
+static Optional<std::pair<RequirementRepr *, Requirement>>
 getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
   auto genericSig =
     witness->getInnermostDeclContext()->getGenericSignatureOfContext();
   if (!genericSig) return None;
 
-  for (const auto &req : genericSig->getRequirements()) {
+  // First, search for any bogus requirements.
+  auto it = llvm::find_if(genericSig->getRequirements(),
+                          [&selfClass](const auto &req) {
     if (req.getKind() != RequirementKind::SameType)
-      continue;
+      return false;
 
-    if (req.getFirstType()->getAnyNominal() == selfClass ||
-        req.getSecondType()->getAnyNominal() == selfClass) {
-      // Try to find the requirement-as-written.
-      GenericParamList *genericParams = nullptr;
-
-      if (auto func = dyn_cast<AbstractFunctionDecl>(witness))
-        genericParams = func->getGenericParams();
-      else if (auto subscript = dyn_cast<SubscriptDecl>(witness))
-        genericParams = subscript->getGenericParams();
-      if (genericParams) {
-        for (auto &req : genericParams->getRequirements()) {
-          if (req.getKind() != RequirementReprKind::SameType)
-            continue;
-
-          if (req.getFirstType()->getAnyNominal() == selfClass ||
-              req.getSecondType()->getAnyNominal() == selfClass)
-            return &req;
-        }
-      }
-
-      // Form an optional(nullptr) to indicate that we don't have the
-      // requirement itself.
-      return nullptr;
-    }
+    return req.getFirstType()->getAnyNominal() == selfClass
+        || req.getSecondType()->getAnyNominal() == selfClass;
+  });
+  if (it == genericSig->getRequirements().end()) {
+    return None;
   }
 
-  return None;
+  // Got it! Now try to find the requirement-as-written.
+  GenericParamList *genericParams = nullptr;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(witness))
+    genericParams = func->getGenericParams();
+  else if (auto subscript = dyn_cast<SubscriptDecl>(witness))
+    genericParams = subscript->getGenericParams();
+
+  // A null repr indicates we don't have a valid location to diagnose. But
+  // at least we have a requirement we can signal is bogus.
+  Optional<std::pair<RequirementRepr *, Requirement>> target
+    = std::make_pair((RequirementRepr *)nullptr, Requirement(*it));
+  if (!genericParams) {
+    return target;
+  }
+
+  // Resolve and search for a written requirement to match our bogus one.
+  WhereClauseOwner(cast<GenericContext>(witness), genericParams)
+    .visitRequirements(TypeResolutionStage::Structural,
+                       [&](Requirement req, RequirementRepr *repr) {
+      if (req.getKind() != RequirementKind::SameType) {
+        return false;
+      }
+
+      if (req.getFirstType()->getAnyNominal() != selfClass &&
+          req.getSecondType()->getAnyNominal() != selfClass) {
+        return false;
+      }
+
+      target.emplace(repr, req);
+      return true;
+    });
+  return target;
 }
 
 void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
@@ -3239,7 +3253,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
         });
     }
   } else if (selfKind.requirement) {
-    if (auto constraint = getAdopteeSelfSameTypeConstraint(classDecl,
+    if (auto targetPair = getAdopteeSelfSameTypeConstraint(classDecl,
                                                            witness)) {
       // A "Self ==" constraint works incorrectly with subclasses. Complain.
       auto proto = Conformance->getProtocol();
@@ -3254,11 +3268,11 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
                      proto->getDeclaredType());
       emitDeclaredHereIfNeeded(diags, diagLoc, witness);
 
-      if (auto requirementRepr = *constraint) {
+      if (auto requirementRepr = targetPair->first) {
         diags.diagnose(requirementRepr->getSeparatorLoc(),
                        diag::witness_self_weaken_same_type,
-                       requirementRepr->getFirstType(),
-                       requirementRepr->getSecondType())
+                       targetPair->second.getFirstType(),
+                       targetPair->second.getSecondType())
           .fixItReplace(requirementRepr->getSeparatorLoc(), ":");
       }
     }

@@ -17,6 +17,7 @@ endif()
 
 add_swift_tool_subdirectory(driver)
 add_swift_tool_subdirectory(sil-opt)
+add_swift_tool_subdirectory(swift-dependency-tool)
 add_swift_tool_subdirectory(swift-ide-test)
 add_swift_tool_subdirectory(swift-remoteast-test)
 add_swift_tool_subdirectory(swift-demangle)

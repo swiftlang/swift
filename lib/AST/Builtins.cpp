@@ -431,25 +431,12 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
 
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
-                                          unsigned numParameters,
-                                          bool isAnyObject) {
+                                          unsigned numParameters) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
 
-  SmallVector<GenericTypeParamDecl*, 2> genericParams;
+  SmallVector<GenericTypeParamDecl *, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
     genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i));
-
-
-  if (isAnyObject) {
-    CanType ao = ctx.getAnyObjectType();
-    SmallVector<RequirementRepr, 1> req;
-    req.push_back(RequirementRepr::getTypeConstraint(TypeLoc::withoutLoc(genericParams[0]->getInterfaceType()), SourceLoc(),
-      TypeLoc::withoutLoc(ao)));
-
-    auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
-                                              SourceLoc(), req, SourceLoc());
-    return paramList;
-  }
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
@@ -474,9 +461,15 @@ namespace {
 
   public:
     BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1,
-                           bool isAnyObject = false)
+                           bool wantsAdditionalAnyObjectRequirement = false)
         : Context(ctx) {
-      TheGenericParamList = getGenericParams(ctx, numGenericParams, isAnyObject);
+      TheGenericParamList = getGenericParams(ctx, numGenericParams);
+      if (wantsAdditionalAnyObjectRequirement) {
+        Requirement req(RequirementKind::Conformance,
+                        TheGenericParamList->getParams()[0]->getInterfaceType(),
+                        ctx.getAnyObjectType());
+        addedRequirements.push_back(req);
+      }
       for (auto gp : TheGenericParamList->getParams()) {
         genericParamTypes.push_back(
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());

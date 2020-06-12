@@ -2488,7 +2488,7 @@ namespace {
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
         LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, TypeChecker::getIntType(ctx));
+        cs.setType(expr, ctx.getIntDecl()->getDeclaredInterfaceType());
         return handleIntegerLiteralExpr(expr);
       };
 
@@ -4698,7 +4698,9 @@ namespace {
                                  StringRef(stringCopy, compatStringBuf.size()),
                                  SourceRange(),
                                  /*implicit*/ true);
-          cs.setType(stringExpr, TypeChecker::getStringType(cs.getASTContext()));
+          cs.setType(
+              stringExpr,
+              cs.getASTContext().getStringDecl()->getDeclaredInterfaceType());
           E->setObjCStringLiteralExpr(stringExpr);
         }
       }

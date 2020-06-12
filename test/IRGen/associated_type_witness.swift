@@ -93,6 +93,16 @@ struct Pair<T, U> : P, Q {}
 // GLOBAL-SAME:    @"symbolic{{.*}}23associated_type_witness4PairV{{.*}}"
 // GLOBAL-SAME:  ]
 
+//   Protocol conformance descriptor for Computed : Assocked.
+// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc" = hidden constant
+// GLOBAL-SAME:    i16 4,
+// GLOBAL-SAME:    i16 1,
+
+//    No instantiator function
+// GLOBAL-SAME:    i32 0,
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint
+// GLOBAL-SAME:  }
+
 struct Computed<T, U> : Assocked {
   typealias Assoc = Pair<T, U>
 }
@@ -116,6 +126,14 @@ protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 // GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWp" = internal constant [2 x i8*]
 // GLOBAL-SAME: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc"
 // GLOBAL-SAME: i8* null
+
+//   Protocol conformance descriptor for GenericComputed : DerivedFromSimpleAssoc.
+// GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc" = hidden constant
+// GLOBAL-SAME:    i16 2,
+// GLOBAL-SAME:    i16 1,
+
+//   Relative reference to instantiator function
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),
 
 //   Relative reference to private data
 struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
@@ -155,7 +173,6 @@ extension ValidatorType {
 
 // MARK: Failing example
 extension Validator where T == String {
-  // GLOBAL: @"symbolic _____ySS__G 23associated_type_witness9ValidatorVAASSRszlE1VV7FailureV"
   struct V: ValidatorType {
     typealias Data = T // or String
 
@@ -163,21 +180,6 @@ extension Validator where T == String {
   }
 }
 
+// GLOBAL-LABEL: @"symbolic _____ySS__G 23associated_type_witness9ValidatorVAASSRszlE1VV7FailureV"
 
-//   Protocol conformance descriptor for Computed : Assocked.
-// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc" = hidden constant
-// GLOBAL-SAME:    i16 4,
-// GLOBAL-SAME:    i16 1,
 
-//    No instantiator function
-// GLOBAL-SAME:    i32 0,
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint
-// GLOBAL-SAME:  }
-
-//   Protocol conformance descriptor for GenericComputed : DerivedFromSimpleAssoc.
-// GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc" = hidden constant
-// GLOBAL-SAME:    i16 2,
-// GLOBAL-SAME:    i16 1,
-
-//   Relative reference to instantiator function
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),

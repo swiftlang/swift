@@ -1030,12 +1030,12 @@ class RequirementRepr {
   SourceLoc SeparatorLoc;
   RequirementReprKind Kind : 2;
   bool Invalid : 1;
-  TypeLoc FirstType;
+  TypeRepr *FirstType;
 
   /// The second element represents the right-hand side of the constraint.
   /// It can be e.g. a type or a layout constraint.
   union {
-    TypeLoc SecondType;
+    TypeRepr *SecondType;
     LayoutConstraintLoc SecondLayout;
   };
 
@@ -1044,16 +1044,16 @@ class RequirementRepr {
   StringRef AsWrittenString;
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeLoc FirstType, TypeLoc SecondType)
+                  TypeRepr *FirstType, TypeRepr *SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondType(SecondType) { }
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeLoc FirstType, LayoutConstraintLoc SecondLayout)
+                  TypeRepr *FirstType, LayoutConstraintLoc SecondLayout)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
-  void printImpl(ASTPrinter &OS, bool AsWritten) const;
+  void printImpl(ASTPrinter &OS) const;
 
 public:
   /// Construct a new type-constraint requirement.
@@ -1064,9 +1064,9 @@ public:
   /// this requirement was implied.
   /// \param Constraint The protocol or protocol composition to which the
   /// subject must conform, or superclass from which the subject must inherit.
-  static RequirementRepr getTypeConstraint(TypeLoc Subject,
+  static RequirementRepr getTypeConstraint(TypeRepr *Subject,
                                            SourceLoc ColonLoc,
-                                           TypeLoc Constraint) {
+                                           TypeRepr *Constraint) {
     return { ColonLoc, RequirementReprKind::TypeConstraint, Subject, Constraint };
   }
 
@@ -1076,9 +1076,9 @@ public:
   /// \param EqualLoc The location of the '==' in the same-type constraint, or
   /// an invalid location if this requirement was implied.
   /// \param SecondType The second type.
-  static RequirementRepr getSameType(TypeLoc FirstType,
+  static RequirementRepr getSameType(TypeRepr *FirstType,
                                      SourceLoc EqualLoc,
-                                     TypeLoc SecondType) {
+                                     TypeRepr *SecondType) {
     return { EqualLoc, RequirementReprKind::SameType, FirstType, SecondType };
   }
 
@@ -1090,7 +1090,7 @@ public:
   /// this requirement was implied.
   /// \param Layout The layout requirement to which the
   /// subject must conform.
-  static RequirementRepr getLayoutConstraint(TypeLoc Subject,
+  static RequirementRepr getLayoutConstraint(TypeRepr *Subject,
                                              SourceLoc ColonLoc,
                                              LayoutConstraintLoc Layout) {
     return {ColonLoc, RequirementReprKind::LayoutConstraint, Subject,
@@ -1108,25 +1108,7 @@ public:
 
   /// For a type-bound requirement, return the subject of the
   /// conformance relationship.
-  Type getSubject() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint ||
-           getKind() == RequirementReprKind::LayoutConstraint);
-    return FirstType.getType();
-  }
-
   TypeRepr *getSubjectRepr() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint ||
-           getKind() == RequirementReprKind::LayoutConstraint);
-    return FirstType.getTypeRepr();
-  }
-
-  TypeLoc &getSubjectLoc() {
-    assert(getKind() == RequirementReprKind::TypeConstraint ||
-           getKind() == RequirementReprKind::LayoutConstraint);
-    return FirstType;
-  }
-
-  const TypeLoc &getSubjectLoc() const {
     assert(getKind() == RequirementReprKind::TypeConstraint ||
            getKind() == RequirementReprKind::LayoutConstraint);
     return FirstType;
@@ -1134,22 +1116,7 @@ public:
 
   /// For a type-bound requirement, return the protocol or to which
   /// the subject conforms or superclass it inherits.
-  Type getConstraint() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return SecondType.getType();
-  }
-
   TypeRepr *getConstraintRepr() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return SecondType.getTypeRepr();
-  }
-
-  TypeLoc &getConstraintLoc() {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return SecondType;
-  }
-
-  const TypeLoc &getConstraintLoc() const {
     assert(getKind() == RequirementReprKind::TypeConstraint);
     return SecondType;
   }
@@ -1170,43 +1137,13 @@ public:
   }
 
   /// Retrieve the first type of a same-type requirement.
-  Type getFirstType() const {
-    assert(getKind() == RequirementReprKind::SameType);
-    return FirstType.getType();
-  }
-
   TypeRepr *getFirstTypeRepr() const {
-    assert(getKind() == RequirementReprKind::SameType);
-    return FirstType.getTypeRepr();
-  }
-
-  TypeLoc &getFirstTypeLoc() {
-    assert(getKind() == RequirementReprKind::SameType);
-    return FirstType;
-  }
-
-  const TypeLoc &getFirstTypeLoc() const {
     assert(getKind() == RequirementReprKind::SameType);
     return FirstType;
   }
 
   /// Retrieve the second type of a same-type requirement.
-  Type getSecondType() const {
-    assert(getKind() == RequirementReprKind::SameType);
-    return SecondType.getType();
-  }
-
   TypeRepr *getSecondTypeRepr() const {
-    assert(getKind() == RequirementReprKind::SameType);
-    return SecondType.getTypeRepr();
-  }
-
-  TypeLoc &getSecondTypeLoc() {
-    assert(getKind() == RequirementReprKind::SameType);
-    return SecondType;
-  }
-
-  const TypeLoc &getSecondTypeLoc() const {
     assert(getKind() == RequirementReprKind::SameType);
     return SecondType;
   }
@@ -1217,19 +1154,13 @@ public:
     return SeparatorLoc;
   }
 
-  SourceRange getSourceRange() const {
-    if (getKind() == RequirementReprKind::LayoutConstraint)
-      return SourceRange(FirstType.getSourceRange().Start,
-                         SecondLayout.getSourceRange().End);
-    return SourceRange(FirstType.getSourceRange().Start,
-                       SecondType.getSourceRange().End);
-  }
+  SourceRange getSourceRange() const;
 
   /// Retrieve the first or subject type representation from the \c repr,
   /// or \c nullptr if \c repr is null.
   static TypeRepr *getFirstTypeRepr(const RequirementRepr *repr) {
     if (!repr) return nullptr;
-    return repr->FirstType.getTypeRepr();
+    return repr->FirstType;
   }
 
   /// Retrieve the second or constraint type representation from the \c repr,
@@ -1238,7 +1169,7 @@ public:
     if (!repr) return nullptr;
     assert(repr->getKind() == RequirementReprKind::TypeConstraint ||
            repr->getKind() == RequirementReprKind::SameType);
-    return repr->SecondType.getTypeRepr();
+    return repr->SecondType;
   }
 
   SWIFT_DEBUG_DUMP;

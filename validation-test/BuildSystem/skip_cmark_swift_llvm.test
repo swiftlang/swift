@@ -1,3 +1,5 @@
+# REQUIRES: standalone_test
+
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
 # RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-cmark 2>&1 | %FileCheck --check-prefix=SKIP-CMARK-CHECK %s
