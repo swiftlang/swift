@@ -3229,6 +3229,9 @@ static bool diagnoseAmbiguity(
       if (!distinctChoices.insert(decl).second)
         continue;
 
+      auto noteLoc =
+          decl->getLoc().isInvalid() ? getLoc(commonAnchor) : decl->getLoc();
+
       if (solution.Fixes.size() == 1) {
         diagnosed &=
             solution.Fixes.front()->diagnose(solution, /*asNote*/ true);
@@ -3241,15 +3244,23 @@ static bool diagnoseAmbiguity(
         // lists.
         auto *fn = type->getAs<AnyFunctionType>();
         assert(fn);
-        DE.diagnose(decl->getLoc(), diag::candidate_partial_match,
-                    fn->getParamListAsString(fn->getParams()));
+
+        if (fn->getNumParams() == 1) {
+          const auto &param = fn->getParams()[0];
+          DE.diagnose(noteLoc, diag::candidate_has_invalid_argument_at_position,
+                      solution.simplifyType(param.getPlainType()),
+                      /*position=*/1, param.isInOut());
+        } else {
+          DE.diagnose(noteLoc, diag::candidate_partial_match,
+                      fn->getParamListAsString(fn->getParams()));
+        }
       } else {
         // Emit a general "found candidate" note
         if (decl->getLoc().isInvalid()) {
           if (candidateTypes.insert(type->getCanonicalType()).second)
             DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
         } else {
-          DE.diagnose(decl->getLoc(), diag::found_candidate);
+          DE.diagnose(noteLoc, diag::found_candidate);
         }
       }
     }
