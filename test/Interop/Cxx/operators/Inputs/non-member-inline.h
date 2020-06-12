@@ -21,6 +21,14 @@ inline IntBox operator/(IntBox lhs, IntBox rhs) {
   return IntBox{.value = lhs.value / rhs.value};
 }
 
+inline IntBox operator<<(IntBox lhs, IntBox rhs) {
+  return IntBox{.value = lhs.value << rhs.value};
+}
+
+inline IntBox operator>>(IntBox lhs, IntBox rhs) {
+  return IntBox{.value = lhs.value >> rhs.value};
+}
+
 struct BoolBox {
   bool value;
 };
