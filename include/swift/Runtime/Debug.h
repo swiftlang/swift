@@ -17,11 +17,13 @@
 #ifndef SWIFT_RUNTIME_DEBUG_HELPERS_H
 #define SWIFT_RUNTIME_DEBUG_HELPERS_H
 
-#include <cstdarg>
-#include <cstdio>
-#include <stdint.h>
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Unreachable.h"
+#include <atomic>
+#include <cstdarg>
+#include <cstdio>
+#include <functional>
+#include <stdint.h>
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 
@@ -146,6 +148,9 @@ void dumpStackTraceEntry(unsigned index, void *framePC,
                          bool shortOutput = false);
 
 SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+bool withCurrentBacktrace(std::function<void(void **, int)> call);
+
+SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void printCurrentBacktrace(unsigned framesToSkip = 1);
 
 /// Debugger breakpoint ABI. This structure is passed to the debugger (and needs
@@ -236,6 +241,9 @@ bool _swift_debug_metadataAllocationIterationEnabled;
 
 SWIFT_RUNTIME_STDLIB_SPI
 const void * const _swift_debug_allocationPoolPointer;
+
+SWIFT_RUNTIME_STDLIB_SPI
+std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
 
 SWIFT_RUNTIME_STDLIB_SPI
 const void * const _swift_debug_protocolConformanceStatePointer;

@@ -67,11 +67,19 @@ class Inspector {
   }
   
   func getAddr(symbolName: String) -> swift_addr_t {
-    let symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore, symbolName)
+    let symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore,
+                                                       "_" + symbolName)
     let range = CSSymbolGetRange(symbol)
     return swift_addr_t(range.location)
   }
-  
+
+  func getSymbol(address: swift_addr_t) -> (name: String?, library: String?) {
+    let symbol = CSSymbolicatorGetSymbolWithAddressAtTime(symbolicator, address,
+                                                          kCSNow)
+    return (CSSymbolGetName(symbol),
+            CSSymbolOwnerGetName(CSSymbolGetSymbolOwner(symbol)))
+  }
+
   enum Callbacks {
     static let QueryDataLayout: @convention(c)
       (UnsafeMutableRawPointer?,
@@ -114,12 +122,12 @@ private func QueryDataLayoutFn(context: UnsafeMutableRawPointer?,
                               inBuffer: UnsafeMutableRawPointer?,
                               outBuffer: UnsafeMutableRawPointer?) -> CInt {
   switch type {
-    case DLQ_GetPointerSize:
-      let size = UInt8(MemoryLayout<UnsafeRawPointer>.stride)
-      outBuffer!.storeBytes(of: size, toByteOffset: 0, as: UInt8.self)
-      return 1
-    default:
-      return 0
+  case DLQ_GetPointerSize:
+    let size = UInt8(MemoryLayout<UnsafeRawPointer>.stride)
+    outBuffer!.storeBytes(of: size, toByteOffset: 0, as: UInt8.self)
+    return 1
+  default:
+    return 0
   }
 }
 
