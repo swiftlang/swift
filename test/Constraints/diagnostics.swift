@@ -1117,8 +1117,10 @@ func platypus<T>(a: [T]) {
 // Another case of the above.
 func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
+  // Notes, attached to declarations, explain that there is a difference between Array.init(_:) and
+  // RangeReplaceableCollection.init(_:) which are both applicable in this case.
   let array = [Int](sequence)
-  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Int' and '[Int]' be equivalent}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
 }
 
 // rdar://34357545
