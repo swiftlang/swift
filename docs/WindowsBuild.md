@@ -79,12 +79,12 @@ git clone https://github.com/compnerd/swift-build swift-build
 ## Acquire ICU, SQLite3, curl, libxml2 and zlib
 
 ```
-python -m pip install --user msrest azure-devops tabulate
-python swift-build\utilities\swift-build.py --build-id ICU --latest-artifacts --filter windows-x64 --download
-python swift-build\utilities\swift-build.py --build-id XML2 --latest-artifacts --filter windows-x64 --download
-python swift-build\utilities\swift-build.py --build-id CURL --latest-artifacts --filter windows-x64 --download
-python swift-build\utilities\swift-build.py --build-id zlib --latest-artifacts --filter windows-x64 --download
-python swift-build\utilities\swift-build.py --build-id SQLite --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe -m pip install --user msrest azure-devops tabulate
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id ICU --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id XML2 --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id CURL --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id zlib --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id SQLite --latest-artifacts --filter windows-x64 --download
 ```
 
 Extract the zip files, ignoring the top level directory, into `S:/Library`. The directory structure should resemble:
