@@ -270,6 +270,11 @@ static cl::opt<std::string> RemarksFormat(
     cl::desc("The format used for serializing remarks (default: YAML)"),
     cl::value_desc("format"), cl::init("yaml"));
 
+static llvm::cl::opt<bool>
+    EnableCxxInterop("enable-cxx-interop",
+                     llvm::cl::desc("Enable C++ interop."),
+                     llvm::cl::init(false));
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   auto &opts = Module->getOptions();
@@ -347,6 +352,8 @@ int main(int argc, char **argv) {
 
   Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
       EnableExperimentalDifferentiableProgramming;
+
+  Invocation.getLangOptions().EnableCXXInterop = EnableCxxInterop;
 
   Invocation.getDiagnosticOptions().VerifyMode =
       VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
