@@ -2889,11 +2889,11 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
 bool ClangImporter::Implementation::isVisibleClangEntry(
     const clang::NamedDecl *clangDecl) {
   // For a declaration, check whether the declaration is hidden.
-  if (!clangDecl->isHidden()) return true;
+  if (clangDecl->isUnconditionallyVisible()) return true;
 
   // Is any redeclaration visible?
   for (auto redecl : clangDecl->redecls()) {
-    if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+    if (cast<clang::NamedDecl>(redecl)->isUnconditionallyVisible()) return true;
   }
 
   return false;
