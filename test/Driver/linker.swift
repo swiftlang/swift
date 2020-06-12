@@ -1,18 +1,18 @@
 // Must be able to run xcrun-return-self.sh
 // REQUIRES: shell
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
-// RUN: not %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 | %FileCheck -check-prefix=SIMPLE_STATIC %s
+// RUN: not %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 | %FileCheck -check-prefix=SIMPLE_STATIC %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1-simulator %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-tvos9.0-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-tvos9.0-simulator %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix tvOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target i386-apple-watchos2.0-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target i386-apple-watchos2.0-simulator %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix watchOS_SIMPLE %s < %t.simple.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
@@ -76,7 +76,7 @@
 // RUN: touch %t/b.swiftmodule
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o %t/a.swiftmodule %t/b.o %t/b.swiftmodule -o linker | %FileCheck -check-prefix LINK-SWIFTMODULES %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10   %s > %t.simple-macosx10.10.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.10   %s > %t.simple-macosx10.10.txt
 // RUN: %FileCheck %s < %t.simple-macosx10.10.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
 
