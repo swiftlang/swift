@@ -1499,7 +1499,7 @@ namespace {
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       auto result = TypeResolution::forContextual(CS.DC, options)
                         .resolveType(repr);
-      if (!result || result->hasError()) {
+      if (result->hasError()) {
         return Type();
       }
       return result;
@@ -2404,6 +2404,7 @@ namespace {
           }
 
           varType = TypeChecker::getOptionalType(var->getLoc(), varType);
+          assert(!varType->hasError());
 
           if (oneWayVarType) {
             oneWayVarType =
@@ -2770,7 +2771,7 @@ namespace {
             Type castType = TypeResolution::forContextual(
                                 CS.DC, TypeResolverContext::InExpression)
                                 .resolveType(isp->getCastTypeRepr());
-            if (!castType) {
+            if (castType->hasError()) {
               return false;
             }
 
@@ -2938,7 +2939,7 @@ namespace {
       // Try to build the appropriate type for a variadic argument list of
       // the fresh element type.  If that failed, just bail out.
       auto array = TypeChecker::getArraySliceType(expr->getLoc(), element);
-      if (!array) return element;
+      if (array->hasError()) return element;
 
       // Require the operand to be convertible to the array type.
       CS.addConstraint(ConstraintKind::Conversion,
@@ -3304,7 +3305,7 @@ namespace {
     /// worth QoI efforts.
     Type getOptionalType(SourceLoc optLoc, Type valueTy) {
       auto optTy = TypeChecker::getOptionalType(optLoc, valueTy);
-      if (!optTy ||
+      if (optTy->hasError() ||
           TypeChecker::requireOptionalIntrinsics(CS.getASTContext(), optLoc))
         return Type();
 

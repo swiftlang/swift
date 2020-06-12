@@ -2426,9 +2426,9 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 static bool isStringCompatiblePointerBaseType(ASTContext &ctx,
                                               Type baseType) {
   // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
-  if (baseType->isEqual(TypeChecker::getInt8Type(ctx)))
+  if (baseType->isEqual(ctx.getInt8Decl()->getDeclaredInterfaceType()))
     return true;
-  if (baseType->isEqual(TypeChecker::getUInt8Type(ctx)))
+  if (baseType->isEqual(ctx.getUInt8Decl()->getDeclaredInterfaceType()))
     return true;
   if (baseType->isEqual(ctx.TheEmptyTupleType))
     return true;
@@ -4926,7 +4926,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
                 auto &ctx = getASTContext();
-                if (type1->isEqual(TypeChecker::getStringType(ctx))) {
+                if (type1->isEqual(
+                        ctx.getStringDecl()->getDeclaredInterfaceType())) {
                   auto baseTy = getFixedTypeRecursive(pointeeTy, false);
 
                   if (baseTy->isTypeVariableOrMember() ||
@@ -6889,6 +6890,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                         TVO_CanBindToLValue |
                                         TVO_CanBindToNoEscape);
       Type optTy = TypeChecker::getOptionalType(SourceLoc(), innerTV);
+      assert(!optTy->hasError());
       SmallVector<Constraint *, 2> optionalities;
       auto nonoptionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
@@ -9222,11 +9224,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         auto &ctx = getASTContext();
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2,
-                                          TypeChecker::getInt8Type(ctx),
+                                          ctx.getInt8Decl()->getDeclaredInterfaceType(),
                                           getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                            baseType2,
-                                           TypeChecker::getUInt8Type(ctx),
+                                           ctx.getUInt8Decl()->getDeclaredInterfaceType(),
                                            getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2, ctx.TheEmptyTupleType,
