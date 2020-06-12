@@ -33,6 +33,7 @@
 #include "swift/Parse/Parser.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/Mangle.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/OperatorKinds.h"
@@ -1700,34 +1701,15 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   if (auto classTemplateSpecDecl =
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
-    if (!dyn_cast<clang::ClassTemplatePartialSpecializationDecl>(D)) {
+    if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
 
-      std::string name = "__";
-      name.append(classTemplateSpecDecl->getQualifiedNameAsString());
-      name.append("__");
-      auto &args = classTemplateSpecDecl->getTemplateInstantiationArgs();
-      for (auto &arg : args.asArray()) {
-        switch (arg.getKind()) {
-        case clang::TemplateArgument::Null: {
-          llvm_unreachable("Cannot mangle NULL template argument");
-        }
-        case clang::TemplateArgument::Type: {
-          auto t = arg.getAsType();
-          auto id = t.getBaseTypeIdentifier();
-          if (id) {
-            name.append(id->getName());
-            name.append("__");
-          }
-          break;
-        }
-        default: {
-          llvm::errs() << "UNEXPECTED TEMPLATE ARGUMENT TYPE " << arg.getKind()
-                       << "\n";
-          break;
-        }
-        }
-      }
-      baseName = swiftCtx.getIdentifier(name).get();
+      auto &astContext = classTemplateSpecDecl->getASTContext();
+      clang::MangleContext *mangler = astContext.createMangleContext();
+      llvm::SmallString<128> storage;
+      llvm::raw_svector_ostream buffer(storage);
+      mangler->mangleTypeName(astContext.getRecordType(classTemplateSpecDecl),
+                              buffer);
+      baseName = swiftCtx.getIdentifier(buffer.str()).get();
     }
   }
 

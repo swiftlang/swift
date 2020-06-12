@@ -13,11 +13,11 @@ public func foo() -> CInt {
 
 // CHECK: sil @$s4main3foos5Int32VyF : $@convention(thin) () -> Int32 {
 // CHECK: %0 = struct $Banana ()
-// CHECK: %2 = alloc_stack $__Peel__Banana__, var, name "peeled"
-// CHECK: %3 = struct $__Peel__Banana__ (%0 : $Banana)
-// CHECK: store %3 to %2 : $*__Peel__Banana__
-// CHECK: %6 = function_ref @_ZNK4PeelI6BananaE11peeledTasteEv : $@convention(c) (@inout __Peel__Banana__) -> Int32
-// CHECK: %7 = apply %6(%5) : $@convention(c) (@inout __Peel__Banana__) -> Int32
+// CHECK: %2 = alloc_stack $_ZTS4PeelI6BananaE, var, name "peeled"
+// CHECK: %3 = struct $_ZTS4PeelI6BananaE (%0 : $Banana)
+// CHECK: store %3 to %2 : $*_ZTS4PeelI6BananaE
+// CHECK: %6 = function_ref @_ZNK4PeelI6BananaE11peeledTasteEv : $@convention(c) (@inout _ZTS4PeelI6BananaE) -> Int32
+// CHECK: %7 = apply %6(%5) : $@convention(c) (@inout _ZTS4PeelI6BananaE) -> Int32
 
 // CHECK: // clang name: Peel<Banana>::peeledTaste
-// CHECK: sil [clang __Peel__Banana__.peeledTaste] @_ZNK4PeelI6BananaE11peeledTasteEv : $@convention(c) (@inout __Peel__Banana__) -> Int32
+// CHECK: sil [clang _ZTS4PeelI6BananaE.peeledTaste] @_ZNK4PeelI6BananaE11peeledTasteEv : $@convention(c) (@inout _ZTS4PeelI6BananaE) -> Int32
