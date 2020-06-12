@@ -457,6 +457,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         *Context,
         getDependencyTracker(), MLM,
         Invocation.getSearchPathOptions().ExplicitSwiftModules,
+        Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
         IgnoreSourceInfoFile);
     Context->addModuleLoader(std::move(ESML));
   }
