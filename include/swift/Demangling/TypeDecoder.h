@@ -716,19 +716,16 @@ class TypeDecoder {
 
         // If the tuple element is labeled, add its label to 'labels'.
         unsigned typeChildIndex = 0;
-        unsigned nameIdx = 0;
-        if (element->getChild(nameIdx)->getKind() == NodeKind::VariadicMarker) {
-          variadic = true;
-          nameIdx = 1;
-          typeChildIndex = 1;
+        if (element->getChild(typeChildIndex)->getKind() == NodeKind::VariadicMarker) {
+          return BuiltType();
         }
-        if (element->getChild(nameIdx)->getKind() == NodeKind::TupleElementName) {
+        if (element->getChild(typeChildIndex)->getKind() == NodeKind::TupleElementName) {
           // Add spaces to terminate all the previous labels if this
           // is the first we've seen.
           if (labels.empty()) labels.append(elements.size(), ' ');
 
           // Add the label and its terminator.
-          labels += element->getChild(0)->getText();
+          labels += element->getChild(typeChildIndex)->getText();
           labels += ' ';
           typeChildIndex++;
 
