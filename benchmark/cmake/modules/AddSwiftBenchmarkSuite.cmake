@@ -43,7 +43,9 @@ macro(configure_build)
     message(FATAL_ERROR "Unsupported platform?!")
   endif()
 
-  set(PAGE_ALIGNMENT_OPTION "-Xllvm" "-align-module-to-page-size")
+  set(PAGE_ALIGNMENT_OPTION
+    "-Xllvm" "-align-module-to-page-size"
+    "-Xllvm" "-force-align-globals-to=32")
   if(EXISTS "${SWIFT_EXEC}")
     # If we are using a pre-built compiler, check if it supports the
     # -align-module-to-page-size option.
