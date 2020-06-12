@@ -1072,7 +1072,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
 
   if (Binding.hasDefaultedLiteralProtocol()) {
-    type = cs.openUnboundGenericType(type, dstLocator);
+    type = cs.openUnboundGenericTypes(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
