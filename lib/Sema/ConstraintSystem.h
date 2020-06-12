@@ -3420,7 +3420,7 @@ public:
   /// \param type The type to open.
   ///
   /// \returns The opened type.
-  Type openUnboundGenericType(Type type, ConstraintLocatorBuilder locator);
+  Type openUnboundGenericTypes(Type type, ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.

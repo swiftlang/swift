@@ -1446,7 +1446,7 @@ namespace {
         if (auto *PD = dyn_cast<ParamDecl>(VD)) {
           if (!CS.hasType(PD)) {
             if (knownType && knownType->hasUnboundGenericType())
-              knownType = CS.openUnboundGenericType(knownType, locator);
+              knownType = CS.openUnboundGenericTypes(knownType, locator);
 
             CS.setType(
                 PD, knownType ? knownType
@@ -1521,7 +1521,7 @@ namespace {
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
-      type = CS.openUnboundGenericType(type, locator);
+      type = CS.openUnboundGenericTypes(type, locator);
       return MetatypeType::get(type);
     }
 
@@ -2205,7 +2205,7 @@ namespace {
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = param->getType();
-            externalType = CS.openUnboundGenericType(declaredTy, paramLoc);
+            externalType = CS.openUnboundGenericTypes(declaredTy, paramLoc);
           } else {
             // Let's allow parameters which haven't been explicitly typed
             // to become holes by default, this helps in situations like
@@ -2439,7 +2439,7 @@ namespace {
         // Look through reference storage types.
         type = type->getReferenceStorageReferent();
 
-        Type openedType = CS.openUnboundGenericType(type, locator);
+        Type openedType = CS.openUnboundGenericTypes(type, locator);
         assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
@@ -2541,7 +2541,7 @@ namespace {
         if (!castType)
           return Type();
 
-        castType = CS.openUnboundGenericType(
+        castType = CS.openUnboundGenericTypes(
             castType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
@@ -2607,7 +2607,7 @@ namespace {
           if (!parentType)
             return Type();
 
-          parentType = CS.openUnboundGenericType(
+          parentType = CS.openUnboundGenericTypes(
               parentType, CS.getConstraintLocator(
                               locator, {LocatorPathElt::PatternMatch(pattern),
                                         ConstraintLocator::ParentType}));
@@ -3100,7 +3100,7 @@ namespace {
 
       // Open the type we're casting to.
       const auto toType =
-          CS.openUnboundGenericType(type, CS.getConstraintLocator(expr));
+          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(fromExpr);
@@ -3127,7 +3127,7 @@ namespace {
 
       // Open the type we're casting to.
       const auto toType =
-          CS.openUnboundGenericType(type, CS.getConstraintLocator(expr));
+          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
@@ -3160,7 +3160,7 @@ namespace {
 
       // Open the type we're casting to.
       const auto toType =
-          CS.openUnboundGenericType(type, CS.getConstraintLocator(expr));
+          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(fromExpr);
@@ -3189,7 +3189,7 @@ namespace {
       // Open up the type we're checking.
       // FIXME: Locator for the cast type?
       const auto toType =
-          CS.openUnboundGenericType(type, CS.getConstraintLocator(expr));
+          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
       CS.setType(expr->getCastTypeRepr(), toType);
 
       // Add a checked cast constraint.
@@ -3469,7 +3469,7 @@ namespace {
             rootRepr, TypeResolverContext::InExpression);
         if (!rootObjectTy || rootObjectTy->hasError())
           return Type();
-        rootObjectTy = CS.openUnboundGenericType(rootObjectTy, locator);
+        rootObjectTy = CS.openUnboundGenericTypes(rootObjectTy, locator);
         // Allow \Derived.property to be inferred as \Base.property to
         // simulate a sort of covariant conversion from
         // KeyPath<Derived, T> to KeyPath<Base, T>.
