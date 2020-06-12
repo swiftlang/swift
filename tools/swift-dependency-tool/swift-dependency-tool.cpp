@@ -19,9 +19,137 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 
 using namespace swift;
 using namespace fine_grained_dependencies;
+
+//==============================================================================
+// MARK: SourceFileDepGraph YAML reading & writing
+//==============================================================================
+
+// This introduces a redefinition where ever std::is_same_t<size_t, uint64_t>
+// holds
+#if !(defined(__linux__) || defined(_WIN64))
+LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
+#endif
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_grained_dependencies::NodeKind)
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_grained_dependencies::DeclAspect)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(
+    swift::fine_grained_dependencies::DependencyKey)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::fine_grained_dependencies::DepGraphNode)
+
+namespace llvm {
+namespace yaml {
+template <>
+struct MappingContextTraits<
+    swift::fine_grained_dependencies::SourceFileDepGraphNode,
+    swift::fine_grained_dependencies::SourceFileDepGraph> {
+  using SourceFileDepGraphNode =
+      swift::fine_grained_dependencies::SourceFileDepGraphNode;
+  using SourceFileDepGraph =
+      swift::fine_grained_dependencies::SourceFileDepGraph;
+
+  static void mapping(IO &io, SourceFileDepGraphNode &node,
+                      SourceFileDepGraph &g);
+};
+
+template <>
+struct SequenceTraits<
+    std::vector<swift::fine_grained_dependencies::SourceFileDepGraphNode *>> {
+  using SourceFileDepGraphNode =
+      swift::fine_grained_dependencies::SourceFileDepGraphNode;
+  using NodeVec = std::vector<SourceFileDepGraphNode *>;
+  static size_t size(IO &, NodeVec &vec);
+  static SourceFileDepGraphNode &element(IO &, NodeVec &vec, size_t index);
+};
+
+} // namespace yaml
+} // namespace llvm
+
+LLVM_YAML_DECLARE_MAPPING_TRAITS(
+    swift::fine_grained_dependencies::SourceFileDepGraph)
+
+namespace llvm {
+namespace yaml {
+// This introduces a redefinition for Linux.
+#if !(defined(__linux__) || defined(_WIN64))
+void ScalarTraits<size_t>::output(const size_t &Val, void *, raw_ostream &out) {
+  out << Val;
+}
+
+StringRef ScalarTraits<size_t>::input(StringRef scalar, void *ctxt,
+                                      size_t &value) {
+  return scalar.getAsInteger(10, value) ? "could not parse size_t" : "";
+}
+#endif
+
+void ScalarEnumerationTraits<swift::fine_grained_dependencies::NodeKind>::
+    enumeration(IO &io, swift::fine_grained_dependencies::NodeKind &value) {
+  using NodeKind = swift::fine_grained_dependencies::NodeKind;
+  io.enumCase(value, "topLevel", NodeKind::topLevel);
+  io.enumCase(value, "nominal", NodeKind::nominal);
+  io.enumCase(value, "potentialMember", NodeKind::potentialMember);
+  io.enumCase(value, "member", NodeKind::member);
+  io.enumCase(value, "dynamicLookup", NodeKind::dynamicLookup);
+  io.enumCase(value, "externalDepend", NodeKind::externalDepend);
+  io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
+}
+
+void ScalarEnumerationTraits<DeclAspect>::enumeration(
+    IO &io, swift::fine_grained_dependencies::DeclAspect &value) {
+  using DeclAspect = swift::fine_grained_dependencies::DeclAspect;
+  io.enumCase(value, "interface", DeclAspect::interface);
+  io.enumCase(value, "implementation", DeclAspect::implementation);
+}
+
+void MappingTraits<DependencyKey>::mapping(
+    IO &io, swift::fine_grained_dependencies::DependencyKey &key) {
+  io.mapRequired("kind", key.kind);
+  io.mapRequired("aspect", key.aspect);
+  io.mapRequired("context", key.context);
+  io.mapRequired("name", key.name);
+}
+
+void MappingTraits<DepGraphNode>::mapping(
+    IO &io, swift::fine_grained_dependencies::DepGraphNode &node) {
+  io.mapRequired("key", node.key);
+  io.mapOptional("fingerprint", node.fingerprint);
+}
+
+void MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>::mapping(
+    IO &io, SourceFileDepGraphNode &node, SourceFileDepGraph &g) {
+  MappingTraits<DepGraphNode>::mapping(io, node);
+  io.mapRequired("sequenceNumber", node.sequenceNumber);
+  std::vector<size_t> defsIDependUponVec(node.defsIDependUpon.begin(),
+                                         node.defsIDependUpon.end());
+  io.mapRequired("defsIDependUpon", defsIDependUponVec);
+  io.mapRequired("isProvides", node.isProvides);
+  if (!io.outputting()) {
+    for (size_t u : defsIDependUponVec)
+      node.defsIDependUpon.insert(u);
+  }
+  assert(g.getNode(node.sequenceNumber) && "Bad sequence number");
+}
+
+size_t SequenceTraits<std::vector<SourceFileDepGraphNode *>>::size(
+    IO &, std::vector<SourceFileDepGraphNode *> &vec) {
+  return vec.size();
+}
+
+SourceFileDepGraphNode &
+SequenceTraits<std::vector<SourceFileDepGraphNode *>>::element(
+    IO &, std::vector<SourceFileDepGraphNode *> &vec, size_t index) {
+  while (vec.size() <= index)
+    vec.push_back(new SourceFileDepGraphNode());
+  return *vec[index];
+}
+
+void MappingTraits<SourceFileDepGraph>::mapping(IO &io, SourceFileDepGraph &g) {
+  io.mapRequired("allNodes", g.allNodes, g);
+}
+} // namespace yaml
+} // namespace llvm
 
 enum class ActionType : unsigned {
   None,
@@ -81,7 +209,7 @@ int main(int argc, char *argv[]) {
     bool hadError =
       withOutputFile(diags, options::OutputFilename,
         [&](llvm::raw_pwrite_stream &out) {
-          out << fg->yamlProlog(/*hadError=*/false);
+          out << "# Fine-grained v0\n";
           llvm::yaml::Output yamlWriter(out);
           yamlWriter << *fg;
           return false;
