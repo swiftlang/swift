@@ -490,6 +490,8 @@ public:
            Loc.ASTNode.ForDebugger.getOpaqueValue() ==
                R.Loc.ASTNode.ForDebugger.getOpaqueValue();
   }
+
+  inline bool operator!=(const SILLocation &R) const { return !(*this == R); }
 };
 
 /// Allowed on any instruction.

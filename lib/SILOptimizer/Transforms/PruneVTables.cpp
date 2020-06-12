@@ -61,7 +61,7 @@ class PruneVTables : public SILModuleTransform {
     SILModule *M = getModule();
     
     for (auto &vtable : M->getVTables()) {
-      runOnVTable(M, &vtable);
+      runOnVTable(M, vtable);
     }
   }
 };

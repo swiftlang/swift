@@ -1410,16 +1410,22 @@ void LookupAllConformancesInContextRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 
 Optional<Type> ResolveTypeEraserTypeRequest::getCachedResult() const {
-  auto ty = std::get<1>(getStorage())->TypeEraserLoc.getType();
-  if (ty.isNull()) {
+  auto *TyExpr = std::get<1>(getStorage())->TypeEraserExpr;
+  if (!TyExpr || !TyExpr->getType()) {
     return None;
   }
-  return ty;
+  return TyExpr->getInstanceType();
 }
 
 void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
   assert(value && "Resolved type erasure type to null type!");
-  std::get<1>(getStorage())->TypeEraserLoc.setType(value);
+  auto *attr = std::get<1>(getStorage());
+  if (attr->TypeEraserExpr) {
+    attr->TypeEraserExpr->setType(MetatypeType::get(value));
+  } else {
+    attr->TypeEraserExpr = TypeExpr::createImplicit(value,
+                                                    value->getASTContext());
+  }
 }
 
 //----------------------------------------------------------------------------//
@@ -1497,4 +1503,34 @@ SourceLoc swift::extractNearestSourceLoc(const TypeRepr *repr) {
   if (!repr)
     return SourceLoc();
   return repr->getLoc();
+}
+
+//----------------------------------------------------------------------------//
+// CustomAttrTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
+  switch (value) {
+  case CustomAttrTypeKind::NonGeneric:
+    out << "non-generic";
+    return;
+
+  case CustomAttrTypeKind::PropertyDelegate:
+    out << "property-delegate";
+    return;
+  }
+  llvm_unreachable("bad kind");
+}
+
+Optional<Type> CustomAttrTypeRequest::getCachedResult() const {
+  auto *attr = std::get<0>(getStorage());
+  if (auto ty = attr->getType()) {
+    return ty;
+  }
+  return None;
+}
+
+void CustomAttrTypeRequest::cacheResult(Type value) const {
+  auto *attr = std::get<0>(getStorage());
+  attr->setType(value);
 }

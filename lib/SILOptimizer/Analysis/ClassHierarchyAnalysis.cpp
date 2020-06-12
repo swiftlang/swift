@@ -23,8 +23,8 @@ void ClassHierarchyAnalysis::init() {
   auto module = M->getSwiftModule();
 
   // For each class declaration in our V-table list:
-  for (auto &VT : M->getVTableList()) {
-    ClassDecl *C = VT.getClass();
+  for (auto &VT : M->getVTables()) {
+    ClassDecl *C = VT->getClass();
 
     while (true) {
       // Ignore classes that are at the top of the class hierarchy:

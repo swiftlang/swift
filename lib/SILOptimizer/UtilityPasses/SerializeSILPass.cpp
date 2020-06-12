@@ -427,7 +427,7 @@ class SerializeSILPass : public SILModuleTransform {
     }
 
     for (auto &VT : M.getVTables()) {
-      VT.setSerialized(IsNotSerialized);
+      VT->setSerialized(IsNotSerialized);
     }
   }
 

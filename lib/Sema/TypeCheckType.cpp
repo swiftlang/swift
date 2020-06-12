@@ -1688,20 +1688,6 @@ static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
   return !isValid;
 }
 
-bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution) {
-  // If we've already validated this type, don't do so again.
-  if (Loc.wasValidated())
-    return Loc.isError();
-
-  if (auto *Stats = resolution.getASTContext().Stats)
-    ++Stats->getFrontendCounters().NumTypesValidated;
-
-  auto type = resolution.resolveType(Loc.getTypeRepr());
-  Loc.setType(type);
-
-  return type->hasError();
-}
-
 namespace {
   const auto DefaultParameterConvention = ParameterConvention::Direct_Unowned;
   const auto DefaultResultConvention = ResultConvention::Unowned;
@@ -3412,7 +3398,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     break;
   }
 
-  if (doDiag) {
+  if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
     // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
     if (Context.isSwiftVersionAtLeast(5)) {
       diagnose(repr->getStartLoc(),
@@ -3882,8 +3868,9 @@ void TypeChecker::checkUnsupportedProtocolType(
   visitor.visitRequirements(genericParams->getRequirements());
 }
 
-Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
-                                  CustomAttrTypeKind typeKind) {
+Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
+                                     DeclContext *dc,
+                                     CustomAttrTypeKind typeKind) const {
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   // Property delegates allow their type to be an unbound generic.
@@ -3891,15 +3878,13 @@ Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   ASTContext &ctx = dc->getASTContext();
-  auto resolution = TypeResolution::forContextual(dc, options);
-  if (TypeChecker::validateType(attr->getTypeLoc(), resolution))
-    return Type();
+  auto type = TypeResolution::forContextual(dc, options)
+                  .resolveType(attr->getTypeRepr());
 
   // We always require the type to resolve to a nominal type.
-  Type type = attr->getTypeLoc().getType();
   if (!type->getAnyNominal()) {
     assert(ctx.Diags.hadAnyError());
-    return Type();
+    return ErrorType::get(ctx);
   }
 
   return type;

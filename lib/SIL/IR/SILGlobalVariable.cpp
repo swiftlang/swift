@@ -24,14 +24,13 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              SILType loweredType,
                                              Optional<SILLocation> loc,
                                              VarDecl *Decl) {
-  // Get a StringMapEntry for the variable.  As a sop to error cases,
-  // allow the name to have an empty string.
+  // Get a StringMapEntry for the variable.
   llvm::StringMapEntry<SILGlobalVariable*> *entry = nullptr;
-  if (!name.empty()) {
-    entry = &*M.GlobalVariableMap.insert(std::make_pair(name, nullptr)).first;
-    assert(!entry->getValue() && "global variable already exists");
-    name = entry->getKey();
-  }
+  assert(!name.empty() && "Name required");
+
+  entry = &*M.GlobalVariableMap.insert(std::make_pair(name, nullptr)).first;
+  assert(!entry->getValue() && "global variable already exists");
+  name = entry->getKey();
 
   auto var = new (M) SILGlobalVariable(M, linkage, isSerialized, name,
                                        loweredType, loc, Decl);

@@ -65,11 +65,11 @@ void Evaluator::registerRequestFunctions(
 static evaluator::DependencyRecorder::Mode
 computeDependencyModeFromFlags(const LangOptions &opts) {
   using Mode = evaluator::DependencyRecorder::Mode;
-  if (opts.EnableExperientalPrivateIntransitiveDependencies) {
-    return Mode::ExperimentalPrivateDependencies;
+  if (opts.DirectIntramoduleDependencies) {
+    return Mode::DirectDependencies;
   }
 
-  return Mode::StatusQuo;
+  return Mode::LegacyCascadingDependencies;
 }
 
 Evaluator::Evaluator(DiagnosticEngine &diags, const LangOptions &opts)
@@ -391,8 +391,7 @@ void evaluator::DependencyRecorder::realize(
 
 void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
                                                    DeclBaseName name) {
-  if (parent.mode ==
-      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+  if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
     scratch.insert(
         Reference::usedMember(subject, name, parent.isActiveSourceCascading()));
   }
@@ -402,8 +401,7 @@ void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
 
 void evaluator::DependencyCollector::addPotentialMember(
     NominalTypeDecl *subject) {
-  if (parent.mode ==
-      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+  if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
     scratch.insert(
         Reference::potentialMember(subject, parent.isActiveSourceCascading()));
   }
@@ -412,8 +410,7 @@ void evaluator::DependencyCollector::addPotentialMember(
 }
 
 void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
-  if (parent.mode ==
-      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+  if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
     scratch.insert(Reference::topLevel(name, parent.isActiveSourceCascading()));
   }
   return parent.realize(
@@ -421,8 +418,7 @@ void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
 }
 
 void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
-  if (parent.mode ==
-      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+  if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
     scratch.insert(Reference::dynamic(name, parent.isActiveSourceCascading()));
   }
   return parent.realize(
@@ -455,7 +451,11 @@ void evaluator::DependencyRecorder::replay(
   assert(!isRecording && "Probably not a good idea to allow nested recording");
 
   auto *source = getActiveDependencySourceOrNull();
-  if (mode == Mode::StatusQuo || !source || !source->isPrimary()) {
+  if (mode == Mode::LegacyCascadingDependencies) {
+    return;
+  }
+
+  if (!source || !source->isPrimary()) {
     return;
   }
 
@@ -503,7 +503,7 @@ void evaluator::DependencyRecorder::replay(
 void evaluator::DependencyRecorder::unionNearestCachedRequest(
     ArrayRef<swift::ActiveRequest> stack,
     const DependencyCollector::ReferenceSet &scratch) {
-  assert(mode != Mode::StatusQuo);
+  assert(mode != Mode::LegacyCascadingDependencies);
   auto nearest = std::find_if(stack.rbegin(), stack.rend(),
                               [](const auto &req){ return req.isCached(); });
   if (nearest == stack.rend()) {

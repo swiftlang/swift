@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 // FIXME: No simd module on linux rdar://problem/20795411
-// XFAIL: linux, windows, wasm
+// XFAIL: linux, windows, openbsd
 // XFAIL: OS=wasi
 
 import simd

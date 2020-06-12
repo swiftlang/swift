@@ -10,7 +10,12 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import libcxx
+from . import libicu
+from . import llvm
 from . import product
+from . import swift
 
 
 class LibDispatch(product.Product):
@@ -31,10 +36,13 @@ class LibDispatch(product.Product):
         return "swift-corelibs-libdispatch"
 
     @classmethod
+    def is_nondarwin_only_build_product(cls):
+        return True
+
+    @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM,
-                product.LibCXX,
-                product.LibICU,
-                product.Swift,
-                product.LLDB]
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift]

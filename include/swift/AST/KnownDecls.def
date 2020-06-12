@@ -44,6 +44,8 @@ FUNC_DECL(AllocateUninitializedArray,
           "_allocateUninitializedArray")
 FUNC_DECL(DeallocateUninitializedArray,
           "_deallocateUninitializedArray")
+FUNC_DECL(FinalizeUninitializedArray,
+          "_finalizeUninitializedArray")
 
 FUNC_DECL(ForceBridgeFromObjectiveC,
           "_forceBridgeFromObjectiveC")

@@ -457,12 +457,11 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   VD->print(Printer, PO);
 }
 
-void SwiftLangSupport::printFullyAnnotatedGenericReq(
-    const swift::GenericSignature Sig, llvm::raw_ostream &OS) {
-  assert(Sig);
+void SwiftLangSupport::printFullyAnnotatedDeclaration(const ExtensionDecl *ED,
+                                                      raw_ostream &OS) {
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  Sig->print(Printer, PO);
+  ED->print(Printer, PO);
 }
 
 void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
@@ -473,6 +472,15 @@ void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
   PO.initForSynthesizedExtension(Target);
   PO.PrintAsMember = true;
   VD->print(Printer, PO);
+}
+
+void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
+    const swift::ExtensionDecl *ED, TypeOrExtensionDecl Target,
+    llvm::raw_ostream &OS) {
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  PO.initForSynthesizedExtension(Target);
+  ED->print(Printer, PO);
 }
 
 template <typename FnTy>

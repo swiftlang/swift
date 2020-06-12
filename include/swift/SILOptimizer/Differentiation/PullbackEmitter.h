@@ -307,6 +307,13 @@ private:
     return pullbackTrampolineBBMap.lookup({originalBlock, successorBlock});
   }
 
+  //--------------------------------------------------------------------------//
+  // Debugging utilities
+  //--------------------------------------------------------------------------//
+
+  void printAdjointValueMapping();
+  void printAdjointBufferMapping();
+
 public:
   //--------------------------------------------------------------------------//
   // Entry point

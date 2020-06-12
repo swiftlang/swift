@@ -1,4 +1,4 @@
-//===----- FineGrainedependencies.h -----------------------------*- C++ -*-===//
+//===----- FineGrainedDependencies.h ----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -632,6 +632,11 @@ public:
 
   const DependencyKey &getKey() const { return key; }
 
+  /// Only used when the driver is reading a SourceFileDepGraphNode.
+  void setKey(const DependencyKey &key) {
+    this->key = key;
+  }
+
   const Optional<StringRef> getFingerprint() const {
     if (fingerprint) {
       return StringRef(fingerprint.getValue());
@@ -684,7 +689,7 @@ class SourceFileDepGraphNode : public DepGraphNode {
   /// True iff a Decl exists for this node.
   /// If a provides and a depends in the existing system both have the same key,
   /// only one SourceFileDepGraphNode is emitted.
-  bool isProvides;
+  bool isProvides = false;
 
   friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode,
                                             SourceFileDepGraph>;
@@ -692,7 +697,7 @@ class SourceFileDepGraphNode : public DepGraphNode {
 public:
   /// When the driver imports a node create an uninitialized instance for
   /// deserializing.
-  SourceFileDepGraphNode() : DepGraphNode(), sequenceNumber(~0) {}
+  SourceFileDepGraphNode() : DepGraphNode() {}
 
   /// Used by the frontend to build nodes.
   SourceFileDepGraphNode(DependencyKey key, Optional<StringRef> fingerprint,
@@ -735,6 +740,9 @@ public:
     return DepGraphNode::humanReadableName(getIsProvides() ? "here"
                                                            : "somewhere else");
   }
+
+  SWIFT_DEBUG_DUMP;
+  void dump(llvm::raw_ostream &os) const;
 
   bool verify() const {
     DepGraphNode::verify();
@@ -872,7 +880,6 @@ public:
 
   void emitDotFile(StringRef outputPath, DiagnosticEngine &diags);
 
-private:
   void addNode(SourceFileDepGraphNode *n) {
     n->setSequenceNumber(allNodes.size());
     allNodes.push_back(n);

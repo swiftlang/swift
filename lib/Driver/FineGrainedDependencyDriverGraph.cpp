@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -65,6 +66,7 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromPath(const Job *Cmd,
                                                      StringRef path,
                                                      DiagnosticEngine &diags) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-loadFromPath");
+  PrettyStackTraceStringAction stackTrace("loading fine-grained dependency graph", path);
 
   if (driverDotFileBasePath.empty()) {
     driverDotFileBasePath = path;
