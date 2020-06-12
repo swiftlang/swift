@@ -51,7 +51,6 @@ using SILLinkageField = BCFixed<4>;
 
 enum SILVTableEntryKindEncoding : uint8_t {
   SIL_VTABLE_ENTRY_NORMAL,
-  SIL_VTABLE_ENTRY_NORMAL_NON_OVERRIDDEN,
   SIL_VTABLE_ENTRY_INHERITED,
   SIL_VTABLE_ENTRY_OVERRIDE,
 };
@@ -183,6 +182,7 @@ namespace sil_block {
     SIL_VTABLE_ENTRY,
     DeclIDField,  // SILFunction name
     SILVTableEntryKindField,  // Kind
+    BCFixed<1>, // NonOverridden
     BCArray<ValueIDField> // SILDeclRef
   >;
   

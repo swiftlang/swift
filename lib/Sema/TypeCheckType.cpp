@@ -2675,6 +2675,10 @@ Type TypeResolver::resolveASTFunctionType(
   }
 
   auto fnTy = FunctionType::get(params, outputTy, extInfo);
+  
+  if (fnTy->hasError())
+    return fnTy;
+
   // If the type is a block or C function pointer, it must be representable in
   // ObjC.
   switch (representation) {

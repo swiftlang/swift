@@ -49,13 +49,12 @@ class SILVTableEntry {
   /// The function which implements the method for the class and the entry kind.
   llvm::PointerIntPair<SILFunction *, 2, unsigned> ImplAndKind;
 
+  bool IsNonOverridden;
+
 public:
   enum Kind : uint8_t {
     /// The vtable entry is for a method defined directly in this class.
     Normal,
-    /// The vtable entry is for a method defined directly in this class, and is
-    /// never overridden by subclasses.
-    NormalNonOverridden,
     /// The vtable entry is inherited from the superclass.
     Inherited,
     /// The vtable entry is inherited from the superclass, and overridden
@@ -67,13 +66,18 @@ public:
 
   SILVTableEntry() : ImplAndKind(nullptr, Kind::Normal) {}
 
-  SILVTableEntry(SILDeclRef Method, SILFunction *Implementation, Kind TheKind)
-      : Method(Method), ImplAndKind(Implementation, TheKind) {}
+  SILVTableEntry(SILDeclRef Method, SILFunction *Implementation, Kind TheKind,
+                 bool NonOverridden)
+      : Method(Method), ImplAndKind(Implementation, TheKind),
+        IsNonOverridden(NonOverridden) {}
 
   SILDeclRef getMethod() const { return Method; }
 
   Kind getKind() const { return Kind(ImplAndKind.getInt()); }
   void setKind(Kind kind) { ImplAndKind.setInt(kind); }
+
+  bool isNonOverridden() const { return IsNonOverridden; }
+  void setNonOverridden(bool value) { IsNonOverridden = value; }
 
   SILFunction *getImplementation() const { return ImplAndKind.getPointer(); }
 };

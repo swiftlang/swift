@@ -104,7 +104,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
-    return SILVTable::Entry(base, implFn, implKind);
+    return SILVTable::Entry(base, implFn, implKind, false);
 
   // If the base method is less visible than the derived method, we need
   // a thunk.
@@ -151,7 +151,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   if (doesNotHaveGenericRequirementDifference
       && !baseLessVisibleThanDerived
       && compatibleCallingConvention)
-    return SILVTable::Entry(base, implFn, implKind);
+    return SILVTable::Entry(base, implFn, implKind, false);
 
   // Generate the thunk name.
   std::string name;
@@ -182,7 +182,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
   // If we already emitted this thunk, reuse it.
   if (auto existingThunk = M.lookUpFunction(name))
-    return SILVTable::Entry(base, existingThunk, implKind);
+    return SILVTable::Entry(base, existingThunk, implKind, false);
 
   GenericEnvironment *genericEnv = nullptr;
   if (auto genericSig = overrideInfo.FormalType.getOptGenericSignature())
@@ -207,7 +207,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
                      baseLessVisibleThanDerived);
   emitLazyConformancesForFunction(thunk);
 
-  return SILVTable::Entry(base, thunk, implKind);
+  return SILVTable::Entry(base, thunk, implKind, false);
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
@@ -292,14 +292,16 @@ public:
       SILDeclRef dtorRef(dtor, SILDeclRef::Kind::Deallocator);
       auto *dtorFn = SGM.getFunction(dtorRef, NotForDefinition);
       vtableEntries.emplace_back(dtorRef, dtorFn,
-                                 SILVTable::Entry::Kind::Normal);
+                                 SILVTable::Entry::Kind::Normal,
+                                 false);
     }
 
     if (SGM.requiresIVarDestroyer(theClass)) {
       SILDeclRef dtorRef(theClass, SILDeclRef::Kind::IVarDestroyer);
       auto *dtorFn = SGM.getFunction(dtorRef, NotForDefinition);
       vtableEntries.emplace_back(dtorRef, dtorFn,
-                                 SILVTable::Entry::Kind::Normal);
+                                 SILVTable::Entry::Kind::Normal,
+                                 false);
     }
 
     IsSerialized_t serialized = IsNotSerialized;
