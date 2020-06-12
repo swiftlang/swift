@@ -5503,12 +5503,19 @@ AllocationPool{PoolRange{InitialAllocationPool.Pool,
 
 bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
 const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
+std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
 
 static void checkAllocatorDebugEnvironmentVariable(void *context) {
   _swift_debug_metadataAllocationIterationEnabled
     = runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION();
-  if (!_swift_debug_metadataAllocationIterationEnabled)
+  if (!_swift_debug_metadataAllocationIterationEnabled) {
+    if (runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING())
+      swift::warning(RuntimeErrorFlagNone,
+                     "Warning: SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING "
+                     "without SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION "
+                     "has no effect.\n");
     return;
+  }
 
   // Write a PoolTrailer to the end of InitialAllocationPool and shrink
   // the pool accordingly.
@@ -5520,6 +5527,24 @@ static void checkAllocatorDebugEnvironmentVariable(void *context) {
          sizeof(trailer));
   poolCopy.Remaining = newPoolSize;
   AllocationPool.store(poolCopy, std::memory_order_relaxed);
+}
+
+static void recordBacktrace(void *allocation) {
+  withCurrentBacktrace([&](void **addrs, int count) {
+    MetadataAllocationBacktraceHeader<InProcess> *record =
+        (MetadataAllocationBacktraceHeader<InProcess> *)malloc(
+            sizeof(*record) + count * sizeof(void *));
+    record->Allocation = allocation;
+    record->Count = count;
+    memcpy(record + 1, addrs, count * sizeof(void *));
+
+    record->Next = _swift_debug_metadataAllocationBacktraceList.load(
+        std::memory_order_relaxed);
+    while (!_swift_debug_metadataAllocationBacktraceList.compare_exchange_weak(
+        record->Next, record, std::memory_order_release,
+        std::memory_order_relaxed))
+      ; // empty
+  });
 }
 
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
@@ -5581,8 +5606,14 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
         AllocationHeader *header = (AllocationHeader *)allocation;
         header->Size = size;
         header->Tag = Tag;
-      
-        return allocation + sizeof(AllocationHeader);
+
+        auto *returnedAllocation = allocation + sizeof(AllocationHeader);
+
+        if (runtime::environment ::
+                SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING())
+          recordBacktrace(returnedAllocation);
+
+        return returnedAllocation;
       } else {
         return allocation;
       }

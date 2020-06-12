@@ -705,7 +705,7 @@ static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
   }
 
   auto ty = resolution.resolveType(Repr);
-  if (!ty || ty->hasError()) {
+  if (ty->hasError()) {
     return ErrorType::get(Context);
   }
 
@@ -1233,7 +1233,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     TypeResolutionOptions paramOptions(TypeResolverContext::InExpression);
     auto castType = TypeResolution::forContextual(dc, paramOptions)
                         .resolveType(IP->getCastTypeRepr());
-    if (!castType || castType->hasError())
+    if (castType->hasError())
       return nullptr;
     IP->setCastType(castType);
 

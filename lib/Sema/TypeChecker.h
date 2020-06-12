@@ -345,32 +345,12 @@ enum class CheckedCastContextKind {
 
 namespace TypeChecker {
 Type getArraySliceType(SourceLoc loc, Type elementType);
-Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
 Type getOptionalType(SourceLoc loc, Type elementType);
-Type getStringType(ASTContext &ctx);
-Type getSubstringType(ASTContext &ctx);
-Type getIntType(ASTContext &ctx);
-Type getInt8Type(ASTContext &ctx);
-Type getUInt8Type(ASTContext &ctx);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
 Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
-
-/// Validate the given type.
-///
-/// Type validation performs name lookup, checking of generic arguments,
-/// and so on to determine whether the given type is well-formed and can
-/// be used as a type.
-///
-/// \param Loc The type (with source location information) to validate.
-/// If the type has already been validated, returns immediately.
-///
-/// \param resolution The type resolution being performed.
-///
-/// \returns true if type validation failed, or false otherwise.
-bool validateType(TypeLoc &Loc, TypeResolution resolution);
 
 /// Check for unsupported protocol types in the given declaration.
 void checkUnsupportedProtocolType(Decl *decl);
@@ -403,25 +383,25 @@ void checkUnsupportedProtocolType(ASTContext &ctx,
 Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
                           TypeResolution resolution, bool isSpecialized);
 
-/// Apply generic arguments to the given type.
+/// Apply generic arguments to the unbound generic type represented by the
+/// given declaration and parent type.
 ///
-/// This function requires a valid unbound generic type with the correct
-/// number of generic arguments given, whereas applyGenericArguments emits
-/// diagnostics in those cases.
+/// This function requires the correct number of generic arguments,
+/// whereas applyGenericArguments emits diagnostics in those cases.
 ///
-/// \param unboundType The unbound generic type to which to apply arguments.
-/// \param decl The declaration of the type.
+/// \param decl The declaration that the resulting bound generic type
+/// shall reference.
+/// \param parentTy The parent type.
 /// \param loc The source location for diagnostic reporting.
 /// \param resolution The type resolution.
-/// \param genericArgs The list of generic arguments to apply to the type.
+/// \param genericArgs The list of generic arguments to apply.
 ///
 /// \returns A BoundGenericType bound to the given arguments, or null on
 /// error.
 ///
 /// \see applyGenericArguments
-Type applyUnboundGenericArguments(UnboundGenericType *unboundType,
-                                  GenericTypeDecl *decl, SourceLoc loc,
-                                  TypeResolution resolution,
+Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
+                                  SourceLoc loc, TypeResolution resolution,
                                   ArrayRef<Type> genericArgs);
 
 /// Substitute the given base type into the type of the given nested type,

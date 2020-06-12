@@ -1577,8 +1577,8 @@ namespace {
       descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
 
       if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
-        assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
-        auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
+        assert(entry->getKind() == SILVTable::Entry::Kind::Normal);
+        auto *implFn = IGM.getAddrOfSILFunction(entry->getImplementation(),
                                                 NotForDefinition);
         descriptor.addRelativeAddress(implFn);
       } else {
@@ -1625,8 +1625,8 @@ namespace {
 
       // The implementation of the override.
       if (auto entry = VTable->getEntry(IGM.getSILModule(), baseRef)) {
-        assert(entry->TheKind == SILVTable::Entry::Kind::Override);
-        auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
+        assert(entry->getKind() == SILVTable::Entry::Kind::Override);
+        auto *implFn = IGM.getAddrOfSILFunction(entry->getImplementation(),
                                                 NotForDefinition);
         descriptor.addRelativeAddress(implFn);
       } else {
@@ -2981,7 +2981,7 @@ namespace {
       // The class is fragile. Emit a direct reference to the vtable entry.
       llvm::Constant *ptr;
       if (entry) {
-        ptr = IGM.getAddrOfSILFunction(entry->Implementation,
+        ptr = IGM.getAddrOfSILFunction(entry->getImplementation(),
                                        NotForDefinition);
       } else {
         // The method is removed by dead method elimination.

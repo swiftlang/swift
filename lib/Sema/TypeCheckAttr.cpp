@@ -2853,7 +2853,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   }
 
   // Definite error-types were already diagnosed in resolveType.
-  if (!T || T->hasError())
+  if (T->hasError())
     return;
   attr->setProtocolType(T);
 

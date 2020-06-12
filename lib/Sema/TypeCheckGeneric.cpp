@@ -931,21 +931,11 @@ RequirementRequest::evaluate(Evaluator &evaluator,
     llvm_unreachable("No clients care about this. Use mapTypeIntoContext()");
   }
 
-  auto resolveType = [&](TypeLoc &typeLoc) -> Type {
-    Type result;
-    if (auto typeRepr = typeLoc.getTypeRepr())
-      result = resolution->resolveType(typeRepr);
-    else
-      result = typeLoc.getType();
-
-    return result ? result : ErrorType::get(owner.dc->getASTContext());
-  };
-
   auto &reqRepr = getRequirement();
   switch (reqRepr.getKind()) {
   case RequirementReprKind::TypeConstraint: {
-    Type subject = resolveType(reqRepr.getSubjectLoc());
-    Type constraint = resolveType(reqRepr.getConstraintLoc());
+    Type subject = resolution->resolveType(reqRepr.getSubjectRepr());
+    Type constraint = resolution->resolveType(reqRepr.getConstraintRepr());
     return Requirement(constraint->getClassOrBoundGenericClass()
                          ? RequirementKind::Superclass
                          : RequirementKind::Conformance,
@@ -954,12 +944,12 @@ RequirementRequest::evaluate(Evaluator &evaluator,
 
   case RequirementReprKind::SameType:
     return Requirement(RequirementKind::SameType,
-                       resolveType(reqRepr.getFirstTypeLoc()),
-                       resolveType(reqRepr.getSecondTypeLoc()));
+                       resolution->resolveType(reqRepr.getFirstTypeRepr()),
+                       resolution->resolveType(reqRepr.getSecondTypeRepr()));
 
   case RequirementReprKind::LayoutConstraint:
     return Requirement(RequirementKind::Layout,
-                       resolveType(reqRepr.getSubjectLoc()),
+                       resolution->resolveType(reqRepr.getSubjectRepr()),
                        reqRepr.getLayoutConstraint());
   }
   llvm_unreachable("unhandled kind");

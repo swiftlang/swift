@@ -1420,7 +1420,7 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
         if (!knownType)
-          knownType = VD->getInterfaceType();
+          knownType = VD->getType();
 
         if (knownType) {
           assert(!knownType->isHole());
@@ -1432,8 +1432,6 @@ namespace {
           }
 
           // Set the favored type for this expression to the known type.
-          if (knownType->hasTypeParameter())
-            knownType = VD->getDeclContext()->mapTypeIntoContext(knownType);
           CS.setFavoredType(E, knownType.getPointer());
         }
 
@@ -1446,7 +1444,7 @@ namespace {
         if (auto *PD = dyn_cast<ParamDecl>(VD)) {
           if (!CS.hasType(PD)) {
             if (knownType && knownType->hasUnboundGenericType())
-              knownType = CS.openUnboundGenericType(knownType, locator);
+              knownType = CS.openUnboundGenericTypes(knownType, locator);
 
             CS.setType(
                 PD, knownType ? knownType
@@ -1499,7 +1497,7 @@ namespace {
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       auto result = TypeResolution::forContextual(CS.DC, options)
                         .resolveType(repr);
-      if (!result || result->hasError()) {
+      if (result->hasError()) {
         return Type();
       }
       return result;
@@ -1521,7 +1519,7 @@ namespace {
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
-      type = CS.openUnboundGenericType(type, locator);
+      type = CS.openUnboundGenericTypes(type, locator);
       return MetatypeType::get(type);
     }
 
@@ -2205,7 +2203,7 @@ namespace {
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = param->getType();
-            externalType = CS.openUnboundGenericType(declaredTy, paramLoc);
+            externalType = CS.openUnboundGenericTypes(declaredTy, paramLoc);
           } else {
             // Let's allow parameters which haven't been explicitly typed
             // to become holes by default, this helps in situations like
@@ -2404,6 +2402,7 @@ namespace {
           }
 
           varType = TypeChecker::getOptionalType(var->getLoc(), varType);
+          assert(!varType->hasError());
 
           if (oneWayVarType) {
             oneWayVarType =
@@ -2439,7 +2438,7 @@ namespace {
         // Look through reference storage types.
         type = type->getReferenceStorageReferent();
 
-        Type openedType = CS.openUnboundGenericType(type, locator);
+        Type openedType = CS.openUnboundGenericTypes(type, locator);
         assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
@@ -2541,7 +2540,7 @@ namespace {
         if (!castType)
           return Type();
 
-        castType = CS.openUnboundGenericType(
+        castType = CS.openUnboundGenericTypes(
             castType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
@@ -2607,7 +2606,7 @@ namespace {
           if (!parentType)
             return Type();
 
-          parentType = CS.openUnboundGenericType(
+          parentType = CS.openUnboundGenericTypes(
               parentType, CS.getConstraintLocator(
                               locator, {LocatorPathElt::PatternMatch(pattern),
                                         ConstraintLocator::ParentType}));
@@ -2770,7 +2769,7 @@ namespace {
             Type castType = TypeResolution::forContextual(
                                 CS.DC, TypeResolverContext::InExpression)
                                 .resolveType(isp->getCastTypeRepr());
-            if (!castType) {
+            if (castType->hasError()) {
               return false;
             }
 
@@ -2938,7 +2937,7 @@ namespace {
       // Try to build the appropriate type for a variadic argument list of
       // the fresh element type.  If that failed, just bail out.
       auto array = TypeChecker::getArraySliceType(expr->getLoc(), element);
-      if (!array) return element;
+      if (array->hasError()) return element;
 
       // Require the operand to be convertible to the array type.
       CS.addConstraint(ConstraintKind::Conversion,
@@ -3100,7 +3099,7 @@ namespace {
 
       // Open the type we're casting to.
       const auto toType =
-          CS.openUnboundGenericType(type, CS.getConstraintLocator(expr));
+          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(fromExpr);
@@ -3127,7 +3126,7 @@ namespace {
 
       // Open the type we're casting to.
       const auto toType =
-          CS.openUnboundGenericType(type, CS.getConstraintLocator(expr));
+          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
@@ -3160,7 +3159,7 @@ namespace {
 
       // Open the type we're casting to.
       const auto toType =
-          CS.openUnboundGenericType(type, CS.getConstraintLocator(expr));
+          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(fromExpr);
@@ -3189,7 +3188,7 @@ namespace {
       // Open up the type we're checking.
       // FIXME: Locator for the cast type?
       const auto toType =
-          CS.openUnboundGenericType(type, CS.getConstraintLocator(expr));
+          CS.openUnboundGenericTypes(type, CS.getConstraintLocator(expr));
       CS.setType(expr->getCastTypeRepr(), toType);
 
       // Add a checked cast constraint.
@@ -3304,7 +3303,7 @@ namespace {
     /// worth QoI efforts.
     Type getOptionalType(SourceLoc optLoc, Type valueTy) {
       auto optTy = TypeChecker::getOptionalType(optLoc, valueTy);
-      if (!optTy ||
+      if (optTy->hasError() ||
           TypeChecker::requireOptionalIntrinsics(CS.getASTContext(), optLoc))
         return Type();
 
@@ -3469,7 +3468,7 @@ namespace {
             rootRepr, TypeResolverContext::InExpression);
         if (!rootObjectTy || rootObjectTy->hasError())
           return Type();
-        rootObjectTy = CS.openUnboundGenericType(rootObjectTy, locator);
+        rootObjectTy = CS.openUnboundGenericTypes(rootObjectTy, locator);
         // Allow \Derived.property to be inferred as \Base.property to
         // simulate a sort of covariant conversion from
         // KeyPath<Derived, T> to KeyPath<Base, T>.

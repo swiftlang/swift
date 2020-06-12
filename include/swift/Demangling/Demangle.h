@@ -50,6 +50,7 @@ struct DemangleOptions {
   bool DisplayProtocolConformances = true;
   bool DisplayWhereClauses = true;
   bool DisplayEntityTypes = true;
+  bool DisplayLocalNameContexts = true;
   bool ShortenPartialApply = false;
   bool ShortenThunk = false;
   bool ShortenValueWitness = false;

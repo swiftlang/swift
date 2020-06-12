@@ -46,10 +46,18 @@ enum Sym {
     symbol(coreSymbolicationHandle, "CSSymbolGetName")
   static let CSSymbolGetMangledName: @convention(c) (CSTypeRef) -> UnsafePointer<CChar>? =
     symbol(coreSymbolicationHandle, "CSSymbolGetMangledName")
+  static let CSSymbolGetSymbolOwner: @convention(c)
+    (CSSymbolRef) -> CSSymbolOwnerRef =
+    symbol(coreSymbolicationHandle, "CSSymbolGetSymbolOwner")
   static let CSSymbolIsFunction: @convention(c) (CSTypeRef) -> CBool =
     symbol(coreSymbolicationHandle, "CSSymbolIsFunction")
   static let CSSymbolGetRange: @convention(c) (CSTypeRef) -> Range =
     symbol(coreSymbolicationHandle, "CSSymbolGetRange")
+  static let CSSymbolOwnerGetName: @convention(c) (CSSymbolOwnerRef) -> UnsafePointer<CChar>? =
+    symbol(coreSymbolicationHandle, "CSSymbolOwnerGetName")
+  static let CSSymbolicatorGetSymbolWithAddressAtTime: @convention(c)
+    (CSSymbolicatorRef, mach_vm_address_t, CSMachineTime) -> CSSymbolRef =
+    symbol(coreSymbolicationHandle, "CSSymbolicatorGetSymbolWithAddressAtTime")
   static let task_start_peeking: @convention(c) (task_t) -> kern_return_t =
     symbol(symbolicationHandle, "task_start_peeking")
   static let task_peek: @convention(c) (task_t, mach_vm_address_t, mach_vm_size_t,
@@ -65,6 +73,10 @@ enum Sym {
 
 typealias CSMachineTime = UInt64
 let kCSNow = CSMachineTime(Int64.max) + 1
+
+typealias CSSymbolicatorRef = CSTypeRef
+typealias CSSymbolRef = CSTypeRef
+typealias CSSymbolOwnerRef = CSTypeRef
 
 func pidFromHint(_ hint: String) -> pid_t? {
   let result = Sym.pidFromHint(hint as NSString)
@@ -100,12 +112,12 @@ func CSSymbolOwnerGetSymbolWithMangledName(
 
 func CSSymbolGetName(_ sym: CSTypeRef) -> String? {
   let name = Sym.CSSymbolGetName(sym)
-  return name.map({ String(cString: $0) })
+  return name.map{ String(cString: $0) }
 }
 
 func CSSymbolGetMangledName(_ sym: CSTypeRef) -> String? {
   let name = Sym.CSSymbolGetMangledName(sym)
-  return name.map({ String(cString: $0) })
+  return name.map{ String(cString: $0) }
 }
 
 func CSSymbolIsFunction(_ sym: CSTypeRef) -> Bool {
@@ -114,6 +126,23 @@ func CSSymbolIsFunction(_ sym: CSTypeRef) -> Bool {
 
 func CSSymbolGetRange(_ sym: CSTypeRef) -> Range {
   Sym.CSSymbolGetRange(sym)
+}
+
+func CSSymbolGetSymbolOwner(_ sym: CSTypeRef) -> CSSymbolOwnerRef {
+  Sym.CSSymbolGetSymbolOwner(sym)
+}
+
+func CSSymbolOwnerGetName(_ sym: CSTypeRef) -> String? {
+  Sym.CSSymbolOwnerGetName(sym)
+    .map(String.init(cString:))
+}
+
+func CSSymbolicatorGetSymbolWithAddressAtTime(
+  _ symbolicator: CSSymbolicatorRef,
+  _ address: mach_vm_address_t,
+  _ time: CSMachineTime
+) -> CSSymbolRef {
+  Sym.CSSymbolicatorGetSymbolWithAddressAtTime(symbolicator, address, time)
 }
 
 func task_start_peeking(_ task: task_t) -> Bool {

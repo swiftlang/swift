@@ -462,7 +462,7 @@ public:
   static NullablePtr<SingleValueInstruction>
   createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
                                      SILType BaseType,
-                                     llvm::SmallVectorImpl<SILValue> &Values);
+                                     ArrayRef<SILValue> Values);
 
   void print(raw_ostream &os, SILType baseType) const;
 private:

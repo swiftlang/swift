@@ -549,42 +549,46 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
 }
 
 void Projection::print(raw_ostream &os, SILType baseType) const {
-  if (isNominalKind()) {
+  switch (getKind()) {
+  case ProjectionKind::Struct:
+  case ProjectionKind::Class: {
     auto *Decl = getVarDecl(baseType);
     os << "Field: ";
     Decl->print(os);
-    return;
+    break;
   }
-
-  if (getKind() == ProjectionKind::Tuple) {
+  case ProjectionKind::Enum: {
+    auto *Decl = getEnumElementDecl(baseType);
+    os << "Enum: ";
+    Decl->print(os);
+    break;
+  }
+  case ProjectionKind::Index:
+  case ProjectionKind::Tuple: {
     os << "Index: " << getIndex();
-    return;
+    break;
   }
-  if (getKind() == ProjectionKind::BitwiseCast) {
-    os << "BitwiseCast";
-    return;
-  }
-  if (getKind() == ProjectionKind::Index) {
-    os << "Index: " << getIndex();
-    return;
-  }
-  if (getKind() == ProjectionKind::Upcast) {
-    os << "UpCast";
-    return;
-  }
-  if (getKind() == ProjectionKind::RefCast) {
-    os << "RefCast";
-    return;
-  }
-  if (getKind() == ProjectionKind::Box) {
+  case ProjectionKind::Box: {
     os << " Box over";
-    return;
+    break;
   }
-  if (getKind() == ProjectionKind::TailElems) {
+  case ProjectionKind::Upcast: {
+    os << "UpCast";
+    break;
+  }
+  case ProjectionKind::RefCast: {
+    os << "RefCast";
+    break;
+  }
+  case ProjectionKind::BitwiseCast: {
+    os << "BitwiseCast";
+    break;
+  }
+  case ProjectionKind::TailElems: {
     os << " TailElems";
-    return;
+    break;
   }
-  os << "<unexpected projection>";
+  }
 }
 
 raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M,
@@ -803,10 +807,9 @@ Projection::operator<(const Projection &Other) const {
 }
 
 NullablePtr<SingleValueInstruction>
-Projection::
-createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
-                                   SILType BaseType,
-                                   llvm::SmallVectorImpl<SILValue> &Values) {
+Projection::createAggFromFirstLevelProjections(
+    SILBuilder &B, SILLocation Loc, SILType BaseType,
+    ArrayRef<SILValue> Values) {
   if (BaseType.getStructOrBoundGenericStruct()) {
     return B.createStruct(Loc, BaseType, Values);
   }

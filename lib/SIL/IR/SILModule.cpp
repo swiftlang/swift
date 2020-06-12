@@ -593,7 +593,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   // Ok, we have a VTable. Try to lookup the SILFunction implementation from
   // the VTable.
   if (auto E = Vtbl->getEntry(*this, Member))
-    return E->Implementation;
+    return E->getImplementation();
 
   return nullptr;
 }

@@ -924,7 +924,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
           if (reqRepr &&
               req.getFirstType()->isEqual(proto->getSelfInterfaceType())) {
             auto &diags = proto->getASTContext().Diags;
-            diags.diagnose(reqRepr->getSubjectLoc().getLoc(),
+            diags.diagnose(reqRepr->getSubjectRepr()->getLoc(),
                            diag::protocol_where_clause_self_requirement);
           }
 
