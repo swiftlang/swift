@@ -34,7 +34,6 @@ function(generate_revision_inc revision_inc_var name dir)
 endfunction()
 
 generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
-generate_revision_inc(clang_revision_inc Clang "${CLANG_MAIN_SRC_DIR}")
 generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 
 add_swift_host_library(swiftBasic STATIC
