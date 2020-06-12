@@ -7,7 +7,7 @@ import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
 
-OperatorsTestSuite.test("plus") {
+OperatorsTestSuite.test("plus (+)") {
   let lhs = IntBox(value: 42)
   let rhs = IntBox(value: 23)
 
@@ -16,7 +16,7 @@ OperatorsTestSuite.test("plus") {
   expectEqual(65, result.value)
 }
 
-OperatorsTestSuite.test("minus") {
+OperatorsTestSuite.test("minus (-)") {
   let lhs = IntBox(value: 42)
   let rhs = IntBox(value: 23)
 
@@ -25,7 +25,7 @@ OperatorsTestSuite.test("minus") {
   expectEqual(19, result.value)
 }
 
-OperatorsTestSuite.test("star") {
+OperatorsTestSuite.test("star (*)") {
   let lhs = IntBox(value: 42)
   let rhs = IntBox(value: 23)
 
@@ -34,7 +34,7 @@ OperatorsTestSuite.test("star") {
   expectEqual(966, result.value)
 }
 
-OperatorsTestSuite.test("slash") {
+OperatorsTestSuite.test("slash (/)") {
   let lhs = IntBox(value: 42)
   let rhs = IntBox(value: 23)
 
