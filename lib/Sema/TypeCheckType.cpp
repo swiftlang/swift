@@ -2700,13 +2700,16 @@ Type TypeResolver::resolveASTFunctionType(
   }
 
   auto fnTy = FunctionType::get(params, outputTy, extInfo);
+  
+  if (fnTy->hasError())
+    return fnTy;
+
   // If the type is a block or C function pointer, it must be representable in
   // ObjC.
   switch (representation) {
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
-    if (!fnTy->hasError() &&
-        !fnTy->isRepresentableIn(ForeignLanguage::ObjectiveC, DC)) {
+    if (!fnTy->isRepresentableIn(ForeignLanguage::ObjectiveC, DC)) {
       StringRef strName =
         (representation == AnyFunctionType::Representation::Block)
         ? "block"
