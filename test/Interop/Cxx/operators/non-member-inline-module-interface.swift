@@ -4,6 +4,9 @@
 // CHECK-NEXT: func - (lhs: IntBox, rhs: IntBox) -> IntBox
 // CHECK-NEXT: func * (lhs: IntBox, rhs: IntBox) -> IntBox
 // CHECK-NEXT: func / (lhs: IntBox, rhs: IntBox) -> IntBox
+// CHECK-NEXT: func % (lhs: IntBox, rhs: IntBox) -> IntBox
+// CHECK-NEXT: func & (lhs: IntBox, rhs: IntBox) -> IntBox
+// CHECK-NEXT: func | (lhs: IntBox, rhs: IntBox) -> IntBox
 // CHECK-NEXT: func << (lhs: IntBox, rhs: IntBox) -> IntBox
 // CHECK-NEXT: func >> (lhs: IntBox, rhs: IntBox) -> IntBox
 
