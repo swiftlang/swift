@@ -3403,14 +3403,12 @@ public:
   /// Add implicit "load" expressions to the given expression.
   Expr *addImplicitLoadExpr(Expr *expr);
 
-  /// "Open" the given unbound type by introducing fresh type
-  /// variables for generic parameters and constructing a bound generic
-  /// type from these type variables.
-  ///
-  /// \param unbound The type to open.
+  /// "Open" the unbound generic type represented by the given declaration and
+  /// parent type by introducing fresh type variables for generic parameters
+  /// and constructing a bound generic type from these type variables.
   ///
   /// \returns The opened type.
-  Type openUnboundGenericType(UnboundGenericType *unbound,
+  Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
                               ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of unbound
