@@ -66,6 +66,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -138,6 +139,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Wrong constructor");
 
@@ -265,6 +267,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
@@ -348,6 +351,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
+  case ConstraintKind::OneWayBindParam: Out << " one-way bind param to "; break;
   case ConstraintKind::DefaultClosureType:
     Out << " closure can default to ";
     break;
@@ -564,6 +568,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);

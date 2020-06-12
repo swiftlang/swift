@@ -632,6 +632,10 @@ def experimental_print_full_convention :
  HelpText<"When emitting a module interface, emit additional @convention "
           "arguments, regardless of whether they were written in the source">;
 
+def experimental_one_way_closure_params :
+  Flag<["-"], "experimental-one-way-closure-params">,
+  HelpText<"Enable experimental support for one-way closure parameters">;
+
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;

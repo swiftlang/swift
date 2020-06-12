@@ -1703,6 +1703,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::ConformsTo:
       case ConstraintKind::Defaultable:
       case ConstraintKind::OneWayEqual:
+      case ConstraintKind::OneWayBindParam:
       case ConstraintKind::DefaultClosureType:
         break;
       }

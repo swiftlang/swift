@@ -1322,6 +1322,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a conversion");
   }
@@ -1387,6 +1388,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     return false;
   }
@@ -1698,6 +1700,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a relational constraint");
   }
@@ -4340,6 +4343,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:
       llvm_unreachable("Not a relational constraint");
     }
@@ -7064,9 +7068,16 @@ ConstraintSystem::simplifyOneWayConstraint(
     return SolutionKind::Solved;
   }
 
-  // Translate this constraint into a one-way binding constraint.
-  return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
-                    locator);
+  // Translate this constraint into an equality or bind-parameter constraint,
+  // as appropriate.
+  if (kind == ConstraintKind::OneWayEqual) {
+    return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
+                      locator);
+  }
+
+  assert(kind == ConstraintKind::OneWayBindParam);
+  return matchTypes(
+      secondSimplified, first, ConstraintKind::BindParam, flags, locator);
 }
 
 static Type getFunctionBuilderTypeFor(ConstraintSystem &cs, unsigned paramIdx,
@@ -7104,6 +7115,24 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = cast<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
+  // Determine whether a function builder will be applied.
+  Type functionBuilderType;
+  ConstraintLocator *calleeLocator = nullptr;
+  if (auto last = locator.last()) {
+    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
+      calleeLocator = getCalleeLocator(getConstraintLocator(locator));
+      functionBuilderType = getFunctionBuilderTypeFor(
+          *this, argToParam->getParamIdx(), calleeLocator);
+    }
+  }
+
+  // Determine whether to introduce one-way constraints between the parameter's
+  // type as seen in the body of the closure and the external parameter
+  // type.
+  bool oneWayConstraints =
+    getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters ||
+    functionBuilderType;
+
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
@@ -7117,13 +7146,25 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
 
     Type internalType;
-
     if (paramList->get(i)->getTypeRepr()) {
       // Internal type is the type used in the body of the closure,
       // so "external" type translates to it as follows:
       //  - `Int...` -> `[Int]`,
       //  - `inout Int` -> `@lvalue Int`.
       internalType = param.getParameterType();
+
+      // When there are type variables in the type and we have enabled
+      // one-way constraints, create a fresh type variable to handle the
+      // binding.
+      if (oneWayConstraints && internalType->hasTypeVariable()) {
+        auto *paramLoc =
+            getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+        auto *typeVar = createTypeVariable(paramLoc, TVO_CanBindToLValue |
+                                                         TVO_CanBindToNoEscape);
+        addConstraint(
+            ConstraintKind::OneWayBindParam, typeVar, internalType, paramLoc);
+        internalType = typeVar;
+      }
     } else {
       auto *paramLoc =
           getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
@@ -7137,7 +7178,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
           param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
 
       auto externalType = param.getOldType();
-      addConstraint(ConstraintKind::BindParam, externalType, typeVar, paramLoc);
+      if (oneWayConstraints) {
+        addConstraint(
+            ConstraintKind::OneWayBindParam, typeVar, externalType, paramLoc);
+      } else {
+        addConstraint(
+            ConstraintKind::BindParam, externalType, typeVar, paramLoc);
+      }
     }
 
     setType(paramList->get(i), internalType);
@@ -7149,17 +7196,12 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                         inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
-  if (auto last = locator.last()) {
-    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
-      auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
-      if (auto functionBuilderType = getFunctionBuilderTypeFor(
-              *this, argToParam->getParamIdx(), calleeLocator)) {
-        if (auto result = matchFunctionBuilder(
-                closure, functionBuilderType, closureType->getResult(),
-                ConstraintKind::Conversion, calleeLocator, locator)) {
-          return result->isSuccess();
-        }
-      }
+  // If there is a function builder to apply, do so now.
+  if (functionBuilderType) {
+    if (auto result = matchFunctionBuilder(
+            closure, functionBuilderType, closureType->getResult(),
+            ConstraintKind::Conversion, calleeLocator, locator)) {
+      return result->isSuccess();
     }
   }
 
@@ -9687,6 +9729,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
                                                subflags, locator);
 
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
     return simplifyOneWayConstraint(kind, first, second, subflags, locator);
 
   case ConstraintKind::ValueMember:
@@ -10194,6 +10237,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return SolutionKind::Unsolved;
 
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::OneWayBindParam:
     return simplifyOneWayConstraint(constraint.getKind(),
                                     constraint.getFirstType(),
                                     constraint.getSecondType(),
