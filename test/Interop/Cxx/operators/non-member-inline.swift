@@ -106,4 +106,58 @@ OperatorsTestSuite.test("pipe pipe (||)") {
   expectEqual(true, result.value)
 }
 
+OperatorsTestSuite.test("less (<)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 6)
+
+  let result = lhs < rhs
+
+  expectEqual(true, result)
+}
+
+OperatorsTestSuite.test("greater (>)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 6)
+
+  let result = lhs > rhs
+
+  expectEqual(false, result)
+}
+
+OperatorsTestSuite.test("equal equal (==)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs == rhs
+
+  expectEqual(true, result)
+}
+
+OperatorsTestSuite.test("exclaim equal (!=)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs != rhs
+
+  expectEqual(false, result)
+}
+
+OperatorsTestSuite.test("less equal (<=)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs <= rhs
+
+  expectEqual(true, result)
+}
+
+OperatorsTestSuite.test("greater equal (>=)") {
+  let lhs = IntBox(value: 6)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs >= rhs
+
+  expectEqual(true, result)
+}
+
 runAllTests()
