@@ -1420,7 +1420,7 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
         if (!knownType)
-          knownType = VD->getInterfaceType();
+          knownType = VD->getType();
 
         if (knownType) {
           assert(!knownType->isHole());
@@ -1432,8 +1432,6 @@ namespace {
           }
 
           // Set the favored type for this expression to the known type.
-          if (knownType->hasTypeParameter())
-            knownType = VD->getDeclContext()->mapTypeIntoContext(knownType);
           CS.setFavoredType(E, knownType.getPointer());
         }
 
