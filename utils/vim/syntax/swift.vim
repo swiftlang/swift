@@ -39,6 +39,10 @@ syn keyword swiftKeyword
 syn match swiftMultiwordKeyword
       \ "indirect case"
 
+syn keyword swiftCoreTypes
+      \ Any
+      \ AnyObject
+
 syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
       \ import
 
@@ -212,9 +216,9 @@ syn match swiftAttribute
 
 syn keyword swiftTodo MARK TODO FIXME contained
 
-syn match swiftCastOp skipwhite skipempty nextgroup=swiftType
+syn match swiftCastOp skipwhite skipempty nextgroup=swiftType,swiftCoreTypes
       \ "\<is\>"
-syn match swiftCastOp skipwhite skipempty nextgroup=swiftType
+syn match swiftCastOp skipwhite skipempty nextgroup=swiftType,swiftCoreTypes
       \ "\<as\>[!?]\?"
 
 syn match swiftNilOps
@@ -227,6 +231,7 @@ hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
+hi def link swiftCoreTypes Type
 hi def link swiftMultiwordKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftMultiwordTypeDefinition Define
