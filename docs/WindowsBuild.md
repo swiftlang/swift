@@ -64,9 +64,9 @@ subst S: <path to sources>
 
 ```cmd
 S:
-git clone https://github.com/apple/llvm-project --branch swift/master toolchain
-git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift toolchain/swift
-git clone https://github.com/apple/swift-cmark toolchain/cmark
+git clone https://github.com/apple/llvm-project --branch swift/master llvm-project
+git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift swift
+git clone https://github.com/apple/swift-cmark cmark
 git clone https://github.com/apple/swift-corelibs-libdispatch swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
@@ -78,15 +78,16 @@ git clone https://github.com/compnerd/swift-build swift-build
 
 ## Acquire ICU, SQLite3, curl, libxml2 and zlib
 
-Go to [compnerd's swift-build azure page](https://dev.azure.com/compnerd/swift-build/_build) and open [Pipelines](https://dev.azure.com/compnerd/swift-build/_build) where you'll see bots (hopefully green) for:
+```
+python -m pip install --user msrest azure-devops tabulate
+python swift-build\utilities\swift-build.py --build-id ICU --latest-artifacts --filter windows-x64 --download
+python swift-build\utilities\swift-build.py --build-id XML2 --latest-artifacts --filter windows-x64 --download
+python swift-build\utilities\swift-build.py --build-id CURL --latest-artifacts --filter windows-x64 --download
+python swift-build\utilities\swift-build.py --build-id zlib --latest-artifacts --filter windows-x64 --download
+python swift-build\utilities\swift-build.py --build-id SQLite --latest-artifacts --filter windows-x64 --download
+```
 
-- [ICU](https://dev.azure.com/compnerd/swift-build/_build?definitionId=9)
-- [SQLite](https://dev.azure.com/compnerd/swift-build/_build?definitionId=12&_a=summary)
-- [curl](https://dev.azure.com/compnerd/swift-build/_build?definitionId=11&_a=summary)
-- [libxml2](https://dev.azure.com/compnerd/swift-build/_build?definitionId=10&_a=summary)
-- [zlib](https://dev.azure.com/compnerd/swift-build/_build?definitionId=16&_a=summary)
-
-Download each of the zip files and copy their contents into S:/Library. The directory structure should resemble:
+Extract the zip files, ignoring the top level directory, into `S:/Library`. The directory structure should resemble:
 
 ```
 /Library
@@ -113,10 +114,10 @@ Set up the `ucrt`, `visualc`, and `WinSDK` modules by:
 - and setup the `visualc.apinotes` located at `swift/stdlib/public/Platform/visualc.apinotes` into `${VCToolsInstallDir}/include` as `visualc.apinotes`
 
 ```cmd
-mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\toolchain\swift\stdlib\public\Platform\ucrt.modulemap
-mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\toolchain\swift\stdlib\public\Platform\winsdk.modulemap
-mklink "%VCToolsInstallDir%\include\module.modulemap" S:\toolchain\swift\stdlib\public\Platform\visualc.modulemap
-mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\toolchain\swift\stdlib\public\Platform\visualc.apinotes
+mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\swift\stdlib\public\Platform\ucrt.modulemap
+mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\swift\stdlib\public\Platform\winsdk.modulemap
+mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Platform\visualc.modulemap
+mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Platform\visualc.apinotes
 ```
 
 Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
@@ -124,18 +125,19 @@ Warning: Creating the above links usually requires administrator privileges. The
 ## Build the toolchain
 
 ```cmd
-md "S:\b\toolchain"
 cmake -B "S:\b\toolchain" ^
   -C S:\swift-build\cmake\caches\windows-x86_64.cmake ^
   -C S:\swift-build\cmake\caches\org.compnerd.dt.cmake ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D LLVM_ENABLE_ASSERTIONS=YES ^
-  -D LLVM_ENABLE_PROJECTS="clang;clang-tools-extra;cmark;swift;lldb;lld" ^
+  -D LLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lldb;lld" ^
   -D LLVM_EXTERNAL_PROJECTS="cmark;swift" ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
   -D LLVM_ENABLE_PDB=YES ^
   -D LLVM_ENABLE_LIBEDIT=NO ^
   -D LLDB_ENABLE_PYTHON=YES ^
+  -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR="S:/swift" ^
+  -D LLVM_EXTERNAL_CMARK_SOURCE_DIR="S:/cmark" ^
   -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include" ^
   -D SWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib" ^
   -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" ^
@@ -145,7 +147,7 @@ cmake -B "S:\b\toolchain" ^
   -D SWIFT_BUILD_DYNAMIC_STDLIB=YES ^
   -D SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES ^
   -G Ninja ^
-  -S S:\toolchain\llvm
+  -S S:\llvm-project\llvm
 
 ninja -C S:\b\toolchain
 ```
