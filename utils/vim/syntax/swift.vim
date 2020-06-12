@@ -17,8 +17,10 @@ endif
 
 syn keyword swiftKeyword
       \ break
+      \ case
       \ catch
       \ continue
+      \ default
       \ defer
       \ do
       \ else
@@ -87,6 +89,8 @@ syn keyword swiftTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ class
       \ enum
       \ extension
+      \ operator
+      \ precedencegroup
       \ protocol
       \ struct
 
