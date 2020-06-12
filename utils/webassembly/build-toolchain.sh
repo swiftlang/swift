@@ -72,13 +72,9 @@ sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $TMP_DIR/$
 
 # Copy nightly-toolchain's host environment stdlib into toolchain
 
-if [[ "$(uname)" == "Linux" ]]; then
-  # Avoid to copy usr/lib/swift/clang because our toolchain's one is a directory
-  # but nightly's one is symbolic link, so fail to merge them.
-  rsync -a $NIGHTLY_TOOLCHAIN/usr/lib/ $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/ --exclude 'swift/clang'
-else
-  cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
-fi
+# Avoid to copy usr/lib/swift/clang because our toolchain's one is a directory
+# but nightly's one is symbolic link, so fail to merge them.
+rsync -a $NIGHTLY_TOOLCHAIN/usr/lib/ $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/ --exclude 'swift/clang'
 
 $UTILS_PATH/build-foundation.sh $TMP_DIR/$TOOLCHAIN_NAME
 $UTILS_PATH/build-xctest.sh $TMP_DIR/$TOOLCHAIN_NAME
