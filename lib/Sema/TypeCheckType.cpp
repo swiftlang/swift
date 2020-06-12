@@ -725,9 +725,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   // Make sure we have the right number of generic arguments.
   // FIXME: If we have fewer arguments than we need, that might be okay, if
   // we're allowed to deduce the remaining arguments from context.
-  auto genericDecl = cast<GenericTypeDecl>(decl);
   auto genericArgs = generic->getGenericArgs();
-  auto genericParams = genericDecl->getGenericParams();
+  auto genericParams = decl->getGenericParams();
   if (genericParams->size() != genericArgs.size()) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       diags.diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
@@ -756,10 +755,10 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   }
 
   // FIXME: More principled handling of circularity.
-  if (!genericDecl->getGenericSignature()) {
+  if (!decl->getGenericSignature()) {
     diags.diagnose(loc, diag::recursive_decl_reference,
-             genericDecl->getDescriptiveKind(), genericDecl->getName());
-    genericDecl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+                   decl->getDescriptiveKind(), decl->getName());
+    decl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
     return ErrorType::get(ctx);
   }
 
@@ -777,9 +776,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     args.push_back(substTy);
   }
 
-  auto result = TypeChecker::applyUnboundGenericArguments(
-      unboundType, genericDecl, loc,
-      resolution, args);
+  const auto result = TypeChecker::applyUnboundGenericArguments(
+      decl, unboundType->getParent(), loc, resolution, args);
 
   const auto genericOptions = genericResolution.getOptions();
   if (!genericOptions.contains(TypeResolutionFlags::AllowUnavailable)) {
@@ -802,10 +800,10 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 }
 
 /// Apply generic arguments to the given type.
-Type TypeChecker::applyUnboundGenericArguments(
-    UnboundGenericType *unboundType, GenericTypeDecl *decl,
-    SourceLoc loc, TypeResolution resolution,
-    ArrayRef<Type> genericArgs) {
+Type TypeChecker::applyUnboundGenericArguments(GenericTypeDecl *decl,
+                                               Type parentTy, SourceLoc loc,
+                                               TypeResolution resolution,
+                                               ArrayRef<Type> genericArgs) {
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
@@ -826,20 +824,20 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
-  if (auto parentType = unboundType->getParent()) {
-    if (parentType->hasUnboundGenericType()) {
+  if (parentTy) {
+    if (parentTy->hasUnboundGenericType()) {
       // If we're working with a nominal type declaration, just construct
       // a bound generic type without checking the generic arguments.
       if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl)) {
-        return BoundGenericType::get(nominalDecl, parentType, genericArgs);
+        return BoundGenericType::get(nominalDecl, parentTy, genericArgs);
       }
 
       assert(!resultType->hasTypeParameter());
       return resultType;
     }
 
-    subs = parentType->getContextSubstitutions(decl->getDeclContext());
-    skipRequirementsCheck |= parentType->hasTypeVariable();
+    subs = parentTy->getContextSubstitutions(decl->getDeclContext());
+    skipRequirementsCheck |= parentTy->hasTypeVariable();
   } else if (auto genericEnv =
                  decl->getDeclContext()->getGenericEnvironmentOfContext()) {
     auto genericSig = genericEnv->getGenericSignature();
@@ -876,11 +874,11 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   if (!skipRequirementsCheck &&
       resolution.getStage() > TypeResolutionStage::Structural) {
-    auto result =
-      checkGenericArguments(dc, loc, noteLoc, unboundType,
-                            genericSig->getGenericParams(),
-                            genericSig->getRequirements(),
-                            QueryTypeSubstitutionMap{subs});
+    auto result = checkGenericArguments(
+        dc, loc, noteLoc,
+        UnboundGenericType::get(decl, parentTy, dc->getASTContext()),
+        genericSig->getGenericParams(), genericSig->getRequirements(),
+        QueryTypeSubstitutionMap{subs});
 
     switch (result) {
     case RequirementCheckResult::Failure:
@@ -903,14 +901,12 @@ Type TypeChecker::applyUnboundGenericArguments(
                                 LookUpConformanceInModule(module));
 
   // Form a sugared typealias reference.
-  Type parentType = unboundType->getParent();
-  if (typealias && (!parentType || !parentType->isAnyExistentialType())) {
+  if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
     auto genericSig = typealias->getGenericSignature();
     auto subMap = SubstitutionMap::get(genericSig,
                                        QueryTypeSubstitutionMap{subs},
                                        LookUpConformanceInModule(module));
-    resultType = TypeAliasType::get(typealias, parentType,
-                                    subMap, resultType);
+    resultType = TypeAliasType::get(typealias, parentTy, subMap, resultType);
   }
 
   return resultType;
@@ -3311,17 +3307,16 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     return ErrorType::get(Context);
   }
 
-  auto dictDecl = Context.getDictionaryDecl();
+  auto *const dictDecl = Context.getDictionaryDecl();
   if (!dictDecl) {
     Context.Diags.diagnose(repr->getBrackets().Start,
                            diag::sugar_type_not_found, 3);
     return ErrorType::get(Context);
   }
 
-  auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
-  Type args[] = {keyTy, valueTy};
   if (!TypeChecker::applyUnboundGenericArguments(
-          unboundTy, dictDecl, repr->getStartLoc(), resolution, args)) {
+          dictDecl, nullptr, repr->getStartLoc(), resolution,
+          {keyTy, valueTy})) {
     assert(Context.Diags.hadAnyError());
     return ErrorType::get(Context);
   }

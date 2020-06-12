@@ -59,7 +59,10 @@ static SILValue stripCopiesAndBorrows(SILValue v) {
 /// It is important to note that, we can not assume that the partial apply, the
 /// apply site, or the callee value are control dependent in any way. This
 /// requires us to need to be very careful. See inline comments.
-static void fixupReferenceCounts(
+///
+/// Returns true if the stack nesting is invalidated and must be corrected
+/// afterwards.
+static  bool fixupReferenceCounts(
     PartialApplyInst *pai, FullApplySite applySite, SILValue calleeValue,
     ArrayRef<ParameterConvention> captureArgConventions,
     MutableArrayRef<SILValue> capturedArgs, bool isCalleeGuaranteed) {
@@ -72,6 +75,7 @@ static void fixupReferenceCounts(
   // FIXME: Can we cache this in between inlining invocations?
   DeadEndBlocks deadEndBlocks(pai->getFunction());
   SmallVector<SILBasicBlock *, 4> leakingBlocks;
+  bool invalidatedStackNesting = false;
 
   // Add a copy of each non-address type capture argument to lifetime extend the
   // captured argument over at least the inlined function and till the end of a
@@ -83,14 +87,6 @@ static void fixupReferenceCounts(
   for (unsigned i : indices(captureArgConventions)) {
     auto convention = captureArgConventions[i];
     SILValue &v = capturedArgs[i];
-    if (v->getType().isAddress()) {
-      // FIXME: What about indirectly owned parameters? The invocation of the
-      // closure would perform an indirect copy which we should mimick here.
-      assert(convention != ParameterConvention::Indirect_In &&
-             "Missing indirect copy");
-      continue;
-    }
-
     auto *f = applySite.getFunction();
 
     // See if we have a trivial value. In such a case, just continue. We do not
@@ -102,11 +98,40 @@ static void fixupReferenceCounts(
 
     switch (convention) {
     case ParameterConvention::Indirect_In:
+      llvm_unreachable("Missing indirect copy");
+
     case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
-    case ParameterConvention::Indirect_In_Guaranteed:
-      llvm_unreachable("Should be handled above");
+      break;
+
+    case ParameterConvention::Indirect_In_Guaranteed: {
+      // Do the same as for Direct_Guaranteed, just the address version.
+      // (See comment below).
+      SILBuilderWithScope builder(pai);
+      auto *stackLoc = builder.createAllocStack(loc, v->getType().getObjectType());
+      builder.createCopyAddr(loc, v, stackLoc, IsNotTake, IsInitialization);
+      visitedBlocks.clear();
+
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      bool consumedInLoop = checker.completeConsumingUseSet(
+          pai, applySite.getCalleeOperand(),
+          [&](SILBasicBlock::iterator insertPt) {
+            SILBuilderWithScope builder(insertPt);
+            builder.createDestroyAddr(loc, stackLoc);
+            builder.createDeallocStack(loc, stackLoc);
+          });
+
+      if (!consumedInLoop) {
+        applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
+          SILBuilderWithScope(iter).createDestroyAddr(loc, stackLoc);
+          SILBuilderWithScope(iter).createDeallocStack(loc, stackLoc);
+        });
+      }
+      v = stackLoc;
+      invalidatedStackNesting = true;
+      break;
+    }
 
     case ParameterConvention::Direct_Guaranteed: {
       // If we have a direct_guaranteed value, the value is being taken by the
@@ -242,6 +267,7 @@ static void fixupReferenceCounts(
       SILBuilderWithScope(iter).emitDestroyValueOperation(loc, calleeValue);
     });
   }
+  return invalidatedStackNesting;
 }
 
 static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
@@ -917,8 +943,9 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         // We need to insert the copies before the partial_apply since if we can
         // not remove the partial_apply the captured values will be dead by the
         // time we hit the call site.
-        fixupReferenceCounts(PAI, InnerAI, CalleeValue, CapturedArgConventions,
-                             CapturedArgs, IsCalleeGuaranteed);
+        invalidatedStackNesting |= fixupReferenceCounts(PAI, InnerAI,
+                                          CalleeValue, CapturedArgConventions,
+                                          CapturedArgs, IsCalleeGuaranteed);
       }
 
       // Register a callback to record potentially unused function values after

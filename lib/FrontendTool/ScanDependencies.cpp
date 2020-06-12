@@ -164,9 +164,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                                      /*onlyClangModule=*/false,
                                                      cache,
                                                      ASTDelegate)) {
-            auto overlayId =
-                ModuleDependencyID{overlayName.str(), found->getKind()};
-            result.push_back(overlayId);
+            result.emplace_back(overlayName.str(), found->getKind());
           }
         }
       });

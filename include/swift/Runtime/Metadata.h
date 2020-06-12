@@ -54,6 +54,13 @@ enum MetadataAllocatorTags : uint16_t {
   GenericValueMetadataTag,
 };
 
+template <typename Runtime> struct MetadataAllocationBacktraceHeader {
+  TargetPointer<Runtime, const void> Next;
+  TargetPointer<Runtime, void> Allocation;
+  uint32_t Count;
+  // Count backtrace pointers immediately follow.
+};
+
 /// The buffer used by a yield-once coroutine (such as the generalized
 /// accessors `read` and `modify`).
 struct YieldOnceBuffer {

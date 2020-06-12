@@ -1200,7 +1200,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
                        /*hasName*/true);
   case Node::Kind::LocalDeclName:
     print(Node->getChild(1));
-    Printer << " #" << (Node->getChild(0)->getIndex() + 1);
+    if (Options.DisplayLocalNameContexts)
+      Printer << " #" << (Node->getChild(0)->getIndex() + 1);
     return nullptr;
   case Node::Kind::PrivateDeclName:
     if (Node->getNumChildren() > 1) {
@@ -2468,8 +2469,9 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   bool MultiWordName = ExtraName.contains(' ');
   // Also a local name (e.g. Mystruct #1) does not look good if its context is
   // printed in prefix form.
-  if (hasName &&
-      Entity->getChild(1)->getKind() == Node::Kind::LocalDeclName)
+  bool LocalName =
+      hasName && Entity->getChild(1)->getKind() == Node::Kind::LocalDeclName;
+  if (LocalName && Options.DisplayLocalNameContexts)
     MultiWordName = true;
 
   if (asPrefixContext && (TypePr != TypePrinting::NoType || MultiWordName)) {
@@ -2554,7 +2556,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
       printEntityType(Entity, type, genericFunctionTypeList);
     }
   }
-  if (!asPrefixContext && PostfixContext) {
+  if (!asPrefixContext && PostfixContext &&
+      (!LocalName || Options.DisplayLocalNameContexts)) {
     // Print any left over context which couldn't be printed in prefix form.
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
         Entity->getKind() == Node::Kind::Initializer ||

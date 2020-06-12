@@ -27,6 +27,7 @@
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA24_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA32_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA40_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA80_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA88_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA104_cEEEvv \
 // RUN:   > %t/swiftCore-all.txt
@@ -47,6 +48,7 @@
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA24_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA32_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA40_cEEEvv \
+// RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA80_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA88_cEEEvv \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA104_cEEEvv \
 // RUN:   > %t/swiftRemoteMirror-all.txt
