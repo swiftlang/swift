@@ -459,60 +459,6 @@ bool RequirementRequest::isCached() const {
   return std::get<2>(getStorage()) == TypeResolutionStage::Interface;
 }
 
-Optional<Requirement> RequirementRequest::getCachedResult() const {
-  auto &reqRepr = getRequirement();
-  switch (reqRepr.getKind()) {
-  case RequirementReprKind::TypeConstraint:
-    if (!reqRepr.getSubjectLoc().wasValidated() ||
-        !reqRepr.getConstraintLoc().wasValidated())
-      return None;
-
-    return Requirement(reqRepr.getConstraint()->getClassOrBoundGenericClass()
-                         ? RequirementKind::Superclass
-                         : RequirementKind::Conformance,
-                       reqRepr.getSubject(),
-                       reqRepr.getConstraint());
-
-  case RequirementReprKind::SameType:
-    if (!reqRepr.getFirstTypeLoc().wasValidated() ||
-        !reqRepr.getSecondTypeLoc().wasValidated())
-      return None;
-
-    return Requirement(RequirementKind::SameType, reqRepr.getFirstType(),
-                       reqRepr.getSecondType());
-
-  case RequirementReprKind::LayoutConstraint:
-    if (!reqRepr.getSubjectLoc().wasValidated())
-      return None;
-
-    return Requirement(RequirementKind::Layout, reqRepr.getSubject(),
-                       reqRepr.getLayoutConstraint());
-  }
-  llvm_unreachable("unhandled kind");
-}
-
-void RequirementRequest::cacheResult(Requirement value) const {
-  auto &reqRepr = getRequirement();
-  switch (value.getKind()) {
-  case RequirementKind::Conformance:
-  case RequirementKind::Superclass:
-    reqRepr.getSubjectLoc().setType(value.getFirstType());
-    reqRepr.getConstraintLoc().setType(value.getSecondType());
-    break;
-
-  case RequirementKind::SameType:
-    reqRepr.getFirstTypeLoc().setType(value.getFirstType());
-    reqRepr.getSecondTypeLoc().setType(value.getSecondType());
-    break;
-
-  case RequirementKind::Layout:
-    reqRepr.getSubjectLoc().setType(value.getFirstType());
-    reqRepr.getLayoutConstraintLoc()
-      .setLayoutConstraint(value.getLayoutConstraint());
-    break;
-  }
-}
-
 //----------------------------------------------------------------------------//
 // DefaultTypeRequest.
 //----------------------------------------------------------------------------//

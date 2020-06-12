@@ -2101,7 +2101,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   if (decl->isVariadic()) {
     Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
-    if (Ty.isNull()) {
+    if (Ty->hasError()) {
       decl->setInvalid();
       return ErrorType::get(ctx);
     }
