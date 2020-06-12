@@ -875,6 +875,15 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   return !fromContext.isContainedIn(containingContext);
 }
 
+
+SourceRange RequirementRepr::getSourceRange() const {
+  if (getKind() == RequirementReprKind::LayoutConstraint)
+    return SourceRange(FirstType->getSourceRange().Start,
+                       SecondLayout.getSourceRange().End);
+  return SourceRange(FirstType->getSourceRange().Start,
+                     SecondType->getSourceRange().End);
+}
+
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    ArrayRef<GenericTypeParamDecl *> Params,
                                    SourceLoc WhereLoc,

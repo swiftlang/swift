@@ -3793,9 +3793,9 @@ public:
   void visitRequirements(ArrayRef<RequirementRepr> reqts) {
     for (auto reqt : reqts) {
       if (reqt.getKind() == RequirementReprKind::SameType) {
-        if (auto *repr = reqt.getFirstTypeLoc().getTypeRepr())
+        if (auto *repr = reqt.getFirstTypeRepr())
           repr->walk(*this);
-        if (auto *repr = reqt.getSecondTypeLoc().getTypeRepr())
+        if (auto *repr = reqt.getSecondTypeRepr())
           repr->walk(*this);
       }
     }

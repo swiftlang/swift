@@ -1345,15 +1345,15 @@ public:
   bool doIt(RequirementRepr &Req) {
     switch (Req.getKind()) {
     case RequirementReprKind::SameType:
-      if (doIt(Req.getFirstTypeLoc()) || doIt(Req.getSecondTypeLoc()))
+      if (doIt(Req.getFirstTypeRepr()) || doIt(Req.getSecondTypeRepr()))
         return true;
       break;
     case RequirementReprKind::TypeConstraint:
-      if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
+      if (doIt(Req.getSubjectRepr()) || doIt(Req.getConstraintRepr()))
         return true;
       break;
     case RequirementReprKind::LayoutConstraint:
-      if (doIt(Req.getFirstTypeLoc()))
+      if (doIt(Req.getFirstTypeRepr()))
         return true;
       break;
     }
