@@ -2208,6 +2208,16 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
 static std::pair<ForeignRepresentableKind, ProtocolConformance *>
 getForeignRepresentable(Type type, ForeignLanguage language,
                         const DeclContext *dc) {
+  // Local function that simply produces a failing result.
+  auto failure = []() -> std::pair<ForeignRepresentableKind,
+                                   ProtocolConformance *> {
+    return { ForeignRepresentableKind::None, nullptr };
+  };
+  
+  // If type has an error let's fail early.
+  if (type->hasError())
+    return failure();
+  
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
   if (auto valueType = type->getOptionalObjectType()) {
@@ -2221,12 +2231,6 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     if (representable != ForeignRepresentableKind::None)
       return { representable, nullptr };
   }
-
-  // Local function that simply produces a failing result.
-  auto failure = []() -> std::pair<ForeignRepresentableKind,
-                                   ProtocolConformance *> {
-    return { ForeignRepresentableKind::None, nullptr };
-  };
 
   // Function types.
   if (auto functionType = type->getAs<FunctionType>()) {
