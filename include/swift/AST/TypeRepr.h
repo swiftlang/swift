@@ -48,7 +48,7 @@ enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 /// Representation of a type as written in source.
-class alignas(8) TypeRepr {
+class alignas(1 << TypeReprAlignInBits) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 

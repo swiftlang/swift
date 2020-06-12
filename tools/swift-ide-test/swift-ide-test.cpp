@@ -1707,6 +1707,9 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
+  if (!RunTypeChecker)
+    Invocation.getLangOptions().DisablePoundIfEvaluation = true;
+
   CompilerInstance CI;
 
   // Display diagnostics to stderr.
@@ -1724,9 +1727,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     CI.getMainModule()->setDebugClient(DebuggerClient.get());
   }
 
-  if (!RunTypeChecker)
-    CI.performParseOnly();
-  else
+  if (RunTypeChecker)
     CI.performSema();
 
   if (MangledNameToFind.empty()) {

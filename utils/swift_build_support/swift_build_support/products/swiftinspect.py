@@ -13,7 +13,17 @@
 import os
 import platform
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import swiftpm
+from . import xctest
 from .. import shell
 from .. import targets
 
@@ -51,17 +61,16 @@ class SwiftInspect(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM,
-                product.LibCXX,
-                product.LibICU,
-                product.Swift,
-                product.LLDB,
-                product.LibDispatch,
-                product.Foundation,
-                product.XCTest,
-                product.LLBuild,
-                product.SwiftPM]
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM]
 
 
 def run_build_script_helper(host_target, product, args):

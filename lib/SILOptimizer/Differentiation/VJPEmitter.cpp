@@ -533,11 +533,21 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     TypeSubstCloner::visitApplyInst(ai);
     return;
   }
-  // If callee is the array literal initialization intrinsic, do standard
-  // cloning. Array literal differentiation is handled separately.
-  if (isArrayLiteralIntrinsic(ai)) {
-    LLVM_DEBUG(getADDebugStream() << "Cloning array literal intrinsic `apply`\n"
-                                  << *ai << '\n');
+  // If callee is `array.uninitialized_intrinsic`, do standard cloning.
+  // `array.unininitialized_intrinsic` differentiation is handled separately.
+  if (ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC)) {
+    LLVM_DEBUG(getADDebugStream()
+               << "Cloning `array.unininitialized_intrinsic` `apply`:\n"
+               << *ai << '\n');
+    TypeSubstCloner::visitApplyInst(ai);
+    return;
+  }
+  // If callee is `array.finalize_intrinsic`, do standard cloning.
+  // `array.finalize_intrinsic` has special-case pullback generation.
+  if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC)) {
+    LLVM_DEBUG(getADDebugStream()
+               << "Cloning `array.finalize_intrinsic` `apply`:\n"
+               << *ai << '\n');
     TypeSubstCloner::visitApplyInst(ai);
     return;
   }
@@ -832,15 +842,16 @@ bool VJPEmitter::run() {
   // `-enable-strip-ownership-after-serialization` is true.
   mergeBasicBlocks(vjp);
 
+  LLVM_DEBUG(getADDebugStream()
+             << "Generated VJP for " << original->getName() << ":\n"
+             << *vjp);
+
   // Generate pullback code.
   PullbackEmitter PullbackEmitter(*this);
   if (PullbackEmitter.run()) {
     errorOccurred = true;
     return true;
   }
-  LLVM_DEBUG(getADDebugStream()
-             << "Generated VJP for " << original->getName() << ":\n"
-             << *vjp);
   return errorOccurred;
 }
 

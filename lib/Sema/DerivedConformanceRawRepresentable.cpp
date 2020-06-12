@@ -108,9 +108,9 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), DeclNameLoc(),
-                                          DeclNameRef(), elt, nullptr);
+    auto pat = new (C)
+        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
+                           DeclNameLoc(), DeclNameRef(), elt, nullptr);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);

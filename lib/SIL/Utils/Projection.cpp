@@ -803,10 +803,9 @@ Projection::operator<(const Projection &Other) const {
 }
 
 NullablePtr<SingleValueInstruction>
-Projection::
-createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
-                                   SILType BaseType,
-                                   llvm::SmallVectorImpl<SILValue> &Values) {
+Projection::createAggFromFirstLevelProjections(
+    SILBuilder &B, SILLocation Loc, SILType BaseType,
+    ArrayRef<SILValue> Values) {
   if (BaseType.getStructOrBoundGenericStruct()) {
     return B.createStruct(Loc, BaseType, Values);
   }

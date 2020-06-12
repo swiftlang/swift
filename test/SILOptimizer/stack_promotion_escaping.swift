@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
+// REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 
 final class Item {}
 

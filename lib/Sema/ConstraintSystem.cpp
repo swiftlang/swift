@@ -655,18 +655,19 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
   return None;
 }
 
-Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
-                                              ConstraintLocatorBuilder locator,
-                                              OpenedTypeMap &replacements) {
+Type
+ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
+                                         ConstraintLocatorBuilder locator) {
   auto unboundDecl = unbound->getDecl();
   auto parentTy = unbound->getParent();
   if (parentTy) {
-    parentTy = openUnboundGenericType(parentTy, locator);
+    parentTy = openUnboundGenericTypes(parentTy, locator);
     unbound = UnboundGenericType::get(unboundDecl, parentTy,
                                       getASTContext());
   }
 
   // Open up the generic type.
+  OpenedTypeMap replacements;
   openGeneric(unboundDecl->getDeclContext(), unboundDecl->getGenericSignature(),
               locator, replacements);
 
@@ -781,7 +782,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
-Type ConstraintSystem::openUnboundGenericType(
+Type ConstraintSystem::openUnboundGenericTypes(
     Type type, ConstraintLocatorBuilder locator) {
   assert(!type->getCanonicalType()->hasTypeParameter());
 
@@ -790,8 +791,7 @@ Type ConstraintSystem::openUnboundGenericType(
 
   type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
-        OpenedTypeMap replacements;
-        return openUnboundGenericType(unbound, locator, replacements);
+        return openUnboundGenericType(unbound, locator);
       }
 
       return type;
@@ -1235,7 +1235,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     checkNestedTypeConstraints(*this, type, locator);
 
     // Open the type.
-    type = openUnboundGenericType(type, locator);
+    type = openUnboundGenericTypes(type, locator);
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
@@ -1491,7 +1491,7 @@ ConstraintSystem::getTypeOfMemberReference(
     checkNestedTypeConstraints(*this, memberTy, locator);
 
     // Open the type if it was a reference to a generic type.
-    memberTy = openUnboundGenericType(memberTy, locator);
+    memberTy = openUnboundGenericTypes(memberTy, locator);
 
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
@@ -4389,9 +4389,12 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
       isImplicit = true;
     }
 
-    auto typeExpr = TypeExpr::createImplicitHack(
-        outermostWrapperAttr->getTypeLoc().getLoc(),
-        outermostWrapperType, ctx);
+    SourceLoc typeLoc;
+    if (auto *repr = outermostWrapperAttr->getTypeRepr()) {
+      typeLoc = repr->getLoc();
+    }
+    auto typeExpr =
+        TypeExpr::createImplicitHack(typeLoc, outermostWrapperType, ctx);
     backingInitializer = CallExpr::create(
         ctx, typeExpr, outermostArg,
         outermostWrapperAttr->getArgumentLabels(),
@@ -4405,7 +4408,8 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   // the initializer type later.
   expression.wrappedVar = singleVar;
   expression.expression = backingInitializer;
-  expression.convertType = outermostWrapperAttr->getTypeLoc();
+  expression.convertType = {outermostWrapperAttr->getTypeRepr(),
+                            outermostWrapperAttr->getType()};
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
@@ -4617,7 +4621,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
 SourceLoc constraints::getLoc(ASTNode anchor) {
   if (auto *E = anchor.dyn_cast<Expr *>()) {
     return E->getLoc();
-  } else if (auto *T = anchor.dyn_cast<TypeLoc *>()) {
+  } else if (auto *T = anchor.dyn_cast<TypeRepr *>()) {
     return T->getLoc();
   } else if (auto *V = anchor.dyn_cast<Decl *>()) {
     if (auto VD = dyn_cast<VarDecl>(V))

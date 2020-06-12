@@ -147,12 +147,9 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
   if (!coerceExpr)
     return nullptr;
 
-  auto subExpr = coerceExpr->getSubExpr();
-  auto castKind =
-      TypeChecker::typeCheckCheckedCast(fromType, toType,
-                                        CheckedCastContextKind::None, cs.DC,
-                                        coerceExpr->getLoc(), subExpr,
-                                        coerceExpr->getCastTypeLoc().getSourceRange());
+  const auto castKind = TypeChecker::typeCheckCheckedCast(
+      fromType, toType, CheckedCastContextKind::None, cs.DC,
+      SourceLoc(), coerceExpr->getSubExpr(), SourceRange());
 
   // Invalid cast.
   if (castKind == CheckedCastKind::Unresolved)
@@ -529,6 +526,23 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
                                ConstraintLocator *locator) {
   return new (cs.getAllocator())
       DefineMemberBasedOnUse(cs, baseType, member, alreadyDiagnosed, locator);
+}
+
+bool DefineMemberBasedOnUnintendedGenericParam::diagnose(
+    const Solution &solution, bool asNote) const {
+  UnintendedExtraGenericParamMemberFailure failure(solution, BaseType, Name,
+                                                   ParamName, getLocator());
+  return failure.diagnose(asNote);
+}
+
+DefineMemberBasedOnUnintendedGenericParam *
+DefineMemberBasedOnUnintendedGenericParam::create(ConstraintSystem &cs,
+                                                  Type baseType,
+                                                  DeclNameRef member,
+                                                  Identifier paramName,
+                                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) DefineMemberBasedOnUnintendedGenericParam(
+      cs, baseType, member, paramName, locator);
 }
 
 AllowMemberRefOnExistential *

@@ -177,7 +177,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
     if (shouldSkip(customAttr->getRangeWithAt()))
       continue;
     auto *Arg = customAttr->getArg();
-    if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+    if (auto *Repr = customAttr->getTypeRepr()) {
       // Note the associated call arguments of the semantic initializer call
       // in case we're resolving an explicit initializer call within the
       // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(wrappedValue: 10)`.

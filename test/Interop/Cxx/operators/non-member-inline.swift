@@ -61,4 +61,22 @@ OperatorsTestSuite.test("greater greater (>>)") {
   expectEqual(2, result.value)
 }
 
+OperatorsTestSuite.test("amp amp (&&)") {
+  let lhs = BoolBox(value: true)
+  let rhs = BoolBox(value: false)
+
+  let result = lhs && rhs
+
+  expectEqual(false, result.value)
+}
+
+OperatorsTestSuite.test("pipe pipe (||)") {
+  let lhs = BoolBox(value: true)
+  let rhs = BoolBox(value: false)
+
+  let result = lhs || rhs
+
+  expectEqual(true, result.value)
+}
+
 runAllTests()

@@ -212,8 +212,8 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
   } else {
     SmallVector<ASTNode, 4> cases;
     for (auto *elt : elements) {
-      auto *pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                             SourceLoc(), DeclNameLoc(),
+      auto *baseTE = TypeExpr::createImplicit(enumType, C);
+      auto *pat = new (C) EnumElementPattern(baseTE, SourceLoc(), DeclNameLoc(),
                                              DeclNameRef(), elt, nullptr);
       pat->setImplicit();
 

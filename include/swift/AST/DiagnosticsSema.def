@@ -94,6 +94,9 @@ ERROR(could_not_find_enum_case,none,
 
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
+     
+NOTE(did_you_mean_generic_param_as_conformance,none,
+     "did you mean to declare %0 as a protocol conformance for %1?", (DeclName, Type))
 
 NOTE(any_as_anyobject_fixit, none,
      "cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members", ())
@@ -5075,8 +5078,8 @@ ERROR(function_builder_infer_ambig, none,
 NOTE(function_builder_infer_add_return, none,
      "add an explicit 'return' statement to not use a function builder", ())
 NOTE(function_builder_infer_pick_specific, none,
-     "apply function builder %0 (inferred from protocol %1)",
-     (Type, DeclName))
+     "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
+     (Type, unsigned, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

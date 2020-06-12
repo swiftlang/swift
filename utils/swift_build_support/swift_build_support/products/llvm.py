@@ -10,6 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
 from . import product
 from ..cmake import CMakeOptions
 
@@ -68,4 +69,4 @@ class LLVM(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark]
+        return [cmark.CMark]
