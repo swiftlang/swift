@@ -1340,6 +1340,7 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
 ///                      ('.' sil-decl-autodiff)?
 ///  sil-decl-subref ::= '!' sil-decl-lang
+///  sil-decl-subref ::= '!' sil-decl-autodiff
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
 ///  sil-decl-subref-part ::= 'allocator'
