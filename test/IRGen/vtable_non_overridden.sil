@@ -66,3 +66,18 @@ sil_vtable InternalB {
 // CHECK-NOT:      @InternalA_foo
 // CHECK-SAME:     @InternalB_bar
 // CHECK-NOT:      @InternalA_bas
+
+// CHECK-LABEL: define {{.*}}@non_overridable_invocation
+sil @non_overridable_invocation : $@convention(thin) (@guaranteed InternalA, @guaranteed InternalB) -> () {
+entry(%a : $InternalA, %b : $InternalB):
+  // CHECK: call swiftcc void @InternalA_foo
+  %am = class_method %a : $InternalA, #InternalA.foo, $@convention(method) (@guaranteed InternalA) -> ()
+  apply %am(%a) : $@convention(method) (@guaranteed InternalA) -> ()
+
+  // CHECK: call swiftcc void @InternalA_foo
+  %bm = class_method %b : $InternalB, #InternalA.foo, $@convention(method) (@guaranteed InternalA) -> ()
+  %ba = upcast %b : $InternalB to $InternalA
+  apply %bm(%ba) : $@convention(method) (@guaranteed InternalA) -> ()
+
+  return undef : $()
+}
