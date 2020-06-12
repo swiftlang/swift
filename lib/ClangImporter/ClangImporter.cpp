@@ -2889,12 +2889,14 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
 bool ClangImporter::Implementation::isVisibleClangEntry(
     const clang::NamedDecl *clangDecl) {
   // For a declaration, check whether the declaration is hidden.
-  if (clangDecl->isUnconditionallyVisible()) return true;
+  auto &clangSema = Instance->getSema();
+  if (clangSema.isVisible(clangDecl))
+    return true;
 
   // Is any redeclaration visible?
-  for (auto redecl : clangDecl->redecls()) {
-    if (cast<clang::NamedDecl>(redecl)->isUnconditionallyVisible()) return true;
-  }
+  for (auto redecl : clangDecl->redecls())
+    if (clangSema.isVisible(cast<clang::NamedDecl>(redecl)))
+      return true;
 
   return false;
 }
