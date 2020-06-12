@@ -205,7 +205,7 @@ syn match swiftDecimal contained
       \ /[0-9]\+/
 
 syn match swiftPreproc
-      \ /#\(\<file\>\|\<line\>\|\<function\>\)/
+      \ /#\(\<column\>\|\<dsohandle\>\|\<file\>\|\<line\>\|\<function\>\)/
 syn match swiftPreproc
       \ /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\|\<error\>\|\<warning\>\)/
 syn region swiftPreprocFalse
