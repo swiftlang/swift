@@ -16,7 +16,6 @@ if exists("b:current_syntax")
 endif
 
 syn keyword swiftKeyword
-      \ associatedtype
       \ break
       \ catch
       \ continue
@@ -92,6 +91,7 @@ syn keyword swiftTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ struct
 
 syn keyword swiftTypeAliasDefinition skipwhite skipempty nextgroup=swiftTypeAliasName
+      \ associatedtype
       \ typealias
 
 syn match swiftMultiwordTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
