@@ -20,6 +20,9 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
+STATISTIC(NumNonoverriddenVTableEntries,
+          "# of vtable entries marked non-overridden");
+
 using namespace swift;
 
 namespace {
@@ -61,6 +64,7 @@ class PruneVTables : public SILModuleTransform {
         if (methodDecl->isOverridden())
           continue;
       }
+      ++NumNonoverriddenVTableEntries;
       entry.setNonOverridden(true);
     }
   }
