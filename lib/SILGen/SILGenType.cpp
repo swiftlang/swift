@@ -83,7 +83,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // it will be redispatched, funneling the method call through the runtime
   // hook point.
   bool usesObjCDynamicDispatch =
-      (derivedDecl->isObjCDynamic() &&
+      (derivedDecl->shouldUseObjCDispatch() &&
        derived.kind != SILDeclRef::Kind::Allocator);
 
   if (usesObjCDynamicDispatch) {
@@ -216,18 +216,27 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   if (auto accessor = dyn_cast<AccessorDecl>(method)) {
     if (accessor->isGetterOrSetter()) {
       auto asd = accessor->getStorage();
-      return asd->isObjC() && !asd->getAttrs().hasAttribute<NSManagedAttr>();
+      return asd->isObjC() && !asd->getAttrs().hasAttribute<NSManagedAttr>() &&
+             !method->isNativeMethodReplacement();
     }
   }
 
   if (method->getAttrs().hasAttribute<NSManagedAttr>())
     return false;
+  if (!method->isObjC())
+    return false;
 
-  return method->isObjC();
+  // Don't emit the objective c entry point of @_dynamicReplacement(for:)
+  // methods in generic classes. There is no way to call it.
+  return !method->isNativeMethodReplacement();
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
-  return constructor->isObjC();
+  if (!constructor->isObjC())
+    return false;
+  // Don't emit the objective c entry point of @_dynamicReplacement(for:)
+  // methods in generic classes. There is no way to call it.
+  return !constructor->isNativeMethodReplacement();
 }
 
 namespace {

@@ -55,6 +55,7 @@ public:
   enum Kind {
     Branch,
     Struct,
+    Tuple,
   };
 
 private:
@@ -67,6 +68,7 @@ public:
     switch (op->getUser()->getKind()) {
     case SILInstructionKind::BranchInst:
     case SILInstructionKind::StructInst:
+    case SILInstructionKind::TupleInst:
       return {{const_cast<Operand *>(op)}};
     default:
       return None;
@@ -79,6 +81,8 @@ public:
       return Kind::Branch;
     case SILInstructionKind::StructInst:
       return Kind::Struct;
+    case SILInstructionKind::TupleInst:
+      return Kind::Tuple;
     default:
       llvm_unreachable("unhandled case?!");
     }
@@ -104,6 +108,7 @@ public:
     switch (getKind()) {
     case Kind::Branch:
       return true;
+    case Kind::Tuple:
     case Kind::Struct:
       return false;
     }
@@ -121,6 +126,8 @@ public:
     switch (getKind()) {
     case Kind::Struct:
       return visitor(cast<StructInst>(getInst()));
+    case Kind::Tuple:
+      return visitor(cast<TupleInst>(getInst()));
     case Kind::Branch: {
       auto *br = cast<BranchInst>(getInst());
       unsigned opNum = getOperandNumber();
@@ -588,6 +595,11 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
     auto *si = cast<StructInst>(introducer.value);
     si->setOwnershipKind(ValueOwnershipKind::Guaranteed);
     return si;
+  }
+  case OwnedValueIntroducerKind::Tuple: {
+    auto *ti = cast<TupleInst>(introducer.value);
+    ti->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+    return ti;
   }
   case OwnedValueIntroducerKind::Copy:
   case OwnedValueIntroducerKind::LoadCopy:

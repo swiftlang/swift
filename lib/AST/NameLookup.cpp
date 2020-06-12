@@ -857,8 +857,6 @@ SelfBoundsFromWhereClauseRequest::evaluate(
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
         isSelfLHS = (identTypeRepr->getNameRef().getBaseIdentifier() ==
                      ctx.Id_Self);
-    } else if (Type type = req.getSubject()) {
-      isSelfLHS = type->isEqual(dc->getSelfInterfaceType());
     }
     if (!isSelfLHS)
       continue;
@@ -867,8 +865,6 @@ SelfBoundsFromWhereClauseRequest::evaluate(
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
       rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, lookupDC);
-    } else if (Type type = req.getConstraint()) {
-      rhsDecls = directReferencesForType(type);
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
@@ -899,30 +895,24 @@ TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = ext->getASTContext();
 
   TinyPtrVector<TypeDecl *> result;
+  auto resolve = [&](TypeRepr *typeRepr) {
+    auto decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+    result.insert(result.end(), decls.begin(), decls.end());
+  };
   for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
-    auto resolve = [&](TypeLoc loc) {
-      DirectlyReferencedTypeDecls decls;
-      if (auto *typeRepr = loc.getTypeRepr())
-        decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-      else if (Type type = loc.getType())
-        decls = directReferencesForType(type);
-
-      result.insert(result.end(), decls.begin(), decls.end());
-    };
-
     switch (req.getKind()) {
     case RequirementReprKind::TypeConstraint:
-      resolve(req.getSubjectLoc());
-      resolve(req.getConstraintLoc());
+      resolve(req.getSubjectRepr());
+      resolve(req.getConstraintRepr());
       break;
 
     case RequirementReprKind::SameType:
-      resolve(req.getFirstTypeLoc());
-      resolve(req.getSecondTypeLoc());
+      resolve(req.getFirstTypeRepr());
+      resolve(req.getSecondTypeRepr());
       break;
 
     case RequirementReprKind::LayoutConstraint:
-      resolve(req.getSubjectLoc());
+      resolve(req.getSubjectRepr());
       break;
     }
   }
@@ -2296,12 +2286,11 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
-  TypeLoc &typeLoc = attr->getTypeLoc();
   DirectlyReferencedTypeDecls decls;
-  if (auto typeRepr = typeLoc.getTypeRepr()) {
+  if (auto *typeRepr = attr->getTypeRepr()) {
     decls = directReferencesForTypeRepr(
         evaluator, ctx, typeRepr, dc);
-  } else if (Type type = typeLoc.getType()) {
+  } else if (Type type = attr->getType()) {
     decls = directReferencesForType(type);
   }
 
@@ -2316,7 +2305,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // If we found declarations that are associated types, look outside of
   // the current context to see if we can recover.
   if (declsAreAssociatedTypes(decls)) {
-    if (auto typeRepr = typeLoc.getTypeRepr()) {
+    if (auto typeRepr = attr->getTypeRepr()) {
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
         auto assocType = cast<AssociatedTypeDecl>(decls.front());
 
@@ -2348,7 +2337,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
               identTypeRepr
             };
 
-            typeLoc = TypeLoc(IdentTypeRepr::create(ctx, components));
+            auto *newTE = new (ctx) TypeExpr(IdentTypeRepr::create(ctx, components));
+            attr->resetTypeInformation(newTE);
             return nominal;
           }
         }

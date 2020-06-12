@@ -99,9 +99,9 @@ AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(const VarDecl *const vd) {
   SourceRange sr;
   for (auto *attr : vd->getAttrs().getAttributes<CustomAttr>()) {
     if (sr.isInvalid())
-      sr = attr->getTypeLoc().getSourceRange();
+      sr = attr->getTypeRepr()->getSourceRange();
     else
-      sr.widen(attr->getTypeLoc().getSourceRange());
+      sr.widen(attr->getTypeRepr()->getSourceRange());
   }
   return sr;
 }

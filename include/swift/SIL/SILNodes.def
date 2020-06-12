@@ -880,8 +880,13 @@ NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
 FULLAPPLYSITE_MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
                                   MultipleValueInstruction, MayHaveSideEffects, MayRelease)
+                                  
+// begin_cow_mutation is defined to have side effects, because it has
+// dependencies with instructions which retain the buffer operand. This prevents
+// optimizations from moving begin_cow_mutation instructions across such retain
+// instructions.
 MULTIPLE_VALUE_INST(BeginCOWMutationInst, begin_cow_mutation,
-                    MultipleValueInstruction, None, DoesNotRelease)
+                    MultipleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
                     MultipleValueInstruction, None, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,

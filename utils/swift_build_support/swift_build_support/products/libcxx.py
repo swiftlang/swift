@@ -10,6 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import llvm
 from . import product
 
 
@@ -24,5 +26,5 @@ class LibCXX(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM]
+        return [cmark.CMark,
+                llvm.LLVM]

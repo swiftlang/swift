@@ -1,0 +1,14 @@
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --llbuild --swiftpm --foundation --libdispatch --cmake %cmake 2>&1 | %FileCheck %s
+
+# REQUIRES: standalone_build
+# REQUIRES: OS=linux-gnu
+
+# CHECK-DAG: --- Installing cmark ---
+# CHECK-DAG: --- Installing swift ---
+# CHECK-DAG: --- Installing llvm ---
+# CHECK-DAG: --- Installing llbuild ---
+# CHECK-DAG: --- Installing foundation ---
+# CHECK-DAG: --- Installing libdispatch ---
+# CHECK-DAG: --- Installing swiftpm ---

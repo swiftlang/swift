@@ -510,11 +510,6 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 
 /// Writes the Syntax tree to the given file
 static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
-  auto bufferID = SF->getBufferID();
-  assert(bufferID && "frontend should have a buffer ID "
-         "for the main source file");
-  (void)bufferID;
-
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
@@ -741,7 +736,7 @@ static void countStatsPostSILGen(UnifiedStatsReporter &Stats,
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time, via the dense maps.
   C.NumSILGenFunctions += Module.getFunctionList().size();
-  C.NumSILGenVtables += Module.getVTableList().size();
+  C.NumSILGenVtables += Module.getVTables().size();
   C.NumSILGenWitnessTables += Module.getWitnessTableList().size();
   C.NumSILGenDefaultWitnessTables += Module.getDefaultWitnessTableList().size();
   C.NumSILGenGlobalVariables += Module.getSILGlobalList().size();
@@ -884,12 +879,13 @@ static void dumpAST(CompilerInstance &Instance) {
       auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
       auto OutputFilename = PSPs.OutputFilename;
       auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
-      sourceFile->dump(*OS);
+      sourceFile->dump(*OS, /*parseIfNeeded*/ true);
     }
   } else {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
-    getPrimaryOrMainSourceFile(Instance)->dump(llvm::outs());
+    auto *SF = getPrimaryOrMainSourceFile(Instance);
+    SF->dump(llvm::outs(), /*parseIfNeeded*/ true);
   }
 }
 
@@ -1226,9 +1222,20 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 /// before or after LLVM depending on when the ASTContext gets freed.
 static void performEndOfPipelineActions(CompilerInstance &Instance) {
   assert(Instance.hasASTContext());
+  auto &ctx = Instance.getASTContext();
+
+  // Make sure we didn't load a module during a parse-only invocation, unless
+  // it's -emit-imported-modules, which can load modules.
+  auto action = Instance.getInvocation().getFrontendOptions().RequestedAction;
+  if (FrontendOptions::shouldActionOnlyParse(action) &&
+      action != FrontendOptions::ActionType::EmitImportedModules) {
+    assert(ctx.LoadedModules.size() == 1 &&
+           "Loaded a module during parse-only");
+    assert(ctx.LoadedModules.front().second == Instance.getMainModule());
+  }
 
   // Verify the AST for all the modules we've loaded.
-  Instance.getASTContext().verifyAllLoadedModules();
+  ctx.verifyAllLoadedModules();
 
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
@@ -1273,15 +1280,22 @@ static bool performCompile(CompilerInstance &Instance,
       return true;
   }
 
+  SWIFT_DEFER {
+    // We might have freed the ASTContext already, but in that case we would
+    // have already performed these actions.
+    if (Instance.hasASTContext())
+      performEndOfPipelineActions(Instance);
+  };
+
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
-    // Disable delayed parsing of type and function bodies when we've been
-    // asked to dump the resulting AST.
-    bool CanDelayBodies = Action != FrontendOptions::ActionType::DumpParse;
-    bool EvaluateConditionals =
-        Action == FrontendOptions::ActionType::EmitImportedModules
-        || Action == FrontendOptions::ActionType::ScanDependencies;
-    Instance.performParseOnly(EvaluateConditionals,
-                              CanDelayBodies);
+    // Parsing gets triggered lazily, but let's make sure we have the right
+    // input kind.
+    auto kind = Invocation.getInputKind();
+    assert((kind == InputFileKind::Swift ||
+            kind == InputFileKind::SwiftLibrary ||
+            kind == InputFileKind::SwiftModuleInterface) &&
+           "Only supports parsing .swift files");
+    (void)kind;
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
   } else {
@@ -1289,8 +1303,15 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   ASTContext &Context = Instance.getASTContext();
-  if (Action == FrontendOptions::ActionType::Parse)
+  if (Action == FrontendOptions::ActionType::Parse) {
+    // A -parse invocation only cares about the side effects of parsing, so
+    // force the parsing of all the source files.
+    for (auto *file : Instance.getMainModule()->getFiles()) {
+      if (auto *SF = dyn_cast<SourceFile>(file))
+        (void)SF->getTopLevelDecls();
+    }
     return Context.hadError();
+  }
 
   if (Action == FrontendOptions::ActionType::ScanDependencies) {
     scanDependencies(Instance);
@@ -1336,13 +1357,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
-
-  SWIFT_DEFER {
-    // We might have freed the ASTContext already, but in that case we would
-    // have already performed these actions.
-    if (Instance.hasASTContext())
-      performEndOfPipelineActions(Instance);
-  };
 
   if (Context.hadError())
     return true;

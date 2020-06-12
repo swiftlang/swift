@@ -35,13 +35,10 @@ extension S1 : HasFoo where T == UInt8 {
 // CHECK: [[EXIS:%.*]] = alloc_stack $HasFoo
 // CHECK: [[S1:%.*]] = alloc_stack $S1<UInt8>
 // CHECK: store %0 to [[S1]] : $*S1<UInt8>
-// CHECK: [[OPT:%.*]] = alloc_stack $Optional<HasFoo>
-// CHECK: [[INIT_DATA:%.*]] = init_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: [[EXIS_ADDR:%.*]] = init_existential_addr [[INIT_DATA]] : $*HasFoo, $S1<UInt8>
+// CHECK: [[HASFOO:%.*]] = alloc_stack $HasFoo
+// CHECK: [[EXIS_ADDR:%.*]] = init_existential_addr [[HASFOO]] : $*HasFoo, $S1<UInt8>
 // CHECK: copy_addr [take] [[S1]] to [initialization] [[EXIS_ADDR]] : $*S1<UInt8>
-// CHECK: inject_enum_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: copy_addr [take] [[DATA]] to [initialization] [[EXIS]] : $*HasFoo
+// CHECK: copy_addr [take] [[HASFOO]] to [initialization] [[EXIS]] : $*HasFoo
 // CHECK: [[OPEN_EXIS_ADDR:%.*]] = open_existential_addr immutable_access [[EXIS]] : $*HasFoo to $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
 // CHECK: [[OPEN_ADDR:%.*]] = unchecked_addr_cast [[OPEN_EXIS_ADDR]] : $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo to $*S1<UInt8>
 // CHECK: [[F:%.*]] = function_ref @witnessS1 : $@convention(witness_method: HasFoo) (@in_guaranteed S1<UInt8>) -> ()
@@ -171,13 +168,10 @@ struct IsP : P {}
 // CHECK: [[EXIS:%.*]] = alloc_stack $HasFoo
 // CHECK: [[S2:%.*]] = alloc_stack $S2<IsP>
 // CHECK: store %0 to [[S2]] : $*S2<IsP>
-// CHECK: [[OPT:%.*]] = alloc_stack $Optional<HasFoo>
-// CHECK: [[INIT_DATA:%.*]] = init_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: [[EXIS_ADDR:%.*]] = init_existential_addr [[INIT_DATA]] : $*HasFoo, $S2<IsP>
+// CHECK: [[HASFOO:%.*]] = alloc_stack $HasFoo
+// CHECK: [[EXIS_ADDR:%.*]] = init_existential_addr [[HASFOO]] : $*HasFoo, $S2<IsP>
 // CHECK: copy_addr [take] [[S2]] to [initialization] [[EXIS_ADDR]] : $*S2<IsP>
-// CHECK: inject_enum_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: copy_addr [take] [[DATA]] to [initialization] [[EXIS]] : $*HasFoo
+// CHECK: copy_addr [take] [[HASFOO]] to [initialization] [[EXIS]] : $*HasFoo
 // CHECK: [[OPEN_EXIS_ADDR:%.*]] = open_existential_addr immutable_access [[EXIS]] : $*HasFoo to $*@opened("4E16D1CE-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
 // CHECK: [[OPEN_ADDR:%.*]] = unchecked_addr_cast [[OPEN_EXIS_ADDR]] : $*@opened("4E16D1CE-FD9F-11E8-A311-D0817AD9F6DD") HasFoo to $*S2<IsP>
 // CHECK: [[F:%.*]] = function_ref @$s9witnessS24main3IsPV_Tg5 : $@convention(witness_method: HasFoo) (S2<IsP>) -> ()
@@ -246,13 +240,10 @@ extension S3 : HasFoo where T : AnyObject {
 // CHECK: [[EXIS:%.*]] = alloc_stack $HasFoo
 // CHECK: [[S3:%.*]] = alloc_stack $S3<C>
 // CHECK: store %0 to [[S3]] : $*S3<C>
-// CHECK: [[OPT:%.*]] = alloc_stack $Optional<HasFoo>
-// CHECK: [[INIT_DATA:%.*]] = init_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: [[EXIS_ADDR:%.*]] = init_existential_addr [[INIT_DATA]] : $*HasFoo, $S3<C>
+// CHECK: [[HASFOO:%.*]] = alloc_stack $HasFoo
+// CHECK: [[EXIS_ADDR:%.*]] = init_existential_addr [[HASFOO]] : $*HasFoo, $S3<C>
 // CHECK: copy_addr [take] [[S3]] to [initialization] [[EXIS_ADDR]] : $*S3<C>
-// CHECK: inject_enum_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: copy_addr [take] [[DATA]] to [initialization] [[EXIS]] : $*HasFoo
+// CHECK: copy_addr [take] [[HASFOO]] to [initialization] [[EXIS]] : $*HasFoo
 // CHECK: [[OPEN_EXIS_ADDR:%.*]] = open_existential_addr immutable_access [[EXIS]] : $*HasFoo to $*@opened("4E16D5E8-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
 // CHECK: [[OPEN_ADDR:%.*]] = unchecked_addr_cast [[OPEN_EXIS_ADDR]] : $*@opened("4E16D5E8-FD9F-11E8-A311-D0817AD9F6DD") HasFoo to $*S3<C>
 // CHECK: [[F:%.*]] = function_ref @$s9witnessS34main1CC_Tg5 : $@convention(witness_method: HasFoo) (S3<C>) -> ()
@@ -319,13 +310,10 @@ extension S4 : HasFoo where T : C {
 // CHECK: [[EXIS:%.*]] = alloc_stack $HasFoo
 // CHECK: [[S3:%.*]] = alloc_stack $S4<SubC>
 // CHECK: store %0 to [[S3]] : $*S4<SubC>
-// CHECK: [[OPT:%.*]] = alloc_stack $Optional<HasFoo>
-// CHECK: [[INIT_DATA:%.*]] = init_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: [[EXIS_ADDR:%.*]] = init_existential_addr [[INIT_DATA]] : $*HasFoo, $S4<SubC>
+// CHECK: [[HASFOO:%.*]] = alloc_stack $HasFoo
+// CHECK: [[EXIS_ADDR:%.*]] = init_existential_addr [[HASFOO]] : $*HasFoo, $S4<SubC>
 // CHECK: copy_addr [take] [[S3]] to [initialization] [[EXIS_ADDR]] : $*S4<SubC>
-// CHECK: inject_enum_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt
-// CHECK: copy_addr [take] [[DATA]] to [initialization] [[EXIS]] : $*HasFoo
+// CHECK: copy_addr [take] [[HASFOO]] to [initialization] [[EXIS]] : $*HasFoo
 // CHECK: [[OPEN_EXIS_ADDR:%.*]] = open_existential_addr immutable_access [[EXIS]] : $*HasFoo to $*@opened("4E16E402-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
 // CHECK: [[OPEN_ADDR:%.*]] = unchecked_addr_cast [[OPEN_EXIS_ADDR]] : $*@opened("4E16E402-FD9F-11E8-A311-D0817AD9F6DD") HasFoo to $*S4<SubC>
 // CHECK: [[F:%.*]] = function_ref @$s9witnessS44main4SubCC_Tg5 : $@convention(witness_method: HasFoo) (S4<SubC>) -> ()

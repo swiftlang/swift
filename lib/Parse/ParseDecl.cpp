@@ -236,9 +236,8 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
     decls.push_back(decl);
   }
 
-  // Finalize the token receiver.
+  // Finalize the syntax context.
   SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
-  TokReceiver->finalize();
 }
 
 bool Parser::parseTopLevelSIL() {
@@ -812,10 +811,10 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   }
 
   // FIXME(ModQual): Reject module qualification on MemberName.
-
+  auto *TE = new (Context) TypeExpr(ProtocolType.get());
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
-                           ProtocolType.get(), MemberName.getFullName(),
+                           TE, MemberName.getFullName(),
                            MemberNameLoc));
 }
 
@@ -2219,7 +2218,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (invalid)
       return false;
 
-    Attributes.add(TypeEraserAttr::create(Context, AtLoc, {Loc, RParenLoc}, ErasedType.get()));
+    auto *TE = new (Context) TypeExpr(ErasedType.get());
+    Attributes.add(TypeEraserAttr::create(Context, AtLoc, {Loc, RParenLoc}, TE));
     break;
   }
 
@@ -2592,7 +2592,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
     }
 
     // Form the attribute.
-    auto attr = CustomAttr::create(Context, AtLoc, type.get(), hasInitializer,
+    auto *TE = new (Context) TypeExpr(type.get());
+    auto attr = CustomAttr::create(Context, AtLoc, TE, hasInitializer,
                                    initContext, lParenLoc, args, argLabels,
                                    argLabelLocs, rParenLoc);
     Attributes.add(attr);
@@ -4478,16 +4479,14 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                       ParseDeclOptions Options, IterableDeclContext *IDC,
                       bool &hadError) {
 
-  // Record the curly braces but nothing inside.
+  // If we're hashing the type body separately, record the curly braces but
+  // nothing inside for the interface hash.
+  Optional<llvm::SaveAndRestore<Optional<llvm::MD5>>> MemberHashingScope;
   if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()) {
     recordTokenHash("{");
     recordTokenHash("}");
+    MemberHashingScope.emplace(CurrentTokenHash, llvm::MD5());
   }
-  llvm::MD5 tokenHashForThisDeclList;
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
-      CurrentTokenHash, IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()
-                            ? &tokenHashForThisDeclList
-                            : CurrentTokenHash);
 
   std::vector<Decl *> decls;
   ParserStatus Status;
@@ -4522,7 +4521,8 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
     return std::make_pair(decls, None);
 
   llvm::MD5::MD5Result result;
-  tokenHashForThisDeclList.final(result);
+  auto declListHash = MemberHashingScope ? *CurrentTokenHash : llvm::MD5();
+  declListHash.final(result);
   llvm::SmallString<32> tokenHashString;
   llvm::MD5::stringifyResult(result, tokenHashString);
   return std::make_pair(decls, tokenHashString.str().str());
@@ -5696,12 +5696,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   if (!PrimaryVar)
     return nullptr;
 
-  TypeLoc TyLoc;
-  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
-    TyLoc = TP->getTypeLoc();
-  }
-
-  if (!TyLoc.hasLocation()) {
+  if (!isa<TypedPattern>(pattern)) {
     if (accessors.Get || accessors.Set || accessors.Address ||
         accessors.MutableAddress) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
@@ -6413,7 +6408,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   recordTokenHash("{");
   recordTokenHash("}");
 
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(CurrentTokenHash, nullptr);
+  llvm::SaveAndRestore<Optional<llvm::MD5>> T(CurrentTokenHash, None);
 
   // If we can delay parsing this body, or this is the first pass of code
   // completion, skip until the end. If we encounter a code completion token

@@ -502,6 +502,10 @@ struct OwnedValueIntroducerKind {
     /// owned.
     Struct,
 
+    /// An owned value that is from a tuple that has multiple operands that are
+    /// owned.
+    Tuple,
+
     /// An owned value that is a function argument.
     FunctionArgument,
 
@@ -528,6 +532,8 @@ struct OwnedValueIntroducerKind {
       return OwnedValueIntroducerKind(BeginApply);
     case ValueKind::StructInst:
       return OwnedValueIntroducerKind(Struct);
+    case ValueKind::TupleInst:
+      return OwnedValueIntroducerKind(Tuple);
     case ValueKind::SILPhiArgument: {
       auto *phiArg = cast<SILPhiArgument>(value);
       if (dyn_cast_or_null<TryApplyInst>(phiArg->getSingleTerminator())) {
@@ -621,6 +627,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::LoadTake:
     case OwnedValueIntroducerKind::Phi:
     case OwnedValueIntroducerKind::Struct:
+    case OwnedValueIntroducerKind::Tuple:
     case OwnedValueIntroducerKind::FunctionArgument:
     case OwnedValueIntroducerKind::PartialApplyInit:
     case OwnedValueIntroducerKind::AllocBoxInit:
@@ -639,6 +646,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::Phi:
       return true;
     case OwnedValueIntroducerKind::Struct:
+    case OwnedValueIntroducerKind::Tuple:
     case OwnedValueIntroducerKind::Copy:
     case OwnedValueIntroducerKind::LoadCopy:
     case OwnedValueIntroducerKind::Apply:

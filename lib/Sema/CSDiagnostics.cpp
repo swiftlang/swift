@@ -2344,8 +2344,8 @@ bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
   auto anchor = getAnchor();
 
   if (auto *coerceExpr = getAsExpr<CoerceExpr>(anchor)) {
-    auto fromType = getType(coerceExpr->getSubExpr());
-    auto toType = getType(&coerceExpr->getCastTypeLoc());
+    const auto fromType = getType(coerceExpr->getSubExpr());
+    const auto toType = getType(coerceExpr->getCastTypeRepr());
 
     auto diagnostic = getDiagnosticFor(CTP_CoerceOperand, toType);
 
@@ -2570,11 +2570,8 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (!getASTContext().getStdlibModule())
     return false;
 
-  auto String = TypeChecker::getStringType(getASTContext());
-  auto Substring = TypeChecker::getSubstringType(getASTContext());
-
-  if (!String || !Substring)
-    return false;
+  auto String = getASTContext().getStringDecl()->getDeclaredInterfaceType();
+  auto Substring = getASTContext().getSubstringDecl()->getDeclaredInterfaceType();
 
   // Substring -> String conversion
   // Wrap in String.init
@@ -3333,6 +3330,30 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
     }
   }
   return false;
+}
+
+bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
+  MissingMemberFailure::diagnoseAsError();
+
+  auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
+  auto archetype = baseType->getMetatypeInstanceType()->castTo<ArchetypeType>();
+  auto genericTy =
+      archetype->mapTypeOutOfContext()->castTo<GenericTypeParamType>();
+  SourceLoc loc = genericTy->getDecl()->getSourceRange().End;
+  StringRef replacement;
+
+  if (archetype->getConformsTo().size()) {
+    loc = loc.getAdvancedLoc(
+        archetype->getConformsTo().back()->getName().getLength());
+    replacement = " &";
+  } else {
+    loc = loc.getAdvancedLoc(archetype->getName().getLength());
+    replacement = ":";
+  }
+  emitDiagnosticAt(loc, diag::did_you_mean_generic_param_as_conformance,
+                   ParamName, archetype)
+      .fixItReplaceChars(loc, loc.getAdvancedLoc(1), replacement);
+  return true;
 }
 
 bool InvalidMemberRefOnExistential::diagnoseAsError() {
@@ -4979,7 +5000,7 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
   }
 
   if (auto *CE = getAsExpr<ExplicitCastExpr>(getRawAnchor())) {
-    auto castTo = getType(&CE->getCastTypeLoc());
+    const auto castTo = getType(CE->getCastTypeRepr());
     auto *NTD = castTo->getAnyNominal();
     emitDiagnosticAt(loc, diag::unbound_generic_parameter_cast, GP,
                      NTD ? NTD->getDeclaredType() : castTo);
@@ -5077,15 +5098,17 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
     llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback) {
   using Callback = llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)>;
 
-  auto anchor = getRawAnchor();
+  auto *const typeRepr = [this]() -> TypeRepr * {
+    const auto anchor = getRawAnchor();
+    if (const auto *TE = getAsExpr<TypeExpr>(anchor))
+      return TE->getTypeRepr();
+    else if (const auto *ECE = getAsExpr<ExplicitCastExpr>(anchor))
+      return ECE->getCastTypeRepr();
+    else
+      return nullptr;
+  }();
 
-  TypeLoc typeLoc;
-  if (auto *TE = getAsExpr<TypeExpr>(anchor))
-    typeLoc = TE->getTypeRepr();
-  else if (auto *ECE = getAsExpr<ExplicitCastExpr>(anchor))
-    typeLoc = ECE->getCastTypeLoc();
-
-  if (!typeLoc.hasLocation())
+  if (!typeRepr)
     return false;
 
   struct AssociateMissingParams : public ASTWalker {
@@ -5140,7 +5163,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
 
   } associator(Parameters, callback);
 
-  typeLoc.getTypeRepr()->walk(associator);
+  typeRepr->walk(associator);
   return associator.allParamsAssigned();
 }
 

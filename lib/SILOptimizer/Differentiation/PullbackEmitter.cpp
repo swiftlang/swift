@@ -272,7 +272,8 @@ void PullbackEmitter::accumulateArrayLiteralElementAddressAdjoints(
       originalValue->getDefiningInstruction());
   if (!dti)
     return;
-  if (!getAllocateUninitializedArrayIntrinsic(dti->getOperand()))
+  if (!ArraySemanticsCall(dti->getOperand(),
+                          semantics::ARRAY_UNINITIALIZED_INTRINSIC))
     return;
   if (originalValue != dti->getResult(0))
     return;
@@ -511,6 +512,66 @@ void PullbackEmitter::addToAdjointBuffer(SILBasicBlock *origBB,
   assert(rhsBufferAccess->getFunction() == &getPullback());
   auto adjointBuffer = getAdjointBuffer(origBB, originalBuffer);
   accumulateIndirect(adjointBuffer, rhsBufferAccess, loc);
+}
+
+//--------------------------------------------------------------------------//
+// Debugging utilities
+//--------------------------------------------------------------------------//
+
+void PullbackEmitter::printAdjointValueMapping() {
+  // Group original/adjoint values by basic block.
+  llvm::DenseMap<SILBasicBlock *, llvm::DenseMap<SILValue, AdjointValue>> tmp;
+  for (auto pair : valueMap) {
+    auto origPair = pair.first;
+    auto *origBB = origPair.first;
+    auto origValue = origPair.second;
+    auto adjValue = pair.second;
+    tmp[origBB].insert({origValue, adjValue});
+  }
+  // Print original/adjoint values per basic block.
+  auto &s = getADDebugStream() << "Adjoint value mapping:\n";
+  for (auto &origBB : getOriginal()) {
+    if (!pullbackBBMap.count(&origBB))
+      continue;
+    auto bbValueMap = tmp[&origBB];
+    s << "bb" << origBB.getDebugID();
+    s << " (size " << bbValueMap.size() << "):\n";
+    for (auto valuePair : bbValueMap) {
+      auto origValue = valuePair.first;
+      auto adjValue = valuePair.second;
+      s << "ORIG: " << origValue;
+      s << "ADJ: " << adjValue << '\n';
+    }
+    s << '\n';
+  }
+}
+
+void PullbackEmitter::printAdjointBufferMapping() {
+  // Group original/adjoint buffers by basic block.
+  llvm::DenseMap<SILBasicBlock *, llvm::DenseMap<SILValue, SILValue>> tmp;
+  for (auto pair : bufferMap) {
+    auto origPair = pair.first;
+    auto *origBB = origPair.first;
+    auto origBuf = origPair.second;
+    auto adjBuf = pair.second;
+    tmp[origBB][origBuf] = adjBuf;
+  }
+  // Print original/adjoint buffers per basic block.
+  auto &s = getADDebugStream() << "Adjoint buffer mapping:\n";
+  for (auto &origBB : getOriginal()) {
+    if (!pullbackBBMap.count(&origBB))
+      continue;
+    auto bbBufferMap = tmp[&origBB];
+    s << "bb" << origBB.getDebugID();
+    s << " (size " << bbBufferMap.size() << "):\n";
+    for (auto valuePair : bbBufferMap) {
+      auto origBuf = valuePair.first;
+      auto adjBuf = valuePair.second;
+      s << "ORIG: " << origBuf;
+      s << "ADJ: " << adjBuf << '\n';
+    }
+    s << '\n';
+  }
 }
 
 //--------------------------------------------------------------------------//
@@ -1420,10 +1481,23 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
 
 void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   assert(getPullbackInfo().shouldDifferentiateApplySite(ai));
-  // Skip `array.uninitialized_intrinsic` intrinsic applications, which have
-  // special `store` and `copy_addr` support.
-  if (isArrayLiteralIntrinsic(ai))
+  // Skip `array.uninitialized_intrinsic` applications, which have special
+  // `store` and `copy_addr` support.
+  if (ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC))
     return;
+  auto loc = ai->getLoc();
+  auto *bb = ai->getParent();
+  // Handle `array.finalize_intrinsic` applications. `array.finalize_intrinsic`
+  // semantically behaves like an identity function.
+  if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC)) {
+    assert(ai->getNumArguments() == 1 &&
+           "Expected intrinsic to have one operand");
+    // Accumulate result's adjoint into argument's adjoint.
+    auto adjResult = getAdjointValue(bb, ai);
+    auto origArg = ai->getArgumentsWithoutIndirectResults().front();
+    addAdjointValue(bb, origArg, adjResult, loc);
+    return;
+  }
   // Replace a call to a function with a call to its pullback.
   auto &nestedApplyInfo = getContext().getNestedApplyInfo();
   auto applyInfoLookup = nestedApplyInfo.find(ai);
@@ -1439,7 +1513,6 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   // Get the pullback.
   auto *field = getPullbackInfo().lookUpLinearMapDecl(ai);
   assert(field);
-  auto loc = ai->getLoc();
   auto pullback = getPullbackStructElement(ai->getParent(), field);
 
   // Get the original result of the `apply` instruction.
@@ -1478,7 +1551,6 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
   }
 
   // Get formal callee pullback arguments.
-  auto *bb = ai->getParent();
   assert(applyInfo.indices.results->getNumIndices() == 1);
   for (auto resultIndex : applyInfo.indices.results->getIndices()) {
     assert(resultIndex < origAllResults.size());

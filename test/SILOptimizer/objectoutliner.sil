@@ -6,9 +6,10 @@ sil_stage canonical
 import Builtin
 import Swift
 
-class Obj {
+class Base { }
+
+class Obj : Base {
   @_hasStorage var value: Int64
-  init()
 }
 
 // CHECK-LABEL: sil_global private @outline_global_simpleTv_ : $Obj = {
@@ -41,7 +42,30 @@ bb0:
   %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @outline_global_with_upcast
+// CHECK: [[G:%[0-9]+]] = global_value @outline_global_with_upcastTv_ : $Obj
+// CHECK: strong_retain [[G]] : $Obj
+// CHECK: [[C:%[0-9]+]] = upcast [[G]] : $Obj to $Base
+// CHECK-NOT: store
+// CHECK: strong_release [[C]] : $Base
+// CHECK: return
+sil @outline_global_with_upcast : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %8 = upcast %7 : $Obj to $Base
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = end_cow_mutation %8 : $Base
+  strong_release %10 : $Base
   %r = tuple ()
   return %r : $()
 }
@@ -70,7 +94,8 @@ bb0:
   %19 = integer_literal $Builtin.Word, 1
   %20 = index_addr %15 : $*Int64, %19 : $Builtin.Word
   store %6 to %20 : $*Int64
-  strong_release %7 : $Obj
+  %21 = end_cow_mutation %7 : $Obj
+  strong_release %21 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -90,8 +115,9 @@ bb0:
   %5 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %6 = ref_element_addr %5 : $Obj, #Obj.value
   store %4 to %6 : $*Int64
-  set_deallocating %5 : $Obj
-  dealloc_ref %5 : $Obj
+  %10 = end_cow_mutation %5 : $Obj
+  set_deallocating %10 : $Obj
+  dealloc_ref %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -107,7 +133,8 @@ bb0:
   %7 = alloc_ref $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -125,7 +152,8 @@ bb0:
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
   store %4 to %9 : $*Int64
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -140,7 +168,8 @@ bb0:
   %4 = struct $Int64 (%1 : $Builtin.Int64)
   %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -156,7 +185,8 @@ bb0:
   %7 = alloc_ref [objc] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -177,7 +207,8 @@ bb0:
   %10 = address_to_pointer %9 : $*Int64 to $Builtin.RawPointer
   %f = function_ref @take_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
   %a = apply %f(%10) : $@convention(thin) (Builtin.RawPointer) -> ()
-  strong_release %7 : $Obj
+  %12 = end_cow_mutation %7 : $Obj
+  strong_release %12 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -215,7 +246,8 @@ bb0:
   store %4 to %9 : $*Int64
   %15 = ref_tail_addr %7 : $Obj, $Int64
   store %5 to %15 : $*Int64
-  strong_release %7 : $Obj
+  %16 = end_cow_mutation %7 : $Obj
+  strong_release %16 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -241,7 +273,8 @@ bb0:
   %19 = integer_literal $Builtin.Word, 1
   %20 = index_addr %15 : $*Int64, %19 : $Builtin.Word
   store %6 to %20 : $*Int64
-  strong_release %7 : $Obj
+  %21 = end_cow_mutation %7 : $Obj
+  strong_release %21 : $Obj
   %r = tuple ()
   return %r : $()
 }

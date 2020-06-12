@@ -61,6 +61,9 @@ EXPECTED_DEFAULTS = {
     'build_cygwin': True,
     'build_external_benchmarks': False,
     'build_foundation': False,
+    'build_cmark': True,
+    'build_swift': True,
+    'build_llvm': True,
     'build_freebsd': True,
     'build_ios': True,
     'build_ios_device': False,
@@ -159,9 +162,11 @@ EXPECTED_DEFAULTS = {
     'host_test': False,
     'only_executable_test': False,
     'only_non_executable_test': False,
+    'infer_dependencies': False,
     'install_prefix': targets.install_prefix(),
     'install_symroot': None,
     'install_destdir': None,
+    'install_all': False,
     'ios': False,
     'ios_all': False,
     'legacy_impl': False,
@@ -236,7 +241,8 @@ EXPECTED_DEFAULTS = {
     'validation_test': None,
     'verbose_build': False,
     'watchos': False,
-    'watchos_all': False
+    'watchos_all': False,
+    'llvm_install_components': defaults.llvm_install_components(),
 }
 
 
@@ -481,6 +487,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('-p', dest='build_swiftpm'),
 
     SetTrueOption('--legacy-impl', dest='legacy_impl'),
+    SetTrueOption('--infer', dest='infer_dependencies'),
 
     EnableOption('--android'),
     EnableOption('--build-external-benchmarks'),
@@ -535,6 +542,10 @@ EXPECTED_OPTIONS = [
     EnableOption('--verbose-build'),
     EnableOption('--watchos'),
     EnableOption('--xctest', dest='build_xctest'),
+
+    DisableOption('--skip-build-cmark', dest='build_cmark'),
+    DisableOption('--skip-build-llvm', dest='build_llvm'),
+    DisableOption('--skip-build-swift', dest='build_swift'),
 
     DisableOption('--skip-build-android', dest='build_android'),
     DisableOption('--skip-build-benchmarks', dest='build_benchmarks'),
@@ -631,6 +642,7 @@ EXPECTED_OPTIONS = [
     PathOption('--install-prefix'),
     PathOption('--install-symroot'),
     PathOption('--install-destdir'),
+    EnableOption('--install-all'),
     PathOption('--symbols-package'),
     PathOption('--cmake-c-launcher'),
     PathOption('--cmake-cxx-launcher'),
@@ -675,4 +687,6 @@ EXPECTED_OPTIONS = [
     IgnoreOption('--ios-all'),
     IgnoreOption('--tvos-all'),
     IgnoreOption('--watchos-all'),
+
+    StrOption('--llvm-install-components'),
 ]

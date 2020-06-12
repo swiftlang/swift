@@ -1174,12 +1174,11 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   auto Instance = std::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation))
     llvm_unreachable("Failed setup");
-
-  Instance->performParseOnly();
 
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();
@@ -3127,7 +3126,7 @@ struct MemberwiseParameter {
   Expr *DefaultExpr;
 
   MemberwiseParameter(Identifier name, Type type, Expr *initialExpr)
-    : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
+      : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
 };
 
 static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
@@ -3140,7 +3139,16 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   EditConsumer.accept(SM, targetLocation, "\ninternal init(");
   auto insertMember = [&SM](const MemberwiseParameter &memberData,
                             llvm::raw_ostream &OS, bool wantsSeparator) {
-    OS << memberData.Name << ": " << memberData.MemberType.getString();
+    {
+      OS << memberData.Name << ": ";
+      // Unconditionally print '@escaping' if we print out a function type -
+      // the assignments we generate below will escape this parameter.
+      if (isa<AnyFunctionType>(memberData.MemberType->getCanonicalType())) {
+        OS << "@" << TypeAttributes::getAttrName(TAK_escaping) << " ";
+      }
+      OS << memberData.MemberType.getString();
+    }
+
     if (auto *expr = memberData.DefaultExpr) {
       if (isa<NilLiteralExpr>(expr)) {
         OS << " = nil";

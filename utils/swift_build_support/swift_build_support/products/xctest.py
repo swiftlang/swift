@@ -10,7 +10,14 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llvm
 from . import product
+from . import swift
 
 
 class XCTest(product.Product):
@@ -32,11 +39,14 @@ class XCTest(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [product.CMark,
-                product.LLVM,
-                product.LibCXX,
-                product.LibICU,
-                product.Swift,
-                product.LLDB,
-                product.LibDispatch,
-                product.Foundation]
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation]
+
+    @classmethod
+    def is_nondarwin_only_build_product(cls):
+        return True

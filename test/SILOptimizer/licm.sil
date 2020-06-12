@@ -355,6 +355,28 @@ bb4:
   return %10 : $()
 }
 
+sil @potential_escape : $@convention(thin) (@guaranteed RefElemClass) -> ()
+
+// CHECK-LABEL: sil @dont_hoist_begin_cow_mutation
+// CHECK:      bb1:
+// CHECK-NEXT:   begin_cow_mutation
+// CHECK-NEXT:   end_cow_mutation
+// CHECK-NEXT:   apply
+sil @dont_hoist_begin_cow_mutation : $@convention(thin) (@owned RefElemClass) -> @owned RefElemClass {
+bb0(%0 : $RefElemClass):
+  br bb1
+
+bb1:
+  (%u, %m) = begin_cow_mutation %0 : $RefElemClass
+  %b = end_cow_mutation %m : $RefElemClass
+  %f = function_ref @potential_escape : $@convention(thin) (@guaranteed RefElemClass) -> ()
+  %a = apply %f(%b) : $@convention(thin) (@guaranteed RefElemClass) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %b : $RefElemClass
+}
+
 // CHECK-LABEL: sil @hoist_load_and_store
 // CHECK:   [[V1:%[0-9]+]] = load %0
 // CHECK:   br bb1([[V1]] : $Int32)

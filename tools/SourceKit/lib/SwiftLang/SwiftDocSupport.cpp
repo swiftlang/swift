@@ -260,7 +260,9 @@ struct SourceTextInfo {
 
 } // end anonymous namespace
 
-static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
+static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
+                                  TypeOrExtensionDecl SynthesizedTarget,
+                                  bool IsSynthesizedExt) {
   auto *GC = D->getAsGenericContext();
   if (!GC)
     return;
@@ -276,35 +278,106 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   if (ParentSig && ParentSig->isEqual(GenericSig))
     return;
 
+
+  // If we have a synthesized target, map from its base type into the this
+  // declaration's innermost type context, or if we're dealing with the
+  // synthesized extention itself rather than a member, into its extended
+  // nominal (the extension's own requirements shouldn't be considered in the
+  // substitution).
+  SubstitutionMap SubMap;
+  Type BaseType;
+  if (SynthesizedTarget) {
+    BaseType = SynthesizedTarget.getBaseNominal()->getDeclaredInterfaceType();
+    if (!BaseType->isExistentialType()) {
+      DeclContext *DC;
+      if (IsSynthesizedExt)
+        DC = cast<ExtensionDecl>(D)->getExtendedNominal();
+      else
+        DC = D->getInnermostDeclContext()->getInnermostTypeContext();
+      auto *M = DC->getParentModule();
+      SubMap = BaseType->getContextSubstitutionMap(M, DC);
+    }
+  }
+
+  auto SubstTypes = [&](Type Ty) {
+    return Ty.subst(SubMap, SubstFlags::DesugarMemberTypes);
+  };
+
   // FIXME: Not right for extensions of nested generic types
   if (GC->isGeneric()) {
     for (auto *GP : GenericSig->getInnermostGenericParams()) {
       if (GP->getDecl()->isImplicit())
         continue;
+      Type TypeToPrint = GP;
+      if (!SubMap.empty()) {
+        if (auto ArgTy = SubstTypes(GP)) {
+          if (!ArgTy->hasError()) {
+            // Ignore parameter that aren't generic after substitution
+            if (!ArgTy->is<ArchetypeType>() && !ArgTy->isTypeParameter())
+              continue;
+            TypeToPrint = ArgTy;
+          }
+        }
+      }
       DocGenericParam Param;
-      Param.Name = std::string(GP->getName());
+      Param.Name = TypeToPrint->getString();
       Info.GenericParams.push_back(Param);
     }
   }
 
-  ProtocolDecl *proto = nullptr;
+  ProtocolDecl *Proto = nullptr;
   if (auto *typeDC = GC->getInnermostTypeContext())
-    proto = typeDC->getSelfProtocolDecl();
+    Proto = typeDC->getSelfProtocolDecl();
 
-  for (auto &Req : GenericSig->getRequirements()) {
-    // Skip protocol Self requirement.
-    if (proto &&
+  for (auto Req: GenericSig->getRequirements()) {
+    if (Proto &&
         Req.getKind() == RequirementKind::Conformance &&
-        Req.getFirstType()->isEqual(proto->getSelfInterfaceType()) &&
-        Req.getSecondType()->getAnyNominal() == proto)
+        Req.getFirstType()->isEqual(Proto->getSelfInterfaceType()) &&
+        Req.getSecondType()->getAnyNominal() == Proto)
       continue;
 
+    auto First = Req.getFirstType();
+    Type Second;
+    if (Req.getKind() != RequirementKind::Layout)
+      Second = Req.getSecondType();
+
+    if (!SubMap.empty()) {
+      Type SubFirst = SubstTypes(First);
+      if (!SubFirst->hasError())
+        First = SubFirst;
+      if (Second) {
+        Type SubSecond = SubstTypes(Second);
+        if (!SubSecond->hasError())
+          Second = SubSecond;
+        // Ignore requirements that don't involve a generic after substitution.
+        if (!(First->is<ArchetypeType>() || First->isTypeParameter()) &&
+            !(Second->is<ArchetypeType>() || Second->isTypeParameter()))
+          continue;
+      }
+    }
+
     std::string ReqStr;
-    PrintOptions Opts;
     llvm::raw_string_ostream OS(ReqStr);
-    Req.print(OS, Opts);
+    PrintOptions Opts;
+    if (Req.getKind() != RequirementKind::Layout) {
+      Requirement(Req.getKind(), First, Second).print(OS, Opts);
+    } else {
+      Requirement(Req.getKind(), First, Req.getLayoutConstraint()).print(OS, Opts);
+    }
     OS.flush();
     Info.GenericRequirements.push_back(std::move(ReqStr));
+  }
+
+  if (IsSynthesizedExt) {
+    // If there's a conditional conformance on the base type that 'enabled' this
+    // extension, we need to print its requirements too.
+    if (auto *EnablingExt = dyn_cast<ExtensionDecl>(SynthesizedTarget.getAsDecl())) {
+      if (EnablingExt->isConstrainedExtension()) {
+        initDocGenericParams(EnablingExt, Info,
+                             /*Target=*/EnablingExt->getExtendedNominal(),
+                             /*IsSynthesizedExtension*/false);
+      }
+    }
   }
 }
 
@@ -376,29 +449,12 @@ static bool initDocEntityInfo(const Decl *D,
       llvm::SmallString<128> DocBuffer;
       {
         llvm::raw_svector_ostream OSS(DocBuffer);
-        ide::getDocumentationCommentAsXML(D, OSS);
+        ide::getDocumentationCommentAsXML(D, OSS, SynthesizedTarget);
       }
-      StringRef DocRef = (StringRef)DocBuffer;
-      if (IsSynthesizedExtension &&
-          DocRef.find("<Declaration>") != StringRef::npos) {
-        StringRef Open = "extension ";
-        assert(DocRef.find(Open) != StringRef::npos);
-        auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
-        auto SecondPart = DocRef.substr(FirstPart.size());
-        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedNominal()
-            ->getName().str();
-        assert(SecondPart.startswith(ExtendedName));
-        SecondPart = SecondPart.substr(ExtendedName.size());
-        llvm::SmallString<128> UpdatedDocBuffer;
-        UpdatedDocBuffer.append(FirstPart);
-        UpdatedDocBuffer.append(SynthesizedTargetNTD->getName().str());
-        UpdatedDocBuffer.append(SecondPart);
-        OS << UpdatedDocBuffer;
-      } else
-        OS << DocBuffer;
+      OS << DocBuffer;
     }
 
-    initDocGenericParams(D, Info);
+    initDocGenericParams(D, Info, SynthesizedTarget, IsSynthesizedExtension);
 
     llvm::raw_svector_ostream LocalizationKeyOS(Info.LocalizationKey);
     ide::getLocalizationKey(D, LocalizationKeyOS);
@@ -410,14 +466,13 @@ static bool initDocEntityInfo(const Decl *D,
             VD, SynthesizedTarget, OS);
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
-    } else if (auto *E = dyn_cast<ExtensionDecl>(D)) {
-      if (auto Sig = E->getGenericSignature()) {
-        // The extension under printing is potentially part of a synthesized
-        // extension. Thus it's hard to print the fully annotated decl. We
-        // need to at least print the generic signature here.
-        llvm::raw_svector_ostream OS(Info.FullyAnnotatedGenericSig);
-        SwiftLangSupport::printFullyAnnotatedGenericReq(Sig, OS);
-      }
+    } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+      llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
+      if (SynthesizedTarget)
+        SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
+            ED, SynthesizedTarget, OS);
+      else
+        SwiftLangSupport::printFullyAnnotatedDeclaration(ED, OS);
     }
 
     if (DeclaringModForCrossImport) {
@@ -808,15 +863,13 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::Swift);
+  Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
-  if (CI.setup(Invocation))
-    return true;
-  CI.performParseOnly();
-  return false;
+  return CI.setup(Invocation);
 }
 
 static void collectFuncEntities(std::vector<TextEntity> &Ents,
@@ -1406,7 +1459,6 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation set up failed";
     return nullptr;
   }
-  ParseCI.performParseOnly(/*EvaluateConditionals*/true);
 
   SourceFile *SF = nullptr;
   unsigned BufferID = ParseCI.getInputBufferIDs().back();
