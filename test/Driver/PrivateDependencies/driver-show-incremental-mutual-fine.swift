@@ -5,9 +5,9 @@
 // RUN: touch -t 201401240005 %t/*
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -enable-direct-intramodule-dependencies -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v -driver-show-incremental 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
-// CHECK-FIRST: Handled main.swift
-// CHECK-FIRST: Handled other.swift
-// CHECK-FIRST: Disabling incremental build: could not read build record
+// CHECK-FIRST-DAG: Handled main.swift
+// CHECK-FIRST-DAG: Handled other.swift
+// CHECK-FIRST-DAG: Disabling incremental build: could not read build record
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -enable-direct-intramodule-dependencies -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v -driver-show-incremental 2>&1 | %FileCheck -check-prefix=CHECK-SECOND %s
 // CHECK-SECOND-NOT: Queuing
