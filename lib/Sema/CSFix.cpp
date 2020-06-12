@@ -408,6 +408,57 @@ bool AllowFunctionTypeMismatch::diagnose(const Solution &solution,
   return coalesceAndDiagnose(solution, {}, asNote);
 }
 
+bool AllowFunctionTypeMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  if (ContextualMismatch::diagnoseForAmbiguity(commonFixes))
+    return true;
+
+  auto *locator = getLocator();
+  // If this is a mismatch between two function types at argument
+  // position, there is a tailored diagnostic for that.
+  if (auto argConv =
+          locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
+    auto &cs = getConstraintSystem();
+    auto &DE = cs.getASTContext().Diags;
+    auto &solution = *commonFixes[0].first;
+
+    auto info = getStructuralTypeContext(solution, locator);
+    if (!info)
+      return false;
+
+    auto *argLoc = cs.getConstraintLocator(simplifyLocatorToAnchor(locator));
+
+    auto overload = solution.getOverloadChoiceIfAvailable(
+        solution.getCalleeLocator(argLoc));
+    if (!overload)
+      return false;
+
+    auto name = overload->choice.getName().getBaseName();
+    DE.diagnose(getLoc(getAnchor()), diag::no_candidates_match_argument_type,
+                name.userFacingName(), std::get<2>(*info),
+                argConv->getParamIdx());
+
+    for (auto &entry : commonFixes) {
+      auto &solution = *entry.first;
+      auto overload = solution.getOverloadChoiceIfAvailable(
+          solution.getCalleeLocator(argLoc));
+
+      if (!(overload && overload->choice.isDecl()))
+        continue;
+
+      auto *decl = overload->choice.getDecl();
+      if (decl->getLoc().isValid()) {
+        DE.diagnose(decl, diag::found_candidate_type,
+                    solution.simplifyType(overload->openedType));
+      }
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 AllowFunctionTypeMismatch *
 AllowFunctionTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                   ConstraintLocator *locator, unsigned index) {
