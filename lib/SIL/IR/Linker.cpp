@@ -80,7 +80,7 @@ void SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
 
   LLVM_DEBUG(llvm::dbgs() << "Imported function: "
                           << F->getName() << "\n");
-  if (Mod.loadFunction(F)) {
+  if (Resolver.loadFunction(F)) {
     if (F->isExternalDeclaration())
       return;
 
@@ -118,6 +118,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
   // Update the linkage of the function in case it's different in the serialized
   // SIL than derived from the AST. This can be the case with cross-module-
   // optimizations.
+  auto &Mod = F->getModule();
   Mod.updateFunctionLinkage(F);
 }
 
@@ -144,7 +145,7 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   assert(isLinkAll());
 
   // Attempt to lookup the Vtbl from the SILModule.
-  SILVTable *Vtbl = Mod.lookUpVTable(D);
+  SILVTable *Vtbl = Resolver.lookUpVTable(D);
   if (!Vtbl)
     return;
 
@@ -217,7 +218,7 @@ void SILLinkerVisitor::visitProtocolConformance(
   if (!VisitedConformances.insert(C).second)
     return;
 
-  auto *WT = Mod.lookUpWitnessTable(C, mustDeserialize);
+  auto *WT = Resolver.lookUpWitnessTable(C, mustDeserialize);
 
   // If the looked up witness table is a declaration, there is nothing we can
   // do here.

@@ -36,12 +36,15 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
   /// The current linking mode.
   LinkingMode Mode;
 
+  /// The external reference resolver.
+  SILReferenceResolver &Resolver;
+
   /// Whether any functions were deserialized.
   bool Changed;
 
 public:
-  SILLinkerVisitor(SILModule &M, SILModule::LinkingMode LinkingMode)
-      : Mod(M), Worklist(), Mode(LinkingMode), Changed(false) {}
+  SILLinkerVisitor(SILModule &M, SILModule::LinkingMode LinkingMode, SILReferenceResolver &R)
+      : Mod(M), Worklist(), Mode(LinkingMode), Resolver(R), Changed(false) {}
 
   /// Process F, recursively deserializing any thing F may reference.
   /// Returns true if any deserialization was performed.

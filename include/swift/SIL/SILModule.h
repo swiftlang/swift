@@ -29,6 +29,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
+#include "swift/SIL/SILReferenceResolver.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILPrintContext.h"
@@ -104,7 +105,7 @@ enum class SILStage {
 
 /// A SIL module. The SIL module owns all of the SILFunctions generated
 /// when a Swift compilation context is lowered to SIL.
-class SILModule {
+class SILModule : public SILReferenceResolver {
   friend class SILFunctionBuilder;
 
 public:
@@ -534,7 +535,7 @@ public:
 
   /// Attempt to deserialize the SILFunction. Returns true if deserialization
   /// succeeded, false otherwise.
-  bool loadFunction(SILFunction *F);
+  bool loadFunction(SILFunction *F) override;
 
   /// Update the linkage of the SILFunction with the linkage of the serialized
   /// function.
@@ -576,7 +577,7 @@ public:
   SILWitnessTable *
   lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily=true);
   SILWitnessTable *
-  lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
+  lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true) override;
 
   /// Attempt to lookup \p Member in the witness table for \p C.
   std::pair<SILFunction *, SILWitnessTable *>
@@ -595,7 +596,7 @@ public:
                                       bool deserializeLazily=true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
-  SILVTable *lookUpVTable(const ClassDecl *C, bool deserializeLazily = true);
+  SILVTable *lookUpVTable(const ClassDecl *C, bool deserializeLazily = true) override;
 
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.

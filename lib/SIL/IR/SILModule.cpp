@@ -353,7 +353,7 @@ void SILModule::updateFunctionLinkage(SILFunction *F) {
 }
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, Mode).processFunction(F);
+  return SILLinkerVisitor(*this, Mode, *this).processFunction(F);
 }
 
 SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
