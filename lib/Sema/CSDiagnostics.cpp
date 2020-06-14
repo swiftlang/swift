@@ -987,6 +987,10 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
 bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   auto baseType = getType(anchor);
+  auto locator = getLocator();
+  auto &solution = getSolution();
+  auto &cs = getConstraintSystem();
+  
   bool resultIsOptional = ResultTypeIsOptional;
 
   // If we've resolved the member overload to one that returns an optional
@@ -996,6 +1000,18 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto overload = getOverloadChoiceIfAvailable(getLocator());
   if (overload && overload->openedType->getOptionalObjectType())
     resultIsOptional = true;
+
+  // Tailored logic to get the base optional type when the failure is
+  // for a keypath component member.
+  if (auto componentPathElt =
+          locator->getLastElementAs<LocatorPathElt::KeyPathComponent>()) {
+    auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
+
+    auto componentType = cs.getType(keyPathExpr, componentPathElt->getIndex() - 1);
+    if (auto componentTypeVar = componentType->getAs<TypeVariableType>()) {
+      baseType = solution.getFixedType(componentTypeVar)->getRValueType();
+    }
+  }
 
   auto unwrappedBaseType = baseType->getOptionalObjectType();
   if (!unwrappedBaseType)
