@@ -34,13 +34,19 @@ extension String {
       return
     }
 
-    // TODO(String performance): We can directly call appendInPlace
-    var result = String()
-    result.reserveCapacity(repeatedValue._guts.count &* count)
-    for _ in 0..<count {
-      result += repeatedValue
-    }
-    self = result
+	var repeatedValue = repeatedValue
+	self.init(_uninitializedCapacity: repeatedValue._guts.count &* count) {
+	  buffer in
+	  repeatedValue.withUTF8 { repeatedValueUTF8 in
+	    let repeatedCount = repeatedValueUTF8.count
+	    for i in 0..<count {
+	      let range = i * repeatedCount ..< (i + 1) * repeatedCount
+		  _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
+			.initialize(from: repeatedValueUTF8)
+	    }
+	  }
+	  return buffer.count
+	}
   }
 
   /// A Boolean value indicating whether a string has no characters.
