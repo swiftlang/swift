@@ -1000,12 +1000,14 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto overload = getOverloadChoiceIfAvailable(getLocator());
   if (overload && overload->openedType->getOptionalObjectType())
     resultIsOptional = true;
-
+  
+  SourceRange sourceRange = FailureDiagnostic::getSourceRange();
   // Tailored logic to get the base optional type when the failure is
   // for a keypath component member.
   if (auto componentPathElt =
           locator->getLastElementAs<LocatorPathElt::KeyPathComponent>()) {
     auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
+    sourceRange = keyPathExpr->getComponents()[componentPathElt->getIndex() - 1].getLoc();
 
     auto componentType = cs.getType(keyPathExpr, componentPathElt->getIndex() - 1);
     if (auto componentTypeVar = componentType->getAs<TypeVariableType>()) {
@@ -1017,8 +1019,8 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   if (!unwrappedBaseType)
     return false;
 
-  emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
-                 unwrappedBaseType);
+  emitDiagnosticAt(sourceRange.End, diag::optional_base_not_unwrapped, baseType, Member,
+                   unwrappedBaseType);
 
   // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
   // for non-optional results where that would be appropriate. For the moment
@@ -1026,11 +1028,11 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
   // the next compile.
   emitDiagnostic(diag::optional_base_chain, Member)
-      .fixItInsertAfter(getSourceRange().End, "?");
+      .fixItInsertAfter(sourceRange.End, "?");
 
   if (!resultIsOptional) {
     emitDiagnostic(diag::unwrap_with_force_value)
-        .fixItInsertAfter(getSourceRange().End, "!");
+        .fixItInsertAfter(sourceRange.End, "!");
   }
 
   return true;
