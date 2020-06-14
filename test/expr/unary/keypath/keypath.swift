@@ -949,25 +949,27 @@ struct SR5688_C {
 }
 
 func testMemberAccessOnOptionalKeyPathComponent() {
+
   _ = \SR5688_A.b.m
   // expected-error@-1 {{value of optional type 'SR5688_B?' must be unwrapped to refer to member 'm' of wrapped base type 'SR5688_B'}}
-  // expected-note@-2 {{chain the optional using '?' to access member 'm' only for non-'nil' base values}}
-  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'm' only for non-'nil' base values}} {{18-18=?}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{18-18=!}}
 
   _ = \SR5688_A.b.c.d 
-  // expected-error@-1 {{value of optional type 'SR5688_B?' must be unwrapped to refer to member 'c' of wrapped base type 'SR5688_B'}}
-  // expected-note@-2 {{chain the optional using '?' to access member 'c' only for non-'nil' base values}}
-  // expected-error@-3 {{value of optional type 'SR5688_C?' must be unwrapped to refer to member 'd' of wrapped base type 'SR5688_C'}}
-  // expected-note@-4 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}}
-  // expected-note@-5 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // expected-error@-1 {{value of optional type 'SR5688_B?' must be unwrapped to refer to member 'c' of wrapped base type 'SR5688_B'}} 
+  // expected-note@-2 {{chain the optional using '?' to access member 'c' only for non-'nil' base values}} {{18-18=?}}
+  // expected-error@-3 {{value of optional type 'SR5688_C?' must be unwrapped to refer to member 'd' of wrapped base type 'SR5688_C'}} 
+  // expected-note@-4 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{20-20=?}}
+  // expected-note@-5 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{20-20=!}}
   _ = \SR5688_A.b?.c.d 
   // expected-error@-1 {{value of optional type 'SR5688_C?' must be unwrapped to refer to member 'd' of wrapped base type 'SR5688_C'}}
-  // expected-note@-2 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{21-21=?}}
 
   _ = \SR5688_AA.b.c.d
   // expected-error@-1 {{value of optional type 'SR5688_C?' must be unwrapped to refer to member 'd' of wrapped base type 'SR5688_C'}}
-  // expected-note@-2 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}}
-  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{21-21=?}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{21-21=!}}
+
 }
 
 func testSyntaxErrors() { // expected-note{{}}
