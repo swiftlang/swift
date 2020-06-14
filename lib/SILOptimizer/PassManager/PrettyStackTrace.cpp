@@ -38,3 +38,9 @@ void PrettyStackTraceSILModuleTransform::print(llvm::raw_ostream &out) const {
   out << "While running pass #" << PassNumber
       << " SILModuleTransform \"" << SMT->getID() << "\".\n";
 }
+
+void PrettyStackTraceSILCrossModuleTransform::print(
+    llvm::raw_ostream &out) const {
+  out << "While running pass #" << PassNumber << " SILCrossModuleTransform \""
+      << SCMT->getID() << "\".\n";
+}

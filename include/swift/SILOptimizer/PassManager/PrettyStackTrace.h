@@ -20,6 +20,7 @@ namespace swift {
 
 class SILFunctionTransform;
 class SILModuleTransform;
+class SILCrossModuleTransform;
 
 class PrettyStackTraceSILFunctionTransform
     : public PrettyStackTraceSILFunction {
@@ -41,6 +42,18 @@ public:
   PrettyStackTraceSILModuleTransform(SILModuleTransform *SMT,
                                      unsigned PassNumber)
       : SMT(SMT), PassNumber(PassNumber) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+class PrettyStackTraceSILCrossModuleTransform
+    : public llvm::PrettyStackTraceEntry {
+  SILCrossModuleTransform *SCMT;
+  unsigned PassNumber;
+
+public:
+  PrettyStackTraceSILCrossModuleTransform(SILCrossModuleTransform *SCMT,
+                                          unsigned PassNumber)
+      : SCMT(SCMT), PassNumber(PassNumber) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
 

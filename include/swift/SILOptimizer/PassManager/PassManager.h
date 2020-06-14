@@ -279,6 +279,8 @@ private:
   /// Add a pass with a given name.
   void addPassForName(StringRef Name);
 
+  /// Run the \p TransIdx'th SIL module transform across all modules.
+  void runCrossModulePass(unsigned TransIdx);
   /// Run the \p TransIdx'th SIL module transform over all the functions in
   /// the module.
   void runModulePass(SILModule *Mod, unsigned TransIdx);

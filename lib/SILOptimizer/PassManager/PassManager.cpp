@@ -593,6 +593,95 @@ void SILPassManager::runFunctionPasses(SILModule *Mod, unsigned FromTransIdx,
   }
 }
 
+void SILPassManager::runCrossModulePass(unsigned TransIdx) {
+  auto *SCMT = cast<SILCrossModuleTransform>(Transformations[TransIdx]);
+  if (isDisabled(SCMT))
+    return;
+
+  SCMT->injectPassManager(this);
+  SCMT->injectModules(Modules);
+
+  PrettyStackTraceSILCrossModuleTransform X(SCMT, NumPassesRun);
+  DebugPrintEnabler DebugPrint(NumPassesRun);
+
+  CurrentPassHasInvalidated = false;
+
+  if (SILPrintPassName)
+    dumpPassInfo("Run module pass", TransIdx);
+
+  if (doPrintBefore(SCMT, nullptr)) {
+    dumpPassInfo("*** SIL module before", TransIdx);
+    for (auto Mod : Modules) {
+      const SILOptions &Options = Mod->getOptions();
+      printModule(Mod, Options.EmitVerboseSIL);
+    }
+  }
+
+  auto MatchFun = [&](const std::string &Str) -> bool {
+    return SCMT->getTag().find(Str) != StringRef::npos ||
+           SCMT->getID().find(Str) != StringRef::npos;
+  };
+  if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
+                                                 SILVerifyBeforePass.end(),
+                                                 MatchFun)) ||
+      (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                 SILVerifyAroundPass.end(),
+                                                 MatchFun))) {
+    for (auto Mod : Modules) {
+      Mod->verify();
+    }
+    verifyAnalyses();
+  }
+
+  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
+  assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
+
+  for (auto Mod : Modules) {
+    Mod->registerDeleteNotificationHandler(SCMT);
+  }
+
+  SCMT->run();
+
+  for (auto Mod : Modules) {
+    Mod->removeDeleteNotificationHandler(SCMT);
+  }
+
+  assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
+
+  auto Delta = (std::chrono::system_clock::now() - StartTime).count();
+  if (SILPrintPassTime) {
+    llvm::dbgs() << Delta << " (" << SCMT->getID() << ",Module)\n";
+  }
+
+  // If this pass invalidated anything, print and verify.
+  if (doPrintAfter(SCMT, nullptr, CurrentPassHasInvalidated && SILPrintAll)) {
+    dumpPassInfo("*** SIL module after", TransIdx);
+    for (auto Mod : Modules) {
+      const SILOptions &Options = Mod->getOptions();
+      printModule(Mod, Options.EmitVerboseSIL);
+    }
+  }
+
+  for (auto Mod : Modules) {
+    const SILOptions &Options = Mod->getOptions();
+    if (Options.VerifyAll &&
+        (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
+      Mod->verify();
+      verifyAnalyses();
+    } else {
+      if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
+                                                    SILVerifyAfterPass.end(),
+                                                    MatchFun)) ||
+          (SILVerifyAroundPass.end() !=
+           std::find_if(SILVerifyAroundPass.begin(), SILVerifyAroundPass.end(),
+                        MatchFun))) {
+        Mod->verify();
+        verifyAnalyses();
+      }
+    }
+  }
+}
+
 void SILPassManager::runModulePass(SILModule *Mod, unsigned TransIdx) {
   auto *SMT = cast<SILModuleTransform>(Transformations[TransIdx]);
   if (isDisabled(SMT))
@@ -705,8 +794,8 @@ void SILPassManager::execute() {
 
   while (Idx < NumTransforms && continueTransforming()) {
     SILTransform *Tr = Transformations[Idx];
-    assert((isa<SILFunctionTransform>(Tr) || isa<SILModuleTransform>(Tr)) &&
-           "Unexpected pass kind!");
+    assert((isa<SILFunctionTransform>(Tr) || isa<SILModuleTransform>(Tr)) ||
+           isa<SILCrossModuleTransform>(Tr) && "Unexpected pass kind!");
     (void)Tr;
 
     unsigned FirstFuncTrans = Idx;
@@ -723,6 +812,14 @@ void SILPassManager::execute() {
       for (auto Mod : Modules) {
         runModulePass(Mod, Idx);
       }
+      ++Idx;
+      ++NumPassesRun;
+    }
+
+    while (Idx < NumTransforms &&
+           isa<SILCrossModuleTransform>(Transformations[Idx]) &&
+           continueTransforming()) {
+      runCrossModulePass(Idx);
       ++Idx;
       ++NumPassesRun;
     }

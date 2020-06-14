@@ -28,6 +28,7 @@ namespace swift {
     enum class TransformKind {
       Function,
       Module,
+      CrossModule,
     };
 
     /// Stores the kind of derived class.
@@ -175,6 +176,28 @@ namespace swift {
     void notifyWillDeleteFunction(SILFunction *F) {
       PM->notifyWillDeleteFunction(F);
     }
+  };
+
+  /// A transformation that operates across modules.
+  class SILCrossModuleTransform : public SILTransform {
+    llvm::SmallVector<SILModule *, 4> Modules;
+
+  public:
+    /// C'tor.
+    SILCrossModuleTransform() : SILTransform(TransformKind::CrossModule) {}
+
+    /// The entry point to the transformation.
+    virtual void run() = 0;
+
+    static bool classof(const SILTransform *S) {
+      return S->getKind() == TransformKind::CrossModule;
+    }
+
+    void injectModules(llvm::SmallVector<SILModule *, 4> Mods) {
+      Modules = Mods;
+    }
+
+    llvm::SmallVector<SILModule *, 4> getModules() { return Modules; }
   };
 } // end namespace swift
 
