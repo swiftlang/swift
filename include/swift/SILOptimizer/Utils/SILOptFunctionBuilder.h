@@ -22,11 +22,15 @@ namespace swift {
 class SILOptFunctionBuilder {
   SILTransform &transform;
   SILFunctionBuilder builder;
+  SILModule &module;
 
 public:
-  SILOptFunctionBuilder(SILTransform &transform)
-      : transform(transform),
-        builder(*transform.getPassManager()->getModule()) {}
+  SILOptFunctionBuilder(SILTransform &transform, SILModule &module)
+      : transform(transform), builder(module), module(module) {}
+  SILOptFunctionBuilder(SILModuleTransform &transform)
+      : SILOptFunctionBuilder(transform, *transform.getModule()) {}
+  SILOptFunctionBuilder(SILFunctionTransform &transform)
+      : SILOptFunctionBuilder(transform, transform.getModule()) {}
 
   template <class... ArgTys>
   SILFunction *getOrCreateSharedFunction(ArgTys &&... args) {
@@ -52,10 +56,10 @@ public:
   void eraseFunction(SILFunction *f) {
     auto &pm = getPassManager();
     pm.notifyWillDeleteFunction(f);
-    pm.getModule()->eraseFunction(f);
+    getModule().eraseFunction(f);
   }
 
-  SILModule &getModule() const { return *getPassManager().getModule(); }
+  SILModule &getModule() const { return module; }
 
 private:
   SILPassManager &getPassManager() const {

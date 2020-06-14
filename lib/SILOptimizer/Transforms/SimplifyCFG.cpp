@@ -98,9 +98,9 @@ namespace {
   public:
     SimplifyCFG(SILFunction &Fn, SILTransform &T, bool Verify,
                 bool EnableJumpThread)
-        : FuncBuilder(T), Fn(Fn), PM(T.getPassManager()),
-          ConstFolder(FuncBuilder, PM->getOptions().AssertConfig,
-                      /* EnableDiagnostics */false,
+        : FuncBuilder(T, Fn.getModule()), Fn(Fn), PM(T.getPassManager()),
+          ConstFolder(FuncBuilder, Fn.getModule().getOptions().AssertConfig,
+                      /* EnableDiagnostics */ false,
                       [&](SILInstruction *I) { constFoldingCallback(I); }),
           ShouldVerify(Verify), EnableJumpThread(EnableJumpThread) {}
 

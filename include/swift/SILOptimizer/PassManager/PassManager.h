@@ -46,7 +46,7 @@ class SILPassManager {
   friend class ExecuteSILPipelineRequest;
 
   /// The module that the pass manager will transform.
-  SILModule *Mod;
+  llvm::SmallVector<SILModule *, 4> Modules;
 
   /// An optional IRGenModule associated with this PassManager.
   irgen::IRGenModule *IRMod;
@@ -56,6 +56,9 @@ class SILPassManager {
 
   /// A list of registered analysis.
   llvm::SmallVector<SILAnalysis *, 16> Analyses;
+
+  /// The ASTContext
+  ASTContext &Ctx;
 
   /// An entry in the FunctionWorkList.
   struct WorklistEntry {
@@ -116,10 +119,13 @@ class SILPassManager {
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def. This is private as it should only be used by
   /// ExecuteSILPipelineRequest.
-  SILPassManager(SILModule *M, bool isMandatory, irgen::IRGenModule *IRMod);
+  SILPassManager(SILModule *M, bool isMandatory, irgen::IRGenModule *IRMod)
+      : SILPassManager(llvm::SmallVector<SILModule *, 4>{M}, M->getASTContext(),
+                       isMandatory, IRMod) {}
+  SILPassManager(llvm::SmallVector<SILModule *, 4> Modules, ASTContext &Ctx,
+                 bool isMandatory, irgen::IRGenModule *IRMod);
 
 public:
-  const SILOptions &getOptions() const;
 
   /// Searches for an analysis of type T in the list of registered
   /// analysis. If the analysis is not found, the program terminates.
@@ -133,11 +139,13 @@ public:
   }
 
   /// \returns the module that the pass manager owns.
-  SILModule *getModule() { return Mod; }
+  llvm::SmallVector<SILModule *, 4> getModules() { return Modules; }
 
   /// \returns the associated IGenModule or null if this is not an IRGen
   /// pass manager.
   irgen::IRGenModule *getIRGenModule() { return IRMod; }
+
+  ASTContext &getASTContext() { return Ctx; }
 
   /// Restart the function pass pipeline on the same function
   /// that is currently being processed.
@@ -273,13 +281,14 @@ private:
 
   /// Run the \p TransIdx'th SIL module transform over all the functions in
   /// the module.
-  void runModulePass(unsigned TransIdx);
+  void runModulePass(SILModule *Mod, unsigned TransIdx);
 
   /// Run the \p TransIdx'th pass on the function \p F.
   void runPassOnFunction(unsigned TransIdx, SILFunction *F);
 
   /// Run the passes in Transform from \p FromTransIdx to \p ToTransIdx.
-  void runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx);
+  void runFunctionPasses(SILModule *Mod, unsigned FromTransIdx,
+                         unsigned ToTransIdx);
 
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.

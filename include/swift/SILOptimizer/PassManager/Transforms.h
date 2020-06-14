@@ -86,13 +86,15 @@ namespace swift {
     template<typename T>
     T* getAnalysis() { return PM->getAnalysis<T>(); }
 
-    const SILOptions &getOptions() { return PM->getOptions(); }
   };
 
   /// A transformation that operates on functions.
   class SILFunctionTransform : public SILTransform {
     friend class PrettyStackTraceSILFunctionTransform;
     SILFunction *F;
+
+  protected:
+    const SILOptions &getOptions() { return getModule().getOptions(); }
 
   public:
     /// C'tor.
@@ -125,6 +127,7 @@ namespace swift {
     void restartPassPipeline() { PM->restartWithCurrentFunction(this); }
 
     SILFunction *getFunction() { return F; }
+    SILModule &getModule() { return F->getModule(); }
 
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(F, K);
@@ -134,6 +137,9 @@ namespace swift {
   /// A transformation that operates on modules.
   class SILModuleTransform : public SILTransform {
     SILModule *M;
+
+  protected:
+    const SILOptions &getOptions() { return getModule()->getOptions(); }
 
   public:
     /// C'tor.
