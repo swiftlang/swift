@@ -40,13 +40,13 @@ extension String {
 	  repeatedValue.withUTF8 { repeatedValueUTF8 in
 	    let repeatedCount = repeatedValueUTF8.count
 	    for i in 0..<count {
-	      let range = i * repeatedCount ..< (i + 1) * repeatedCount
-		  _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
-			.initialize(from: repeatedValueUTF8)
-	    }
-	  }
-	  return buffer.count
-	}
+          let range = i * repeatedCount ..< (i + 1) * repeatedCount
+            _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
+              .initialize(from: repeatedValueUTF8)
+        }
+      }
+      return buffer.count
+    }
   }
 
   /// A Boolean value indicating whether a string has no characters.
