@@ -1364,6 +1364,10 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   assert(!Ctx.hadError());
 
   IRGenOptions Opts;
+  // This tool doesn't pass  the necessary runtime library path to
+  // TypeConverter, because this feature isn't needed.
+  Opts.DisableLegacyTypeInfo = true;
+
   Opts.OutputKind = IRGenOutputKind::ObjectFile;
   IRGenerator irgen(Opts, SILMod);
 
