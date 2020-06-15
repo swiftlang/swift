@@ -397,6 +397,16 @@ struct SILDeclRef {
 
   bool canBeDynamicReplacement() const;
 
+  bool isAutoDiffDerivativeFunction() const {
+    return derivativeFunctionIdentifier != nullptr;
+  }
+
+  AutoDiffDerivativeFunctionIdentifier *
+  getAutoDiffDerivativeFunctionIdentifier() const {
+    assert(isAutoDiffDerivativeFunction());
+    return derivativeFunctionIdentifier;
+  }
+
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
   /// Produces a SILDeclRef from an opaque value.
