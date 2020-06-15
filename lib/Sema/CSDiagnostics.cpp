@@ -991,7 +991,7 @@ Type MemberAccessOnOptionalBaseFailure::getMemberBaseType() const {
   return MemberBaseType;
 }
 
-SourceRange MemberAccessOnOptionalBaseFailure::getMemberSourceRange() const {
+SourceRange MemberAccessOnOptionalBaseFailure::getMemberBaseSourceRange() const {
   auto anchor = getAnchor();
   auto locator = getLocator();
 
@@ -1027,10 +1027,10 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   if (!unwrappedBaseType)
     return false;
   
-  auto sourceRange = getMemberSourceRange();
+  auto baseSourceRange = getMemberBaseSourceRange();
   
-  emitDiagnosticAt(sourceRange.End, diag::optional_base_not_unwrapped, baseType,
-                   Member, unwrappedBaseType);
+  emitDiagnosticAt(baseSourceRange.End, diag::optional_base_not_unwrapped,
+                   baseType, Member, unwrappedBaseType);
 
   auto componentPathElt =
       locator->getLastElementAs<LocatorPathElt::KeyPathComponent>();
@@ -1054,11 +1054,11 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
     // the next compile.
     emitDiagnostic(diag::optional_base_chain, Member)
-        .fixItInsertAfter(sourceRange.End, "?");
+        .fixItInsertAfter(baseSourceRange.End, "?");
 
     if (!resultIsOptional) {
       emitDiagnostic(diag::unwrap_with_force_value)
-          .fixItInsertAfter(sourceRange.End, "!");
+          .fixItInsertAfter(baseSourceRange.End, "!");
     }
   }
   return true;

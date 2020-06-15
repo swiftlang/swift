@@ -494,7 +494,7 @@ public:
   bool diagnoseAsError() override;
   
   Type getMemberBaseType() const;
-  SourceRange getMemberSourceRange() const;
+  SourceRange getMemberBaseSourceRange() const;
 
 };
 
