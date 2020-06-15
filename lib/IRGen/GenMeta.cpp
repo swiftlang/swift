@@ -5101,7 +5101,6 @@ void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
 bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                                              const SILVTable *vtable,
                                              SILDeclRef method) {
-  auto &M = IGM.getSILModule();
   auto entry = vtable->getEntry(IGM.getSILModule(), method);
   if (!entry) {
     return true;
