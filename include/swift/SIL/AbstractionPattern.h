@@ -559,7 +559,8 @@ public:
   getCurriedCXXMethod(CanType origType, const AbstractFunctionDecl *function);
 
   static AbstractionPattern
-  getCurriedOperator(CanType origType, const AbstractFunctionDecl *function);
+  getCurriedCXXOperatorMethod(CanType origType,
+                              const AbstractFunctionDecl *function);
 
   /// Return an abstraction pattern for the uncurried type of a C++ method.
   ///
@@ -602,7 +603,7 @@ public:
   }
 
   static AbstractionPattern
-  getCurriedOperator(CanType origType, const clang::CXXMethodDecl *method) {
+  getCurriedCXXOperatorMethod(CanType origType, const clang::CXXMethodDecl *method) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method,

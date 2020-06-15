@@ -4027,7 +4027,8 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
         return method->isOverloadedOperator()
-                   ? AbstractionPattern::getCurriedOperator(fnType, bridgedFn)
+                   ? AbstractionPattern::getCurriedCXXOperatorMethod(fnType,
+                                                                     bridgedFn)
                    : AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {
         // C function imported as a method.

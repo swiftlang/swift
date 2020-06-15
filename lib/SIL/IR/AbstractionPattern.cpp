@@ -168,13 +168,11 @@ AbstractionPattern::getCurriedCXXMethod(CanType origType,
   return getCurriedCXXMethod(origType, clangMethod);
 }
 
-AbstractionPattern
-AbstractionPattern::getCurriedOperator(CanType origType,
-                                        const AbstractFunctionDecl *function) {
+AbstractionPattern AbstractionPattern::getCurriedCXXOperatorMethod(
+    CanType origType, const AbstractFunctionDecl *function) {
   auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedOperator(origType, clangMethod);
+  return getCurriedCXXOperatorMethod(origType, clangMethod);
 }
-
 
 AbstractionPattern
 AbstractionPattern::getOptional(AbstractionPattern object) {
