@@ -854,14 +854,17 @@ class ArgumentFailureTracker : public MatchCallArgumentListener {
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> MissingArguments;
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
 
+  bool DidTupleSplatFix;
+
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
                          SmallVectorImpl<AnyFunctionType::Param> &args,
                          ArrayRef<AnyFunctionType::Param> params,
                          SmallVectorImpl<ParamBinding> &bindings,
-                         ConstraintLocatorBuilder locator)
+                         ConstraintLocatorBuilder locator,
+                         bool didTupleSplatFix)
       : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
-        Locator(locator) {}
+        Locator(locator), DidTupleSplatFix(didTupleSplatFix) {}
 
   ~ArgumentFailureTracker() override {
     if (!MissingArguments.empty()) {
@@ -939,6 +942,39 @@ public:
   bool relabelArguments(ArrayRef<Identifier> newLabels) override {
     if (!CS.shouldAttemptFixes())
       return true;
+
+    /**
+     [FIXME]
+
+     For example, if tuple splatting fix happens with following:
+
+     @code
+     func tr(_ aa: Int, _ bb: Int) {}
+     func f(x: (aa: Int, bb: Int)) {
+       tr(x)
+     }
+     @endcode
+
+     Arguments `(_: x)` is fixed to `(aa: x.aa, bb: x.bb)`.
+
+     So two labeling failures should be reported with:
+
+     - [extra label] aa: => _ aa:
+     - [extra label] bb: => _ bb:
+
+     But reconstructing this splatting fix in diagnostic phase is hard.
+     And this problem cause compiler crash (SR-13002).
+
+     Anyway, this fix already reports `AddMissingArgument` and
+     will diagnose special message as
+     `cannot_convert_single_tuple_into_multiple_arguments`.
+
+     So I disabled `RelabelArguments` here to avoid problem.
+     */
+    if (DidTupleSplatFix) {
+      CS.increaseScore(SK_Fix);
+      return false;
+    }
 
     // TODO(diagnostics): If re-labeling is mixed with extra arguments,
     // let's produce a fix only for extraneous arguments for now,
@@ -1063,6 +1099,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   argsWithLabels.append(args.begin(), args.end());
   AnyFunctionType::relabelParams(argsWithLabels, argInfo->Labels);
 
+  bool didTupleSplatFix = false;
+
   // Special case when a single tuple argument if used
   // instead of N distinct arguments e.g.:
   //
@@ -1098,6 +1136,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           AddMissingArguments::create(cs, synthesizedArgs,
                                       cs.getConstraintLocator(locator)),
           /*impact=*/synthesizedArgs.size() * 2);
+
+      didTupleSplatFix = true;
     }
   }
 
@@ -1105,7 +1145,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   SmallVector<ParamBinding, 4> parameterBindings;
   {
     ArgumentFailureTracker listener(cs, argsWithLabels, params,
-                                    parameterBindings, locator);
+                                    parameterBindings, locator,
+                                    didTupleSplatFix);
     if (constraints::matchCallArguments(
             argsWithLabels, params, paramInfo,
             argInfo->UnlabeledTrailingClosureIndex,

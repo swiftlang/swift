@@ -5,7 +5,7 @@
 
 func concrete(_ x: Int) {}
 func concreteLabeled(x: Int) {}
-func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 5 {{'concreteTwo' declared here}}
+func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 8 {{'concreteTwo' declared here}}
 func concreteTuple(_ x: (Int, Int)) {}
 
 do {
@@ -19,6 +19,7 @@ do {
 
   concreteTwo(3, 4)
   concreteTwo((3, 4)) // expected-error {{global function 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
+  concreteTwo((x: 3, y: 4)) // expected-error {{global function 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{26-27=}}
 
   concreteTuple(3, 4) // expected-error {{global function 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   concreteTuple((3, 4))
@@ -29,6 +30,7 @@ do {
   let b = 4
   let c = (3)
   let d = (a, b)
+  let e = (x: 3, y: 4)
 
   concrete(a)
   concrete((a))
@@ -37,6 +39,7 @@ do {
   concreteTwo(a, b)
   concreteTwo((a, b)) // expected-error {{global function 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
   concreteTwo(d) // expected-error {{global function 'concreteTwo' expects 2 separate arguments}}
+  concreteTwo(e) // expected-error {{global function 'concreteTwo' expects 2 separate arguments}}
 
   concreteTuple(a, b) // expected-error {{global function 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   concreteTuple((a, b))
@@ -48,6 +51,7 @@ do {
   var b = 4
   var c = (3)
   var d = (a, b)
+  var e = (x: 3, y: 4)
 
   concrete(a)
   concrete((a))
@@ -56,6 +60,7 @@ do {
   concreteTwo(a, b)
   concreteTwo((a, b)) // expected-error {{global function 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
   concreteTwo(d) // expected-error {{global function 'concreteTwo' expects 2 separate arguments}}
+  concreteTwo(e) // expected-error {{global function 'concreteTwo' expects 2 separate arguments}}
 
   concreteTuple(a, b) // expected-error {{global function 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   concreteTuple((a, b))
