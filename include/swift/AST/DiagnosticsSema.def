@@ -1076,7 +1076,7 @@ NOTE(optional_base_chain,none,
      "chain the optional using '?' to access member %0 only for non-'nil' "
      "base values", (DeclNameRef))
 NOTE(optional_base_remove_optional_for_keypath_root, none,
-    "remove optional '?' form key path root base type %0", (Type))
+    "remove optional '?' from key path root base type %0", (Type))
 
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "

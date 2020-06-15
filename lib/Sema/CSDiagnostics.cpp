@@ -985,8 +985,7 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
 }
 
 Type MemberAccessOnOptionalBaseFailure::getMemberBaseType() const {
-  auto locator = getLocator();
-  if (locator->isForKeyPathComponent()) {
+  if (getLocator()->isForKeyPathComponent()) {
     if (auto *memberBaseTypeVar = MemberBaseType->getAs<TypeVariableType>()) {
       return getSolution().getFixedType(memberBaseTypeVar);
     }
@@ -1044,7 +1043,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // fix to replace the optional type with its unwrapped type.
     if (auto *nominalDecl = unwrappedBaseType->getAnyNominal()) {
       auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
-      auto unwrappedName = unwrappedBaseType->getAnyNominal()->getBaseName();
+      auto unwrappedName = nominalDecl->getBaseName();
       emitDiagnostic(diag::optional_base_remove_optional_for_keypath_root,
                      baseType)
           .fixItReplace(keyPathExpr->getRootType()->getSourceRange(),
