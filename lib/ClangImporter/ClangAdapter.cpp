@@ -453,18 +453,9 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
       return OmissionTypeName();
 
     // SVE builtin types that don't have Swift equivalents.
-    case clang::BuiltinType::SveInt8:
-    case clang::BuiltinType::SveInt16:
-    case clang::BuiltinType::SveInt32:
-    case clang::BuiltinType::SveInt64:
-    case clang::BuiltinType::SveUint8:
-    case clang::BuiltinType::SveUint16:
-    case clang::BuiltinType::SveUint32:
-    case clang::BuiltinType::SveUint64:
-    case clang::BuiltinType::SveFloat16:
-    case clang::BuiltinType::SveFloat32:
-    case clang::BuiltinType::SveFloat64:
-    case clang::BuiltinType::SveBool:
+#define SVE_TYPE(Name, Id, ...) \
+    case clang::BuiltinType::Id:
+#include "clang/Basic/AArch64SVEACLETypes.def"
       return OmissionTypeName();
     }
   }
