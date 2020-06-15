@@ -576,9 +576,9 @@ public:
     pattern.initCXXMethod(nullptr, origType, method, Kind::CXXMethodType);
     return pattern;
   }
-  
-  static AbstractionPattern getOperator(CanType origType,
-                                         const clang::CXXMethodDecl *method) {
+
+  static AbstractionPattern
+  getCXXOperatorMethod(CanType origType, const clang::CXXMethodDecl *method) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method,
@@ -718,8 +718,9 @@ private:
   }
 
   static AbstractionPattern
-  getPartialCurriedOperator(CanGenericSignature signature, CanType origType,
-                            const clang::CXXMethodDecl *method) {
+  getPartialCurriedCXXOperatorMethod(CanGenericSignature signature,
+                                     CanType origType,
+                                     const clang::CXXMethodDecl *method) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(signature, origType, method,

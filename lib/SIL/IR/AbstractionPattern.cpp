@@ -506,8 +506,9 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     return getPartialCurriedCXXMethod(getGenericSignatureForFunctionComponent(),
                                       getResultType(getType()), getCXXMethod());
   case Kind::CurriedCXXOperatorMethodType:
-    return getPartialCurriedOperator(getGenericSignatureForFunctionComponent(),
-                                     getResultType(getType()), getCXXMethod());
+    return getPartialCurriedCXXOperatorMethod(
+        getGenericSignatureForFunctionComponent(), getResultType(getType()),
+        getCXXMethod());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType:
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),

@@ -2770,7 +2770,7 @@ getSILFunctionTypeForClangDecl(TypeConverter &TC, const clang::Decl *clangDecl,
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
     AbstractionPattern origPattern = method->isOverloadedOperator() ?
-        AbstractionPattern::getOperator(origType, method):
+        AbstractionPattern::getCXXOperatorMethod(origType, method):
         AbstractionPattern::getCXXMethod(origType, method);
     auto conventions = CXXMethodConventions(method);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
