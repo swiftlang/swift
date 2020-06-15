@@ -985,10 +985,14 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
 }
 
 Type MemberAccessOnOptionalBaseFailure::getMemberBaseType() const {
-  if (auto *memberBaseTypeVar = MemberBaseType->getAs<TypeVariableType>()) {
-    return getSolution().getFixedType(memberBaseTypeVar);
+  auto locator = getLocator();
+  if (locator->isForKeyPathComponent()) {
+    if (auto *memberBaseTypeVar = MemberBaseType->getAs<TypeVariableType>()) {
+      return getSolution().getFixedType(memberBaseTypeVar);
+    }
+    return MemberBaseType;
   }
-  return MemberBaseType;
+  return getType(getAnchor());
 }
 
 SourceRange MemberAccessOnOptionalBaseFailure::getMemberBaseSourceRange() const {
