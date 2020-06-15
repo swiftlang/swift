@@ -616,7 +616,7 @@ extension Unsafe${Mutable}BufferPointer {
   ///   - repeatedValue: The instance to assign this buffer's memory to.
   ///
   /// Warning: All buffer elements must be initialized before calling this. 
-  /// Assigning to part of the buffer must be done using the `assign(repeating:count:)`` 
+  /// Assigning to part of the buffer must be done using the `assign(repeating:count:)`
   /// method on the buffer’s `baseAddress`. 
   @inlinable // unsafe-performance
   public func assign(repeating repeatedValue: Element) {
