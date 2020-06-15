@@ -3334,6 +3334,13 @@ void constraints::simplifyLocator(Expr *&anchor,
       if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
         anchor = subscriptExpr->getIndex();
         path = path.slice(1);
+
+        // TODO: It would be better if the index expression was always wrapped
+        // in a ParenExpr (if there is no label).
+        if (!(isa<TupleExpr>(anchor) || isa<ParenExpr>(anchor)) &&
+            !path.empty() && path[0].is<LocatorPathElt::ApplyArgToParam>()) {
+          path = path.slice(1);
+        }
         continue;
       }
 
