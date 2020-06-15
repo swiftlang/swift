@@ -40,8 +40,8 @@ struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;
   std::vector<std::function<void()>> freeFuncs;
   std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
-  std::string lastError;
-  
+  std::string lastString;
+
   SwiftReflectionContext(MemoryReaderImpl impl) {
     auto Reader = std::make_shared<CMemoryReader>(impl);
     nativeContext = new NativeReflectionContext(Reader);
@@ -423,11 +423,11 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   };
 }
 
-static const char *convertError(SwiftReflectionContextRef ContextRef,
-                                llvm::Optional<std::string> Error) {
-  if (Error) {
-    ContextRef->lastError = *Error;
-    return ContextRef->lastError.c_str();
+static const char *returnableCString(SwiftReflectionContextRef ContextRef,
+                                      llvm::Optional<std::string> String) {
+  if (String) {
+    ContextRef->lastString = *String;
+    return ContextRef->lastString.c_str();
   }
   return nullptr;
 }
@@ -605,7 +605,7 @@ const char *swift_reflection_iterateConformanceCache(
   auto Error = Context->iterateConformances([&](auto Type, auto Proto) {
     Call(Type, Proto, ContextPtr);
   });
-  return convertError(ContextRef, Error);
+  return returnableCString(ContextRef, Error);
 }
 
 const char *swift_reflection_iterateMetadataAllocations(
@@ -621,10 +621,9 @@ const char *swift_reflection_iterateMetadataAllocations(
     CAllocation.Size = Allocation.Size;
     Call(CAllocation, ContextPtr);
   });
-  return convertError(ContextRef, Error);
+  return returnableCString(ContextRef, Error);
 }
 
-SWIFT_REMOTE_MIRROR_LINKAGE
 swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
   SwiftReflectionContextRef ContextRef,
   swift_metadata_allocation_t Allocation) {
@@ -636,9 +635,16 @@ swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
   return Context->allocationMetadataPointer(NativeAllocation);
 }
 
+const char *swift_reflection_metadataAllocationTagName(
+    SwiftReflectionContextRef ContextRef, swift_metadata_allocation_tag_t Tag) {
+  auto Context = ContextRef->nativeContext;
+  auto Result = Context->metadataAllocationTagName(Tag);
+  return returnableCString(ContextRef, Result);
+}
+
 const char *swift_reflection_iterateMetadataAllocationBacktraces(
-    SwiftReflectionContextRef ContextRef, swift_metadataAllocationIterator Call,
-    void *ContextPtr) {
+    SwiftReflectionContextRef ContextRef,
+    swift_metadataAllocationBacktraceIterator Call, void *ContextPtr) {
   auto Context = ContextRef->nativeContext;
   auto Error = Context->iterateMetadataAllocationBacktraces(
       [&](auto AllocationPtr, auto Count, auto Ptrs) {
@@ -651,5 +657,5 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
                                                           &Ptrs[Count]};
         Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
       });
-  return convertError(ContextRef, Error);
+  return returnableCString(ContextRef, Error);
 }
