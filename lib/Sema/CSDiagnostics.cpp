@@ -991,11 +991,27 @@ Type MemberAccessOnOptionalBaseFailure::getMemberBaseType() const {
   return MemberBaseType;
 }
 
-bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
+SourceRange MemberAccessOnOptionalBaseFailure::getMemberSourceRange() const {
   auto anchor = getAnchor();
+  auto locator = getLocator();
+
+  if (auto componentPathElt =
+          locator->getLastElementAs<LocatorPathElt::KeyPathComponent>()) {
+    auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
+    if (componentPathElt->getIndex() == 0) {
+      return keyPathExpr->getParsedRoot()->getSourceRange();
+    } else {
+      auto componentIdx = componentPathElt->getIndex() - 1;
+      auto component = keyPathExpr->getComponents()[componentIdx];
+      return component.getSourceRange();
+    }
+  }
+  return FailureDiagnostic::getSourceRange();
+}
+
+bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto baseType = getMemberBaseType();
   auto locator = getLocator();
-  auto &solution = getSolution();
   
   bool resultIsOptional = ResultTypeIsOptional;
 
@@ -1006,41 +1022,45 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto overload = getOverloadChoiceIfAvailable(getLocator());
   if (overload && overload->openedType->getOptionalObjectType())
     resultIsOptional = true;
-  
-  SourceRange sourceRange = FailureDiagnostic::getSourceRange();
-  // Tailored logic to get the base optional type when the failure is
-  // for a keypath component member.
-  if (auto componentPathElt =
-          locator->getLastElementAs<LocatorPathElt::KeyPathComponent>()) {
-    auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
-    if (componentPathElt->getIndex() == 0) {
-      sourceRange = keyPathExpr->getParsedRoot()->getSourceRange();
-    } else {
-      auto component = keyPathExpr->getComponents()[componentPathElt->getIndex() - 1];
-      sourceRange = component.getSourceRange();
-    }
-  }
 
   auto unwrappedBaseType = baseType->getOptionalObjectType();
   if (!unwrappedBaseType)
     return false;
-
+  
+  auto sourceRange = getMemberSourceRange();
+  
   emitDiagnosticAt(sourceRange.End, diag::optional_base_not_unwrapped, baseType,
                    Member, unwrappedBaseType);
 
-  // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
-  // for non-optional results where that would be appropriate. For the moment
-  // always offering "?" means that if the user chooses chaining, we'll end up
-  // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
-  // the next compile.
-  emitDiagnostic(diag::optional_base_chain, Member)
-      .fixItInsertAfter(sourceRange.End, "?");
+  auto componentPathElt =
+      locator->getLastElementAs<LocatorPathElt::KeyPathComponent>();
+  if (componentPathElt && componentPathElt->getIndex() == 0) {
+    // For members where the base type is an optional key path root
+    // let's emit tailored note suggesting to remove the '?' and a
+    // fix to replace the optional type with its unwrapped type.
+    if (auto *nominalDecl = unwrappedBaseType->getAnyNominal()) {
+      auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
+      auto unwrappedName = unwrappedBaseType->getAnyNominal()->getBaseName();
+      emitDiagnostic(diag::optional_base_remove_optional_for_keypath_root,
+                     baseType)
+          .fixItReplace(keyPathExpr->getRootType()->getSourceRange(),
+                        unwrappedName.getIdentifier().str());
+    }
+    
+  } else {
+    // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
+    // for non-optional results where that would be appropriate. For the moment
+    // always offering "?" means that if the user chooses chaining, we'll end up
+    // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
+    // the next compile.
+    emitDiagnostic(diag::optional_base_chain, Member)
+        .fixItInsertAfter(sourceRange.End, "?");
 
-  if (!resultIsOptional) {
-    emitDiagnostic(diag::unwrap_with_force_value)
-        .fixItInsertAfter(sourceRange.End, "!");
+    if (!resultIsOptional) {
+      emitDiagnostic(diag::unwrap_with_force_value)
+          .fixItInsertAfter(sourceRange.End, "!");
+    }
   }
-
   return true;
 }
 

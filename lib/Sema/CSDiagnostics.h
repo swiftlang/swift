@@ -492,7 +492,10 @@ public:
         MemberBaseType(memberBaseType), ResultTypeIsOptional(resultOptional) {}
   
   bool diagnoseAsError() override;
+  
   Type getMemberBaseType() const;
+  SourceRange getMemberSourceRange() const;
+
 };
 
 /// Diagnose errors associated with rvalues in positions
