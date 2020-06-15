@@ -1340,6 +1340,7 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
 ///                      ('.' sil-decl-autodiff)?
 ///  sil-decl-subref ::= '!' sil-decl-lang
+///  sil-decl-subref ::= '!' sil-decl-autodiff
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
 ///  sil-decl-subref-part ::= 'allocator'
@@ -6083,7 +6084,8 @@ bool SILParserState::parseSILVTable(Parser &P) {
       }
 
       auto Kind = SILVTable::Entry::Kind::Normal;
-      if (P.Tok.is(tok::l_square)) {
+      bool NonOverridden = false;
+      while (P.Tok.is(tok::l_square)) {
         P.consumeToken(tok::l_square);
         if (P.Tok.isNot(tok::identifier)) {
           P.diagnose(P.Tok.getLoc(), diag::sil_vtable_bad_entry_kind);
@@ -6098,7 +6100,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
           Kind = SILVTable::Entry::Kind::Inherited;
         } else if (P.Tok.getText() == "nonoverridden") {
           P.consumeToken();
-          Kind = SILVTable::Entry::Kind::NormalNonOverridden;
+          NonOverridden = true;
         } else {
           P.diagnose(P.Tok.getLoc(), diag::sil_vtable_bad_entry_kind);
           return true;
@@ -6108,7 +6110,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
           return true;
       }
 
-      vtableEntries.emplace_back(Ref, Func, Kind);
+      vtableEntries.emplace_back(Ref, Func, Kind, NonOverridden);
     } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
   }
 

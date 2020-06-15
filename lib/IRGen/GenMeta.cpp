@@ -1437,7 +1437,13 @@ namespace {
     }
 
     void addMethod(SILDeclRef fn) {
-      VTableEntries.push_back(fn);
+      if (methodRequiresReifiedVTableEntry(IGM, VTable, fn)) {
+        VTableEntries.push_back(fn);
+      } else if (getType()->getEffectiveAccess() >= AccessLevel::Public) {
+        // Emit a stub method descriptor and lookup function for nonoverridden
+        // methods so that resilient code sequences can still use them.
+        emitNonoverriddenMethod(fn);
+      }
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
@@ -1521,9 +1527,6 @@ namespace {
     }
     
     void addVTable() {
-      if (VTableEntries.empty())
-        return;
-      
       LLVM_DEBUG(
         llvm::dbgs() << "VTable entries for " << getType()->getName() << ":\n";
         for (auto entry : VTableEntries) {
@@ -1533,6 +1536,9 @@ namespace {
         }
       );
 
+      if (VTableEntries.empty())
+        return;
+      
       // Only emit a method lookup function if the class is resilient
       // and has a non-empty vtable.
       if (IGM.hasResilientMetadata(getType(), ResilienceExpansion::Minimal))
@@ -1595,8 +1601,25 @@ namespace {
         IGM.emitDispatchThunk(fn);
       }
     }
+    
+    void emitNonoverriddenMethod(SILDeclRef fn) {
+      // TODO: Emit a freestanding method descriptor structure, and a method
+      // lookup function, to present the ABI of an overridable method even
+      // though the method has no real overrides currently.
+    }
 
     void addOverrideTable() {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Override Table entries for " << getType()->getName() << ":\n";
+        for (auto entry : OverrideTableEntries) {
+          llvm::dbgs() << "  ";
+          entry.first.print(llvm::dbgs());
+          llvm::dbgs() << " -> ";
+          entry.second.print(llvm::dbgs());
+          llvm::dbgs() << '\n';
+        }
+      );
+
       if (OverrideTableEntries.empty())
         return;
 
@@ -2702,12 +2725,12 @@ namespace {
     using super::asImpl;
     using super::IGM;
     using super::Target;
+    using super::VTable;
 
     ConstantStructBuilder &B;
 
     const ClassLayout &FieldLayout;
     const ClassMetadataLayout &MetadataLayout;
-    const SILVTable *VTable;
 
     Size AddressPoint;
 
@@ -2717,8 +2740,7 @@ namespace {
                              const ClassLayout &fieldLayout)
       : super(IGM, theClass), B(builder),
         FieldLayout(fieldLayout),
-        MetadataLayout(IGM.getClassMetadataLayout(theClass)),
-        VTable(IGM.getSILModule().lookUpVTable(theClass)) {}
+        MetadataLayout(IGM.getClassMetadataLayout(theClass)) {}
 
   public:
     SILType getLoweredType() {
@@ -2854,7 +2876,7 @@ namespace {
                            PointerAuthEntity::Special::HeapDestructor);
       } else {
         // In case the optimizer removed the function. See comment in
-        // addMethod().
+        // addReifiedVTableEntry().
         B.addNullPointer(IGM.FunctionPtrTy);
       }
     }
@@ -2973,7 +2995,7 @@ namespace {
       B.add(data);
     }
 
-    void addMethod(SILDeclRef fn) {
+    void addReifiedVTableEntry(SILDeclRef fn) {
       // Find the vtable entry.
       assert(VTable && "no vtable?!");
       auto entry = VTable->getEntry(IGM.getSILModule(), fn);
@@ -5085,4 +5107,34 @@ llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
 void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
   // Emit the opaque type descriptor.
   OpaqueTypeDescriptorBuilder(*this, D).emit();
+}
+
+bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
+                                             const SILVTable *vtable,
+                                             SILDeclRef method) {
+  auto &M = IGM.getSILModule();
+  auto entry = vtable->getEntry(IGM.getSILModule(), method);
+  if (!entry) {
+    return true;
+  }
+  
+  // We may be able to elide the vtable entry, ABI permitting, if it's not
+  // overridden.
+  if (!entry->isNonOverridden()) {
+    return true;
+  }
+  
+  // Does the ABI require a vtable entry to exist? If the class is public,
+  // and it's either marked fragile or part of a non-resilient module, then
+  // other modules will directly address vtable offsets and we can't remove
+  // vtable entries.
+  if (vtable->getClass()->getEffectiveAccess() >= AccessLevel::Public) {
+    // TODO: Check whether we use a resilient ABI to access this
+    // class's methods. We can drop unnecessary vtable entries if we do;
+    // otherwise fixed vtable offsets are part of the ABI.
+    return true;
+  }
+    
+  // Otherwise, we can leave this method out of the runtime vtable.
+  return false;
 }

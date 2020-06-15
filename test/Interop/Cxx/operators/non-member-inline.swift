@@ -43,6 +43,33 @@ OperatorsTestSuite.test("slash (/)") {
   expectEqual(1, result.value)
 }
 
+OperatorsTestSuite.test("percent") {
+  let lhs = IntBox(value: 11)
+  let rhs = IntBox(value: 2)
+
+  let result = lhs % rhs
+
+  expectEqual(1, result.value)
+}
+
+OperatorsTestSuite.test("amp") {
+  let lhs = IntBox(value: 6)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs & rhs
+
+  expectEqual(4, result.value)
+}
+
+OperatorsTestSuite.test("pipe") {
+  let lhs = IntBox(value: 6)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs | rhs
+
+  expectEqual(7, result.value)
+}
+
 OperatorsTestSuite.test("less less (<<)") {
   let lhs = IntBox(value: 2)
   let rhs = IntBox(value: 4)

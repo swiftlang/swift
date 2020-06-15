@@ -905,6 +905,11 @@ class BuildScriptInvocation(object):
         # list.
         if self.args.infer_dependencies:
             combined = impl_product_classes + product_classes
+            if self.args.verbose_build:
+                print("-- Build Graph Inference --")
+                print("Initial Product List:")
+                for p in combined:
+                    print("    {}".format(p.product_name()))
 
             # Now that we have produced the schedule, resplit. We require our
             # dependencies to respect our build-script-impl property. This means
@@ -924,6 +929,12 @@ class BuildScriptInvocation(object):
                     impl_product_classes.append(p)
                 else:
                     product_classes.append(p)
+            if self.args.verbose_build:
+                print("Final Build Order:")
+                for p in impl_product_classes:
+                    print("    {}".format(p.product_name()))
+                for p in product_classes:
+                    print("    {}".format(p.product_name()))
         return (impl_product_classes, product_classes)
 
     def execute(self):

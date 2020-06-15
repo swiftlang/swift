@@ -1,0 +1,68 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+class InternalA {
+  init()
+  func foo()
+  func bar()
+  func bas()
+}
+
+sil @InternalA_foo : $@convention(method) (@guaranteed InternalA) -> ()
+sil @InternalA_bar : $@convention(method) (@guaranteed InternalA) -> ()
+sil @InternalA_bas : $@convention(method) (@guaranteed InternalA) -> ()
+sil @InternalA_init : $@convention(method) (@thick InternalA.Type) -> @owned InternalA
+sil @InternalA_dealloc : $@convention(method) (@owned InternalA) -> ()
+
+sil_vtable InternalA {
+  #InternalA.deinit!deallocator : @InternalA_dealloc
+  #InternalA.init!allocator : @InternalA_init
+  #InternalA.foo : @InternalA_foo [nonoverridden]
+  #InternalA.bar : @InternalA_bar
+  #InternalA.bas : @InternalA_bas [nonoverridden]
+}
+
+// -- only overridden entries in internal method descriptor table
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalACMn" =
+// CHECK-SAME:     i32 2, %swift.method_descriptor
+// CHECK-SAME:     @InternalA_init
+// CHECK-NOT:      @InternalA_foo
+// CHECK-SAME:     @InternalA_bar
+// CHECK-NOT:      @InternalA_bas
+
+// -- only overridden entries in internal vtable
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalACMf" = 
+// CHECK-SAME:     @InternalA_init
+// CHECK-NOT:      @InternalA_foo
+// CHECK-SAME:     @InternalA_bar
+// CHECK-NOT:      @InternalA_bas
+
+sil @InternalB_bar : $@convention(method) (@guaranteed InternalB) -> ()
+sil @InternalB_init : $@convention(method) (@thick InternalB.Type) -> @owned InternalB
+sil @InternalB_dealloc : $@convention(method) (@owned InternalB) -> ()
+
+class InternalB: InternalA {
+  override func bar()
+}
+
+sil_vtable InternalB {
+  #InternalB.deinit!deallocator : @InternalB_dealloc
+  #InternalA.init!allocator : @InternalB_init [override]
+  #InternalA.foo : @InternalA_foo [inherited] [nonoverridden]
+  #InternalA.bar : @InternalB_bar [override]
+  #InternalA.bas : @InternalA_bas [inherited] [nonoverridden]
+}
+
+// -- only overridden entries in internal method descriptor table
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalBCMn" =
+// CHECK-SAME:     i32 2, %swift.method_override_descriptor
+// CHECK-NOT:      @InternalA_foo
+// CHECK-SAME:     @InternalB_bar
+// CHECK-NOT:      @InternalA_bas
+// CHECK-SAME:     @InternalB_init
+
+// -- only overridden entries in internal vtable
+// CHECK-LABEL: @"$s21vtable_non_overridden9InternalBCMf" = 
+// CHECK-SAME:     @InternalB_init
+// CHECK-NOT:      @InternalA_foo
+// CHECK-SAME:     @InternalB_bar
+// CHECK-NOT:      @InternalA_bas
