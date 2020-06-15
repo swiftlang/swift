@@ -1349,11 +1349,11 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return getTypeMatchSuccess();
 }
 
-// Determine if a function representation conversion is allowed returning
-// 'false' (i.e. no error) if the conversion is valid.
+// Determine whether conversion is allowed between two function types
+// based on their representations.
 static bool
-matchFunctionConversionRepresentations(FunctionTypeRepresentation rep1,
-                                       FunctionTypeRepresentation rep2) {
+isConversionAllowedBetween(FunctionTypeRepresentation rep1,
+                           FunctionTypeRepresentation rep2) {
   auto isThin = [](FunctionTypeRepresentation rep) {
     return rep == FunctionTypeRepresentation::CFunctionPointer ||
         rep == FunctionTypeRepresentation::Thin;
@@ -1361,15 +1361,15 @@ matchFunctionConversionRepresentations(FunctionTypeRepresentation rep1,
   
   // Allowing "thin" (c, thin) to "thin" conventions
   if (isThin(rep1) && isThin(rep2))
-    return false;
+    return true;
   
   // Allowing all to "thick" (swift, block) conventions
   // "thin" (c, thin) to "thick" or "thick" to "thick"
   if (rep2 == FunctionTypeRepresentation::Swift ||
       rep2 == FunctionTypeRepresentation::Block)
-    return false;
+    return true;
   
-  return rep1 != rep2;
+  return rep1 == rep2;
 }
 
 // Returns 'false' (i.e. no error) if it is legal to match functions with the
@@ -1390,7 +1390,9 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
     if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
       return false;
     
-    return matchFunctionConversionRepresentations(rep1, rep2);
+    // Inverting the result because matchFunctionRepresentations
+    // returns false in conversions are allowed.
+    return !isConversionAllowedBetween(rep1, rep2);
   }
 
   case ConstraintKind::OpaqueUnderlyingType:
