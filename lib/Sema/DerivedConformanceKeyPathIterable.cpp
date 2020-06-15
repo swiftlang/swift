@@ -122,6 +122,7 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   // Return array of all key path expressions.
   Expr *keyPathsArrayExpr =
       ArrayExpr::create(C, SourceLoc(), keyPathExprs, {}, SourceLoc());
+  keyPathsArrayExpr->setImplicit();
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), keyPathsArrayExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);

@@ -3848,10 +3848,20 @@ namespace {
 
     Expr *visitCoerceExpr(CoerceExpr *expr, Optional<unsigned> choice) {
       // Simplify and update the type we're coercing to.
-      assert(expr->getCastTypeRepr());
-      const auto toType = simplifyType(cs.getType(expr->getCastTypeRepr()));
-      expr->setCastType(toType);
-      cs.setType(expr->getCastTypeRepr(), toType);
+      // SWIFT_ENABLE_TENSORFLOW
+      // Handle implicit `CoerceExpr` with null `TypeRepr`.
+      // Created by `KeyPathIterable` derived conformances.
+      if (expr->getCastType()) {
+        const auto toType = simplifyType(expr->getCastType());
+        expr->setCastType(toType);
+      } else {
+        assert(expr->getCastTypeRepr());
+        const auto toType = simplifyType(cs.getType(expr->getCastTypeRepr()));
+        expr->setCastType(toType);
+        cs.setType(expr->getCastTypeRepr(), toType);
+      }
+      const auto toType = expr->getCastType();
+      // SWIFT_ENABLE_TENSORFLOW END
 
       // If this is a literal that got converted into constructor call
       // lets put proper source information in place.
