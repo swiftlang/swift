@@ -1,4 +1,5 @@
 // RUN: %target-build-swift -O %s
+// REQUIRES: SR-12493
 
 // SR-12493: SIL verification error regarding substituted function types and
 // `differentiable_function_extract` instruction. Occurs only with `-O`.
