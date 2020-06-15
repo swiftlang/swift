@@ -4111,6 +4111,18 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
       }
     }
 
+    // C++ operators that are implemented as non-static member functionsget
+    // imported into Swift as static member functions that use anadditional
+    // parameter for the left-hand side operand instead ofthe receiver object.
+    // Those are inout parameters and don't get bridged.
+    if (auto method = dyn_cast_or_null<clang::CXXMethodDecl>(
+            constant.getDecl()->getClangDecl())) {
+      if (method->isOverloadedOperator()) {
+        bridgedParams.push_back(methodParams[0]);
+        methodParams = methodParams.drop_front(1);
+      }
+    }
+
     auto partialFnPattern = bridgingFnPattern.getFunctionResultType();
     getBridgedParams(rep, partialFnPattern, methodParams, bridgedParams,
                      bridging);
