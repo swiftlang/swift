@@ -1331,6 +1331,12 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   decl->prepareLookupTable();
 
+  // If we're allowed to load extensions, call prepareExtensions to ensure we
+  // properly invalidate the lazily-complete cache for any extensions brought in
+  // by modules loaded after-the-fact. This can happen with the LLDB REPL.
+  if (!disableAdditionalExtensionLoading)
+    decl->prepareExtensions();
+
   auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {
     // Make sure we have the complete list of members (in this nominal and in
