@@ -1036,7 +1036,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
       locator->getLastElementAs<LocatorPathElt::KeyPathComponent>();
   if (componentPathElt && componentPathElt->getIndex() == 0) {
     // For members where the base type is an optional key path root
-    // let's emit tailored note suggesting to remove the '?' and a
+    // let's emit a tailored note suggesting to remove the '?' and a
     // fix to replace the optional type with its unwrapped type.
     if (auto *nominalDecl = unwrappedBaseType->getAnyNominal()) {
       auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());

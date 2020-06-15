@@ -976,7 +976,7 @@ func testMemberAccessOnOptionalKeyPathComponent() {
 
   \String?.count 
   // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
-  // expected-note@-2 {{remove optional '?' form key path root type 'String?'}} {{4-11=String}}
+  // expected-note@-2 {{remove optional '?' form key path root base type 'String?'}} {{4-11=String}}
 
   \SR5688_S.[5].count 
   // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}

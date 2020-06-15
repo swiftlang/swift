@@ -490,7 +490,7 @@ public:
                                     bool resultOptional)
       : FailureDiagnostic(solution, locator), Member(memberName),
         MemberBaseType(memberBaseType), ResultTypeIsOptional(resultOptional) {}
-  
+
   bool diagnoseAsError() override;
   
   Type getMemberBaseType() const;
