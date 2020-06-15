@@ -179,23 +179,25 @@ class AbstractionPattern {
     /// type.  ObjCMethod is valid.  OtherData is an encoded foreign
     /// error index.
     ObjCMethodType,
-    /// The uncurried imported type of a C++ non-operator method. OrigType is
-    /// valid and is a function type. CXXMethod is valid.
+    /// The uncurried imported type of a C++ non-operator non-static member
+    /// function. OrigType is valid and is a function type. CXXMethod is valid.
     CXXMethodType,
-    /// The curried imported type of a C++ non-operator method. OrigType is
-    /// valid and is a function type. CXXMethod is valid.
+    /// The curried imported type of a C++ non-operator non-static member
+    /// function. OrigType is valid and is a function type. CXXMethod is valid.
     CurriedCXXMethodType,
     /// The partially-applied curried imported type of a C++ non-operator
-    /// method. OrigType is valid and is a function type. CXXMethod is valid.
+    /// non-static member function. OrigType is valid and is a function type.
+    /// CXXMethod is valid.
     PartialCurriedCXXMethodType,
-    /// The uncurried imported type of a C++ operator method. OrigType is valid
-    /// and is a function type. CXXMethod is valid.
+    /// The uncurried imported type of a C++ operator non-static member
+    /// function. OrigType is valid and is a function type. CXXMethod is valid.
     CXXOperatorMethodType,
-    /// The curried imported type of a C++ operator method. OrigType is valid
-    /// and is a function type. CXXMethod is valid.
-    CurriedCXXOperatorMethodType,
-    /// The partially-applied curried imported type of a C++ operator method.
+    /// The curried imported type of a C++ operator non-static member function.
     /// OrigType is valid and is a function type. CXXMethod is valid.
+    CurriedCXXOperatorMethodType,
+    /// The partially-applied curried imported type of a C++ operator non-static
+    /// member function. OrigType is valid and is a function type. CXXMethod is
+    /// valid.
     PartialCurriedCXXOperatorMethodType,
     /// A Swift function whose parameters and results are opaque. This is
     /// like `AP::Type<T>((T) -> T)`, except that the number of parameters is

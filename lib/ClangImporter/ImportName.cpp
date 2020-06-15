@@ -1427,8 +1427,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       if (auto FD = dyn_cast<clang::FunctionDecl>(D)) {
         baseName = clang::getOperatorSpelling(op);
         isFunction = true;
-        argumentNames.resize(FD->param_size() +
-                             (isa<clang::CXXMethodDecl>(D) ? 1 : 0));
+        argumentNames.resize(
+            FD->param_size() +
+            // C++ operators that are implemented as non-static member functions
+            // get imported into Swift as static member functions that use an
+            // additional parameter for the left-hand side operand instead of
+            // the receiver object.
+            (isa<clang::CXXMethodDecl>(D) ? 1 : 0));
       } else {
         // This can happen for example for templated operators functions.
         // We don't support those, yet.

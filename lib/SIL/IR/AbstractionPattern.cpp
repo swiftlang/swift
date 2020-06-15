@@ -609,20 +609,22 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
   case Kind::CXXOperatorMethodType:
   case Kind::PartialCurriedCXXOperatorMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
-
-    // A parameter of type () does not correspond to a Clang parameter.
     auto paramType = params[index].getParameterType();
-    if (paramType->isVoid())
-      return AbstractionPattern(paramType);
 
+    // The first parameter holds the left-hand-side operand, which gets passed
+    // to the C++ function as the this pointer.
     if (index == 0)
       return getCXXMethodSelfPattern(paramType);
+
+    // A parameter of type () does not correspond to a Clang parameter.
+    if (paramType->isVoid())
+      return AbstractionPattern(paramType);
     
     // Otherwise, we're talking about the formal parameter clause.
     auto methodType = getCXXMethod()->getType().getTypePtr();
-    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
-                              paramType,
-                              getClangFunctionParameterType(methodType, index-1));
+    return AbstractionPattern(
+        getGenericSignatureForFunctionComponent(), paramType,
+        getClangFunctionParameterType(methodType, index - 1));
   }
   case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();

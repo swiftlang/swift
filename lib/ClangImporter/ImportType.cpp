@@ -1710,12 +1710,14 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   unsigned index = 0;
   SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
+  // C++ operators that are implemented as non-static member functions get
+  // imported into Swift as static member functions that use an additional
+  // parameter for the left-hand side operand instead of the receiver object.
   if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
     if (clangDecl->isOverloadedOperator()) {
       auto param = new (SwiftContext)
           ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
                     SwiftContext.getIdentifier("lhs"), dc);
-      param->setSpecifier(ParamSpecifier::Default);
 
       auto parent = CMD->getParent();
       auto parentType = importType(

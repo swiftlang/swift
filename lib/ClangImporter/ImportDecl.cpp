@@ -3813,6 +3813,10 @@ namespace {
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
           if (!mdecl->isStatic() &&
+              // C++ operators that are implemented as non-static member
+              // functions get imported into Swift as static member functions
+              // that use an additional parameter for the left-hand side operand
+              // instead of the receiver object.
               mdecl->getDeclName().getNameKind() !=
                   clang::DeclarationName::CXXOperatorName) {
             selfIdx = 0;
