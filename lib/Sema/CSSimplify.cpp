@@ -6950,12 +6950,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       SmallVector<Constraint *, 2> optionalities;
       auto nonoptionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::create(*this, member, locator), memberTy, innerTV,
-          locator);
-      auto optionalResult = Constraint::createFixed(
-          *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::createWithOptionalResult(*this, member, locator),
-          optTy, memberTy, locator);
+          UnwrapOptionalBase::create(*this, member, baseObjTy, locator),
+          memberTy, innerTV, locator);
+      auto optionalResult =
+          Constraint::createFixed(*this, ConstraintKind::Bind,
+                                  UnwrapOptionalBase::createWithOptionalResult(
+                                      *this, member, baseObjTy, locator),
+                                  optTy, memberTy, locator);
       optionalities.push_back(nonoptionalResult);
       optionalities.push_back(optionalResult);
       addDisjunctionConstraint(optionalities, locator);

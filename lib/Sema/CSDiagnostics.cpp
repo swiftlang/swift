@@ -984,12 +984,18 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   return true;
 }
 
+Type MemberAccessOnOptionalBaseFailure::getMemberBaseType() const {
+  if (auto *memberBaseTypeVar = MemberBaseType->getAs<TypeVariableType>()) {
+    return getSolution().getFixedType(memberBaseTypeVar);
+  }
+  return MemberBaseType;
+}
+
 bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto anchor = getAnchor();
-  auto baseType = getType(anchor);
+  auto baseType = getMemberBaseType();
   auto locator = getLocator();
   auto &solution = getSolution();
-  auto &cs = getConstraintSystem();
   
   bool resultIsOptional = ResultTypeIsOptional;
 
@@ -1007,11 +1013,11 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   if (auto componentPathElt =
           locator->getLastElementAs<LocatorPathElt::KeyPathComponent>()) {
     auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
-    sourceRange = keyPathExpr->getComponents()[componentPathElt->getIndex() - 1].getLoc();
-
-    auto componentType = cs.getType(keyPathExpr, componentPathElt->getIndex() - 1);
-    if (auto componentTypeVar = componentType->getAs<TypeVariableType>()) {
-      baseType = solution.getFixedType(componentTypeVar)->getRValueType();
+    if (componentPathElt->getIndex() == 0) {
+      sourceRange = keyPathExpr->getParsedRoot()->getSourceRange();
+    } else {
+      auto component = keyPathExpr->getComponents()[componentPathElt->getIndex() - 1];
+      sourceRange = component.getSourceRange();
     }
   }
 
@@ -1019,8 +1025,8 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   if (!unwrappedBaseType)
     return false;
 
-  emitDiagnosticAt(sourceRange.End, diag::optional_base_not_unwrapped, baseType, Member,
-                   unwrappedBaseType);
+  emitDiagnosticAt(sourceRange.End, diag::optional_base_not_unwrapped, baseType,
+                   Member, unwrappedBaseType);
 
   // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
   // for non-optional results where that would be appropriate. For the moment
