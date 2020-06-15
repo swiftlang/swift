@@ -82,6 +82,10 @@ static UIdent Attr_Setter_FilePrivate("source.decl.attribute.setter_access.filep
 static UIdent Attr_Setter_Internal("source.decl.attribute.setter_access.internal");
 static UIdent Attr_Setter_Public("source.decl.attribute.setter_access.public");
 static UIdent Attr_Setter_Open("source.decl.attribute.setter_access.open");
+static UIdent EffectiveAccess_Public("source.decl.effective_access.public");
+static UIdent EffectiveAccess_Internal("source.decl.effective_access.internal");
+static UIdent EffectiveAccess_FilePrivate("source.decl.effective_access.fileprivate");
+static UIdent EffectiveAccess_LessThanFilePrivate("source.decl.effective_access.less_than_fileprivate");
 
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
@@ -806,6 +810,20 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
   }
 
   return None;
+}
+
+UIdent SwiftLangSupport::getUIDForFormalAccessScope(const swift::AccessScope Scope) {
+  if (Scope.isPublic()) {
+    return EffectiveAccess_Public;
+  } else if (Scope.isInternal()) {
+    return EffectiveAccess_Internal;
+  } else if (Scope.isFileScope()) {
+    return EffectiveAccess_FilePrivate;
+  } else if (Scope.isPrivate()) {
+    return EffectiveAccess_LessThanFilePrivate;
+  } else {
+    llvm_unreachable("Unsupported access scope");
+  }
 }
 
 std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttributes &Attrs) {
