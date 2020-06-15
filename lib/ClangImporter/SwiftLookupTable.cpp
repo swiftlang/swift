@@ -36,7 +36,6 @@
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/OnDiskHashTable.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace importer;
@@ -803,10 +802,11 @@ SwiftLookupTable::lookupMemberOperators(SerializedSwiftName baseName) {
 
   // Find the lookup table entry for this base name.
   auto known = findOrCreate(LookupTable, baseName,
-                             [](auto &results, auto &Reader, auto Name) {
-     return (void)Reader.lookup(Name, results);
-   });
-  if (known == LookupTable.end()) return result;
+                            [](auto &results, auto &Reader, auto Name) {
+                              return (void)Reader.lookup(Name, results);
+                            });
+  if (known == LookupTable.end())
+    return result;
 
   // Walk each of the entries.
   for (auto &entry : known->second) {

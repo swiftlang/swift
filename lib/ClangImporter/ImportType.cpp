@@ -1722,7 +1722,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       auto parent = CMD->getParent();
       auto parentType = importType(
           parent->getASTContext().getRecordType(parent),
-          ImportTypeKind::Parameter, allowNSUIntegerAsInt, Bridgeability::Full);
+          ImportTypeKind::Parameter, allowNSUIntegerAsInt, Bridgeability::None);
 
       param->setInterfaceType(parentType.getType());
       param->setSpecifier(ParamSpecifier::InOut);
