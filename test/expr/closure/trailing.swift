@@ -420,11 +420,11 @@ func variadicAndNonOverloadLabel(b: (() -> Void)...) -> Int { return 0 }
 func testVariadic() {
   variadic {}
   variadic() {}
-  variadic({}) {} // expected-error {{extra argument in call}}
+  variadic({}) {} // expected-error {{extra trailing closure passed in call}}
 
   variadicLabel {}
   variadicLabel() {}
-  variadicLabel(closures: {}) {} // expected-error {{extra argument 'closures' in call}}
+  variadicLabel(closures: {}) {} // expected-error {{extra trailing closure passed in call}}
 
   let a1 = variadicOverloadMismatch {}
   _ = a1 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}

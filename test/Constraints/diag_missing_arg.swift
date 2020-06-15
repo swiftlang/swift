@@ -41,6 +41,13 @@ trailingClosureSingle2() { 1 }
 // expected-error@-1 {{missing argument for parameter 'x' in call}} {{24-24=x: <#() -> Int#>}}
 // expected-error@-2 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
 
+func trailingClosureDefaults(x: () -> Int, y: Int = 0, z: Int = 1) {} // expected-note * {{here}}
+trailingClosureDefaults { 1 }
+trailingClosureDefaults { "foo" }
+// expected-error@-1 {{cannot convert value of type 'String' to closure result type 'Int'}}
+trailingClosureDefaults(x: { 1 }) { 2 }
+// expected-error@-1 {{extra trailing closure passed in call}}
+
 func trailingClosureMulti1(x: Int, y: Int, z: () -> Int) {} // expected-note * {{here}}
 trailingClosureMulti1(y: 1) { 1 } // expected-error {{missing argument for parameter 'x' in call}} {{23-23=x: <#Int#>, }}
 trailingClosureMulti1(x: 1) { 1 } // expected-error {{missing argument for parameter 'y' in call}} {{27-27=, y: <#Int#>}}
