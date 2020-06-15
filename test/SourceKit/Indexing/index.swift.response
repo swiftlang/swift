@@ -29,7 +29,8 @@
           key.column: 5,
           key.is_implicit: 1
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.ref.struct,
@@ -50,7 +51,8 @@
           key.name: "init()",
           key.usr: <usr>,
           key.line: 7,
-          key.column: 3
+          key.column: 3,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -75,7 +77,8 @@
               key.is_dynamic: 1,
               key.is_implicit: 1
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.class,
@@ -90,7 +93,8 @@
           key.usr: <usr>,
           key.line: 9,
           key.column: 8,
-          key.is_dynamic: 1
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -121,7 +125,8 @@
               key.line: 10,
               key.column: 45
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -152,7 +157,8 @@
               key.line: 13,
               key.column: 47
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.class,
@@ -160,9 +166,11 @@
           key.usr: <usr>,
           key.line: 16,
           key.column: 14,
-          key.is_dynamic: 1
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.function.operator.infix,
@@ -192,7 +200,8 @@
           key.line: 19,
           key.column: 26
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.struct,
@@ -206,23 +215,27 @@
           key.name: "meth()",
           key.usr: <usr>,
           key.line: 24,
-          key.column: 8
+          key.column: 8,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.static,
           key.name: "smeth()",
           key.usr: <usr>,
           key.line: 25,
-          key.column: 15
+          key.column: 15,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: <usr>,
           key.line: 23,
           key.column: 8,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.enum,
@@ -236,9 +249,11 @@
           key.name: "EElem",
           key.usr: <usr>,
           key.line: 29,
-          key.column: 8
+          key.column: 8,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.protocol,
@@ -262,9 +277,11 @@
               key.line: 33,
               key.column: 22
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -373,7 +390,8 @@
           key.line: 42,
           key.column: 14
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.typealias,
@@ -389,7 +407,8 @@
           key.line: 47,
           key.column: 21
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.extension.class,
@@ -436,7 +455,8 @@
               key.line: 50,
               key.column: 19
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -460,7 +480,8 @@
               key.line: 51,
               key.column: 22
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -477,7 +498,8 @@
               key.column: 18,
               key.is_dynamic: 1
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.struct,
@@ -516,7 +538,8 @@
               key.name: "protMeth(_:)",
               key.usr: <usr>
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.class,
@@ -542,9 +565,11 @@
             {
               key.attribute: source.decl.attribute.override
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -567,7 +592,8 @@
           key.column: 5,
           key.is_implicit: 1
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.ref.class,
@@ -606,7 +632,8 @@
               key.column: 5,
               key.is_dynamic: 1
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.struct,
@@ -630,7 +657,8 @@
               key.column: 22,
               key.is_dynamic: 1
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.struct,
@@ -644,9 +672,11 @@
           key.usr: <usr>,
           key.line: 59,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -670,16 +700,19 @@
               key.line: 74,
               key.column: 22
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: <usr>,
           key.line: 73,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -750,7 +783,8 @@
             {
               key.attribute: source.decl.attribute.override
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
@@ -769,9 +803,11 @@
             {
               key.attribute: source.decl.attribute.override
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -827,16 +863,19 @@
               key.line: 81,
               key.column: 26
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: <usr>,
           key.line: 80,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -949,7 +988,8 @@
             }
           ]
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.struct,
@@ -963,16 +1003,19 @@
           key.name: "sfoo()",
           key.usr: <usr>,
           key.line: 102,
-          key.column: 8
+          key.column: 8,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: <usr>,
           key.line: 101,
           key.column: 8,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -1004,7 +1047,8 @@
             }
           ]
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.ref.struct,
@@ -1044,7 +1088,8 @@
           key.column: 16,
           key.receiver_usr: "s:5index2S2V"
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1059,16 +1104,19 @@
           key.usr: <usr>,
           key.line: 116,
           key.column: 8,
-          key.is_dynamic: 1
+          key.is_dynamic: 1,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: <usr>,
           key.line: 115,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1139,7 +1187,8 @@
             {
               key.attribute: source.decl.attribute.override
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
@@ -1158,9 +1207,11 @@
             {
               key.attribute: source.decl.attribute.override
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -1207,14 +1258,16 @@
           key.column: 5,
           key.receiver_usr: "s:5index2S2V"
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "meth()",
       key.usr: <usr>,
       key.line: 134,
-      key.column: 8
+      key.column: 8,
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1251,16 +1304,19 @@
             {
               key.attribute: source.decl.attribute.convenience
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: <usr>,
           key.line: 137,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1314,7 +1370,8 @@
               key.column: 11,
               key.receiver_usr: "s:5index3CC4C"
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
@@ -1333,9 +1390,11 @@
             {
               key.attribute: source.decl.attribute.override
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1349,7 +1408,8 @@
           key.name: "init()",
           key.usr: <usr>,
           key.line: 150,
-          key.column: 3
+          key.column: 3,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -1406,7 +1466,8 @@
                 }
               ]
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.struct,
@@ -1415,7 +1476,8 @@
           key.line: 151,
           key.column: 23
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1454,7 +1516,8 @@
               key.line: 170,
               key.column: 5
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.struct,
@@ -1468,9 +1531,11 @@
           key.usr: <usr>,
           key.line: 162,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.protocol,
@@ -1510,7 +1575,8 @@
               key.column: 5,
               key.is_dynamic: 1
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.struct,
@@ -1519,7 +1585,8 @@
           key.line: 176,
           key.column: 11
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1533,14 +1600,16 @@
           key.usr: <usr>,
           key.line: 184,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
       ],
       key.attributes: [
         {
           key.attribute: source.decl.attribute.available
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1554,14 +1623,16 @@
           key.usr: <usr>,
           key.line: 188,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
       ],
       key.attributes: [
         {
           key.attribute: source.decl.attribute.available
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -1575,14 +1646,16 @@
           key.usr: <usr>,
           key.line: 192,
           key.column: 7,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
       ],
       key.attributes: [
         {
           key.attribute: source.decl.attribute.available
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     }
   ]
 }

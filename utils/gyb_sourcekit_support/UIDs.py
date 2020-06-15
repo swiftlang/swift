@@ -183,6 +183,7 @@ UID_KEYS = [
         'key.completion_check_dependency_interval'),
     KEY('AnnotatedTypename', 'key.annotated.typename'),
     KEY('CompileOperation', 'key.compile_operation'),
+    KEY('EffectiveAccess', 'key.effective_access'),
 ]
 
 
