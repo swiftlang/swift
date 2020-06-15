@@ -948,6 +948,10 @@ struct SR5688_C {
     var d: Int
 }
 
+struct SR5688_S {
+  subscript(_ x: Int) -> String? { "" }
+}
+
 func testMemberAccessOnOptionalKeyPathComponent() {
 
   _ = \SR5688_A.b.m
@@ -969,6 +973,15 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   // expected-error@-1 {{value of optional type 'SR5688_C?' must be unwrapped to refer to member 'd' of wrapped base type 'SR5688_C'}}
   // expected-note@-2 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{21-21=?}}
   // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{21-21=!}}
+
+  \String?.count 
+  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
+  // expected-note@-2 {{remove optional '?' form key path root type 'String?'}} {{4-11=String}}
+
+  \SR5688_S.[5].count 
+  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'count' only for non-'nil' base values}}{{16-16=?}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{16-16=!}}
 
 }
 
