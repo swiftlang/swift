@@ -91,7 +91,7 @@ Extract the zip files, ignoring the top level directory, into `S:/Library`. The 
 
 ```
 /Library
-  ┝ icu-64
+  ┝ icu-67
   │   ┕ usr/...
   ├ libcurl-development
   │   ┕ usr/...
@@ -138,10 +138,10 @@ cmake -B "S:\b\toolchain" ^
   -D LLDB_ENABLE_PYTHON=YES ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR="S:/swift" ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR="S:/cmark" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib" ^
+  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-67/usr/include" ^
+  -D SWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-67/usr/lib/icuuc67.lib" ^
+  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-67/usr/include" ^
+  -D SWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-67/usr/lib/icuin67.lib" ^
   -D CMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" ^
   -D PYTHON_EXECUTABLE=C:\Python27\python.exe ^
   -D SWIFT_BUILD_DYNAMIC_STDLIB=YES ^
@@ -158,7 +158,7 @@ ninja -C S:\b\toolchain
 ## Running Swift tests on Windows
 
 ```cmd
-path S:\Library\icu-64\usr\bin;S:\b\toolchain\bin;S:\b\toolchain\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\Library\icu-67\usr\bin;S:\b\toolchain\bin;S:\b\toolchain\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\toolchain check-swift
 ```
 
@@ -178,7 +178,7 @@ ninja -C S:\b\libdispatch check
 ## Build swift-corelibs-foundation
 
 ```cmd
-cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-64" -D ICU_INCLUDE_DIR=S:/Library/icu-64/usr/include -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2s.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include/libxml2" -D ENABLE_TESTING=NO -D dispatch_DIR=S:/b/libdispatch/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
+cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-67" -D ICU_INCLUDE_DIR=S:/Library/icu-67/usr/include -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2s.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include/libxml2" -D ENABLE_TESTING=NO -D dispatch_DIR=S:/b/libdispatch/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
 ninja -C S:\b\foundation
 ```
 
@@ -210,7 +210,7 @@ ninja -C S:\b\xctest check-xctest
 ## Rebuild Foundation
 
 ```cmd
-cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-64" -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -D ENABLE_TESTING=YES -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D XCTest_DIR=S:/b/xctest/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
+cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-67" -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -D ENABLE_TESTING=YES -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D XCTest_DIR=S:/b/xctest/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
 ninja -C S:\b\foundation
 ```
 
