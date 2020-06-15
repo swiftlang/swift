@@ -40,8 +40,7 @@ func dumpRawMetadata(
 ) throws {
   let backtraces = backtraceStyle != nil ? context.allocationBacktraces : [:]
   for allocation in context.allocations {
-    let tagNameC = swift_reflection_metadataAllocationTagName(context, allocation.tag)
-    let tagName = tagNameC.map(String.init) ?? "<unknown>"
+    let tagName = context.metadataTagName(allocation.tag) ?? "<unknown>"
     print("Metadata allocation at: \(hex: allocation.ptr) " +
           "size: \(allocation.size) tag: \(allocation.tag) (\(tagName))")
     printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
@@ -71,6 +70,22 @@ func dumpGenericMetadata(
     if let allocation = metadata.allocation {
       printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
     }
+  }
+}
+
+func dumpMetadataCacheNodes(
+  context: SwiftReflectionContextRef,
+  inspector: Inspector
+) throws {
+  print("Address","Tag","Tag Name","Size","Left","Right", separator: "\t")
+  for allocation in context.allocations {
+    guard let node = context.metadataAllocationCacheNode(allocation.allocation_t) else {
+      continue
+    }
+
+    let tagName = context.metadataTagName(allocation.tag) ?? "<unknown>"
+    print("\(hex: allocation.ptr)\t\(allocation.tag)\t\(tagName)\t" +
+          "\(allocation.size)\t\(hex: node.Left)\t\(hex: node.Right)")
   }
 }
 
@@ -133,6 +148,7 @@ struct SwiftInspect: ParsableCommand {
       DumpConformanceCache.self,
       DumpRawMetadata.self,
       DumpGenericMetadata.self,
+      DumpCacheNodes.self,
     ])
 }
 
@@ -194,6 +210,21 @@ struct DumpGenericMetadata: ParsableCommand {
       try dumpGenericMetadata(context: $0,
                               inspector: $1,
                               backtraceStyle: style)
+    }
+  }
+}
+
+struct DumpCacheNodes: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print the target's metadata cache nodes.")
+
+  @Argument(help: "The pid or partial name of the target process")
+  var nameOrPid: String
+
+  func run() throws {
+    try withReflectionContext(nameOrPid: nameOrPid) {
+      try dumpMetadataCacheNodes(context: $0,
+                                 inspector: $1)
     }
   }
 }
