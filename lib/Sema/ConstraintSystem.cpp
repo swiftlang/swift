@@ -655,25 +655,19 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
   return None;
 }
 
-Type
-ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
-                                         ConstraintLocatorBuilder locator) {
-  auto unboundDecl = unbound->getDecl();
-  auto parentTy = unbound->getParent();
+Type ConstraintSystem::openUnboundGenericType(
+    GenericTypeDecl *decl, Type parentTy, ConstraintLocatorBuilder locator) {
   if (parentTy) {
     parentTy = openUnboundGenericTypes(parentTy, locator);
-    unbound = UnboundGenericType::get(unboundDecl, parentTy,
-                                      getASTContext());
   }
 
   // Open up the generic type.
   OpenedTypeMap replacements;
-  openGeneric(unboundDecl->getDeclContext(), unboundDecl->getGenericSignature(),
-              locator, replacements);
+  openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
+              replacements);
 
   if (parentTy) {
-    auto subs = parentTy->getContextSubstitutions(
-      unboundDecl->getDeclContext());
+    auto subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     for (auto pair : subs) {
       auto found = replacements.find(
         cast<GenericTypeParamType>(pair.first));
@@ -686,7 +680,7 @@ ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
 
   // Map the generic parameters to their corresponding type variables.
   llvm::SmallVector<Type, 2> arguments;
-  for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
+  for (auto gp : decl->getInnermostGenericParamTypes()) {
     auto found = replacements.find(
       cast<GenericTypeParamType>(gp->getCanonicalType()));
     assert(found != replacements.end() &&
@@ -699,8 +693,8 @@ ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
   return TypeChecker::applyUnboundGenericArguments(
-      unbound, unboundDecl, SourceLoc(),
-      TypeResolution::forContextual(DC, None), arguments);
+      decl, parentTy, SourceLoc(), TypeResolution::forContextual(DC, None),
+      arguments);
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
@@ -791,7 +785,8 @@ Type ConstraintSystem::openUnboundGenericTypes(
 
   type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
-        return openUnboundGenericType(unbound, locator);
+        return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
+                                      locator);
       }
 
       return type;
@@ -3474,6 +3469,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
       if (auto subscriptExpr = getAsExpr<SubscriptExpr>(anchor)) {
         anchor = subscriptExpr->getIndex();
         path = path.slice(1);
+
+        // TODO: It would be better if the index expression was always wrapped
+        // in a ParenExpr (if there is no label).
+        if (!(isExpr<TupleExpr>(anchor) || isExpr<ParenExpr>(anchor)) &&
+            !path.empty() && path[0].is<LocatorPathElt::ApplyArgToParam>()) {
+          path = path.slice(1);
+        }
         continue;
       }
 

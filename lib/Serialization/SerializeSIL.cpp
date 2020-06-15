@@ -73,8 +73,6 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
 static unsigned toStableVTableEntryKind(SILVTable::Entry::Kind kind) {
   switch (kind) {
   case SILVTable::Entry::Kind::Normal: return SIL_VTABLE_ENTRY_NORMAL;
-  case SILVTable::Entry::Kind::NormalNonOverridden:
-    return SIL_VTABLE_ENTRY_NORMAL_NON_OVERRIDDEN;
   case SILVTable::Entry::Kind::Inherited: return SIL_VTABLE_ENTRY_INHERITED;
   case SILVTable::Entry::Kind::Override: return SIL_VTABLE_ENTRY_OVERRIDE;
   }
@@ -2379,18 +2377,19 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
     SmallVector<ValueID, 4> ListOfValues;
     // Do not emit entries which are not public or serialized, unless everything
     // has to be serialized.
-    if (!ShouldSerializeAll && entry.Implementation &&
-        !entry.Implementation->isPossiblyUsedExternally() &&
-        !entry.Implementation->isSerialized())
+    if (!ShouldSerializeAll && entry.getImplementation() &&
+        !entry.getImplementation()->isPossiblyUsedExternally() &&
+        !entry.getImplementation()->isSerialized())
       continue;
-    handleSILDeclRef(S, entry.Method, ListOfValues);
-    addReferencedSILFunction(entry.Implementation, true);
+    handleSILDeclRef(S, entry.getMethod(), ListOfValues);
+    addReferencedSILFunction(entry.getImplementation(), true);
     // Each entry is a pair of SILDeclRef and SILFunction.
-    VTableEntryLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[VTableEntryLayout::Code],
+    VTableEntryLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[VTableEntryLayout::Code],
         // SILFunction name
-        S.addUniquedStringRef(entry.Implementation->getName()),
-        toStableVTableEntryKind(entry.TheKind),
+        S.addUniquedStringRef(entry.getImplementation()->getName()),
+        toStableVTableEntryKind(entry.getKind()),
+        entry.isNonOverridden(),
         ListOfValues);
   }
 }

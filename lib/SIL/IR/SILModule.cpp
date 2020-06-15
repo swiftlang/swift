@@ -476,7 +476,8 @@ void SILModule::eraseGlobalVariable(SILGlobalVariable *G) {
   getSILGlobalList().erase(G);
 }
 
-SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
+SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
+                                   bool deserializeLazily) {
   if (!C)
     return nullptr;
 
@@ -484,6 +485,9 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
   auto R = VTableMap.find(C);
   if (R != VTableMap.end())
     return R->second;
+
+  if (!deserializeLazily)
+    return nullptr;
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
   SILVTable *Vtbl = getSILLoader()->lookupVTable(C);
@@ -593,7 +597,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   // Ok, we have a VTable. Try to lookup the SILFunction implementation from
   // the VTable.
   if (auto E = Vtbl->getEntry(*this, Member))
-    return E->Implementation;
+    return E->getImplementation();
 
   return nullptr;
 }

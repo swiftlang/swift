@@ -3106,11 +3106,11 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   for (auto &entry : getEntries()) {
     OS << "  ";
-    entry.Method.print(OS);
+    entry.getMethod().print(OS);
     OS << ": ";
 
     bool HasSingleImplementation = false;
-    switch (entry.Method.kind) {
+    switch (entry.getMethod().kind) {
     default:
       break;
     case SILDeclRef::Kind::IVarDestroyer:
@@ -3122,17 +3122,14 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     // single implementation, e.g. for destructors.
     if (!HasSingleImplementation) {
       QualifiedSILTypeOptions.CurrentModule =
-          entry.Method.getDecl()->getDeclContext()->getParentModule();
-      entry.Method.getDecl()->getInterfaceType().print(OS,
-                                                       QualifiedSILTypeOptions);
+          entry.getMethod().getDecl()->getDeclContext()->getParentModule();
+      entry.getMethod().getDecl()->getInterfaceType().print(
+          OS, QualifiedSILTypeOptions);
       OS << " : ";
     }
-    OS << '@' << entry.Implementation->getName();
-    switch (entry.TheKind) {
+    OS << '@' << entry.getImplementation()->getName();
+    switch (entry.getKind()) {
     case SILVTable::Entry::Kind::Normal:
-      break;
-    case SILVTable::Entry::Kind::NormalNonOverridden:
-      OS << " [nonoverridden]";
       break;
     case SILVTable::Entry::Kind::Inherited:
       OS << " [inherited]";
@@ -3141,7 +3138,11 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << " [override]";
       break;
     }
-    OS << "\t// " << demangleSymbol(entry.Implementation->getName());
+    if (entry.isNonOverridden()) {
+      OS << " [nonoverridden]";
+    }
+
+    OS << "\t// " << demangleSymbol(entry.getImplementation()->getName());
     OS << "\n";
   }
   OS << "}\n\n";

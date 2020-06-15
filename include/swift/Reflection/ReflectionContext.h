@@ -34,9 +34,10 @@
 #include "swift/Runtime/Unreachable.h"
 
 #include <set>
-#include <vector>
+#include <sstream>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -794,7 +795,7 @@ public:
   llvm::Optional<std::string> iterateConformances(
     std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     std::string ConformancesPointerName =
-      "__swift_debug_protocolConformanceStatePointer";
+        "_swift_debug_protocolConformanceStatePointer";
     auto ConformancesAddrAddr =
       getReader().getSymbolAddress(ConformancesPointerName);
     if (!ConformancesAddrAddr)
@@ -844,9 +845,9 @@ public:
   llvm::Optional<std::string> iterateMetadataAllocations(
     std::function<void (MetadataAllocation<Runtime>)> Call) {
     std::string IterationEnabledName =
-      "__swift_debug_metadataAllocationIterationEnabled";
+        "_swift_debug_metadataAllocationIterationEnabled";
     std::string AllocationPoolPointerName =
-      "__swift_debug_allocationPoolPointer";
+        "_swift_debug_allocationPoolPointer";
 
     auto IterationEnabledAddr =
       getReader().getSymbolAddress(IterationEnabledName);
@@ -918,6 +919,50 @@ public:
       }
       
       TrailerPtr = Trailer->PrevTrailer;
+    }
+    return llvm::None;
+  }
+
+  llvm::Optional<std::string> iterateMetadataAllocationBacktraces(
+      std::function<void(StoredPointer, uint32_t, const StoredPointer *)>
+          Call) {
+    std::string BacktraceListName =
+        "_swift_debug_metadataAllocationBacktraceList";
+
+    auto BacktraceListAddr = getReader().getSymbolAddress(BacktraceListName);
+    if (!BacktraceListAddr)
+      return "unable to look up debug variable " + BacktraceListName;
+    auto BacktraceListNextPtr =
+        getReader().readPointer(BacktraceListAddr, sizeof(StoredPointer));
+    if (!BacktraceListNextPtr)
+      return llvm::None;
+
+    auto BacktraceListNext = BacktraceListNextPtr->getResolvedAddress();
+    while (BacktraceListNext) {
+      auto HeaderBytes = getReader().readBytes(
+          RemoteAddress(BacktraceListNext),
+          sizeof(MetadataAllocationBacktraceHeader<Runtime>));
+      auto HeaderPtr =
+          reinterpret_cast<const MetadataAllocationBacktraceHeader<Runtime> *>(
+              HeaderBytes.get());
+      if (HeaderPtr == nullptr) {
+        std::stringstream stream;
+        stream << "unable to read Next pointer 0x" << std::hex
+               << BacktraceListNext.getAddressData();
+        return stream.str();
+      }
+      auto BacktraceAddrPtr =
+          BacktraceListNext +
+          sizeof(MetadataAllocationBacktraceHeader<Runtime>);
+      auto BacktraceBytes =
+          getReader().readBytes(RemoteAddress(BacktraceAddrPtr),
+                                HeaderPtr->Count * sizeof(StoredPointer));
+      auto BacktracePtr =
+          reinterpret_cast<const StoredPointer *>(BacktraceBytes.get());
+
+      Call(HeaderPtr->Allocation, HeaderPtr->Count, BacktracePtr);
+
+      BacktraceListNext = RemoteAddress(HeaderPtr->Next);
     }
     return llvm::None;
   }

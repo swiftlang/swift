@@ -383,25 +383,25 @@ void checkUnsupportedProtocolType(ASTContext &ctx,
 Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
                           TypeResolution resolution, bool isSpecialized);
 
-/// Apply generic arguments to the given type.
+/// Apply generic arguments to the unbound generic type represented by the
+/// given declaration and parent type.
 ///
-/// This function requires a valid unbound generic type with the correct
-/// number of generic arguments given, whereas applyGenericArguments emits
-/// diagnostics in those cases.
+/// This function requires the correct number of generic arguments,
+/// whereas applyGenericArguments emits diagnostics in those cases.
 ///
-/// \param unboundType The unbound generic type to which to apply arguments.
-/// \param decl The declaration of the type.
+/// \param decl The declaration that the resulting bound generic type
+/// shall reference.
+/// \param parentTy The parent type.
 /// \param loc The source location for diagnostic reporting.
 /// \param resolution The type resolution.
-/// \param genericArgs The list of generic arguments to apply to the type.
+/// \param genericArgs The list of generic arguments to apply.
 ///
 /// \returns A BoundGenericType bound to the given arguments, or null on
 /// error.
 ///
 /// \see applyGenericArguments
-Type applyUnboundGenericArguments(UnboundGenericType *unboundType,
-                                  GenericTypeDecl *decl, SourceLoc loc,
-                                  TypeResolution resolution,
+Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
+                                  SourceLoc loc, TypeResolution resolution,
                                   ArrayRef<Type> genericArgs);
 
 /// Substitute the given base type into the type of the given nested type,

@@ -42,12 +42,6 @@ add_swift_tool_subdirectory(swift-demangle-fuzzer)
 add_swift_tool_subdirectory(swift-reflection-fuzzer)
 endif()
 
-if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
-  set(BUILD_FOUNDATION TRUE)
-else()
-  set(BUILD_FOUNDATION FALSE)
-endif()
-
 if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
 endif()

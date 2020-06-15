@@ -27,33 +27,41 @@ class PruneVTables : public SILModuleTransform {
   void runOnVTable(SILModule *M,
                    SILVTable *vtable) {
     for (auto &entry : vtable->getMutableEntries()) {
-      // We don't need to worry about entries that are inherited, overridden,
+      
+      // We don't need to worry about entries that are overridden,
       // or have already been found to have no overrides.
-      if (entry.TheKind != SILVTable::Entry::Normal) {
+      if (entry.isNonOverridden())
+        continue;
+      
+      switch (entry.getKind()) {
+      case SILVTable::Entry::Normal:
+      case SILVTable::Entry::Inherited:
+        break;
+          
+      case SILVTable::Entry::Override:
         continue;
       }
-      
+
       // The destructor entry must remain.
-      if (entry.Method.kind == SILDeclRef::Kind::Deallocator) {
+      if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator) {
         continue;
       }
-      
-      auto methodDecl = entry.Method.getAbstractFunctionDecl();
+
+      auto methodDecl = entry.getMethod().getAbstractFunctionDecl();
       if (!methodDecl)
         continue;
 
       // Is the method declared final?
       if (!methodDecl->isFinal()) {
         // Are callees of this entry statically knowable?
-        if (!calleesAreStaticallyKnowable(*M, entry.Method))
+        if (!calleesAreStaticallyKnowable(*M, entry.getMethod()))
           continue;
         
         // Does the method have any overrides in this module?
         if (methodDecl->isOverridden())
           continue;
       }
-      
-      entry.TheKind = SILVTable::Entry::NormalNonOverridden;
+      entry.setNonOverridden(true);
     }
   }
   
