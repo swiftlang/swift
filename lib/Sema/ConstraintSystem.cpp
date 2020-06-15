@@ -2775,7 +2775,8 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
                                       Identifier operatorName,
                                       ArrayRef<Solution> solutions,
                                       ConstraintLocator *locator) {
-  auto &DE = cs.getASTContext().Diags;
+  auto &ctx = cs.getASTContext();
+  auto &DE = ctx.Diags;
   auto *anchor = castToExpr(locator->getAnchor());
   auto *applyExpr = cast<ApplyExpr>(cs.getParentExpr(anchor));
 
@@ -2814,7 +2815,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
                     operatorName.str());
         return;
       }
-    } else if (operatorName.is("~=")) {
+    } else if (operatorName == ctx.Id_MatchOperator) {
       DE.diagnose(anchor->getLoc(), diag::cannot_match_expr_pattern_with_value,
                   lhsType, rhsType);
     } else {

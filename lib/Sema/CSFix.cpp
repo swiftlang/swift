@@ -273,7 +273,7 @@ bool ContextualMismatch::diagnoseForAmbiguity(
                    etalonTypes.second->isEqual(types.second);
           })) {
     const auto &primary = commonFixes.front();
-    return primary.second->diagnose(*primary.first, /*aNote=*/false);
+    return primary.second->diagnose(*primary.first, /*asNote=*/false);
   }
 
   return false;
