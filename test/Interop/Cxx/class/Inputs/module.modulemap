@@ -2,8 +2,8 @@ module AccessSpecifiers {
   header "access-specifiers.h"
 }
 
-module LoadableTypes {
-  header "loadable-types.h"
+module TypeClassification {
+  header "type-classification.h"
 }
 
 module MemberwiseInitializer {
