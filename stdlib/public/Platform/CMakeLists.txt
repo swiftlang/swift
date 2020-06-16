@@ -119,6 +119,13 @@ foreach(sdk ${SWIFT_SDKS})
       list(APPEND glibc_modulemap_target_list ${copy_glibc_modulemap_static})
     endif()
 
+    set(glibc_header_out "${module_dir}/SwiftGlibc.h")
+    handle_gyb_source_single(glibc_header_target
+        SOURCE "SwiftGlibc.h.gyb"
+        OUTPUT "${glibc_header_out}"
+        FLAGS "-DCMAKE_SDK=${sdk}")
+    list(APPEND glibc_modulemap_target_list ${glibc_header_target})
+
     # If this SDK is a target for a non-native host, except if it's for Android
     # with its own native sysroot, create a native modulemap without a sysroot
     # prefix. This is the one we'll install instead.
@@ -152,7 +159,7 @@ foreach(sdk ${SWIFT_SDKS})
                                COMPONENT sdk-overlay)
 
     if(SWIFT_BUILD_STATIC_STDLIB)
-      swift_install_in_component(FILES "${glibc_modulemap_out}"
+      swift_install_in_component(FILES "${glibc_header_out}"
                                  DESTINATION "lib/swift_static/${arch_subdir}"
                                  COMPONENT sdk-overlay)
     endif()
