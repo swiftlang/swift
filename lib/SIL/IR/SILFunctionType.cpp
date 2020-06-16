@@ -4116,6 +4116,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     // imported into Swift as static methods that have an additional
     // parameter for the left-hand-side operand instead of the receiver object.
     // These are inout parameters and don't get bridged.
+    // TODO: Undo this if we stop using inout.
     if (auto method = dyn_cast_or_null<clang::CXXMethodDecl>(
             constant.getDecl()->getClangDecl())) {
       if (method->isOverloadedOperator()) {
