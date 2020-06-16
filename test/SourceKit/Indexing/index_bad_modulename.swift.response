@@ -70,7 +70,8 @@
           key.column: 5,
           key.is_implicit: 1
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.ref.class,

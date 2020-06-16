@@ -1016,7 +1016,7 @@ public:
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
   /// The node -> type mappings introduced by this solution.
-  llvm::MapVector<ASTNode, Type> nodeTypes;
+  llvm::DenseMap<ASTNode, Type> nodeTypes;
 
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;

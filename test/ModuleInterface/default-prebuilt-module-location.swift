@@ -10,7 +10,7 @@
 // 3. Compile this into a module and put it into the default prebuilt cache
 //    location relative to the fake resource dir. Also drop an interface into
 //    the build dir.
-// RUN: %target-swift-frontend -emit-module %t/PrebuiltModule.swift -o %t/ResourceDir/%target-sdk-name/prebuilt-modules/PrebuiltModule.swiftmodule/%target-cpu.swiftmodule -module-name PrebuiltModule -parse-stdlib -emit-module-interface-path %t/PrebuiltModule.swiftmodule/%target-cpu.swiftinterface
+// RUN: %target-swift-frontend -emit-module %t/PrebuiltModule.swift -o %t/ResourceDir/%target-sdk-name/prebuilt-modules/PrebuiltModule.swiftmodule/%target-swiftmodule-name -module-name PrebuiltModule -parse-stdlib -emit-module-interface-path %t/PrebuiltModule.swiftmodule/%target-swiftinterface-name
 
 // 4. Import this prebuilt module, but DON'T pass in -prebuilt-module-cache-path, it should use the implicit one.
 // RUN: %target-swift-frontend -typecheck -resource-dir %t/ResourceDir -I %t %s -parse-stdlib -module-cache-path %t/ModuleCache -sdk %t
