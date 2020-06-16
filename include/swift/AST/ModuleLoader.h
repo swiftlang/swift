@@ -92,6 +92,7 @@ struct SubCompilerInstanceInfo {
   CompilerInstance* Instance;
   StringRef Hash;
   ArrayRef<StringRef> BuildArguments;
+  ArrayRef<StringRef> ExtraPCMArgs;
 };
 
 /// Abstract interface to run an action in a sub ASTContext.
@@ -100,7 +101,8 @@ struct InterfaceSubContextDelegate {
                                StringRef interfacePath,
                                StringRef outputPath,
                                SourceLoc diagLoc,
-  llvm::function_ref<bool(ASTContext&,ArrayRef<StringRef>, StringRef)> action) = 0;
+  llvm::function_ref<bool(ASTContext&,ArrayRef<StringRef>,
+                          ArrayRef<StringRef>, StringRef)> action) = 0;
   virtual bool runInSubCompilerInstance(StringRef moduleName,
                                         StringRef interfacePath,
                                         StringRef outputPath,
