@@ -34,7 +34,6 @@
 #include "swift/Runtime/Unreachable.h"
 
 #include <set>
-#include <sstream>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -946,10 +945,12 @@ public:
           reinterpret_cast<const MetadataAllocationBacktraceHeader<Runtime> *>(
               HeaderBytes.get());
       if (HeaderPtr == nullptr) {
-        std::stringstream stream;
-        stream << "unable to read Next pointer 0x" << std::hex
-               << BacktraceListNext.getAddressData();
-        return stream.str();
+        // FIXME: std::stringstream would be better, but LLVM's standard library
+        // introduces a vtable and we don't want that.
+        char result[128];
+        std::snprintf(result, sizeof(result), "unable to read Next pointer %p",
+            BacktraceListNext.getAddressData());
+        return std::string(result);
       }
       auto BacktraceAddrPtr =
           BacktraceListNext +
