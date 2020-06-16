@@ -387,9 +387,25 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #endif
+#elif defined(_WIN32)
+static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
+  return _strtod_l(str, &end, getCLocale());
+}
+
+static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
+  return _strtof_l(str, &end, getCLocale());
+}
+
+static long double swift_strtold_l(const char *nptr, char **endptr,
+                                   locale_t loc) {
+  return _strtod_l(str, &end, getCLocale());
+}
+#define strtod_l swift_strtod_l
+#define strtof_l swift_strtof_l
+#define strtold_l swift_strtold_l
 #endif
 
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(__HAIKU__)
 // Cygwin does not support uselocale(), but we can use the locale feature 
 // in stringstream object.
 template <typename T>
@@ -415,62 +431,6 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   return nptr + pos;
 }
 
-#if defined(_WIN32)
-template <>
-const char *
-_swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
-  if (swift_stringIsSignalingNaN(str)) {
-    *result = std::numeric_limits<float>::signaling_NaN();
-    return str + std::strlen(str);
-  }
-
-  char *end;
-  _set_errno(0);
-  *result = _strtof_l(str, &end, getCLocale());
-  if (*result == HUGE_VALF || *result == -HUGE_VALF || *result == 0.0 || *result == -0.0) {
-    if (errno == ERANGE)
-        end = nullptr;
-  }
-  return end;
-}
-
-template <>
-const char *
-_swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
-  if (swift_stringIsSignalingNaN(str)) {
-    *result = std::numeric_limits<double>::signaling_NaN();
-    return str + std::strlen(str);
-  }
-
-  char *end;
-  _set_errno(0);
-  *result = _strtod_l(str, &end, getCLocale());
-  if (*result == HUGE_VAL || *result == -HUGE_VAL || *result == 0.0 || *result == -0.0) {
-    if (errno == ERANGE)
-        end = nullptr;
-  }
-  return end;
-}
-
-template <>
-const char *
-_swift_stdlib_strtoX_clocale_impl<long double>(const char *str, long double *result) {
-  if (swift_stringIsSignalingNaN(str)) {
-    *result = std::numeric_limits<long double>::signaling_NaN();
-    return str + std::strlen(str);
-  }
-
-  char *end;
-  _set_errno(0);
-  *result = _strtod_l(str, &end, getCLocale());
-  if (*result == HUGE_VALL || *result == -HUGE_VALL || *result == 0.0 || *result == -0.0) {
-    if (errno == ERANGE)
-        end = nullptr;
-  }
-  return end;
-}
-#endif
-
 const char *swift::_swift_stdlib_strtold_clocale(
     const char *nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
@@ -488,6 +448,14 @@ const char *swift::_swift_stdlib_strtof_clocale(
 }
 #else
 
+static inline void _swift_set_errno(int to) {
+#if defined(_WIN32)
+  _set_errno(0);
+#else
+  errno = 0;
+#endif
+}
+
 // We can't return Float80, but we can receive a pointer to one, so
 // switch the return type and the out parameter on strtold.
 template <typename T>
@@ -503,7 +471,7 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   }
   
   char *EndPtr;
-  errno = 0;
+  _swift_set_errno(0);
   const auto result = posixImpl(nptr, &EndPtr, getCLocale());
   *outResult = result;
   if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
