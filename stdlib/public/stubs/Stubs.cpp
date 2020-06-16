@@ -355,51 +355,61 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
 static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
   return strtod(nptr, endptr);
 }
+#elif defined(__ANDROID_API__) && __ANDROID_API__ < 26
+static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
+  return strtod(nptr, endptr);
+}
+#elif defined(_WIN32)
+static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
+  return _strtod_l(nptr, endptr, getCLocale());
+}
+#endif
 
+#if defined(__OpenBSD__)
 static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
   return strtof(nptr, endptr);
 }
+#elif defined(__ANDROID_API__) && __ANDROID_API__ < 26
+static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
+  return strtof(nptr, endptr);
+}
+#elif defined(_WIN32)
+static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
+  return _strtof_l(nptr, endptr, getCLocale());
+}
+#endif
 
+#if defined(__OpenBSD__)
 static long double swift_strtold_l(const char *nptr, char **endptr,
                                    locale_t loc) {
   return strtold(nptr, endptr);
 }
+#elif defined(__ANDROID_API__) && __ANDROID_API__ < 21
+static long double swift_strtold_l(const char *nptr, char **endptr,
+                                   locale_t loc) {
+  return strtod(nptr, endptr);
+}
+#elif defined(_WIN32)
+static long double swift_strtold_l(const char *nptr, char **endptr,
+                                   locale_t loc) {
+  return _strtod_l(nptr, endptr, getCLocale());
+}
+#endif
 
+#if defined(__OpenBSD__) || defined(_WIN32)
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #define strtold_l swift_strtold_l
 #elif defined(__ANDROID__)
 #if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
-static inline long double swift_strtold_l(const char *nptr, char **endptr,
-                                          locale_t) {
-  return strtod(nptr, endptr);
-}
 #define strtold_l swift_strtold_l
 #endif
 
 #if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtod(nptr, endptr);
-}
-static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtof(nptr, endptr);
-}
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #endif
 #elif defined(_WIN32)
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-  return _strtod_l(str, &end, getCLocale());
-}
-
-static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
-  return _strtof_l(str, &end, getCLocale());
-}
-
-static long double swift_strtold_l(const char *nptr, char **endptr,
-                                   locale_t loc) {
-  return _strtod_l(str, &end, getCLocale());
-}
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #define strtold_l swift_strtold_l
