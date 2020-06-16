@@ -738,8 +738,52 @@ class ModuleInterfaceLoaderImpl {
       }
     }
 
-    // If we weren't able to open the file for any reason, including it not
-    // existing, keep going.
+    // [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]
+    // If there's a module adjacent to the .swiftinterface that we can
+    // _likely_ load (it validates OK and is up to date), bail early with
+    // errc::not_supported, so the next (serialized) loader in the chain will
+    // load it.
+    // Alternately, if there's a .swiftmodule present but we can't even
+    // read it (for whatever reason), we should let the other module loader
+    // diagnose it.
+
+    if (shouldLoadAdjacentModule) {
+      auto adjacentModuleBuffer = fs.getBufferForFile(modulePath);
+      if (adjacentModuleBuffer) {
+        if (serializedASTBufferIsUpToDate(modulePath, *adjacentModuleBuffer.get(),
+                                          deps)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
+                                  << modulePath
+                                  << "; deferring to serialized module loader\n");
+          return std::make_error_code(std::errc::not_supported);
+        } else if (isInResourceDir(modulePath) &&
+                   loadMode == ModuleLoadingMode::PreferSerialized) {
+          // Special-case here: If we're loading a .swiftmodule from the resource
+          // dir adjacent to the compiler, defer to the serialized loader instead
+          // of falling back. This is mainly to support development of Swift,
+          // where one might change the module format version but forget to
+          // recompile the standard library. If that happens, don't fall back
+          // and silently recompile the standard library -- instead, error like
+          // we used to.
+          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module in the "
+                                     "resource-dir at "
+                                  << modulePath
+                                  << "; deferring to serialized module loader "
+                                     "to diagnose\n");
+          return std::make_error_code(std::errc::not_supported);
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "
+                                  << modulePath << "\n");
+          rebuildInfo.setModuleKind(modulePath,
+                                    ModuleRebuildInfo::ModuleKind::Normal);
+        }
+      } else if (adjacentModuleBuffer.getError() != notFoundError) {
+        LLVM_DEBUG(llvm::dbgs() << "Found unreadable module at "
+                                << modulePath
+                                << "; deferring to serialized module loader\n");
+        return std::make_error_code(std::errc::not_supported);
+      }
+    }
 
     // If we have a prebuilt cache path, check that too if the interface comes
     // from the SDK.
@@ -764,53 +808,6 @@ class ModuleInterfaceLoaderImpl {
                                     ModuleRebuildInfo::ModuleKind::Prebuilt);
         }
       }
-    }
-
-    // [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]
-    // Finally, if there's a module adjacent to the .swiftinterface that we can
-    // _likely_ load (it validates OK and is up to date), bail early with
-    // errc::not_supported, so the next (serialized) loader in the chain will
-    // load it.
-    // Alternately, if there's a .swiftmodule present but we can't even
-    // read it (for whatever reason), we should let the other module loader
-    // diagnose it.
-    if (!shouldLoadAdjacentModule)
-      return notFoundError;
-
-    auto adjacentModuleBuffer = fs.getBufferForFile(modulePath);
-    if (adjacentModuleBuffer) {
-      if (serializedASTBufferIsUpToDate(modulePath, *adjacentModuleBuffer.get(),
-                                        deps)) {
-        LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
-                                << modulePath
-                                << "; deferring to serialized module loader\n");
-        return std::make_error_code(std::errc::not_supported);
-      } else if (isInResourceDir(modulePath) &&
-                 loadMode == ModuleLoadingMode::PreferSerialized) {
-        // Special-case here: If we're loading a .swiftmodule from the resource
-        // dir adjacent to the compiler, defer to the serialized loader instead
-        // of falling back. This is mainly to support development of Swift,
-        // where one might change the module format version but forget to
-        // recompile the standard library. If that happens, don't fall back
-        // and silently recompile the standard library -- instead, error like
-        // we used to.
-        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module in the "
-                                   "resource-dir at "
-                                << modulePath
-                                << "; deferring to serialized module loader "
-                                   "to diagnose\n");
-        return std::make_error_code(std::errc::not_supported);
-      } else {
-        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "
-                                << modulePath << "\n");
-        rebuildInfo.setModuleKind(modulePath,
-                                  ModuleRebuildInfo::ModuleKind::Normal);
-      }
-    } else if (adjacentModuleBuffer.getError() != notFoundError) {
-      LLVM_DEBUG(llvm::dbgs() << "Found unreadable module at "
-                              << modulePath
-                              << "; deferring to serialized module loader\n");
-      return std::make_error_code(std::errc::not_supported);
     }
 
     // Couldn't find an up-to-date .swiftmodule, will need to build module from
