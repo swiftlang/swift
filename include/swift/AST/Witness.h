@@ -212,7 +212,7 @@ public:
 
   friend bool operator==(const TypeWitnessAndDecl &lhs,
                          const TypeWitnessAndDecl &rhs) {
-    return lhs.witnessType->isEqual(rhs.witnessType) &&
+    return lhs.witnessType.getPointer() == rhs.witnessType.getPointer() &&
            lhs.witnessDecl == rhs.witnessDecl;
   }
 
