@@ -4,6 +4,10 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -verify-ignore-unknown
 
 // REQUIRES: objc_interop
+
+// FIXME(rdar://64425653): We should re-enable this test for other platforms.
+// REQUIRES: OS=macosx
+
 import Foundation
 import PrivateObjC
 
