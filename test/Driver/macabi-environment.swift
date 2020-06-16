@@ -2,7 +2,7 @@
 
 // UNSUPPORTED: windows
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios13.0-macabi -sdk %S/../Inputs/clang-importer-sdk %s | %FileCheck -check-prefix=IOS13-MACABI %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios13.0-macabi -sdk %S/../Inputs/clang-importer-sdk %s | %FileCheck -check-prefix=IOS13-MACABI %s
 // IOS13-MACABI: bin/swift
 // IOS13-MACABI: -target x86_64-apple-ios13.0-macabi
 
@@ -19,7 +19,7 @@
 
 // Adjust iOS versions < 13.0 to 13.0 for the linker's sake.
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios12.0-macabi -sdk %S/../Inputs/clang-importer-sdk %s | %FileCheck -check-prefix=IOS12-MACABI %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios12.0-macabi -sdk %S/../Inputs/clang-importer-sdk %s | %FileCheck -check-prefix=IOS12-MACABI %s
 // IOS12-MACABI: bin/swift
 // IOS12-MACABI: -target x86_64-apple-ios12.0-macabi
 
@@ -40,7 +40,7 @@
 // ZIPPERED-VARIANT-OBJECT: bin/swift
 // ZIPPERED-VARIANT-OBJECT: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0-macabi
 
-// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0-macabi -module-name foo %s | %FileCheck -check-prefix=ZIPPERED-VARIANT-LIBRARY %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -emit-library -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0-macabi -module-name foo %s | %FileCheck -check-prefix=ZIPPERED-VARIANT-LIBRARY %s
 // ZIPPERED-VARIANT-LIBRARY: bin/swift
 // ZIPPERED-VARIANT-LIBRARY: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0-macabi
 
@@ -48,7 +48,7 @@
 // ZIPPERED-VARIANT-LIBRARY: -platform_version macos 10.14.0 0.0.0 -platform_version mac-catalyst 13.0.0 0.0.0
 
 // Make sure we pass the -target-variant when creating the pre-compiled header.
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0-macabi -enable-bridging-pch -import-objc-header %S/Inputs/bridging-header.h %s | %FileCheck -check-prefix=ZIPPERED-VARIANT-PCH %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0-macabi -enable-bridging-pch -import-objc-header %S/Inputs/bridging-header.h %s | %FileCheck -check-prefix=ZIPPERED-VARIANT-PCH %s
 // ZIPPERED-VARIANT-PCH: bin/swift
 // ZIPPERED-VARIANT-PCH: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0-macabi
 // ZIPPERED_VARIANT-PCH  -emit-pch
@@ -64,7 +64,7 @@
 // REVERSE-ZIPPERED-VARIANT-OBJECT: bin/swift
 // REVERSE-ZIPPERED-VARIANT-OBJECT: -target x86_64-apple-ios13.0-macabi -target-variant x86_64-apple-macosx10.14
 
-// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-ios13.0-macabi -target-variant x86_64-apple-macosx10.14 -module-name foo %s | %FileCheck -check-prefix=REVERSE-ZIPPERED-VARIANT-LIBRARY %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -emit-library -target x86_64-apple-ios13.0-macabi -target-variant x86_64-apple-macosx10.14 -module-name foo %s | %FileCheck -check-prefix=REVERSE-ZIPPERED-VARIANT-LIBRARY %s
 // REVERSE-ZIPPERED-VARIANT-LIBRARY: bin/swift
 // REVERSE-ZIPPERED-VARIANT-LIBRARY: -target x86_64-apple-ios13.0-macabi -target-variant x86_64-apple-macosx10.14
 
@@ -72,7 +72,7 @@
 // REVERSE-ZIPPERED-VARIANT-LIBRARY: -platform_version mac-catalyst 13.0.0 0.0.0 -platform_version macos 10.14.0
 
 // Make sure we pass the -target-variant when creating the pre-compiled header.
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios13.0-macabi -target-variant x86_64-apple-macosx10.14 -enable-bridging-pch -import-objc-header %S/Inputs/bridging-header.h %s | %FileCheck -check-prefix=REVERSE-ZIPPERED-VARIANT-PCH %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios13.0-macabi -target-variant x86_64-apple-macosx10.14 -enable-bridging-pch -import-objc-header %S/Inputs/bridging-header.h %s | %FileCheck -check-prefix=REVERSE-ZIPPERED-VARIANT-PCH %s
 // REVERSE-ZIPPERED-VARIANT-PCH: bin/swift
 // REVERSE-ZIPPERED-VARIANT-PCH: -target x86_64-apple-ios13.0-macabi -target-variant x86_64-apple-macosx10.14
 // REVERSE-ZIPPERED_VARIANT-PCH  -emit-pch
