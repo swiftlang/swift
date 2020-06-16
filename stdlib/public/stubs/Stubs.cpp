@@ -36,16 +36,18 @@
 #endif
 #include <climits>
 #include <clocale>
+#include <cmath>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__OpenBSD__) || defined(__ANDROID__) || defined(__linux__) || defined(__wasi__)
-#include <locale.h>
-#elif defined(__CYGWIN__) || defined(__HAIKU__) || defined(_WIN32)
 #include <sstream>
-#include <cmath>
+#if defined(__OpenBSD__) || defined(__ANDROID__) || defined(__linux__) || defined(__wasi__) || defined(_WIN32)
+#include <locale.h>
+#if defined(_WIN32)
+#define locale_t _locale_t
+#endif
 #else
 #include <xlocale.h>
 #endif
@@ -351,52 +353,61 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
   return strcasecmp(nptr, "snan") == 0;
 }
 
-#if defined(__OpenBSD__)
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtod(nptr, endptr);
-}
-#elif defined(__ANDROID_API__) && __ANDROID_API__ < 26
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtod(nptr, endptr);
-}
-#elif defined(_WIN32)
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-  return _strtod_l(nptr, endptr, getCLocale());
-}
-#endif
+// This implementation should only be used on platforms without the
+// relevant strto* functions, such as Cygwin or Haiku.
+// Note that using this currently causes test failures.
+template <typename T>
+T _swift_strto(const char *nptr, char **endptr) {
+  std::istringstream ValueStream(nptr);
+  ValueStream.imbue(std::locale::classic());
+  T ParsedValue;
+  ValueStream >> ParsedValue;
 
-#if defined(__OpenBSD__)
-static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtof(nptr, endptr);
+  std::streamoff pos = ValueStream.tellg();
+  if (ValueStream.eof())
+    pos = static_cast<std::streamoff>(strlen(nptr));
+  if (pos <= 0) {
+    errno = ERANGE;
+    return 0.0;
+  }
+
+  return ParsedValue;
 }
-#elif defined(__ANDROID_API__) && __ANDROID_API__ < 26
-static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtof(nptr, endptr);
+
+static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
+#if defined(_WIN32)
+  return _strtod_l(nptr, endptr, getCLocale());
+#elif defined(__CYGWIN__) || defined(__HAIKU__)
+  return _swift_strto<double>(nptr, endptr);
+#else
+  return strtod(nptr, endptr);
+#endif
 }
-#elif defined(_WIN32)
+
 static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
+#if defined(_WIN32)
   return _strtof_l(nptr, endptr, getCLocale());
-}
+#elif defined(__CYGWIN__) || defined(__HAIKU__)
+  return _swift_strto<float>(nptr, endptr);
+#else
+  return strtof(nptr, endptr);
 #endif
+}
 
-#if defined(__OpenBSD__)
 static long double swift_strtold_l(const char *nptr, char **endptr,
                                    locale_t loc) {
-  return strtold(nptr, endptr);
-}
-#elif defined(__ANDROID_API__) && __ANDROID_API__ < 21
-static long double swift_strtold_l(const char *nptr, char **endptr,
-                                   locale_t loc) {
-  return strtod(nptr, endptr);
-}
-#elif defined(_WIN32)
-static long double swift_strtold_l(const char *nptr, char **endptr,
-                                   locale_t loc) {
+#if defined(_WIN32)
   return _strtod_l(nptr, endptr, getCLocale());
-}
+#elif defined(__ANDROID__)
+  return strtod(nptr, endptr);
+#elif defined(__CYGWIN__) || defined(__HAIKU__)
+  return _swift_strto<long double>(nptr, endptr);
+#else
+  return strtold(nptr, endptr);
 #endif
+}
 
-#if defined(__OpenBSD__) || defined(_WIN32)
+#if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #define strtold_l swift_strtold_l
@@ -409,54 +420,7 @@ static long double swift_strtold_l(const char *nptr, char **endptr,
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #endif
-#elif defined(_WIN32)
-#define strtod_l swift_strtod_l
-#define strtof_l swift_strtof_l
-#define strtold_l swift_strtold_l
 #endif
-
-#if defined(__CYGWIN__) || defined(__HAIKU__)
-// Cygwin does not support uselocale(), but we can use the locale feature 
-// in stringstream object.
-template <typename T>
-static const char *_swift_stdlib_strtoX_clocale_impl(
-    const char *nptr, T *outResult) {
-  if (swift_stringIsSignalingNaN(nptr)) {
-    *outResult = std::numeric_limits<T>::signaling_NaN();
-    return nptr + std::strlen(nptr);
-  }
-  
-  std::istringstream ValueStream(nptr);
-  ValueStream.imbue(std::locale::classic());
-  T ParsedValue;
-  ValueStream >> ParsedValue;
-  *outResult = ParsedValue;
-
-  std::streamoff pos = ValueStream.tellg();
-  if (ValueStream.eof())
-    pos = static_cast<std::streamoff>(strlen(nptr));
-  if (pos <= 0)
-    return nullptr;
-
-  return nptr + pos;
-}
-
-const char *swift::_swift_stdlib_strtold_clocale(
-    const char *nptr, void *outResult) {
-  return _swift_stdlib_strtoX_clocale_impl(
-    nptr, static_cast<long double*>(outResult));
-}
-
-const char *swift::_swift_stdlib_strtod_clocale(
-    const char * nptr, double *outResult) {
-  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
-}
-
-const char *swift::_swift_stdlib_strtof_clocale(
-    const char * nptr, float *outResult) {
-  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
-}
-#else
 
 static inline void _swift_set_errno(int to) {
 #if defined(_WIN32)
@@ -508,7 +472,6 @@ const char *swift::_swift_stdlib_strtof_clocale(
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, outResult, HUGE_VALF, strtof_l);
 }
-#endif
 
 const char *swift::_swift_stdlib_strtof16_clocale(
     const char * nptr, __fp16 *outResult) {
