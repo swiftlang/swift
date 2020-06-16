@@ -855,7 +855,13 @@ void AbstractionPattern::print(raw_ostream &out) const {
   case Kind::CXXOperatorMethodType:
   case Kind::CurriedCXXOperatorMethodType:
   case Kind::PartialCurriedCXXOperatorMethodType:
-    out << (getKind() == Kind::CXXMethodType
+    out << (getKind() == Kind::CXXOperatorMethodType
+              ? "AP::CXXOperatorMethodType(" :
+            getKind() == Kind::CurriedCXXOperatorMethodType
+              ? "AP::CurriedCXXOperatorMethodType(" :
+            getKind() == Kind::PartialCurriedCXXOperatorMethodType
+              ? "AP::PartialCurriedCXXOperatorMethodType(" :
+            getKind() == Kind::CXXMethodType
               ? "AP::CXXMethodType(" :
             getKind() == Kind::CurriedCXXMethodType
               ? "AP::CurriedCXXMethodType("
