@@ -1714,6 +1714,24 @@ public:
                                                   ConstraintLocator *locator);
 };
 
+class AllowInvalidUseOfTooManyDefaultedTrailingClosure final
+    : public ConstraintFix {
+  AllowInvalidUseOfTooManyDefaultedTrailingClosure(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidUseOfTrailingClosure, locator) {}
+
+public:
+  std::string getName() const {
+    return "allow invalid use of trailing closure because of too many "
+           "defaulted trailing params";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const;
+
+  static AllowInvalidUseOfTooManyDefaultedTrailingClosure *
+  create(ConstraintSystem &cs, ConstraintLocator *locator);
+};
+
 class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {
   ConversionRestrictionKind ConversionKind;
 

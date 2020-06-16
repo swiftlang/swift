@@ -5761,6 +5761,12 @@ bool InvalidUseOfTrailingClosure::diagnoseAsError() {
   return true;
 }
 
+bool InvalidUseOfTooManyDefaultedTrailingClosure::diagnoseAsError() {
+  emitDiagnostic(diag::trailing_closure_too_many_defaulted)
+      .highlight(getSourceRange());
+  return true;
+}
+
 void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   auto getPointerKind = [](Type ty) -> PointerTypeKind {
     PointerTypeKind pointerKind;

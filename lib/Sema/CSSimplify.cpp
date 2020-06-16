@@ -66,6 +66,11 @@ bool MatchCallArgumentListener::trailingClosureMismatch(
   return true;
 }
 
+bool MatchCallArgumentListener::trailingClosureTooManyDefaulted(
+    unsigned paramIdx, unsigned argIdx) {
+  return true;
+}
+
 /// Produce a score (smaller is better) comparing a parameter name and
 /// potentially-typo'd argument name.
 ///
@@ -526,6 +531,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     }
 
     if (claimed) {
+      if (((prevParamIdx - paramIdx) > 2) &&
+          listener.trailingClosureTooManyDefaulted(paramIdx, unlabeledArgIdx))
+        return true;
+
       // Claim the parameter/argument pair.
       claim(params[paramIdx].getLabel(), unlabeledArgIdx,
             /*ignoreNameClash=*/true);
@@ -1003,6 +1012,21 @@ public:
 
     auto *fix = AllowInvalidUseOfTrailingClosure::create(
         CS, argType, param.getPlainType(), argLoc);
+    return CS.recordFix(fix, /*impact=*/3);
+  }
+
+  bool trailingClosureTooManyDefaulted(unsigned paramIdx,
+                                       unsigned argIdx) override {
+    if (!CS.shouldAttemptFixes())
+      return true;
+
+    const auto &param = Parameters[paramIdx];
+    auto *argLoc = CS.getConstraintLocator(
+        Locator.withPathElement(LocatorPathElt::ApplyArgToParam(
+            argIdx, paramIdx, param.getParameterFlags())));
+
+    auto *fix =
+        AllowInvalidUseOfTooManyDefaultedTrailingClosure::create(CS, argLoc);
     return CS.recordFix(fix, /*impact=*/3);
   }
 

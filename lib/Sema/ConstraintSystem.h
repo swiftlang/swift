@@ -5041,6 +5041,16 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx);
+
+  /// Indicates that the trailing closure argument at the given \c argIdx
+  /// cannot be passed to the last parameter at \c paramIdx because there are
+  /// two or more defaulted parameters in between, which we do not accept for
+  /// compatibility reasons.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool trailingClosureTooManyDefaulted(unsigned paramIdx,
+                                               unsigned argIdx);
 };
 
 /// Match the call arguments (as described by the given argument type) to

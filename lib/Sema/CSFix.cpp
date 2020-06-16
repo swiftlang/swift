@@ -1209,6 +1209,19 @@ AllowInvalidUseOfTrailingClosure::create(ConstraintSystem &cs, Type argType,
       AllowInvalidUseOfTrailingClosure(cs, argType, paramType, locator);
 }
 
+bool AllowInvalidUseOfTooManyDefaultedTrailingClosure::diagnose(
+    const Solution &solution, bool asNote) const {
+  InvalidUseOfTooManyDefaultedTrailingClosure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidUseOfTooManyDefaultedTrailingClosure *
+AllowInvalidUseOfTooManyDefaultedTrailingClosure::create(
+    ConstraintSystem &cs, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidUseOfTooManyDefaultedTrailingClosure(cs, locator);
+}
+
 bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
   NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),

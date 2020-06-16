@@ -1007,10 +1007,10 @@ func rdar52204414() {
 }
 
 // SR-12291 - trailing closure is used as an argument to the last (positionally) parameter
-func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {} // expected-note {{found this candidate}}
-func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {} // expected-note {{found this candidate}}
+func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {}
+func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {}
 
-overloaded_with_default { 0 } // expected-error {{ambiguous use of 'overloaded_with_default'}}
+overloaded_with_default { 0 } // Ok
 
 func overloaded_with_default_and_autoclosure<T>(_ a: @autoclosure () -> T, b: Int = 0) {}
 func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T?) {}

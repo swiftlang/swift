@@ -1927,6 +1927,16 @@ public:
   bool diagnoseAsError() override;
 };
 
+class InvalidUseOfTooManyDefaultedTrailingClosure final
+    : public FailureDiagnostic {
+public:
+  InvalidUseOfTooManyDefaultedTrailingClosure(const Solution &solution,
+                                              ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose the invalid conversion of a temporary pointer argument generated
 /// from an X-to-pointer conversion to an @_nonEphemeral parameter.
 ///

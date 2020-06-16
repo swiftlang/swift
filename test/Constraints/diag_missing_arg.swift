@@ -43,8 +43,10 @@ trailingClosureSingle2() { 1 }
 
 func trailingClosureDefaults(x: () -> Int, y: Int = 0, z: Int = 1) {} // expected-note * {{here}}
 trailingClosureDefaults { 1 }
+// expected-error@-1 {{trailing closure not allowed in call with more than one defaulted trailing parameter}}
 trailingClosureDefaults { "foo" }
 // expected-error@-1 {{cannot convert value of type 'String' to closure result type 'Int'}}
+// expected-error@-2 {{trailing closure not allowed in call with more than one defaulted trailing parameter}}
 trailingClosureDefaults(x: { 1 }) { 2 }
 // expected-error@-1 {{extra trailing closure passed in call}}
 
