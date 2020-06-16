@@ -31,11 +31,9 @@ let _ = SimpleStruct.encode(to:)
 let _ = SimpleStruct.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 
 // rdar://problem/59655704 
-struct SR_12248_1: Codable { // expected-error {{type 'SR_12248_1' does not conform to protocol 'Encodable'}}
+struct SR_12248_1: Codable { 
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
-  // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'Int' does not conform to 'Encodable'}}
-  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'Int' does not conform to 'Encodable'}}
 }
 
 struct SR_12248_2: Decodable { 
@@ -46,4 +44,14 @@ struct SR_12248_2: Decodable {
 struct SR_12248_3: Encodable { 
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
+}
+
+struct NotConforms: Codable { // expected-error {{type 'NotConforms' does not conform to protocol 'Decodable'}}
+// expected-error@-1 {{type 'NotConforms' does not conform to protocol 'Encodable'}}
+  enum CodingKeys: CodingKey {
+    case x
+    case y
+  }
+  var x: Int
+  var y: NotDefined // expected-error {{cannot find type 'NotDefined' in scope}}
 }

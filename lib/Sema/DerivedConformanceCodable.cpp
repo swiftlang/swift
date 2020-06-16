@@ -177,7 +177,6 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     validatedProperties.insert(eltIdentifier);
     auto it = properties.find(eltIdentifier);
     if (it == properties.end()) {
-
       elt->diagnose(diag::codable_extraneous_codingkey_case_here,
                     elt->getBaseIdentifier());
       // TODO: Investigate typo-correction here; perhaps the case name was
