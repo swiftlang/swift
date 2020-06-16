@@ -338,7 +338,21 @@ static void writeJSON(llvm::raw_ostream &out,
           out << "\n";
         }
         out.indent(5 * 2);
-        out << "]\n";
+        out << "],\n";
+      }
+
+      if (!swiftDeps->extraPCMArgs.empty()) {
+        out.indent(5 * 2);
+        out << "\"extraPcmArgs\": [\n";
+        for (auto &arg :swiftDeps->extraPCMArgs) {
+          out.indent(6 * 2);
+          out << "\"" << arg << "\"";
+          if (&arg != &swiftDeps->extraPCMArgs.back())
+            out << ",";
+          out << "\n";
+        }
+        out.indent(5 * 2);
+        out << (swiftDeps->bridgingHeaderFile.hasValue() ? "],\n" : "]\n");
       }
 
       /// Bridging header and its source file dependencies, if any.
@@ -412,9 +426,16 @@ bool swift::scanDependencies(CompilerInstance &instance) {
   llvm::SmallString<32> mainModulePath = mainModule->getName().str();
   llvm::sys::path::replace_extension(mainModulePath, newExt);
 
+  std::string apinotesVer = (llvm::Twine("-fapinotes-swift-version=")
+    + instance.getASTContext().LangOpts.EffectiveLanguageVersion
+      .asAPINotesVersionString()).str();
   // Compute the dependencies of the main module.
   auto mainDependencies =
-      ModuleDependencies::forSwiftModule(mainModulePath.str().str());
+    ModuleDependencies::forMainSwiftModule(mainModulePath.str().str(), {
+      // ExtraPCMArgs
+      "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str(),
+      "-Xcc", apinotesVer
+    });
   {
     llvm::StringSet<> alreadyAddedModules;
     for (auto fileUnit : mainModule->getFiles()) {
