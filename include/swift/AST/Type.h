@@ -325,11 +325,6 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
-  friend llvm::hash_code hash_value(Type type) {
-    using llvm::hash_value;
-    return hash_value(type.getPointer());
-  }
-
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
   /// to be appended to only a portion of the returned type. For
@@ -501,6 +496,10 @@ public:
   // Direct comparison is allowed for CanTypes - they are known canonical.
   bool operator==(CanType T) const { return getPointer() == T.getPointer(); }
   bool operator!=(CanType T) const { return !operator==(T); }
+
+  friend llvm::hash_code hash_value(CanType T) {
+    return llvm::hash_value(T.getPointer());
+  }
 
   bool operator<(CanType T) const { return getPointer() < T.getPointer(); }
 };
