@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify -enable-ownership-stripping-after-serialization
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
 // Tests for yield-once diagnostics emitted for generalized accessors.
 
