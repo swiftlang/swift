@@ -41,58 +41,21 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#if defined(__OpenBSD__) || defined(__ANDROID__) || defined(__linux__) || defined(__wasi__)
+#include <locale.h>
+#elif defined(__CYGWIN__) || defined(__HAIKU__) || defined(_WIN32)
 #include <sstream>
 #include <cmath>
-#elif defined(__OpenBSD__)
-#include <locale.h>
-
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtod(nptr, endptr);
-}
-
-static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtof(nptr, endptr);
-}
-
-static long double swift_strtold_l(const char *nptr, char **endptr,
-                                   locale_t loc) {
-  return strtold(nptr, endptr);
-}
-
-#define strtod_l swift_strtod_l
-#define strtof_l swift_strtof_l
-#define strtold_l swift_strtold_l
-#elif defined(__ANDROID__)
-#include <locale.h>
-
-#include <android/api-level.h>
-
-#if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
-static inline long double swift_strtold_l(const char *nptr, char **endptr,
-                                          locale_t) {
-  return strtod(nptr, endptr);
-}
-#define strtold_l swift_strtold_l
-#endif
-
-#if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
-static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtod(nptr, endptr);
-}
-static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
-  return strtof(nptr, endptr);
-}
-#define strtod_l swift_strtod_l
-#define strtof_l swift_strtof_l
-#endif
-#elif defined(__linux__) || defined(__wasi__)
-#include <locale.h>
 #else
 #include <xlocale.h>
 #endif
 #include <limits>
 #include <thread>
+
+#if defined(__ANDROID__)
+#include <android/api-level.h>
+#endif
+
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"
@@ -387,6 +350,44 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
 
   return strcasecmp(nptr, "snan") == 0;
 }
+
+#if defined(__OpenBSD__)
+static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
+  return strtod(nptr, endptr);
+}
+
+static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
+  return strtof(nptr, endptr);
+}
+
+static long double swift_strtold_l(const char *nptr, char **endptr,
+                                   locale_t loc) {
+  return strtold(nptr, endptr);
+}
+
+#define strtod_l swift_strtod_l
+#define strtof_l swift_strtof_l
+#define strtold_l swift_strtold_l
+#elif defined(__ANDROID__)
+#if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
+static inline long double swift_strtold_l(const char *nptr, char **endptr,
+                                          locale_t) {
+  return strtod(nptr, endptr);
+}
+#define strtold_l swift_strtold_l
+#endif
+
+#if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
+static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
+  return strtod(nptr, endptr);
+}
+static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
+  return strtof(nptr, endptr);
+}
+#define strtod_l swift_strtod_l
+#define strtof_l swift_strtof_l
+#endif
+#endif
 
 #if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
 // Cygwin does not support uselocale(), but we can use the locale feature 
