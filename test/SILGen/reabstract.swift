@@ -34,13 +34,11 @@ func test0() {
 // MANDATORY:      reabstract.liftOptional
 // MANDATORY-NEXT: [[T1:%.*]] = function_ref @$s10reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
 // MANDATORY-NEXT: [[T2:%.*]] = thin_to_thick_function [[T1]]
-// MANDATORY-NEXT: strong_retain [[T2]]
 // MANDATORY-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [[T2]]
 // MANDATORY-NEXT: //{{.*}}reabstraction thunk
 // MANDATORY-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :
 // MANDATORY-NEXT: [[T4:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[T3]]([[CVT]])
 // MANDATORY-NEXT: [[T5:%.*]] = convert_function [[T4]]
-// MANDATORY-NEXT: strong_release [[T2]]
 // MANDATORY-NEXT: // function_ref
 // MANDATORY-NEXT: [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // MANDATORY-NEXT: apply [[T0]]<Int>([[T5]])

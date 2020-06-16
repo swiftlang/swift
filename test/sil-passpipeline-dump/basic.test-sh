@@ -1,8 +1,8 @@
 // RUN: %sil-passpipeline-dumper -Onone | %FileCheck %s
 
 // CHECK: ---
-// CHECK: name:            Mandatory Combines
-// CHECK: passes:          [ "for-each-loop-unroll", "mandatory-combine" ]
+// CHECK: name:            non-Diagnostic Enabling Mandatory Optimizations
+// CHECK: passes:          [ "for-each-loop-unroll", "mandatory-combine", "guaranteed-arc-opts" ]
 // CHECK: ---
 // CHECK: name:            Serialization
 // CHECK: passes:          [ "serialize-sil", "ownership-model-eliminator" ]

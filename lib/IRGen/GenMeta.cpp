@@ -739,6 +739,9 @@ namespace {
                            isa<ConstructorDecl>(func.getDecl())
                              ? SILDeclRef::Kind::Allocator
                              : SILDeclRef::Kind::Func);
+        if (entry.getFunction().isAutoDiffDerivativeFunction())
+          declRef = declRef.asAutoDiffDerivativeFunction(
+              entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         addDiscriminator(flags, schema, declRef);
       }
 
