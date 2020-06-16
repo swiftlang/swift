@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
-// RUN: %target-swift-frontend -enable-experimental-static-assert -enable-ownership-stripping-after-serialization -emit-sil %s -verify
+// RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
 // REQUIRES: asserts
 
 //===----------------------------------------------------------------------===//
