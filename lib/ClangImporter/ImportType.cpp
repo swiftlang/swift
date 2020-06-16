@@ -1711,7 +1711,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   // C++ operators that are implemented as non-static member functions get
-  // imported into Swift as static member functions that use an additional
+  // imported into Swift as static methods that have an additional
   // parameter for the left-hand side operand instead of the receiver object.
   if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
     if (clangDecl->isOverloadedOperator()) {
