@@ -99,6 +99,14 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
 /// \param proto The \c ProtocolDecl to check conformance to.
 static CodableConformanceType
 varConformsToCodable(DeclContext *DC, VarDecl *varDecl, ProtocolDecl *proto) {
+  // CodingKeys enum that couldn't be generated correctly because of some other
+  // error elsewhere. e.g. Invalid redeclaration of members. So let's fail early
+  // here as type not validated.
+  auto declInterfaceType = varDecl->getValueInterfaceType();
+  if (declInterfaceType->hasError()) {
+    return CodableConformanceType::TypeNotValidated;
+  }
+  
   // If the decl doesn't yet have a type, we may be seeing it before the type
   // checker has gotten around to evaluating its type. For example:
   //
@@ -112,8 +120,7 @@ varConformsToCodable(DeclContext *DC, VarDecl *varDecl, ProtocolDecl *proto) {
   //              //    hasn't yet been evaluated
   // }
   bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
-  return typeConformsToCodable(DC, varDecl->getValueInterfaceType(), isIUO,
-                               proto);
+  return typeConformsToCodable(DC, declInterfaceType, isIUO, proto);
 }
 
 /// Retrieve the variable name for the purposes of encoding/decoding.
@@ -147,14 +154,30 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
   for (auto *varDecl : derived.Nominal->getStoredProperties()) {
     if (!varDecl->isUserAccessible())
       continue;
-
-    properties[getVarNameForCoding(varDecl)] = varDecl;
+    // When we have invalid redeclaration we may endup with duplicated
+    // members here.
+    auto varIdentifier = getVarNameForCoding(varDecl);
+    if (properties.count(varIdentifier) != 0)
+      continue;
+      
+    properties[varIdentifier] = varDecl;
   }
-
+  
+  llvm::SetVector<Identifier> validatedProperties;
   bool propertiesAreValid = true;
   for (auto elt : codingKeysDecl->getAllElements()) {
-    auto it = properties.find(elt->getBaseIdentifier());
+    auto eltIdentifier = elt->getBaseIdentifier();
+    
+    // We are skipping duplicated members on properties
+    // so let's avoid to validate the same declaration for
+    // a duplicated identifier.
+    if (validatedProperties.count(eltIdentifier) != 0)
+      continue;
+    
+    validatedProperties.insert(eltIdentifier);
+    auto it = properties.find(eltIdentifier);
     if (it == properties.end()) {
+
       elt->diagnose(diag::codable_extraneous_codingkey_case_here,
                     elt->getBaseIdentifier());
       // TODO: Investigate typo-correction here; perhaps the case name was
