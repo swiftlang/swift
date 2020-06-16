@@ -23,16 +23,16 @@ class Derived : ObjCBase {
   }
 }
 
-// RUN: %target-swift-ide-test -range -pos=4:1 -end-pos=9:2 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
-// RUN: %target-swift-ide-test -range -pos=5:3 -end-pos=7:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
-// RUN: %target-swift-ide-test -range -pos=5:25 -end-pos=7:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
-// RUN: %target-swift-ide-test -range -pos=8:3 -end-pos=8:31 -source-filename %s | %FileCheck %s -check-prefix=CHECK4
-// RUN: %target-swift-ide-test -range -pos=13:5 -end-pos=13:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK5
-// RUN: %target-swift-ide-test -range -pos=13:16 -end-pos=13:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK6
-// RUN: %target-swift-ide-test -range -pos=12:26 -end-pos=14:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK7
-// RUN: %target-swift-ide-test -range -pos=17:5 -end-pos=18:21 -source-filename %s | %FileCheck %s -check-prefix=CHECK8
-// RUN: %target-swift-ide-test -range -pos=20:5 -end-pos=22:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK9
-// RUN: %target-swift-ide-test -range -pos=21:5 -end-pos=22:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK10
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=4:1 -end-pos=9:2 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=5:3 -end-pos=7:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=5:25 -end-pos=7:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=8:3 -end-pos=8:31 -source-filename %s | %FileCheck %s -check-prefix=CHECK4
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=13:5 -end-pos=13:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK5
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=13:16 -end-pos=13:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK6
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=12:26 -end-pos=14:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK7
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=17:5 -end-pos=18:21 -source-filename %s | %FileCheck %s -check-prefix=CHECK8
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=20:5 -end-pos=22:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK9
+// RUN: %target-swift-ide-test -enable-objc-interop -disable-objc-attr-requires-foundation-module -range -pos=21:5 -end-pos=22:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK10
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>@objc class ObjCClass : ObjCBase {
