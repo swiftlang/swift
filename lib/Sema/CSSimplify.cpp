@@ -1350,20 +1350,53 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return getTypeMatchSuccess();
 }
 
+// Determine whether conversion is allowed between two function types
+// based on their representations.
+static bool
+isConversionAllowedBetween(FunctionTypeRepresentation rep1,
+                           FunctionTypeRepresentation rep2) {
+  auto isThin = [](FunctionTypeRepresentation rep) {
+    return rep == FunctionTypeRepresentation::CFunctionPointer ||
+        rep == FunctionTypeRepresentation::Thin;
+  };
+  
+  // Allowing "thin" (c, thin) to "thin" conventions
+  if (isThin(rep1) && isThin(rep2))
+    return true;
+  
+  // Allowing all to "thick" (swift, block) conventions
+  // "thin" (c, thin) to "thick" or "thick" to "thick"
+  if (rep2 == FunctionTypeRepresentation::Swift ||
+      rep2 == FunctionTypeRepresentation::Block)
+    return true;
+  
+  return rep1 == rep2;
+}
+
 // Returns 'false' (i.e. no error) if it is legal to match functions with the
 // corresponding function type representations and the given match kind.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
                                          FunctionTypeRepresentation rep2,
-                                         ConstraintKind kind) {
+                                         ConstraintKind kind,
+                                         ConstraintLocatorBuilder locator) {
   switch (kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
     return rep1 != rep2;
+      
+  case ConstraintKind::Subtype: {
+    auto last = locator.last();
+    if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
+      return false;
+    
+    // Inverting the result because matchFunctionRepresentations
+    // returns false in conversions are allowed.
+    return !isConversionAllowedBetween(rep1, rep2);
+  }
 
   case ConstraintKind::OpaqueUnderlyingType:
-  case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
@@ -1658,7 +1691,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   if (matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
                                    func2->getExtInfo().getRepresentation(),
-                                   kind)) {
+                                   kind, locator)) {
     return getTypeMatchFailure(locator);
   }
 
