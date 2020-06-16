@@ -244,7 +244,6 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation subInvocation;
-  std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
