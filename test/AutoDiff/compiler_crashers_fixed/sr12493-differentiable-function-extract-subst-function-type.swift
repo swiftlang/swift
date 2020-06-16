@@ -8,6 +8,9 @@
 // UNSUPPORTED: tensorflow
 // SWIFT_ENABLE_TENSORFLOW END
 
+// FIXME(SR-13021): Disabled due to flakiness on Linux.
+// REQUIRES: SR13021
+
 import _Differentiation
 
 func exampleVJP_1(_ x0: Float) -> (Float, (Float) -> (Float)) {
