@@ -4536,8 +4536,8 @@ WitnessTableCacheEntry::allocate(
   // Find the allocation.
   void **fullTable = reinterpret_cast<void**>(this + 1);
 
-  // Zero out the private storage area.
-  memset(fullTable, 0, privateSizeInWords * sizeof(void*));
+  // Zero out the witness table.
+  memset(fullTable, 0, getWitnessTableSize(conformance));
 
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
