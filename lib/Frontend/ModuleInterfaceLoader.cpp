@@ -1050,6 +1050,13 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
+  // Inherit the Swift language version
+  subInvocation.getLangOptions().EffectiveLanguageVersion =
+    LangOpts.EffectiveLanguageVersion;
+  GenericArgs.push_back("-swift-version");
+  GenericArgs.push_back(ArgSaver.save(subInvocation.getLangOptions()
+    .EffectiveLanguageVersion.asAPINotesVersionString()));
+
   subInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
   llvm::for_each(SearchPathOpts.ImportSearchPaths,
                  [&](const std::string &path) {
@@ -1323,10 +1330,12 @@ bool InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                       StringRef interfacePath,
                                                       StringRef outputPath,
                                                       SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>, StringRef)> action) {
+    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>,
+                            ArrayRef<StringRef>, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, outputPath, diagLoc,
                                   [&](SubCompilerInstanceInfo &info){
     return action(info.Instance->getASTContext(), info.BuildArguments,
+                  info.ExtraPCMArgs,
                   info.Hash);
   });
 }
@@ -1398,6 +1407,16 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   }
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
+  auto target =  *(std::find(BuildArgs.rbegin(), BuildArgs.rend(), "-target") - 1);
+  auto langVersion = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(),
+                                 "-swift-version") - 1);
+  std::array<StringRef, 6> ExtraPCMArgs = {
+    // PCMs should use the target triple the interface will be using to build
+    "-Xcc", "-target", "-Xcc", target,
+    // PCMs should use the effective Swift language version for apinotes.
+    "-Xcc", ArgSaver.save((llvm::Twine("-fapinotes-swift-version=") + langVersion).str())
+  };
+  info.ExtraPCMArgs = ExtraPCMArgs;
   // Run the action under the sub compiler instance.
   return action(info);
 }
