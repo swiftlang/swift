@@ -206,7 +206,7 @@ public:
   }
 
   friend llvm::hash_code hash_value(const TypeWitnessAndDecl &owner) {
-    return llvm::hash_combine(owner.witnessType,
+    return llvm::hash_combine(owner.witnessType.getPointer(),
                               owner.witnessDecl);
   }
 
