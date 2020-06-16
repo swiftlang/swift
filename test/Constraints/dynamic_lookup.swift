@@ -338,7 +338,7 @@ func testOverloadedWithUnavailable(ao: AnyObject) {
 
 func dynamicInitCrash(ao: AnyObject.Type) {
   let sdk = ao.init(blahblah: ())
-  // expected-error@-1 {{incorrect argument label in call (have 'blahblah:', expected 'toMemory:')}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
 }
 
 // Test that we correctly diagnose ambiguity for different typed members available

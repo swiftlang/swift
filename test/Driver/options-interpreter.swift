@@ -14,17 +14,17 @@
 // PARSE_STDLIB: -parse-stdlib
 
 
-// RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -resource-dir /RSRC/ %s | %FileCheck -check-prefix=CHECK-RESOURCE-DIR-ONLY %s
+// RUN: %swift_driver -sdk "" -### -target x86_64-apple-macosx10.9 -resource-dir /RSRC/ %s | %FileCheck -check-prefix=CHECK-RESOURCE-DIR-ONLY %s
 // CHECK-RESOURCE-DIR-ONLY: # DYLD_LIBRARY_PATH=/RSRC/macosx{{$}}
 
-// RUN: %swift_driver -### -target x86_64-unknown-linux-gnu -resource-dir /RSRC/ %s | %FileCheck -check-prefix=CHECK-RESOURCE-DIR-ONLY-LINUX${LD_LIBRARY_PATH+_LAX} %s
+// RUN: %swift_driver -sdk "" -### -target x86_64-unknown-linux-gnu -resource-dir /RSRC/ %s | %FileCheck -check-prefix=CHECK-RESOURCE-DIR-ONLY-LINUX${LD_LIBRARY_PATH+_LAX} %s
 // CHECK-RESOURCE-DIR-ONLY-LINUX: # LD_LIBRARY_PATH=/RSRC/linux{{$}}
 // CHECK-RESOURCE-DIR-ONLY-LINUX_LAX: # LD_LIBRARY_PATH=/RSRC/linux{{$|:}}
 
-// RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -L/foo/ %s | %FileCheck -check-prefix=CHECK-L %s
+// RUN: %swift_driver -sdk "" -### -target x86_64-apple-macosx10.9 -L/foo/ %s | %FileCheck -check-prefix=CHECK-L %s
 // CHECK-L: # DYLD_LIBRARY_PATH={{/foo/:[^:]+/lib/swift/macosx$}}
 
-// RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | %FileCheck -check-prefix=CHECK-L2 %s
+// RUN: %swift_driver -sdk "" -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | %FileCheck -check-prefix=CHECK-L2 %s
 // CHECK-L2: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx$}}
 
 // RUN: env DYLD_LIBRARY_PATH=/abc/ SDKROOT=/sdkroot %swift_driver_plain -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s 2>&1 | %FileCheck -check-prefix=CHECK-L2-ENV %s 
@@ -60,7 +60,7 @@
 // CHECK-COMPLEX-DAG: DYLD_FRAMEWORK_PATH=/foo/:/bar/:/abc/{{$| }}
 // CHECK-COMPLEX-DAG: DYLD_LIBRARY_PATH={{/foo2/:/bar2/:[^:]+/lib/swift/macosx:/sdkroot/usr/lib/swift($| )}}
 
-// RUN: %swift_driver -### -target x86_64-unknown-linux-gnu -L/foo/ %s | %FileCheck -check-prefix=CHECK-L-LINUX${LD_LIBRARY_PATH+_LAX} %s
+// RUN: %swift_driver -sdk "" -### -target x86_64-unknown-linux-gnu -L/foo/ %s | %FileCheck -check-prefix=CHECK-L-LINUX${LD_LIBRARY_PATH+_LAX} %s
 // CHECK-L-LINUX: # LD_LIBRARY_PATH={{/foo/:[^:]+/lib/swift/linux$}}
 // CHECK-L-LINUX_LAX: # LD_LIBRARY_PATH={{/foo/:[^:]+/lib/swift/linux($|:)}}
 

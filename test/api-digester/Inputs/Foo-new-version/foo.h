@@ -21,6 +21,9 @@
 @interface PhotoSettings: NSObject
 + (instancetype)photoSettingsWithFormat:(int)format;
 + (instancetype)photoSettingsWithNumber:(int)number;
+
++ (instancetype)photoSettingsWithCake:(int)cake;
+- (instancetype)initWithCake:(int)cake;
 @end
 
 @interface PhotoBracketSettings : PhotoSettings

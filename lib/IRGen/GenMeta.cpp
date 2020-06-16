@@ -739,6 +739,9 @@ namespace {
                            isa<ConstructorDecl>(func.getDecl())
                              ? SILDeclRef::Kind::Allocator
                              : SILDeclRef::Kind::Func);
+        if (entry.getFunction().isAutoDiffDerivativeFunction())
+          declRef = declRef.asAutoDiffDerivativeFunction(
+              entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         addDiscriminator(flags, schema, declRef);
       }
 
@@ -5111,7 +5114,6 @@ void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
 bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                                              const SILVTable *vtable,
                                              SILDeclRef method) {
-  auto &M = IGM.getSILModule();
   auto entry = vtable->getEntry(IGM.getSILModule(), method);
   if (!entry) {
     return true;

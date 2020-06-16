@@ -54,8 +54,9 @@ struct MyArray<Element> {} // expected-note {{'Element' declared as parameter to
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}}
-        // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+        a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<_>.Type' and 'Int.Type'}}
+       // expected-error@-2 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
     }
 }
 
@@ -114,11 +115,11 @@ func test17875634() {
   var col = 2
   var coord = (row, col)
 
-  match += (1, 2) // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match += (row, col) // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match += coord // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
   match.append(row, col) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 
