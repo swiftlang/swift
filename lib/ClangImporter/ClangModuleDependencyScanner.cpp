@@ -231,14 +231,19 @@ void ClangImporter::recordModuleDependencies(
     // Add all args inheritted from creating the importer.
     auto It = allArgs.begin();
     while(It != allArgs.end()) {
+      StringRef arg = *It;
       // Remove the -target arguments because we should use the target triple
       // from the depending Swift modules.
-      if (*It == "-target") {
+      if (arg == "-target") {
         It += 2;
-        continue;
+      } else if (arg.startswith("-fapinotes-swift-version=")) {
+        // Remove the apinotes version because we should use the language version
+        // specified in the interface file.
+        It += 1;
+      } else {
+        addClangArg(*It);
+        ++ It;
       }
-      addClangArg(*It);
-      ++ It;
     }
 
     // Swift frontend action: -emit-pcm

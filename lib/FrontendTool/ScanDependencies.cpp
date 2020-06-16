@@ -426,10 +426,15 @@ bool swift::scanDependencies(CompilerInstance &instance) {
   llvm::SmallString<32> mainModulePath = mainModule->getName().str();
   llvm::sys::path::replace_extension(mainModulePath, newExt);
 
+  std::string apinotesVer = (llvm::Twine("-fapinotes-swift-version=")
+    + instance.getASTContext().LangOpts.EffectiveLanguageVersion
+      .asAPINotesVersionString()).str();
   // Compute the dependencies of the main module.
   auto mainDependencies =
     ModuleDependencies::forMainSwiftModule(mainModulePath.str().str(), {
-      "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str()
+      // ExtraPCMArgs
+      "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str(),
+      "-Xcc", apinotesVer
     });
   {
     llvm::StringSet<> alreadyAddedModules;
