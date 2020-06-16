@@ -7401,7 +7401,9 @@ void SwiftDeclConverter::importInheritedConstructors(
 
         Impl.importAttributes(objcMethod, newCtor, curObjCClass);
         newMembers.push_back(newCtor);
-      } else if (existing && existing->getClangDecl()) {
+      } else if (existing && existing->getInitKind() ==
+                   CtorInitializerKind::ConvenienceFactory &&
+                 existing->getClangDecl()) {
         // Check that the existing constructor the prevented new creation is
         // really an inherited factory initializer and not a class member.
         auto existingMD = cast<clang::ObjCMethodDecl>(existing->getClangDecl());
