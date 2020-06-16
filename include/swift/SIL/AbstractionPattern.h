@@ -603,7 +603,8 @@ public:
   }
 
   static AbstractionPattern
-  getCurriedCXXOperatorMethod(CanType origType, const clang::CXXMethodDecl *method) {
+  getCurriedCXXOperatorMethod(CanType origType,
+                              const clang::CXXMethodDecl *method) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method,

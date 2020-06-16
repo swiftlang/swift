@@ -549,7 +549,12 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
   case Kind::CurriedCXXOperatorMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     assert(params.size() == 1);
-    return getCXXMethodSelfPattern(params[0].getParameterType());
+
+    // The formal metatype parameter to a C++ member operator function imported
+    // as a static method is dropped on the floor. Leave it untransformed.
+    return AbstractionPattern::getDiscard(
+        getGenericSignatureForFunctionComponent(),
+        params[0].getParameterType());
   }
   case Kind::CFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType: {
