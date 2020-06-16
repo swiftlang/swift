@@ -1725,8 +1725,11 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
           ImportTypeKind::Parameter, allowNSUIntegerAsInt, Bridgeability::None);
 
       param->setInterfaceType(parentType.getType());
+
+      // Workaround until proper const support is handled: Force everything to
+      // be mutating. This implicitly makes the parameter indirect.
       param->setSpecifier(ParamSpecifier::InOut);
-      
+
       parameters.push_back(param);
     }
   }
