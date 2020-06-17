@@ -252,6 +252,33 @@ bool ContextualMismatch::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool ContextualMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto getTypes =
+      [&](const std::pair<const Solution *, const ConstraintFix *> &entry)
+      -> std::pair<Type, Type> {
+    auto &solution = *entry.first;
+    auto *fix = static_cast<const ContextualMismatch *>(entry.second);
+
+    return {solution.simplifyType(fix->getFromType()),
+            solution.simplifyType(fix->getToType())};
+  };
+
+  auto etalonTypes = getTypes(commonFixes.front());
+  if (llvm::all_of(
+          commonFixes,
+          [&](const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            auto types = getTypes(entry);
+            return etalonTypes.first->isEqual(types.first) &&
+                   etalonTypes.second->isEqual(types.second);
+          })) {
+    const auto &primary = commonFixes.front();
+    return primary.second->diagnose(*primary.first, /*asNote=*/false);
+  }
+
+  return false;
+}
+
 ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
@@ -379,6 +406,57 @@ bool AllowFunctionTypeMismatch::coalesceAndDiagnose(
 bool AllowFunctionTypeMismatch::diagnose(const Solution &solution,
                                          bool asNote) const {
   return coalesceAndDiagnose(solution, {}, asNote);
+}
+
+bool AllowFunctionTypeMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  if (ContextualMismatch::diagnoseForAmbiguity(commonFixes))
+    return true;
+
+  auto *locator = getLocator();
+  // If this is a mismatch between two function types at argument
+  // position, there is a tailored diagnostic for that.
+  if (auto argConv =
+          locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
+    auto &cs = getConstraintSystem();
+    auto &DE = cs.getASTContext().Diags;
+    auto &solution = *commonFixes[0].first;
+
+    auto info = getStructuralTypeContext(solution, locator);
+    if (!info)
+      return false;
+
+    auto *argLoc = cs.getConstraintLocator(simplifyLocatorToAnchor(locator));
+
+    auto overload = solution.getOverloadChoiceIfAvailable(
+        solution.getCalleeLocator(argLoc));
+    if (!overload)
+      return false;
+
+    auto name = overload->choice.getName().getBaseName();
+    DE.diagnose(getLoc(getAnchor()), diag::no_candidates_match_argument_type,
+                name.userFacingName(), std::get<2>(*info),
+                argConv->getParamIdx());
+
+    for (auto &entry : commonFixes) {
+      auto &solution = *entry.first;
+      auto overload = solution.getOverloadChoiceIfAvailable(
+          solution.getCalleeLocator(argLoc));
+
+      if (!(overload && overload->choice.isDecl()))
+        continue;
+
+      auto *decl = overload->choice.getDecl();
+      if (decl->getLoc().isValid()) {
+        DE.diagnose(decl, diag::found_candidate_type,
+                    solution.simplifyType(overload->openedType));
+      }
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 AllowFunctionTypeMismatch *
@@ -867,14 +945,19 @@ RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs, Type lhs, Type rh
   return new (cs.getAllocator()) RemoveAddressOf(cs, lhs, rhs, locator);
 }
 
+RemoveReturn::RemoveReturn(ConstraintSystem &cs, Type resultTy,
+                           ConstraintLocator *locator)
+    : ContextualMismatch(cs, FixKind::RemoveReturn, resultTy,
+                         cs.getASTContext().TheEmptyTupleType, locator) {}
+
 bool RemoveReturn::diagnose(const Solution &solution, bool asNote) const {
   ExtraneousReturnFailure failure(solution, getLocator());
   return failure.diagnose(asNote);
 }
 
-RemoveReturn *RemoveReturn::create(ConstraintSystem &cs,
+RemoveReturn *RemoveReturn::create(ConstraintSystem &cs, Type resultTy,
                                    ConstraintLocator *locator) {
-  return new (cs.getAllocator()) RemoveReturn(cs, locator);
+  return new (cs.getAllocator()) RemoveReturn(cs, resultTy, locator);
 }
 
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,
@@ -1077,6 +1160,43 @@ bool IgnoreAssignmentDestinationType::diagnose(const Solution &solution,
       solution, CTP, getFromType(), getToType(),
       cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
   return failure.diagnose(asNote);
+}
+
+bool IgnoreAssignmentDestinationType::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto &cs = getConstraintSystem();
+
+  // If all of the types are the same let's try to diagnose
+  // this as if there is no ambiguity.
+  if (ContextualMismatch::diagnoseForAmbiguity(commonFixes))
+    return true;
+
+  auto *commonLocator = getLocator();
+  auto *assignment = castToExpr<AssignExpr>(commonLocator->getAnchor());
+
+  auto &solution = *commonFixes.front().first;
+  auto *calleeLocator = solution.getCalleeLocator(
+      solution.getConstraintLocator(assignment->getSrc()));
+  auto overload = solution.getOverloadChoiceIfAvailable(calleeLocator);
+  if (!overload)
+    return false;
+
+  auto memberName = overload->choice.getName().getBaseName();
+  auto destType = solution.getType(assignment->getDest());
+
+  auto &DE = cs.getASTContext().Diags;
+  // TODO(diagnostics): It might be good to add a tailored diagnostic
+  // for cases like this instead of using "contextual" one.
+  DE.diagnose(assignment->getSrc()->getLoc(),
+              diag::no_candidates_match_result_type,
+              memberName.userFacingName(),
+              solution.simplifyType(destType)->getRValueType());
+
+  for (auto &entry : commonFixes) {
+    entry.second->diagnose(*entry.first, /*asNote=*/true);
+  }
+
+  return true;
 }
 
 IgnoreAssignmentDestinationType *

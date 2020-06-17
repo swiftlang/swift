@@ -369,6 +369,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
 };
@@ -521,6 +525,8 @@ public:
   Type getToType() const { return RHS; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
@@ -798,6 +804,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
                                     bool usingStorageWrapper, Type base,
                                     Type wrapper, ConstraintLocator *locator);
@@ -824,6 +834,10 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
@@ -1103,6 +1117,8 @@ public:
                            bool asNote = false) const override;
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 };
 
 
@@ -1399,16 +1415,16 @@ private:
                                           ConstraintLocator *locator);
 };
 
-class RemoveReturn final : public ConstraintFix {
-  RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
+class RemoveReturn final : public ContextualMismatch {
+  RemoveReturn(ConstraintSystem &cs, Type resultTy, ConstraintLocator *locator);
 
 public:
   std::string getName() const override { return "remove or omit return type"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
+  static RemoveReturn *create(ConstraintSystem &cs, Type resultTy,
+                              ConstraintLocator *locator);
 };
 
 class CollectionElementContextualMismatch final : public ContextualMismatch {
@@ -1527,10 +1543,6 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
-
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
@@ -1547,6 +1559,8 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static IgnoreAssignmentDestinationType *create(ConstraintSystem &cs,
                                                  Type sourceTy, Type destTy,

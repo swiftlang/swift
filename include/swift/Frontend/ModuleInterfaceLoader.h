@@ -244,7 +244,6 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation subInvocation;
-  std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -280,7 +279,8 @@ public:
                        StringRef interfacePath,
                        StringRef outputPath,
                        SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>, StringRef)> action) override;
+    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>,
+                            ArrayRef<StringRef>, StringRef)> action) override;
   bool runInSubCompilerInstance(StringRef moduleName,
                                 StringRef interfacePath,
                                 StringRef outputPath,

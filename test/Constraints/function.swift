@@ -62,12 +62,12 @@ func test() {
 
 // <rdar://problem/19962010> QoI: argument label mismatches produce not-great diagnostic
 class A {
-  func a(_ text:String) {
+  func a(_ text:String) { // expected-note {{incorrect labels for candidate (have: '(text:)', expected: '(_:)')}}
   }
-  func a(_ text:String, something:Int?=nil) {
+  func a(_ text:String, something:Int?=nil) { // expected-note {{incorrect labels for candidate (have: '(text:)', expected: '(_:)')}}
   }
 }
-A().a(text:"sometext") // expected-error{{extraneous argument label 'text:' in call}}{{7-12=}}
+A().a(text:"sometext") // expected-error{{no exact matches in call to instance method 'a'}}
 
 
 // <rdar://problem/22451001> QoI: incorrect diagnostic when argument to print has the wrong type

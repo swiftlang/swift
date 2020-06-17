@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify -enable-ownership-stripping-after-serialization
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
 // REQUIRES: PTRSIZE=32
 //

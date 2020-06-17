@@ -219,7 +219,7 @@ struct MultipleWrappers {
   // attempting to splice a 'wrappedValue:' argument into the call to Wrapper's
   // init, but it doesn't have a matching init. We're then attempting to access
   // the nested 'wrappedValue', but Wrapper's 'wrappedValue' is Int.
-  @Wrapper(stored: 17) // expected-error{{value of type 'Int' has no member 'wrappedValue'}}
+  @Wrapper(stored: 17) // expected-error{{cannot convert value of type 'Int' to expected argument type 'WrapperWithInitialValue<Int>'}}
   @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 
@@ -1067,6 +1067,51 @@ struct TestComposition {
     _p3 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperD<WrapperE<Int?>, Int, String>'}}
     // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Property wrapper composition type inference
+// ---------------------------------------------------------------------------
+
+protocol DefaultValue {
+  static var defaultValue: Self { get }
+}
+
+extension Int: DefaultValue {
+  static var defaultValue: Int { 0 }
+}
+
+struct TestCompositionTypeInference {
+  @propertyWrapper
+  struct A<Value: DefaultValue> {
+    var wrappedValue: Value
+
+    init(wrappedValue: Value = .defaultValue, key: String) {
+      self.wrappedValue = wrappedValue
+    }
+  }
+
+  @propertyWrapper
+  struct B<Value: DefaultValue>: DefaultValue {
+    var wrappedValue: Value
+
+    init(wrappedValue: Value = .defaultValue) {
+      self.wrappedValue = wrappedValue
+    }
+
+    static var defaultValue: B<Value> { B() }
+  }
+
+  // All of these are okay
+
+  @A(key: "b") @B
+  var a: Int = 0
+
+  @A(key: "b") @B
+  var b: Int
+
+  @A(key: "c") @B @B
+  var c: Int
 }
 
 // ---------------------------------------------------------------------------
