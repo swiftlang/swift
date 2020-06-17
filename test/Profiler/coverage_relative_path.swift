@@ -5,11 +5,11 @@
 // RUN: cp %s %t/foo/bar/baz/coverage_relative_path.swift
 // RUN: cd %t/foo/bar
 
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -Xllvm -enable-name-compression=false -emit-ir baz/coverage_relative_path.swift | %FileCheck -check-prefix=ABSOLUTE %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -Xllvm -enable-name-compression=false -emit-ir %/S/baz/coverage_relative_path.swift | %FileCheck -check-prefix=ABSOLUTE %s
 //
 // ABSOLUTE: @__llvm_coverage_mapping = {{.*"\\01.*foo.*bar.*baz.*coverage_relative_path\.swift}}
 
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -Xllvm -enable-name-compression=false -coverage-prefix-map $PWD=. -emit-ir baz/coverage_relative_path.swift | %FileCheck -check-prefix=RELATIVE %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -Xllvm -enable-name-compression=false -coverage-prefix-map %/S=. -emit-ir %/S/baz/coverage_relative_path.swift | %FileCheck -check-prefix=RELATIVE %s
 //
 // RELATIVE: @__llvm_coverage_mapping = {{.*"\\01[^/]*}}.{{/|\\}}baz{{.*coverage_relative_path\.swift}}
 
