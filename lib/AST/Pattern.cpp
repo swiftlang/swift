@@ -441,12 +441,77 @@ SourceRange TypedPattern::getSourceRange() const {
            PatTypeRepr->getSourceRange().End };
 }
 
+IsPattern::IsPattern(SourceLoc IsLoc, TypeExpr *CastTy, Pattern *SubPattern,
+                     CheckedCastKind Kind)
+    : Pattern(PatternKind::Is), IsLoc(IsLoc), SubPattern(SubPattern),
+      CastKind(Kind), CastType(CastTy) {
+  assert(IsLoc.isValid() == CastTy->getLoc().isValid());
+}
+
+IsPattern *IsPattern::createImplicit(ASTContext &Ctx, Type castTy,
+                                     Pattern *SubPattern,
+                                     CheckedCastKind Kind) {
+  assert(castTy);
+  auto *CastTE = TypeExpr::createImplicit(castTy, Ctx);
+  auto *ip = new (Ctx) IsPattern(SourceLoc(), CastTE, SubPattern, Kind);
+  ip->setImplicit();
+  return ip;
+}
+
+SourceRange IsPattern::getSourceRange() const {
+  SourceLoc beginLoc = SubPattern ? SubPattern->getSourceRange().Start : IsLoc;
+  SourceLoc endLoc = (isImplicit() ? beginLoc : CastType->getEndLoc());
+  return {beginLoc, endLoc};
+}
+
+Type IsPattern::getCastType() const { return CastType->getInstanceType(); }
+void IsPattern::setCastType(Type type) {
+  assert(type);
+  CastType->setType(MetatypeType::get(type));
+}
+
+TypeRepr *IsPattern::getCastTypeRepr() const { return CastType->getTypeRepr(); }
+
 /// Construct an ExprPattern.
 ExprPattern::ExprPattern(Expr *e, bool isResolved, Expr *matchExpr,
                          VarDecl *matchVar)
   : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
     MatchExpr(matchExpr), MatchVar(matchVar) {
   assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
+}
+
+SourceLoc EnumElementPattern::getStartLoc() const {
+  return (ParentType && !ParentType->isImplicit())
+             ? ParentType->getSourceRange().Start
+             : DotLoc.isValid() ? DotLoc : NameLoc.getBaseNameLoc();
+}
+
+SourceLoc EnumElementPattern::getEndLoc() const {
+  if (SubPattern && SubPattern->getSourceRange().isValid()) {
+    return SubPattern->getSourceRange().End;
+  }
+  return NameLoc.getEndLoc();
+}
+
+TypeRepr *EnumElementPattern::getParentTypeRepr() const {
+  if (!ParentType)
+    return nullptr;
+  return ParentType->getTypeRepr();
+}
+
+Type EnumElementPattern::getParentType() const {
+  if (!ParentType)
+    return Type();
+  return ParentType->getInstanceType();
+}
+
+void EnumElementPattern::setParentType(Type type) {
+  assert(type);
+  if (ParentType) {
+    ParentType->setType(MetatypeType::get(type));
+  } else {
+    ParentType = TypeExpr::createImplicit(type, type->getASTContext());
+  }
 }
 
 SourceLoc ExprPattern::getLoc() const {

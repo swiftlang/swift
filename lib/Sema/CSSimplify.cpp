@@ -15,13 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CSFix.h"
 #include "CSDiagnostics.h"
+#include "CSFix.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1349,20 +1350,53 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return getTypeMatchSuccess();
 }
 
+// Determine whether conversion is allowed between two function types
+// based on their representations.
+static bool
+isConversionAllowedBetween(FunctionTypeRepresentation rep1,
+                           FunctionTypeRepresentation rep2) {
+  auto isThin = [](FunctionTypeRepresentation rep) {
+    return rep == FunctionTypeRepresentation::CFunctionPointer ||
+        rep == FunctionTypeRepresentation::Thin;
+  };
+  
+  // Allowing "thin" (c, thin) to "thin" conventions
+  if (isThin(rep1) && isThin(rep2))
+    return true;
+  
+  // Allowing all to "thick" (swift, block) conventions
+  // "thin" (c, thin) to "thick" or "thick" to "thick"
+  if (rep2 == FunctionTypeRepresentation::Swift ||
+      rep2 == FunctionTypeRepresentation::Block)
+    return true;
+  
+  return rep1 == rep2;
+}
+
 // Returns 'false' (i.e. no error) if it is legal to match functions with the
 // corresponding function type representations and the given match kind.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
                                          FunctionTypeRepresentation rep2,
-                                         ConstraintKind kind) {
+                                         ConstraintKind kind,
+                                         ConstraintLocatorBuilder locator) {
   switch (kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Equal:
     return rep1 != rep2;
+      
+  case ConstraintKind::Subtype: {
+    auto last = locator.last();
+    if (!(last && last->is<LocatorPathElt::FunctionArgument>()))
+      return false;
+    
+    // Inverting the result because matchFunctionRepresentations
+    // returns false in conversions are allowed.
+    return !isConversionAllowedBetween(rep1, rep2);
+  }
 
   case ConstraintKind::OpaqueUnderlyingType:
-  case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::ArgumentConversion:
@@ -1657,7 +1691,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   if (matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
                                    func2->getExtInfo().getRepresentation(),
-                                   kind)) {
+                                   kind, locator)) {
     return getTypeMatchFailure(locator);
   }
 
@@ -2425,9 +2459,9 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 static bool isStringCompatiblePointerBaseType(ASTContext &ctx,
                                               Type baseType) {
   // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
-  if (baseType->isEqual(TypeChecker::getInt8Type(ctx)))
+  if (baseType->isEqual(ctx.getInt8Decl()->getDeclaredInterfaceType()))
     return true;
-  if (baseType->isEqual(TypeChecker::getUInt8Type(ctx)))
+  if (baseType->isEqual(ctx.getUInt8Decl()->getDeclaredInterfaceType()))
     return true;
   if (baseType->isEqual(ctx.TheEmptyTupleType))
     return true;
@@ -3046,11 +3080,12 @@ bool ConstraintSystem::repairFailures(
     // default values, let's see whether error is related to missing
     // explicit call.
     if (fnType->getNumParams() > 0) {
-      auto anchor = simplifyLocatorToAnchor(getConstraintLocator(locator));
-      if (!anchor.is<Expr *>())
+      auto *loc = getConstraintLocator(locator);
+      auto *anchor = getAsExpr(simplifyLocatorToAnchor(loc));
+      if (!anchor)
         return false;
 
-      auto overload = findSelectedOverloadFor(getAsExpr(anchor));
+      auto overload = findSelectedOverloadFor(anchor);
       if (!(overload && overload->choice.isDecl()))
         return false;
 
@@ -4924,7 +4959,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
                 auto &ctx = getASTContext();
-                if (type1->isEqual(TypeChecker::getStringType(ctx))) {
+                if (type1->isEqual(
+                        ctx.getStringDecl()->getDeclaredInterfaceType())) {
                   auto baseTy = getFixedTypeRecursive(pointeeTy, false);
 
                   if (baseTy->isTypeVariableOrMember() ||
@@ -6887,6 +6923,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                         TVO_CanBindToLValue |
                                         TVO_CanBindToNoEscape);
       Type optTy = TypeChecker::getOptionalType(SourceLoc(), innerTV);
+      assert(!optTy->hasError());
       SmallVector<Constraint *, 2> optionalities;
       auto nonoptionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
@@ -6930,6 +6967,54 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                      SolutionKind::Solved;
             })) {
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
+    // If base is an archetype or metatype of archetype, check for an unintended
+    // extra generic parameter.
+    if (auto archetype =
+            baseTy->getMetatypeInstanceType()->getAs<ArchetypeType>()) {
+      if (auto genericTy =
+              archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
+        for (auto param :
+             archetype->getGenericEnvironment()->getGenericParams()) {
+          // Find a param at the same depth and one index past the type we're
+          // dealing with
+          if (param->getDepth() != genericTy->getDepth() ||
+              param->getIndex() != genericTy->getIndex() + 1)
+            continue;
+          auto paramDecl = param->getDecl();
+          if (!paramDecl)
+            continue;
+
+          auto descriptor = UnqualifiedLookupDescriptor(
+              DeclNameRef(param->getName()),
+              paramDecl->getDeclContext()->getParentForLookup(),
+              paramDecl->getStartLoc(),
+              UnqualifiedLookupFlags::KnownPrivate |
+                  UnqualifiedLookupFlags::TypeLookup);
+          auto lookup = evaluateOrDefault(
+              Context.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+          for (auto &result : lookup) {
+            if (auto proto =
+                    dyn_cast_or_null<ProtocolDecl>(result.getValueDecl())) {
+              auto result =
+                  baseTy->is<MetatypeType>()
+                      ? solveWithNewBaseOrName(ExistentialMetatypeType::get(
+                                                   proto->getDeclaredType()),
+                                               member)
+                      : solveWithNewBaseOrName(proto->getDeclaredType(),
+                                               member);
+              if (result == SolutionKind::Solved)
+                return recordFix(
+                           DefineMemberBasedOnUnintendedGenericParam::create(
+                               *this, baseTy, member, param->getName(),
+                               locator))
+                           ? SolutionKind::Error
+                           : SolutionKind::Solved;
+            }
+          }
+        }
+      }
     }
 
     if (auto *funcType = baseTy->getAs<FunctionType>()) {
@@ -7172,6 +7257,24 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
+  // Determine whether a function builder will be applied.
+  Type functionBuilderType;
+  ConstraintLocator *calleeLocator = nullptr;
+  if (auto last = locator.last()) {
+    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
+      calleeLocator = getCalleeLocator(getConstraintLocator(locator));
+      functionBuilderType = getFunctionBuilderTypeFor(
+          *this, argToParam->getParamIdx(), calleeLocator);
+    }
+  }
+
+  // Determine whether to introduce one-way constraints between the parameter's
+  // type as seen in the body of the closure and the external parameter
+  // type.
+  bool oneWayConstraints =
+    getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters ||
+    functionBuilderType;
+
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
@@ -7185,9 +7288,6 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
 
     Type internalType;
-
-    bool oneWayConstraints =
-      getASTContext().TypeCheckerOpts.EnableOneWayClosureParameters;
     if (paramList->get(i)->getTypeRepr()) {
       // Internal type is the type used in the body of the closure,
       // so "external" type translates to it as follows:
@@ -7238,17 +7338,12 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                         inferredClosureType->getExtInfo());
   assignFixedType(typeVar, closureType, closureLocator);
 
-  if (auto last = locator.last()) {
-    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
-      auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
-      if (auto functionBuilderType = getFunctionBuilderTypeFor(
-              *this, argToParam->getParamIdx(), calleeLocator)) {
-        if (auto result = matchFunctionBuilder(
-                closure, functionBuilderType, closureType->getResult(),
-                ConstraintKind::Conversion, calleeLocator, locator)) {
-          return result->isSuccess();
-        }
-      }
+  // If there is a function builder to apply, do so now.
+  if (functionBuilderType) {
+    if (auto result = matchFunctionBuilder(
+            closure, functionBuilderType, closureType->getResult(),
+            ConstraintKind::Conversion, calleeLocator, locator)) {
+      return result->isSuccess();
     }
   }
 
@@ -9162,11 +9257,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         auto &ctx = getASTContext();
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2,
-                                          TypeChecker::getInt8Type(ctx),
+                                          ctx.getInt8Decl()->getDeclaredInterfaceType(),
                                           getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                            baseType2,
-                                           TypeChecker::getUInt8Type(ctx),
+                                           ctx.getUInt8Decl()->getDeclaredInterfaceType(),
                                            getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2, ctx.TheEmptyTupleType,

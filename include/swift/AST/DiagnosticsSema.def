@@ -94,6 +94,9 @@ ERROR(could_not_find_enum_case,none,
 
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
+     
+NOTE(did_you_mean_generic_param_as_conformance,none,
+     "did you mean to declare %0 as a protocol conformance for %1?", (DeclName, Type))
 
 NOTE(any_as_anyobject_fixit, none,
      "cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members", ())
@@ -2666,6 +2669,9 @@ ERROR(enum_non_integer_convertible_raw_type_no_value,none,
       "expressible by integer or string literal", ())
 ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
+ERROR(enum_raw_value_magic_literal,none,
+      "use of '%0' literal as raw value for enum case is not supported",
+      (StringRef))
 NOTE(enum_raw_value_used_here,none,
      "raw value previously used here", ())
 NOTE(enum_raw_value_incrementing_from_here,none,

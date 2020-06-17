@@ -222,7 +222,7 @@ TEST(ArithmeticEvaluator, Simple) {
   LangOptions opts;
   opts.DebugDumpCycles = false;
   opts.BuildRequestDependencyGraph = true;
-  opts.EnableExperientalPrivateIntransitiveDependencies = false;
+  opts.DirectIntramoduleDependencies = false;
   Evaluator evaluator(diags, opts);
   evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
@@ -349,7 +349,7 @@ TEST(ArithmeticEvaluator, Cycle) {
   LangOptions opts;
   opts.DebugDumpCycles = false;
   opts.BuildRequestDependencyGraph = false;
-  opts.EnableExperientalPrivateIntransitiveDependencies = false;
+  opts.DirectIntramoduleDependencies = false;
   Evaluator evaluator(diags, opts);
   evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);

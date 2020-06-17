@@ -121,15 +121,7 @@ void RequirementRepr::dump() const {
   llvm::errs() << "\n";
 }
 
-void RequirementRepr::printImpl(ASTPrinter &out, bool AsWritten) const {
-  auto printTy = [&](const TypeLoc &TyLoc) {
-    if (AsWritten && TyLoc.getTypeRepr()) {
-      TyLoc.getTypeRepr()->print(out, PrintOptions());
-    } else {
-      TyLoc.getType().print(out, PrintOptions());
-    }
-  };
-
+void RequirementRepr::printImpl(ASTPrinter &out) const {
   auto printLayoutConstraint =
       [&](const LayoutConstraintLoc &LayoutConstraintLoc) {
         LayoutConstraintLoc.getLayoutConstraint()->print(out, PrintOptions());
@@ -137,31 +129,41 @@ void RequirementRepr::printImpl(ASTPrinter &out, bool AsWritten) const {
 
   switch (getKind()) {
   case RequirementReprKind::LayoutConstraint:
-    printTy(getSubjectLoc());
+    if (auto *repr = getSubjectRepr()) {
+      repr->print(out, PrintOptions());
+    }
     out << " : ";
     printLayoutConstraint(getLayoutConstraintLoc());
     break;
 
   case RequirementReprKind::TypeConstraint:
-    printTy(getSubjectLoc());
+    if (auto *repr = getSubjectRepr()) {
+      repr->print(out, PrintOptions());
+    }
     out << " : ";
-    printTy(getConstraintLoc());
+    if (auto *repr = getConstraintRepr()) {
+      repr->print(out, PrintOptions());
+    }
     break;
 
   case RequirementReprKind::SameType:
-    printTy(getFirstTypeLoc());
+    if (auto *repr = getFirstTypeRepr()) {
+      repr->print(out, PrintOptions());
+    }
     out << " == ";
-    printTy(getSecondTypeLoc());
+    if (auto *repr = getSecondTypeRepr()) {
+      repr->print(out, PrintOptions());
+    }
     break;
   }
 }
 
 void RequirementRepr::print(raw_ostream &out) const {
   StreamPrinter printer(out);
-  printImpl(printer, /*AsWritten=*/true);
+  printImpl(printer);
 }
 void RequirementRepr::print(ASTPrinter &out) const {
-  printImpl(out, /*AsWritten=*/true);
+  printImpl(out);
 }
 
 static void printTrailingRequirements(ASTPrinter &Printer,
@@ -479,9 +481,9 @@ namespace {
     void visitTypedPattern(TypedPattern *P) {
       printCommon(P, "pattern_typed") << '\n';
       printRec(P->getSubPattern());
-      if (P->getTypeLoc().getTypeRepr()) {
+      if (auto *repr = P->getTypeRepr()) {
         OS << '\n';
-        printRec(P->getTypeLoc().getTypeRepr());
+        printRec(repr);
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -489,7 +491,7 @@ namespace {
     void visitIsPattern(IsPattern *P) {
       printCommon(P, "pattern_is")
         << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
-      P->getCastTypeLoc().getType().print(OS);
+      P->getCastType().print(OS);
       if (auto sub = P->getSubPattern()) {
         OS << '\n';
         printRec(sub);
@@ -514,8 +516,7 @@ namespace {
     void visitEnumElementPattern(EnumElementPattern *P) {
       printCommon(P, "pattern_enum_element");
       OS << ' ';
-      P->getParentType().getType().print(
-        PrintWithColorRAII(OS, TypeColor).getOS());
+      P->getParentType().print(PrintWithColorRAII(OS, TypeColor).getOS());
       PrintWithColorRAII(OS, IdentifierColor) << '.' << P->getName();
       if (P->hasSubPattern()) {
         OS << '\n';
@@ -1781,18 +1782,18 @@ class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
   raw_ostream &OS;
   llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
-  llvm::function_ref<Type(TypeLoc &)> GetTypeOfTypeLoc;
+  llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
   llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
       GetTypeOfKeyPathComponent;
   unsigned Indent;
 
   PrintExpr(raw_ostream &os, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
-            llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
+            llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr,
             llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                 getTypeOfKeyPathComponent,
             unsigned indent)
       : OS(os), GetTypeOfExpr(getTypeOfExpr),
-        GetTypeOfTypeLoc(getTypeOfTypeLoc),
+        GetTypeOfTypeRepr(getTypeOfTypeRepr),
         GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent), Indent(indent) {}
 
   void printRec(Expr *E) {
@@ -2607,7 +2608,10 @@ public:
     if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
       OS << getCheckedCastKindName(checkedCast->getCastKind()) << ' ';
     OS << "writtenType='";
-    GetTypeOfTypeLoc(E->getCastTypeLoc()).print(OS);
+    if (GetTypeOfTypeRepr)
+      GetTypeOfTypeRepr(E->getCastTypeRepr()).print(OS);
+    else
+      E->getCastType().print(OS);
     OS << "'\n";
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -2872,21 +2876,22 @@ void Expr::dump() const {
 }
 
 void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
-                llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
+                llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr,
                 llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
-  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent, Indent)
+  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent,
+            Indent)
       .visit(const_cast<Expr *>(this));
 }
 
 void Expr::dump(raw_ostream &OS, unsigned Indent) const {
   auto getTypeOfExpr = [](Expr *E) -> Type { return E->getType(); };
-  auto getTypeOfTypeLoc = [](TypeLoc &TL) -> Type { return TL.getType(); };
   auto getTypeOfKeyPathComponent = [](KeyPathExpr *E, unsigned index) -> Type {
     return E->getComponents()[index].getComponentType();
   };
-  dump(OS, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent, Indent);
+  dump(OS, getTypeOfExpr, /*getTypeOfTypeRepr*/ nullptr,
+       getTypeOfKeyPathComponent, Indent);
 }
 
 void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {

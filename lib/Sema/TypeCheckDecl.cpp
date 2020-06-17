@@ -838,7 +838,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
+  if (decl->isFinal() || decl->shouldUseObjCDispatch() || decl->hasClangNode())
     return false;
 
   auto &ctx = dc->getASTContext();
@@ -868,7 +868,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 
   auto base = decl->getOverriddenDecl();
 
-  if (!base || base->hasClangNode() || base->isObjCDynamic())
+  if (!base || base->hasClangNode() || base->shouldUseObjCDispatch())
     return true;
 
   // As above, convenience initializers are not formally overridable in Swift
@@ -1082,6 +1082,21 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     if (ED->LazySemanticInfo.hasFixedRawValues())
       continue;
 
+    // Using magic literals like #file as raw value is not supported right now.
+    // TODO: We could potentially support #file, #function, #line and #column.
+    auto &Diags = ED->getASTContext().Diags;
+    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
+                            ? elt->getLoc()
+                            : uncheckedRawValueOf(elt)->getLoc();
+    if (auto magicLiteralExpr =
+            dyn_cast<MagicIdentifierLiteralExpr>(prevValue)) {
+      auto kindString =
+          magicLiteralExpr->getKindString(magicLiteralExpr->getKind());
+      Diags.diagnose(diagLoc, diag::enum_raw_value_magic_literal, kindString);
+      elt->setInvalid();
+      continue;
+    }
+
     // Check that the raw value is unique.
     RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};
@@ -1091,9 +1106,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       continue;
 
     // Diagnose the duplicate value.
-    auto &Diags = ED->getASTContext().Diags;
-    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
-        ? elt->getLoc() : uncheckedRawValueOf(elt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
     assert(lastExplicitValueElt &&
            "should not be able to have non-unique raw values when "
@@ -2101,7 +2113,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   if (decl->isVariadic()) {
     Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
-    if (Ty.isNull()) {
+    if (Ty->hasError()) {
       decl->setInvalid();
       return ErrorType::get(ctx);
     }

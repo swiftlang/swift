@@ -3759,7 +3759,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
                              diag::optional_check_promotion,
                              subExpr->getType())
             .highlight(subExpr->getSourceRange())
-            .fixItReplace(TP->getTypeLoc().getSourceRange(),
+            .fixItReplace(TP->getTypeRepr()->getSourceRange(),
                           ooType->getString());
           return;
         }
@@ -4286,7 +4286,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       if (!property)
         return;
       auto propertyVar = cast<VarDecl>(property);
-      if (propertyVar->isObjCDynamic() ||
+      if (propertyVar->shouldUseObjCDispatch() ||
           (propertyVar->isObjC() &&
            propertyVar->getParsedAccessor(AccessorKind::Set)))
         return;

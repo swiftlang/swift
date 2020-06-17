@@ -8,7 +8,7 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS, introduced: 10.15)
+@available(macOS, introduced: 10.14)
 public struct S {
   // Not possible: declarations cannot be more available than an enclosing scope
   // @available(macOS, introduced: 10.10)
@@ -20,11 +20,11 @@ public struct S {
   // GREATERTHAN-NEXT:     "domain": "macOS",
   // GREATERTHAN-NEXT:     "introduced": {
   // GREATERTHAN-NEXT:       "major": 10,
-  // GREATERTHAN-NEXT:       "minor": 16
+  // GREATERTHAN-NEXT:       "minor": 15
   // GREATERTHAN-NEXT:     }
   // GREATERTHAN-NEXT:   }
   // GREATERTHAN-NEXT: ]
-  @available(macOS, introduced: 10.16)
+  @available(macOS, introduced: 10.15)
   public func greaterThan() {}
 
   // EQUAL-LABEL: "precise": "s:18IntroducedReplaced1SV5equalyyF",
@@ -33,15 +33,15 @@ public struct S {
   // EQUAL-NEXT:     "domain": "macOS",
   // EQUAL-NEXT:     "introduced": {
   // EQUAL-NEXT:       "major": 10,
-  // EQUAL-NEXT:       "minor": 15
+  // EQUAL-NEXT:       "minor": 14
   // EQUAL-NEXT:     }
   // EQUAL-NEXT:   }
   // EQUAL-NEXT: ]
-  @available(macOS, introduced: 10.15)
+  @available(macOS, introduced: 10.14)
   public func equal() {}
 }
 
-@available(macOS, introduced: 10.15)
+@available(macOS, introduced: 10.14)
 public struct Outer {
   public struct Inner {
     // TRANSITIVEGREATERTHAN-LABEL: "precise": "s:18IntroducedReplaced5OuterV5InnerV11greaterThanyyF"
@@ -50,11 +50,11 @@ public struct Outer {
     // TRANSITIVEGREATERTHAN-NEXT:     "domain": "macOS",
     // TRANSITIVEGREATERTHAN-NEXT:     "introduced": {
     // TRANSITIVEGREATERTHAN-NEXT:       "major": 10,
-    // TRANSITIVEGREATERTHAN-NEXT:       "minor": 16
+    // TRANSITIVEGREATERTHAN-NEXT:       "minor": 15
     // TRANSITIVEGREATERTHAN-NEXT:     }
     // TRANSITIVEGREATERTHAN-NEXT:   }
     // TRANSITIVEGREATERTHAN-NEXT: ]
-    @available(macOS, introduced: 10.16)
+    @available(macOS, introduced: 10.15)
     public func greaterThan() {}
 
     // TRANSITIVEEQUAL-LABEL: precise": "s:18IntroducedReplaced5OuterV5InnerV5equalyyF"
@@ -63,11 +63,11 @@ public struct Outer {
     // TRANSITIVEEQUAL-NEXT:     "domain": "macOS",
     // TRANSITIVEEQUAL-NEXT:     "introduced": {
     // TRANSITIVEEQUAL-NEXT:       "major": 10,
-    // TRANSITIVEEQUAL-NEXT:       "minor": 15
+    // TRANSITIVEEQUAL-NEXT:       "minor": 14
     // TRANSITIVEEQUAL-NEXT:     }
     // TRANSITIVEEQUAL-NEXT:   }
     // TRANSITIVEEQUAL-NEXT: ]
-    @available(macOS, introduced: 10.15)
+    @available(macOS, introduced: 10.14)
     public func equal() {}
   }
 }

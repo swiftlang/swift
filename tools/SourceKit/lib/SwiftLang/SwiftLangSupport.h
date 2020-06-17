@@ -387,6 +387,8 @@ public:
 
   static Optional<UIdent> getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
 
+  static SourceKit::UIdent getUIDForFormalAccessScope(const swift::AccessScope Scope);
+
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 
   static SourceKit::UIdent getUIDForNameKind(swift::ide::NameKind Kind);
@@ -424,14 +426,18 @@ public:
                                              swift::Type BaseTy,
                                              llvm::raw_ostream &OS);
 
+  static void printFullyAnnotatedDeclaration(const swift::ExtensionDecl *VD,
+                                             llvm::raw_ostream &OS);
+
   static void
   printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
                                             swift::TypeOrExtensionDecl Target,
                                             llvm::raw_ostream &OS);
 
   static void
-  printFullyAnnotatedGenericReq(const swift::GenericSignature Sig,
-                                llvm::raw_ostream &OS);
+  printFullyAnnotatedSynthesizedDeclaration(const swift::ExtensionDecl *ED,
+                                            swift::TypeOrExtensionDecl Target,
+                                            llvm::raw_ostream &OS);
 
   /// Print 'description' or 'sourcetext' the given \p VD to \p OS. If
   /// \p usePlaceholder is \c true, call argument positions are substituted with

@@ -80,6 +80,9 @@ import SubE
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "A"
 // CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "_cross_import_E"
+// CHECK-NEXT: }
 
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":

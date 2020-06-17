@@ -9,3 +9,14 @@ let resultPlus = lhs + rhs
 let resultMinus = lhs - rhs
 let resultStar = lhs * rhs
 let resultSlash = lhs / rhs
+let resultPercent = lhs % rhs
+let resultAmp = lhs & rhs
+let resultPipe = lhs | rhs
+let resultLessLess = lhs << rhs
+let resultGreaterGreater = lhs >> rhs
+
+var lhsBool = BoolBox(value: true)
+var rhsBool = BoolBox(value: false)
+
+let resultAmpAmp = lhsBool && rhsBool
+let resultPipePipe = lhsBool && rhsBool

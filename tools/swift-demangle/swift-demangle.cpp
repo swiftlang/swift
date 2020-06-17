@@ -76,6 +76,11 @@ Classify("classify",
 
 /// Options that are primarily used for testing.
 /// \{
+static llvm::cl::opt<bool> DisplayLocalNameContexts(
+    "display-local-name-contexts", llvm::cl::init(true),
+    llvm::cl::desc("Qualify local names"),
+    llvm::cl::Hidden);
+
 static llvm::cl::opt<bool> DisplayStdlibModule(
     "display-stdlib-module", llvm::cl::init(true),
     llvm::cl::desc("Qualify types originating from the Swift standard library"),
@@ -255,6 +260,7 @@ int main(int argc, char **argv) {
   options.DisplayStdlibModule = DisplayStdlibModule;
   options.DisplayObjCModule = DisplayObjCModule;
   options.HidingCurrentModule = HidingModule;
+  options.DisplayLocalNameContexts = DisplayLocalNameContexts;
 
   if (InputNames.empty()) {
     CompactMode = true;

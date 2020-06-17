@@ -1005,7 +1005,7 @@ public:
       // @objc dynamic initializers are statically dispatched (we're
       // calling the allocating entry point, which is a thunk that
       // does the dynamic dispatch for us).
-      if (ctor->isObjCDynamic())
+      if (ctor->shouldUseObjCDispatch())
         return false;
 
       // Required constructors are statically dispatched when the 'self'
@@ -4963,17 +4963,26 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
-                                                      SILValue array) {
+                                                      ManagedValue array) {
   auto &Ctx = getASTContext();
-  auto finalize = Ctx.getFinalizeUninitializedArray();
+  FuncDecl *finalize = Ctx.getFinalizeUninitializedArray();
+  
+  // The _finalizeUninitializedArray function only needs to be called if the
+  // library contains it.
+  // The Array implementation in the stdlib <= 5.3 does not use SIL COW
+  // support yet and therefore does not provide the _finalizeUninitializedArray
+  // intrinsic function.
+  if (!finalize)
+    return array;
 
-  CanType arrayTy = array->getType().getASTType();
+  SILValue arrayVal = array.forward(*this);
+  CanType arrayTy = arrayVal->getType().getASTType();
 
   // Invoke the intrinsic.
   auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                                    Ctx.getArrayDecl());
   RValue result = emitApplyOfLibraryIntrinsic(loc, finalize, subMap,
-                              ManagedValue::forUnmanaged(array),
+                              ManagedValue::forUnmanaged(arrayVal),
                               SGFContext());
   return std::move(result).getScalarValue();
 }

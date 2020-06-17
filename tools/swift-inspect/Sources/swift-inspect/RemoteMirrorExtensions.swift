@@ -63,6 +63,20 @@ extension SwiftReflectionContextRef {
     try throwError(str: errStr)
   }
 
+  func iterateMetadataAllocationBacktraces(
+    _ body: (swift_reflection_ptr_t, Int, UnsafePointer<swift_reflection_ptr_t>)
+            -> Void
+  ) throws {
+    var body = body
+    let errStr = swift_reflection_iterateMetadataAllocationBacktraces(self, {
+      let callPtr = $3!.bindMemory(to:
+        ((swift_reflection_ptr_t, Int, UnsafePointer<swift_reflection_ptr_t>)
+         -> Void).self, capacity: 1)
+      callPtr.pointee($0, $1, $2!)
+    }, &body)
+    try throwError(str: errStr)
+  }
+
   func metadataPointer(
     allocation: swift_metadata_allocation_t
   ) -> swift_reflection_ptr_t {
@@ -81,5 +95,14 @@ extension SwiftReflectionContextRef {
       allocations.append(.init(allocation_t: allocation_t))
     }
     return allocations
+  }
+
+  var allocationBacktraces: [swift_reflection_ptr_t: Backtrace] {
+    var backtraces: [swift_reflection_ptr_t: Backtrace] = [:]
+    try! iterateMetadataAllocationBacktraces { allocation, count, ptrs in
+      let array = Array(UnsafeBufferPointer(start: ptrs, count: count))
+      backtraces[allocation] = Backtrace(ptrs: array)
+    }
+    return backtraces
   }
 }

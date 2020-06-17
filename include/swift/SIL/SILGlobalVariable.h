@@ -53,7 +53,7 @@ private:
   
   /// The SIL location of the variable, which provides a link back to the AST.
   /// The variable only gets a location after it's been emitted.
-  Optional<SILLocation> Location;
+  const SILLocation Location;
 
   /// The linkage of the global variable.
   unsigned Linkage : NumSILLinkageBits;
@@ -67,12 +67,15 @@ private:
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
 
+  /// Whether or not this is a declaration.
+  unsigned IsDeclaration : 1;
+
+  /// Whether or not there is a valid SILLocation.
+  unsigned HasLocation : 1;
+
   /// The VarDecl associated with this SILGlobalVariable. Must by nonnull for
   /// language-level global variables.
   VarDecl *VDecl;
-
-  /// Whether or not this is a declaration.
-  bool IsDeclaration;
 
   /// If this block is not empty, the global variable has a static initializer.
   ///
@@ -132,20 +135,17 @@ public:
 
   VarDecl *getDecl() const { return VDecl; }
 
-  /// Initialize the source location of the function.
-  void setLocation(SILLocation L) { Location = L; }
-
   /// Check if the function has a location.
   /// FIXME: All functions should have locations, so this method should not be
   /// necessary.
   bool hasLocation() const {
-    return Location.hasValue();
+    return HasLocation;
   }
 
   /// Get the source location of the function.
   SILLocation getLocation() const {
-    assert(Location.hasValue());
-    return Location.getValue();
+    assert(HasLocation);
+    return Location;
   }
 
   /// Returns the value of the static initializer or null if the global has no

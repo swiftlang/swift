@@ -1,3 +1,4 @@
+// REQUIRES: fuzzer_runtime
 // RUN: %empty-directory(%t)
 
 

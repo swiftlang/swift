@@ -1,3 +1,4 @@
+import hashlib
 import textwrap
 from . import Classification  # noqa: I201
 from . import Token
@@ -143,34 +144,34 @@ def dedented_lines(description):
     return textwrap.dedent(description).split('\n')
 
 
-def hash_syntax_node(node):
+def digest_syntax_node(digest, node):
     # Hash into the syntax name and serialization code
-    result = hash((node.name, get_serialization_code(node.syntax_kind)))
+    digest.update(node.name)
+    digest.update(str(get_serialization_code(node.syntax_kind)))
     for child in node.children:
         # Hash into the expected child syntax
-        result = hash((result, child.syntax_kind))
+        digest.update(child.syntax_kind)
         # Hash into the child name
-        result = hash((result, child.name))
+        digest.update(child.name)
         # Hash into whether the child is optional
-        result = hash((result, child.is_optional))
-    return result
+        digest.update(str(child.is_optional))
 
 
-def hash_token_syntax(token):
+def digest_syntax_token(digest, token):
     # Hash into the token name and serialization code
-    return hash((token.name, token.serialization_code))
+    digest.update(token.name)
+    digest.update(str(token.serialization_code))
 
 
-def hash_trivia(trivia):
-    return hash((trivia.name, trivia.serialization_code, trivia.characters))
+def digest_trivia(digest, trivia):
+    digest.update(trivia.name)
+    digest.update(str(trivia.serialization_code))
+    digest.update(str(trivia.characters))
 
 
 def calculate_node_hash():
-    result = 0
-    for node in SYNTAX_NODES:
-        result = hash((result, hash_syntax_node(node)))
-    for token in SYNTAX_TOKENS:
-        result = hash((result, hash_token_syntax(token)))
-    for trivia in TRIVIAS:
-        result = hash((result, hash_trivia(trivia)))
-    return result
+    digest = hashlib.sha1()
+    map(lambda node: digest_syntax_node(digest, node), SYNTAX_NODES)
+    map(lambda token: digest_syntax_token(digest, token), SYNTAX_TOKENS)
+    map(lambda trivia: digest_trivia(digest, trivia), TRIVIAS)
+    return digest.hexdigest()

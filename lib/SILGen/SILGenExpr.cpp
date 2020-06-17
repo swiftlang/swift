@@ -1972,7 +1972,7 @@ static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
 }
 RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
-                         E->getCastTypeLoc().getType(), E->getCastKind());
+                         E->getCastType(), E->getCastKind());
   return emitBoolLiteral(SGF, E, isa, C);
 }
 
@@ -2117,7 +2117,7 @@ ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
   if (array.hasCleanup())
     SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Active);
 
-  return SGF.emitUninitializedArrayFinalization(loc, array.forward(SGF));
+  return SGF.emitUninitializedArrayFinalization(loc, std::move(array));
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {

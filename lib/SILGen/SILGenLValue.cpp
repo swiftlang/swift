@@ -1463,7 +1463,7 @@ namespace {
         auto setterInfo =
             SGF.getConstantInfo(SGF.getTypeExpansionContext(), setter);
         SILValue setterFRef;
-        if (setter.hasDecl() && setter.getDecl()->isObjCDynamic()) {
+        if (setter.hasDecl() && setter.getDecl()->shouldUseObjCDispatch()) {
           // Emit a thunk we might have to bridge arguments.
           auto foreignSetterThunk = setter.asForeign(false);
           setterFRef =

@@ -372,7 +372,7 @@ namespace swift {
 
     /// Whether to enable a more aggressive mode of incremental dependency
     /// gathering that never captures cascading edges.
-    bool EnableExperientalPrivateIntransitiveDependencies = false;
+    bool DirectIntramoduleDependencies = true;
 
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;

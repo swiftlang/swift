@@ -1181,7 +1181,7 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   // If the function should not be differentiated or its the array literal
   // initialization intrinsic, just do standard cloning.
   if (!differentialInfo.shouldDifferentiateApplySite(ai) ||
-      isArrayLiteralIntrinsic(ai)) {
+      ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC)) {
     LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
     TypeSubstCloner::visitApplyInst(ai);
     return;
