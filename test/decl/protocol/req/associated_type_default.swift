@@ -34,3 +34,9 @@ protocol P4 {
 }
 
 struct X4 : P4 {} // expected-error{{type 'X4' does not conform to protocol 'P4'}}
+
+// rdar://62355224 - circularity check for default type was over-eager
+protocol Seq {
+  associatedtype SubSeq: Seq
+  associatedtype Index = SubSeq.Index
+}
