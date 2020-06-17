@@ -165,8 +165,8 @@ class LocalizationInput : public llvm::yaml::Input {
         // YAML file isn't guaranteed to have diagnostics in order of their
         // declaration in `.def` files, to accommodate that we need to leave
         // holes in diagnostic array for diagnostics which haven't yet been
-        // localized and for the ones that
-        // have `DiagnosticNode::id` indicates their position.
+        // localized and for the ones that have `DiagnosticNode::id` 
+        // indicates their position.
         Seq[static_cast<unsigned>(current.id)] = std::move(current.msg);
       }
     }
