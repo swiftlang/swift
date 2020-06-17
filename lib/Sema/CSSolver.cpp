@@ -1406,8 +1406,8 @@ void ConstraintSystem::solveForCodeCompletion(
     SolverState state(cs, FreeTypeVariableBinding::Disallow);
 
     // Enable "diagnostic mode" by default, this means that
-    // solver would produce "fixed" solutions along side of
-    // valid ones, which helps code completion to rank choices.
+    // solver would produce "fixed" solutions alongside valid
+    // ones, which helps code completion to rank choices.
     state.recordFixes = true;
 
     cs.solveImpl(solutions);
