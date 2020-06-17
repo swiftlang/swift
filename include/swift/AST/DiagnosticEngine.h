@@ -654,7 +654,6 @@ namespace swift {
     std::string getMessageOr(DiagID id,
                              std::string defaultMessage) const override;
   };
-
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {

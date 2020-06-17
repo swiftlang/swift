@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticMessageFormat.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticMessageFormat.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -36,6 +37,8 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 
 using namespace swift;
 
@@ -162,7 +165,6 @@ class LocalizationInput : public llvm::yaml::Input {
         DiagnosticNode current;
         yamlize(io, current, true, Ctx);
         io.postflightElement(SaveInfo);
-
         // YAML file isn't guaranteed to have diagnostics in order of their
         // declaration in `.def` files, to accommodate that we need to leave
         // holes in diagnostic array for diagnostics which haven't yet been
@@ -369,7 +371,6 @@ YAMLLocalizationProducer::YAMLLocalizationProducer(std::string locale,
   auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(DiagnosticsFilePath);
   if (!FileBufOrErr)
     llvm_unreachable("Failed to read yaml file");
-
   llvm::MemoryBuffer *document = FileBufOrErr->get();
   LocalizationInput yin(document->getBuffer());
   yin >> diagnostics;
