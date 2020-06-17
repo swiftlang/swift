@@ -26,9 +26,7 @@ cake: InfixOperator ..*.. has been changed to a PrefixOperator
 cake: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
-cake: Class SwiftObjcClass has ObjC name change from OldObjCClass to NewObjCClass
 cake: Func S1.foo5(x:y:) has been renamed to Func foo5(x:y:z:)
-cake: Func SwiftObjcClass.foo(a:b:c:) has ObjC name change from OldObjCFool:OldObjCA:OldObjCB: to NewObjCFool:NewObjCA:NewObjCB:
 cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
@@ -54,7 +52,6 @@ cake: Accessor GlobalLetChangedToVar.Set() is a new API without @available attri
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API without @available attribute
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
 cake: Class C0 is a new API without @available attribute
-cake: Class C5 is now without @objc
 cake: Class C8 is a new API without @available attribute
 cake: Constructor C1.init(_:) is a new API without @available attribute
 cake: Constructor ClassWithMissingDesignatedInits.init() is a new API without @available attribute
@@ -62,7 +59,6 @@ cake: Constructor SubclassWithMissingDesignatedInits.init() is a new API without
 cake: Enum IceKind is now without @frozen
 cake: EnumElement FrozenKind.AddedCase is a new API without @available attribute
 cake: Func C1.foo1() is now not static
-cake: Func C5.dy_foo() is now with dynamic
 cake: Func FinalFuncContainer.NewFinalFunc() is now with final
 cake: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
 cake: Func Float.floatHigher() is a new API without @available attribute
@@ -94,8 +90,6 @@ cake: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored 
 /* Protocol Conformance Change */
 cake: Class C7 has added a conformance to an existing protocol P1
 cake: Class SuperClassChange has added a conformance to an existing protocol P1
-cake: Func ObjCProtocol.addOptional() is now an optional requirement
-cake: Func ObjCProtocol.removeOptional() is no longer an optional requirement
 cake: Protocol P3 has added inherited protocol P4
 cake: Protocol P3 has removed inherited protocol P2
 cake: Struct fixedLayoutStruct has added a conformance to an existing protocol P2
@@ -110,7 +104,6 @@ cake: Func RequiementChanges.addedFunc() has been added as a protocol requiremen
 cake: Var RequiementChanges.addedVar has been added as a protocol requirement
 
 /* Class Inheritance Change */
-cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType
 cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>
 cake: Class SuperClassRemoval has removed its super class cake.C3
 cake: Class SuperClassRemoval no longer inherits convenience inits from its superclass
