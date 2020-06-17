@@ -181,7 +181,7 @@ class LocalizationInput : public llvm::yaml::Input {
     llvm::yaml::EmptyContext Ctx;
     if (yin.setCurrentDocument()) {
       // If YAML file's format doesn't match the current format in
-      // DiagnosticMessageFormat, will through an error.
+      // DiagnosticMessageFormat, will throw an error.
       readYAML(yin, diagnostics, true, Ctx);
     }
 
