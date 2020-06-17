@@ -1730,7 +1730,8 @@ public:
       auto mentionsItself =
         defaultType.findIf([&](Type defaultType) {
           if (auto DMT = defaultType->getAs<DependentMemberType>()) {
-            return DMT->getAssocType() == AT;
+            return (DMT->getAssocType() == AT &&
+                    DMT->getBase()->isEqual(proto->getSelfInterfaceType()));
           }
           return false;
         });
