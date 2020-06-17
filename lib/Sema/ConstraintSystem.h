@@ -4731,17 +4731,16 @@ public:
   /// Construct and solve a system of constraints based on the given expression
   /// and its contextual information.
   ///
-  /// This menthod is designed to be used for code completion which means that
+  /// This method is designed to be used for code completion which means that
   /// it doesn't mutate given expression, even if there is a single valid
   /// solution, and constraint solver is allowed to produce partially correct
-  /// solutions, such solutions can have any number of holes in them, alongside
-  /// with valid ones.
+  /// solutions. Such solutions can have any number of holes in them.
   ///
   /// \param expr The expression involved in code completion.
   ///
   /// \param DC The declaration context this expression is found in.
   ///
-  /// \param contextualType The type expression is being converted to.
+  /// \param contextualType The type \p expr is being converted to.
   ///
   /// \param CTP When contextualType is specified, this indicates what
   /// the conversion is doing.
