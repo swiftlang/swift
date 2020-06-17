@@ -436,7 +436,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     importedModules.insert(import.importedModule);
 
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
-  for (auto &module : ctxt.LoadedModules) {
+  for (const auto &module : ctxt.getLoadedModules()) {
     ModuleDecl *loadedDecl = module.second;
     if (!loadedDecl)
       llvm::report_fatal_error("Expected loaded modules to be non-null.");
@@ -690,7 +690,7 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
   C.NumLinkLibraries = Instance.getLinkLibraries().size();
 
   auto const &AST = Instance.getASTContext();
-  C.NumLoadedModules = AST.LoadedModules.size();
+  C.NumLoadedModules = AST.getNumLoadedModules();
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -1229,9 +1229,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   auto action = Instance.getInvocation().getFrontendOptions().RequestedAction;
   if (FrontendOptions::shouldActionOnlyParse(action) &&
       action != FrontendOptions::ActionType::EmitImportedModules) {
-    assert(ctx.LoadedModules.size() == 1 &&
+    assert(ctx.getNumLoadedModules() == 1 &&
            "Loaded a module during parse-only");
-    assert(ctx.LoadedModules.front().second == Instance.getMainModule());
+    assert(ctx.getLoadedModules().begin()->second == Instance.getMainModule());
   }
 
   // Verify the AST for all the modules we've loaded.
