@@ -701,6 +701,11 @@ class BuildScriptInvocation(object):
                 "--host-lipo", toolchain.lipo,
             ]
 
+            # Isolate build from the system; Darwin toolchains build against SDKs.
+            args.extra_cmake_options.append(
+                '-DCMAKE_IGNORE_PATH=/usr/lib;/usr/local/lib;/lib'
+            )
+
         if toolchain.libtool is not None:
             impl_args += [
                 "--host-libtool", toolchain.libtool,

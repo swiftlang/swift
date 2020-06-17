@@ -1942,7 +1942,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         "${cmake_options[@]}"
 
                         -DSQLite3_INCLUDE_DIR:PATH="$(xcrun -sdk macosx -show-sdk-path)/usr/include"
-                        -DSQLite3_LIBRARY:PATH="/usr/lib/libsqlite3.dylib"
                     )
                 fi
                 ;;
