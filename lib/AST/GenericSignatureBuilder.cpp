@@ -2370,43 +2370,6 @@ Type ResolvedType::getDependentType(GenericSignatureBuilder &builder) const {
   return result->isTypeParameter() ? result : Type();
 }
 
-/// If there is a same-type requirement to be added for the given nested type
-/// due to a superclass constraint on the parent type, add it now.
-static void maybeAddSameTypeRequirementForNestedType(
-                                          ResolvedType nested,
-                                          const RequirementSource *superSource,
-                                          GenericSignatureBuilder &builder) {
-  // If there's no super conformance, we're done.
-  if (!superSource) return;
-
-  // If the nested type is already concrete, we're done.
-  if (nested.getAsConcreteType()) return;
-
-  // Dig out the associated type.
-  AssociatedTypeDecl *assocType = nullptr;
-  if (auto depMemTy =
-        nested.getDependentType(builder)->getAs<DependentMemberType>())
-    assocType = depMemTy->getAssocType();
-  else
-    return;
-
-  // Dig out the type witness.
-  auto superConformance = superSource->getProtocolConformance().getConcrete();
-  auto concreteType = superConformance->getTypeWitness(assocType);
-  if (!concreteType) return;
-
-  // We should only have interface types here.
-  assert(!superConformance->getType()->hasArchetype());
-  assert(!concreteType->hasArchetype());
-
-  // Add the same-type constraint.
-  auto nestedSource = superSource->viaParent(builder, assocType);
-
-  builder.addSameTypeRequirement(
-        nested.getUnresolvedType(), concreteType, nestedSource,
-        GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints);
-}
-
 auto PotentialArchetype::getOrCreateEquivalenceClass(
                                        GenericSignatureBuilder &builder) const
     -> EquivalenceClass * {
@@ -2542,7 +2505,9 @@ static void concretizeNestedTypeFromConcreteParent(
   // If we don't already have a conformance of the parent to this protocol,
   // add it now; it was elided earlier.
   if (parentEquiv->conformsTo.count(proto) == 0) {
-    auto source = parentEquiv->concreteTypeConstraints.front().source;
+    auto source = (!isSuperclassConstrained
+                   ? parentEquiv->concreteTypeConstraints.front().source
+                   : parentEquiv->superclassConstraints.front().source);
     parentEquiv->recordConformanceConstraint(builder, parent, proto, source);
   }
 
@@ -2572,7 +2537,7 @@ static void concretizeNestedTypeFromConcreteParent(
   if (conformance.isConcrete()) {
     witnessType =
       conformance.getConcrete()->getTypeWitness(assocType);
-    if (!witnessType || witnessType->hasError())
+    if (!witnessType)
       return; // FIXME: should we delay here?
   } else if (auto archetype = concreteParent->getAs<ArchetypeType>()) {
     witnessType = archetype->getNestedType(assocType->getName());
@@ -2593,18 +2558,9 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     return nullptr;
 
   // Always refer to the archetype anchor.
-  if (assocType)
-    assocType = assocType->getAssociatedTypeAnchor();
-
-  // If we were asked for a complete, well-formed archetype, make sure we
-  // process delayed requirements if anything changed.
-  SWIFT_DEFER {
-    if (kind == ArchetypeResolutionKind::CompleteWellFormed)
-      builder.processDelayedRequirements();
-  };
+  assocType = assocType->getAssociatedTypeAnchor();
 
   Identifier name = assocType->getName();
-  auto *proto = assocType->getProtocol();
 
   // Look for either an unresolved potential archetype (which we can resolve
   // now) or a potential archetype with the appropriate associated type.
@@ -2646,21 +2602,18 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
   // If we have a potential archetype that requires more processing, do so now.
   if (shouldUpdatePA) {
-    // If there's a superclass constraint that conforms to the protocol,
-    // add the appropriate same-type relationship.
-    if (proto) {
-      if (auto superSource = builder.resolveSuperConformance(this, proto)) {
-        maybeAddSameTypeRequirementForNestedType(resultPA, superSource,
-                                                 builder);
-      }
-    }
-
     // We know something concrete about the parent PA, so we need to propagate
     // that information to this new archetype.
-    if (isConcreteType()) {
-      concretizeNestedTypeFromConcreteParent(this, resultPA, builder);
+    if (auto equivClass = getEquivalenceClassIfPresent()) {
+      if (equivClass->concreteType || equivClass->superclass)
+        concretizeNestedTypeFromConcreteParent(this, resultPA, builder);
     }
   }
+
+  // If we were asked for a complete, well-formed archetype, make sure we
+  // process delayed requirements if anything changed.
+  if (kind == ArchetypeResolutionKind::CompleteWellFormed)
+    builder.processDelayedRequirements();
 
   return resultPA;
 }
@@ -3512,16 +3465,20 @@ GenericSignatureBuilder::lookupConformance(CanType dependentType,
 }
 
 /// Resolve any unresolved dependent member types using the given builder.
-static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
-                                        Type type) {
+static Type resolveDependentMemberTypes(
+                                GenericSignatureBuilder &builder,
+                                Type type,
+                                ArchetypeResolutionKind resolutionKind
+                                  = ArchetypeResolutionKind::WellFormed) {
   if (!type->hasTypeParameter()) return type;
 
-  return type.transformRec([&builder](TypeBase *type) -> Optional<Type> {
+  return type.transformRec([&resolutionKind,
+                            &builder](TypeBase *type) -> Optional<Type> {
     if (!type->isTypeParameter())
       return None;
 
     auto resolved = builder.maybeResolveEquivalenceClass(
-        Type(type), ArchetypeResolutionKind::WellFormed, true);
+        Type(type), resolutionKind, true);
 
     if (!resolved)
       return ErrorType::get(Type(type));
@@ -3546,7 +3503,8 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
         equivClass->recursiveConcreteType = false;
       };
 
-      return resolveDependentMemberTypes(builder, equivClass->concreteType);
+      return resolveDependentMemberTypes(builder, equivClass->concreteType,
+                                         resolutionKind);
     }
 
     return equivClass->getAnchor(builder, builder.getGenericParams());
@@ -3583,50 +3541,29 @@ static Type getStructuralType(TypeDecl *typeDecl, bool keepSugar) {
   return typeDecl->getDeclaredInterfaceType();
 }
 
-static Type substituteConcreteType(GenericSignatureBuilder &builder,
-                                   PotentialArchetype *basePA,
+static Type substituteConcreteType(Type parentType,
                                    TypeDecl *concreteDecl) {
+  if (parentType->is<ErrorType>())
+    return parentType;
+
   assert(concreteDecl);
 
   auto *dc = concreteDecl->getDeclContext();
-  auto *proto = dc->getSelfProtocolDecl();
 
   // Form an unsubstituted type referring to the given type declaration,
   // for use in an inferred same-type requirement.
   auto type = getStructuralType(concreteDecl, /*keepSugar=*/true);
 
-  SubstitutionMap subMap;
-  if (proto) {
-    // Substitute in the type of the current PotentialArchetype in
-    // place of 'Self' here.
-    auto parentType = basePA->getDependentType(builder.getGenericParams());
-
-    subMap = SubstitutionMap::getProtocolSubstitutions(
-        proto, parentType, ProtocolConformanceRef(proto));
-  } else {
-    // Substitute in the superclass type.
-    auto parentPA = basePA->getEquivalenceClassIfPresent();
-    auto parentType =
-        parentPA->concreteType ? parentPA->concreteType : parentPA->superclass;
-    auto parentDecl = parentType->getAnyNominal();
-
-    subMap = parentType->getContextSubstitutionMap(
-        parentDecl->getParentModule(), dc);
-  }
+  auto subMap = parentType->getContextSubstitutionMap(
+      dc->getParentModule(), dc);
 
   return type.subst(subMap);
-};
+}
 
 ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind,
                                     bool wantExactPotentialArchetype) {
-  // An error type is best modeled as an unresolved potential archetype, since
-  // there's no way to be sure what it is actually meant to be.
-  if (type->is<ErrorType>()) {
-    return ResolvedType::forUnresolved(nullptr);
-  }
-
   // The equivalence class of a generic type is known directly.
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
     unsigned index = GenericParamKey(genericParam).findIndexIn(
@@ -3648,8 +3585,11 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                    wantExactPotentialArchetype);
     if (!resolvedBase) return resolvedBase;
     // If the base is concrete, so is this member.
-    if (resolvedBase.getAsConcreteType())
-      return ResolvedType::forConcrete(type);
+    if (auto parentType = resolvedBase.getAsConcreteType()) {
+      auto concreteType = substituteConcreteType(parentType,
+                                                 depMemTy->getAssocType());
+      return ResolvedType::forConcrete(concreteType);
+    }
 
     // Find the nested type declaration for this.
     auto baseEquivClass = resolvedBase.getEquivalenceClass(*this);
@@ -3666,66 +3606,91 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       basePA = baseEquivClass->members.front();
     }
 
-    AssociatedTypeDecl *nestedTypeDecl = nullptr;
     if (auto assocType = depMemTy->getAssocType()) {
       // Check whether this associated type references a protocol to which
-      // the base conforms. If not, it's unresolved.
-      if (baseEquivClass->conformsTo.find(assocType->getProtocol())
+      // the base conforms. If not, it's either concrete or unresolved.
+      auto *proto = assocType->getProtocol();
+      if (baseEquivClass->conformsTo.find(proto)
           == baseEquivClass->conformsTo.end()) {
-        if (!baseEquivClass->concreteType ||
-            !lookupConformance(type->getCanonicalType(),
-                               baseEquivClass->concreteType,
-                               assocType->getProtocol())) {
+        if (baseEquivClass->concreteType &&
+            lookupConformance(type->getCanonicalType(),
+                              baseEquivClass->concreteType,
+                              proto)) {
+          // Fall through
+        } else if (baseEquivClass->superclass &&
+                   lookupConformance(type->getCanonicalType(),
+                                     baseEquivClass->superclass,
+                                     proto)) {
+          // Fall through
+        } else {
           return ResolvedType::forUnresolved(baseEquivClass);
+        }
+
+        // FIXME: Instead of falling through, we ought to return a concrete
+        // type here, but then we fail to update a nested PotentialArchetype
+        // if one happens to already exist. It would be cleaner if concrete
+        // types never had nested PotentialArchetypes.
+      }
+
+      auto nestedPA =
+        basePA->updateNestedTypeForConformance(*this, assocType,
+                                               resolutionKind);
+      if (!nestedPA)
+        return ResolvedType::forUnresolved(baseEquivClass);
+
+      // If base resolved to the anchor, then the nested potential archetype
+      // we found is the resolved potential archetype. Return it directly,
+      // so it doesn't need to be resolved again.
+      if (basePA == resolvedBase.getPotentialArchetypeIfKnown())
+        return ResolvedType(nestedPA);
+
+      // Compute the resolved dependent type to return.
+      Type resolvedBaseType = resolvedBase.getDependentType(*this);
+      Type resolvedMemberType =
+          DependentMemberType::get(resolvedBaseType, assocType);
+
+      return ResolvedType(resolvedMemberType,
+                          nestedPA->getOrCreateEquivalenceClass(*this));
+    } else {
+      auto *concreteDecl =
+          baseEquivClass->lookupNestedType(*this, depMemTy->getName());
+
+      if (!concreteDecl)
+        return ResolvedType::forUnresolved(baseEquivClass);
+
+      Type parentType;
+      auto *proto = concreteDecl->getDeclContext()->getSelfProtocolDecl();
+      if (!proto) {
+        parentType = (baseEquivClass->concreteType
+                      ? baseEquivClass->concreteType
+                      : baseEquivClass->superclass);
+      } else {
+        if (baseEquivClass->concreteType &&
+            lookupConformance(type->getCanonicalType(),
+                              baseEquivClass->concreteType,
+                              proto)) {
+          parentType = baseEquivClass->concreteType;
+        } else if (baseEquivClass->superclass &&
+                   lookupConformance(type->getCanonicalType(),
+                                     baseEquivClass->superclass,
+                                     proto)) {
+          parentType = baseEquivClass->superclass;
+        } else {
+          parentType = basePA->getDependentType(getGenericParams());
         }
       }
 
-      nestedTypeDecl = assocType;
-    } else {
-      auto *typeAlias =
-          baseEquivClass->lookupNestedType(*this, depMemTy->getName());
-
-      if (!typeAlias)
-        return ResolvedType::forUnresolved(baseEquivClass);
-
-      auto type = substituteConcreteType(*this, basePA, typeAlias);
-      return maybeResolveEquivalenceClass(type, resolutionKind,
+      auto concreteType = substituteConcreteType(parentType, concreteDecl);
+      return maybeResolveEquivalenceClass(concreteType, resolutionKind,
                                           wantExactPotentialArchetype);
     }
-
-    auto nestedPA =
-      basePA->updateNestedTypeForConformance(*this, nestedTypeDecl,
-                                             resolutionKind);
-    if (!nestedPA)
-      return ResolvedType::forUnresolved(baseEquivClass);
-
-    // If base resolved to the anchor, then the nested potential archetype
-    // we found is the resolved potential archetype. Return it directly,
-    // so it doesn't need to be resolved again.
-    if (basePA == resolvedBase.getPotentialArchetypeIfKnown())
-      return ResolvedType(nestedPA);
-
-    // Compute the resolved dependent type to return.
-    Type resolvedBaseType = resolvedBase.getDependentType(*this);
-    Type resolvedMemberType;
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(nestedTypeDecl)) {
-      resolvedMemberType =
-        DependentMemberType::get(resolvedBaseType, assocType);
-    } else {
-      // Note: strange case that might not even really be dependent.
-      resolvedMemberType =
-        DependentMemberType::get(resolvedBaseType, depMemTy->getName());
-    }
-
-    return ResolvedType(resolvedMemberType,
-                         nestedPA->getOrCreateEquivalenceClass(*this));
   }
 
   // If it's not a type parameter, it won't directly resolve to one.
   // FIXME: Generic typealiases contradict the assumption above.
   // If there is a type parameter somewhere in this type, resolve it.
   if (type->hasTypeParameter()) {
-    Type resolved = resolveDependentMemberTypes(*this, type);
+    Type resolved = resolveDependentMemberTypes(*this, type, resolutionKind);
     if (resolved->hasError() && !type->hasError())
       return ResolvedType::forUnresolved(nullptr);
 
@@ -3753,7 +3718,7 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
     return ResolvedType(pa);
 
   // Determine what kind of resolution we want.
-  Type type = paOrT.dyn_cast<Type>();
+  Type type = paOrT.get<Type>();
   ArchetypeResolutionKind resolutionKind =
     ArchetypeResolutionKind::WellFormed;
   if (!source.isExplicit() && source.isRecursive(type, *this))
@@ -5521,7 +5486,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
       // Don't allow a generic parameter to be equivalent to a concrete type,
       // because then we don't actually have a parameter.
       auto equivClass = rep->getOrCreateEquivalenceClass(*this);
-      if (equivClass->concreteType) {
+      if (equivClass->concreteType &&
+          !equivClass->concreteType->is<ErrorType>()) {
         if (auto constraint = equivClass->findAnyConcreteConstraintAsWritten()){
           Impl->HadAnyError = true;
 
