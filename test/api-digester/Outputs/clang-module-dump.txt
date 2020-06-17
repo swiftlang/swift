@@ -327,6 +327,45 @@
         {
           "kind": "Constructor",
           "name": "init",
+          "printedName": "init(cake:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoBracketSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoBracketSettings",
+                  "printedName": "Foo.PhotoBracketSettings",
+                  "usr": "c:objc(cs)PhotoBracketSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoSettings(im)initWithCake:",
+          "moduleName": "Foo",
+          "overriding": true,
+          "implicit": true,
+          "objc_name": "initWithCake:",
+          "declAttributes": [
+            "Override",
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "Designated"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
           "printedName": "init()",
           "children": [
             {
@@ -468,6 +507,42 @@
             "Dynamic"
           ],
           "init_kind": "ConvenienceFactory"
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(cake:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Foo.PhotoSettings?",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "PhotoSettings",
+                  "printedName": "Foo.PhotoSettings",
+                  "usr": "c:objc(cs)PhotoSettings"
+                }
+              ],
+              "usr": "s:Sq"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int32",
+              "printedName": "Swift.Int32",
+              "usr": "s:s5Int32V"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)PhotoSettings(im)initWithCake:",
+          "moduleName": "Foo",
+          "objc_name": "initWithCake:",
+          "declAttributes": [
+            "ObjC",
+            "Dynamic"
+          ],
+          "init_kind": "Designated"
         },
         {
           "kind": "Constructor",

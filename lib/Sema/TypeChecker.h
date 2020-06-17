@@ -700,6 +700,17 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
                                           DeclRefKind refKind,
                                           ConcreteDeclRef &refdDecl);
 
+/// Type check the given expression and provide results back to code completion
+/// via specified callback.
+///
+/// This menthod is designed to be used for code completion which means that
+/// it doesn't mutate AST and constraint solver is allowed to produce partially
+/// correct solutions, such solutions can have any number of holes in them,
+/// alongside with valid ones.
+void typeCheckForCodeCompletion(
+    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+    llvm::function_ref<void(const constraints::Solution &)> callback);
+
 /// Check the key-path expression.
 ///
 /// Returns the type of the last component of the key-path.
