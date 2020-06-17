@@ -19,7 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticMessageFormat.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticMessageFormat.h"
 #include "swift/AST/Module.h"
@@ -37,8 +36,6 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/YAMLTraits.h"
 
 using namespace swift;
 
