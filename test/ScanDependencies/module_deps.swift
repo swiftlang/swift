@@ -17,29 +17,6 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/deps.json
 
-// RUN: mkdir -p %t/BuildModules
-// RUN: cp %S/Inputs/BuildModulesFromGraph.swift %t/BuildModules/main.swift
-// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/BuildModules/main.swift -o %t/ModuleBuilder
-// RUN: %target-codesign %t/ModuleBuilder
-
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path SwiftShims.pcm -o %t/clang-module-cache/SwiftShims.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/SwiftShims.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.pcm -o %t/clang-module-cache/A.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/A.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path B.pcm -o %t/clang-module-cache/B.pcm -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/A.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/B.pcm
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path C.pcm -o %t/clang-module-cache/C.pcm -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/B.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/C.pcm
-
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.swiftmodule -o %t/clang-module-cache/A.swiftmodule -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/A.pcm -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/SwiftShims.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/A.swiftmodule
-
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path E.swiftmodule -o %t/clang-module-cache/E.swiftmodule -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/SwiftShims.pcm | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/E.swiftmodule
-
-// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path SubE.swiftmodule -o %t/clang-module-cache/SubE.swiftmodule -Xcc -Xclang -Xcc -fmodule-map-file=%S/Inputs/CHeaders/module.modulemap -Xcc -Xclang -Xcc -fmodule-file=%t/clang-module-cache/SwiftShims.pcm -swift-module-file %t/clang-module-cache/E.swiftmodule | %S/Inputs/CommandRunner.py
-// RUN: ls %t/clang-module-cache/SubE.swiftmodule
-
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -83,6 +60,13 @@ import SubE
 // CHECK-NEXT: {
 // CHECK-NEXT:   "swift": "_cross_import_E"
 // CHECK-NEXT: }
+// CHECK-NEXT: ],
+
+// CHECK:      "extraPcmArgs": [
+// CHECK-NEXT:    "-Xcc",
+// CHECK-NEXT:    "-target",
+// CHECK-NEXT:    "-Xcc",
+// CHECK:         "-fapinotes-swift-version=4"
 
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
@@ -151,7 +135,11 @@ import SubE
 // CHECK: "G"
 // CHECK: "-swift-version"
 // CHECK: "5"
-// CHECK: ]
+// CHECK: ],
+// CHECK" "extraPcmArgs": [
+// CHECK"   "-target",
+// CHECK"   "-fapinotes-swift-version=5"
+// CHECK" ]
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "Swift.swiftmodule",

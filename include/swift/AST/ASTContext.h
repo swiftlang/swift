@@ -254,11 +254,6 @@ public:
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
 
-  /// The set of top-level modules we have loaded.
-  /// This map is used for iteration, therefore it's a MapVector and not a
-  /// DenseMap.
-  llvm::MapVector<Identifier, ModuleDecl*> LoadedModules;
-
   /// The builtin module.
   ModuleDecl * const TheBuiltinModule;
 
@@ -787,7 +782,23 @@ public:
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
 
+public:
   namelookup::ImportCache &getImportCache() const;
+
+  /// Returns an iterator over the modules that are known by this context
+  /// to be loaded.
+  ///
+  /// Iteration order is guaranteed to match the order in which
+  /// \c addLoadedModule was called to register the loaded module
+  /// with this context.
+  iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
+  getLoadedModules() const;
+
+  /// Returns the number of loaded modules known by this context to be loaded.
+  unsigned getNumLoadedModules() const {
+    auto eltRange = getLoadedModules();
+    return std::distance(eltRange.begin(), eltRange.end());
+  }
 
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
@@ -828,6 +839,11 @@ public:
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
 
+  /// Insert an externally-sourced module into the set of known loaded modules
+  /// in this context.
+  void addLoadedModule(ModuleDecl *M);
+
+public:
   /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.

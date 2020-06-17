@@ -399,16 +399,16 @@ enum Color {
   static func rainbow() -> Color {}
   
   static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
-  // expected-note@-1 {{candidate has partially matching parameter list (a: Int)}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
   static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
-  // expected-note@-1 {{candidate has partially matching parameter list (b: Int)}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
 }
 
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
-// expected-error@-1 {{cannot infer contextual base in reference to member 'Unknown'}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) })
+// expected-error@-1 {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
@@ -1117,8 +1117,10 @@ func platypus<T>(a: [T]) {
 // Another case of the above.
 func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
+  // Notes, attached to declarations, explain that there is a difference between Array.init(_:) and
+  // RangeReplaceableCollection.init(_:) which are both applicable in this case.
   let array = [Int](sequence)
-  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Int' and '[Int]' be equivalent}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
 }
 
 // rdar://34357545
@@ -1248,10 +1250,9 @@ func f11(_ n: Int) {}
 func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
 f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
 
-// FIXME: Arguably we should also prefer the conformance failure in this case.
-let f12: (Int) -> Void = { _ in }
-func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}
-f12(3, f4)// expected-error {{extra argument in call}}
+let f12: (Int) -> Void = { _ in } // expected-note {{candidate '(Int) -> Void' requires 1 argument, but 2 were provided}}
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' == 'P2')}}
+f12(3, f4)// expected-error {{no exact matches in call to global function 'f12'}}
 
 // SR-12242
 struct SR_12242_R<Value> {}

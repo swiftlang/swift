@@ -156,6 +156,11 @@ struct ASTContext::Implementation {
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
+  /// The set of top-level modules we have loaded.
+  /// This map is used for iteration, therefore it's a MapVector and not a
+  /// DenseMap.
+  llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
+
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
@@ -1538,8 +1543,18 @@ ModuleDecl *ASTContext::getLoadedModule(
   return nullptr;
 }
 
+iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
+ASTContext::getLoadedModules() const {
+  return {getImpl().LoadedModules.begin(), getImpl().LoadedModules.end()};
+}
+
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
-  return LoadedModules.lookup(ModuleName);
+  return getImpl().LoadedModules.lookup(ModuleName);
+}
+
+void ASTContext::addLoadedModule(ModuleDecl *M) {
+  assert(M);
+  getImpl().LoadedModules[M->getName()] = M;
 }
 
 static AllocationArena getArena(GenericSignature genericSig) {

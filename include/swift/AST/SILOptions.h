@@ -161,10 +161,6 @@ public:
   /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 
-  /// Should the default pass pipelines strip ownership during the diagnostic
-  /// pipeline or after serialization.
-  bool StripOwnershipAfterSerialization = true;
-
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;

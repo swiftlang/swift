@@ -358,8 +358,6 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 }
 
 func sr12426(a: Any, _ str: String?) {
-  a == str // expected-error {{cannot convert value of type 'Any' to expected argument type 'String'}}
-  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
-  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  a == str // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (String, String)}}
 }

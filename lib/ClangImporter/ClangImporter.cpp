@@ -1829,9 +1829,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   if (clangModule->isSubModule()) {
     finishLoadingClangModule(clangModule->getTopLevelModule(), importLoc);
   } else {
-    ModuleDecl *&loaded = SwiftContext.LoadedModules[result->getName()];
-    if (!loaded)
-      loaded = result;
+
+    if (!SwiftContext.getLoadedModule(result->getName()))
+      SwiftContext.addLoadedModule(result);
   }
 
   return result;
@@ -3372,10 +3372,12 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     if (overlay == M) {
       overlay = nullptr;
     } else {
-      auto &sharedModuleRef = Ctx.LoadedModules[M->getName()];
+      // FIXME: This bizarre and twisty invariant is due to nested
+      // re-entrancy in both clang module loading and overlay module loading.
+      auto *sharedModuleRef = Ctx.getLoadedModule(M->getName());
       assert(!sharedModuleRef || sharedModuleRef == overlay ||
              sharedModuleRef == M);
-      sharedModuleRef = overlay;
+      Ctx.addLoadedModule(overlay);
     }
 
     auto mutableThis = const_cast<ClangModuleUnit *>(this);

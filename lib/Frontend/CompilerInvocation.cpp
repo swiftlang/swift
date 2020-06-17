@@ -1088,7 +1088,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.StripOwnershipAfterSerialization |= Args.hasArg(OPT_enable_ownership_stripping_after_serialization);
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
 
@@ -1292,6 +1291,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);
+  }
+
+  for (auto A : Args.getAllArgValues(options::OPT_coverage_prefix_map)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.CoveragePrefixMap.addMapping(SplitMap.first, SplitMap.second);
   }
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
