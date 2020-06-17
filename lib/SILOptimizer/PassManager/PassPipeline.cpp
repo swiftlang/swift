@@ -275,6 +275,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // splits up copy_addr.
   P.addCopyForwarding();
 
+  // Optimize copies from a temporary (an "l-value") to a destination.
+  P.addTempLValueOpt();
+
   // Split up opaque operations (copy_addr, retain_value, etc.).
   P.addLowerAggregateInstrs();
 
