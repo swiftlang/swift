@@ -1360,7 +1360,7 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   assert(BuildArgs.size() == GenericArgs.size());
   // Configure inputs
   subInvocation.getFrontendOptions().InputsAndOutputs
-    .addPrimaryInputFile(interfacePath);
+    .addInputFile(interfacePath);
   BuildArgs.push_back(interfacePath);
   subInvocation.setModuleName(moduleName);
   BuildArgs.push_back("-module-name");
@@ -1377,13 +1377,12 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
   }
 
   // Configure the outputs in front-end options. There must be an equal number of
-  // primary inputs and outputs.
-  auto N = subInvocation.getFrontendOptions().InputsAndOutputs
-    .primaryInputCount();
-  std::vector<std::string> outputFiles(N, "/<unused>");
+  // inputs and outputs.
+  std::vector<std::string> outputFiles{"/<unused>"};
+  std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
   ModuleOutputPaths.emplace_back();
   ModuleOutputPaths.back().ModuleOutputPath = outputPath.str();
-  assert(N == ModuleOutputPaths.size());
+  assert(subInvocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
