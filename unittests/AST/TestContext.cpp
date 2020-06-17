@@ -40,7 +40,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
   auto *module = ModuleDecl::create(stdlibID, Ctx);
-  Ctx.LoadedModules[stdlibID] = module;
+  Ctx.addLoadedModule(module);
 
   FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
                                         /*buffer*/ None);
