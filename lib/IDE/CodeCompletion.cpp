@@ -6170,15 +6170,33 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         if (analyzedExpr->getEndLoc() != CodeCompleteTokenExpr->getLoc())
           break;
 
-        // If the call expression doesn't have a type, infer it from the
-        // possible callee info.
         Type resultTy = analyzedExpr->getType();
-        if (!resultTy) {
-          if (ContextInfo.getPossibleCallees().empty())
-            break;
-          auto calleeInfo = ContextInfo.getPossibleCallees()[0];
-          resultTy = calleeInfo.Type->getResult();
-          analyzedExpr->setType(resultTy);
+        // If the call expression doesn't have a type, fallback to:
+        if (!resultTy || resultTy->is<ErrorType>()) {
+          // 1) Try to type check removing CodeCompletionExpr from the call.
+          Expr *removedExpr = analyzedExpr;
+          removeCodeCompletionExpr(CurDeclContext->getASTContext(),
+                                   removedExpr);
+          ConcreteDeclRef referencedDecl;
+          auto optT = getTypeOfCompletionContextExpr(
+              CurDeclContext->getASTContext(), CurDeclContext,
+              CompletionTypeCheckKind::Normal, removedExpr, referencedDecl);
+          if (optT) {
+            resultTy = *optT;
+            analyzedExpr->setType(resultTy);
+          }
+        }
+        if (!resultTy || resultTy->is<ErrorType>()) {
+          // 2) Infer it from the possible callee info.
+          if (!ContextInfo.getPossibleCallees().empty()) {
+            auto calleeInfo = ContextInfo.getPossibleCallees()[0];
+            resultTy = calleeInfo.Type->getResult();
+            analyzedExpr->setType(resultTy);
+          }
+        }
+        if (!resultTy || resultTy->is<ErrorType>()) {
+          // 3) Give up providing postfix completions.
+          break;
         }
 
         auto &SM = CurDeclContext->getASTContext().SourceMgr;

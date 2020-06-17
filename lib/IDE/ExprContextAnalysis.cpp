@@ -12,6 +12,7 @@
 
 #include "ExprContextAnalysis.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
@@ -192,6 +193,81 @@ Expr *swift::ide::findParsedExpr(const DeclContext *DC,
   ExprFinder finder(DC->getASTContext().SourceMgr, TargetRange);
   const_cast<DeclContext *>(DC)->walkContext(finder);
   return finder.get();
+}
+
+//===----------------------------------------------------------------------===//
+// removeCodeCompletionExpr(ASTContext, Expr)
+//===----------------------------------------------------------------------===//
+
+namespace {
+// TODO: Implement other expressions?
+class CCExprRemover: public ASTWalker, public ExprVisitor<CCExprRemover, Expr *> {
+  ASTContext &Ctx;
+
+public:
+  bool Removed = false;
+
+  CCExprRemover(ASTContext &Ctx) : Ctx(Ctx) {}
+
+  Expr *visitCallExpr(CallExpr *E) {
+    SourceLoc lParenLoc, rParenLoc;
+    SmallVector<Identifier, 2> argLabels;
+    SmallVector<SourceLoc, 2> argLabelLocs;
+    SmallVector<Expr *, 2> args;
+    SmallVector<TrailingClosure, 2> trailingClosures;
+    bool removing = false;
+
+    if (auto paren = dyn_cast<ParenExpr>(E->getArg())) {
+      if (isa<CodeCompletionExpr>(paren->getSubExpr())) {
+        lParenLoc = paren->getLParenLoc();
+        rParenLoc = paren->getRParenLoc();
+        removing = true;
+      }
+    } else if (auto tuple = dyn_cast<TupleExpr>(E->getArg())) {
+      lParenLoc = tuple->getLParenLoc();
+      rParenLoc = tuple->getRParenLoc();
+      for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i) {
+        if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
+          removing = true;
+          continue;
+        }
+
+        if (i < E->getUnlabeledTrailingClosureIndex()) {
+          // Normal arguments.
+          argLabels.push_back(E->getArgumentLabels()[i]);
+          argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
+          args.push_back(tuple->getElement(i));
+        } else {
+          // Trailing closure arguments.
+          trailingClosures.emplace_back(E->getArgumentLabels()[i],
+                                        E->getArgumentLabelLocs()[i],
+                                        tuple->getElement(i));
+        }
+      }
+    }
+    if (removing) {
+      Removed = true;
+      return CallExpr::create(Ctx, E->getFn(), lParenLoc, args, argLabels,
+                              argLabelLocs, rParenLoc, trailingClosures,
+                              E->isImplicit());
+    }
+    return E;
+  }
+
+  Expr *visitExpr(Expr *E) {
+    return E;
+  }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    return {true, visit(E)};
+  }
+};
+}
+
+bool swift::ide::removeCodeCompletionExpr(ASTContext &Ctx, Expr *&expr) {
+  CCExprRemover remover(Ctx);
+  expr = expr->walk(remover);
+  return remover.Removed;
 }
 
 //===----------------------------------------------------------------------===//
