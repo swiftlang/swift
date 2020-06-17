@@ -2,7 +2,7 @@
 // clean directory, put the source there, and cd into it.
 // RUN: rm -rf %t
 // RUN: mkdir -p %t/foo/bar/baz
-// RUN: cp %s %t/foo/bar/baz/coverage_relative_path.swift
+// RUN: echo "func coverage() {}" > %t/foo/bar/baz/coverage_relative_path.swift
 // RUN: cd %t/foo/bar
 
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -Xllvm -enable-name-compression=false -emit-ir %/t/foo/bar/baz/coverage_relative_path.swift | %FileCheck -check-prefix=ABSOLUTE %s
