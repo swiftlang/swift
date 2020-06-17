@@ -40,8 +40,10 @@ func dumpRawMetadata(
 ) throws {
   let backtraces = backtraceStyle != nil ? context.allocationBacktraces : [:]
   for allocation in context.allocations {
+    let tagNameC = swift_reflection_metadataAllocationTagName(context, allocation.tag)
+    let tagName = tagNameC.map(String.init) ?? "<unknown>"
     print("Metadata allocation at: \(hex: allocation.ptr) " +
-          "size: \(allocation.size) tag: \(allocation.tag)")
+          "size: \(allocation.size) tag: \(allocation.tag) (\(tagName))")
     printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
   }
 }
