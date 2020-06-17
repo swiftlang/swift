@@ -202,6 +202,19 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
   return !path.empty();
 }
 
+static bool findXcodeClangLibPath(const Twine &libName,
+                                  llvm::SmallVectorImpl<char> &path) {
+  assert(path.empty());
+
+  if (!findXcodeClangPath(path)) {
+    return false;
+  }
+  llvm::sys::path::remove_filename(path); // 'clang'
+  llvm::sys::path::remove_filename(path); // 'bin'
+  llvm::sys::path::append(path, "lib", libName);
+  return true;
+}
+
 static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
                              unsigned major, unsigned minor, unsigned micro) {
   llvm::SmallString<8> buf;
@@ -239,12 +252,15 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfos.push_back(
-        {Arguments.back(), file_types::TY_Object,
+        {Arguments.back(), context.OI.CompilerOutputType,
          FilelistInfo::WhichFiles::InputJobsAndSourceInputActions});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_LLVM_BC);
     addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+    addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
   }
 
 
@@ -274,11 +290,7 @@ static void findARCLiteLibPath(const toolchains::Darwin &TC,
     // If we don't have a 'lib/arc/' directory, find the "arclite" library
     // relative to the Clang in the active Xcode.
     ARCLiteLib.clear();
-    if (findXcodeClangPath(ARCLiteLib)) {
-      llvm::sys::path::remove_filename(ARCLiteLib); // 'clang'
-      llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-      llvm::sys::path::append(ARCLiteLib, "lib", "arc");
-    }
+    findXcodeClangLibPath("arc", ARCLiteLib);
   }
 }
 
@@ -304,6 +316,15 @@ toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
     // Arclite depends on CoreFoundation.
     Arguments.push_back("-framework");
     Arguments.push_back("CoreFoundation");
+  }
+}
+
+void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
+                                       const JobContext &context) const {
+  llvm::SmallString<128> LTOLibPath;
+  if (findXcodeClangLibPath("libLTO.dylib", LTOLibPath)) {
+    Arguments.push_back("-lto_library");
+    Arguments.push_back(context.Args.MakeArgString(LTOLibPath));
   }
 }
 
@@ -761,6 +782,10 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
 
   addArgsToLinkARCLite(Arguments, context);
 
+  if (job.shouldPerformLTO()) {
+    addLTOLibArgs(Arguments, context);
+  }
+
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
     Arguments.push_back("-F");
@@ -828,14 +853,17 @@ toolchains::Darwin::constructInvocation(const StaticLinkJobAction &job,
   if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
+    II.FilelistInfos.push_back({Arguments.back(), context.OI.CompilerOutputType,
                                 FilelistInfo::WhichFiles::InputJobs});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_LLVM_BC);
   }
 
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
 
   Arguments.push_back("-o");
 
