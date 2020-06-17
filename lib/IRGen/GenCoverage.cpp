@@ -18,7 +18,6 @@
 #include "IRGenModule.h"
 #include "SwiftTargetInfo.h"
 
-#include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
@@ -61,7 +60,6 @@ void IRGenModule::emitCoverageMapping() {
     if (std::find(Files.begin(), Files.end(), M->getFile()) == Files.end())
       Files.push_back(M->getFile());
 
-  auto remapper = getOptions().CoveragePrefixMap;
   // Awkwardly munge absolute filenames into a vector of StringRefs.
   // TODO: This is heinous - the same thing is happening in clang, but the API
   // really needs to be cleaned up for both.
@@ -70,7 +68,7 @@ void IRGenModule::emitCoverageMapping() {
   for (StringRef Name : Files) {
     llvm::SmallString<256> Path(Name);
     llvm::sys::fs::make_absolute(Path);
-    FilenameStrs.push_back(remapper.remapPath(Path));
+    FilenameStrs.push_back(std::string(Path.begin(), Path.end()));
     FilenameRefs.push_back(FilenameStrs.back());
   }
 
