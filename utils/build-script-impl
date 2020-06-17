@@ -584,6 +584,12 @@ function set_build_options_for_host() {
 
             cmake_os_sysroot="$(xcrun --sdk ${platform} --show-sdk-path)"
 
+            # Give the SDK sysroot higher priority in calls to CMake `find_*`
+            # functions, over paths that may come from `pkg-config`. This fixes
+            # compile failures caused when `pkg-config` returns CommandLineTools
+            # paths instead of Xcode paths.
+            export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}:${cmake_os_sysroot}/usr"
+
             cmark_cmake_options=(
                 -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
                 -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
