@@ -167,7 +167,7 @@ class LocalizationInput : public llvm::yaml::Input {
         // holes in diagnostic array for diagnostics which haven't yet been
         // localized and for the ones that
         // have `DiagnosticNode::id` indicates their position.
-        Seq[static_cast<unsigned>(current.id)] = std::move(current);
+        Seq[static_cast<unsigned>(current.id)] = std::move(current.msg);
       }
     }
     io.endSequence();
@@ -376,7 +376,7 @@ YAMLLocalizationProducer::YAMLLocalizationProducer(std::string locale,
 std::string
 YAMLLocalizationProducer::getMessageOr(DiagID id,
                                        std::string defaultMessage) const {
-  std::string diagnosticMessage = diagnostics[(unsigned)id].msg;
+  std::string diagnosticMessage = diagnostics[(unsigned)id];
   if (diagnosticMessage.empty())
     return defaultMessage;
   return diagnosticMessage;

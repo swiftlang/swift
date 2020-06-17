@@ -649,7 +649,7 @@ namespace swift {
 
   class YAMLLocalizationProducer final : public LocalizationProducer {
   public:
-    std::vector<DiagnosticNode> diagnostics;
+    std::vector<std::string> diagnostics;
     explicit YAMLLocalizationProducer(std::string locale, std::string path);
     std::string getMessageOr(DiagID id,
                              std::string defaultMessage) const override;
