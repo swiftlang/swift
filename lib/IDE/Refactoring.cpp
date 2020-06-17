@@ -3451,7 +3451,9 @@ getDeclarationContextFromInfo(ResolvedCursorInfo Info) {
       return AddEquatableContext(NomDecl);
     }
   } else if (auto *ExtDecl = Info.ExtTyRef) {
-    return AddEquatableContext(ExtDecl);
+    if (ExtDecl->getExtendedNominal()) {
+      return AddEquatableContext(ExtDecl);
+    }
   }
   return AddEquatableContext();
 }
