@@ -2012,7 +2012,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     body = body->getSemanticsProvidingExpr();
 
     if (auto *openExistential = dyn_cast<OpenExistentialExpr>(body)) {
-      body = openExistential->getSubExpr();
+      body = openExistential->getSubExpr()->getSemanticsProvidingExpr();
     }
 
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
@@ -2032,7 +2032,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
       innerBody = innerBody->getSemanticsProvidingExpr();
 
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(innerBody)) {
-        innerBody = openExistential->getSubExpr();
+        innerBody = openExistential->getSubExpr()->getSemanticsProvidingExpr();
         if (auto *ICE = dyn_cast<ImplicitConversionExpr>(innerBody))
           innerBody = ICE->getSyntacticSubExpr();
       }
