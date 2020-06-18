@@ -1428,7 +1428,6 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
 }
 
 struct ExplicitSwiftModuleLoader::Implementation {
-
   // Information about explicitly specified Swift module files.
   struct ExplicitModuleInfo {
     // Path of the .swiftmodule file.
@@ -1451,44 +1450,48 @@ struct ExplicitSwiftModuleLoader::Implementation {
     return Saver.save(cast<llvm::yaml::ScalarNode>(N)->getValue(Buffer));
   }
 
-  bool parseSingleModuleEntry(llvm::yaml::KeyValueNode &node) {
+  bool parseSingleModuleEntry(llvm::yaml::Node &node) {
     using namespace llvm::yaml;
-    auto moduleName = getScalaNodeText(node.getKey());
-    auto insertRes = ExplicitModuleMap.insert({moduleName,
-      ExplicitModuleInfo()});
-    if (!insertRes.second) {
+    auto *mapNode = dyn_cast<MappingNode>(&node);
+    if (!mapNode)
       return true;
-    }
-    auto moduleDetails = dyn_cast<MappingNode>(node.getValue());
-    if (!moduleDetails)
-      return true;
-    for (auto &entry: *moduleDetails) {
+    StringRef moduleName;
+    ExplicitModuleInfo result;
+    for (auto &entry: *mapNode) {
       auto key = getScalaNodeText(entry.getKey());
       auto val = getScalaNodeText(entry.getValue());
-      if (key == "SwiftModulePath") {
-        insertRes.first->second.modulePath = val;
+      if (key == "SwiftModule") {
+        moduleName = val;
+      } else if (key == "SwiftModulePath") {
+        result.modulePath = val;
       } else if (key == "SwiftDocPath") {
-        insertRes.first->second.moduleDocPath = val;
+        result.moduleDocPath = val;
       } else if (key == "SwiftSourceInfoPath") {
-        insertRes.first->second.moduleSourceInfoPath = val;
+        result.moduleSourceInfoPath = val;
       } else {
-        return true;
+        // Being forgiving for future fields.
+        continue;
       }
     }
+    if (moduleName.empty())
+      return true;
+    ExplicitModuleMap[moduleName] = std::move(result);
     return false;
   }
-  //  {
-  //    "A": {
+  //  [
+  //    {
+  //      "SwiftModule": "A",
   //      "SwiftModulePath": "A.swiftmodule",
   //      "SwiftDocPath": "A.swiftdoc",
   //      "SwiftSourceInfoPath": "A.swiftsourceinfo"
   //    },
-  //    "B": {
+  //    {
+  //      "SwiftModule": "B",
   //      "SwiftModulePath": "B.swiftmodule",
   //      "SwiftDocPath": "B.swiftdoc",
   //      "SwiftSourceInfoPath": "B.swiftsourceinfo"
   //    }
-  //  }
+  //  ]
   void parseSwiftExplicitModuleMap(StringRef fileName) {
     using namespace llvm::yaml;
     // Load the input file.
@@ -1504,7 +1507,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
                         Ctx.SourceMgr.getLLVMSourceMgr());
     for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
       assert(DI != Stream.end() && "Failed to read a document");
-      if (auto *MN = dyn_cast_or_null<MappingNode>(DI->getRoot())) {
+      if (auto *MN = dyn_cast_or_null<SequenceNode>(DI->getRoot())) {
         for (auto &entry: *MN) {
           if (parseSingleModuleEntry(entry)) {
             Ctx.Diags.diagnose(SourceLoc(),
@@ -1559,8 +1562,12 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
   auto &fs = *Ctx.SourceMgr.getFileSystem();
   // Open .swiftmodule file
   auto moduleBuf = fs.getBufferForFile(moduleInfo.modulePath);
-  if (!moduleBuf)
+  if (!moduleBuf) {
+    // We cannot read the module content, diagnose.
+    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+                       moduleInfo.modulePath);
     return moduleBuf.getError();
+  }
   *ModuleBuffer = std::move(moduleBuf.get());
 
   // Open .swiftdoc file
