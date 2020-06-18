@@ -480,11 +480,11 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   return true;
 }
 
-static bool
+static void
 emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
                                              DependencyTracker *depTracker,
                                              const FrontendOptions &opts) {
-  return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         return emitLoadedModuleTraceIfNeeded(
           mainModule, depTracker, opts.PrebuiltModuleCachePath,
@@ -1154,14 +1154,21 @@ static void emitIndexData(const CompilerInstance &Instance) {
 
 /// Emits all "one-per-module" supplementary outputs that don't depend on
 /// anything past type-checking.
-///
-/// These are extracted out so that they can be invoked early when using
-/// `-typecheck`, but skipped for any mode that runs SIL diagnostics if there's
-/// an error found there (to get those diagnostics back to the user faster).
 static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
+
+  // FIXME: Whole-module outputs with a non-whole-module action ought to
+  // be disallowed, but the driver implements -index-file mode by generating a
+  // regular whole-module frontend command line and modifying it to index just
+  // one file (by making it a primary) instead of all of them. If that
+  // invocation also has flags to emit whole-module supplementary outputs, the
+  // compiler can crash trying to access information for non-type-checked
+  // declarations in the non-primary files. For now, prevent those crashes by
+  // guarding the emission of whole-module supplementary outputs.
+  if (!opts.InputsAndOutputs.isWholeModule())
+    return false;
 
   // Record whether we failed to emit any of these outputs, but keep going; one
   // failure does not mean skipping the rest.
@@ -1249,6 +1256,15 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 
   // Verify generic signatures if we've been asked to.
   verifyGenericSignaturesIfNeeded(Invocation, ctx);
+
+  // Emit any additional outputs that we only need for a successful compilation.
+  // We don't want to unnecessarily delay getting any errors back to the user.
+  if (!ctx.hadError()) {
+    emitLoadedModuleTraceForAllPrimariesIfNeeded(
+        Instance.getMainModule(), Instance.getDependencyTracker(), opts);
+    
+    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
+  }
 
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
@@ -1360,26 +1376,9 @@ static bool performCompile(CompilerInstance &Instance,
   if (Context.hadError())
     return true;
 
-  (void)emitLoadedModuleTraceForAllPrimariesIfNeeded(
-      Instance.getMainModule(), Instance.getDependencyTracker(), opts);
-
   // We've just been told to perform a typecheck, so we can return now.
-  if (Action == FrontendOptions::ActionType::Typecheck) {
-    // FIXME: Whole-module outputs with a non-whole-module -typecheck ought to
-    // be disallowed, but the driver implements -index-file mode by generating a
-    // regular whole-module frontend command line and modifying it to index just
-    // one file (by making it a primary) instead of all of them. If that
-    // invocation also has flags to emit whole-module supplementary outputs, the
-    // compiler can crash trying to access information for non-type-checked
-    // declarations in the non-primary files. For now, prevent those crashes by
-    // guarding the emission of whole-module supplementary outputs.
-    if (opts.InputsAndOutputs.isWholeModule()) {
-      if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance)) {
-        return true;
-      }
-    }
+  if (Action == FrontendOptions::ActionType::Typecheck)
     return false;
-  }
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
@@ -1648,8 +1647,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (observer)
     observer->performedSILProcessing(*SM);
-
-  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Context, MSF);
