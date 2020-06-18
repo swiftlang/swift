@@ -125,10 +125,10 @@ public:
 
   void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
-    ModuleDecl::ImportFilter ImportFilter;
-    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    constexpr ModuleDecl::ImportFilter ImportFilter = {
+        ModuleDecl::ImportFilterKind::Public,
+        ModuleDecl::ImportFilterKind::Private,
+        ModuleDecl::ImportFilterKind::ImplementationOnly};
 
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ImportFilter);

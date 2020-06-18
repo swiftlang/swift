@@ -100,13 +100,11 @@ static void printImports(raw_ostream &out,
                          ModuleDecl *M) {
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
-  ModuleDecl::ImportFilter allImportFilter;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
-
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  M->getImportedModules(allImports, allImportFilter);
+  M->getImportedModules(allImports,
+                        {ModuleDecl::ImportFilterKind::Public,
+                         ModuleDecl::ImportFilterKind::Private,
+                         ModuleDecl::ImportFilterKind::SPIAccessControl});
   ModuleDecl::removeDuplicateImports(allImports);
   diagnoseScopedImports(M->getASTContext().Diags, allImports);
 
