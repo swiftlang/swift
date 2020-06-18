@@ -1426,8 +1426,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Percent:
     case clang::OverloadedOperatorKind::OO_Amp:
     case clang::OverloadedOperatorKind::OO_Pipe:
+    case clang::OverloadedOperatorKind::OO_Less:
+    case clang::OverloadedOperatorKind::OO_Greater:
     case clang::OverloadedOperatorKind::OO_LessLess:
     case clang::OverloadedOperatorKind::OO_GreaterGreater:
+    case clang::OverloadedOperatorKind::OO_EqualEqual:
+    case clang::OverloadedOperatorKind::OO_ExclaimEqual:
+    case clang::OverloadedOperatorKind::OO_LessEqual:
+    case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe:
       if (auto FD = dyn_cast<clang::FunctionDecl>(D)) {
