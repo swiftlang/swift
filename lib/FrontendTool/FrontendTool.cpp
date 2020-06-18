@@ -199,10 +199,10 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
   return false;
 }
 
-static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
+static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
                                          const FrontendOptions &opts) {
-  return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &f) -> bool {
         return emitMakeDependenciesIfNeeded(diags, depTracker, opts, f);
       });
@@ -1253,6 +1253,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitIndexData(Instance);
+  emitMakeDependenciesIfNeeded(Instance.getDiags(),
+                               Instance.getDependencyTracker(), opts);
+
 }
 
 /// Performs the compile requested by the user.
@@ -1300,6 +1303,7 @@ static bool performCompile(CompilerInstance &Instance,
       performEndOfPipelineActions(Instance);
   };
 
+  auto &Context = Instance.getASTContext();
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
     // Parsing gets triggered lazily, but let's make sure we have the right
     // input kind.
@@ -1311,11 +1315,11 @@ static bool performCompile(CompilerInstance &Instance,
     (void)kind;
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
+    return Context.hadError();
   } else {
     Instance.performSema();
   }
 
-  ASTContext &Context = Instance.getASTContext();
   if (Action == FrontendOptions::ActionType::Parse) {
     // A -parse invocation only cares about the side effects of parsing, so
     // force the parsing of all the source files.
@@ -1326,16 +1330,8 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  if (Action == FrontendOptions::ActionType::ScanDependencies) {
-    scanDependencies(Instance);
-  }
-
-  (void)emitMakeDependenciesIfNeeded(Instance.getDiags(),
-                                     Instance.getDependencyTracker(), opts);
-
-  if (Action == FrontendOptions::ActionType::ResolveImports ||
-      Action == FrontendOptions::ActionType::ScanDependencies)
-    return Context.hadError();
+  if (Action == FrontendOptions::ActionType::ScanDependencies)
+    return scanDependencies(Instance);
 
   if (observer)
     observer->performedSemanticAnalysis(Instance);
