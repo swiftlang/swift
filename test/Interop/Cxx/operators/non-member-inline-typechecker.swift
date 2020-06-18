@@ -14,6 +14,12 @@ let resultAmp = lhs & rhs
 let resultPipe = lhs | rhs
 let resultLessLess = lhs << rhs
 let resultGreaterGreater = lhs >> rhs
+let resultLess = lhs < rhs
+let resultGreater = lhs > rhs
+let resultEqualEqual = lhs == rhs
+let resultExclaimEqual = lhs != rhs
+let resultLessEqual = lhs <= rhs
+let resultGreaterEqual = lhs >= rhs
 
 var lhsBool = BoolBox(value: true)
 var rhsBool = BoolBox(value: false)
