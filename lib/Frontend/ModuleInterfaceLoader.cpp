@@ -1223,7 +1223,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // FIXME: we shouldn't need this. Remove it?
   StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   subInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
-    explictSwiftModuleMap;
+    explictSwiftModuleMap.str();
   if (!explictSwiftModuleMap.empty()) {
     GenericArgs.push_back("-explicit-swift-module-map-file");
     GenericArgs.push_back(explictSwiftModuleMap);
