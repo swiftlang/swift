@@ -238,3 +238,10 @@ func autoclosure1<T>(_: [T], _: X) { }
 func test_autoclosure1(ia: [Int]) {
   autoclosure1(ia, X()) // okay: resolves to the second function
 }
+
+// rdar://problem/64368545 - failed to produce diagnostic (hole propagated to func result without recording a fix)
+func test_no_hole_propagation() {
+  func test(withArguments arguments: [String]) -> String {
+    return arguments.reduce(0, +) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  }
+}
