@@ -3,6 +3,7 @@
 func callee(file: String = #file) {} // expected-note {{'file' declared here}}
 func callee(optFile: String? = #file) {} // expected-note {{'optFile' declared here}}
 func callee(arbitrary: String) {}
+func callee(filePath: String = #filePath) {}
 
 class SomeClass {
   static func callee(file: String = #file) {} // expected-note 2{{'file' declared here}}
@@ -39,6 +40,8 @@ func bad(function: String = #function) {
 // `#file`-defaulted argument.
 func good(file: String = #file) {
   callee(file: file)
+
+  callee(filePath: file)
 
   SomeClass.callee(file: file)
 

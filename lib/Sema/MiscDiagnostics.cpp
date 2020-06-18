@@ -442,6 +442,19 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           *calleeDefaultArg == *callerDefaultArg)
         return;
 
+      // If the caller passes #file and the callee expects #filePath, this is
+      // fine because:
+      //  - Right now, #file == #filePath
+      //  - There is no warning-free way to forward #file to #filePath (
+      //     https://bugs.swift.org/browse/SR-13041 and
+      //     https://bugs.swift.org/browse/SR-12934)
+      //  - Making #file != #filePath is source-breaking and would therefore
+      //    require a bump of `swift-version`
+      //    (https://bugs.swift.org/browse/SR-12936).
+      if (calleeDefaultArg == MagicIdentifierLiteralExpr::Kind::FilePath &&
+          callerDefaultArg == MagicIdentifierLiteralExpr::Kind::File)
+        return;
+
       StringRef calleeDefaultArgString =
           MagicIdentifierLiteralExpr::getKindString(*calleeDefaultArg);
       StringRef callerDefaultArgString =
