@@ -1665,7 +1665,8 @@ extension Collection where SubSequence == Self {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
     guard let idx = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
-      _preconditionFailure("Can't remove more items from a collection than it contains")
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
     }
     self = self[idx..<endIndex]
       "Can't remove more items from a collection than it contains")
