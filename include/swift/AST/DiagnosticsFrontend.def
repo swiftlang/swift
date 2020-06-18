@@ -251,6 +251,14 @@ ERROR(previous_installname_map_corrupted,none,
       "previous install name map from %0 is malformed",
       (StringRef))
 
+ERROR(explicit_swift_module_map_missing,none,
+      "cannot open explicit Swift module map from %0",
+      (StringRef))
+
+ERROR(explicit_swift_module_map_corrupted,none,
+      "explicit Swift module map from %0 is malformed",
+      (StringRef))
+
 REMARK(default_previous_install_name, none,
       "default previous install name for %0 is %1", (StringRef, StringRef))
 
