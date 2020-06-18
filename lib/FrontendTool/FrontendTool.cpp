@@ -682,8 +682,8 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   }
 }
 
-static void countStatsPostSema(UnifiedStatsReporter &Stats,
-                               CompilerInstance& Instance) {
+static void countASTStats(UnifiedStatsReporter &Stats,
+                          CompilerInstance& Instance) {
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
   C.NumSourceBuffers = SM.getLLVMSourceMgr().getNumBuffers();
@@ -1223,6 +1223,16 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 static void performEndOfPipelineActions(CompilerInstance &Instance) {
   assert(Instance.hasASTContext());
   auto &ctx = Instance.getASTContext();
+  const auto &Invocation = Instance.getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+
+  // If we were asked to print Clang stats, do so.
+  if (opts.PrintClangStats && ctx.getClangModuleLoader())
+    ctx.getClangModuleLoader()->printStatistics();
+
+  // Report AST stats if needed.
+  if (auto *stats = ctx.Stats)
+    countASTStats(*stats, Instance);
 
   // Make sure we didn't load a module during a parse-only invocation, unless
   // it's -emit-imported-modules, which can load modules.
@@ -1327,10 +1337,6 @@ static bool performCompile(CompilerInstance &Instance,
   if (observer)
     observer->performedSemanticAnalysis(Instance);
 
-  if (auto *Stats = Context.Stats) {
-    countStatsPostSema(*Stats, Instance);
-  }
-
   {
     FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
     if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
@@ -1350,10 +1356,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (auto r = dumpASTIfNeeded(Instance))
     return *r;
-
-  // If we were asked to print Clang stats, do so.
-  if (opts.PrintClangStats && Context.getClangModuleLoader())
-    Context.getClangModuleLoader()->printStatistics();
 
   emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
