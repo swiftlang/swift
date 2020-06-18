@@ -150,6 +150,7 @@ public:
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          ArrayRef<std::string> ExplicitModulePaths,
+         StringRef ExplicitSwiftModuleMap,
          bool IgnoreSwiftSourceInfoFile);
 
   /// Append visible module names to \p names. Note that names are possibly
