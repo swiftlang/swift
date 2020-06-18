@@ -797,6 +797,7 @@ bool PullbackEmitter::run() {
          "Functions without returns must have been diagnosed");
   auto *origExit = &*origExitIt;
 
+  // Collect original formal results.
   SmallVector<SILValue, 8> origFormalResults;
   collectAllFormalResultsInTypeOrder(original, origFormalResults);
   for (auto resultIndex : getIndices().results->getIndices()) {
@@ -815,7 +816,7 @@ bool PullbackEmitter::run() {
     }
   }
 
-  // Get dominated active values in original blocks.
+  // Collect dominated active values in original basic blocks.
   // Adjoint values of dominated active values are passed as pullback block
   // arguments.
   DominanceOrder domOrder(original.getEntryBlock(), domInfo);
@@ -829,15 +830,21 @@ bool PullbackEmitter::run() {
       auto &domBBActiveValues = activeValues[domNode->getBlock()];
       bbActiveValues.append(domBBActiveValues.begin(), domBBActiveValues.end());
     }
-    // Booleans tracking whether active-value-related errors have been emitted.
-    // This prevents duplicate diagnostics for the same active values.
-    bool diagnosedActiveEnumValue = false;
-    bool diagnosedActiveValueTangentValueCategoryIncompatible = false;
-    // Mark the activity of a value if it has not yet been visited.
-    auto markValueActivity = [&](SILValue v) {
+    // If `v` is active and has not been visited, records it as an active value
+    // in the original basic block.
+    // For active values unsupported by differentiation, emits a diagnostic and
+    // returns true. Otherwise, returns false.
+    auto recordValueIfActive = [&](SILValue v) -> bool {
+      // If value is not active, skip.
+      if (!getActivityInfo().isActive(v, getIndices()))
+        return false;
+      // If active value has already been visited, skip.
       if (visited.count(v))
-        return;
+        return false;
+      // Mark active value as visited.
       visited.insert(v);
+
+      // Diagnose unsupported active values.
       auto type = v->getType();
       // Diagnose active values whose value category is incompatible with their
       // tangent types's value category.
@@ -851,56 +858,54 @@ bool PullbackEmitter::run() {
       // $*A           | $L           | Yes (can create $*L adjoint buffer)
       // $L            | $*A          | No (cannot create $A adjoint value)
       // $*A           | $*A          | Yes (no mismatch)
-      if (!diagnosedActiveValueTangentValueCategoryIncompatible) {
-        if (auto tanSpace = getTangentSpace(remapType(type).getASTType())) {
-          auto tanASTType = tanSpace->getCanonicalType();
-          auto &origTL = getTypeLowering(type.getASTType());
-          auto &tanTL = getTypeLowering(tanASTType);
-          if (!origTL.isAddressOnly() && tanTL.isAddressOnly()) {
-            getContext().emitNondifferentiabilityError(
-                v, getInvoker(),
-                diag::autodiff_loadable_value_addressonly_tangent_unsupported,
-                type.getASTType(), tanASTType);
-            diagnosedActiveValueTangentValueCategoryIncompatible = true;
-            errorOccurred = true;
-          }
+      if (auto tanSpace = getTangentSpace(remapType(type).getASTType())) {
+        auto tanASTType = tanSpace->getCanonicalType();
+        auto &origTL = getTypeLowering(type.getASTType());
+        auto &tanTL = getTypeLowering(tanASTType);
+        if (!origTL.isAddressOnly() && tanTL.isAddressOnly()) {
+          getContext().emitNondifferentiabilityError(
+              v, getInvoker(),
+              diag::autodiff_loadable_value_addressonly_tangent_unsupported,
+              type.getASTType(), tanASTType);
+          errorOccurred = true;
+          return true;
         }
       }
       // Do not emit remaining activity-related diagnostics for semantic member
       // accessors, which have special-case pullback generation.
       if (isSemanticMemberAccessor(&original))
-        return;
+        return false;
       // Diagnose active enum values. Differentiation of enum values requires
       // special adjoint value handling and is not yet supported. Diagnose
       // only the first active enum value to prevent too many diagnostics.
-      if (!diagnosedActiveEnumValue && type.getEnumOrBoundGenericEnum()) {
+      if (type.getEnumOrBoundGenericEnum()) {
         getContext().emitNondifferentiabilityError(
             v, getInvoker(), diag::autodiff_enums_unsupported);
         errorOccurred = true;
-        diagnosedActiveEnumValue = true;
+        return true;
       }
       // Skip address projections.
       // Address projections do not need their own adjoint buffers; they
       // become projections into their adjoint base buffer.
       if (Projection::isAddressProjection(v))
-        return;
+        return false;
+      // Record active value.
       bbActiveValues.push_back(v);
+      return false;
     };
-    // Visit bb arguments and all instruction operands/results.
+    // Record all active values in the basic block.
     for (auto *arg : bb->getArguments())
-      if (getActivityInfo().isActive(arg, getIndices()))
-        markValueActivity(arg);
+      if (recordValueIfActive(arg))
+        return true;
     for (auto &inst : *bb) {
       for (auto op : inst.getOperandValues())
-        if (getActivityInfo().isActive(op, getIndices()))
-          markValueActivity(op);
+        if (recordValueIfActive(op))
+          return true;
       for (auto result : inst.getResults())
-        if (getActivityInfo().isActive(result, getIndices()))
-          markValueActivity(result);
+        if (recordValueIfActive(result))
+          return true;
     }
     domOrder.pushChildren(bb);
-    if (errorOccurred)
-      return true;
   }
 
   // Create pullback blocks and arguments, visiting original blocks in
