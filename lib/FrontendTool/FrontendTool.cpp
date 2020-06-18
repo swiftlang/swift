@@ -1247,6 +1247,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // Verify the AST for all the modules we've loaded.
   ctx.verifyAllLoadedModules();
 
+  // Verify generic signatures if we've been asked to.
+  verifyGenericSignaturesIfNeeded(Invocation, ctx);
+
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitIndexData(Instance);
@@ -1344,8 +1347,6 @@ static bool performCompile(CompilerInstance &Instance,
     else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
       debugFailWithCrash();
   }
-
-  verifyGenericSignaturesIfNeeded(Invocation, Context);
 
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
