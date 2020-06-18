@@ -36,6 +36,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/YAMLParser.h"
 #include "ModuleInterfaceBuilder.h"
 
 using namespace swift;
@@ -1218,6 +1219,15 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back("-swift-module-file");
     GenericArgs.push_back(ArgSaver.save(EM));
   }
+  // Pass down -explicit-swift-module-map-file
+  // FIXME: we shouldn't need this. Remove it?
+  StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
+  subInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
+    explictSwiftModuleMap;
+  if (!explictSwiftModuleMap.empty()) {
+    GenericArgs.push_back("-explicit-swift-module-map-file");
+    GenericArgs.push_back(explictSwiftModuleMap);
+  }
   if (clangImporter) {
     // We need to add these extra clang flags because explict module building
     // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
@@ -1429,14 +1439,99 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
 }
 
 struct ExplicitSwiftModuleLoader::Implementation {
+
   // Information about explicitly specified Swift module files.
   struct ExplicitModuleInfo {
-    // Path of the module file.
-    StringRef path;
-    // Buffer of the module content.
+    // Path of the .swiftmodule file.
+    StringRef modulePath;
+    // Path of the .swiftmoduledoc file.
+    StringRef moduleDocPath;
+    // Path of the .swiftsourceinfo file.
+    StringRef moduleSourceInfoPath;
+    // Opened buffer for the .swiftmodule file.
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
   };
+  ASTContext &Ctx;
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver Saver;
   llvm::StringMap<ExplicitModuleInfo> ExplicitModuleMap;
+  Implementation(ASTContext &Ctx): Ctx(Ctx), Saver(Allocator) {}
+
+  StringRef getScalaNodeText(llvm::yaml::Node *N) {
+    SmallString<32> Buffer;
+    return Saver.save(cast<llvm::yaml::ScalarNode>(N)->getValue(Buffer));
+  }
+
+  bool parseSingleModuleEntry(llvm::yaml::KeyValueNode &node) {
+    using namespace llvm::yaml;
+    auto moduleName = getScalaNodeText(node.getKey());
+    auto insertRes = ExplicitModuleMap.insert({moduleName,
+      ExplicitModuleInfo()});
+    if (!insertRes.second) {
+      return true;
+    }
+    auto moduleDetails = dyn_cast<MappingNode>(node.getValue());
+    if (!moduleDetails)
+      return true;
+    for (auto &entry: *moduleDetails) {
+      auto key = getScalaNodeText(entry.getKey());
+      auto val = getScalaNodeText(entry.getValue());
+      if (key == "SwiftModulePath") {
+        insertRes.first->second.modulePath = val;
+      } else if (key == "SwiftDocPath") {
+        insertRes.first->second.moduleDocPath = val;
+      } else if (key == "SwiftSourceInfoPath") {
+        insertRes.first->second.moduleSourceInfoPath = val;
+      } else {
+        return true;
+      }
+    }
+    return false;
+  }
+  //  {
+  //    "A": {
+  //      "SwiftModulePath": "A.swiftmodule",
+  //      "SwiftDocPath": "A.swiftdoc",
+  //      "SwiftSourceInfoPath": "A.swiftsourceinfo"
+  //    },
+  //    "B": {
+  //      "SwiftModulePath": "B.swiftmodule",
+  //      "SwiftDocPath": "B.swiftdoc",
+  //      "SwiftSourceInfoPath": "B.swiftsourceinfo"
+  //    }
+  //  }
+  void parseSwiftExplicitModuleMap(StringRef fileName) {
+    using namespace llvm::yaml;
+    // Load the input file.
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+      llvm::MemoryBuffer::getFile(fileName);
+    if (!fileBufOrErr) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_missing,
+                         fileName);
+      return;
+    }
+    StringRef Buffer = fileBufOrErr->get()->getBuffer();
+    Stream Stream(llvm::MemoryBufferRef(Buffer, fileName),
+                        Ctx.SourceMgr.getLLVMSourceMgr());
+    for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
+      assert(DI != Stream.end() && "Failed to read a document");
+      if (auto *MN = dyn_cast_or_null<MappingNode>(DI->getRoot())) {
+        for (auto &entry: *MN) {
+          if (parseSingleModuleEntry(entry)) {
+            Ctx.Diags.diagnose(SourceLoc(),
+                               diag::explicit_swift_module_map_corrupted,
+                               fileName);
+            return;
+          }
+        }
+      } else {
+        Ctx.Diags.diagnose(SourceLoc(),
+                           diag::explicit_swift_module_map_corrupted,
+                           fileName);
+        return;
+      }
+    }
+  }
 };
 
 ExplicitSwiftModuleLoader::ExplicitSwiftModuleLoader(
@@ -1446,7 +1541,7 @@ ExplicitSwiftModuleLoader::ExplicitSwiftModuleLoader(
       bool IgnoreSwiftSourceInfoFile):
         SerializedModuleLoaderBase(ctx, tracker, loadMode,
                                    IgnoreSwiftSourceInfoFile),
-        Impl(*new Implementation()) {}
+        Impl(*new Implementation(ctx)) {}
 
 ExplicitSwiftModuleLoader::~ExplicitSwiftModuleLoader() { delete &Impl; }
 
@@ -1464,9 +1559,33 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
   if (it == Impl.ExplicitModuleMap.end()) {
     return std::make_error_code(std::errc::not_supported);
   }
-  // We found an explicit module matches the given name, give the buffer
-  // back to the caller side.
-  *ModuleBuffer = std::move(it->getValue().moduleBuffer);
+  auto &moduleInfo = it->getValue();
+  if (moduleInfo.moduleBuffer) {
+    // We found an explicit module matches the given name, give the buffer
+    // back to the caller side.
+    *ModuleBuffer = std::move(moduleInfo.moduleBuffer);
+    return std::error_code();
+  }
+
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  // Open .swiftmodule file
+  auto moduleBuf = fs.getBufferForFile(moduleInfo.modulePath);
+  if (!moduleBuf)
+    return moduleBuf.getError();
+  *ModuleBuffer = std::move(moduleBuf.get());
+
+  // Open .swiftdoc file
+  if (!moduleInfo.moduleDocPath.empty()) {
+    auto moduleDocBuf = fs.getBufferForFile(moduleInfo.moduleDocPath);
+    if (moduleBuf)
+      *ModuleDocBuffer = std::move(moduleDocBuf.get());
+  }
+  // Open .swiftsourceinfo file
+  if (!moduleInfo.moduleSourceInfoPath.empty()) {
+    auto moduleSourceInfoBuf = fs.getBufferForFile(moduleInfo.moduleSourceInfoPath);
+    if (moduleSourceInfoBuf)
+      *ModuleSourceInfoBuffer = std::move(moduleSourceInfoBuf.get());
+  }
   return std::error_code();
 }
 
@@ -1481,11 +1600,16 @@ std::unique_ptr<ExplicitSwiftModuleLoader>
 ExplicitSwiftModuleLoader::create(ASTContext &ctx,
     DependencyTracker *tracker, ModuleLoadingMode loadMode,
     ArrayRef<std::string> ExplicitModulePaths,
+    StringRef ExplicitSwiftModuleMap,
     bool IgnoreSwiftSourceInfoFile) {
   auto result = std::unique_ptr<ExplicitSwiftModuleLoader>(
     new ExplicitSwiftModuleLoader(ctx, tracker, loadMode,
                                   IgnoreSwiftSourceInfoFile));
   auto &Impl = result->Impl;
+  // Parse a JSON file to collect explicitly built modules.
+  Impl.parseSwiftExplicitModuleMap(ExplicitSwiftModuleMap);
+  // Collect .swiftmodule paths from -swift-module-path
+  // FIXME: remove these.
   for (auto path: ExplicitModulePaths) {
     std::string name;
     // Load the explicit module into a buffer and get its name.
@@ -1493,7 +1617,7 @@ ExplicitSwiftModuleLoader::create(ASTContext &ctx,
     if (buffer) {
       // Register this module for future loading.
       auto &entry = Impl.ExplicitModuleMap[name];
-      entry.path = path;
+      entry.modulePath = path;
       entry.moduleBuffer = std::move(buffer);
     } else {
       // We cannot read the module content, diagnose.

@@ -85,6 +85,8 @@ public:
   /// The paths to a set of explicitly built modules from interfaces.
   std::vector<std::string> ExplicitSwiftModules;
 
+  /// A map of explict Swift module information.
+  std::string ExplicitSwiftModuleMap;
 private:
   static StringRef
   pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {
