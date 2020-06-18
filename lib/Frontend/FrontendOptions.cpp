@@ -67,45 +67,6 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
-bool FrontendOptions::isActionImmediate(ActionType action) {
-  switch (action) {
-  case ActionType::NoneAction:
-  case ActionType::Parse:
-  case ActionType::ResolveImports:
-  case ActionType::Typecheck:
-  case ActionType::DumpParse:
-  case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
-  case ActionType::DumpInterfaceHash:
-  case ActionType::PrintAST:
-  case ActionType::DumpScopeMaps:
-  case ActionType::DumpTypeRefinementContexts:
-  case ActionType::EmitPCH:
-  case ActionType::EmitSILGen:
-  case ActionType::EmitSIL:
-  case ActionType::EmitSIBGen:
-  case ActionType::EmitSIB:
-  case ActionType::EmitModuleOnly:
-  case ActionType::MergeModules:
-  case ActionType::CompileModuleFromInterface:
-    return false;
-  case ActionType::Immediate:
-  case ActionType::REPL:
-    return true;
-  case ActionType::EmitAssembly:
-  case ActionType::EmitIR:
-  case ActionType::EmitBC:
-  case ActionType::EmitObject:
-  case ActionType::EmitImportedModules:
-  case ActionType::DumpTypeInfo:
-  case ActionType::EmitPCM:
-  case ActionType::DumpPCM:
-  case ActionType::ScanDependencies:
-    return false;
-  }
-  llvm_unreachable("Unknown ActionType");
-}
-
 bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
   switch (action) {
   case FrontendOptions::ActionType::Parse:
