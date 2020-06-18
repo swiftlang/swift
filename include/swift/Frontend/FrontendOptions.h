@@ -287,9 +287,6 @@ public:
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
-  /// Indicates whether the action will immediately run code.
-  static bool isActionImmediate(ActionType);
-
   /// \return true if action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
 
