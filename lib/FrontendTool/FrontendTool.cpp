@@ -1315,11 +1315,20 @@ static bool performCompile(CompilerInstance &Instance,
       return true;
   }
 
+  bool didFinishPipeline = false;
   SWIFT_DEFER {
+    assert(didFinishPipeline && "Returned without calling finishPipeline");
+  };
+
+  auto finishPipeline = [&](bool hadError) -> bool {
     // We might have freed the ASTContext already, but in that case we would
     // have already performed these actions.
-    if (Instance.hasASTContext())
+    if (Instance.hasASTContext()) {
       performEndOfPipelineActions(Instance);
+      hadError |= Instance.getASTContext().hadError();
+    }
+    didFinishPipeline = true;
+    return hadError;
   };
 
   auto &Context = Instance.getASTContext();
@@ -1334,7 +1343,7 @@ static bool performCompile(CompilerInstance &Instance,
     (void)kind;
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
-    return Context.hadError();
+    return finishPipeline(Context.hadError());
   } else {
     Instance.performSema();
   }
@@ -1346,11 +1355,11 @@ static bool performCompile(CompilerInstance &Instance,
       if (auto *SF = dyn_cast<SourceFile>(file))
         (void)SF->getTopLevelDecls();
     }
-    return Context.hadError();
+    return finishPipeline(Context.hadError());
   }
 
   if (Action == FrontendOptions::ActionType::ScanDependencies)
-    return scanDependencies(Instance);
+    return finishPipeline(scanDependencies(Instance));
 
   if (observer)
     observer->performedSemanticAnalysis(Instance);
@@ -1371,19 +1380,20 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (auto r = dumpASTIfNeeded(Instance))
-    return *r;
+    return finishPipeline(*r);
 
   if (Context.hadError())
-    return true;
+    return finishPipeline(/*hadError*/ true);
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck)
-    return false;
+    return finishPipeline(/*hadError*/ false);
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
 
-  return performCompileStepsPostSema(Instance, ReturnValue, observer);
+  return finishPipeline(
+      performCompileStepsPostSema(Instance, ReturnValue, observer));
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
