@@ -284,11 +284,9 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
   return false;
 }
 
-static SILInstruction *findUnexpectedBoxUseInDFSOrder(SILValue Box,
-                                            bool inAppliedFunction,
-                                            SmallVectorImpl<Operand *> &,
-                                            SmallPtrSetImpl<SILFunction *> &,
-                                            unsigned CurrentRecurDepth);
+static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
+    SILValue Box, bool inAppliedFunction, SmallVectorImpl<Operand *> &,
+    SmallPtrSetImpl<SILFunction *> &, unsigned CurrentRecurDepth);
 
 /// checkLocalApplyBody - Check the body of an apply's callee to see
 /// if the box pointer argument passed to it has uses that would
@@ -310,10 +308,10 @@ static bool checkLocalApplyBody(Operand *O,
     return false;
 
   auto calleeArg = F->getArgument(ApplySite(O->getUser()).getCalleeArgIndex(*O));
-  auto res = !findUnexpectedBoxUseInDFSOrder(calleeArg,
-                                             /* inAppliedFunction = */ true,
-                                             PromotedOperands, VisitedCallees,
-                                             CurrentRecurDepth + 1);
+  auto res = !recursivelyFindBoxOperandsPromotableToAddress(
+      calleeArg,
+      /* inAppliedFunction = */ true, PromotedOperands, VisitedCallees,
+      CurrentRecurDepth + 1);
   return res;
 }
 
@@ -351,11 +349,11 @@ static bool isOptimizableApplySite(ApplySite Apply) {
 /// for unexpected use of the box argument. If all the callees through which the
 /// box is passed don't have any unexpected uses, `PromotedOperands` will be
 /// populated with the box arguments in DFS order.
-static SILInstruction *
-findUnexpectedBoxUseInDFSOrder(SILValue Box, bool inAppliedFunction,
-                               SmallVectorImpl<Operand *> &PromotedOperands,
-                               SmallPtrSetImpl<SILFunction *> &VisitedCallees,
-                               unsigned CurrentRecurDepth = 0) {
+static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
+    SILValue Box, bool inAppliedFunction,
+    SmallVectorImpl<Operand *> &PromotedOperands,
+    SmallPtrSetImpl<SILFunction *> &VisitedCallees,
+    unsigned CurrentRecurDepth = 0) {
   assert((Box->getType().is<SILBoxType>()
           || Box->getType()
                  == SILType::getNativeObjectType(Box->getType().getASTContext()))
@@ -434,7 +432,7 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
   SmallPtrSet<SILFunction *, 8> VisitedCallees;
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted to the stack.
-  if (auto *User = findUnexpectedBoxUseInDFSOrder(
+  if (auto *User = recursivelyFindBoxOperandsPromotableToAddress(
           ABI,
           /* inAppliedFunction = */ false, PromotedOperands, VisitedCallees,
           /* CurrentRecurDepth = */ 0)) {
@@ -998,9 +996,10 @@ static void rewriteApplySites(AllocBoxToStackState &pass) {
     auto iterAndSuccess = IndexMap.try_emplace(Apply, Indices);
     // AllocBoxStack opt promotes boxes passed to a chain of applies when it is
     // safe to do so. All such applies have to be specialized to take pointer
-    // arguments instead of box arguments This has to be done in dfs order.
-    // PromotedOperands is already in dfs order. Build AppliesToSpecialize in
-    // dfs order.
+    // arguments instead of box arguments. This has to be done in dfs order.
+    // Since PromotedOperands is already populated in dfs order by
+    // `recursivelyFindBoxOperandsPromotableToAddress`. Build
+    // `AppliesToSpecialize` in the same order.
     if (iterAndSuccess.second) {
       AppliesToSpecialize.push_back(Apply);
     } else {
