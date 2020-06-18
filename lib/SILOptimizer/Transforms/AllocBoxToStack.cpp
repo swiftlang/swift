@@ -35,9 +35,13 @@ using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 
+// MaxLocalApplyRecurDepth limits the recursive analysis depth while
+// checking if a box can be promoted to stack. This is currently set to 4, a
+// limit assumed to be sufficient to handle typical call chain of local
+// functions through which a box can be passed.
 static llvm::cl::opt<unsigned> MaxLocalApplyRecurDepth(
     "max-local-apply-recur-depth", llvm::cl::init(4),
-    llvm::cl::desc("Mac recursove depth for analyzing local functions"));
+    llvm::cl::desc("Max recursive depth for analyzing local functions"));
 
 //===-----------------------------------------------------------------------===//
 //                 SIL Utilities for alloc_box Promotion
@@ -280,7 +284,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
   return false;
 }
 
-static SILInstruction *findUnexpectedBoxUse(SILValue Box,
+static SILInstruction *findUnexpectedBoxUseInDFSOrder(SILValue Box,
                                             bool inAppliedFunction,
                                             SmallVectorImpl<Operand *> &,
                                             SmallPtrSetImpl<SILFunction *> &,
@@ -299,22 +303,24 @@ static bool checkLocalApplyBody(Operand *O,
   if (!F || F->empty())
     return false;
 
+  // Since this function can be called recursively while analyzing the same box,
+  // mark the callee as visited, so that we don't end up in a recursive cycle.
   auto iter = VisitedCallees.insert(F);
   if (!iter.second)
     return false;
 
   auto calleeArg = F->getArgument(ApplySite(O->getUser()).getCalleeArgIndex(*O));
-  auto res =
-      !findUnexpectedBoxUse(calleeArg,
-                            /* inAppliedFunction = */ true, PromotedOperands,
-                            VisitedCallees, CurrentRecurDepth + 1);
+  auto res = !findUnexpectedBoxUseInDFSOrder(calleeArg,
+                                             /* inAppliedFunction = */ true,
+                                             PromotedOperands, VisitedCallees,
+                                             CurrentRecurDepth + 1);
   return res;
 }
 
 // Returns true if a callee is eligible to be cloned and rewritten for
 // AllocBoxToStack opt. We don't want to increase code size, so this is
 // restricted only for private local functions currently.
-static bool isEligibleApply(ApplySite Apply) {
+static bool isOptimizableApplySite(ApplySite Apply) {
   auto callee = Apply.getReferencedFunctionOrNull();
   if (!callee) {
     return false;
@@ -332,21 +338,24 @@ static bool isEligibleApply(ApplySite Apply) {
   if (callee->getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
 
-  if (callee->getLinkage() != SILLinkage::Private) {
+  if (callee->getLinkage() != SILLinkage::Private)
     return false;
-  }
+
   return true;
 }
 
 /// Validate that the uses of a pointer to a box do not eliminate it from
-/// consideration for promotion to a stack element. Optionally examine the body
-/// of an ApplySite to see if there is an unexpected use inside.
-/// Return the instruction with the unexpected use if we find one.
+/// consideration for promotion to a stack element. Return the instruction with
+/// the unexpected use if we find one.
+/// If a box has ApplySite users, we recursively examine the callees to check
+/// for unexpected use of the box argument. If all the callees through which the
+/// box is passed don't have any unexpected uses, `PromotedOperands` will be
+/// populated with the box arguments in DFS order.
 static SILInstruction *
-findUnexpectedBoxUse(SILValue Box, bool inAppliedFunction,
-                     SmallVectorImpl<Operand *> &PromotedOperands,
-                     SmallPtrSetImpl<SILFunction *> &VisitedCallees,
-                     unsigned CurrentRecurDepth = 0) {
+findUnexpectedBoxUseInDFSOrder(SILValue Box, bool inAppliedFunction,
+                               SmallVectorImpl<Operand *> &PromotedOperands,
+                               SmallPtrSetImpl<SILFunction *> &VisitedCallees,
+                               unsigned CurrentRecurDepth = 0) {
   assert((Box->getType().is<SILBoxType>()
           || Box->getType()
                  == SILType::getNativeObjectType(Box->getType().getASTContext()))
@@ -396,7 +405,7 @@ findUnexpectedBoxUse(SILValue Box, bool inAppliedFunction,
       case ApplySiteKind::ApplyInst:
       case ApplySiteKind::BeginApplyInst:
       case ApplySiteKind::TryApplyInst:
-        if (isEligibleApply(Apply) &&
+        if (isOptimizableApplySite(Apply) &&
             checkLocalApplyBody(Op, LocalPromotedOperands, VisitedCallees,
                                 CurrentRecurDepth)) {
           LocalPromotedOperands.push_back(Op);
@@ -425,10 +434,10 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
   SmallPtrSet<SILFunction *, 8> VisitedCallees;
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted to the stack.
-  if (auto *User = findUnexpectedBoxUse(ABI,
-                                        /* inAppliedFunction = */ false,
-                                        PromotedOperands, VisitedCallees,
-                                        /* CurrentRecurDepth = */ 0)) {
+  if (auto *User = findUnexpectedBoxUseInDFSOrder(
+          ABI,
+          /* inAppliedFunction = */ false, PromotedOperands, VisitedCallees,
+          /* CurrentRecurDepth = */ 0)) {
     (void)User;
     // Otherwise, we have an unexpected use.
     LLVM_DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
@@ -828,8 +837,10 @@ void PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
 
 // While cloning during specialization, make sure apply instructions do not have
 // box arguments that need to be promoted.
-// This is an assertion in debug builds only. This should never be true because
-// we process apply callees that take promotable boxes in dfs order
+// This is an assertion in debug builds only. The reason why this should never
+// be true is that we have cloned our callees in DFS order meaning that any of
+// our callees that had a promotable box will have already have been promoted
+// away by the time this runs.
 void PromotedParamCloner::checkNoPromotedBoxInApply(ApplySite Apply) {
 #ifndef NDEBUG
   for (auto &O : Apply.getArgumentOperands()) {
@@ -857,10 +868,10 @@ void PromotedParamCloner::visitTryApplyInst(TryApplyInst *Inst) {
 /// Specialize ApplySite by promoting the parameters indicated by
 /// indices. We expect these parameters to be replaced by stack address
 /// references.
-static SILInstruction *specializeApply(SILOptFunctionBuilder &FuncBuilder,
-                                       ApplySite Apply,
-                                       ArgIndexList &PromotedCalleeArgIndices,
-                                       AllocBoxToStackState &pass) {
+static SILInstruction *
+specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
+                    ArgIndexList &PromotedCalleeArgIndices,
+                    AllocBoxToStackState &pass) {
   auto *FRI = cast<FunctionRefInst>(Apply.getCallee());
   assert(FRI && "Expected a direct ApplySite");
   auto *F = FRI->getReferencedFunctionOrNull();
@@ -968,7 +979,7 @@ static SILInstruction *specializeApply(SILOptFunctionBuilder &FuncBuilder,
   }
 }
 
-static void rewriteApplies(AllocBoxToStackState &pass) {
+static void rewriteApplySites(AllocBoxToStackState &pass) {
   llvm::DenseMap<ApplySite, ArgIndexList> IndexMap;
   llvm::SmallVector<ApplySite, 8> AppliesToSpecialize;
   ArgIndexList Indices;
@@ -1009,7 +1020,7 @@ static void rewriteApplies(AllocBoxToStackState &pass) {
     // Sort the indices and unique them.
     sortUnique(Indices);
 
-    auto *Replacement = specializeApply(FuncBuilder, Apply, Indices, pass);
+    auto *Replacement = specializeApplySite(FuncBuilder, Apply, Indices, pass);
     assert(Apply.getKind() == ApplySite(Replacement).getKind());
     Apply.getInstruction()->replaceAllUsesPairwiseWith(Replacement);
 
@@ -1027,7 +1038,7 @@ static void rewriteApplies(AllocBoxToStackState &pass) {
 static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass) {
   // First we'll rewrite any ApplySite that we can to remove
   // the box container pointer from the operands.
-  rewriteApplies(pass);
+  rewriteApplySites(pass);
 
   unsigned Count = 0;
   auto rend = pass.Promotable.rend();
