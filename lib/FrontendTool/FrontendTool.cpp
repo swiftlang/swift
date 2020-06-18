@@ -1256,6 +1256,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
 
+  // Emit information about the parsed primaries.
+  emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
+  emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 
 /// Performs the compile requested by the user.
@@ -1353,9 +1356,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (auto r = dumpASTIfNeeded(Instance))
     return *r;
-
-  emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
-  emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 
   if (Context.hadError())
     return true;
