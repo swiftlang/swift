@@ -38,3 +38,11 @@ func test_42098130<T>(e1: T, e2: E_42098130) {
 // RUN: %refactor -source-filename %s -pos=31:3 | %FileCheck %s -check-prefix=CHECK3
 // RUN: %refactor -source-filename %s -pos=32:3 | %FileCheck %s -check-prefix=CHECK3
 // CHECK3: Action begins
+
+// SR-13000
+enum Foo {}
+typealias Bar = (Any, Any) -> Foo
+extension /*invoke here:*/Bar {}
+
+// RUN: %refactor --actions -source-filename %s -pos=45:27 | %FileCheck %s -check-prefix=CHECK4
+// CHECK4: Action begins

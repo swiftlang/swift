@@ -572,7 +572,7 @@ void ExistentialTransform::populateThunkBody() {
     //     copy_addr %valAdr to %temp // <== Temp CopyAddr
     //     apply(%temp)               // <== Temp is consumed by the apply
     //
-    // Destroy the original arument and deallocation the temporary:
+    // Destroy the original argument and deallocation the temporary:
     //     destroy_addr %consumedExistential : $*Protocol
     //     dealloc_stack %temp : $*T
     if (Temp.DestroyValue)

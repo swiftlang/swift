@@ -723,6 +723,10 @@ EnableSwiftSourceInfo("enable-swiftsourceinfo",
                  llvm::cl::cat(Category),
                  llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+ExplicitSwiftModuleMap("explicit-swift-module-map-file",
+                       llvm::cl::desc("JSON file to include explicit Swift modules"),
+                       llvm::cl::cat(Category));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -3462,6 +3466,11 @@ int main(int argc, char *argv[]) {
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);
 
+  if (!options::ExplicitSwiftModuleMap.empty()) {
+    InitInvok.getSearchPathOptions().ExplicitSwiftModuleMap =
+      options::ExplicitSwiftModuleMap;
+    InitInvok.getFrontendOptions().DisableImplicitModules = true;
+  }
   // Process the clang arguments last and allow them to override previously
   // set options.
   if (!CCArgs.empty()) {

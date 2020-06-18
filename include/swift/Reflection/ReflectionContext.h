@@ -838,6 +838,18 @@ public:
     return 0;
   }
 
+  /// Get the name of a metadata tag, if known.
+  llvm::Optional<std::string> metadataAllocationTagName(int Tag) {
+    switch (Tag) {
+#define TAG(name, value)                                                       \
+  case value:                                                                  \
+    return std::string(#name);
+#include "../../../stdlib/public/runtime/MetadataAllocatorTags.def"
+    default:
+      return llvm::None;
+    }
+  }
+
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
