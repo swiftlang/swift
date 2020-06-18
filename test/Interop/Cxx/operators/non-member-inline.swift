@@ -43,7 +43,7 @@ OperatorsTestSuite.test("slash (/)") {
   expectEqual(1, result.value)
 }
 
-OperatorsTestSuite.test("percent") {
+OperatorsTestSuite.test("percent (%)") {
   let lhs = IntBox(value: 11)
   let rhs = IntBox(value: 2)
 
@@ -52,7 +52,7 @@ OperatorsTestSuite.test("percent") {
   expectEqual(1, result.value)
 }
 
-OperatorsTestSuite.test("amp") {
+OperatorsTestSuite.test("amp (&)") {
   let lhs = IntBox(value: 6)
   let rhs = IntBox(value: 5)
 
@@ -61,13 +61,31 @@ OperatorsTestSuite.test("amp") {
   expectEqual(4, result.value)
 }
 
-OperatorsTestSuite.test("pipe") {
+OperatorsTestSuite.test("pipe (|)") {
   let lhs = IntBox(value: 6)
   let rhs = IntBox(value: 5)
 
   let result = lhs | rhs
 
   expectEqual(7, result.value)
+}
+
+OperatorsTestSuite.test("less (<)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 6)
+
+  let result = lhs < rhs
+
+  expectEqual(true, result)
+}
+
+OperatorsTestSuite.test("greater (>)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 6)
+
+  let result = lhs > rhs
+
+  expectEqual(false, result)
 }
 
 OperatorsTestSuite.test("less less (<<)") {
@@ -86,6 +104,42 @@ OperatorsTestSuite.test("greater greater (>>)") {
   let result = lhs >> rhs
 
   expectEqual(2, result.value)
+}
+
+OperatorsTestSuite.test("equal equal (==)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs == rhs
+
+  expectEqual(true, result)
+}
+
+OperatorsTestSuite.test("exclaim equal (!=)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs != rhs
+
+  expectEqual(false, result)
+}
+
+OperatorsTestSuite.test("less equal (<=)") {
+  let lhs = IntBox(value: 5)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs <= rhs
+
+  expectEqual(true, result)
+}
+
+OperatorsTestSuite.test("greater equal (>=)") {
+  let lhs = IntBox(value: 6)
+  let rhs = IntBox(value: 5)
+
+  let result = lhs >= rhs
+
+  expectEqual(true, result)
 }
 
 OperatorsTestSuite.test("amp amp (&&)") {
