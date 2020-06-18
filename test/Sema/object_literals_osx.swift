@@ -27,3 +27,13 @@ let text = #fileLiteral(resourceName: "TextFile.txt").relativeString! // expecte
 
 // rdar://problem/49861813
 #fileLiteral() // expected-error{{missing argument for parameter 'resourceName' in call}} expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'URL' as the default file reference literal type}}
+
+// rdar://problem/62927467
+func test_literal_arguments_are_loaded() {
+  var resource = "foo.txt" // expected-warning {{variable 'resource' was never mutated; consider changing to 'let' constant}}
+  let _: Path = #fileLiteral(resourceName: resource) // Ok
+
+  func test(red: inout Float, green: inout Float) -> S {
+    return #colorLiteral(red: red, green: green, blue: 1, alpha: 1) // Ok
+  }
+}
