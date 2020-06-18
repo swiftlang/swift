@@ -107,7 +107,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
+PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *M,
+                                                   bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs) {
   PrintOptions result;
@@ -115,6 +116,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
+  result.CurrentModule = M;
   result.FullyQualifiedTypes = true;
   result.UseExportedModuleNames = true;
   result.AllowNullTypes = false;
@@ -3648,6 +3650,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
+  Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>> VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> Args) {
     if (Args.empty())
@@ -3700,10 +3703,71 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     return T->hasSimpleTypeRepr();
   }
 
+  /// Add all Clang modules that have been imported into `Mod` to
+  /// `clangModules`.
+  ///
+  /// This also takes into account any modules that are imported transitively
+  /// through public (`@_exported`) imports.
+  /// `clangModules` is a map from each imported Clang module to the
+  /// corresponding Swift module.
+  static void getImportedClangModules(
+      ModuleDecl *Mod, ModuleDecl::ImportFilter filter,
+      llvm::DenseMap<const clang::Module *, ModuleDecl *> &clangModules) {
+    SmallVector<ModuleDecl::ImportedModule, 4> imports;
+    Mod->getImportedModules(imports, filter);
+    for (const auto &import : imports) {
+      if (const clang::Module *clangModule =
+              import.importedModule->findUnderlyingClangModule())
+        clangModules[clangModule] = import.importedModule;
+      getImportedClangModules(import.importedModule,
+                              ModuleDecl::ImportFilterKind::Public,
+                              clangModules);
+    }
+  }
+
+  /// Returns all Clang modules that are visible from `Options.CurrentModule`.
+  /// The returned map associates each visible Clang module with the
+  /// corresponding Swift module.
+  const llvm::DenseMap<const clang::Module *, ModuleDecl *> &
+  getVisibleClangModules() {
+    assert(Options.CurrentModule &&
+           "CurrentModule needs to be set to determine imported Clang modules");
+    if (!VisibleClangModules) {
+      VisibleClangModules.emplace();
+      ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Public;
+      Filter |= ModuleDecl::ImportFilterKind::Private;
+      getImportedClangModules(Options.CurrentModule, Filter,
+                              *VisibleClangModules);
+    }
+    return *VisibleClangModules;
+  }
+
   template <typename T>
   void printModuleContext(T *Ty) {
     FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
     ModuleDecl *Mod = File->getParentModule();
+    std::string ExportedModuleName = File->getExportedModuleName();
+
+    // Clang declarations need special treatment: Multiple Clang modules can
+    // contain the same declarations from a textually included header, but not
+    // all of these modules may be visible. We therefore need to make sure we
+    // choose a module that is visible from the current module. This is
+    // obviously only possible, however, if we know what the current module is.
+    const clang::Decl *ClangDecl = Ty->getDecl()->getClangDecl();
+    if (ClangDecl && Options.CurrentModule) {
+      for (auto *Redecl : ClangDecl->redecls()) {
+        clang::Module *ClangModule = Redecl->getOwningModule();
+        if (!ClangModule)
+          continue;
+
+        if (ModuleDecl *VisibleModule =
+                getVisibleClangModules().lookup(ClangModule)) {
+          Mod = VisibleModule;
+          ExportedModuleName = ClangModule->ExportAsModule;
+          break;
+        }
+      }
+    }
 
     if (Options.MapCrossImportOverlaysToDeclaringModule) {
       if (ModuleDecl *Declaring = Mod->getDeclaringModuleIfCrossImportOverlay())
@@ -3711,8 +3775,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
 
     Identifier Name = Mod->getName();
-    if (Options.UseExportedModuleNames)
-      Name = Mod->getASTContext().getIdentifier(File->getExportedModuleName());
+    if (Options.UseExportedModuleNames && !ExportedModuleName.empty()) {
+      Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
+    }
 
     Printer.printModuleRef(Mod, Name);
     Printer << ".";
