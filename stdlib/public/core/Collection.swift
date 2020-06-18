@@ -1669,7 +1669,5 @@ extension Collection where SubSequence == Self {
         "Can't remove more items from a collection than it contains")
     }
     self = self[idx..<endIndex]
-      "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: k)..<endIndex]
   }
 }
