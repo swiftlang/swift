@@ -3828,7 +3828,7 @@ public:
     }
 
     printQualifiedType(T);
-    printGenericArgs(T->getInnermostGenericArgs());
+    printGenericArgs(T->getDirectGenericArgs());
   }
 
   void visitParenType(ParenType *T) {
