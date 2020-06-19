@@ -144,34 +144,36 @@ def dedented_lines(description):
     return textwrap.dedent(description).split('\n')
 
 
-def digest_syntax_node(digest, node):
-    # Hash into the syntax name and serialization code
-    digest.update(node.name)
-    digest.update(str(get_serialization_code(node.syntax_kind)))
-    for child in node.children:
-        # Hash into the expected child syntax
-        digest.update(child.syntax_kind)
-        # Hash into the child name
-        digest.update(child.name)
-        # Hash into whether the child is optional
-        digest.update(str(child.is_optional))
-
-
-def digest_syntax_token(digest, token):
-    # Hash into the token name and serialization code
-    digest.update(token.name)
-    digest.update(str(token.serialization_code))
-
-
-def digest_trivia(digest, trivia):
-    digest.update(trivia.name)
-    digest.update(str(trivia.serialization_code))
-    digest.update(str(trivia.characters))
-
-
 def calculate_node_hash():
     digest = hashlib.sha1()
-    map(lambda node: digest_syntax_node(digest, node), SYNTAX_NODES)
-    map(lambda token: digest_syntax_token(digest, token), SYNTAX_TOKENS)
-    map(lambda trivia: digest_trivia(digest, trivia), TRIVIAS)
+
+    def _digest_syntax_node(node):
+        # Hash into the syntax name and serialization code
+        digest.update(node.name.encode("utf-8"))
+        digest.update(str(get_serialization_code(node.syntax_kind)).encode("utf-8"))
+        for child in node.children:
+            # Hash into the expected child syntax
+            digest.update(child.syntax_kind.encode("utf-8"))
+            # Hash into the child name
+            digest.update(child.name.encode("utf-8"))
+            # Hash into whether the child is optional
+            digest.update(str(child.is_optional).encode("utf-8"))
+
+    def _digest_syntax_token(token):
+        # Hash into the token name and serialization code
+        digest.update(token.name.encode("utf-8"))
+        digest.update(str(token.serialization_code).encode("utf-8"))
+
+    def _digest_trivia(trivia):
+        digest.update(trivia.name.encode("utf-8"))
+        digest.update(str(trivia.serialization_code).encode("utf-8"))
+        digest.update(str(trivia.characters).encode("utf-8"))
+
+    for node in SYNTAX_NODES:
+        _digest_syntax_node(node)
+    for token in SYNTAX_TOKENS:
+        _digest_syntax_token(token)
+    for trivia in TRIVIAS:
+        _digest_trivia(trivia)
+
     return digest.hexdigest()
