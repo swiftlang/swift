@@ -204,7 +204,9 @@ public:
     return *this << StringRef(&c, 1);
   }
 
-  void printKeyword(StringRef name, PrintOptions Opts, StringRef Suffix = "") {
+  void printKeyword(StringRef name,
+                    const PrintOptions &Opts,
+                    StringRef Suffix = "") {
     if (Opts.SkipUnderscoredKeywords && name.startswith("_"))
       return;
     assert(!name.empty() && "Tried to print empty keyword");
