@@ -3225,6 +3225,23 @@ bool ConstraintSystem::repairFailures(
     if (!isValueOfRawRepresentable(expectedType, rawReprType))
       return false;
 
+    auto valueTy = expectedType->lookThroughSingleOptionalType();
+    auto unwrappedRawReprTy = rawReprType->lookThroughSingleOptionalType();
+    auto memberLoc = getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::ApplyFunction));
+    auto memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+    addValueMemberConstraint(
+        MetatypeType::get(unwrappedRawReprTy, getASTContext()),
+        DeclNameRef(DeclName(getASTContext(), DeclBaseName::createConstructor(),
+                             {getASTContext().Id_rawValue})),
+        memberTy, DC, FunctionRefKind::SingleApply, {},
+        getConstraintLocator(
+            locator.withPathElement(ConstraintLocator::ConstructorMember)));
+    addConstraint(ConstraintKind::ApplicableFunction,
+                  FunctionType::get({AnyFunctionType::Param(valueTy)},
+                                    unwrappedRawReprTy),
+                  memberTy, memberLoc);
+
     conversionsOrFixes.push_back(ExplicitlyConstructRawRepresentable::create(
         *this, rawReprType, expectedType, getConstraintLocator(locator)));
     return true;
