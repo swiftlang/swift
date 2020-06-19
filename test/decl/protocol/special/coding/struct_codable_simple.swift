@@ -55,3 +55,24 @@ struct NotConforms: Codable { // expected-error {{type 'NotConforms' does not co
   var x: Int
   var y: NotDefined // expected-error {{cannot find type 'NotDefined' in scope}}
 }
+
+struct CodableDuplicatedKeys: Codable { 
+  enum CodingKeys: CodingKey {
+    case x // expected-note{{'x' previously declared here}}
+    case x // expected-error{{invalid redeclaration of 'x'}}
+  }
+  var x: Int
+}
+
+struct NonCodable {}
+// expected-error@+2 {{type 'DuplicatedKeys' does not conform to protocol 'Encodable'}}
+// expected-error@+1 {{type 'DuplicatedKeys' does not conform to protocol 'Decodable'}}
+struct DuplicatedKeys: Codable { 
+  enum CodingKeys: CodingKey {
+    case x // expected-note{{'x' previously declared here}}
+    case x // expected-error{{invalid redeclaration of 'x'}}
+  }
+  var x: NonCodable 
+  // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'NonCodable' does not conform to 'Encodable'}}
+  // expected-note@-2 {{cannot automatically synthesize 'Decodable' because 'NonCodable' does not conform to 'Decodable'}}
+}

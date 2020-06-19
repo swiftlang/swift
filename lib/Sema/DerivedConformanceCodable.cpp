@@ -170,8 +170,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     // duplicated identifier.
     if (!validatedProperties.insert(eltIdentifier).second)
       continue;
-    
-    ;
+
     auto it = properties.find(eltIdentifier);
     if (it == properties.end()) {
       elt->diagnose(diag::codable_extraneous_codingkey_case_here,
