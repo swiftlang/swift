@@ -97,9 +97,6 @@ enum class TypeResolverContext : uint8_t {
   /// tuple return values. See also: TypeResolutionFlags::Direct
   FunctionResult,
 
-  /// Whether we are in a protocol's where clause
-  ProtocolWhereClause,
-
   /// Whether this is a pattern binding entry.
   PatternBindingDecl,
 
@@ -210,7 +207,6 @@ public:
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
     case Context::FunctionResult:
-    case Context::ProtocolWhereClause:
     case Context::ExtensionBinding:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:

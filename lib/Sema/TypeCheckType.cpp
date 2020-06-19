@@ -3363,7 +3363,6 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     doDiag = !isDirect;
     break;
   case TypeResolverContext::VariadicFunctionInput:
-  case TypeResolverContext::ProtocolWhereClause:
   case TypeResolverContext::ForEachStmt:
   case TypeResolverContext::ExtensionBinding:
   case TypeResolverContext::ExplicitCastExpr:
