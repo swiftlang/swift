@@ -29,15 +29,26 @@ namespace swift {
 extern "C" {
 #endif
 
+/// Specifies the address range corresponding to a section.
 typedef struct MetadataSectionRange {
   __swift_uintptr_t start;
   __swift_size_t length;
 } MetadataSectionRange;
 
+
+/// Identifies the address space ranges for the Swift metadata required by the Swift runtime.
 struct MetadataSections {
   __swift_uintptr_t version;
   __swift_uintptr_t reserved;
 
+  /// `next` and `prev` are used by the runtime to construct a
+  /// circularly doubly linked list to quickly iterate over the metadata
+  /// from each image loaded into the address space.  These are invasive
+  /// to enable the runtime registration, which occurs at image load time, to
+  /// be allocation-free as it is invoked from an image constructor function
+  /// context where the system may not yet be ready to perform allocations.
+  /// Additionally, avoiding the allocation enables a fast load operation, which
+  /// directly impacts application load time.
   struct MetadataSections *next;
   struct MetadataSections *prev;
 
