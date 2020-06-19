@@ -245,6 +245,10 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
   if (!mayAlias(LI->getOperand()))
     return MemBehavior::None;
 
+  // A take is modelled as a write. See MemoryBehavior::MayWrite.
+  if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+      return MemBehavior::MayReadWrite;
+
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove that load inst does not alias "
                              "pointer. Returning may read.\n");
   return MemBehavior::MayRead;
