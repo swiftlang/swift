@@ -6,8 +6,8 @@
 // CHECK-coff: "swiftc.{{exe}}", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
 // CHECK-coff: "clang.exe", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
 
-// CHECK-elf: "swift", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
-// CHECK-elf: "swift", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
+// CHECK-elf: "swift-frontend", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
+// CHECK-elf: "swift-frontend", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
 // CHECK-elf: "swift-autolink-extract", inputs: ["[[OBJECT]]"], output: {autolink: "[[AUTOLINK:.*\.autolink]]"}
 // CHECK-elf: "clang", inputs: ["[[OBJECT]]", "[[AUTOLINK]]"], output: {image: "main"}
 
