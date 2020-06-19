@@ -1813,13 +1813,10 @@ public:
     return *getTrailingObjects<SubstitutionMap>();
   }
 
-  /// Get the innermost generic arguments, which correspond to the generic
-  /// arguments that are directly applied to the typealias declaration in
-  /// produced by \c getDecl().
-  ///
-  /// The result can be empty, if the declaration itself is non-generic but
-  /// the parent is generic.
-  SmallVector<Type, 2> getInnermostGenericArgs() const;
+  /// Get the direct generic arguments, which correspond to the generic
+  /// arguments that are directly applied to the typealias declaration
+  /// this type references.
+  ArrayRef<Type> getDirectGenericArgs() const;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
