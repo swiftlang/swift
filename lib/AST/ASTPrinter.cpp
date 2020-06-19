@@ -3716,9 +3716,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     SmallVector<ModuleDecl::ImportedModule, 4> imports;
     Mod->getImportedModules(imports, filter);
     for (const auto &import : imports) {
+      ModuleDecl *importedModule = import.importedModule->getTopLevelModule();
       if (const clang::Module *clangModule =
-              import.importedModule->findUnderlyingClangModule())
-        clangModules[clangModule] = import.importedModule;
+              importedModule->findUnderlyingClangModule())
+        clangModules[clangModule] = importedModule;
       getImportedClangModules(import.importedModule,
                               ModuleDecl::ImportFilterKind::Public,
                               clangModules);
@@ -3756,7 +3757,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     const clang::Decl *ClangDecl = Ty->getDecl()->getClangDecl();
     if (ClangDecl && Options.CurrentModule) {
       for (auto *Redecl : ClangDecl->redecls()) {
-        clang::Module *ClangModule = Redecl->getOwningModule();
+        clang::Module *ClangModule =
+            Redecl->getOwningModule()->getTopLevelModule();
         if (!ClangModule)
           continue;
 
