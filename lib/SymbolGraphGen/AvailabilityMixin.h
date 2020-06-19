@@ -46,6 +46,9 @@ struct Availability {
   /// If \c true, is unconditionally deprecated in this \c Domain.
   bool IsUnconditionallyDeprecated;
 
+  /// If \c true, is unconditionally unavailable in this \c Domain.
+  bool IsUnconditionallyUnavailable;
+
   Availability(const AvailableAttr &AvAttr);
 
   /// Update this availability from a duplicate @available
