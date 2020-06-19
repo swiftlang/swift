@@ -1602,8 +1602,11 @@ ExplicitSwiftModuleLoader::create(ASTContext &ctx,
     new ExplicitSwiftModuleLoader(ctx, tracker, loadMode,
                                   IgnoreSwiftSourceInfoFile));
   auto &Impl = result->Impl;
-  // Parse a JSON file to collect explicitly built modules.
-  Impl.parseSwiftExplicitModuleMap(ExplicitSwiftModuleMap);
+  // If the explicit module map is given, try parse it.
+  if (!ExplicitSwiftModuleMap.empty()) {
+    // Parse a JSON file to collect explicitly built modules.
+    Impl.parseSwiftExplicitModuleMap(ExplicitSwiftModuleMap);
+  }
   // Collect .swiftmodule paths from -swift-module-path
   // FIXME: remove these.
   for (auto path: ExplicitModulePaths) {
