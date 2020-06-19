@@ -677,8 +677,10 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
-  // We have a custom prefix, so finalize() won't verify for us. Do it manually.
-  verify(Storage.str().drop_front(USRPrefix.size()));
+  // We have a custom prefix, so finalize() won't verify for us. If we're not
+  // in invalid code (coming from an IDE caller) verify manually.
+  if (!decl->isInvalid())
+    verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
 }
 
