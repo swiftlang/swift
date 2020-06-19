@@ -1,7 +1,0 @@
-module ForeignA {
-  header "foreign-a.h"
-}
-
-module ForeignB {
-  header "foreign-b.h"
-}
