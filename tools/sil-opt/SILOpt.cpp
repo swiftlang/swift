@@ -299,6 +299,7 @@ void anchorForGetMainExecutable() {}
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
