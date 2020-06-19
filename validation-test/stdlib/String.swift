@@ -2448,9 +2448,14 @@ StringTests.test("StringRepeating/MultipleCyrilicCharactersCount2") {
                 String(repeating: "абвгґдеєжзиіїйклмнопрстуфхцчшщьюя", count: 2))
 }
 
-StringTests.test("StringRepeating/UnicodeSequencesCombinedOnConcatenation") {
+StringTests.test("StringRepeating/\\u{1F1F8}\\u{1F1FA}Count2") {
     expectEqual("\u{1F1F8}\u{1F1FA}\u{1F1F8}\u{1F1FA}" /* 🇸🇺🇸🇺 */,
                 String(repeating: "\u{1F1F8}\u{1F1FA}" /* 🇸🇺 */, count: 2))
+}
+
+StringTests.test("StringRepeating/\\u{301}cafeCount5") {
+    expectEqual("\u{301}cafécafécafécafécafe",
+                String(repeating: "\u{301}cafe", count: 5))
 }
 
 runAllTests()
