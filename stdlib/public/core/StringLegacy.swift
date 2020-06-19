@@ -33,19 +33,26 @@ extension String {
       self = count == 0 ? "" : repeatedValue
       return
     }
+    guard !repeatedValue.isEmpty else {
+        self = ""
+        return
+    }
 
-	var repeatedValue = repeatedValue
-	self.init(_uninitializedCapacity: repeatedValue._guts.count &* count) {
-	  buffer in
-	  repeatedValue.withUTF8 { repeatedValueUTF8 in
-	    let repeatedCount = repeatedValueUTF8.count
-	    for i in 0..<count {
-          let range = i * repeatedCount ..< (i + 1) * repeatedCount
+    var repeatedValue = repeatedValue
+    let repeatedValueUTF8Count = repeatedValue.withUTF8 { $0.count }
+    self.init(_uninitializedCapacity: repeatedValueUTF8Count * count) {
+      buffer in
+      var total = 0
+      repeatedValue.withUTF8 { repeatedValueUTF8 in
+        for i in 0..<count {
+          let offset = i * repeatedValueUTF8Count
+          let range = offset ..< offset + repeatedValueUTF8Count
             _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
               .initialize(from: repeatedValueUTF8)
+          total += range.count
         }
       }
-      return buffer.count
+      return total
     }
   }
 
