@@ -4993,6 +4993,12 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
                                                    assocConformance);
 }
 
+bool swift::swift_compareProtocolConformanceDescriptors(
+    const ProtocolConformanceDescriptor *lhs,
+    const ProtocolConformanceDescriptor *rhs) {
+  return MetadataCacheKey::compareProtocolConformanceDescriptors(lhs, rhs) == 0;
+}
+
 /***************************************************************************/
 /*** Recursive metadata dependencies ***************************************/
 /***************************************************************************/

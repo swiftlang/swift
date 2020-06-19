@@ -653,6 +653,11 @@ public:
   /// for the target platform.
   AvailabilityContext getCompareTypeContextDescriptorsAvailability();
 
+  /// Get the runtime availability of the
+  /// swift_compareProtocolConformanceDescriptors entry point for the target
+  /// platform.
+  AvailabilityContext getCompareProtocolConformanceDescriptorsAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
