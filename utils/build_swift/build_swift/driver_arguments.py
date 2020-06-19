@@ -1015,7 +1015,7 @@ def create_argument_parser():
 
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
-    option('--skip-test-swiftdriver', toggle_false('test_swift_driver'),
+    option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
            help='skip testing Swift driver')
     option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
            help='skip testing SwiftSyntax')
