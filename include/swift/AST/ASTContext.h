@@ -654,6 +654,10 @@ public:
   /// metadata.
   AvailabilityContext getPrespecializedGenericMetadataAvailability();
 
+  /// Get the runtime availability of the swift_compareTypeContextDescriptors
+  /// for the target platform.
+  AvailabilityContext getCompareTypeContextDescriptorsAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();

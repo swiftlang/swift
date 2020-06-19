@@ -1918,6 +1918,33 @@ bool swift::equalContexts(const ContextDescriptor *a,
   }
 }
 
+SWIFT_CC(swift)
+bool swift::swift_compareTypeContextDescriptors(
+    const TypeContextDescriptor *a, const TypeContextDescriptor *b) {
+  // The implementation is the same as the implementation of
+  // swift::equalContexts except that the handling of non-type
+  // context descriptors and casts to TypeContextDescriptor are removed.
+
+  // Fast path: pointer equality.
+  if (a == b) return true;
+
+  // If either context is null, we're done.
+  if (a == nullptr || b == nullptr)
+    return false;
+
+  // If either descriptor is known to be unique, we're done.
+  if (a->isUnique() || b->isUnique()) return false;
+  
+  // Do the kinds match?
+  if (a->getKind() != b->getKind()) return false;
+  
+  // Do the parents match?
+  if (!equalContexts(a->Parent.get(), b->Parent.get()))
+    return false;
+
+  return TypeContextIdentity(a) == TypeContextIdentity(b);
+}
+
 /***************************************************************************/
 /*** Common value witnesses ************************************************/
 /***************************************************************************/
