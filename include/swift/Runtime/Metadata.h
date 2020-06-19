@@ -829,6 +829,9 @@ const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type
 SWIFT_RUNTIME_EXPORT
 const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
 
+SWIFT_RUNTIME_EXPORT
+void swift_setMetadataDebugLogLevel(int level);
+
 #if defined(swiftCore_EXPORTS)
 /// Given a pointer to a borrowed value of type `Root` and a
 /// `KeyPath<Root, Value>`, project a pointer to a borrowed value of type

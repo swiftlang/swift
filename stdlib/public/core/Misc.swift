@@ -132,3 +132,12 @@ public func _getTypeByMangledNameInContext(
   genericContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
+
+/// Sets the log level for printing type metadata creation.
+///
+/// 0 ... No debug logging (default)
+/// 1 ... Print the name of types for which dynamic metadata is created.
+/// 2 ... Like '1' but also prints the backtrace.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@_silgen_name("swift_setMetadataDebugLogLevel")
+public func _setMetaDataDebugging(logLevel: Int)

@@ -79,6 +79,27 @@ extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
 using namespace swift;
 using namespace metadataimpl;
 
+/// 0 ... no debug logging
+/// 1 ... print type names
+/// 2 ... print type names and backtrace
+static int metadataDebugLogLevel = 0;
+
+void swift::swift_setMetadataDebugLogLevel(int level) {
+  metadataDebugLogLevel = level;
+}
+
+static  __attribute__((noinline)) void debugLogMetadataImpl(Metadata *metadata) {
+  fprintf(stderr, "### %s\n", nameForMetadata(metadata).c_str());
+  if (metadataDebugLogLevel > 1) {
+    printCurrentBacktrace(/*framesToSkip*/ 3);
+  }
+}
+
+static inline void debugLogMetadata(Metadata *metadata) {
+  if (metadataDebugLogLevel > 0)
+    debugLogMetadataImpl(metadata);
+}
+
 static ClassMetadata *
 _swift_relocateClassMetadata(const ClassDescriptor *description,
                              const ResilientClassMetadataPattern *pattern);
@@ -669,6 +690,8 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
 
   // Copy the generic arguments into place.
   installGenericArguments(metadata, description, arguments);
+
+  debugLogMetadata(metadata);
 
   return metadata;
 }
@@ -1801,6 +1824,8 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
   // Okay, we're all done with layout and setting up the elements.
   // Check transitive completeness.
 
+  debugLogMetadata(getValue());
+
   // We don't need to check the element statuses again in a couple of cases:
 
   // - If all the elements are transitively complete, we are, too.
@@ -2908,6 +2933,8 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 #else
   assert(!self->getDescription()->hasObjCResilientClassStub());
 #endif
+
+  debugLogMetadata(self);
 
   return MetadataDependency();
 }
