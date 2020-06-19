@@ -70,7 +70,8 @@ Availability::Availability(const AvailableAttr &AvAttr)
     Obsoleted(AvAttr.Obsoleted),
     Message(AvAttr.Message),
     Renamed(AvAttr.Rename),
-    IsUnconditionallyDeprecated(AvAttr.isUnconditionallyDeprecated()) {
+    IsUnconditionallyDeprecated(AvAttr.isUnconditionallyDeprecated()),
+    IsUnconditionallyUnavailable(AvAttr.isUnconditionallyUnavailable()) {
       assert(!Domain.empty());
 }
 
@@ -92,6 +93,9 @@ Availability::updateFromDuplicate(const Availability &Other) {
 
   // Same for `deprecated` with no version.
   IsUnconditionallyDeprecated = Other.IsUnconditionallyDeprecated;
+
+  // Same for `unavailable` with no version.
+  IsUnconditionallyUnavailable = Other.IsUnconditionallyUnavailable;
 
   // Same for `obsoleted`.
   Obsoleted = Other.Obsoleted;
@@ -150,6 +154,10 @@ Availability::updateFromParent(const Availability &Parent) {
   // If a parent is unconditionally deprecated, then so are all
   // of its children.
   IsUnconditionallyDeprecated |= Parent.IsUnconditionallyDeprecated;
+
+  // If a parent is unconditionally unavailable, then so are all
+  // of its children.
+  IsUnconditionallyUnavailable |= Parent.IsUnconditionallyUnavailable;
 }
 
 void Availability::serialize(llvm::json::OStream &OS) const {
@@ -176,6 +184,9 @@ void Availability::serialize(llvm::json::OStream &OS) const {
     if (IsUnconditionallyDeprecated) {
       OS.attribute("isUnconditionallyDeprecated", true);
     }
+    if (IsUnconditionallyUnavailable) {
+      OS.attribute("isUnconditionallyUnavailable", true);
+    }
   }); // end availability object
 }
 
@@ -183,5 +194,6 @@ bool Availability::empty() const {
   return !Introduced.hasValue() &&
          !Deprecated.hasValue() &&
          !Obsoleted.hasValue() &&
-         !IsUnconditionallyDeprecated;
+         !IsUnconditionallyDeprecated &&
+         !IsUnconditionallyUnavailable;
 }
