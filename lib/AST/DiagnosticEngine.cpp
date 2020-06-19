@@ -20,7 +20,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticSuppression.h"
-#include "swift/AST/DiagnosticMessageFormat.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -33,8 +32,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
-#include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -142,52 +139,6 @@ struct EducationalNotes {
 
 static constexpr EducationalNotes<LocalDiagID::NumDiags> _EducationalNotes = EducationalNotes<LocalDiagID::NumDiags>();
 static constexpr auto educationalNotes = _EducationalNotes.value;
-
-class LocalizationInput : public llvm::yaml::Input {
-  using Input::Input;
-
-  /// Read diagnostics in the YAML file iteratively
-  template <typename T, typename Context>
-  static typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value,
-                                 void>::type
-  readYAML(IO &io, T &Seq, bool, Context &Ctx) {
-    unsigned count = io.beginSequence();
-
-    // Resize Diags from YAML file to be the same size
-    // as diagnosticStrings from def files.
-    Seq.resize(LocalDiagID::NumDiags);
-    for (unsigned i = 0; i < count; ++i) {
-      void *SaveInfo;
-      if (io.preflightElement(i, SaveInfo)) {
-        DiagnosticNode current;
-        yamlize(io, current, true, Ctx);
-        io.postflightElement(SaveInfo);
-        // YAML file isn't guaranteed to have diagnostics in order of their
-        // declaration in `.def` files, to accommodate that we need to leave
-        // holes in diagnostic array for diagnostics which haven't yet been
-        // localized and for the ones that have `DiagnosticNode::id` 
-        // indicates their position.
-        Seq[static_cast<unsigned>(current.id)] = std::move(current.msg);
-      }
-    }
-    io.endSequence();
-  }
-
-  template <typename T>
-  inline friend
-      typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value,
-                              LocalizationInput &>::type
-      operator>>(LocalizationInput &yin, T &diagnostics) {
-    llvm::yaml::EmptyContext Ctx;
-    if (yin.setCurrentDocument()) {
-      // If YAML file's format doesn't match the current format in
-      // DiagnosticMessageFormat, will throw an error.
-      readYAML(yin, diagnostics, true, Ctx);
-    }
-
-    return yin;
-  }
-};
 
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
@@ -358,28 +309,6 @@ void Diagnostic::addChildNote(Diagnostic &&D) {
   assert(storedDiagnosticInfos[(unsigned)ID].kind != DiagnosticKind::Note &&
          "Notes can't have children.");
   ChildNotes.push_back(std::move(D));
-}
-
-YAMLLocalizationProducer::YAMLLocalizationProducer(std::string locale,
-                                                   std::string path) {
-  llvm::SmallString<128> DiagnosticsFilePath(path);
-  llvm::sys::path::append(DiagnosticsFilePath, locale);
-  llvm::sys::path::replace_extension(DiagnosticsFilePath, ".yaml");
-  auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(DiagnosticsFilePath);
-  if (!FileBufOrErr)
-    llvm_unreachable("Failed to read yaml file");
-  llvm::MemoryBuffer *document = FileBufOrErr->get();
-  LocalizationInput yin(document->getBuffer());
-  yin >> diagnostics;
-}
-
-std::string
-YAMLLocalizationProducer::getMessageOr(DiagID id,
-                                       std::string defaultMessage) const {
-  std::string diagnosticMessage = diagnostics[(unsigned)id];
-  if (diagnosticMessage.empty())
-    return defaultMessage;
-  return diagnosticMessage;
 }
 
 bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
@@ -1082,17 +1011,10 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
                                                   bool printDiagnosticName) {
-  // TODO: Print diagnostic names from `localization`.
   if (printDiagnosticName) {
     return debugDiagnosticStrings[(unsigned)id];
   }
-  auto defaultMessage = diagnosticStrings[(unsigned)id];
-  if (localization) {
-    std::string localizedMessage =
-        localization.get()->getMessageOr(id, defaultMessage);
-    return localizedMessage.c_str();
-  }
-  return defaultMessage;
+  return diagnosticStrings[(unsigned)id];
 }
 
 const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {
