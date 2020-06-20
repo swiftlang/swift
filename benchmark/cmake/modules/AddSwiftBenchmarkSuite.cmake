@@ -660,8 +660,11 @@ function (swift_benchmark_compile_archopts)
           "-m${triple_platform}-version-min=${ver}"
           "-lobjc"
           "-L${SWIFT_LIBRARY_PATH}/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
+          "-L${sdk}/usr/lib/swift"
           "-Xlinker" "-rpath"
           "-Xlinker" "${SWIFT_LINK_RPATH}"
+          "-Xlinker" "-rpath"
+          "-Xlinker" "/usr/lib/swift"
           ${bench_library_objects}
           ${bench_driver_objects}
           ${ld64_add_ast_path_opts}

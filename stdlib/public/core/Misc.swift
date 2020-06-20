@@ -78,13 +78,13 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 @_silgen_name("swift_getMangledTypeName")
 public func _getMangledTypeName(_ type: Any.Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public // SPI
 func _mangledTypeName(_ type: Any.Type) -> String? {
   let (stringPtr, count) = _getMangledTypeName(type)

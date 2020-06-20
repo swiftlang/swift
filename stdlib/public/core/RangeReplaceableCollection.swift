@@ -1158,7 +1158,7 @@ extension RangeReplaceableCollection {
   /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
   public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
     guard !subranges.isEmpty else {
       return
@@ -1188,7 +1188,7 @@ extension MutableCollection where Self: RangeReplaceableCollection {
   /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
   public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
     guard let firstRange = subranges.ranges.first else {
       return

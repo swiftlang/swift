@@ -60,9 +60,9 @@ CoreGraphicsTests.test("CGColor/_ExpressibleByColorLiteral") {
 CoreGraphicsTests.test("CGColor/description") {
   expectTrue(String(describing: makeCGColor(red: 1, green: 0, blue: 0, alpha: 1)).contains("1 0 0 1"))
 #if os(macOS)
-  expectTrue(String(describing: CGColor.black).contains("Generic Gray Profile"))
-  expectTrue(String(describing: CGColor.white).contains("Generic Gray Profile"))
-  expectTrue(String(describing: CGColor.clear).contains("Generic Gray Profile"))
+  expectTrue(String(describing: CGColor.black).contains("Generic Gray"))
+  expectTrue(String(describing: CGColor.white).contains("Generic Gray"))
+  expectTrue(String(describing: CGColor.clear).contains("Generic Gray"))
 #endif
 }
 
