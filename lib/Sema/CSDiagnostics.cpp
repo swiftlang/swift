@@ -984,25 +984,15 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   return true;
 }
 
-Type MemberAccessOnOptionalBaseFailure::getMemberBaseType() const {
-  if (getLocator()->isForKeyPathComponent()) {
-    if (auto *memberBaseTypeVar = MemberBaseType->getAs<TypeVariableType>()) {
-      return getSolution().getFixedType(memberBaseTypeVar);
-    }
-    return MemberBaseType;
-  }
-  return getType(getAnchor());
-}
-
-SourceRange MemberAccessOnOptionalBaseFailure::getMemberBaseSourceRange() const {
-  auto anchor = getAnchor();
-  auto locator = getLocator();
-
+SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
   if (auto componentPathElt =
-          locator->getLastElementAs<LocatorPathElt::KeyPathComponent>()) {
+          getLocator()->getLastElementAs<LocatorPathElt::KeyPathComponent>()) {
+    auto anchor = getAnchor();
     auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
     if (componentPathElt->getIndex() == 0) {
-      return keyPathExpr->getParsedRoot()->getSourceRange();
+      if (auto rootType = keyPathExpr->getRootType()) {
+        return rootType->getSourceRange();
+      }
     } else {
       auto componentIdx = componentPathElt->getIndex() - 1;
       auto component = keyPathExpr->getComponents()[componentIdx];
@@ -1022,7 +1012,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   // type, then the result of the expression is optional (and we want to offer
   // only a '?' fixit) even though the constraint system didn't need to add any
   // additional optionality.
-  auto overload = getOverloadChoiceIfAvailable(getLocator());
+  auto overload = getOverloadChoiceIfAvailable(locator);
   if (overload && overload->openedType->getOptionalObjectType())
     resultIsOptional = true;
 
@@ -1030,10 +1020,10 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   if (!unwrappedBaseType)
     return false;
   
-  auto baseSourceRange = getMemberBaseSourceRange();
+  auto sourceRange = getSourceRange();
   
-  emitDiagnosticAt(baseSourceRange.End, diag::optional_base_not_unwrapped,
-                   baseType, Member, unwrappedBaseType);
+  emitDiagnostic(diag::optional_base_not_unwrapped,
+                 baseType, Member, unwrappedBaseType);
 
   auto componentPathElt =
       locator->getLastElementAs<LocatorPathElt::KeyPathComponent>();
@@ -1041,15 +1031,16 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // For members where the base type is an optional key path root
     // let's emit a tailored note suggesting to remove the '?' and a
     // fix to replace the optional type with its unwrapped type.
-    if (auto *nominalDecl = unwrappedBaseType->getAnyNominal()) {
-      auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
-      auto unwrappedName = nominalDecl->getBaseName();
+    auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
+    if (auto rootType = keyPathExpr->getRootType()) {
       emitDiagnostic(diag::optional_base_remove_optional_for_keypath_root,
-                     baseType)
-          .fixItReplace(keyPathExpr->getRootType()->getSourceRange(),
-                        unwrappedName.getIdentifier().str());
+                     unwrappedBaseType)
+          .fixItReplace(rootType->getSourceRange(),
+                        unwrappedBaseType.getStringAsComponent());
+    } else {
+      emitDiagnostic(diag::optional_base_chain, Member)
+          .fixItInsertAfter(keyPathExpr->getLoc(), "?");
     }
-    
   } else {
     // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
     // for non-optional results where that would be appropriate. For the moment
@@ -1057,11 +1048,11 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
     // the next compile.
     emitDiagnostic(diag::optional_base_chain, Member)
-        .fixItInsertAfter(baseSourceRange.End, "?");
+        .fixItInsertAfter(sourceRange.End, "?");
 
     if (!resultIsOptional) {
       emitDiagnostic(diag::unwrap_with_force_value)
-          .fixItInsertAfter(baseSourceRange.End, "!");
+          .fixItInsertAfter(sourceRange.End, "!");
     }
   }
   return true;

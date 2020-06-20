@@ -493,8 +493,19 @@ public:
 
   bool diagnoseAsError() override;
   
-  Type getMemberBaseType() const;
-  SourceRange getMemberBaseSourceRange() const;
+  Type getMemberBaseType() const {
+    return getSolution().simplifyType(MemberBaseType)->getRValueType();
+  }
+  
+  SourceLoc getLoc() const override {
+    if (getLocator()->isForKeyPathComponent()) {
+      return getSourceRange().End;
+    }
+    return FailureDiagnostic::getLoc();
+  }
+  
+  SourceRange getSourceRange() const override;
+  
 
 };
 
