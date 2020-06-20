@@ -10,8 +10,6 @@
 #
 # ----------------------------------------------------------------------------
 
-import os
-
 from . import cmark
 from . import foundation
 from . import indexstoredb
@@ -24,8 +22,6 @@ from . import product
 from . import swift
 from . import xctest
 
-from .. import shell
-from .. import targets
 
 class SwiftDriver(product.Product):
     @classmethod
@@ -69,4 +65,3 @@ class SwiftDriver(product.Product):
     def install(self, host_target):
         indexstoredb.run_build_script_helper(
             'install', host_target, self, self.args)
-

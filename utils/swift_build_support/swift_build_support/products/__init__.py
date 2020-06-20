@@ -51,6 +51,7 @@ __all__ = [
     'Swift',
     'SwiftInspect',
     'SwiftPM',
+    'SwiftDriver',
     'TensorFlowSwiftAPIs',
     'XCTest',
     'SwiftSyntax',
