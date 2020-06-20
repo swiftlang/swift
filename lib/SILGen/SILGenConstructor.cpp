@@ -937,9 +937,9 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
                           cast<TypedPattern>(pattern)->getSubPattern(),
                           std::move(src));
 
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return emitMemberInit(SGF, selfDecl,
-                          cast<VarPattern>(pattern)->getSubPattern(),
+                          cast<BindingPattern>(pattern)->getSubPattern(),
                           std::move(src));
 
 #define PATTERN(Name, Parent)

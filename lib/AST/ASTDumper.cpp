@@ -507,7 +507,7 @@ namespace {
         printRec(P->getSubExpr());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    void visitVarPattern(VarPattern *P) {
+    void visitBindingPattern(BindingPattern *P) {
       printCommon(P, P->isLet() ? "pattern_let" : "pattern_var");
       OS << '\n';
       printRec(P->getSubPattern());

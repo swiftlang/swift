@@ -2293,8 +2293,8 @@ namespace {
 
         return setType(ParenType::get(CS.getASTContext(), underlyingType));
       }
-      case PatternKind::Var: {
-        auto *subPattern = cast<VarPattern>(pattern)->getSubPattern();
+      case PatternKind::Binding: {
+        auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
         auto type = getTypeForPattern(subPattern, locator, externalPatternType,
                                       bindPatternVarsOneWay);
 
@@ -2304,7 +2304,6 @@ namespace {
         // Var doesn't affect the type.
         return setType(type);
       }
-
       case PatternKind::Any: {
         return setType(
             externalPatternType

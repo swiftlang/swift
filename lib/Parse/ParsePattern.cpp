@@ -1022,8 +1022,8 @@ ParserResult<Pattern> Parser::parsePattern() {
       return makeParserCodeCompletionResult<Pattern>();
     if (subPattern.isNull())
       return nullptr;
-    return makeParserResult(new (Context) VarPattern(varLoc, isLet,
-                                                     subPattern.get()));
+    return makeParserResult(
+        new (Context) BindingPattern(varLoc, isLet, subPattern.get()));
   }
       
   default:
@@ -1233,7 +1233,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())
     return nullptr;
-  auto *varP = new (Context) VarPattern(varLoc, isLet, subPattern.get());
+  auto *varP = new (Context) BindingPattern(varLoc, isLet, subPattern.get());
   return makeParserResult(ParserStatus(subPattern), varP);
 }
 

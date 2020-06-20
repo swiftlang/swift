@@ -1257,7 +1257,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD);
   Named->setType(Tmp1VD->getType());
-  auto *Let = VarPattern::createImplicit(Ctx, /*let*/true, Named);
+  auto *Let = BindingPattern::createImplicit(Ctx, /*let*/ true, Named);
   Let->setType(Named->getType());
   auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc());
   Some->setImplicit();

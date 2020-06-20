@@ -1510,7 +1510,7 @@ namespace decls_block {
     // The sub-pattern trails the record.
   >;
 
-  using VarPatternLayout = BCRecordLayout<
+  using BindingPatternLayout = BCRecordLayout<
     VAR_PATTERN,
     BCFixed<1>  // isLet?
     // The sub-pattern trails the record.
