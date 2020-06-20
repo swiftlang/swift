@@ -20,6 +20,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/LocalizationFormat.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -1011,8 +1012,15 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
                                                   bool printDiagnosticName) {
+  // TODO: Print diagnostic names from `localization`.
   if (printDiagnosticName) {
     return debugDiagnosticStrings[(unsigned)id];
+  }
+  auto defaultMessage = diagnosticStrings[(unsigned)id];
+  if (localization) {
+    const std::string &localizedMessage =
+        localization.get()->getMessageOr((LocalDiagID)id, defaultMessage);
+    return localizedMessage.c_str();
   }
   return diagnosticStrings[(unsigned)id];
 }
