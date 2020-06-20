@@ -528,8 +528,8 @@ static std::string getDifferentiationParametersClauseString(
 /// - If `omitWrtClause` is true, omit printing the `wrt:` differentiation
 ///   parameters clause.
 static void printDifferentiableAttrArguments(
-    const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, bool omitWrtClause = false) {
+    const DifferentiableAttr *attr, ASTPrinter &printer,
+    const PrintOptions &Options, const Decl *D, bool omitWrtClause = false) {
   assert(D);
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
