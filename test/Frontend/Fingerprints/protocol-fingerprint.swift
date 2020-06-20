@@ -16,7 +16,7 @@
 // Seeing weird failure on CI, so set the mod times
 // RUN: touch -t 200101010101 %t/*.swift
 
-// RUN: cd %t && %swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json >&output1
+// RUN: cd %t && %target-swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json >&output1
 
 // only-run-for-debugging: cp %t/usesB.swiftdeps %t/usesB1.swiftdeps
 
@@ -29,7 +29,7 @@
 // RUN: touch -t 200101010101 %t/*.swift
 // RUN: touch -t 200301010101 %t/definesAB.swift
 
-// RUN: cd %t && %swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift  -module-name main -output-file-map ofm.json >&output2
+// RUN: cd %t && %target-swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift  -module-name main -output-file-map ofm.json >&output2
 
 // Save for debugging:
 // only-run-for-debugging: cp %t/usesB.swiftdeps %t/usesB1.swiftdeps
@@ -53,7 +53,7 @@
 // Seeing weird failure on CI, so set the mod times
 // RUN: touch -t 200101010101 %t/*.swift
 
-// RUN: cd %t && %swiftc_driver  -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json >&output3
+// RUN: cd %t && %target-swiftc_driver  -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json >&output3
 
 // only-run-for-debugging: cp %t/usesB.swiftdeps %t/usesB3.swiftdeps
 
@@ -67,9 +67,8 @@
 // RUN: touch -t 200101010101 %t/*.swift
 // RUN: touch -t 200301010101 %t/definesAB.swift
 
-// RUN: cd %t && %swiftc_driver  -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json >&output4
+// RUN: cd %t && %target-swiftc_driver  -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json >&output4
 
 // only-run-for-debugging: cp %t/usesB.swiftdeps %t/usesB4.swiftdeps
 
 // RUN: %FileCheck -check-prefix=CHECK-MAINAB-RECOMPILED %s < %t/output4
-
