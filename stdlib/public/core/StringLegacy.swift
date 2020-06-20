@@ -39,20 +39,18 @@ extension String {
     }
 
     var repeatedValue = repeatedValue
-    let repeatedValueUTF8Count = repeatedValue.withUTF8 { $0.count }
-    self.init(_uninitializedCapacity: repeatedValueUTF8Count * count) {
-      buffer in
-      var total = 0
-      repeatedValue.withUTF8 { repeatedValueUTF8 in
+    self = repeatedValue.withUTF8 { repeatedUTF8 in
+      String(_uninitializedCapacity: repeatedUTF8.count * count) { buffer in
+        var total = 0
         for i in 0..<count {
-          let offset = i * repeatedValueUTF8Count
-          let range = offset ..< offset + repeatedValueUTF8Count
+          let offset = i * repeatedUTF8.count
+          let range = offset ..< offset + repeatedUTF8.count
             _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
-              .initialize(from: repeatedValueUTF8)
+              .initialize(from: repeatedUTF8)
           total += range.count
         }
+        return total
       }
-      return total
     }
   }
 
