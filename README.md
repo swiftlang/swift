@@ -1,3 +1,12 @@
+# SwiftWasm 
+
+## Compile your Swift code to WebAssembly
+
+This is the main repository for SwiftWasm toolchain and SDK. Please refer to [the 
+SwiftWasm book](https://swiftwasm.github.io/swiftwasm-book/) to get started, and to
+the [`awesome-swiftwasm`](https://github.com/swiftwasm/awesome-swiftwasm) list for
+more links in the SwiftWasm ecosystem.
+
 <img src="https://swift.org/assets/images/swift.svg" alt="Swift logo" height="70" >
 
 # Swift Programming Language
