@@ -1055,6 +1055,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
           .fixItInsertAfter(sourceRange.End, "!");
     }
   }
+
   return true;
 }
 

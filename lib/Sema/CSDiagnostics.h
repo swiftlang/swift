@@ -505,7 +505,6 @@ public:
   }
   
   SourceRange getSourceRange() const override;
-  
 
 };
 
