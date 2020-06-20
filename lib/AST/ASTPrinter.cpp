@@ -476,7 +476,7 @@ void StreamPrinter::printText(StringRef Text) {
 /// Whether we will be printing a TypeLoc by using the TypeRepr printer
 static bool willUseTypeReprPrinting(TypeLoc tyLoc,
                                     Type currentType,
-                                    PrintOptions options) {
+                                    const PrintOptions &options) {
   // Special case for when transforming archetypes
   if (currentType && tyLoc.getType())
     return false;
@@ -687,7 +687,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printTypeWithOptions(Type T, PrintOptions options) {
+  void printTypeWithOptions(Type T, const PrintOptions &options) {
     if (options.TransformContext) {
       // FIXME: it's not clear exactly what we want to keep from the existing
       // options, and what we want to discard.
@@ -737,7 +737,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printTransformedTypeWithOptions(T, Options);
   }
 
-  void printTypeLocWithOptions(const TypeLoc &TL, PrintOptions options) {
+  void printTypeLocWithOptions(const TypeLoc &TL, const PrintOptions &options) {
     if (CurrentType && TL.getType()) {
       printTransformedTypeWithOptions(TL.getType(), options);
       return;
@@ -1082,7 +1082,7 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
 
 /// Determines if we are required to print the name of a property declaration,
 /// or if we can elide it by printing a '_' instead.
-static bool mustPrintPropertyName(VarDecl *decl, PrintOptions opts) {
+static bool mustPrintPropertyName(VarDecl *decl, const PrintOptions &opts) {
   // If we're not allowed to omit the name, we must print it.
   if (!opts.OmitNameOfInaccessibleProperties) return true;
 
@@ -2637,8 +2637,10 @@ static bool isEscaping(Type type) {
   return false;
 }
 
-static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
-                                ParameterTypeFlags flags, bool escaping) {
+static void printParameterFlags(ASTPrinter &printer,
+                                const PrintOptions &options,
+                                ParameterTypeFlags flags,
+                                bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer.printAttrName("@autoclosure ");
   if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
@@ -4681,12 +4683,13 @@ void GenericSignatureImpl::print(ASTPrinter &Printer, PrintOptions PO) const {
   GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(Printer, PO);
 }
 
-void GenericSignature::print(raw_ostream &OS, PrintOptions Opts) const {
+void GenericSignature::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
 }
 
-void GenericSignature::print(ASTPrinter &Printer, PrintOptions Opts) const {
+void GenericSignature::print(ASTPrinter &Printer,
+                             const PrintOptions &Opts) const {
   if (isNull()) {
     Printer << "<null>";
     return;
