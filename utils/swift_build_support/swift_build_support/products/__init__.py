@@ -26,6 +26,7 @@ from .pythonkit import PythonKit
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
+from .swiftdriver import SwiftDriver
 from .swiftevolve import SwiftEvolve
 from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
@@ -50,6 +51,7 @@ __all__ = [
     'Swift',
     'SwiftInspect',
     'SwiftPM',
+    'SwiftDriver',
     'TensorFlowSwiftAPIs',
     'XCTest',
     'SwiftSyntax',
