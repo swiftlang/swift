@@ -3517,7 +3517,7 @@ namespace {
       if (T->getParent())
         printRec("parent", T->getParent());
 
-      for (auto arg : T->getInnermostGenericArgs())
+      for (const auto arg : T->getDirectGenericArgs())
         printRec(arg);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
