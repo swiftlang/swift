@@ -494,7 +494,7 @@ SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   87)
 SIMPLE_DECL_ATTR(_functionBuilder, FunctionBuilder,
-  OnNominalType |
+  OnNominalType | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   88)
 DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
