@@ -3225,6 +3225,7 @@ bool ConstraintSystem::repairFailures(
     if (!isValueOfRawRepresentable(expectedType, rawReprType))
       return false;
 
+    auto rawValueLabel = getASTContext().Id_rawValue;
     auto valueTy = expectedType->lookThroughSingleOptionalType();
     auto unwrappedRawReprTy = rawReprType->lookThroughSingleOptionalType();
     auto memberLoc = getConstraintLocator(
@@ -3233,14 +3234,18 @@ bool ConstraintSystem::repairFailures(
     addValueMemberConstraint(
         MetatypeType::get(unwrappedRawReprTy, getASTContext()),
         DeclNameRef(DeclName(getASTContext(), DeclBaseName::createConstructor(),
-                             {getASTContext().Id_rawValue})),
+                             {rawValueLabel})),
         memberTy, DC, FunctionRefKind::SingleApply, {},
         getConstraintLocator(
             locator.withPathElement(ConstraintLocator::ConstructorMember)));
-    addConstraint(ConstraintKind::ApplicableFunction,
-                  FunctionType::get({AnyFunctionType::Param(valueTy)},
-                                    unwrappedRawReprTy),
-                  memberTy, memberLoc);
+    addConstraint(
+        ConstraintKind::ApplicableFunction,
+        FunctionType::get({AnyFunctionType::Param(valueTy, rawValueLabel)},
+                          unwrappedRawReprTy),
+        memberTy, memberLoc);
+
+    ArgumentInfos[getArgumentInfoLocator(memberLoc)] =
+        ArgumentInfo({rawValueLabel, None});
 
     conversionsOrFixes.push_back(ExplicitlyConstructRawRepresentable::create(
         *this, rawReprType, expectedType, getConstraintLocator(locator)));
