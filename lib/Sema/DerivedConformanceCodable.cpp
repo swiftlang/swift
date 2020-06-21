@@ -165,9 +165,9 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
   for (auto elt : codingKeysDecl->getAllElements()) {
     const auto eltIdentifier = elt->getBaseIdentifier();
     
-    // We are skipping duplicated members on properties so
-    // let's avoid to validate the same declaration for a
-    // duplicated identifier.
+    // Duplicate coding keys should not affect the conformance
+    // so let's avoid to validate the same declaration for a
+    // duplicate identifier.
     if (!validatedProperties.insert(eltIdentifier).second)
       continue;
 
