@@ -58,9 +58,9 @@ enum class OptGroup {
 
 } // end anonymous namespace
 
-static llvm::cl::opt<std::string>
-InputFilename(llvm::cl::desc("input file"), llvm::cl::init("-"),
-              llvm::cl::Positional);
+static llvm::cl::list<std::string> InputFilenames(llvm::cl::desc("input file"),
+                                                  llvm::cl::Positional,
+                                                  llvm::cl::ZeroOrMore);
 
 static llvm::cl::opt<std::string>
 OutputFilename("o", llvm::cl::desc("output filename"));
@@ -302,6 +302,9 @@ int main(int argc, char **argv) {
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
+  if (InputFilenames.size() == 0)
+    InputFilenames.push_back("-");
+
   if (PrintStats)
     llvm::EnableStatistics();
 
@@ -337,6 +340,7 @@ int main(int argc, char **argv) {
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
+  Invocation.getLangOptions().EnableMemoryBufferImporter = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
   Invocation.getLangOptions().EnableObjCInterop =
@@ -402,14 +406,29 @@ int main(int argc, char **argv) {
 
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
 
-  serialization::ExtendedValidationInfo extendedInfo;
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      Invocation.setUpInputForSILTool(InputFilename, ModuleName,
-                                      /*alwaysSetModuleToMain*/ false,
-                                      /*bePrimary*/ !PerformWMO, extendedInfo);
-  if (!FileBufOrErr) {
-    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
-    exit(-1);
+  bool IsSingleSIBInput = false;
+  std::unique_ptr<llvm::MemoryBuffer> FileBufOwner;
+  if (InputFilenames.size() == 1) {
+    auto InputFilename = InputFilenames[0];
+    serialization::ExtendedValidationInfo extendedInfo;
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+        Invocation.setUpInputForSILTool(InputFilename, ModuleName,
+                                        /*alwaysSetModuleToMain*/ false,
+                                        /*bePrimary*/ !PerformWMO,
+                                        extendedInfo);
+    if (!FileBufOrErr) {
+      fprintf(stderr, "Error! Failed to open file: %s\n",
+              InputFilename.c_str());
+      exit(-1);
+    }
+    FileBufOwner = std::move(FileBufOrErr.get());
+    IsSingleSIBInput = extendedInfo.isSIB();
+  } else {
+    SILOpts.MergePartialModules = true;
+
+    Invocation.setInputKind(InputFileKind::SIL);
+    Invocation.setModuleName(ModuleName.empty() ? StringRef("merged_module")
+                                                : ModuleName);
   }
 
   CompilerInstance CI;
@@ -444,6 +463,58 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation))
     return finishDiagProcessing(1);
 
+  std::vector<ModuleDecl *> MergedModules;
+  if (InputFilenames.size() > 1) {
+    std::vector<Identifier> MergeModuleNames;
+    auto MBL = CI.getMemoryBufferSerializedModuleLoader();
+
+    // Register all serialized input modules
+    for (auto inputFilename : InputFilenames) {
+      // Load the input file.
+      llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+          llvm::MemoryBuffer::getFileOrSTDIN(inputFilename);
+
+      if (!fileBufOrErr) {
+        fprintf(stderr, "Error! Failed to open file: %s\n",
+                inputFilename.c_str());
+        exit(-1);
+      }
+
+      serialization::ExtendedValidationInfo extendedInfo;
+
+      auto result = serialization::validateSerializedAST(
+          fileBufOrErr.get()->getBuffer(), &extendedInfo);
+      if (result.status != serialization::Status::Valid) {
+        fprintf(stderr, "Error! Invalid SIB file: %s\n", inputFilename.c_str());
+        exit(-1);
+      }
+
+      if (Invocation.getSearchPathOptions().SDKPath.empty()) {
+        Invocation.setSDKPath(extendedInfo.getSDKPath());
+      }
+
+      MBL->registerMemoryBuffer(result.name, std::move(fileBufOrErr.get()));
+      MergeModuleNames.emplace_back(
+          CI.getASTContext().getIdentifier(result.name));
+    }
+
+    for (auto MergeModuleName : MergeModuleNames) {
+      std::vector<swift::Located<swift::Identifier>> AccessPath;
+
+      AccessPath.emplace_back(MergeModuleName, SourceLoc());
+      auto SwiftModule = CI.getASTContext().getModule(AccessPath);
+      if (!SwiftModule) {
+        fprintf(stderr, "Error! Unable to load serialized module: %s\n",
+                MergeModuleName.str().data());
+        exit(-1);
+      }
+      for (auto file : SwiftModule->getFiles()) {
+        CI.getMainModule()->addFile(*file);
+      }
+      MergedModules.push_back(SwiftModule);
+    }
+  }
+
   CI.performSema();
 
   // If parsing produced an error, don't run any passes.
@@ -452,10 +523,11 @@ int main(int argc, char **argv) {
     return finishDiagProcessing(1);
 
   auto *mod = CI.getMainModule();
-  assert(mod->getFiles().size() == 1);
+  assert(mod->getFiles().size() >= 1);
 
+  bool PerformCMO = InputFilenames.size() > 1;
   std::unique_ptr<SILModule> SILMod;
-  if (PerformWMO) {
+  if (PerformWMO || PerformCMO) {
     SILMod = performASTLowering(mod, CI.getSILTypes(), CI.getSILOptions());
   } else {
     SILMod = performASTLowering(*mod->getFiles()[0], CI.getSILTypes(),
@@ -465,13 +537,22 @@ int main(int argc, char **argv) {
 
   // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
   // us.
-  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
+  if (Invocation.hasSerializedAST() && !IsSingleSIBInput) {
     auto SL = SerializedSILLoader::create(
         CI.getASTContext(), SILMod.get(), nullptr);
     if (DisableSILLinking)
       SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
     else
       SL->getAll();
+  }
+
+  if (InputFilenames.size() > 1) {
+    // Load all entries from merged modules
+    for (auto Module : MergedModules) {
+      assert(Module->getFiles().size() == 1);
+      SILMod->getSILLoader()->getAllForModule(Module->getName(),
+                                              Module->getFiles()[0]);
+    }
   }
 
   if (!RemarksFilename.empty()) {
