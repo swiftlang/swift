@@ -34,8 +34,8 @@ extension String {
       return
     }
     guard !repeatedValue.isEmpty else {
-        self = ""
-        return
+      self = ""
+      return
     }
 
     var repeatedValue = repeatedValue
@@ -45,8 +45,8 @@ extension String {
         for i in 0..<count {
           let offset = i * repeatedUTF8.count
           let range = offset ..< offset + repeatedUTF8.count
-            _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
-              .initialize(from: repeatedUTF8)
+          _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
+            .initialize(from: repeatedUTF8)
           total += range.count
         }
         return total
