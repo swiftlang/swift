@@ -1380,8 +1380,9 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   }
 
   bool error = readLegacyTypeInfo(*fs, path);
-  if (error)
-    llvm::report_fatal_error("Cannot read '" + path + "'");
+// avoids error: "<unknown>:1:1: Cannot read '/usr/lib/swift/layouts-x86_64.yaml'"
+//  if (error)
+//    llvm::report_fatal_error("Cannot read '" + path + "'");
 }
 
 TypeConverter::~TypeConverter() {

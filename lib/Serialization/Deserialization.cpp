@@ -5008,7 +5008,14 @@ public:
       MF.fatal();
 
     const clang::Type *clangFunctionType = nullptr;
-    if (clangTypeID) {
+    // avoids: "error: Segmentation fault: 11" (SR-12831)
+    // during "merge module" containing the following code:
+    /*
+    static var onEntry: @convention(c) (_ swizzle: Swizzle, _ returnAddress: UnsafeRawPointer,
+        _ stackPointer: UnsafeMutablePointer<UInt64>) -> IMP? = {
+            (swizzle, returnAddress, stackPointer) -> IMP? in
+     */
+    if (clangTypeID && false) {
       auto loadedClangType = MF.getClangType(clangTypeID);
       if (!loadedClangType)
         return loadedClangType.takeError();
