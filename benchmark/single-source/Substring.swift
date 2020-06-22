@@ -36,7 +36,7 @@ let longWide = "fὢasὢodὢijὢadὢolὢsjὢalὢsdὢjlὢasὢdfὢijὢ
 let (s1, ss1) = equivalentWithDistinctBuffers()
 let (s2, ss2) = equivalentWithDistinctBuffers()
 
-let quiteLong = String(repeating: "0", count: 10_000)
+let quiteLong = String(repeating: "0", count: 15_000)[...]
 
 @inline(never)
 public func run_SubstringFromLongString(_ N: Int) {
@@ -132,16 +132,16 @@ public func run_EqualSubstringSubstringGenericEquatable(_ N: Int) {
 
 @inline(never)
 public func run_SubstringDropFirst1(_ N: Int) {
-  let s = quiteLong[...]
-  for _ in 1...N*500 {
+  let s = quiteLong
+  for _ in 1...N*1000 {
     blackHole(!s.dropFirst(1).isEmpty)
   }
 }
 
 @inline(never)
 public func run_SubstringDropLast1(_ N: Int) {
-  let s = quiteLong[...]
-  for _ in 1...N*500 {
+  let s = quiteLong
+  for _ in 1...N*1000 {
     blackHole(!s.dropLast(1).isEmpty)
   }
 }
