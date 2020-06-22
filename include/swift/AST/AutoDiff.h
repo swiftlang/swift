@@ -35,6 +35,7 @@ class AnyFunctionType;
 class SourceFile;
 class SILFunctionType;
 class TupleType;
+class VarDecl;
 
 /// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
@@ -458,6 +459,99 @@ public:
     return llvm::inconvertibleErrorCode();
   }
 };
+
+/// Describes the "tangent stored property" corresponding to an original stored
+/// property in a `Differentiable`-conforming type.
+///
+/// The tangent stored property is the stored property in the `TangentVector`
+/// struct of the `Differentiable`-conforming type, with the same name as the
+/// original stored property and with the original stored property's
+/// `TangentVector` type.
+struct TangentPropertyInfo {
+  struct Error {
+    enum class Kind {
+      /// The original property is `@noDerivative`.
+      NoDerivativeOriginalProperty,
+      /// The nominal parent type does not conform to `Differentiable`.
+      NominalParentNotDifferentiable,
+      /// The original property's type does not conform to `Differentiable`.
+      OriginalPropertyNotDifferentiable,
+      /// The parent `TangentVector` type is not a struct.
+      ParentTangentVectorNotStruct,
+      /// The parent `TangentVector` struct does not declare a stored property
+      /// with the same name as the original property.
+      TangentPropertyNotFound,
+      /// The tangent property's type is not equal to the original property's
+      /// `TangentVector` type.
+      TangentPropertyWrongType,
+      /// The tangent property is not a stored property.
+      TangentPropertyNotStored
+    };
+
+    /// The error kind.
+    Kind kind;
+
+  private:
+    union Value {
+      Type type;
+      Value(Type type) : type(type) {}
+      Value() {}
+    } value;
+
+  public:
+    Error(Kind kind) : kind(kind), value() {
+      assert(kind == Kind::NoDerivativeOriginalProperty ||
+             kind == Kind::NominalParentNotDifferentiable ||
+             kind == Kind::OriginalPropertyNotDifferentiable ||
+             kind == Kind::ParentTangentVectorNotStruct ||
+             kind == Kind::TangentPropertyNotFound ||
+             kind == Kind::TangentPropertyNotStored);
+    };
+
+    Error(Kind kind, Type type) : kind(kind), value(type) {
+      assert(kind == Kind::TangentPropertyWrongType);
+    };
+
+    Type getType() const {
+      assert(kind == Kind::TangentPropertyWrongType);
+      return value.type;
+    }
+
+    friend bool operator==(const Error &lhs, const Error &rhs);
+  };
+
+  /// The tangent stored property.
+  VarDecl *tangentProperty = nullptr;
+
+  /// An optional error.
+  Optional<Error> error = None;
+
+private:
+  TangentPropertyInfo(VarDecl *tangentProperty, Optional<Error> error)
+      : tangentProperty(tangentProperty), error(error) {}
+
+public:
+  TangentPropertyInfo(VarDecl *tangentProperty)
+      : TangentPropertyInfo(tangentProperty, None) {}
+
+  TangentPropertyInfo(Error::Kind errorKind)
+      : TangentPropertyInfo(nullptr, Error(errorKind)) {}
+
+  TangentPropertyInfo(Error::Kind errorKind, Type errorType)
+      : TangentPropertyInfo(nullptr, Error(errorKind, errorType)) {}
+
+  /// Returns `true` iff this tangent property info is valid.
+  bool isValid() const { return tangentProperty && !error; }
+
+  explicit operator bool() const { return isValid(); }
+
+  friend bool operator==(const TangentPropertyInfo &lhs,
+                         const TangentPropertyInfo &rhs) {
+    return lhs.tangentProperty == rhs.tangentProperty && lhs.error == rhs.error;
+  }
+};
+
+void simple_display(llvm::raw_ostream &OS, TangentPropertyInfo info);
 
 /// The key type used for uniquing `SILDifferentiabilityWitness` in
 /// `SILModule`: original function name, parameter indices, result indices, and
