@@ -2191,6 +2191,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Resolves the "tangent stored property" corresponding to an original stored
+/// property in a `Differentiable`-conforming type.
+class TangentStoredPropertyRequest
+    : public SimpleRequest<TangentStoredPropertyRequest,
+                           TangentPropertyInfo(VarDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  TangentPropertyInfo evaluate(Evaluator &evaluator,
+                               VarDecl *originalField) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether a type eraser has a viable initializer.
 class TypeEraserHasViableInitRequest
     : public SimpleRequest<TypeEraserHasViableInitRequest,
