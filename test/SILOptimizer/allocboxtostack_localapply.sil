@@ -1,0 +1,351 @@
+// RUN: %target-sil-opt %s -allocbox-to-stack -sil-deadfuncelim | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+
+sil hidden [noinline] [Onone] @$blackhole : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [noinline] @$testapply :
+// CHECK-NOT: alloc_box
+// CHECK: [[STK:%.*]] = alloc_stack $Int64, var, name "x"
+// CHECK-LABEL: } // end sil function '$testapply'
+sil [noinline] @$testapply : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  %5 = function_ref @$testapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  strong_release %0 : ${ var Int64 }
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil private [noinline] @$testapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = begin_access [read] [dynamic] %1 : $*Int64
+  %4 = load %3 : $*Int64
+  end_access %3 : $*Int64
+  %6 = alloc_stack $Int64
+  store %4 to %6 : $*Int64
+  %8 = function_ref @$blackhole : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<Int64>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %6 : $*Int64
+  %11 = tuple ()
+  return %11 : $()
+}
+
+sil private [noinline] @$testapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = function_ref @$testapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [noinline] @$testtryapply :
+// CHECK-NOT: alloc_box
+// CHECK: [[STK:%.*]] = alloc_stack $Int64, var, name "x"
+// CHECK-LABEL: } // end sil function '$testtryapply'
+sil [noinline] @$testtryapply : $@convention(thin) () -> @error Error {
+bb0:
+  %1 = alloc_box ${ var Int64 }, var, name "x"
+  %2 = project_box %1 : ${ var Int64 }, 0
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to %2 : $*Int64
+  %6 = function_ref @$testtryapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error
+  try_apply %6(%1) : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error, normal bb1, error bb2
+bb1(%8 : $()):
+  strong_release %1 : ${ var Int64 }
+  %10 = tuple ()
+  return %10 : $()
+bb2(%12 : $Error):
+  strong_release %1 : ${ var Int64 }
+  throw %12 : $Error
+}
+
+sil private [noinline] @$testtryapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error {
+bb0(%0 : ${ var Int64 }):
+  %2 = project_box %0 : ${ var Int64 }, 0
+  %4 = begin_access [read] [dynamic] %2 : $*Int64
+  %5 = load %4 : $*Int64
+  end_access %4 : $*Int64
+  %7 = alloc_stack $Int64
+  store %5 to %7 : $*Int64
+  %9 = function_ref @$blackhole : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %10 = apply %9<Int64>(%7) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %7 : $*Int64
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil private [noinline] @$testtryapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error {
+bb0(%0 : ${ var Int64 }):
+  %2 = project_box %0 : ${ var Int64 }, 0
+  %4 = function_ref @$testtryapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error
+  try_apply %4(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error, normal bb1, error bb2
+bb1(%6 : $()):
+  %7 = tuple ()
+  return %7 : $()
+bb2(%9 : $Error):
+  throw %9 : $Error
+}
+
+
+// CHECK-LABEL: sil [noinline] @$testpartialapply :
+// CHECK-NOT: alloc_box
+// CHECK: [[STK:%.*]] = alloc_stack $Int64, var, name "x"
+// CHECK-LABEL: } // end sil function '$testpartialapply'
+sil [noinline] @$testpartialapply : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  %5 = function_ref @$testpartialapplyclosure : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  strong_release %0 : ${ var Int64 }
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil private [noinline] @$testpartialapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = begin_access [read] [dynamic] %1 : $*Int64
+  %4 = load %3 : $*Int64
+  end_access %3 : $*Int64
+  %6 = alloc_stack $Int64
+  store %4 to %6 : $*Int64
+  %8 = function_ref @$blackhole : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<Int64>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %6 : $*Int64
+  %11 = tuple ()
+  return %11 : $()
+}
+
+sil private [noinline] @$testpartialapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = function_ref @$testpartialapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil private @$testpartialapplyclosure : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = function_ref @$testpartialapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [noinline] @$testtwoboxes :
+// CHECK-NOT: alloc_box
+// CHECK: [[STK1:%.*]] = alloc_stack $Int64, var, name "x"
+// CHECK: [[STK2:%.*]] = alloc_stack $Int64, var, name "y"
+// CHECK-LABEL: } // end sil function '$testtwoboxes'
+sil [noinline] @$testtwoboxes : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  %5 = alloc_box ${ var Int64 }, var, name "y"
+  %6 = project_box %5 : ${ var Int64 }, 0
+  %7 = integer_literal $Builtin.Int64, 0
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  store %8 to %6 : $*Int64
+  %10 = function_ref @$testtwoboxesbas : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> ()
+  %11 = apply %10(%0, %5) : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> ()
+  strong_release %5 : ${ var Int64 }
+  strong_release %0 : ${ var Int64 }
+  %14 = tuple ()
+  return %14 : $()
+}
+
+sil private [noinline] @$testtwoboxesbar : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }, %1 : ${ var Int64 }):
+  %2 = project_box %0 : ${ var Int64 }, 0
+  %4 = project_box %1 : ${ var Int64 }, 0
+  %6 = begin_access [read] [dynamic] %2 : $*Int64
+  %7 = load %6 : $*Int64
+  end_access %6 : $*Int64
+  %9 = alloc_stack $Int64
+  store %7 to %9 : $*Int64
+  %11 = function_ref @$blackhole : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %12 = apply %11<Int64>(%9) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %9 : $*Int64
+  %14 = begin_access [read] [dynamic] %4 : $*Int64
+  %15 = load %14 : $*Int64
+  end_access %14 : $*Int64
+  %17 = alloc_stack $Int64
+  store %15 to %17 : $*Int64
+  %19 = function_ref @$blackhole : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %20 = apply %19<Int64>(%17) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %17 : $*Int64
+  %22 = tuple ()
+  return %22 : $()
+}
+
+sil private [noinline] @$testtwoboxesbas : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }, %1 : ${ var Int64 }):
+  %2 = project_box %0 : ${ var Int64 }, 0
+  %4 = project_box %1 : ${ var Int64 }, 0
+  %6 = function_ref @$testtwoboxesbar : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> ()
+  %7 = apply %6(%0, %1) : $@convention(thin) (@guaranteed { var Int64 }, @guaranteed { var Int64 }) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [noinline] @$testboxescapes :
+// CHECK: alloc_box ${ var Int64 }, var, name "x"
+// CHECK-LABEL: } // end sil function '$testboxescapes'
+sil [noinline] @$testboxescapes : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
+bb0:
+  %0 = alloc_box ${ var Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  %5 = function_ref @$testboxescapesbas : $@convention(thin) (@guaranteed { var Int64 }) -> @owned @callee_guaranteed () -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> @owned @callee_guaranteed () -> ()
+  strong_release %0 : ${ var Int64 }
+  return %6 : $@callee_guaranteed () -> ()
+}
+
+sil private [noinline] @$testboxescapesbar : $@convention(thin) (@guaranteed { var Int64 }) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = function_ref @$testboxescapesclosure : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  strong_retain %0 : ${ var Int64 }
+  %5 = partial_apply [callee_guaranteed] %3(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  return %5 : $@callee_guaranteed () -> ()
+}
+
+sil private @$testboxescapesclosure : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = load %1 : $*Int64
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil private [noinline] @$testboxescapesbas : $@convention(thin) (@guaranteed { var Int64 }) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = function_ref @$testboxescapesbar : $@convention(thin) (@guaranteed { var Int64 }) -> @owned @callee_guaranteed () -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> @owned @callee_guaranteed () -> ()
+  return %4 : $@callee_guaranteed () -> ()
+}
+
+// CHECK-LABEL: sil [noinline] @$testrecur :
+// CHECK: alloc_box ${ var Int64 }, var, name "x"
+// CHECK-LABEL: } // end sil function '$testrecur'
+sil [noinline] @$testrecur : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  %5 = function_ref @$testrecurbas : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %7 = function_ref @$testrecurbar : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %8 = apply %7(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  strong_release %0 : ${ var Int64 }
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil private [noinline] @$testrecurbar : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = begin_access [read] [dynamic] %1 : $*Int64
+  %4 = load %3 : $*Int64
+  end_access %3 : $*Int64
+  %6 = alloc_stack $Int64
+  store %4 to %6 : $*Int64
+  %8 = function_ref @$blackhole : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<Int64>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %6 : $*Int64
+  %11 = function_ref @$testrecurbas : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %12 = apply %11(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil private [noinline] @$testrecurbas : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = function_ref @$testrecurbar : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [noinline] @$testbeginapply :
+// CHECK-NOT: alloc_box
+// CHECK: [[STK:%.*]] = alloc_stack $Int64, var, name "x"
+// CHECK-LABEL: } // end sil function '$testbeginapply'
+sil [noinline] @$testbeginapply : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  %5 = function_ref @$testbeginapplybas : $@yield_once @convention(thin) (@guaranteed { var Int64 }) -> @yields ()
+  (%addr, %token) = begin_apply %5(%0) : $@yield_once @convention(thin) (@guaranteed { var Int64 }) -> @yields ()
+  end_apply %token
+  strong_release %0 : ${ var Int64 }
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil private [noinline] @$testbeginapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = begin_access [read] [dynamic] %1 : $*Int64
+  %4 = load %3 : $*Int64
+  end_access %3 : $*Int64
+  %6 = alloc_stack $Int64
+  store %4 to %6 : $*Int64
+  %8 = function_ref @$blackhole : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<Int64>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %6 : $*Int64
+  %11 = tuple ()
+  return %11 : $()
+}
+
+sil private [noinline] @$testbeginapplybas : $@yield_once @convention(thin) (@guaranteed { var Int64 }) -> @yields () {
+bb0(%0 : ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %3 = function_ref @$testbeginapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = tuple ()
+  yield %5 : $(), resume bb1, unwind bb2
+bb1:
+  %rv = tuple()
+  return %rv : $()
+bb2:
+  unwind
+}
+
