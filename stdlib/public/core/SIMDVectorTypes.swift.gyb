@@ -253,7 +253,7 @@ extension ${Self}: SIMDScalar {
 
 %for (Self, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
 %if bits == 16:
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 %end
 extension ${Self} : SIMDScalar {
 

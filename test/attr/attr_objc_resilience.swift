@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -I %t
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=iosmac
 
 import Foundation
 import resilient_objc_class

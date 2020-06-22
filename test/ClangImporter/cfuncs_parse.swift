@@ -72,7 +72,7 @@ func test_powl() {
 }
 #endif
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 func test_f16() {
   var x = Float16.zero
   f16ptrfunc(&x)

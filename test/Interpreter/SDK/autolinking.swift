@@ -36,7 +36,11 @@ if global() != 42 {
 
 let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 if dlsym(RTLD_DEFAULT, "global") == nil {
-  print(String(cString: dlerror()))
+  if let err = dlerror() {
+    print(String(cString: err))
+  } else {
+    print("Unknown dlsym error")
+  }
   exit(EXIT_FAILURE)
 }
 #endif

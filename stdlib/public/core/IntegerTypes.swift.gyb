@@ -1152,7 +1152,7 @@ public struct ${Self}
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
 %     if FloatType == 'Float16':
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 %     end
   @_transparent
   public init(_ source: ${FloatType}) {
@@ -1182,7 +1182,7 @@ public struct ${Self}
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
 %     if FloatType == 'Float16':
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 %     end
   @_transparent
   public init?(exactly source: ${FloatType}) {

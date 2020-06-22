@@ -46,7 +46,7 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 
 //===--- Parsing ----------------------------------------------------------===//
 %if bits == 16:
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 %end
 extension ${Self}: LosslessStringConvertible {
   /// Creates a new instance from the given string.
@@ -134,7 +134,7 @@ extension ${Self}: LosslessStringConvertible {
   %if bits == 16:
     self.init(Substring(text))
   %else:
-    if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
       self.init(Substring(text))
     } else {
       self = 0.0
@@ -164,7 +164,7 @@ extension ${Self}: LosslessStringConvertible {
   // In particular, we still have to export
   // _swift_stdlib_strtoXYZ_clocale()
   // as ABI to support old compiled code that still requires it.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
   public init?(_ text: Substring) {
     self = 0.0
     let success = withUnsafeMutablePointer(to: &self) { p -> Bool in

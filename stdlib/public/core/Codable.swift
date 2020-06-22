@@ -4730,7 +4730,7 @@ extension RawRepresentable where RawValue == Float, Self: Decodable {
   }
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 extension Float16: Codable {
   /// Creates a new instance by decoding from the given decoder.
   ///

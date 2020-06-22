@@ -23,10 +23,6 @@ import StdlibUnittestFoundationExtras
 import Foundation
 import CoreGraphics
 
-#if os(iOS) || os(tvOS) || os(watchOS)
-import UIKit
-#endif
-
 var nsValueBridging = TestSuite("NSValueBridging")
 
 func rangesEqual(_ x: NSRange, _ y: NSRange) -> Bool {
@@ -67,16 +63,6 @@ ${ testCase("CGPoint",           "CGPoint(x: 17, y: 38)",                      "
 ${ testCase("CGSize",            "CGSize(width: 6, height: 79)",               "size",  "(==)") }
 ${ testCase("CGVector",          "CGVector(dx: 6, dy: 79)",                    None,    "(==)") }
 ${ testCase("CGAffineTransform", "CGAffineTransform(rotationAngle: .pi)",      None,    "(==)") }
-
-#endif
-
-#if os(iOS) || os(tvOS) || os(watchOS)
-
-${ testCase("CGRect",            "CGRect(x: 17, y: 38, width: 6, height: 79)", "cgRect",            "(==)") }
-${ testCase("CGPoint",           "CGPoint(x: 17, y: 38)",                      "cgPoint",           "(==)") }
-${ testCase("CGSize",            "CGSize(width: 6, height: 79)",               "cgSize",            "(==)") }
-${ testCase("CGVector",          "CGVector(dx: 6, dy: 79)",                    "cgVector",          "(==)") }
-${ testCase("CGAffineTransform", "CGAffineTransform(rotationAngle: .pi)",      "cgAffineTransform", "(==)") }
 
 #endif
 
