@@ -28,6 +28,7 @@ from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
 from .swiftevolve import SwiftEvolve
 from .swiftinspect import SwiftInspect
+from .swiftformat import SwiftFormat
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tensorflow import TensorFlowSwiftAPIs
@@ -49,6 +50,7 @@ __all__ = [
     'PythonKit',
     'Swift',
     'SwiftInspect',
+    'SwiftFormat',
     'SwiftPM',
     'TensorFlowSwiftAPIs',
     'XCTest',
