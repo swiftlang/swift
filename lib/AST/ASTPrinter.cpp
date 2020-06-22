@@ -107,7 +107,7 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *M,
+PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    bool printSPIs) {
@@ -116,7 +116,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *M,
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
-  result.CurrentModule = M;
+  result.CurrentModule = ModuleToPrint;
   result.FullyQualifiedTypes = true;
   result.UseExportedModuleNames = true;
   result.AllowNullTypes = false;
@@ -3768,8 +3768,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     // Clang declarations need special treatment: Multiple Clang modules can
     // contain the same declarations from a textually included header, but not
     // all of these modules may be visible. We therefore need to make sure we
-    // choose a module that is visible from the current module. This is
-    // obviously only possible, however, if we know what the current module is.
+    // choose a module that is visible from the current module. This is possible
+    // only if we know what the current module is.
     const clang::Decl *ClangDecl = Ty->getDecl()->getClangDecl();
     if (ClangDecl && Options.CurrentModule) {
       for (auto *Redecl : ClangDecl->redecls()) {
