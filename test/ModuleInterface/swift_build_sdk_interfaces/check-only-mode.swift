@@ -13,14 +13,14 @@
 // CHECK-DAG: FMWK.swiftmodule
 
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
-// RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/*.swiftmodule
+// RUN: "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/*.swiftmodule
 
 // Touch a file in the SDK (to make it look like it changed) and try again.
 // In -check-only mode, this should force a rebuild.
 // RUN: rm -rf %t/MCP
-// RUN: %{python} %S/../ModuleCache/Inputs/make-old.py %t/sdk/usr/lib/swift/Normal.swiftmodule/%target-swiftinterface-name
+// RUN: "%{python}" %S/../ModuleCache/Inputs/make-old.py %t/sdk/usr/lib/swift/Normal.swiftmodule/%target-swiftinterface-name
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
-// RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Normal-*.swiftmodule
+// RUN: not "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Normal-*.swiftmodule
 
 import Normal
 import Flat

@@ -11,7 +11,7 @@
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %S/Inputs -I %S/Inputs/prebuilt-module-cache/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-PREBUILT %s
 
 // Make sure we installed a forwarding module.
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 
 // What if the module is invalid?
 // RUN: rm %t/prebuilt-cache/Lib.swiftmodule && touch %t/prebuilt-cache/Lib.swiftmodule

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/../../CrossImport/Inputs/lib-templates/* %t/
-// RUN: %{python} %S/../../CrossImport/Inputs/rewrite-module-triples.py %t %module-target-triple
+// RUN: "%{python}" %S/../../CrossImport/Inputs/rewrite-module-triples.py %t %module-target-triple
 
 import BystandingLibrary
 

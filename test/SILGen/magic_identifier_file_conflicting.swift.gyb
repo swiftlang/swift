@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb -D TEMPDIR=%t %s > %t/magic_identifier_file_conflicting.swift
-// RUN: %{python} -c "import sys; t = open(sys.argv[1], 'rb').read().replace('\r\n', '\n'); open(sys.argv[1], 'wb').write(t)" %t/magic_identifier_file_conflicting.swift
+// RUN: "%{python}" -c "import sys; t = open(sys.argv[1], 'rb').read().replace('\r\n', '\n'); open(sys.argv[1], 'wb').write(t)" %t/magic_identifier_file_conflicting.swift
 
 // We want to check both the diagnostics and the SIL output.
 // RUN: %target-swift-emit-silgen -verify -emit-sorted-sil -enable-experimental-concise-pound-file -module-name Foo %t/magic_identifier_file_conflicting.swift %S/Inputs/magic_identifier_file_conflicting_other.swift | %FileCheck %s

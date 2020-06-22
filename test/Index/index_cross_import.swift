@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/CrossImport %t/CrossImport
-// RUN: %{python} %S/../CrossImport/Inputs/rewrite-module-triples.py %t/CrossImport %module-target-triple
+// RUN: "%{python}" %S/../CrossImport/Inputs/rewrite-module-triples.py %t/CrossImport %module-target-triple
 
 // RUN: %target-swift-ide-test -print-indexed-symbols -enable-cross-import-overlays -source-filename %s -F %t/CrossImport > %t/out
 // RUN: %FileCheck %s --check-prefix=CHECK-NEGATIVE -input-file=%t/out

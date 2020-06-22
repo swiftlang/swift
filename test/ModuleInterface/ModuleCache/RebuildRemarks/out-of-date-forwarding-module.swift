@@ -15,7 +15,7 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t/Build -sdk %t -prebuilt-module-cache-path %t/PrebuiltCache -module-cache-path %t/ModuleCache
 
 // 6. Make sure we installed a forwarding module in the cache
-// RUN: %{python} %S/../Inputs/check-is-forwarding-module.py %t/ModuleCache/TestModule-*.swiftmodule
+// RUN: "%{python}" %S/../Inputs/check-is-forwarding-module.py %t/ModuleCache/TestModule-*.swiftmodule
 
 // 7. Modify the interface so the forwarding module and prebuilt modules are no longer up-to-date
 // RUN: echo ' ' >> %t/Build/TestModule.swiftinterface

@@ -41,7 +41,7 @@ func foo(arg: Foo) {
 // BEGIN DUMMY.swift
 
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: "%{python}" %utils/split_file.py -o %t %s
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=complete -pos=8:11 -name file.swift -text-input %t/State1.swift -- file.swift == \

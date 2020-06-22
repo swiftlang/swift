@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/mcp)
 // RUN: cp -r %S/../../CrossImport/Inputs/lib-templates/* %t/
-// RUN: %{python} %S/../../CrossImport/Inputs/rewrite-module-triples.py %t %module-target-triple
+// RUN: "%{python}" %S/../../CrossImport/Inputs/rewrite-module-triples.py %t %module-target-triple
 
 
 // RUN: %sourcekitd-test -req=doc-info -module SwiftFramework -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -module-cache-path %t/mcp > %t.response

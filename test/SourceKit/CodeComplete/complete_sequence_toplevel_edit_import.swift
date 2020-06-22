@@ -19,7 +19,7 @@ import Bar
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: "%{python}" %utils/split_file.py -o %t %s
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=complete -pos=3:1 -name main.swift -text-input %t/State1.swift -- main.swift -F %S/../Inputs/libIDE-mock-sdk == \

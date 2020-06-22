@@ -19,7 +19,7 @@ func test() {
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/Modules)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: "%{python}" %utils/split_file.py -o %t %s
 
 // RUN: %target-swift-frontend \
 // RUN:     -emit-module \

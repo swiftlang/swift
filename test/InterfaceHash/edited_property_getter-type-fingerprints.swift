@@ -6,7 +6,7 @@
 // The per-type fingerprint should change
 
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: "%{python}" %utils/split_file.py -o %t %s
 // RUN: cp %t/{a,x}.swift
 // RUN: %target-swift-frontend -typecheck -enable-type-fingerprints -primary-file %t/x.swift -emit-reference-dependencies-path %t/x.swiftdeps -module-name main
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps_with_fingerprints.sh %swift-dependency-tool %t/x.swiftdeps %t/a-processed.swiftdeps

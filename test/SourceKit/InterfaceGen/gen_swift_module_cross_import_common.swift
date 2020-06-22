@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/mcp)
 // RUN: cp -r %S/../../CrossImport/Inputs/lib-templates/* %t/
-// RUN: %{python} %S/../../CrossImport/Inputs/rewrite-module-triples.py %t %module-target-triple
+// RUN: "%{python}" %S/../../CrossImport/Inputs/rewrite-module-triples.py %t %module-target-triple
 
 // 1) Check the interface shows the decls from each of SwiftFramework's cross-import overlays.
 //

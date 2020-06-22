@@ -16,25 +16,25 @@
 // RUN: %empty-directory(%t/prebuilt-cache/Lib.swiftmodule)
 // RUN: sed -e 's/FromInterface/FromPrebuiltLong/g' %S/Inputs/prebuilt-module-cache/Lib.swiftinterface | %target-swift-frontend -parse-stdlib -module-cache-path %t/MCP -emit-module-path %t/prebuilt-cache/Lib.swiftmodule/x86_64-apple-macos.swiftmodule - -module-name Lib
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %t/include -I %t/include/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-PREBUILT-LONG %s
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 
 // Prefer a matching name.
 // RUN: %empty-directory(%t/MCP)
 // RUN: sed -e 's/FromInterface/FromPrebuiltShort/g' %S/Inputs/prebuilt-module-cache/Lib.swiftinterface | %target-swift-frontend -parse-stdlib -module-cache-path %t/MCP -emit-module-path %t/prebuilt-cache/Lib.swiftmodule/x86_64.swiftmodule - -module-name Lib
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %t/include -I %t/include/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-PREBUILT-SHORT %s
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 
 // Prefer a matching name in the other direction too.
 // RUN: %empty-directory(%t/MCP)
 // RUN: mv %t/include/Lib.swiftmodule/x86_64.swiftinterface %t/include/Lib.swiftmodule/x86_64-apple-macos.swiftinterface
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %t/include -I %t/include/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-PREBUILT-LONG %s
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 
 // Don't do the fallback thing for long names to short names.
 // RUN: %empty-directory(%t/MCP)
 // RUN: rm %t/prebuilt-cache/Lib.swiftmodule/x86_64-apple-macos.swiftmodule
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %t/include -I %t/include/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 
 import Lib
 

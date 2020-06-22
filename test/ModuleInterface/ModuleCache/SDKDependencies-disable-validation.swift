@@ -39,8 +39,8 @@
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
 //
 // Check they are *not* forwarding modules
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they don't contain dependencies in the module cache (..or prebuilt cache)
 // RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
@@ -71,8 +71,8 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they *are* forwarding modules
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they contain the expected dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=EXLIB
@@ -114,8 +114,8 @@
 //
 // Check that they're both still forwarding modules, because we didn't stat
 // the system dependencies.
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
 //
 // Check ExportedLib still contains the same dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=EXLIB
@@ -134,8 +134,8 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check ExportedLib is still a forwarding module and SdkLib is not
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
 //
 // Check ExportedLib still contains the same dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=EXLIB
@@ -148,7 +148,7 @@
 
 // 6) If we do one more change, we won't rebuild SdkLib *again*...
 //
-// RUN: %{python} %S/Inputs/make-old.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/make-old.py %t/MCP/SdkLib-*.swiftmodule
 // RUN: echo "// size change" >> %t/my-sdk/SdkLib.swiftinterface
 // RUN: %target-swift-frontend -typecheck -I %t/my-sdk -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies -disable-modules-validate-system-headers %s
 //
@@ -157,17 +157,17 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check ExportedLib is still a forwarding module and SdkLib is not
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
 //
 // Check SdkLib hasn't been rebuilt.
-// RUN: %{python} %S/Inputs/check-is-old.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-old.py %t/MCP/SdkLib-*.swiftmodule
 //
 // RUN: echo '6: PASSED'
 
 // 7) ...until we turn off -disable-modules-validate-system-headers.
 //
-// RUN: %{python} %S/Inputs/make-old.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/make-old.py %t/MCP/SdkLib-*.swiftmodule
 // RUN: echo "// size change" >> %t/my-sdk/SdkLib.swiftinterface
 // RUN: %target-swift-frontend -typecheck -I %t/my-sdk -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
 //
@@ -176,11 +176,11 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check ExportedLib is still a forwarding module and SdkLib is not
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
 //
 // Check SdkLib has been rebuilt.
-// RUN: not %{python} %S/Inputs/check-is-old.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-old.py %t/MCP/SdkLib-*.swiftmodule
 //
 // RUN: echo '7: PASSED'
 

@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/keypaths_external_other.swiftmodule -module-name=keypaths_external_other %S/Inputs/keypaths_external_other.swift
 // -- Convert <i32 0x...> constants to decimal constants that LLVM will print
-// RUN: %{python} %utils/chex.py < %s > %t/keypaths.sil
+// RUN: "%{python}" %utils/chex.py < %s > %t/keypaths.sil
 // RUN: %target-swift-frontend -module-name keypaths -emit-ir %s -I %t | %FileCheck %t/keypaths.sil
 
 sil_stage canonical

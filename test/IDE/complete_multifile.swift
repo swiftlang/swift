@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: "%{python}" %utils/split_file.py -o %t %s
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/Main.swift %t/Library.swift -code-completion-token=POINT_PAREN | %FileCheck --check-prefix=POINT_PAREN %s
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/Main.swift %t/Library.swift -code-completion-token=POINT_DOT | %FileCheck --check-prefix=POINT_DOT %s

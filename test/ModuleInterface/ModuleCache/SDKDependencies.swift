@@ -41,8 +41,8 @@
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
 //
 // Check they are *not* forwarding modules
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they don't contain dependencies in the module cache (..or prebuilt cache)
 // RUN: llvm-bcanalyzer -dump %t/MCP/SdkLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT
@@ -83,8 +83,8 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they *are* forwarding modules
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they contain the expected dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=EXLIB
@@ -131,8 +131,8 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they are still both forwarding modules
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check they contain the expected dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NEW-EXLIB
@@ -170,8 +170,8 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check ExportedLib is still a forwarding module and SdkLib is not
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
 //
 // Check ExportedLib still contains the same dependencies
 // RUN: cat %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=NEW-EXLIB
@@ -190,8 +190,8 @@
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check neither are forwarding modules
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
-// RUN: not %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/SdkLib-*.swiftmodule
+// RUN: not "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/ExportedLib-*.swiftmodule
 //
 // Check neither contains dependencies in the module cache or prebuilt cache
 // RUN: llvm-bcanalyzer -dump %t/MCP/ExportedLib-*.swiftmodule | %FileCheck %s -check-prefix=PREBUILT

@@ -10,7 +10,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/one-way-with-swiftdeps-fine/* %t
-// RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
+// RUN: "%{python}" %S/Inputs/touch.py 443865900 %t/*
 
 // RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0]}}' > %t/main~buildrecord.swiftdeps
 // RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -disable-direct-intramodule-dependencies -v -driver-show-incremental -disable-direct-intramodule-dependencies -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-INCREMENTAL %s

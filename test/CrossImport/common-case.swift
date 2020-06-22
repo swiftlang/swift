@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/lib-templates/* %t/
-// RUN: %{python} %S/Inputs/rewrite-module-triples.py %t %module-target-triple
+// RUN: "%{python}" %S/Inputs/rewrite-module-triples.py %t %module-target-triple
 
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -I %t/include -I %t/lib/swift -F %t/Frameworks
 

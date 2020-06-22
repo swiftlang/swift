@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/chex.py < %s > %t/class_metadata.swift
+// RUN: "%{python}" %utils/chex.py < %s > %t/class_metadata.swift
 // RUN: %target-swift-frontend  -enable-objc-interop -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefixes=CHECK,CHECK-%target-ptrsize,CHECK-%target-import-type,CHECK-%target-cpu -D#MDSIZE=7
 // RUN: %target-swift-frontend -disable-objc-interop -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefixes=CHECK,CHECK-%target-ptrsize,CHECK-%target-import-type,CHECK-%target-cpu -D#MDSIZE=4
 

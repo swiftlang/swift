@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/lib-templates/* %t/
-// RUN: %{python} %S/Inputs/rewrite-module-triples.py %t %module-target-triple
+// RUN: "%{python}" %S/Inputs/rewrite-module-triples.py %t %module-target-triple
 
 //
 // Meta-tests: These verify that the test harness is functional. If they fail,

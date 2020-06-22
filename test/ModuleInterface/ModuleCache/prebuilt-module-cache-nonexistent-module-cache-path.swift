@@ -8,6 +8,6 @@
 // RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/RandomPath/NonExistentCachePath -sdk %S/Inputs -I %S/Inputs/prebuilt-module-cache -prebuilt-module-cache-path %t/prebuilt-cache %s
 
 // Make sure we installed a forwarding module.
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/RandomPath/NonExistentCachePath/Lib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/RandomPath/NonExistentCachePath/Lib-*.swiftmodule
 
 import Lib

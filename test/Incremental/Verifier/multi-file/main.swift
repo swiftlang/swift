@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %{python} %S/../gen-output-file-map.py -o %t %S/Inputs -r %t.resp
+// RUN: "%{python}" %S/../gen-output-file-map.py -o %t %S/Inputs -r %t.resp
 // RUN: cd %t && %target-swiftc_driver -c -output-file-map %t/output.json -incremental -disable-direct-intramodule-dependencies -module-name main -verify-incremental-dependencies @%t.resp
 // RUN: cd %t && %target-swiftc_driver -c -output-file-map %t/output.json -incremental -disable-direct-intramodule-dependencies -enable-batch-mode -module-name main -verify-incremental-dependencies @%t.resp
 

@@ -16,7 +16,7 @@
 // RUN: %target-swift-frontend -typecheck -resource-dir %t/ResourceDir -I %t %s -parse-stdlib -module-cache-path %t/ModuleCache -sdk %t
 
 // 5. Make sure we installed a forwarding module in the module cache.
-// RUN: %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/ModuleCache/PrebuiltModule-*.swiftmodule
+// RUN: "%{python}" %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/ModuleCache/PrebuiltModule-*.swiftmodule
 
 import PrebuiltModule
 

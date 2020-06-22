@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: "%{python}" %utils/split_file.py -o %t %s
 
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift
 // RUN: %target-swift-ide-test -code-completion -source-filename %t/Test.swift -I %t -code-completion-token=OPAQUE_RESULT | %FileCheck --check-prefix=OPAQUE_RESULT %s

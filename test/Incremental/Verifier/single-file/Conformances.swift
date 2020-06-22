@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %{python} %S/../gen-output-file-map.py -o %t %S
+// RUN: "%{python}" %S/../gen-output-file-map.py -o %t %S
 // RUN: cd %t && %target-swiftc_driver -typecheck -output-file-map %t/output.json -incremental -disable-direct-intramodule-dependencies -module-name main -verify-incremental-dependencies %s
 
 public protocol PublicProtocol { } // expected-provides {{PublicProtocol}}

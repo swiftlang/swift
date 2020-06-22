@@ -28,7 +28,7 @@
 
 // 4. Make sure the forwarding module is installed in the cache.
 
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/ModuleCache/ExportedLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/ModuleCache/ExportedLib-*.swiftmodule
 
 // 5. Make sure the forwarding module depends on the prebuilt module and the C
 //    header.
@@ -48,9 +48,9 @@
 // 8. Make sure we re-build the SdkLib module if one of the dependencies changes its mtime (but not its hash).
 //    This will ensure we recorded the forwarding module's dependencies, not the prebuilt.
 
-// RUN: %{python} %S/Inputs/make-old.py %t/ModuleCache/SdkLib-*.swiftmodule
-// RUN: %{python} %S/Inputs/make-old.py %t/mock-sdk/usr/include/SomeCModule.h
+// RUN: "%{python}" %S/Inputs/make-old.py %t/ModuleCache/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/make-old.py %t/mock-sdk/usr/include/SomeCModule.h
 // RUN: %target-swift-frontend -typecheck %s -prebuilt-module-cache-path %t/PrebuiltModuleCache -module-cache-path %t/ModuleCache -sdk %t/mock-sdk -I %t/mock-sdk -track-system-dependencies
-// RUN: %{python} %S/Inputs/check-is-new.py %t/ModuleCache/SdkLib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-new.py %t/ModuleCache/SdkLib-*.swiftmodule
 
 import SdkLib

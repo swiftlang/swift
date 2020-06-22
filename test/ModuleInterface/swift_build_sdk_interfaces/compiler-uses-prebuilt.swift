@@ -13,16 +13,16 @@
 // CHECK-DAG: FMWK.swiftmodule
 
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
-// RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/*.swiftmodule
+// RUN: "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/*.swiftmodule
 
 // Touch a file in the SDK (to make it look like it changed) and try again.
 // This should still be able to use the prebuilt modules because they track
 // content hashes, not just size+mtime.
 // RUN: rm -rf %t/MCP
-// RUN: %{python} %S/../ModuleCache/Inputs/make-old.py %t/sdk/usr/lib/swift/Normal.swiftmodule/%target-swiftinterface-name
+// RUN: "%{python}" %S/../ModuleCache/Inputs/make-old.py %t/sdk/usr/lib/swift/Normal.swiftmodule/%target-swiftinterface-name
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
 // RUN: ls %t/MCP/*.swiftmodule | %FileCheck -check-prefix CHECK-CACHE %s
-// RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/*.swiftmodule
+// RUN: "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/*.swiftmodule
 
 // CHECK-CACHE-DAG: Normal-{{.+}}.swiftmodule
 // CHECK-CACHE-DAG: Flat-{{.+}}.swiftmodule
@@ -34,18 +34,18 @@
 // RUN: echo "public func another()" >> %t/sdk/usr/lib/swift/Normal.swiftmodule/%target-swiftinterface-name
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
 // RUN: ls %t/MCP/*.swiftmodule | %FileCheck -check-prefix CHECK-CACHE %s
-// RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Normal-*.swiftmodule
-// RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Flat-*.swiftmodule
-// RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/FMWK-*.swiftmodule
+// RUN: not "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Normal-*.swiftmodule
+// RUN: "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Flat-*.swiftmodule
+// RUN: "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/FMWK-*.swiftmodule
 
 // Without the prebuilt cache everything should still work; it'll just take time
 // because we have to build the interfaces.
 // RUN: rm -rf %t/MCP
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP
 // RUN: ls %t/MCP/*.swiftmodule | %FileCheck -check-prefix CHECK-CACHE %s
-// RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Normal-*.swiftmodule
-// RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Flat-*.swiftmodule
-// RUN: not %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/FMWK-*.swiftmodule
+// RUN: not "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Normal-*.swiftmodule
+// RUN: not "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Flat-*.swiftmodule
+// RUN: not "%{python}" %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/FMWK-*.swiftmodule
 
 
 import Normal

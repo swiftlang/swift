@@ -9,9 +9,9 @@
 // generating inlinable SIL) should produce the same swiftmodule. We don't
 // promise more than that at this time...
 
-// RUN: %{python} %S/../Inputs/getmtime.py %t/def_class.1.swiftmodule > %t/orig-mtime.txt
+// RUN: "%{python}" %S/../Inputs/getmtime.py %t/def_class.1.swiftmodule > %t/orig-mtime.txt
 // RUN: %target-swift-frontend -module-name def_class -emit-module-path %t/def_class.1.swiftmodule %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module -enable-objc-interop
-// RUN: %{python} %S/../Inputs/getmtime.py %t/def_class.1.swiftmodule > %t.3
+// RUN: "%{python}" %S/../Inputs/getmtime.py %t/def_class.1.swiftmodule > %t.3
 // RUN: cmp %t/orig-mtime.txt %t.3
 
 // We shouldn't re-emit the module if it hasn't changed.

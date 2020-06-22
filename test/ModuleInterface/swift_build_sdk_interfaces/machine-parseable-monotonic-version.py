@@ -1,5 +1,5 @@
 # RUN: %swift_build_sdk_interfaces -machine-parseable-monotonic-version | \
-# RUN:   %{python} %s
+# RUN:   "%{python}" %s
 
 import sys
 

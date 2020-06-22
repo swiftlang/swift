@@ -11,7 +11,7 @@
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %S/Inputs -I %S/Inputs/prebuilt-module-cache/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-PREBUILT %s
 
 // Make sure we installed a forwarding module.
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 // RUN: cat %t/MCP/Lib-*.swiftmodule
 
 // Now invalidate a dependency of the prebuilt module, by changing the hash of the .swiftinterface.
@@ -39,10 +39,10 @@
 // we should delete it and generate a new forwarding module.
 // RUN: %empty-directory(%t/MCP)
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %S/Inputs -I %S/Inputs/prebuilt-module-cache/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
-// RUN: %{python} %S/../Inputs/make-unreadable.py %t/MCP/Lib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: "%{python}" %S/../Inputs/make-unreadable.py %t/MCP/Lib-*.swiftmodule
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %S/Inputs -I %S/Inputs/prebuilt-module-cache/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-PREBUILT %s
-// RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: "%{python}" %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 
 import Lib
 

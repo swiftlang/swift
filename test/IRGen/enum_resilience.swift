@@ -1,6 +1,6 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/chex.py < %s > %t/enum_resilience.swift
+// RUN: "%{python}" %utils/chex.py < %s > %t/enum_resilience.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -disable-type-layout -emit-ir -enable-library-evolution -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_RES

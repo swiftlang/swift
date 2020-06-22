@@ -32,7 +32,7 @@ extension Bar {
 // NOTE: Test that switching editing file doesn't trigger fast-completion
 
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: "%{python}" %utils/split_file.py -o %t %s
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=complete -pos=7:11 %t/file1.swift -- %t/file1.swift %t/file2.swift == \
