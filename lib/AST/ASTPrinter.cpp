@@ -3650,7 +3650,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
-  Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>> VisibleClangModules;
+  Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
+      VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> Args) {
     if (Args.empty())
