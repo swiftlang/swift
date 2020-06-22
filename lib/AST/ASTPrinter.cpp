@@ -3681,7 +3681,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
   }
 
-  /// Determinee whether the given type has a simple representation
+  /// Determine whether the given type has a simple representation
   /// under the current print options.
   bool isSimpleUnderPrintOptions(Type T) {
     if (auto typealias = dyn_cast<TypeAliasType>(T.getPointer())) {
@@ -3703,42 +3703,58 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     return T->hasSimpleTypeRepr();
   }
 
-  /// Add all Clang modules that have been imported into `Mod` to
-  /// `clangModules`.
-  ///
-  /// This also takes into account any modules that are imported transitively
-  /// through public (`@_exported`) imports.
-  /// `clangModules` is a map from each imported Clang module to the
-  /// corresponding Swift module.
-  static void getImportedClangModules(
-      ModuleDecl *Mod, ModuleDecl::ImportFilter filter,
-      llvm::DenseMap<const clang::Module *, ModuleDecl *> &clangModules) {
-    SmallVector<ModuleDecl::ImportedModule, 4> imports;
-    Mod->getImportedModules(imports, filter);
-    for (const auto &import : imports) {
-      ModuleDecl *importedModule = import.importedModule->getTopLevelModule();
-      if (const clang::Module *clangModule =
-              importedModule->findUnderlyingClangModule())
-        clangModules[clangModule] = importedModule;
-      getImportedClangModules(import.importedModule,
-                              ModuleDecl::ImportFilterKind::Public,
-                              clangModules);
+  /// Computes the map that is cached by `getVisibleClangModules()`.
+  /// Do not call directly.
+  llvm::DenseMap<const clang::Module *, ModuleDecl *>
+  computeVisibleClangModules() {
+    assert(Options.CurrentModule &&
+           "CurrentModule needs to be set to determine imported Clang modules");
+
+    llvm::DenseMap<const clang::Module *, ModuleDecl *> Result;
+
+    // For the current module, consider both private and public imports.
+    ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Public;
+    Filter |= ModuleDecl::ImportFilterKind::Private;
+    SmallVector<ModuleDecl::ImportedModule, 4> Imports;
+    Options.CurrentModule->getImportedModules(Imports, Filter);
+
+    SmallVector<ModuleDecl *, 4> ModulesToProcess;
+    for (const auto &Import : Imports) {
+      ModulesToProcess.push_back(Import.importedModule);
     }
+
+    SmallPtrSet<ModuleDecl *, 4> Processed;
+    while (!ModulesToProcess.empty()) {
+      ModuleDecl *Mod = ModulesToProcess.back();
+      ModulesToProcess.pop_back();
+
+      if (!Processed.insert(Mod).second)
+        continue;
+
+      if (const clang::Module *ClangModule = Mod->findUnderlyingClangModule())
+        Result[ClangModule] = Mod;
+
+      // For transitive imports, consider only public imports.
+      Imports.clear();
+      Mod->getImportedModules(Imports, ModuleDecl::ImportFilterKind::Public);
+      for (const auto &Import : Imports) {
+        ModulesToProcess.push_back(Import.importedModule);
+      }
+    }
+
+    return Result;
   }
 
   /// Returns all Clang modules that are visible from `Options.CurrentModule`.
+  /// This includes any modules that are imported transitively through public
+  /// (`@_exported`) imports.
+  ///
   /// The returned map associates each visible Clang module with the
   /// corresponding Swift module.
   const llvm::DenseMap<const clang::Module *, ModuleDecl *> &
   getVisibleClangModules() {
-    assert(Options.CurrentModule &&
-           "CurrentModule needs to be set to determine imported Clang modules");
     if (!VisibleClangModules) {
-      VisibleClangModules.emplace();
-      ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Public;
-      Filter |= ModuleDecl::ImportFilterKind::Private;
-      getImportedClangModules(Options.CurrentModule, Filter,
-                              *VisibleClangModules);
+      VisibleClangModules = computeVisibleClangModules();
     }
     return *VisibleClangModules;
   }
