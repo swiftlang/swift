@@ -295,6 +295,10 @@ AvailabilityContext ASTContext::getPrespecializedGenericMetadataAvailability() {
   return getSwift53Availability();
 }
 
+AvailabilityContext ASTContext::getCompareTypeContextDescriptorsAvailability() {
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 

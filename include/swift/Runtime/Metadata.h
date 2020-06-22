@@ -294,6 +294,20 @@ const
 /// the same context.
 bool equalContexts(const ContextDescriptor *a, const ContextDescriptor *b);
 
+/// Determines whether two type context descriptors describe the same type
+/// context.
+///
+/// Runtime availability: Swift 5.4.
+///
+/// \param lhs The first type context descriptor to compare.
+/// \param rhs The second type context descriptor to compare.
+///
+/// \returns true if both describe the same type context, false otherwise.
+SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
+bool swift_compareTypeContextDescriptors(const TypeContextDescriptor *lhs,
+                                         const TypeContextDescriptor *rhs);
+
 /// Compute the bounds of class metadata with a resilient superclass.
 ClassMetadataBounds getResilientMetadataBounds(
                                            const ClassDescriptor *descriptor);
