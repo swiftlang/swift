@@ -375,6 +375,12 @@ public:
     /// The instruction may read memory.
     MayRead,
     /// The instruction may write to memory.
+    /// This includes destroying or taking from memory (e.g. destroy_addr,
+    /// copy_addr [take], load [take]).
+    /// Although, physically, destroying or taking does not modify the memory,
+    /// it is important to model it is a write. Optimizations must not assume
+    /// that the value stored in memory is still available for loading after
+    /// the memory is destroyed or taken.
     MayWrite,
     /// The instruction may read or write memory.
     MayReadWrite,
