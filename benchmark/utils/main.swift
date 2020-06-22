@@ -379,6 +379,7 @@ register(StringEnum.benchmarks)
 register(StringInterpolation.benchmarks)
 register(StringMatch.benchmarks)
 register(StringRemoveDupes.benchmarks)
+registerBenchmark(StringRepeating.benchmarks)
 register(StringReplaceSubrange.benchmarks)
 
 if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
