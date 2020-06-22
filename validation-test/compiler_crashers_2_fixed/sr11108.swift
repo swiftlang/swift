@@ -1,6 +1,4 @@
-// RUN: not --crash %target-swift-emit-silgen %s
-
-// REQUIRES: asserts
+// RUN: %target-swift-emit-silgen %s
 
 protocol Example {
     associatedtype Signed: SignedInteger
