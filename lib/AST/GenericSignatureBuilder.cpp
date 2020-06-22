@@ -837,6 +837,11 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
 
       if (parentEquivClass->concreteType)
         derivedViaConcrete = true;
+      else if (parentEquivClass->superclass &&
+               builder.lookupConformance(parentType->getCanonicalType(),
+                                         parentEquivClass->superclass,
+                                         source->getProtocolDecl()))
+        derivedViaConcrete = true;
 
       // The parent potential archetype must conform to the protocol in which
       // this requirement resides. Add this constraint.
