@@ -3,6 +3,8 @@
 // RUN: %target-swift-symbolgraph-extract -module-name UnconditionallyUnavailable -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/UnconditionallyUnavailable.symbols.json
 
+// REQUIRES: OS=macosx
+
 @available(iOS, unavailable)
 public struct UnconditionallyUnavailable {}
 
