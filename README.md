@@ -91,7 +91,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/resources/).
+To build for macOS, you need [Xcode 12 beta](https://developer.apple.com/xcode/resources/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
