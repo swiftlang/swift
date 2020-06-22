@@ -547,29 +547,12 @@ CLONE_AND_EMIT_TANGENT(StructExtract, sei) {
   assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
          "`struct_extract` with `@noDerivative` field should not be "
          "differentiated; activity analysis should not marked as varied.");
-
   auto diffBuilder = getDifferentialBuilder();
-  ;
-  auto tangentVectorTy = getRemappedTangentType(sei->getOperand()->getType());
-  auto *tangentVectorDecl = tangentVectorTy.getStructOrBoundGenericStruct();
-
   // Find the corresponding field in the tangent space.
-  VarDecl *tanField = nullptr;
-  // If the tangent space is the original struct, then field is the same.
-  if (tangentVectorDecl == sei->getStructDecl())
-    tanField = sei->getField();
-  // Otherwise, look up the field by name.
-  else {
-    auto tanFieldLookup =
-        tangentVectorDecl->lookupDirect(sei->getField()->getName());
-    if (tanFieldLookup.empty()) {
-      context.emitNondifferentiabilityError(
-          sei, invoker, diag::autodiff_stored_property_no_corresponding_tangent,
-          sei->getStructDecl()->getNameStr(), sei->getField()->getNameStr());
-      errorOccurred = true;
-      return;
-    }
-    tanField = cast<VarDecl>(tanFieldLookup.front());
+  auto *tanField = getTangentStoredProperty(context, sei, invoker);
+  if (!tanField) {
+    errorOccurred = true;
+    return;
   }
   // Emit tangent `struct_extract`.
   auto tanStruct =
@@ -590,32 +573,14 @@ CLONE_AND_EMIT_TANGENT(StructElementAddr, seai) {
   assert(!seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
          "`struct_element_addr` with `@noDerivative` field should not be "
          "differentiated; activity analysis should not marked as varied.");
-
   auto diffBuilder = getDifferentialBuilder();
   auto *bb = seai->getParent();
-  auto tangentVectorTy = getRemappedTangentType(seai->getOperand()->getType());
-  auto *tangentVectorDecl = tangentVectorTy.getStructOrBoundGenericStruct();
-
   // Find the corresponding field in the tangent space.
-  VarDecl *tanField = nullptr;
-  // If the tangent space is the original struct, then field is the same.
-  if (tangentVectorDecl == seai->getStructDecl())
-    tanField = seai->getField();
-  // Otherwise, look up the field by name.
-  else {
-    auto tanFieldLookup =
-        tangentVectorDecl->lookupDirect(seai->getField()->getName());
-    if (tanFieldLookup.empty()) {
-      context.emitNondifferentiabilityError(
-          seai, invoker,
-          diag::autodiff_stored_property_no_corresponding_tangent,
-          seai->getStructDecl()->getNameStr(), seai->getField()->getNameStr());
-      errorOccurred = true;
-      return;
-    }
-    tanField = cast<VarDecl>(tanFieldLookup.front());
+  auto *tanField = getTangentStoredProperty(context, seai, invoker);
+  if (!tanField) {
+    errorOccurred = true;
+    return;
   }
-
   // Emit tangent `struct_element_addr`.
   auto tanOperand = getTangentBuffer(bb, seai->getOperand());
   auto tangentInst =

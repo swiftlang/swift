@@ -421,3 +421,128 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
   }
   }
 }
+
+bool swift::operator==(const TangentPropertyInfo::Error &lhs,
+                       const TangentPropertyInfo::Error &rhs) {
+  if (lhs.kind != rhs.kind)
+    return false;
+  switch (lhs.kind) {
+  case TangentPropertyInfo::Error::Kind::NoDerivativeOriginalProperty:
+  case TangentPropertyInfo::Error::Kind::NominalParentNotDifferentiable:
+  case TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable:
+  case TangentPropertyInfo::Error::Kind::ParentTangentVectorNotStruct:
+  case TangentPropertyInfo::Error::Kind::TangentPropertyNotFound:
+  case TangentPropertyInfo::Error::Kind::TangentPropertyNotStored:
+    return true;
+  case TangentPropertyInfo::Error::Kind::TangentPropertyWrongType:
+    return lhs.getType()->isEqual(rhs.getType());
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &os, TangentPropertyInfo info) {
+  os << "{ ";
+  os << "tangent property: "
+     << (info.tangentProperty ? info.tangentProperty->printRef() : "null");
+  if (info.error) {
+    os << ", error: ";
+    switch (info.error->kind) {
+    case TangentPropertyInfo::Error::Kind::NoDerivativeOriginalProperty:
+      os << "'@noDerivative' original property has no tangent property";
+      break;
+    case TangentPropertyInfo::Error::Kind::NominalParentNotDifferentiable:
+      os << "nominal parent does not conform to 'Differentiable'";
+      break;
+    case TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable:
+      os << "original property type does not conform to 'Differentiable'";
+      break;
+    case TangentPropertyInfo::Error::Kind::ParentTangentVectorNotStruct:
+      os << "'TangentVector' type is not a struct";
+      break;
+    case TangentPropertyInfo::Error::Kind::TangentPropertyNotFound:
+      os << "'TangentVector' struct does not have stored property with the "
+            "same name as the original property";
+      break;
+    case TangentPropertyInfo::Error::Kind::TangentPropertyWrongType:
+      os << "tangent property's type is not equal to the original property's "
+            "'TangentVector' type";
+      break;
+    case TangentPropertyInfo::Error::Kind::TangentPropertyNotStored:
+      os << "'TangentVector' property '" << info.tangentProperty->getName()
+         << "' is not a stored property";
+      break;
+    }
+  }
+  os << " }";
+}
+
+TangentPropertyInfo
+TangentStoredPropertyRequest::evaluate(Evaluator &evaluator,
+                                       VarDecl *originalField) const {
+  assert(originalField->hasStorage() && originalField->isInstanceMember() &&
+         "Expected stored property");
+  auto *parentDC = originalField->getDeclContext();
+  assert(parentDC->isTypeContext());
+  auto parentType = parentDC->getDeclaredTypeInContext();
+  auto *moduleDecl = originalField->getModuleContext();
+  auto parentTan = parentType->getAutoDiffTangentSpace(
+      LookUpConformanceInModule(moduleDecl));
+  // Error if parent nominal type does not conform to `Differentiable`.
+  if (!parentTan) {
+    return TangentPropertyInfo(
+        TangentPropertyInfo::Error::Kind::NominalParentNotDifferentiable);
+  }
+  // Error if original stored property is `@noDerivative`.
+  if (originalField->getAttrs().hasAttribute<NoDerivativeAttr>()) {
+    return TangentPropertyInfo(
+        TangentPropertyInfo::Error::Kind::NoDerivativeOriginalProperty);
+  }
+  // Error if original property's type does not conform to `Differentiable`.
+  auto originalFieldTan = originalField->getType()->getAutoDiffTangentSpace(
+      LookUpConformanceInModule(moduleDecl));
+  if (!originalFieldTan) {
+    return TangentPropertyInfo(
+        TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable);
+  }
+  auto parentTanType = parentTan->getType();
+  auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
+  // Error if parent `TangentVector` is not a struct.
+  if (!parentTanStruct) {
+    return TangentPropertyInfo(
+        TangentPropertyInfo::Error::Kind::ParentTangentVectorNotStruct);
+  }
+  // Find the corresponding field in the tangent space.
+  VarDecl *tanField = nullptr;
+  // If `TangentVector` is the original struct, then the tangent property is the
+  // original property.
+  if (parentTanStruct == parentDC->getSelfStructDecl()) {
+    tanField = originalField;
+  }
+  // Otherwise, look up the field by name.
+  else {
+    auto tanFieldLookup =
+        parentTanStruct->lookupDirect(originalField->getName());
+    llvm::erase_if(tanFieldLookup,
+                   [](ValueDecl *v) { return !isa<VarDecl>(v); });
+    // Error if tangent property could not be found.
+    if (tanFieldLookup.empty()) {
+      return TangentPropertyInfo(
+          TangentPropertyInfo::Error::Kind::TangentPropertyNotFound);
+    }
+    tanField = cast<VarDecl>(tanFieldLookup.front());
+  }
+  // Error if tangent property's type is not equal to the original property's
+  // `TangentVector` type.
+  auto originalFieldTanType = originalFieldTan->getType();
+  if (!originalFieldTanType->isEqual(tanField->getType())) {
+    return TangentPropertyInfo(
+        TangentPropertyInfo::Error::Kind::TangentPropertyWrongType,
+        originalFieldTanType);
+  }
+  // Error if tangent property is not a stored property.
+  if (!tanField->hasStorage()) {
+    return TangentPropertyInfo(
+        TangentPropertyInfo::Error::Kind::TangentPropertyNotStored);
+  }
+  // Otherwise, tangent property is valid.
+  return TangentPropertyInfo(tanField);
+}
