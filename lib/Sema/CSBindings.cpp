@@ -69,6 +69,9 @@ void ConstraintSystem::inferTransitiveSupertypeBindings(
 
       auto type = binding.BindingType;
 
+      if (type->isHole())
+        continue;
+
       if (!existingTypes.insert(type->getCanonicalType()).second)
         continue;
 
