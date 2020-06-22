@@ -586,17 +586,17 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
         case SearchPathKind::RuntimeLibrary: {
           isFramework = false;
 
-          bool checkTargetSpecificModule;
-          if (Kind == SearchPathKind::RuntimeLibrary) {
-            // Apple platforms always use target-specific files within a
-            // .swiftmodule directory for the stdlib; non-Apple platforms
-            // always use single-architecture swiftmodules.
-            checkTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
-          } else {
+          // On Apple platforms, we can assume that the runtime libraries use
+          // target-specifi module files wihtin a `.swiftmodule` directory.
+          // This was not always true on non-Apple platforms, and in order to
+          // ease the transition, check both layouts.
+          bool checkTargetSpecificModule = true;
+          if (Kind != SearchPathKind::RuntimeLibrary ||
+              !Ctx.LangOpts.Target.isOSDarwin()) {
             auto modulePath = currPath;
             llvm::sys::path::append(modulePath, genericModuleFileName);
-
             llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(modulePath);
+
             // Even if stat fails, we can't just return the error; the path
             // we're looking for might not be "Foo.swiftmodule".
             checkTargetSpecificModule = statResult && statResult->isDirectory();
