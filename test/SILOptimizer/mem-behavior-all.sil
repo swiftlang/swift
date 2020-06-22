@@ -113,6 +113,21 @@ bb0(%0 : $*Builtin.Int32):
   return %val : $Builtin.Int32
 }
 
+// CHECK-LABEL: @testLoadTake
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   %2 = load [take] %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=1,se=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:   %2 = load [take] %0 : $*C
+// CHECK-NEXT:   %1 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0,se=0
+sil [ossa] @testLoadTake : $@convention(thin) (@in C, @in_guaranteed C) -> @owned C {
+bb0(%0 : $*C, %1 : $*C):
+  %2 = load [take] %0 : $*C
+  return %2 : $C
+}
+
 // ===-----------------------------------------------------------------------===
 // Test the effect of a [deinit] access on a global 'let'
 //
@@ -168,3 +183,64 @@ bb0(%0 : $*Int64Wrapper):
   %8 = tuple ()
   return %8 : $()
 }
+
+// CHECK-LABEL: @test_copy_addr_initialize
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=1,se=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:    copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:    %1 = argument of bb0 : $*C
+// CHECK-NEXT:    r=1,w=0,se=0
+// CHECK:      PAIR #2.
+// CHECK-NEXT:   copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %2 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0,se=0
+sil @test_copy_addr_initialize : $@convention(thin) (@inout C, @inout C) -> @out C {
+bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  copy_addr %1 to [initialization] %0 : $*C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @test_copy_addr_assign
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   copy_addr %1 to %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=1,se=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:    copy_addr %1 to %0 : $*C
+// CHECK-NEXT:    %1 = argument of bb0 : $*C
+// CHECK-NEXT:    r=1,w=1,se=1
+// CHECK:      PAIR #2.
+// CHECK-NEXT:   copy_addr %1 to %0 : $*C
+// CHECK-NEXT:   %2 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=1,se=1
+sil @test_copy_addr_assign : $@convention(thin) (@inout C, @inout C, @inout C) -> () {
+bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  copy_addr %1 to %0 : $*C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @test_copy_addr_take
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=1,se=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %1 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=1,se=1
+// CHECK:      PAIR #2.
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %2 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0,se=0
+sil @test_copy_addr_take : $@convention(thin) (@in C, @inout C) -> @out C {
+bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  copy_addr [take] %1 to [initialization] %0 : $*C
+  %6 = tuple ()
+  return %6 : $()
+}
+
