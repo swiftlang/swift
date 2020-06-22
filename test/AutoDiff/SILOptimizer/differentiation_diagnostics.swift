@@ -66,14 +66,162 @@ func noReturn(_ x: Float) -> Float {
 }
 
 //===----------------------------------------------------------------------===//
-// Conversion to `@differentiable(linear)` (not yet supported)
+// Global variables
 //===----------------------------------------------------------------------===//
 
-// expected-error @+1 {{conversion to '@differentiable(linear)' function type is not yet supported}}
-let _: @differentiable(linear) (Float) -> Float = { x in x }
+var global: Float = 3.0
+
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable(wrt: x)
+func testWriteToGlobalVariable(x: Float) -> Float {
+  // expected-note @+1 {{cannot differentiate writes to global variables}}
+  global = global + x
+  return global
+}
 
 //===----------------------------------------------------------------------===//
-// Non-differentiable arguments and results
+// Class differentiation
+//===----------------------------------------------------------------------===//
+
+class Class : Differentiable {
+  @differentiable
+  var stored: Float = 1
+
+  @differentiable
+  func testRefElementAddr(_ x: Float) -> Float {
+    return stored * x
+  }
+
+  var nonDifferentiableStored: Float = 1
+
+  @differentiable
+  func testNonDifferentiableRefElementAddr(_ x: Float) -> Float {
+    // expected-error @+2 {{expression is not differentiable}}
+    // expected-note @+1 {{member is not differentiable because the corresponding class member is not '@differentiable'}}
+    return nonDifferentiableStored * x
+  }
+
+  @differentiable
+  func method(_ x: Float) -> Float { x }
+
+  @differentiable
+  static func testClassMethod(x: Float) -> Float {
+    return Class().method(x)
+  }
+
+  func nonDifferentiableMethod(_ x: Float) -> Float { x }
+
+  @differentiable
+  static func testDifferentiableClassMethod(x: Float) -> Float {
+    // expected-error @+2 {{expression is not differentiable}}
+    // expected-note @+1 {{member is not differentiable because the corresponding class member is not '@differentiable'}}
+    return Class().nonDifferentiableMethod(x)
+  }
+}
+
+// TF-676: Test differentiation of class method with multiple `@differentiable`
+// attributes.
+class ClassMethodMultipleDifferentiableAttribute : Differentiable {
+  @differentiable(wrt: (self, x))
+  @differentiable(wrt: x)
+  func f(_ x: Float) -> Float { x }
+}
+func testMultipleDiffAttrsClass<C: ClassMethodMultipleDifferentiableAttribute>(
+  _ c: C, _ x: Float
+) {
+  _ = gradient(at: c, x) { c, x in c.f(x) }
+  _ = gradient(at: x) { x in c.f(x) }
+}
+
+// TF-1149: Test class with loadable type but address-only `TangentVector` type.
+class C<T: Differentiable>: Differentiable {
+  // expected-error @+1 {{function is not differentiable}}
+  @differentiable
+  // expected-note @+2 {{when differentiating this function definition}}
+  // expected-note @+1 {{cannot yet differentiate value whose type 'C<T>' has a compile-time known size, but whose 'TangentVector' contains stored properties of unknown size; consider modifying 'C<τ_0_0>.TangentVector' to use fewer generic parameters in stored properties}}
+  var stored: T
+
+  init(_ stored: T) {
+    self.stored = stored
+  }
+
+  // expected-error @+1 {{function is not differentiable}}
+  @differentiable
+  // expected-note @+2 {{when differentiating this function definition}}
+  // expected-note @+1 {{cannot yet differentiate value whose type 'C<T>' has a compile-time known size, but whose 'TangentVector' contains stored properties of unknown size; consider modifying 'C<τ_0_0>.TangentVector' to use fewer generic parameters in stored properties}}
+  func method(_ x: T) -> T {
+    stored
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Enum differentiation
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func usesOptionals(_ x: Float) -> Float {
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  var maybe: Float? = 10
+  maybe = x
+  return maybe!
+}
+
+enum DirectEnum: Differentiable & AdditiveArithmetic {
+  case leaf(Float)
+
+  typealias TangentVector = Self
+
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func enum_active(_ e: DirectEnum, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func activeEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
+}
+
+enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
+  case leaf(T)
+
+  typealias TangentVector = Self
+
+  static func ==(_ lhs: Self, _ rhs: Self) -> Bool { fatalError() }
+  static var zero: Self { fatalError() }
+  static func +(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+  static func -(_ lhs: Self, _ rhs: Self) -> Self { fatalError() }
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: e)
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{differentiating enum values is not yet supported}}
+func activeEnumAddr(_ e: IndirectEnum<Float>, _ x: Float) -> Float {
+  switch e {
+  case let .leaf(y): return y
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Unmet derivative generic requirements
 //===----------------------------------------------------------------------===//
 
 @differentiable
@@ -82,7 +230,6 @@ func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   // expected-note @+1 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
   return x + 1
 }
-_ = gradient(at: 1.0, in: generic)
 
 // Test unmet generic requirements.
 
@@ -95,12 +242,12 @@ func vjpWeirdExtraRequirements<T : Differentiable & CaseIterable>(_ x: T) -> (
 ) where T.AllCases : ExpressibleByStringLiteral {
   return (x, { $0 })
 }
+@differentiable
 func weirdWrapper<T : Differentiable>(_ x: T) -> T {
   // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{function call is not differentiable because generic requirements are not met: 'T : CaseIterable, T.AllCases : ExpressibleByStringLiteral'}}
   return weird(x)
 }
-_ = gradient(at: Float(1), in: { x in weirdWrapper(x) })
 
 @differentiable
 func direct<T : Differentiable>(_ x: T) -> T {
@@ -118,13 +265,13 @@ extension Tensor where Scalar : BinaryFloatingPoint {
   }
 }
 
-protocol TF8Proto : Differentiable {
+protocol TF8_Proto : Differentiable {
   associatedtype Scalar
   @differentiable(wrt: (self, input))
   func applied(to input: Float) -> Float
 }
 
-struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiable {
+struct TF8_Struct<Scalar> : TF8_Proto where Scalar : FloatingPoint & Differentiable {
   @noDerivative let bar: Scalar
 
   @differentiable(wrt: (self, input))
@@ -133,27 +280,8 @@ struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiabl
   }
 }
 
-_ = gradient(at: 1.0, in: { x in x.squareRoot() })
-
 //===----------------------------------------------------------------------===//
-// Non-differentiable arguments and results
-//===----------------------------------------------------------------------===//
-
-struct TF_687<T> : Differentiable {
-  @noDerivative var indirectDummy: T
-  var base: Float
-
-  init(_ base: Float, dummy: T) {
-    self.base = base
-    self.indirectDummy = dummy
-  }
-}
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
-let _: @differentiable (Float) -> TF_687<Any> = { x in TF_687<Any>(x, dummy: x) }
-
-//===----------------------------------------------------------------------===//
-// Add `Differentiable` conformance for generic wrt parameters
+// `Differentiable` conformance requirement inference
 //===----------------------------------------------------------------------===//
 
 func id<T>(_ x: T) -> T { x }
@@ -172,7 +300,178 @@ let _: @differentiable (Float) -> TF_691<Float> = { x in identity(TF_691(x)) }
 let _: @differentiable (Float) -> TF_691<Float> = { x in id(TF_691(x)) }
 
 //===----------------------------------------------------------------------===//
-// Property wrappers
+// Non-differentiable arguments and results
+//===----------------------------------------------------------------------===//
+
+struct TF_687<T> : Differentiable {
+  @noDerivative var indirectDummy: T
+  var base: Float
+
+  init(_ base: Float, dummy: T) {
+    self.base = base
+    self.indirectDummy = dummy
+  }
+}
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
+let _: @differentiable (Float) -> TF_687<Any> = { x in TF_687<Any>(x, dummy: x) }
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func roundingGivesError(x: Float) -> Float {
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
+  return Float(Int(x))
+}
+
+//===----------------------------------------------------------------------===//
+// Non-varied results
+//===----------------------------------------------------------------------===//
+
+@differentiable
+func nonVariedResult(_ x: Float) -> Float {
+  // TODO(TF-788): Re-enable non-varied result warning.
+  // xpected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}} {{15-15=)}}
+  return 0
+}
+
+// Check that `withoutDerivative(at:)` silences the non-varied result warning.
+
+struct TF_775: Differentiable {
+  @differentiable(wrt: (self))
+  func nonVariedResult(_ input: Float) -> Float {
+    return withoutDerivative(at: input)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Multiple results
+//===----------------------------------------------------------------------===//
+
+func multipleResults(_ x: Float) -> (Float, Float) {
+  return (x, x)
+}
+
+// TODO(TF-983): Support differentiation of multiple results.
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func usesMultipleResults(_ x: Float) -> Float {
+  // expected-note @+1 {{cannot differentiate through multiple results}}
+  let tuple = multipleResults(x)
+  return tuple.0 + tuple.1
+}
+
+//===----------------------------------------------------------------------===//
+// `inout` parameter differentiation
+//===----------------------------------------------------------------------===//
+
+@differentiable
+func activeInoutParam(_ x: Float) -> Float {
+  var result = x
+  result += x
+  return result
+}
+
+@differentiable
+func activeInoutParamNonactiveInitialResult(_ x: Float) -> Float {
+  var result: Float = 1
+  result += x
+  return result
+}
+
+@differentiable
+func activeInoutParamTuple(_ x: Float) -> Float {
+  var tuple = (x, x)
+  tuple.0 *= x
+  return x * tuple.0
+}
+
+@differentiable
+func activeInoutParamControlFlow(_ array: [Float]) -> Float {
+  var result: Float = 1
+  for i in withoutDerivative(at: array).indices {
+    result += array[i]
+  }
+  return result
+}
+
+@differentiable
+func activeInoutParamControlFlowComplex(_ array: [Float], _ bool: Bool) -> Float {
+  var result: Float = 1
+  if bool {
+    if bool {}
+    for i in withoutDerivative(at: array).indices {
+      switch i % 2 {
+      case 0: continue
+      case 1: break
+      default: break
+      }
+      result = result + 1
+      result += array[i]
+    }
+  }
+  return result
+}
+
+struct Mut: Differentiable {}
+extension Mut {
+  @differentiable(wrt: x)
+  mutating func mutatingMethod(_ x: Mut) {}
+}
+
+@differentiable(wrt: x)
+func nonActiveInoutParam(_ nonactive: inout Mut, _ x: Mut) {
+  nonactive.mutatingMethod(x)
+}
+
+@differentiable(wrt: x)
+func activeInoutParamMutatingMethod(_ x: Mut) -> Mut {
+  var result = x
+  result.mutatingMethod(result)
+  return result
+}
+
+@differentiable(wrt: x)
+func activeInoutParamMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
+  var result = nonactive
+  result.mutatingMethod(x)
+  nonactive = result
+}
+
+@differentiable(wrt: x)
+func activeInoutParamMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
+  var result = (nonactive, x)
+  result.0.mutatingMethod(result.0)
+  nonactive = result.0
+}
+
+// TODO(TF-983): Support differentiation of multiple results.
+func twoInoutParameters(_ x: inout Float, _ y: inout Float) {}
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func testTwoInoutParameters(_ x: Float, _ y: Float) -> Float {
+  var x = x
+  var y = y
+  // expected-note @+1 {{cannot differentiate through multiple results}}
+  twoInoutParameters(&x, &y)
+  return x
+}
+
+// TODO(TF-983): Support differentiation of multiple results.
+func inoutParameterAndFormalResult(_ x: inout Float) -> Float { x }
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func testInoutParameterAndFormalResult(_ x: Float) -> Float {
+  var x = x
+  // expected-note @+1 {{cannot differentiate through multiple results}}
+  return inoutParameterAndFormalResult(&x)
+}
+
+//===----------------------------------------------------------------------===//
+// Wrapped property differentiation
 //===----------------------------------------------------------------------===//
 
 @propertyWrapper
@@ -240,3 +539,172 @@ func modify(_ s: Struct, _ x: Float) -> Float {
   s.x *= x * s.z
   return s.x
 }
+
+//===----------------------------------------------------------------------===//
+// Array literal initialization
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
+  // `Array<(Float, Float)>` does not conform to `Differentiable`.
+  let array = [(x * y, x * y)]
+  // expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
+  return array[0].0
+}
+
+//===----------------------------------------------------------------------===//
+// Subset parameter differentiation thunks
+//===----------------------------------------------------------------------===//
+
+// FIXME(SR-13046): Non-differentiability diagnostic crash due to invalid source location.
+/*
+func testNoDerivativeParameter(_ f: @differentiable (Float, @noDerivative Float) -> Float) -> Float {
+  return gradient(at: 2) { x in f(x * x, x) }
+}
+*/
+
+// Test parameter subset thunk + partially-applied original function.
+struct TF_675 : Differentiable {
+  @differentiable
+  func method(_ x: Float) -> Float {
+    return x
+  }
+}
+let _: @differentiable (Float) -> Float = TF_675().method
+
+// TF-918: Test parameter subset thunk + partially-applied original function.
+let _: @differentiable (Float, Float) -> Float = (+) as @differentiable (Float, @noDerivative Float) -> Float
+
+//===----------------------------------------------------------------------===//
+// Differentiation in fragile functions
+//===----------------------------------------------------------------------===//
+
+public func implicitlyDifferentiableFromFragile(_ x: Float) -> Float { x }
+
+public func hasImplicitlyDifferentiatedTopLevelDefaultArgument(
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{differentiated functions in default arguments must be marked '@differentiable' or have a public '@derivative'}}
+  _ f: @differentiable (Float) -> Float = implicitlyDifferentiableFromFragile
+) {}
+
+// TODO(TF-1030): This will eventually not be an error.
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{differentiated functions in default arguments must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
+public func hasImplicitlyDifferentiatedClosureDefaultArgument(_ f: @differentiable (Float) -> Float = { $0 }) {}
+
+@inlinable
+public func fragileFuncWithGradient() {
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'}}
+  _ = gradient(at: 0, in: implicitlyDifferentiableFromFragile)
+}
+
+@inlinable
+@differentiable
+public func fragileDifferentiable(_ x: Float) -> Float {
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'}}
+  implicitlyDifferentiableFromFragile(x)
+}
+
+// TF-1208: Test curry thunk differentiation regression.
+public struct TF_1208_Struct<Scalar> {
+  var x: Scalar
+}
+extension TF_1208_Struct: Differentiable where Scalar: Differentiable {
+  @differentiable
+  public static func id(x: Self) -> Self {
+    return x
+  }
+}
+@differentiable(wrt: x)
+public func TF_1208<Scalar: Differentiable>(
+  _ x: TF_1208_Struct<Scalar>,
+  // NOTE(TF-1208): This diagnostic is unexpected because `TF_1208_Struct.id` is marked `@differentiable`.
+  // expected-error @+3 2 {{function is not differentiable}}
+  // expected-note @+2 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
+  // expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
+  reduction: @differentiable (TF_1208_Struct<Scalar>) -> TF_1208_Struct<Scalar> = TF_1208_Struct.id
+) -> TF_1208_Struct<Scalar> {
+  reduction(x)
+}
+
+//===----------------------------------------------------------------------===//
+// Coroutines (SIL function yields, `begin_apply`) (not yet supported)
+//===----------------------------------------------------------------------===//
+
+struct HasCoroutineAccessors: Differentiable {
+  var stored: Float
+  var computed: Float {
+    // `_read` is a coroutine: `(Self) -> () -> ()`.
+    _read { yield stored }
+    // `_modify` is a coroutine: `(inout Self) -> () -> ()`.
+    _modify { yield &stored }
+  }
+}
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors {
+  var x = x
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  x.computed = x.computed
+  return x
+}
+
+// TF-1078: Diagnose `_modify` accessor application with active `inout` argument.
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func TF_1078(array: [Float], x: Float) -> Float {
+  var array = array
+  // Array subscript assignment below calls `Array.subscript.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  array[0] = x
+  return array[0]
+}
+
+// TF-1115: Diagnose `_modify` accessor application with initially non-active `inout` argument.
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func TF_1115(_ x: Float) -> Float {
+  var array: [Float] = [0]
+  // Array subscript assignment below calls `Array.subscript.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  array[0] = x
+  return array[0]
+}
+
+// TF-1115: Test `_modify` accessor application with initially non-active `inout` argument,
+// where the yielded value is not a projection from `self`.
+extension Float {
+  static var staticProperty: Float = 1
+
+  var projection: Float {
+    get { self }
+    // This `modify` accessor yields a static variable, not a projection from `self`.
+    // Diagnosing active applications is nonetheless a safe over-approximation.
+    _modify { yield &Float.staticProperty }
+  }
+}
+
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func TF_1115_modifyNonSelfProjection(x: Float) -> Float {
+  var result: Float = 0
+  // Assignment below calls `Float.projection.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  result.projection = x
+  return result
+}
+
+//===----------------------------------------------------------------------===//
+// Conversion to `@differentiable(linear)` (not yet supported)
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{conversion to '@differentiable(linear)' function type is not yet supported}}
+let _: @differentiable(linear) (Float) -> Float = { x in x }
