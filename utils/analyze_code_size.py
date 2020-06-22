@@ -124,8 +124,12 @@ class GenericSpecialization(object):
         self.size += symbol.size
 
     def list_symbols(self):
+        sorted_symbols = []
         for symbol in self.symbols:
-            print("  " + symbol.name + " " + str(symbol.size))
+            sorted_symbols.append((symbol.name, symbol.size))
+        sorted_symbols.sort(key=lambda entry: entry[1], reverse=True)
+        for symbol in sorted_symbols:
+            print("%9d %s" % (symbol[1], symbol[0]))
 
 
 class Categories(object):
@@ -229,7 +233,7 @@ class Categories(object):
         self.categories = {}
         self.specializations = {}
         self.specialization_matcher = re.compile(
-            r'.*generic specialization <(?P<spec_list>[^>]*)>.* of' +
+            r'.*generic specialization <(?P<spec_list>.*)> of' +
             r' (static )?(\(extension in Swift\):)?(?P<module_name>[^.]*)\.' +
             r'(?:(?P<first_type>[^.^(^<]*)\.){0,1}' +
             r'(?:(?P<last_type>[^.^(^<]*)\.)*(?P<function_name>[^(^<]*)'
@@ -255,7 +259,7 @@ class Categories(object):
         self.array_type_matcher = re.compile(r'Array')
         self.dictionary = re.compile(r'Array')
         self.single_specialized_types_matcher = re.compile(
-            r'(?P<module_name>[^,^.]*)\.(?P<type_name>[^,^.]*)$'
+            r'(?P<module_name>[^,^.]*)\.([^,^.]*\.)*(?P<type_name>[^,^.]*)$'
         )
         self.is_class_type_dict = {}
         self.stdlib_and_other_type_matcher = re.compile(
