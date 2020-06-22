@@ -41,7 +41,7 @@ print(", \(glob_b)", terminator: "")
 print(", \(glob_s)", terminator: "")
 var unused: Int32 = -1
 
-// CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"{{.*}}Swift.swiftmodule{{(/.+[.]swiftmodule)?}}"
+// CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"{{.*}}Swift.swiftmodule{{([/\\].+[.]swiftmodule)?}}"
 
 
 // Stack variables.
