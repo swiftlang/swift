@@ -39,7 +39,7 @@ extension S : Differentiable, AdditiveArithmetic {
 }
 
 // expected-error @+2 {{function is not differentiable}}
-// expected-note @+1 {{property cannot be differentiated because 'S.TangentVector' does not have a member named 'p'}}
+// expected-note @+1 {{cannot differentiate access to property 'S.p' because 'S.TangentVector' does not have a stored property named 'p'}}
 _ = gradient(at: S(p: 0)) { s in 2 * s.p }
 
 struct NoDerivativeProperty : Differentiable {
