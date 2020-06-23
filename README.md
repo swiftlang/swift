@@ -130,6 +130,7 @@ sudo apt-get install    \
   clang                 \
   cmake                 \
   git                   \
+  git-lfs               \
   icu-devtools          \
   libcurl4-openssl-dev  \
   libedit-dev           \
