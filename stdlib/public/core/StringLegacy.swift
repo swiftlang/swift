@@ -43,7 +43,7 @@ extension String {
       String(_uninitializedCapacity: repeatedUTF8.count * count) { buffer in
         var total = 0
         for i in 0..<count {
-          let offset = i * repeatedUTF8.count
+          let offset = i &* repeatedUTF8.count
           let range = offset ..< offset + repeatedUTF8.count
           _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
             .initialize(from: repeatedUTF8)
