@@ -223,21 +223,31 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   __wasi_errno_t err;
 
-  size_t argv_buf_size;
-  size_t argc;
+  size_t argv_buf_size = 0;
+  size_t argc = 0;
   err = __wasi_args_sizes_get(&argc, &argv_buf_size);
-  if (err != __WASI_ERRNO_SUCCESS)
-    return nullptr;
+  if (err != __WASI_ERRNO_SUCCESS) {
+    argc = 0;
+  }
 
+  // __wasi_args_sizes_get requires the caller to allocate extra space for NULL
+  // termination.
   size_t num_ptrs = argc + 1;
-  char *argv_buf = static_cast<char *>(alloc(argv_buf_size));
   char **argv = static_cast<char **>(calloc(num_ptrs, sizeof(char *)));
+  if (err != __WASI_ERRNO_SUCCESS) {
+    *outArgLen = 0;
+    argv[0] = nullptr;
+    return argv;
+  }
 
+  char *argv_buf = static_cast<char *>(malloc(argv_buf_size));
   err = __wasi_args_get((uint8_t **)argv, (uint8_t *)argv_buf);
   if (err != __WASI_ERRNO_SUCCESS) {
     free(argv_buf);
-    free(argv);
-    return nullptr;
+
+    *outArgLen = 0;
+    argv[0] = nullptr;
+    return argv;
   }
 
   *outArgLen = static_cast<int>(argc);
