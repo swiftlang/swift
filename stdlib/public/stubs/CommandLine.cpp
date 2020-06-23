@@ -121,23 +121,27 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
         WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, szArgList[i], -1,
                             nullptr, 0, nullptr, nullptr);
     if (szBufferSize == 0) {
-      for (char *arg : argv)
-        free(arg);
+      swift::fatalError(0,
+                        "Fatal error: Could not retrieve commandline "
+                        "arguments: %u\n",
+                        GetLastError());
       return nullptr;
     }
 
     char *buffer = static_cast<char *>(
         calloc(static_cast<size_t>(szBufferSize), sizeof(char)));
     if (buffer == nullptr) {
-      for (char *arg : argv)
-        free(arg);
+      swift::fatalError(0,
+                        "Fatal error: Could not allocate space for commandline"
+                        "arguments");
       return nullptr;
     }
 
     if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, szArgList[i], -1,
                              buffer, szBufferSize, nullptr, nullptr)) {
-      for (char *arg : argv)
-        free(arg);
+      swift::fatalError(0,
+                        "Fatal error: Conversion to UTF-8 failed for "
+                        "commandline arguments");
       return nullptr;
     }
 
@@ -227,27 +231,21 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   size_t argc = 0;
   err = __wasi_args_sizes_get(&argc, &argv_buf_size);
   if (err != __WASI_ERRNO_SUCCESS) {
-    argc = 0;
-  }
-
-  // __wasi_args_sizes_get requires the caller to allocate extra space for NULL
-  // termination.
-  size_t num_ptrs = argc + 1;
-  char **argv = static_cast<char **>(calloc(num_ptrs, sizeof(char *)));
-  if (err != __WASI_ERRNO_SUCCESS) {
-    *outArgLen = 0;
-    argv[0] = nullptr;
-    return argv;
+    swift::fatalError(0,
+                      "Fatal error: Could not retrieve commandline "
+                      "arguments: %d.\n", static_cast<int>(err));
+    return nullptr;
   }
 
   char *argv_buf = static_cast<char *>(malloc(argv_buf_size));
+  char **argv = static_cast<char **>(calloc(argc + 1, sizeof(char *)));
+
   err = __wasi_args_get((uint8_t **)argv, (uint8_t *)argv_buf);
   if (err != __WASI_ERRNO_SUCCESS) {
-    free(argv_buf);
-
-    *outArgLen = 0;
-    argv[0] = nullptr;
-    return argv;
+    swift::fatalError(0,
+                      "Fatal error: Could not retrieve commandline "
+                      "arguments: %d.\n", static_cast<int>(err));
+    return nullptr;
   }
 
   *outArgLen = static_cast<int>(argc);
