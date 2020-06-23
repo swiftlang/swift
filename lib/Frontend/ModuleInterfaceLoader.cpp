@@ -1460,13 +1460,13 @@ struct ExplicitSwiftModuleLoader::Implementation {
     for (auto &entry: *mapNode) {
       auto key = getScalaNodeText(entry.getKey());
       auto val = getScalaNodeText(entry.getValue());
-      if (key == "SwiftModule") {
+      if (key == "moduleName") {
         moduleName = val;
-      } else if (key == "SwiftModulePath") {
+      } else if (key == "modulePath") {
         result.modulePath = val;
-      } else if (key == "SwiftDocPath") {
+      } else if (key == "docPath") {
         result.moduleDocPath = val;
-      } else if (key == "SwiftSourceInfoPath") {
+      } else if (key == "sourceInfoPath") {
         result.moduleSourceInfoPath = val;
       } else {
         // Being forgiving for future fields.
@@ -1480,16 +1480,16 @@ struct ExplicitSwiftModuleLoader::Implementation {
   }
   //  [
   //    {
-  //      "SwiftModule": "A",
-  //      "SwiftModulePath": "A.swiftmodule",
-  //      "SwiftDocPath": "A.swiftdoc",
-  //      "SwiftSourceInfoPath": "A.swiftsourceinfo"
+  //      "moduleName": "A",
+  //      "modulePath": "A.swiftmodule",
+  //      "docPath": "A.swiftdoc",
+  //      "sourceInfoPath": "A.swiftsourceinfo"
   //    },
   //    {
-  //      "SwiftModule": "B",
-  //      "SwiftModulePath": "B.swiftmodule",
-  //      "SwiftDocPath": "B.swiftdoc",
-  //      "SwiftSourceInfoPath": "B.swiftsourceinfo"
+  //      "moduleName": "B",
+  //      "modulePath": "B.swiftmodule",
+  //      "docPath": "B.swiftdoc",
+  //      "sourceInfoPath": "B.swiftsourceinfo"
   //    }
   //  ]
   void parseSwiftExplicitModuleMap(StringRef fileName) {
