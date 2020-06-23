@@ -735,6 +735,18 @@ FUNCTION(GetAssociatedConformanceWitness,
               ProtocolRequirementStructTy->getPointerTo()),
          ATTRS(NoUnwind, ReadNone))
 
+// SWIFT_RUNTIME_EXPORT
+//     SWIFT_CC(swift) bool swift_compareProtocolConformanceDescriptors(
+//         const ProtocolConformanceDescriptor *lhs,
+//         const ProtocolConformanceDescriptor *rhs);
+FUNCTION(CompareProtocolConformanceDescriptors, 
+         swift_compareProtocolConformanceDescriptors, SwiftCC, 
+         CompareProtocolConformanceDescriptorsAvailability,
+         RETURNS(Int1Ty),
+         ARGS(ProtocolConformanceDescriptorPtrTy, 
+              ProtocolConformanceDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
