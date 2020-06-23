@@ -37,9 +37,6 @@ class SILGlobalVariable
   : public llvm::ilist_node<SILGlobalVariable>,
     public SILAllocated<SILGlobalVariable>
 {
-public:
-  using const_iterator = SILBasicBlock::const_iterator;
-
 private:
   friend class SILModule;
   friend class SILBuilder;
@@ -159,9 +156,6 @@ public:
   bool isInitializedObject() {
     return dyn_cast_or_null<ObjectInst>(getStaticInitializerValue()) != nullptr;
   }
-
-  const_iterator begin() const { return StaticInitializerBlock.begin(); }
-  const_iterator end() const { return StaticInitializerBlock.end(); }
 
   /// Returns true if \p I is a valid instruction to be contained in the
   /// static initializer.

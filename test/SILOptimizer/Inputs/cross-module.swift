@@ -130,7 +130,6 @@ extension Int : PrivateProtocol {
 }
 
 @inline(never)
-@_semantics("optimize.no.crossmodule")
 private func printFooExistential(_ p: PrivateProtocol) {
   print(p.foo())
 }
@@ -267,4 +266,3 @@ public func callUnrelated<T>(_ t: T) -> T {
   return t
 }
 
-public let globalLet = 529387
