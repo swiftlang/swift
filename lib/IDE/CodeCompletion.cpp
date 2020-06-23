@@ -6158,15 +6158,29 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (IsAtStartOfLine) {
         //   foo() {}
         //   <HERE>
-        // Global completion.
+
         auto &Sink = CompletionContext.getResultSink();
-        addDeclKeywords(Sink);
-        addStmtKeywords(Sink, MaybeFuncBody);
-        addSuperKeyword(Sink);
-        addLetVarKeywords(Sink);
-        addExprKeywords(Sink);
-        addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
-        DoPostfixExprBeginning();
+        if (isa<Initializer>(CurDeclContext))
+          CurDeclContext = CurDeclContext->getParent();
+
+        if (CurDeclContext->isTypeContext()) {
+          // Override completion (CompletionKind::NominalMemberBeginning).
+          addDeclKeywords(Sink);
+          addLetVarKeywords(Sink);
+          SmallVector<StringRef, 0> ParsedKeywords;
+          CompletionOverrideLookup OverrideLookup(Sink, Context, CurDeclContext,
+                                                  ParsedKeywords, SourceLoc());
+          OverrideLookup.getOverrideCompletions(SourceLoc());
+        } else {
+          // Global completion (CompletionKind::PostfixExprBeginning).
+          addDeclKeywords(Sink);
+          addStmtKeywords(Sink, MaybeFuncBody);
+          addSuperKeyword(Sink);
+          addLetVarKeywords(Sink);
+          addExprKeywords(Sink);
+          addAnyTypeKeyword(Sink, Context.TheAnyType);
+          DoPostfixExprBeginning();
+        }
       } else {
         //   foo() {} <HERE>
         // Member completion.
