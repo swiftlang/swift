@@ -1357,22 +1357,21 @@ namespace {
       if (expr->getType())
         return expr->getType();
 
-      auto &de = CS.getASTContext().Diags;
-      auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
+      auto &ctx = CS.getASTContext();
+      auto &de = ctx.Diags;
+      auto protocol = TypeChecker::getLiteralProtocol(ctx, expr);
       if (!protocol) {
         de.diagnose(expr->getLoc(), diag::use_unknown_object_literal_protocol,
                     expr->getLiteralKindPlainName());
         return nullptr;
       }
 
-      auto tv = CS.createTypeVariable(exprLoc,
-                                      TVO_PrefersSubtypeBinding |
-                                      TVO_CanBindToNoEscape |
-                                      TVO_CanBindToHole);
-      
-      CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
-                       protocol->getDeclaredType(),
-                       exprLoc);
+      auto witnessType = CS.createTypeVariable(
+          exprLoc, TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape |
+                       TVO_CanBindToHole);
+
+      CS.addConstraint(ConstraintKind::LiteralConformsTo, witnessType,
+                       protocol->getDeclaredType(), exprLoc);
 
       // The arguments are required to be argument-convertible to the
       // idealized parameter type of the initializer, which generally
@@ -1380,9 +1379,7 @@ namespace {
       // all the redundant stuff about literals (leaving e.g. "red:").
       // Constraint application will quietly rewrite the type of 'args' to
       // use the right labels before forming the call to the initializer.
-      auto constrName =
-          TypeChecker::getObjectLiteralConstructorName(CS.getASTContext(),
-                                                       expr);
+      auto constrName = TypeChecker::getObjectLiteralConstructorName(ctx, expr);
       assert(constrName);
       auto *constr = dyn_cast_or_null<ConstructorDecl>(
           protocol->getSingleRequirement(constrName));
@@ -1390,27 +1387,33 @@ namespace {
         de.diagnose(protocol, diag::object_literal_broken_proto);
         return nullptr;
       }
-      auto constrParamType =
-          TypeChecker::getObjectLiteralParameterType(expr, constr);
 
-      // Extract the arguments.
+      auto *memberLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember);
+
+      auto *memberType =
+          CS.createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+
+      CS.addValueMemberConstraint(MetatypeType::get(witnessType, ctx),
+                                  DeclNameRef(constrName), memberType, CurDC,
+                                  FunctionRefKind::DoubleApply, {}, memberLoc);
+
       SmallVector<AnyFunctionType::Param, 8> args;
       AnyFunctionType::decomposeInput(CS.getType(expr->getArg()), args);
 
-      // Extract the parameters.
-      SmallVector<AnyFunctionType::Param, 8> params;
-      AnyFunctionType::decomposeInput(constrParamType, params);
+      auto resultType = CS.createTypeVariable(
+          CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+          TVO_CanBindToNoEscape);
 
-      auto funcType = constr->getMethodInterfaceType()->castTo<FunctionType>();
-      ::matchCallArguments(
-          CS, funcType, args, params, ConstraintKind::ArgumentConversion,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+      CS.addConstraint(
+          ConstraintKind::ApplicableFunction,
+          FunctionType::get(args, resultType), memberType,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
-      Type result = tv;
       if (constr->isFailable())
-        result = OptionalType::get(result);
+        return OptionalType::get(witnessType);
 
-      return result;
+      return witnessType;
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {

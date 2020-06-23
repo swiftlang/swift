@@ -1110,8 +1110,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
         fix = SpecifyClosureParameterType::create(cs, dstLocator);
       } else if (TypeVar->getImpl().isClosureResultType()) {
         fix = SpecifyClosureReturnType::create(cs, dstLocator);
-      } else if (srcLocator->getAnchor() &&
-                 isExpr<ObjectLiteralExpr>(srcLocator->getAnchor())) {
+      } else if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
         fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
       } else if (srcLocator->isKeyPathRoot()) {
         fix = SpecifyKeyPathRootType::create(cs, dstLocator);

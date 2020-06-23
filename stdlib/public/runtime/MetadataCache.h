@@ -386,6 +386,14 @@ class MetadataCacheKey {
 
     auto *aDescription = awt->getDescription();
     auto *bDescription = bwt->getDescription();
+    return compareProtocolConformanceDescriptors(aDescription, bDescription);
+  }
+
+public:
+  /// Compare two conformance descriptors, checking their contents if necessary.
+  static int compareProtocolConformanceDescriptors(
+      const ProtocolConformanceDescriptor *aDescription,
+      const ProtocolConformanceDescriptor *bDescription) {
     if (aDescription == bDescription)
       return 0;
 
@@ -405,6 +413,7 @@ class MetadataCacheKey {
                            bDescription->getProtocol());
   }
 
+private:
   /// Compare the content from two keys.
   static int compareContent(const void * const *adata,
                             const void * const *bdata,

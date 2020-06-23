@@ -447,6 +447,10 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // is linked in from the stdlib.
   P.addTempRValueOpt();
 
+  // Needed to serialize static initializers of globals for cross-module
+  // optimization.
+  P.addGlobalOpt();
+
   // Add the outliner pass (Osize).
   P.addOutliner();
 

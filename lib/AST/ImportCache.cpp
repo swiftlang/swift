@@ -179,11 +179,10 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
       ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), mod});
 
   if (file) {
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    importFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
-    file->getImportedModules(imports, importFilter);
+    file->getImportedModules(imports,
+                             {ModuleDecl::ImportFilterKind::Private,
+                              ModuleDecl::ImportFilterKind::ImplementationOnly,
+                              ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
 
   auto &result = getImportSet(ctx, imports);
@@ -265,11 +264,10 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
       ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), currentMod});
 
   if (auto *file = dyn_cast<FileUnit>(dc)) {
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    importFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
-    file->getImportedModules(stack, importFilter);
+    file->getImportedModules(stack,
+                             {ModuleDecl::ImportFilterKind::Private,
+                              ModuleDecl::ImportFilterKind::ImplementationOnly,
+                              ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
 
   SmallVector<ModuleDecl::AccessPathTy, 4> accessPaths;

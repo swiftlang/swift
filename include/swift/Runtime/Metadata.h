@@ -423,6 +423,21 @@ const WitnessTable *swift_getAssociatedConformanceWitness(
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
 
+/// Determine whether two protocol conformance descriptors describe the same
+/// conformance of a type to a protocol.
+///
+/// Runtime availability: Swift 5.4
+///
+/// \param lhs The first protocol conformance descriptor to compare.
+/// \param rhs The second protocol conformance descriptor to compare.
+///
+/// \returns true if both describe the same conformance, false otherwise.
+SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
+bool swift_compareProtocolConformanceDescriptors(
+    const ProtocolConformanceDescriptor *lhs,
+    const ProtocolConformanceDescriptor *rhs);
+
 /// Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
