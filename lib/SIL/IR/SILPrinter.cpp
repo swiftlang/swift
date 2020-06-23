@@ -2701,7 +2701,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
 
   OS << "sil_global ";
-  printLinkage(OS, getLinkage(), isDefinition());
+  // Passing true for 'isDefinition' lets print the (external) linkage if it's
+  // not a definition.
+  printLinkage(OS, getLinkage(), /*isDefinition*/ true);
 
   if (isSerialized())
     OS << "[serialized] ";

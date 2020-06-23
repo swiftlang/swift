@@ -3739,3 +3739,80 @@ bb0(%0 : $@thick SpecialEnum.Type):
   %4 = struct $Bool (%3 : $Builtin.Int1)
   return %4 : $Bool
 }
+
+struct IntTuple {
+  @_hasStorage var t: (Int64, Int64)
+}
+
+sil_global [let] @initialized_let_global : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+sil_global @initialized_var_global : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+sil_global [let] @initialized_tuple_global : $IntTuple = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %1 = integer_literal $Builtin.Int64, 28
+  %2 = struct $Int64 (%0 : $Builtin.Int64)
+  %3 = struct $Int64 (%1 : $Builtin.Int64)
+  %4 = tuple (%2 : $Int64, %3 : $Int64)
+  %initval = struct $IntTuple (%4 : $(Int64, Int64))
+}
+
+// CHECK-LABEL: sil @load_from_global_let
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 27
+// CHECK:         [[R:%.*]] = struct $Int64 ([[I]] : $Builtin.Int64)
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'load_from_global_let'
+sil @load_from_global_let : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @initialized_let_global : $*Int64
+  %1 = load %0 : $*Int64
+  return %1 : $Int64
+}
+
+// CHECK-LABEL: sil @load_from_global_with_projections
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 28
+// CHECK:         return [[I]]
+// CHECK:       } // end sil function 'load_from_global_with_projections'
+sil @load_from_global_with_projections : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = global_addr @initialized_tuple_global : $*IntTuple
+  %1 = struct_element_addr %0 : $*IntTuple, #IntTuple.t
+  %2 = tuple_element_addr %1 : $*(Int64, Int64), 1
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  %4 = load %3 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @load_from_global_without_projections
+// CHECK-DAG:     [[I1:%.*]] = integer_literal $Builtin.Int64, 27
+// CHECK-DAG:     [[I2:%.*]] = integer_literal $Builtin.Int64, 28
+// CHECK-DAG:     [[S1:%.*]] = struct $Int64 ([[I1]] : $Builtin.Int64)
+// CHECK-DAG:     [[S2:%.*]] = struct $Int64 ([[I2]] : $Builtin.Int64)
+// CHECK-DAG:     [[T:%.*]] = tuple ([[S1]] : $Int64, [[S2]] : $Int64)
+// CHECK-DAG:     [[IT:%.*]] = struct $IntTuple ([[T]] : $(Int64, Int64))
+// CHECK:         return [[IT]]
+// CHECK:       } // end sil function 'load_from_global_without_projections'
+sil @load_from_global_without_projections : $@convention(thin) () -> IntTuple {
+bb0:
+  %0 = global_addr @initialized_tuple_global : $*IntTuple
+  %1 = load %0 : $*IntTuple
+  return %1 : $IntTuple
+}
+
+// CHECK-LABEL: sil @load_from_global_var
+// CHECK:         global_addr
+// CHECK-NEXT:    load
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'load_from_global_var'
+sil @load_from_global_var : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @initialized_var_global : $*Int64
+  %1 = load %0 : $*Int64
+  return %1 : $Int64
+}
