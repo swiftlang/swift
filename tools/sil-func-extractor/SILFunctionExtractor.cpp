@@ -275,16 +275,10 @@ int main(int argc, char **argv) {
   auto SILMod = performASTLowering(CI.getMainModule(), CI.getSILTypes(),
                                    CI.getSILOptions());
 
-  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
-  // us.
+  // Load in all the SIL if we're allowed to.
   if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
-    auto SL = SerializedSILLoader::create(
-        CI.getASTContext(), SILMod.get(), nullptr);
-
-    if (DisableSILLinking)
-      SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
-    else
-      SL->getAll();
+    if (!DisableSILLinking)
+      SILMod->getSILLoader()->getAll();
   }
 
   if (CommandLineFunctionNames.empty() && FunctionNameFile.empty())
