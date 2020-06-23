@@ -4389,7 +4389,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
             parameters);
 
         DeclNameRefWithLoc origName{
-            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc()};
+          DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc(), None};
         auto derivativeKind =
             getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
         if (!derivativeKind)
@@ -4418,7 +4418,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
             scratch, isImplicit, origNameId, origDeclId, parameters);
 
         DeclNameRefWithLoc origName{
-            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc()};
+            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc(), None};
         auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))

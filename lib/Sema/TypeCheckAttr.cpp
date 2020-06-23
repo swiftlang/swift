@@ -3613,7 +3613,8 @@ static IndexSubset *computeDifferentiabilityParameters(
 // If the function declaration cannot be resolved, emits a diagnostic and
 // returns nullptr.
 static AbstractFunctionDecl *findAbstractFunctionDecl(
-    DeclNameRef funcName, SourceLoc funcNameLoc, Type baseType,
+    DeclNameRef funcName, SourceLoc funcNameLoc,
+    Optional<AccessorKind> accessorKind, Type baseType,
     DeclContext *lookupContext,
     const std::function<bool(AbstractFunctionDecl *)> &isValidCandidate,
     const std::function<void()> &noneValidDiagnostic,
@@ -3654,8 +3655,12 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     auto *candidate = dyn_cast<AbstractFunctionDecl>(decl);
     // If the candidate is an `AbstractStorageDecl`, use its getter as the
     // candidate.
-    if (auto *asd = dyn_cast<AbstractStorageDecl>(decl))
-      candidate = asd->getAccessor(AccessorKind::Get);
+    if (auto *asd = dyn_cast<AbstractStorageDecl>(decl)) {
+      if (accessorKind != None)
+        candidate = asd->getAccessor(accessorKind.getValue());
+      else
+        candidate = asd->getAccessor(AccessorKind::Get);
+    }
     if (!candidate) {
       notFunction = true;
       continue;
@@ -4477,12 +4482,13 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Look up original function.
   auto *originalAFD = findAbstractFunctionDecl(
-      originalName.Name, originalName.Loc.getBaseNameLoc(), baseType,
-      derivativeTypeCtx, isValidOriginal, noneValidDiagnostic,
+      originalName.Name, originalName.Loc.getBaseNameLoc(), originalName.AccessorKind,
+      baseType, derivativeTypeCtx, isValidOriginal, noneValidDiagnostic,
       ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
       hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!originalAFD)
     return true;
+  /* 
   // Diagnose original stored properties. Stored properties cannot have custom
   // registered derivatives.
   if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
@@ -4528,6 +4534,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       }
     }
   }
+  */
   attr->setOriginalFunction(originalAFD);
 
   // Returns true if:
@@ -5032,9 +5039,10 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   if (attr->getBaseTypeRepr())
     funcLoc = attr->getBaseTypeRepr()->getLoc();
   auto *originalAFD = findAbstractFunctionDecl(
-      originalName.Name, funcLoc, baseType, transposeTypeCtx, isValidOriginal,
-      noneValidDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
-      lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
+      originalName.Name, funcLoc, originalName.AccessorKind, baseType,
+      transposeTypeCtx, isValidOriginal, noneValidDiagnostic,
+      ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
+      hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!originalAFD) {
     attr->setInvalid();
     return;

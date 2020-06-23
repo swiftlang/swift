@@ -1092,7 +1092,26 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
       Parser::DeclNameFlag::AllowOperators);
   // The base type is optional, but the final unqualified declaration name is
   // not. If name could not be parsed, return true for error.
-  return !original.Name;
+  if (!original.Name)
+    return true;
+
+  // Parse to see if this is an accessor  and set it's type.  This is an optional field.
+  if (P.Tok.is(tok::period)) {
+     const Token &nextToken = P.peekToken();
+     if(nextToken.is(tok::identifier)) {
+       StringRef tokText = nextToken.getText();
+       for(auto accessor : allAccessorKinds()) {
+         if(tokText == getAccessorLabel(accessor)) {
+           original.AccessorKind = accessor;
+           P.consumeIf(tok::period);
+           P.consumeIf(tok::identifier);
+         }
+       }
+     }
+  }
+
+  return false;
+  
 }
 
 /// Parse a `@derivative(of:)` attribute, returning true on error.
