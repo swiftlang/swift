@@ -111,11 +111,6 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
                llvm::cl::init(false),
                llvm::cl::desc("Do not dump AST."));
 
-static llvm::cl::opt<bool>
-DisableSILLinking("disable-sil-linking",
-                  llvm::cl::init(true),
-                  llvm::cl::desc("Disable SIL linking"));
-
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -274,12 +269,6 @@ int main(int argc, char **argv) {
 
   auto SILMod = performASTLowering(CI.getMainModule(), CI.getSILTypes(),
                                    CI.getSILOptions());
-
-  // Load in all the SIL if we're allowed to.
-  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
-    if (!DisableSILLinking)
-      SILMod->getSILLoader()->getAll();
-  }
 
   if (CommandLineFunctionNames.empty() && FunctionNameFile.empty())
     return CI.getASTContext().hadError();

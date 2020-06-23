@@ -172,10 +172,6 @@ static llvm::cl::opt<unsigned>
 AssertConfId("assert-conf-id", llvm::cl::Hidden,
              llvm::cl::init(0));
 
-static llvm::cl::opt<bool>
-DisableSILLinking("disable-sil-linking",
-                  llvm::cl::desc("Disable SIL linking"));
-
 static llvm::cl::opt<int>
 SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
@@ -463,12 +459,6 @@ int main(int argc, char **argv) {
                                 CI.getSILOptions());
   }
   SILMod->setSerializeSILAction([]{});
-
-  // Load in all the SIL if we're allowed to.
-  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
-    if (!DisableSILLinking)
-      SILMod->getSILLoader()->getAll();
-  }
 
   if (!RemarksFilename.empty()) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
