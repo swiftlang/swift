@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TypeID.h"
+
 namespace swift {
 
 class AbstractFunctionDecl;
@@ -58,14 +59,14 @@ class Requirement;
 enum class ResilienceExpansion : unsigned;
 struct FragileFunctionKind;
 class SourceFile;
+struct TangentPropertyInfo;
 class Type;
+class TypeAliasDecl;
+struct TypePair;
+struct TypeWitnessAndDecl;
 class ValueDecl;
 class VarDecl;
 class Witness;
-class TypeAliasDecl;
-class Type;
-struct TypePair;
-struct TypeWitnessAndDecl;
 enum class AncestryFlags : uint8_t;
 enum class ImplicitMemberAction : uint8_t;
 struct FingerprintAndMembers;

@@ -237,7 +237,6 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
     interfaceErrorResult = errorResult.map(mapTypeOutOfContext);
-    ;
   }
 
   // The type of the thunk function.

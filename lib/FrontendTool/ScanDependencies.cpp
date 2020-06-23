@@ -459,12 +459,6 @@ bool swift::scanDependencies(CompilerInstance &instance) {
       break;
     }
 
-    // Swift -Onone support library.
-    if (invocation.shouldImportSwiftONoneSupport()) {
-      mainDependencies.addModuleDependency(
-          SWIFT_ONONE_SUPPORT, alreadyAddedModules);
-    }
-
     // Add any implicit module names.
     for (const auto &moduleName : importInfo.ModuleNames) {
       mainDependencies.addModuleDependency(moduleName.str(), alreadyAddedModules);
