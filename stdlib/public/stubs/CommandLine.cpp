@@ -242,6 +242,42 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   return argv;
 }
+#elif defined(__OpenBSD__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <sys/exec.h>
+
+SWIFT_RUNTIME_STDLIB_API
+char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+  assert(outArgLen != nullptr);
+  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
+    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
+    return _swift_stdlib_ProcessOverrideUnsafeArgv;
+  }
+
+  int mib[2] = {CTL_VM, VM_PSSTRINGS};
+  struct _ps_strings _ps;
+  size_t len = sizeof(_ps);
+
+  if (sysctl(mib, 2, &_ps, &len, NULL, 0) == -1) {
+    char **empty_argv = static_cast<char **>(calloc(1, sizeof(char *)));
+    empty_argv[0] = nullptr;
+    *outArgLen = 0;
+    return empty_argv;
+  }
+
+  struct ps_strings *ps = static_cast<struct ps_strings *>(_ps.val);
+  *outArgLen = ps->ps_nargvstr;
+
+  char **argv_copy =
+      static_cast<char **>(calloc(ps->ps_nargvstr + 1, sizeof(char *)));
+  for(int i = 0; i < ps->ps_nargvstr; i++) {
+    argv_copy[i] = strdup(ps->ps_argvstr[i]);
+  }
+  argv_copy[ps->ps_nargvstr] = nullptr;
+
+  return argv_copy;
+}
 #else // Add your favorite OS's command line arg grabber here.
 SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
