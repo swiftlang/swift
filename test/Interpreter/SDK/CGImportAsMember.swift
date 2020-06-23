@@ -12,9 +12,9 @@ class Colors {
 
 	class func printColors() {
 		print("Colors") // CHECK: Colors
-		print(black)    // CHECK: Generic Gray Profile
-		print(white)    // CHECK: Generic Gray Profile
-		print(clear)    // CHECK: Generic Gray Profile
+		print(black)    // CHECK: Generic Gray
+		print(white)    // CHECK: Generic Gray
+		print(clear)    // CHECK: Generic Gray
 	}
 }
 

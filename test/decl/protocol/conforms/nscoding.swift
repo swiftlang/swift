@@ -8,6 +8,7 @@
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/old.ast
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=iosmac
 // UNSUPPORTED: CPU=arm64e
 
 // See also nscoding_stable_abi.swift, for the stable ABI deployment

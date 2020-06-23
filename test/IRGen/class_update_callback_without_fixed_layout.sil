@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-library-evolution -O %s -target %target-pre-stable-abi-triple
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=iosmac
 // UNSUPPORTED: CPU=arm64e
 
 // With the old deployment target, these classes use the 'singleton' metadata

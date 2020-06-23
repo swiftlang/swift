@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -target %target-pre-stable-abi-triple | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-OLD
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=iosmac
 // UNSUPPORTED: CPU=arm64e
 
 // See also eager-class-initialization-stable-abi.swift, for the stable ABI
