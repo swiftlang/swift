@@ -3838,7 +3838,6 @@ class TestData : TestDataSuper {
     }
 
     func test_increaseCount() {
-        // https://github.com/apple/swift/pull/28919
         guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else { return }
         let initials: [Range<UInt8>] = [
             0..<0,
@@ -4375,4 +4374,3 @@ DataTests.test("bounding failure subscript") {
 
 runAllTests()
 #endif
-
