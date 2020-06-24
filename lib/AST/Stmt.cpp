@@ -479,6 +479,9 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
                           theSwitch->getTrailingObjects<ASTNode>());
+  for (auto *caseStmt : theSwitch->getCases())
+    caseStmt->setParentStmt(theSwitch);
+
   return theSwitch;
 }
 
