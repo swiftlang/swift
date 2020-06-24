@@ -16,9 +16,11 @@
 
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/NamespaceMacros.h"
 
 namespace swift {
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 //////////////////////////////////
 // Context member functions     //
@@ -248,5 +250,6 @@ std::string demangleTypeAsString(const char *MangledName,
                                   Options);
 }
 
+SWIFT_END_INLINE_NAMESPACE
 } // namespace Demangle
 } // namespace swift

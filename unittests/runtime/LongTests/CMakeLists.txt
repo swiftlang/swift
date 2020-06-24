@@ -47,7 +47,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   # interfaces.
   target_compile_definitions(SwiftRuntimeLongTests
                              PRIVATE
-                               swiftCore_EXPORTS)
+                               swiftCore_EXPORTS
+                               SWIFT_INLINE_NAMESPACE=__runtime)
 
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeLongTests
