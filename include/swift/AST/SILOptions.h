@@ -41,7 +41,7 @@ public:
   int UnrollThreshold = 250;
 
   /// The number of threads for multi-threaded code generation.
-  int NumThreads = 0;
+  unsigned NumThreads = 0;
   
   /// Controls whether to pull in SIL from partial modules during the
   /// merge modules step. Could perhaps be merged with the link mode
