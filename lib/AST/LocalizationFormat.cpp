@@ -31,6 +31,11 @@ enum LocalDiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
+
+struct DiagnosticNode {
+  uint32_t id;
+  std::string msg;
+};
 } // namespace
 
 namespace llvm {
@@ -44,25 +49,17 @@ template <> struct ScalarEnumerationTraits<LocalDiagID> {
   }
 };
 
-template <> struct MappingTraits<swift::diag::DiagnosticNode> {
-  static void mapping(IO &io, swift::diag::DiagnosticNode &node) {
-    // Cast `uint32_t` to `LocalDiagID` to use `diagID` at
-    // ScalarEnumerationTraits, because EnumerationTraits has to have an `id` of
-    // type `LocalDiagID`
-    auto diagID = static_cast<LocalDiagID>(node.id);
+template <> struct MappingTraits<DiagnosticNode> {
+  static void mapping(IO &io, DiagnosticNode &node) {
+    LocalDiagID diagID;
     io.mapRequired("id", diagID);
     io.mapRequired("msg", node.msg);
-    // We will need to cast `diagID` back again to unsigned int, and assign it
-    // to `node.id` because we will need the `uint32_t` value as it'll be used
-    // to retrieve diagnostic nodes later.
-    node.id = (unsigned)diagID;
+    node.id = static_cast<uint32_t>(diagID);
   }
 };
 
 } // namespace yaml
 } // namespace llvm
-
-LLVM_YAML_IS_SEQUENCE_VECTOR(swift::diag::DiagnosticNode)
 
 namespace swift {
 namespace diag {

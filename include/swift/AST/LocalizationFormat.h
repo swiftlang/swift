@@ -30,12 +30,6 @@ enum class DiagID : uint32_t;
 
 namespace swift {
 namespace diag {
-
-struct DiagnosticNode {
-  uint32_t id;
-  std::string msg;
-};
-
 class LocalizationProducer {
 public:
   /// If the  message isn't available/localized in the current `yaml` file,
