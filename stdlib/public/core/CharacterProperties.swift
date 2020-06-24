@@ -32,7 +32,7 @@ extension Character {
   ///
   ///     let chars: [Character] = ["a", " ", "™"]
   ///     for ch in chars {
-  ///         print(ch, "-->", ch.properties.numericValue)
+  ///         print(ch, "-->", ch.asciiValue)
   ///     }
   ///     // a --> 97
   ///     //   --> 32
@@ -125,7 +125,7 @@ extension Character {
   ///
   ///     let chars: [Character] = ["4", "④", "万", "a"]
   ///     for ch in chars {
-  ///         print(ch, "-->", ch.properties.numericValue)
+  ///         print(ch, "-->", ch.wholeNumberValue)
   ///     }
   ///     // 4 --> 4
   ///     // ④ --> 4
