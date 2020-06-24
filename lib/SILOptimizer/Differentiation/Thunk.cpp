@@ -380,6 +380,23 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   for (unsigned resIdx : range(toType->getNumResults())) {
     auto fromRes = fromConv.getResults()[resIdx];
     auto toRes = toConv.getResults()[resIdx];
+    // Check function-typed results.
+    if (isa<SILFunctionType>(fromRes.getInterfaceType()) &&
+        isa<SILFunctionType>(toRes.getInterfaceType())) {
+      auto fromFnType = cast<SILFunctionType>(fromRes.getInterfaceType());
+      auto toFnType = cast<SILFunctionType>(toRes.getInterfaceType());
+      auto fromUnsubstFnType = fromFnType->getUnsubstitutedType(module);
+      auto toUnsubstFnType = toFnType->getUnsubstitutedType(module);
+      // If unsubstituted function types are not equal, perform reabstraction.
+      if (fromUnsubstFnType != toUnsubstFnType) {
+        auto fromFn = *fromDirResultsIter++;
+        auto newFromFn = reabstractFunction(
+            builder, fb, loc, fromFn, toFnType,
+            [](SubstitutionMap substMap) { return substMap; });
+        results.push_back(newFromFn);
+        continue;
+      }
+    }
     // No abstraction mismatch.
     if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
       // If result types are direct, add call result as direct thunk result.
