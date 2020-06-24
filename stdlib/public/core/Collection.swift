@@ -491,7 +491,7 @@ public protocol Collection: Sequence {
   ///
   ///     let horseName = "Silver"
   ///     if horseName.isEmpty {
-  ///         print("I've been through the desert on a horse with no name.")
+  ///         print("My horse has no name.")
   ///     } else {
   ///         print("Hi ho, \(horseName)!")
   ///     }
@@ -1070,7 +1070,7 @@ extension Collection {
   ///
   ///     let horseName = "Silver"
   ///     if horseName.isEmpty {
-  ///         print("I've been through the desert on a horse with no name.")
+  ///         print("My horse has no name.")
   ///     } else {
   ///         print("Hi ho, \(horseName)!")
   ///     }
