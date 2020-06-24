@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Demangling/TypeDecoder.h"
 
 namespace swift {
@@ -33,6 +34,7 @@ namespace swift {
 class TypeDecl;
 
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 Type getTypeForMangling(ASTContext &ctx,
                         llvm::StringRef mangling);
@@ -178,6 +180,7 @@ private:
                                               Demangle::Node::Kind kind);
 };
 
+SWIFT_END_INLINE_NAMESPACE
 }  // namespace Demangle
 
 }  // namespace swift

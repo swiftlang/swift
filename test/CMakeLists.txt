@@ -49,7 +49,7 @@ function(get_test_dependencies SDK result_var_name)
       sil-nm
       sil-opt
       sil-passpipeline-dumper
-      swift
+      swift-frontend
       swift-api-digester
       swift-demangle
       swift-demangle-yamldump

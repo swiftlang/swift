@@ -39,6 +39,8 @@ class Pattern;
 class PatternBindingDecl;
 class VarDecl;
 class CaseStmt;
+class DoCatchStmt;
+class SwitchStmt;
 
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
@@ -927,6 +929,7 @@ class CaseStmt final
                                     CaseLabelItem> {
   friend TrailingObjects;
 
+  Stmt *ParentStmt = nullptr;
   SourceLoc UnknownAttrLoc;
   SourceLoc ItemIntroducerLoc;
   SourceLoc ItemTerminatorLoc;
@@ -953,6 +956,14 @@ public:
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
 
   CaseParentKind getParentKind() const { return ParentKind; }
+
+  Stmt *getParentStmt() const { return ParentStmt; }
+  void setParentStmt(Stmt *S) {
+    assert(S && "Parent statement must be SwitchStmt or DoCatchStmt");
+    assert((ParentKind == CaseParentKind::Switch && isa<SwitchStmt>(S)) ||
+           (ParentKind == CaseParentKind::DoCatch && isa<DoCatchStmt>(S)));
+    ParentStmt = S;
+  }
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
@@ -1161,6 +1172,8 @@ class DoCatchStmt final
     Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
                             getTrailingObjects<CaseStmt *>());
+    for (auto *catchStmt : getCatches())
+      catchStmt->setParentStmt(this);
   }
 
 public:
