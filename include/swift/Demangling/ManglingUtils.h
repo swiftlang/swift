@@ -14,10 +14,12 @@
 #define SWIFT_DEMANGLING_MANGLINGUTILS_H
 
 #include "llvm/ADT/StringRef.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Demangling/Punycode.h"
 
 namespace swift {
 namespace Mangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 using llvm::StringRef;
 
@@ -311,6 +313,7 @@ public:
   }
 };
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Mangle
 } // end namespace swift
 
