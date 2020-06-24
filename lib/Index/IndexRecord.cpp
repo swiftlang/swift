@@ -580,11 +580,9 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     unitWriter.addRecordFile(recordFile, *FE, isSystemModule, mod);
   }
 
-  ModuleDecl::ImportFilter importFilter;
-  importFilter |= ModuleDecl::ImportFilterKind::Public;
-  importFilter |= ModuleDecl::ImportFilterKind::Private;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  module->getImportedModules(imports, importFilter);
+  module->getImportedModules(imports, {ModuleDecl::ImportFilterKind::Public,
+                                       ModuleDecl::ImportFilterKind::Private});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules, skipStdlib,
                         targetTriple, clangCI, diags, unitWriter,
@@ -621,13 +619,11 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
       getModuleInfoFromOpaqueModule);
 
   // Module dependencies.
-  ModuleDecl::ImportFilter importFilter;
-  importFilter |= ModuleDecl::ImportFilterKind::Public;
-  importFilter |= ModuleDecl::ImportFilterKind::Private;
-  importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  primarySourceFile->getImportedModules(imports, importFilter);
+  primarySourceFile->getImportedModules(
+      imports, {ModuleDecl::ImportFilterKind::Public,
+                ModuleDecl::ImportFilterKind::Private,
+                ModuleDecl::ImportFilterKind::ImplementationOnly});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules, skipStdlib,
                         targetTriple, clangCI, diags, unitWriter,

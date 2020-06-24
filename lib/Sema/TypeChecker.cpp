@@ -174,42 +174,6 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ASTContext &Context,
   llvm_unreachable("unknown literal constructor");
 }
 
-/// Return an idealized form of the parameter type of the given
-/// object-literal initializer.  This removes references to the protocol
-/// name from the first argument label, which would be otherwise be
-/// redundant when writing out the object-literal syntax:
-///
-///   #fileLiteral(fileReferenceLiteralResourceName: "hello.jpg")
-///
-/// Doing this allows us to preserve a nicer (and source-compatible)
-/// literal syntax while still giving the initializer a semantically
-/// unambiguous name.
-Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
-                                                ConstructorDecl *ctor) {
-  auto params = ctor->getMethodInterfaceType()
-                    ->castTo<FunctionType>()->getParams();
-  SmallVector<AnyFunctionType::Param, 8> newParams;
-  newParams.append(params.begin(), params.end());
-
-  auto replace = [&](StringRef replacement) -> Type {
-    auto &Context = ctor->getASTContext();
-    newParams[0] = AnyFunctionType::Param(newParams[0].getPlainType(),
-                                          Context.getIdentifier(replacement),
-                                          newParams[0].getParameterFlags());
-    return AnyFunctionType::composeInput(Context, newParams,
-                                         /*canonicalVararg=*/false);
-  };
-
-  switch (expr->getLiteralKind()) {
-  case ObjectLiteralExpr::colorLiteral:
-    return replace("red");
-  case ObjectLiteralExpr::fileLiteral:
-  case ObjectLiteralExpr::imageLiteral:
-    return replace("resourceName");
-  }
-  llvm_unreachable("unknown literal constructor");
-}
-
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   if (auto *stdlib = dc->getASTContext().getStdlibModule()) {
     return stdlib;

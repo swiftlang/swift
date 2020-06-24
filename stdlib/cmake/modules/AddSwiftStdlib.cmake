@@ -1124,6 +1124,8 @@ function(_add_swift_target_library_single target name)
       list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
   endif()
 
+  list(APPEND library_search_directories "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift")
+
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")

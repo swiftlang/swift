@@ -345,7 +345,7 @@ let PrintTests = TestSuite("FloatingPointPrinting")
 
 % for FloatType in ['Float16', 'Float', 'Double', 'Float80']:
 % if FloatType == 'Float16':
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 % end
 % if FloatType == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -383,7 +383,7 @@ fileprivate func expectDescription(_ expected: String, _ object: ${FloatType},
 //   that is closest (as an infinitely-precise real number) to the original
 //   binary float (interpreted as an infinitely-precise real number).
 % if FloatType == 'Float16':
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 % end
 fileprivate func expectAccurateDescription(_ object: ${FloatType},
   _ message: @autoclosure () -> String = "",
@@ -584,7 +584,7 @@ PrintTests.test("Printable_CDouble") {
   expectDescription("-1.0", CDouble(-1.0))
 }
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
 PrintTests.test("Printable_Float16") {
   func asFloat16(_ f: Float16) -> Float16 { return f }
 

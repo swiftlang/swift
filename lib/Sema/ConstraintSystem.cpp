@@ -581,6 +581,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   if (isExpr<MemberRefExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::Member);
 
+  if (isExpr<ObjectLiteralExpr>(anchor))
+    return getConstraintLocator(anchor, ConstraintLocator::ConstructorMember);
+
   return getConstraintLocator(anchor);
 }
 
@@ -1664,6 +1667,34 @@ ConstraintSystem::getTypeOfMemberReference(
           return ExistentialMetatypeType::get(baseObjTy);
       return t;
     });
+  }
+
+  // Construct an idealized parameter type of the initializer associated
+  // with object literal, which generally simplifies the first label
+  // (e.g. "colorLiteralRed:") by stripping all the redundant stuff about
+  // literals (leaving e.g. "red:").
+  {
+    auto anchor = locator.getAnchor();
+    if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
+      auto fnType = type->castTo<FunctionType>();
+
+      SmallVector<AnyFunctionType::Param, 4> params(fnType->getParams().begin(),
+                                                    fnType->getParams().end());
+
+      switch (OLE->getLiteralKind()) {
+      case ObjectLiteralExpr::colorLiteral:
+        params[0] = params[0].withLabel(Context.getIdentifier("red"));
+        break;
+
+      case ObjectLiteralExpr::fileLiteral:
+      case ObjectLiteralExpr::imageLiteral:
+        params[0] = params[0].withLabel(Context.getIdentifier("resourceName"));
+        break;
+      }
+
+      type =
+          FunctionType::get(params, fnType->getResult(), fnType->getExtInfo());
+    }
   }
 
   // If we opened up any type variables, record the replacements.
