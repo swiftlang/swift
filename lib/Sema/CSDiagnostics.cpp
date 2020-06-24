@@ -1036,10 +1036,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
       emitDiagnostic(diag::optional_base_remove_optional_for_keypath_root,
                      unwrappedBaseType)
           .fixItReplace(rootType->getSourceRange(),
-                        unwrappedBaseType.getStringAsComponent());
-    } else {
-      emitDiagnostic(diag::optional_base_chain, Member)
-          .fixItInsertAfter(keyPathExpr->getLoc(), "?");
+                        unwrappedBaseType.getString());
     }
   } else {
     // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"

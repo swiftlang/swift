@@ -498,10 +498,7 @@ public:
   }
   
   SourceLoc getLoc() const override {
-    if (getLocator()->isForKeyPathComponent()) {
-      return getSourceRange().End;
-    }
-    return FailureDiagnostic::getLoc();
+    return getSourceRange().End;
   }
   
   SourceRange getSourceRange() const override;

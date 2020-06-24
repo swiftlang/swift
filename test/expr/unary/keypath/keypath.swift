@@ -1006,7 +1006,6 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   
   SR5688_KP(\.count)
   // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
-  // expected-note@-2 {{chain the optional using '?' to access member 'count' only for non-'nil' base values}}{{14-14=?}}
 }
 
 func testSyntaxErrors() { // expected-note{{}}
