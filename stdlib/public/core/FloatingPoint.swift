@@ -144,14 +144,14 @@
 /// every value of the `tempsFahrenheit` array, any NaN values cause the
 /// result to also be NaN, as seen in this example:
 ///
-///     let badAverage = tempsFahrenheit.reduce(0.0, combine: +) / Double(tempsFahrenheit.count)
+///     let badAverage = tempsFahrenheit.reduce(0.0, +) / Double(tempsFahrenheit.count)
 ///     // badAverage.isNaN == true
 ///
 /// Instead, when you need an operation to have a specific numeric result,
 /// filter out any NaN values using the `isNaN` property.
 ///
 ///     let validTemps = tempsFahrenheit.filter { !$0.isNaN }
-///     let average = validTemps.reduce(0.0, combine: +) / Double(validTemps.count)
+///     let average = validTemps.reduce(0.0, +) / Double(validTemps.count)
 ///
 /// Finally, report the average temperature and observation counts:
 ///
