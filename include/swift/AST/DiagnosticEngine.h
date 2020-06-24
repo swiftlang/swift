@@ -966,8 +966,7 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    static const char *diagnosticStringFor(const DiagID id,
-                                           bool printDiagnosticName);
+    const char *diagnosticStringFor(const DiagID id, bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
