@@ -980,6 +980,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
   
   if (Builtin.ID == BuiltinValueKind::ZeroInitializer) {
+    (void)args.claimAll();
     // Build a zero initializer of the result type.
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);

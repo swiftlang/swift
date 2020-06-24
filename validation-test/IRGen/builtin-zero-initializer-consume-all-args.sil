@@ -1,0 +1,16 @@
+// RUN: %swift -module-name main %s -emit-ir | %FileCheck %s
+
+import Builtin
+
+// All we need to do here is check that we didn't run into any assertions.
+// CHECK-LABEL: define swiftcc void @test
+// CHECK: ret void
+sil @test : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  %1 = builtin "zeroInitializer"<Builtin.Int32>(%0 : $*Builtin.Int32) : $()
+  dealloc_stack %0 : $*Builtin.Int32
+  %t = tuple ()
+  return %t : $()
+}
+
