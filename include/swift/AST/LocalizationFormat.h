@@ -18,18 +18,21 @@
 #ifndef SWIFT_LOCALIZATIONFORMAT_H
 #define SWIFT_LOCALIZATIONFORMAT_H
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include <string>
+#include <type_traits>
 
 namespace {
-enum LocalDiagID : uint32_t;
+enum class DiagID : uint32_t;
 }
 
 namespace swift {
 namespace diag {
 
 struct DiagnosticNode {
-  LocalDiagID id;
+  uint32_t id;
   std::string msg;
 };
 
@@ -37,7 +40,7 @@ class LocalizationProducer {
 public:
   /// If the  message isn't available/localized in the current `yaml` file,
   /// return the fallback default message.
-  virtual llvm::StringRef getMessageOr(LocalDiagID id,
+  virtual llvm::StringRef getMessageOr(DiagID id,
                                        llvm::StringRef defaultMessage) const {
     return defaultMessage;
   }
@@ -49,7 +52,7 @@ class YAMLLocalizationProducer final : public LocalizationProducer {
 public:
   std::vector<std::string> diagnostics;
   explicit YAMLLocalizationProducer(std::string locale, std::string path);
-  llvm::StringRef getMessageOr(LocalDiagID id,
+  llvm::StringRef getMessageOr(DiagID id,
                                llvm::StringRef defaultMessage) const override;
 };
 

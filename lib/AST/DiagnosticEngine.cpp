@@ -1018,11 +1018,11 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
   }
   auto defaultMessage = diagnosticStrings[(unsigned)id];
   if (localization) {
-    const std::string &localizedMessage =
-        localization.get()->getMessageOr((LocalDiagID)id, defaultMessage);
-    return localizedMessage.c_str();
+    auto localizedMessage =
+        localization.get()->getMessageOr(id, defaultMessage);
+    return localizedMessage.data();
   }
-  return diagnosticStrings[(unsigned)id];
+  return defaultMessage;
 }
 
 const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {

@@ -16,9 +16,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/LocalizationFormat.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include <string>
+#include <type_traits>
 
 namespace {
 enum LocalDiagID : uint32_t {
@@ -41,8 +46,16 @@ template <> struct ScalarEnumerationTraits<LocalDiagID> {
 
 template <> struct MappingTraits<swift::diag::DiagnosticNode> {
   static void mapping(IO &io, swift::diag::DiagnosticNode &node) {
-    io.mapRequired("id", node.id);
+    // Cast `uint32_t` to `LocalDiagID` to use `diagID` at
+    // ScalarEnumerationTraits, because EnumerationTraits has to have an `id` of
+    // type `LocalDiagID`
+    auto diagID = static_cast<LocalDiagID>(node.id);
+    io.mapRequired("id", diagID);
     io.mapRequired("msg", node.msg);
+    // We will need to cast `diagID` back again to unsigned int, and assign it
+    // to `node.id` because we will need the `uint32_t` value as it'll be used
+    // to retrieve diagnostic nodes later.
+    node.id = (unsigned)diagID;
   }
 };
 
