@@ -973,6 +973,11 @@ def num_threads : Separate<["-"], "num-threads">,
   HelpText<"Enable multi-threading and specify number of threads">,
   MetaVarName<"<n>">;
 
+def order_file_instrumentation : Separate<["-"], "-order-file-instrumentation">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Generate instrumented code to collect order file into default.profraw file (overridden by '=' form of option or LLVM_PROFILE_FILE env var)">,
+  MetaVarName<"<n>">;
+
 def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
 
