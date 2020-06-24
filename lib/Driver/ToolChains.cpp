@@ -456,6 +456,11 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back(remarksFilter->getValue());
   }
 
+  if (context.Args.hasArg(options::OPT_order_file_instrumentation)) {
+    Arguments.push_back("-mllvm");
+    Arguments.push_back("-enable-order-file-instrumentation");
+  }
+
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
     Arguments.push_back("-migrate-keep-objc-visibility");
   }
