@@ -79,7 +79,7 @@ YAMLLocalizationProducer::YAMLLocalizationProducer(std::string locale,
 }
 
 llvm::StringRef
-YAMLLocalizationProducer::getMessageOr(DiagID id,
+YAMLLocalizationProducer::getMessageOr(swift::DiagID id,
                                        llvm::StringRef defaultMessage) const {
   if (diagnostics.empty())
     return defaultMessage;

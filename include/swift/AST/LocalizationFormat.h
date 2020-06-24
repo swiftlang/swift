@@ -24,17 +24,14 @@
 #include <string>
 #include <type_traits>
 
-namespace {
-enum class DiagID : uint32_t;
-}
-
 namespace swift {
+  enum class DiagID : uint32_t;
 namespace diag {
 class LocalizationProducer {
 public:
   /// If the  message isn't available/localized in the current `yaml` file,
   /// return the fallback default message.
-  virtual llvm::StringRef getMessageOr(DiagID id,
+  virtual llvm::StringRef getMessageOr(swift::DiagID id,
                                        llvm::StringRef defaultMessage) const {
     return defaultMessage;
   }
@@ -46,7 +43,7 @@ class YAMLLocalizationProducer final : public LocalizationProducer {
 public:
   std::vector<std::string> diagnostics;
   explicit YAMLLocalizationProducer(std::string locale, std::string path);
-  llvm::StringRef getMessageOr(DiagID id,
+  llvm::StringRef getMessageOr(swift::DiagID id,
                                llvm::StringRef defaultMessage) const override;
 };
 
