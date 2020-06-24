@@ -666,6 +666,8 @@ Type ConstraintSystem::openUnboundGenericType(
   openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
               replacements);
 
+  recordOpenedTypes(locator, replacements);
+
   if (parentTy) {
     auto subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     for (auto pair : subs) {
