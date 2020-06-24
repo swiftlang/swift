@@ -1953,16 +1953,51 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
       auto requirements = GenericTypeRequirements(IGF.IGM, nominal);
       int requirementIndex = 0;
       for (auto requirement : requirements.getRequirements()) {
-        if (requirement.Protocol) {
-          continue;
-        }
         auto parameter = requirement.TypeParameter;
         auto argument = parameter.subst(substitutions);
-        llvm::Constant *addr =
-            IGM.getAddrOfTypeMetadata(argument->getCanonicalType());
-        auto addrInt = IGF.Builder.CreateBitCast(addr, IGM.Int8PtrTy);
-        condition = IGF.Builder.CreateAnd(
-            condition, IGF.Builder.CreateICmpEQ(addrInt, valueAtIndex(requirementIndex)));
+        if (requirement.Protocol) {
+          auto conformance = substitutions.lookupConformance(
+              requirement.TypeParameter->getCanonicalType(),
+              requirement.Protocol);
+          ProtocolConformance *concreteConformance = conformance.getConcrete();
+          auto argumentNominal = argument->getAnyNominal();
+          if (argumentNominal && argumentNominal->isGenericContext()) {
+            // TODO: Statically specialize the witness table pattern for t's
+            //       conformance.
+            llvm_unreachable(
+                "Statically specializing metadata at generic types is "
+                "not supported.");
+          } else {
+            RootProtocolConformance *rootConformance =
+                concreteConformance->getRootConformance();
+            auto *expectedDescriptor =
+                IGF.IGM.getAddrOfProtocolConformanceDescriptor(rootConformance);
+            auto *witnessTable = valueAtIndex(requirementIndex);
+            auto *witnessBuffer =
+                IGF.Builder.CreateBitCast(witnessTable, IGM.Int8PtrPtrTy);
+            auto *uncastProvidedDescriptor =
+                IGF.Builder.CreateLoad(witnessBuffer, Alignment());
+            auto *providedDescriptor = IGF.Builder.CreateBitCast(
+                uncastProvidedDescriptor,
+                IGM.ProtocolConformanceDescriptorPtrTy);
+
+            auto *call = IGF.Builder.CreateCall(
+                IGF.IGM.getCompareProtocolConformanceDescriptorsFn(),
+                {providedDescriptor, expectedDescriptor});
+            call->setDoesNotThrow();
+            call->setCallingConv(IGF.IGM.SwiftCC);
+            call->addAttribute(llvm::AttributeList::FunctionIndex,
+                               llvm::Attribute::ReadNone);
+            condition = IGF.Builder.CreateAnd(condition, call);
+          }
+        } else {
+          llvm::Constant *addr =
+              IGM.getAddrOfTypeMetadata(argument->getCanonicalType());
+          auto addrInt = IGF.Builder.CreateBitCast(addr, IGM.Int8PtrTy);
+          condition = IGF.Builder.CreateAnd(
+              condition, IGF.Builder.CreateICmpEQ(
+                             addrInt, valueAtIndex(requirementIndex)));
+        }
         ++requirementIndex;
       }
       IGF.Builder.CreateCondBr(condition, specializationBlock, successorBlock);
@@ -2053,7 +2088,6 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
         IGF, request, nominal, genericArgs, [&](int index) {
           llvm::Value *indexValue = llvm::ConstantInt::get(IGM.Int64Ty, index);
-          llvm::SmallVector<llvm::Value *, 1> indices{indexValue};
           llvm::Value *elementPointer =
               IGF.Builder.CreateGEP(argumentsBuffer, indexValue);
           llvm::LoadInst *retval = IGF.Builder.CreateLoad(
