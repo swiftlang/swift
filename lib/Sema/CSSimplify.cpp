@@ -5716,7 +5716,24 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
       return SolutionKind::Error;
     }
   }
-  
+
+  auto fnType = optTy->getAs<FunctionType>();
+  if (shouldAttemptFixes() && fnType && fnType->getNumParams() == 0) {
+    // For function types with no parameters, let's try to
+    // offer a "make it a call" fix if possible.
+    auto optionalResultType = fnType->getResult()->getOptionalObjectType();
+    if (optionalResultType) {
+      if (matchTypes(optionalResultType, second, ConstraintKind::Bind,
+                     flags | TMF_ApplyingFix, locator)
+              .isSuccess()) {
+        auto *fix =
+            InsertExplicitCall::create(*this, getConstraintLocator(locator));
+
+        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+      }
+    }
+  }
+
   // The object type is an lvalue if the optional was.
   if (optLValueTy->is<LValueType>())
     objectTy = LValueType::get(objectTy);
@@ -6952,11 +6969,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           *this, ConstraintKind::Bind,
           UnwrapOptionalBase::create(*this, member, baseObjTy, locator),
           memberTy, innerTV, locator);
-      auto optionalResult =
-          Constraint::createFixed(*this, ConstraintKind::Bind,
-                                  UnwrapOptionalBase::createWithOptionalResult(
-                                      *this, member, baseObjTy, locator),
-                                  optTy, memberTy, locator);
+      auto optionalResult = Constraint::createFixed(
+          *this, ConstraintKind::Bind,
+          UnwrapOptionalBase::createWithOptionalResult(*this, member,
+                                                       baseObjTy, locator),
+          optTy, memberTy, locator);
       optionalities.push_back(nonoptionalResult);
       optionalities.push_back(optionalResult);
       addDisjunctionConstraint(optionalities, locator);
