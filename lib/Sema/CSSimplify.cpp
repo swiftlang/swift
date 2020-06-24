@@ -3225,28 +3225,6 @@ bool ConstraintSystem::repairFailures(
     if (!isValueOfRawRepresentable(expectedType, rawReprType))
       return false;
 
-    auto rawValueLabel = getASTContext().Id_rawValue;
-    auto valueTy = expectedType->lookThroughSingleOptionalType();
-    auto unwrappedRawReprTy = rawReprType->lookThroughSingleOptionalType();
-    auto memberLoc = getConstraintLocator(
-        locator.withPathElement(ConstraintLocator::ApplyFunction));
-    auto memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
-    addValueMemberConstraint(
-        MetatypeType::get(unwrappedRawReprTy, getASTContext()),
-        DeclNameRef(DeclName(getASTContext(), DeclBaseName::createConstructor(),
-                             {rawValueLabel})),
-        memberTy, DC, FunctionRefKind::SingleApply, {},
-        getConstraintLocator(
-            locator.withPathElement(ConstraintLocator::ConstructorMember)));
-    addConstraint(
-        ConstraintKind::ApplicableFunction,
-        FunctionType::get({AnyFunctionType::Param(valueTy, rawValueLabel)},
-                          unwrappedRawReprTy),
-        memberTy, memberLoc);
-
-    ArgumentInfos[getArgumentInfoLocator(memberLoc)] =
-        ArgumentInfo({rawValueLabel, None});
-
     conversionsOrFixes.push_back(ExplicitlyConstructRawRepresentable::create(
         *this, rawReprType, expectedType, getConstraintLocator(locator)));
     return true;
@@ -9744,13 +9722,39 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UseWrappedValue:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:
-  case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
   case FixKind::AllowKeyPathRootTypeMismatch:
   case FixKind::AllowCoercionToForceCast:
   case FixKind::SpecifyKeyPathRootType: {
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::ExplicitlyConstructRawRepresentable: {
+    auto rawValueLabel = getASTContext().Id_rawValue;
+    auto valueTy = type1->lookThroughSingleOptionalType();
+    auto unwrappedRawReprTy = type2->lookThroughSingleOptionalType();
+    auto memberLoc = getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::ApplyFunction));
+    auto memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+    addValueMemberConstraint(
+        MetatypeType::get(unwrappedRawReprTy, getASTContext()),
+        DeclNameRef(DeclName(getASTContext(), DeclBaseName::createConstructor(),
+                             {rawValueLabel})),
+        memberTy, DC, FunctionRefKind::SingleApply, {},
+        getConstraintLocator(
+            locator.withPathElement(ConstraintLocator::ConstructorMember)));
+    addConstraint(
+        ConstraintKind::ApplicableFunction,
+        FunctionType::get({AnyFunctionType::Param(valueTy, rawValueLabel)},
+                          unwrappedRawReprTy),
+        memberTy, memberLoc);
+    addConstraint(ConstraintKind::Bind, unwrappedRawReprTy, valueTy, memberLoc);
+
+    ArgumentInfos[getArgumentInfoLocator(memberLoc)] =
+        ArgumentInfo({rawValueLabel, None});
+
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
