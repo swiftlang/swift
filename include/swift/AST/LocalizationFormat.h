@@ -25,7 +25,8 @@
 #include <type_traits>
 
 namespace swift {
-  enum class DiagID : uint32_t;
+enum class DiagID : uint32_t;
+
 namespace diag {
 class LocalizationProducer {
 public:
