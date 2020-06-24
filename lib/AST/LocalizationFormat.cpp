@@ -92,10 +92,9 @@ YAMLLocalizationProducer::getMessageOr(swift::DiagID id,
 template <typename T, typename Context>
 typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value, void>::type
 readYAML(llvm::yaml::IO &io, T &Seq, bool, Context &Ctx) {
-  // Resize Diags from YAML file to be the same size
-  // as diagnosticStrings from def files.
-  Seq.resize((unsigned)DiagID::NumDiags);
   unsigned count = io.beginSequence();
+  if (count)
+    Seq.resize(LocalDiagID::NumDiags);
   for (unsigned i = 0; i < count; ++i) {
     void *SaveInfo;
     if (io.preflightElement(i, SaveInfo)) {
