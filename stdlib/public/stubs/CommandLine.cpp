@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <vector>
-#include <string>
 #include <cassert>
 #include <climits>
 #include <cstdarg>
@@ -23,11 +21,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "swift/Runtime/Debug.h"
 
-#include "../SwiftShims/RuntimeStubs.h"
 #include "../SwiftShims/GlobalObjects.h"
+#include "../SwiftShims/RuntimeStubs.h"
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -52,7 +52,7 @@ extern "C" char ***_NSGetArgv(void);
 extern "C" int *_NSGetArgc(void);
 
 SWIFT_RUNTIME_STDLIB_API
-char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -65,7 +65,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 }
 #elif defined(__linux__) || defined(__CYGWIN__)
 SWIFT_RUNTIME_STDLIB_API
-char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -75,8 +75,8 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   FILE *cmdline = fopen("/proc/self/cmdline", "rb");
   if (!cmdline) {
-    swift::fatalError(0,
-            "Fatal error: Unable to open interface to '/proc/self/cmdline'.\n");
+    swift::fatalError(
+        0, "Fatal error: Unable to open interface to '/proc/self/cmdline'.\n");
   }
   char *arg = nullptr;
   size_t size = 0;
@@ -95,11 +95,11 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   return outBuf;
 }
-#elif defined (_WIN32)
+#elif defined(_WIN32)
 #include <stdlib.h>
 
 SWIFT_RUNTIME_STDLIB_API
-char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -109,7 +109,6 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   *outArgLen = 0;
 
-
   LPWSTR *szArgList;
   int nArgs;
   szArgList = CommandLineToArgvW(GetCommandLineW(), &nArgs);
@@ -118,17 +117,17 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   std::vector<char *> argv;
   for (int i = 0; i < nArgs; ++i) {
-    int szBufferSize = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-                                           szArgList[i], -1, nullptr, 0,
-                                           nullptr, nullptr);
+    int szBufferSize =
+        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, szArgList[i], -1,
+                            nullptr, 0, nullptr, nullptr);
     if (szBufferSize == 0) {
       for (char *arg : argv)
         free(arg);
       return nullptr;
     }
 
-    char *buffer = static_cast<char *>(calloc(static_cast<size_t>(szBufferSize),
-                                              sizeof(char)));
+    char *buffer = static_cast<char *>(
+        calloc(static_cast<size_t>(szBufferSize), sizeof(char)));
     if (buffer == nullptr) {
       for (char *arg : argv)
         free(arg);
@@ -157,13 +156,13 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 }
 #elif defined(__FreeBSD__)
 #include <errno.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 SWIFT_RUNTIME_STDLIB_API
-char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -172,7 +171,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   }
 
   char *argPtr = nullptr; // or use ARG_MAX? 8192 is used in LLDB though..
-  int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ARGS, getpid() };
+  int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_ARGS, getpid()};
   size_t argPtrSize = 0;
   for (int i = 0; i < 3 && !argPtr; ++i) { // give up after 3 tries
     if (sysctl(mib, 4, nullptr, &argPtrSize, nullptr, 0) != -1) {
@@ -188,8 +187,10 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     }
   }
   if (!argPtr)
-    swift::fatalError(0, "Fatal error: Could not retrieve commandline "
-                         "arguments: sysctl: %s.\n", strerror(errno));
+    swift::fatalError(0,
+                      "Fatal error: Could not retrieve commandline "
+                      "arguments: sysctl: %s.\n",
+                      strerror(errno));
 
   char *curPtr = argPtr;
   char *endPtr = argPtr + argPtrSize;
@@ -203,16 +204,16 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   outBuf[argvec.size()] = nullptr;
 
   free(argPtr);
-    
+
   return outBuf;
 }
 #elif defined(__wasi__)
+#include <stdlib.h>
 #include <wasi/api.h>
 #include <wasi/libc.h>
-#include <stdlib.h>
 
 SWIFT_RUNTIME_STDLIB_API
-char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -225,7 +226,8 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   size_t argv_buf_size;
   size_t argc;
   err = __wasi_args_sizes_get(&argc, &argv_buf_size);
-  if (err != __WASI_ERRNO_SUCCESS) return nullptr;
+  if (err != __WASI_ERRNO_SUCCESS)
+    return nullptr;
 
   size_t num_ptrs = argc + 1;
   char *argv_buf = (char *)malloc(argv_buf_size);
@@ -280,14 +282,14 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 }
 #else // Add your favorite OS's command line arg grabber here.
 SWIFT_RUNTIME_STDLIB_API
-char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
     *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
     return _swift_stdlib_ProcessOverrideUnsafeArgv;
   }
-  
-  swift::fatalError(0,
+
+  swift::fatalError(
+      0,
       "Fatal error: Command line arguments not supported on this platform.\n");
 }
 #endif
-
