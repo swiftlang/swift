@@ -2241,12 +2241,16 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
-    auto *namingPattern = VD->getNamingPattern();
-    if (!namingPattern) {
-      return ErrorType::get(Context);
+    Type interfaceType;
+    if (auto *parentE = VD->getParentExpr()) {
+      interfaceType = parentE->getType();
+    } else if (auto *namingPattern = VD->getNamingPattern()) {
+      interfaceType = namingPattern->getType();
     }
 
-    Type interfaceType = namingPattern->getType();
+    if (!interfaceType)
+      return ErrorType::get(Context);
+
     if (interfaceType->hasArchetype())
       interfaceType = interfaceType->mapTypeOutOfContext();
 
