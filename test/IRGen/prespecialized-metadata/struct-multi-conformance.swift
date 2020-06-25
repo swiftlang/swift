@@ -16,6 +16,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
+// UNSUPPORTED: remote_run
 
 #if BASE
 public struct K {
