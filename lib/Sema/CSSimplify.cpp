@@ -5697,26 +5697,41 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   // If the base type is not optional, let's attempt a fix (if possible)
   // and assume that `!` is just not there.
   if (!objectTy) {
-    // Let's see if we can apply a specific fix here.
-    if (shouldAttemptFixes()) {
-      if (optTy->isHole())
-        return SolutionKind::Solved;
-
-      auto *fix =
-          RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
-
-      if (recordFix(fix))
-        return SolutionKind::Error;
-
-      // If the fix was successful let's record
-      // "fixed" object type and continue.
-      objectTy = optTy;
-    } else {
-      // If fixes are not allowed, no choice but to fail.
+    if (!shouldAttemptFixes())
       return SolutionKind::Error;
+    
+    // Let's see if we can apply a specific fix here.
+    if (optTy->isHole())
+      return SolutionKind::Solved;
+    
+    auto fnType = optTy->getAs<FunctionType>();
+    if (fnType && fnType->getNumParams() == 0) {
+      // For function types with no parameters, let's try to
+      // offer a "make it a call" fix if possible.
+      auto optionalResultType = fnType->getResult()->getOptionalObjectType();
+      if (optionalResultType) {
+        if (matchTypes(optionalResultType, second, ConstraintKind::Bind,
+                       flags | TMF_ApplyingFix, locator)
+                .isSuccess()) {
+          auto *fix =
+              InsertExplicitCall::create(*this, getConstraintLocator(locator));
+
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+        }
+      }
     }
+
+    auto *fix =
+        RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
+
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    // If the fix was successful let's record
+    // "fixed" object type and continue.
+    objectTy = optTy;
   }
-  
+
   // The object type is an lvalue if the optional was.
   if (optLValueTy->is<LValueType>())
     objectTy = LValueType::get(objectTy);
@@ -6950,11 +6965,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       SmallVector<Constraint *, 2> optionalities;
       auto nonoptionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::create(*this, member, locator), memberTy, innerTV,
-          locator);
+          UnwrapOptionalBase::create(*this, member, baseObjTy, locator),
+          memberTy, innerTV, locator);
       auto optionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::createWithOptionalResult(*this, member, locator),
+          UnwrapOptionalBase::createWithOptionalResult(*this, member,
+                                                       baseObjTy, locator),
           optTy, memberTy, locator);
       optionalities.push_back(nonoptionalResult);
       optionalities.push_back(optionalResult);
