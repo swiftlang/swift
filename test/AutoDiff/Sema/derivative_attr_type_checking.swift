@@ -401,6 +401,14 @@ where T: Differentiable & AdditiveArithmetic {
   }
 }
 
+class Class<T> {
+  var x: T
+  init(_ x: T) {
+    self.x = x
+  }
+}
+extension Class: Differentiable where T: Differentiable {}
+
 // Test computed properties.
 
 extension Struct {
@@ -411,6 +419,27 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   func vjpProperty() -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
     return (x, { v in .init(x: v) })
   }
+
+  // FIXME: `computedProperty.set` is ambiguous and is currently parsed
+  // incorrectly.
+  //
+  // Actual:
+  // - Base type: `computedProperty`
+  // - Member name: `set`
+  // - Accessor kind: none
+  //
+  // Desired:
+  // - Base type: none
+  // - Member name: `computedProperty`
+  // - Accessor kind: `set`
+  /*
+  @derivative(of: computedProperty.set)
+  mutating func vjpPropertySetter(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+  */
 }
 
 // Test initializers.
@@ -442,7 +471,10 @@ extension Struct {
     get { 1 }
     set {}
   }
-  subscript(float float: Float) -> Float { 1 }
+  subscript(float float: Float) -> Float {
+    get { 1 }
+    set {}
+  }
   subscript<T: Differentiable>(x: T) -> T { x }
 }
 extension Struct where T: Differentiable & AdditiveArithmetic {
@@ -451,14 +483,75 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     return (1, { _ in .zero })
   }
 
+  @derivative(of: subscript.set)
+  mutating func vjpSubscriptSetter(_ newValue: Float) -> (
+    value: (), pullback: (inout TangentVector) -> Float
+  ) {
+    fatalError()
+  }
+
+  @derivative(of: subscript().set)
+  mutating func jvpSubscriptSetter(_ newValue: Float) -> (
+    value: (), differential: (inout TangentVector, Float) -> ()
+  ) {
+    fatalError()
+  }
+
   @derivative(of: subscript(float:), wrt: self)
-  func vjpSubscriptLabelled(float: Float) -> (value: Float, pullback: (Float) -> TangentVector) {
+  func vjpSubscriptLabeled(float: Float) -> (value: Float, pullback: (Float) -> TangentVector) {
     return (1, { _ in .zero })
+  }
+
+  @derivative(of: subscript(float:).set)
+  mutating func vjpSubscriptLabeledSetter(float: Float, newValue: Float) -> (
+    value: (), pullback: (inout TangentVector) -> (Float, Float)
+  ) {
+    fatalError()
+  }
+
+  @derivative(of: subscript(float:).set)
+  mutating func jvpSubscriptLabeledSetter(float: Float, _ newValue: Float) -> (
+    value: (), differential: (inout TangentVector, Float, Float) -> Void
+  ) {
+    fatalError()
   }
 
   @derivative(of: subscript(_:), wrt: self)
   func vjpSubscriptGeneric<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
     return (x, { _ in .zero })
+  }
+
+  // Error: original subscript has no setter.
+  // FIXME: Improve diagnostic. The current one makes no sense.
+  // expected-error @+1 {{'subscript(_:)' is not a 'func', 'init', 'subscript', or 'var' computed property declaration}}
+  @derivative(of: subscript(_:).set, wrt: self)
+  mutating func vjpSubscriptGeneric_NoSetter<T: Differentiable>(x: T) -> (
+    value: T, pullback: (T.TangentVector) -> TangentVector
+  ) {
+    return (x, { _ in .zero })
+  }
+}
+
+extension Class {
+  subscript() -> Float {
+    get { 1 }
+    set {}
+  }
+}
+extension Class where T: Differentiable {
+  @derivative(of: subscript)
+  func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {
+    return (1, { _ in .zero })
+  }
+
+  // FIXME: Change derivative type calculation rules for functions with class-typed parameters.
+  // We need to assume that all functions taking class-typed operands may mutate those operands.
+  // Related to TF-1175.
+  @derivative(of: subscript.set)
+  func vjpSubscriptSetter(_ newValue: Float) -> (
+    value: (), pullback: (inout TangentVector) -> Float
+  ) {
+    fatalError()
   }
 }
 

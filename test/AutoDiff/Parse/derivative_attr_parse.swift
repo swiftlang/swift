@@ -26,6 +26,15 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
+@derivative(of: property.set) // ok
+func dPropertySetter() -> ()
+
+@derivative(of: subscript.set) // ok
+func dSubscriptSetter() -> ()
+
+@derivative(of: subscript(_:label:).set) // ok
+func dLabeledSubscriptSetter() -> ()
+
 /// Bad
 
 // expected-error @+2 {{expected an original function name}}

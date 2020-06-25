@@ -4488,7 +4488,6 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!originalAFD)
     return true;
-  /* 
   // Diagnose original stored properties. Stored properties cannot have custom
   // registered derivatives.
   if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
@@ -4534,7 +4533,6 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       }
     }
   }
-  */
   attr->setOriginalFunction(originalAFD);
 
   // Returns true if:
