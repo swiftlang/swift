@@ -489,12 +489,13 @@ public:
                                     Type memberBaseType,
                                     bool resultOptional)
       : FailureDiagnostic(solution, locator), Member(memberName),
-        MemberBaseType(memberBaseType), ResultTypeIsOptional(resultOptional) {}
+        MemberBaseType(resolveType(memberBaseType)),
+        ResultTypeIsOptional(resultOptional) {}
 
   bool diagnoseAsError() override;
   
   Type getMemberBaseType() const {
-    return getSolution().simplifyType(MemberBaseType)->getRValueType();
+    return MemberBaseType;
   }
   
   SourceLoc getLoc() const override {
