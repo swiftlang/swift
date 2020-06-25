@@ -134,6 +134,7 @@ public:
     DumpPCM, ///< Dump information about a precompiled Clang module
 
     ScanDependencies,   ///< Scan dependencies of Swift source files
+    PrintVersion,       ///< Print version information.
   };
 
   /// Indicates the action the user requested that the frontend perform.
