@@ -314,6 +314,10 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
       // (Setting up module output will be handled below.)
       return FrontendOptions::ActionType::EmitModuleOnly;
     }
+
+    if (args.hasArg(OPT_version))
+      return FrontendOptions::ActionType::PrintVersion;
+
     return FrontendOptions::ActionType::NoneAction;
   }
   Option Opt = A->getOption();
@@ -386,7 +390,8 @@ bool ArgsToFrontendOptionsConverter::setUpInputKindAndImmediateArgs() {
   if (Opts.InputsAndOutputs.verifyInputs(
           Diags, treatAsSIL,
           Opts.RequestedAction == FrontendOptions::ActionType::REPL,
-          Opts.RequestedAction == FrontendOptions::ActionType::NoneAction)) {
+          (Opts.RequestedAction == FrontendOptions::ActionType::NoneAction ||
+           Opts.RequestedAction == FrontendOptions::ActionType::PrintVersion))){
     return true;
   }
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate) {
