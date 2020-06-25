@@ -1297,7 +1297,13 @@ static bool performCompile(CompilerInstance &Instance,
     return precompileClangModule(Instance);
   if (Action == FrontendOptions::ActionType::DumpPCM)
     return dumpPrecompiledClangModule(Instance);
-
+  if (Action == FrontendOptions::ActionType::PrintVersion) {
+    llvm::outs() << version::getSwiftFullVersion(
+      version::Version::getCurrentLanguageVersion()) << '\n';
+    llvm::outs() << "Target: "
+      << Invocation.getLangOptions().Target.str() << '\n';
+    return false;
+  }
   if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
     return buildModuleFromInterface(Instance);
 
