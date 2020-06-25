@@ -186,6 +186,10 @@ func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<
 func inferredConformancesGenericLinear<T, U>(_: @differentiable(linear) (Vector<T>) -> Vector<U>) {}
 
 func nondiff(x: Vector<Int>) -> Vector<Int> {}
+
+// TODO(diagnostics): Ambiguity notes for two following calls should talk about `T` and `U` both not conforming to `Differentiable`
+// but we currently have to way to coalesce notes multiple fixes in to a single note.
+
 // expected-error @+1 {{no exact matches in call to global function 'inferredConformancesGeneric'}}
 inferredConformancesGeneric(nondiff)
 // expected-error @+1 {{no exact matches in call to global function 'inferredConformancesGenericLinear'}}
