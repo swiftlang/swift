@@ -33,6 +33,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -40,6 +41,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/StringSet.h"
 #include <algorithm>
 
 using namespace swift;
@@ -1008,6 +1010,7 @@ bool Parser::parseDifferentiableAttributeArguments(
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
+
   // Parse the optional 'wrt' differentiability parameters clause.
   if (isIdentifier(Tok, "wrt")) {
     if (parseDifferentiabilityParametersClause(parameters, AttrName))
@@ -3945,8 +3948,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   if (DeclResult.isNonNull()) {
     Decl *D = DeclResult.get();
-    if (!declWasHandledAlready(D))
+
+    if (!declWasHandledAlready(D)) {
       Handler(D);
+    }
+
     setOriginalDeclarationForDifferentiableAttributes(D->getAttrs(), D);
   }
 
@@ -5982,6 +5988,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
+
       setLocalDiscriminator(VD);
       VD->setTopLevelGlobal(topLevelDecl);
 

@@ -553,6 +553,16 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   }
 
   for (auto Attr : getAttrs()) {
+    // SWIFT_ENABLE_TENSORFLOW
+    // Skip implicitly `@differentiable` attribute generated during
+    // `@derivative` attribute type-checking.
+    // TODO(TF-835): Instead of generating implicit `@differentiable`
+    // attributes, lower `@derivative` attributes to differentiability witnesses
+    // for the referenced declaration.
+    if (auto *diffAttr = dyn_cast<DifferentiableAttr>(Attr))
+      if (diffAttr->isImplicit())
+        continue;
+    // SWIFT_ENABLE_TENSORFLOW END
     if (Attr->getRange().isValid())
       Range.widen(Attr->getRangeWithAt());
   }
@@ -629,7 +639,8 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   if (isa<ModuleDecl>(this))
     return SourceLoc();
   // When the decl is context-free, we should get loc from source buffer.
-  if (!getDeclContext())
+  if (!getDeclContext() ||
+      !isa<FileUnit>(getDeclContext()->getModuleScopeContext()))
     return getLocFromSource();
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   switch(File->getKind()) {
@@ -1463,8 +1474,30 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
   auto PBE = PatternBindingEntry(Pat, EqualLoc, E, BindingInitContext);
   auto *Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
 
-  if (BindingInitContext)
+  if (BindingInitContext) {
     cast<PatternBindingInitializer>(BindingInitContext)->setBinding(Result, 0);
+
+    // If the expression contains any closures, then we must change the
+    // closures' parents to `BindingInitContext`, because the closures are now
+    // children of `BindingInitContext`.
+    if (E) {
+      class Walker : public ASTWalker {
+      public:
+        DeclContext *NewParent;
+        explicit Walker(DeclContext *NewParent) : NewParent(NewParent) {}
+        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+          if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
+            ACE->setParent(NewParent);
+            // Don't set the parents of nested closures.
+            return { false, E };
+          }
+          return { true, E };
+        }
+      };
+      Walker walker(BindingInitContext);
+      E->walk(walker);
+    }
+  }
 
   return Result;
 }
@@ -5122,7 +5155,10 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   auto module = getModuleContext();
   if (module != module->getASTContext().getStdlibModule() &&
       !module->getName().is("Foundation") &&
-      !module->getName().is("_Differentiation")) {
+      !module->getName().is("_Differentiation") &&
+      // SWIFT_ENABLE_TENSORFLOW
+      !module->getName().is("TensorFlow")) {
+      // SWIFT_ENABLE_TENSORFLOW END
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -5168,6 +5204,22 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::PointwiseMultiplicative:
+    return KnownDerivableProtocolKind::PointwiseMultiplicative;
+  case KnownProtocolKind::ElementaryFunctions:
+    return KnownDerivableProtocolKind::ElementaryFunctions;
+  case KnownProtocolKind::KeyPathIterable:
+    return KnownDerivableProtocolKind::KeyPathIterable;
+  case KnownProtocolKind::TensorArrayProtocol:
+    return KnownDerivableProtocolKind::TensorArrayProtocol;
+  case KnownProtocolKind::TensorGroup:
+    return KnownDerivableProtocolKind::TensorGroup;
+  case KnownProtocolKind::VectorProtocol:
+    return KnownDerivableProtocolKind::VectorProtocol;
+  case KnownProtocolKind::EuclideanDifferentiable:
+    return KnownDerivableProtocolKind::EuclideanDifferentiable;
+  // SWIFT_ENABLE_TENSORFLOW END
   default: return None;
   }
 }

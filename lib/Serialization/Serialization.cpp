@@ -818,6 +818,13 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
+  BLOCK_RECORD(sil_block, SIL_INST_DIFFERENTIABLE_FUNCTION);
+  BLOCK_RECORD(sil_block, SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT);
+  // SWIFT_ENABLE_TENSORFLOW
+  BLOCK_RECORD(sil_block, SIL_INST_LINEAR_FUNCTION);
+  BLOCK_RECORD(sil_block, SIL_INST_LINEAR_FUNCTION_EXTRACT);
+  // SWIFT_ENABLE_TENSORFLOW END
+  BLOCK_RECORD(sil_block, SIL_DIFFERENTIABILITY_WITNESS);
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(X, #X, nameBuffer)
@@ -856,6 +863,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
+  // SWIFT_ENABLE_TENSORFLOW
+  BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_OFFSETS);
+  // SWIFT_ENABLE_TENSORFLOW END
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -5267,6 +5278,30 @@ void swift::serializeToBuffers(
     if (moduleSourceInfoBuffer)
       *moduleSourceInfoBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
           std::move(buf), options.SourceInfoOutputPath);
+  }
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void swift::serializeToMemory(
+    ModuleOrSourceFile DC, const SerializationOptions &options,
+    std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer, const SILModule *M) {
+  if (moduleBuffer) {
+    SharedTimer timer("Serialization, swiftmodule, to memory");
+    llvm::SmallString<1024> buf;
+    llvm::raw_svector_ostream stream(buf);
+    Serializer::writeToStream(stream, DC, M, options);
+    *moduleBuffer =
+        std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buf));
+  }
+
+  if (moduleDocBuffer) {
+    SharedTimer timer("Serialization, swiftdoc, to memory");
+    llvm::SmallString<1024> buf;
+    llvm::raw_svector_ostream stream(buf);
+    writeDocToStream(stream, DC, options.GroupInfoPath);
+    *moduleDocBuffer =
+        std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buf));
   }
 }
 

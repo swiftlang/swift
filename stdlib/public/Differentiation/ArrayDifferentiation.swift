@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 //===----------------------------------------------------------------------===//
 // Protocol conformances
 //===----------------------------------------------------------------------===//
@@ -67,6 +65,16 @@ where Element: Differentiable {
     }
   }
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+extension Array.DifferentiableView: EuclideanDifferentiable
+where Element: EuclideanDifferentiable {
+  public var differentiableVectorView: Array.DifferentiableView.TangentVector {
+    Array.DifferentiableView.TangentVector(
+      base.map { $0.differentiableVectorView })
+  }
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 extension Array.DifferentiableView: Equatable
 where Element: Differentiable & Equatable {
@@ -170,6 +178,15 @@ extension Array: Differentiable where Element: Differentiable {
     }
   }
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+extension Array: EuclideanDifferentiable
+where Element: EuclideanDifferentiable {
+  public var differentiableVectorView: TangentVector {
+    TangentVector(map { $0.differentiableVectorView })
+  }
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // Derivatives

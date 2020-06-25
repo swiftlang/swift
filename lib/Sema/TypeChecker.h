@@ -1204,6 +1204,7 @@ void checkInitializerErrorHandling(Initializer *I, Expr *E);
 void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
 void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
                                        Expr *expr);
+void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.

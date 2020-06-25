@@ -130,6 +130,12 @@ static SourceKit::Context &getGlobalContext() {
   return *GlobalCtx;
 }
 
+namespace SourceKit {
+void SOURCEKITD_PUBLIC setGlobalInMemoryOutputFileSystem(IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
+  getGlobalContext().getSwiftLangSupport().setInMemoryOutputFileSystem(std::move(FS));
+}
+} // namespace SourceKit
+
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
                                            bool Simplified);
 

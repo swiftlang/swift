@@ -133,6 +133,9 @@ static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
     llvm::cl::desc("The directory that holds the compiler resource files"));
 
+static llvm::cl::list<std::string>
+ExtraClangArgs("Xcc", llvm::cl::desc("Extra flags to pass to Clang."));
+
 static llvm::cl::opt<std::string>
 SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
                               "importer."),
@@ -181,6 +184,11 @@ SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
 
 static llvm::cl::opt<bool>
+SILExistentialSpecializer("enable-sil-existential-specializer", 
+                          llvm::cl::Hidden,
+                          llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::Hidden,
                    llvm::cl::init(true),
@@ -223,7 +231,10 @@ EnableExperimentalStaticAssert(
 
 static llvm::cl::opt<bool> EnableExperimentalDifferentiableProgramming(
     "enable-experimental-differentiable-programming", llvm::cl::Hidden,
-    llvm::cl::init(false),
+    // SWIFT_ENABLE_TENSORFLOW
+    // Use default value true on `tensorflow` branch.
+    llvm::cl::init(true),
+    // SWIFT_ENABLE_TENSORFLOW END
     llvm::cl::desc("Enable experimental differentiable programming"));
 
 /// Regular expression corresponding to the value given in one of the
@@ -336,6 +347,7 @@ int main(int argc, char **argv) {
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.getClangImporterOptions().ExtraArgs = ExtraClangArgs;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
@@ -365,6 +377,7 @@ int main(int argc, char **argv) {
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
+  SILOpts.ExistentialSpecializer = SILExistentialSpecializer;
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;

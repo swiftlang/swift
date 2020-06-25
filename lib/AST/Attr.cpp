@@ -20,12 +20,18 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/GenericSignatureBuilder.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/TypeCheckRequests.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
@@ -1674,6 +1680,15 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
   auto &ctx = original->getASTContext();
   void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
                            alignof(DifferentiableAttr));
+  // SWIFT_ENABLE_TENSORFLOW
+  // Register derivative function configuration for the given original
+  // declaration.
+  // NOTE(TF-1038): `@differentiable` attributes currently always have
+  // effective result indices `{0}` (the first and only result index).
+  auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+  original->addDerivativeFunctionConfiguration(
+      {parameterIndices, resultIndices, derivativeGenSig});
+  // SWIFT_ENABLE_TENSORFLOW END
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
                                       linear, parameterIndices, derivativeGenSig);
 }

@@ -592,6 +592,17 @@ class TypeDecoder {
         flags = flags.withDifferentiabilityKind(
             FunctionMetadataDifferentiabilityKind::Linear);
       }
+      // SWIFT_ENABLE_TENSORFLOW
+      else if (Node->getKind() == NodeKind::DifferentiableFunctionType ||
+               Node->getKind() ==
+                   NodeKind::EscapingDifferentiableFunctionType) {
+        flags = flags.withDifferentiabilityKind(
+            FunctionMetadataDifferentiabilityKind::Normal);
+      } else if (Node->getKind() == NodeKind::LinearFunctionType ||
+                 Node->getKind() == NodeKind::EscapingLinearFunctionType) {
+        flags = flags.withDifferentiabilityKind(
+            FunctionMetadataDifferentiabilityKind::Linear);
+      }
 
       bool isThrow =
         Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;

@@ -3,11 +3,11 @@
 // STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}
 
 // RUN: not %swiftc_driver -crazy-option-that-does-not-exist %s 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
-// RUN: not %swift_driver -crazy-option-that-does-not-exist 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
+// SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
 // INVALID_OPTION: error: unknown argument: '-crazy-option-that-does-not-exist'
 
 // RUN: %swiftc_driver -assert-config Debug -### %s | %FileCheck -check-prefix=ASSERTCONFIG %s
-// RUN: %swift_driver -assert-config Debug -### | %FileCheck -check-prefix=ASSERTCONFIG %s
+// SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
 // ASSERTCONFIG: -assert-config Debug
 
 // RUN: %swiftc_driver -assert-config Release -### %s | %FileCheck -check-prefix=ASSERTCONFIG_RELEASE %s
@@ -29,26 +29,7 @@
 // RUN: not %swiftc_driver -import-objc-header fake.h -emit-module-interface-path fake.swiftinterface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
 // BRIDGING_HEADER_SWIFTINTERFACE: error: using bridging headers with module interfaces is unsupported
 
-// RUN: %swift_driver -### | %FileCheck -check-prefix=DEFAULT_REPL %s
-// DEFAULT_REPL: -repl
-// RUN: not %swiftc_driver 2>&1 | %FileCheck -check-prefix=DEFAULT_EXEC_ERR  %s
-// DEFAULT_EXEC_ERR: error: no input files
-// RUN: %swiftc_driver %s -### 2>&1 | %FileCheck -check-prefix=DEFAULT_EXEC  %s
-// DEFAULT_EXEC: -c
-// DEFAULT_EXEC: {{ld|clang\+\+}}
-
-// RUN: %swift_driver -repl -### 2>&1 | %FileCheck -check-prefix=REPL %s
-// REPL: warning: unnecessary option '-repl'
-
-// RUN: %swift_driver -lldb-repl -### 2>&1 | %FileCheck -check-prefix=LLDB_REPL %s
-// LLDB_REPL-NOT: warning
-// LLDB_REPL: lldb
-// LLDB_REPL-NOT: warning
-
-// RUN: %swift_driver -deprecated-integrated-repl -### 2>&1 | %FileCheck -check-prefix=INTEGRATED_REPL %s
-// INTEGRATED_REPL-NOT: warning
-// INTEGRATED_REPL: -repl
-// INTEGRATED_REPL-NOT: warning
+// SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
 
 // RUN: %swift_driver -### %s | %FileCheck -check-prefix=DEFAULT_I %s
 // DEFAULT_I: -interpret

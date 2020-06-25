@@ -1,6 +1,12 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 // REQUIRES: asserts
 
+// SWIFT_ENABLE_TENSORFLOW
+// This test isn't reproducible on `tensorflow` branch because
+// `_Differentiation` module does not currently match `master` branch.
+// REQUIRES: no_tensorflow
+// SWIFT_ENABLE_TENSORFLOW END
+
 // TF-1167: `OverrideMatcher::match` crash due to meaningless assertion:
 // `assert(false)`. The assertion was triggered when parameter indices
 // could not be resolved for neither base nor derived declaration

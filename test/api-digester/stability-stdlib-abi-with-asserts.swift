@@ -1,3 +1,9 @@
+// SWIFT_ENABLE_TENSORFLOW
+// Note: this test is disabled on `tensorflow` branch because `tensorflow`
+// branch adds various public APIs to the stdlib without `@available`
+// attributes. Some of these APIs will be usptreamed to the
+// UNSUPPORTED: tensorflow
+
 // REQUIRES: rdar60088553
 // REQUIRES: OS=macosx
 // REQUIRES: swift_stdlib_asserts

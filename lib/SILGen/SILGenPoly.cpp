@@ -3100,7 +3100,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // This may inherit @noescape from the expectedType. The @noescape attribute
   // is only stripped when using this type to materialize a new decl.
   auto extInfo = expectedType->getExtInfo()
-    .withRepresentation(SILFunctionType::Representation::Thin);
+    .withRepresentation(SILFunctionType::Representation::Thin)
+    .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
 
   if (withoutActuallyEscaping)
     extInfo = extInfo.withNoEscape(false);

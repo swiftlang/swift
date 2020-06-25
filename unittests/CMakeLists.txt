@@ -28,5 +28,7 @@ if(SWIFT_INCLUDE_TOOLS)
   if(SWIFT_BUILD_SOURCEKIT)
     add_subdirectory(SourceKit)
   endif()
+
+  add_subdirectory(libInMemoryFrontend)
 endif()
 

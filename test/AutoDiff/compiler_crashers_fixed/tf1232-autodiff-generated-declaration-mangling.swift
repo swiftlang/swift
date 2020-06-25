@@ -1,6 +1,11 @@
 // RUN: %target-build-swift -g %s
 // REQUIRES: asserts
 
+// SWIFT_ENABLE_TENSORFLOW
+// Note: TF-1232 is reproducible only on master branch, not on tensorflow branch.
+// UNSUPPORTED: tensorflow
+// SWIFT_ENABLE_TENSORFLOW END
+
 // TF-1232: IRGenDebugInfo crash due to lack of proper mangling for
 // AutoDiff-generated declarations: linear map structs and branching trace
 // enums.

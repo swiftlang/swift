@@ -1,3 +1,12 @@
+// SWIFT_ENABLE_TENSORFLOW
+//
+// NOTE: This test is disabled on the 'tensorflow' branch because we are
+// actively developing and changing attributes such as `@differentiable` and
+// `@compilerEvaluable`. When various features get merged to 'master', a
+// canonical update of these tests will be included.
+//
+// UNSUPPORTED: tensorflow
+
 // REQUIRES: objc_interop
 
 // FIXME: the test output we're comparing to is specific to macOS.

@@ -1,3 +1,5 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: macosx
 // RUN: %scale-test --begin 8 --end 16 --step 1 --select NumLeafScopes %s -Xfrontend=-solver-expression-time-threshold=1
 // REQUIRES: asserts,no_asan
 

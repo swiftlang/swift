@@ -96,10 +96,12 @@ public:
 ///     domOrder.pushChildren(block);
 ///   }
 /// \endcode
-class DominanceOrder {
+// SWIFT_ENABLE_TENSORFLOW
+template <class DomInfo>
+class DominanceOrderBase {
   
   SmallVector<SILBasicBlock *, 16> buffer;
-  DominanceInfo *DT;
+  DomInfo *DT;
   size_t srcIdx = 0;
   
 public:
@@ -109,7 +111,8 @@ public:
   /// \p DT The dominance info of the function.
   /// \p capacity Should be the number of basic blocks in the dominator tree to
   ///             reduce memory allocation.
-  DominanceOrder(SILBasicBlock *root, DominanceInfo *DT, int capacity = 0) :
+  // SWIFT_ENABLE_TENSORFLOW
+  DominanceOrderBase(SILBasicBlock *root, DomInfo *DT, int capacity = 0) :
             DT(DT) {
      buffer.reserve(capacity);
      buffer.push_back(root);
@@ -183,6 +186,9 @@ public:
   using super::properlyDominates;
 };
 
+// SWIFT_ENABLE_TENSORFLOW
+using DominanceOrder = DominanceOrderBase<DominanceInfo>;
+using PostDominanceOrder = DominanceOrderBase<PostDominanceInfo>;
 
 } // end namespace swift
 

@@ -1456,6 +1456,10 @@ namespace  {
     UNINTERESTING_ATTR(Transpose)
     UNINTERESTING_ATTR(NoDerivative)
 
+    // SWIFT_ENABLE_TENSORFLOW
+    UNINTERESTING_ATTR(CompilerEvaluable)
+    // SWIFT_ENABLE_TENSORFLOW END
+
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)

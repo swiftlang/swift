@@ -183,6 +183,8 @@ namespace swift {
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
     /// disabled because it is not complete.
+    /// options.
+    /// FIXME: Disabled by default until this is fully baked.
     bool EnableCXXInterop = false;
 
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
@@ -356,7 +358,10 @@ namespace swift {
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
-    bool EnableExperimentalDifferentiableProgramming = false;
+    // SWIFT_ENABLE_TENSORFLOW
+    // Use default value true on `tensorflow` branch.
+    bool EnableExperimentalDifferentiableProgramming = true;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Whether to enable forward mode differentiation.
     bool EnableExperimentalForwardModeDifferentiation = false;

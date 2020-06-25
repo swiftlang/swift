@@ -57,6 +57,15 @@ class PythonKit(product.Product):
         except OSError:
             pass
 
+        # SWIFT_ENABLE_TENSORFLOW
+        # NOTE(TF-1252): macOS deployment target must be below 10.13 to avoid
+        # libswiftCore.dylib dynamic linker issues on 10.14+ while `tensorflow`
+        # branch contains changes to libswiftCore.dylib.
+        target = ''
+        if host_target.startswith('macosx'):
+            target = '-DCMAKE_Swift_COMPILER_TARGET=x86_64-apple-macosx10.10'
+        # SWIFT_ENABLE_TENSORFLOW END
+
         with shell.pushd(self.build_dir):
             shell.call([
                 self.toolchain.cmake,
@@ -66,6 +75,9 @@ class PythonKit(product.Product):
                     self.install_toolchain_path()),
                 '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
+                # SWIFT_ENABLE_TENSORFLOW
+                target,
+                # SWIFT_ENABLE_TENSORFLOW END
                 '-B', self.build_dir,
                 '-S', self.source_dir,
             ])

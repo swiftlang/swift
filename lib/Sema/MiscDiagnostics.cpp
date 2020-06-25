@@ -225,7 +225,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           });
         }
       }
-      
+
       // If we have an assignment expression, scout ahead for acceptable _'s.
       if (auto *AE = dyn_cast<AssignExpr>(E)) {
         auto destExpr = AE->getDest();

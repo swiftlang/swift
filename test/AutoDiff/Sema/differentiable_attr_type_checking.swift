@@ -170,16 +170,14 @@ struct SubscriptMethod: Differentiable {
   subscript(explicit x: Float) -> Float {
     @differentiable // ok
     get { return x }
-    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
-    @differentiable
+    @differentiable // ok
     set {}
   }
 
   subscript(x: Float, y: Float) -> Float {
     @differentiable // ok
     get { return x + y }
-    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
-    @differentiable
+    @differentiable // ok
     set {}
   }
 }
@@ -682,7 +680,7 @@ struct Accessors: Differentiable {
 
   var stored: Float
   var computed: Float {
-    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
+    // `set` has an `inout` parameter: `(inout Self) -> (Float) -> ()`.
     @differentiable
     set { stored = newValue }
 

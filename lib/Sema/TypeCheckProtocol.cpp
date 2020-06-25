@@ -5575,6 +5575,32 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(
           "When possible, OptionSet is derived via memberwise init synthesis");
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownDerivableProtocolKind::KeyPathIterable:
+    return derived.deriveKeyPathIterable(Requirement);
+
+  case KnownDerivableProtocolKind::TensorArrayProtocol:
+    return derived.deriveTensorArrayProtocol(Requirement);
+
+  case KnownDerivableProtocolKind::TensorGroup:
+    return derived.deriveTensorGroup(Requirement);
+
+  case KnownDerivableProtocolKind::PointwiseMultiplicative:
+    return derived.derivePointwiseMultiplicative(Requirement);
+
+  case KnownDerivableProtocolKind::ElementaryFunctions:
+    return derived.deriveElementaryFunctions(Requirement);
+
+  case KnownDerivableProtocolKind::VectorProtocol:
+    return derived.deriveVectorProtocol(Requirement);
+
+  case KnownDerivableProtocolKind::EuclideanDifferentiable:
+    return derived.deriveEuclideanDifferentiable(Requirement);
+
+  default:
+    return nullptr;
+  // SWIFT_ENABLE_TENSORFLOW END
   }
   llvm_unreachable("unknown derivable protocol kind");
 }
@@ -5600,6 +5626,12 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveCaseIterable(AssocType);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::KeyPathIterable:
+    return derived.deriveKeyPathIterable(AssocType);
+  case KnownProtocolKind::VectorProtocol:
+    return derived.deriveVectorProtocol(AssocType);
+  // SWIFT_ENABLE_TENSORFLOW END
   default:
     return nullptr;
   }

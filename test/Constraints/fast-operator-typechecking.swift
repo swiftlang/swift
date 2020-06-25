@@ -1,3 +1,5 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: tensorflow
 // RUN: %target-typecheck-verify-swift -swift-version 5 -solver-enable-operator-designated-types -solver-disable-shrink -disable-constraint-solver-performance-hacks
 
 // rdar://problem/32998180

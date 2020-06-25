@@ -48,14 +48,16 @@ class TensorFlowSwiftAPIs(product.Product):
         # generate the build rules if you are not in the build directory.  As a
         # result, we need to create the build tree before we can use it and
         # change into it.
-        #
-        # NOTE: unfortunately, we do not know if the build is using Python
-        # 2.7 or Python 3.2+.  In the latter, the `exist_ok` named parameter
-        # would alleviate some of this issue.
         try:
             os.makedirs(self.build_dir)
         except OSError:
             pass
+
+        # SWIFT_ENABLE_TENSORFLOW
+        target = ''
+        if host_target.startswith('macosx'):
+            target = '-DCMAKE_Swift_COMPILER_TARGET=x86_64-apple-macosx10.13'
+        # SWIFT_ENABLE_TENSORFLOW END
 
         with shell.pushd(self.build_dir):
             shell.call([
@@ -66,6 +68,13 @@ class TensorFlowSwiftAPIs(product.Product):
                     self.install_toolchain_path()),
                 '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),
+                # SWIFT_ENABLE_TENSORFLOW
+                target,
+                '-D', 'BUILD_TESTING={}'.format(
+                    'NO' if host_target.startswith('macosx') else 'YES'
+                ),
+                '-D', 'BUILD_X10=YES',
+                # SWIFT_ENABLE_TENSORFLOW END
                 '-B', self.build_dir,
                 '-S', self.source_dir,
             ])
@@ -81,7 +90,7 @@ class TensorFlowSwiftAPIs(product.Product):
         pass
 
     def should_install(self, host_target):
-        return self.args.install_tensorflow_swift_apis
+        return self.args.build_tensorflow_swift_apis
 
     def install(self, host_target):
         shell.call([

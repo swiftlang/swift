@@ -246,6 +246,10 @@ WARNING(designated_init_in_cross_module_extension,none,
 NOTE(designated_init_c_struct_fix,none,
      "use \"self.init()\" to initialize the struct with zero values", ())
 
+NOTE(constexpr_unknown_reason, none, "%0", (StringRef))
+NOTE(constexpr_called_from, none, "when called from here", ())
+NOTE(constexpr_not_evaluable, none,
+     "expression not evaluable as constant here", ())
 
 // Control flow diagnostics.
 ERROR(missing_return,none,
@@ -338,6 +342,7 @@ ERROR(shifting_all_significant_bits,none,
 ERROR(static_report_error, none,
       "static report error", ())
 
+// SWIFT_ENABLE_TENSORFLOW
 ERROR(pound_assert_condition_not_constant,none,
        "#assert condition not constant", ())
 ERROR(pound_assert_failure,none,
@@ -415,6 +420,13 @@ NOTE(constexpr_witness_call_with_no_conformance, none,
     "cannot find concrete conformance "
     "%select{for this call|for a witness-method invoked during this call}0",
     (bool))
+
+NOTE(constexpr_witness_call_with_no_conformance_found, none,
+    "cannot find concrete conformance for a witness method call", ())
+NOTE(constexpr_witness_call_with_no_target_found, none,
+    "cannot resolve a witness method call to a concrete function", ())
+NOTE(constexpr_witness_call_found_here, none,
+    "witness method call found here", ())
 
 NOTE(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
      "non-constant value produced by an unevaluated instructions", ())

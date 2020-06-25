@@ -1,4 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
+// SWIFT_ENABLE_TENSORFLOW
+// XFAIL: *
 
 // expected-error @+1 {{'@differentiable' attribute used without importing module '_Differentiation'}}
 let _: @differentiable (Float) -> Float
