@@ -175,10 +175,10 @@ extension Vector: Differentiable where T: Differentiable {
   mutating func move(along direction: TangentVector) { fatalError() }
 }
 
-// expected-note@+1 2 {{candidate requires that 'Int' conform to 'Differentiable' (requirement specified as 'T' == 'Differentiable')}}
+// expected-note@+1 2 {{found this candidate}}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<U>) {}
 
-// expected-note  @+5 2 {{candidate requires that 'Int' conform to 'Differentiable' (requirement specified as 'T' == 'Differentiable')}}
+// expected-note  @+5 2 {{found this candidate}}
 // expected-error @+4 {{generic signature requires types 'Vector<T>' and 'Vector<T>.TangentVector' to be the same}}
 // expected-error @+3 {{generic signature requires types 'Vector<U>' and 'Vector<U>.TangentVector' to be the same}}
 // expected-error @+2 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
@@ -210,10 +210,10 @@ extension Linear: Differentiable where T: Differentiable, T == T.TangentVector {
   typealias TangentVector = Self
 }
 
-// expected-note @+1 2 {{candidate requires that 'Int' conform to 'Differentiable' (requirement specified as 'T' == 'Differentiable')}}
+// expected-note @+1 2 {{found this candidate}}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Linear<T>) -> Linear<U>) {}
 
-// expected-note @+1 2 {{candidate requires that 'Int' conform to 'Differentiable' (requirement specified as 'T' == 'Differentiable')}}
+// expected-note @+1 2 {{found this candidate}}
 func inferredConformancesGenericLinear<T, U>(_: @differentiable(linear) (Linear<T>) -> Linear<U>) {}
 
 func nondiff(x: Linear<Int>) -> Linear<Int> {}

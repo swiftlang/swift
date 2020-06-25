@@ -687,7 +687,7 @@ enum AssocTest {
   case one(Int)
 }
 
-if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '==' cannot be applied to two 'AssocTest' operands}}
+if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{referencing operator function '==' on 'Equatable' requires that 'AssocTest' conform to 'Equatable'}}
 // expected-note @-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
 
 
@@ -1100,9 +1100,13 @@ func rdar17170728() {
   }
 
   let _ = [i, j, k].reduce(0 as Int?) {
+    // expected-error@-1 3 {{cannot convert value of type 'Int?' to expected element type 'Int'}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Int?' operands}}
-    // expected-error@-2 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+    // expected-error@-1 2 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-2   {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-error@-3 2 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+    // expected-note@-4:16 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-5:16 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
 }
 
