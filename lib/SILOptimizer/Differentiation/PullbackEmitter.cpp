@@ -190,8 +190,14 @@ SILValueCategory PullbackEmitter::getTangentValueCategory(SILValue v) {
   // $L            | address-only           | address, $*A' (no alternative)
   // $*A           | address-only           | address, $*A' (no alternative)
 
+  // TODO(SR-13077): Make "tangent value category" depend solely on whether the
+  // tangent type is loadable or address-only.
+  //
+  // For loadable tangent types, using symbolic adjoint values instead of
+  // concrete adjoint buffers is more efficient.
+
   // Quick check: if the value has an address type, the tangent value category
-  // is always "address".
+  // is currently always "address".
   if (v->getType().isAddress())
     return SILValueCategory::Address;
   // If the value has an object type and the tangent type is not address-only,
