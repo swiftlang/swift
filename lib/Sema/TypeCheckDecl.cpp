@@ -1152,6 +1152,10 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
     return false;
   }
 
+  // Always assume non-simple 'didSet' in code completion mode.
+  if (decl->getASTContext().SourceMgr.hasCodeCompletionBuffer())
+    return false;
+
   // didSet must have a single parameter.
   if (decl->getParameters()->size() != 1) {
     return false;
