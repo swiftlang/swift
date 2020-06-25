@@ -897,8 +897,8 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
           // implementation defines `set` if the protocol declares it.
           if (auto protoStorage = dyn_cast<AbstractStorageDecl>(VD))
             if (auto entryStorage = dyn_cast<AbstractStorageDecl>(entryDecl))
-              if (protoStorage->getAccessor(AccessorKind::Set) &&
-                  !entryStorage->getAccessor(AccessorKind::Set))
+              if (protoStorage->supportsMutation() &&
+                  !entryStorage->supportsMutation())
                 return false;
 
           return true;
