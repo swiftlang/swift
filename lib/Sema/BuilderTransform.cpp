@@ -1387,6 +1387,63 @@ BraceStmt *swift::applyFunctionBuilderTransform(
         captured.first, captured.second)));
 }
 
+/// Produce any additional syntactic diagnostics for the body of a
+static void performAddOnDiagnostics(BraceStmt *stmt, DeclContext *dc) {
+  class AddOnDiagnosticWalker : public ASTWalker {
+    SmallVector<DeclContext *, 4> dcStack;
+
+  public:
+    AddOnDiagnosticWalker(DeclContext *dc) {
+      dcStack.push_back(dc);
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      performSyntacticExprDiagnostics(
+          expr, dcStack.back(), /*isExprStmt=*/false);
+
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        if (closure->wasSeparatelyTypeChecked()) {
+          dcStack.push_back(closure);
+          return { true, expr };
+        }
+      }
+
+      return { false, expr };
+    }
+
+    Expr *walkToExprPost(Expr *expr) override {
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        if (closure->wasSeparatelyTypeChecked()) {
+          assert(dcStack.back() == closure);
+          dcStack.pop_back();
+        }
+      }
+
+      return expr;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      performStmtDiagnostics(dcStack.back()->getASTContext(), stmt);
+      return { true, stmt };
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
+      return { false, pattern };
+    }
+
+    bool walkToTypeLocPre(TypeLoc &typeLoc) override { return false; }
+
+    bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
+
+    bool walkToParameterListPre(ParameterList *params) override {
+      return false;
+    }
+  };
+
+  AddOnDiagnosticWalker walker(dc);
+  stmt->walk(walker);
+}
+
 Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     FuncDecl *func, Type builderType) {
   // Pre-check the body: pre-check any expressions in it and look
@@ -1505,6 +1562,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   if (auto result = cs.applySolution(
           solutions.front(),
           SolutionApplicationTarget(func))) {
+    performAddOnDiagnostics(result->getFunctionBody(), func);
     return result->getFunctionBody();
   }
 
