@@ -1111,7 +1111,7 @@ struct LLVMCodeGenThreads {
 /// All this is done in multiple threads.
 static void performParallelIRGeneration(
     const IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
-    StringRef ModuleName, int numThreads,
+    StringRef ModuleName,
     ArrayRef<std::string> outputFilenames,
     llvm::StringSet<> *linkerDirectives) {
 
@@ -1285,7 +1285,8 @@ static void performParallelIRGeneration(
   llvm::sys::Mutex DiagMutex;
 
   // Start all the threads and do the LLVM compilation.
-  LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, numThreads - 1);
+
+  LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, SILMod->getOptions().NumThreads - 1);
   codeGenThreads.startThreads();
 
   // Free the memory occupied by the SILModule.
@@ -1319,10 +1320,9 @@ IRGenWholeModuleRequest::evaluate(Evaluator &evaluator,
   auto *M = desc.Ctx.get<ModuleDecl *>();
   if (desc.SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
       !desc.parallelOutputFilenames.empty()) {
-    const auto NumThreads = desc.SILMod->getOptions().NumThreads;
     ::performParallelIRGeneration(
         desc.Opts, M, std::unique_ptr<SILModule>(desc.SILMod), desc.ModuleName,
-        NumThreads, desc.parallelOutputFilenames, desc.LinkerDirectives);
+        desc.parallelOutputFilenames, desc.LinkerDirectives);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return GeneratedModule::null();
