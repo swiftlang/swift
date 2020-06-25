@@ -4285,11 +4285,11 @@ DestructorDecl *ClassDecl::getDestructor() const {
                            nullptr);
 }
 
-DeclRange ClassDecl::getEmittedMembers() const {
+ArrayRef<Decl *> ClassDecl::getEmittedMembers() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
                            EmittedMembersRequest{const_cast<ClassDecl *>(this)},
-                           getMembers());
+                           ArrayRef<Decl *>());
 }
 
 /// Synthesizer callback for an empty implicit function body.

@@ -2417,13 +2417,17 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   return namingPattern;
 }
 
-DeclRange
+ArrayRef<Decl *>
 EmittedMembersRequest::evaluate(Evaluator &evaluator,
                                 ClassDecl *CD) const {
-  if (!CD->getParentSourceFile())
-    return CD->getMembers();
-
   auto &Context = CD->getASTContext();
+  SmallVector<Decl *, 8> result;
+
+  if (!CD->getParentSourceFile()) {
+    auto members = CD->getMembers();
+    result.append(members.begin(), members.end());
+    return Context.AllocateCopy(result);
+  }
 
   // We need to add implicit initializers because they
   // affect vtable layout.
@@ -2461,7 +2465,9 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
         (void) var->getPropertyWrapperBackingProperty();
   }
 
-  return CD->getMembers();
+  auto members = CD->getMembers();
+  result.append(members.begin(), members.end());
+  return Context.AllocateCopy(result);
 }
 
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
