@@ -1297,7 +1297,12 @@ bool ExtensionDecl::isConstrainedExtension() const {
 
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
   auto decl = getExtendedNominal();
-  return getParentModule() == decl->getParentModule()
+  auto extendDeclfromSameModule =
+    getParentModule() == decl->getParentModule() ||
+    // if the extended type was defined in the same module with the extension,
+    // we should consider them as the same module to preserve ABI stability.
+    decl->getAlternateModuleName() == getParentModule()->getNameStr();
+  return extendDeclfromSameModule
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
 }
