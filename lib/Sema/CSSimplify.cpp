@@ -5697,41 +5697,39 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   // If the base type is not optional, let's attempt a fix (if possible)
   // and assume that `!` is just not there.
   if (!objectTy) {
-    // Let's see if we can apply a specific fix here.
-    if (shouldAttemptFixes()) {
-      if (optTy->isHole())
-        return SolutionKind::Solved;
-
-      auto *fix =
-          RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
-
-      if (recordFix(fix))
-        return SolutionKind::Error;
-
-      // If the fix was successful let's record
-      // "fixed" object type and continue.
-      objectTy = optTy;
-    } else {
-      // If fixes are not allowed, no choice but to fail.
+    if (!shouldAttemptFixes())
       return SolutionKind::Error;
-    }
-  }
+    
+    // Let's see if we can apply a specific fix here.
+    if (optTy->isHole())
+      return SolutionKind::Solved;
+    
+    auto fnType = optTy->getAs<FunctionType>();
+    if (fnType && fnType->getNumParams() == 0) {
+      // For function types with no parameters, let's try to
+      // offer a "make it a call" fix if possible.
+      auto optionalResultType = fnType->getResult()->getOptionalObjectType();
+      if (optionalResultType) {
+        if (matchTypes(optionalResultType, second, ConstraintKind::Bind,
+                       flags | TMF_ApplyingFix, locator)
+                .isSuccess()) {
+          auto *fix =
+              InsertExplicitCall::create(*this, getConstraintLocator(locator));
 
-  auto fnType = optTy->getAs<FunctionType>();
-  if (shouldAttemptFixes() && fnType && fnType->getNumParams() == 0) {
-    // For function types with no parameters, let's try to
-    // offer a "make it a call" fix if possible.
-    auto optionalResultType = fnType->getResult()->getOptionalObjectType();
-    if (optionalResultType) {
-      if (matchTypes(optionalResultType, second, ConstraintKind::Bind,
-                     flags | TMF_ApplyingFix, locator)
-              .isSuccess()) {
-        auto *fix =
-            InsertExplicitCall::create(*this, getConstraintLocator(locator));
-
-        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+        }
       }
     }
+
+    auto *fix =
+        RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
+
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    // If the fix was successful let's record
+    // "fixed" object type and continue.
+    objectTy = optTy;
   }
 
   // The object type is an lvalue if the optional was.

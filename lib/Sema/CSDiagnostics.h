@@ -498,7 +498,7 @@ public:
   }
   
   SourceLoc getLoc() const override {
-    // The end location points the dot in the member access.
+    // The end location points to the dot in the member access.
     return getSourceRange().End;
   }
   
