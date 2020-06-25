@@ -220,6 +220,10 @@ def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules"
 def swift_module_file
   : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
     HelpText<"Specify Swift module explicitly built from textual interface">;
+
+def explict_swift_module_map
+  : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
+    HelpText<"Specify a JSON file containing information of explict Swift modules">;
 }
 
 
@@ -288,10 +292,6 @@ def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
 
 def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
   HelpText<"Enable speculative devirtualization pass.">;
-
-def enable_ownership_stripping_after_serialization
-  : Flag<["-"], "enable-ownership-stripping-after-serialization">,
-  HelpText<"Strip ownership after serialization">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;

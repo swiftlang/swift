@@ -19,6 +19,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
@@ -684,7 +685,7 @@ class SourceFileDepGraphNode : public DepGraphNode {
   size_t sequenceNumber = ~0;
 
   /// Holds the sequence numbers of definitions I depend upon.
-  std::unordered_set<size_t> defsIDependUpon;
+  llvm::SetVector<size_t> defsIDependUpon;
 
   /// True iff a Decl exists for this node.
   /// If a provides and a depends in the existing system both have the same key,

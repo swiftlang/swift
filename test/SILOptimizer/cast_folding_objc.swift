@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -enable-ownership-stripping-after-serialization -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -emit-sil %s | %FileCheck %s
 
 // We want to check two things here:
 // - Correctness

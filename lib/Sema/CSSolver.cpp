@@ -800,6 +800,12 @@ void ConstraintSystem::shrink(Expr *expr) {
         return {false, expr};
       }
 
+      // Similar to 'ClosureExpr', 'TapExpr' has a 'VarDecl' the type of which
+      // is determined by type checking the parent interpolated string literal.
+      if (isa<TapExpr>(expr)) {
+        return {false, expr};
+      }
+
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (coerceExpr->isLiteralInit())
           ApplyExprs.push_back({coerceExpr, 1});
@@ -1372,6 +1378,49 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
       prevFailed = result.getKind() == SolutionKind::Error;
       result.transfer(workList);
     }
+  }
+}
+
+void ConstraintSystem::solveForCodeCompletion(
+    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+    llvm::function_ref<void(const Solution &)> callback) {
+  // First, pre-check the expression, validating any types that occur in the
+  // expression and folding sequence expressions.
+  if (ConstraintSystem::preCheckExpression(expr, DC))
+    return;
+
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::AllowFixes;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
+
+  ConstraintSystem cs(DC, options);
+
+  if (CTP != ContextualTypePurpose::CTP_Unused)
+    cs.setContextualType(expr, TypeLoc::withoutLoc(contextualType), CTP);
+
+  // Set up the expression type checker timer.
+  cs.Timer.emplace(expr, cs);
+
+  cs.shrink(expr);
+
+  if (cs.generateConstraints(expr, DC))
+    return;
+
+  llvm::SmallVector<Solution, 4> solutions;
+
+  {
+    SolverState state(cs, FreeTypeVariableBinding::Disallow);
+
+    // Enable "diagnostic mode" by default, this means that
+    // solver would produce "fixed" solutions alongside valid
+    // ones, which helps code completion to rank choices.
+    state.recordFixes = true;
+
+    cs.solveImpl(solutions);
+  }
+
+  for (const auto &solution : solutions) {
+    callback(solution);
   }
 }
 

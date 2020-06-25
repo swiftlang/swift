@@ -29,29 +29,9 @@ namespace swift {
 // allocator. This is encoded in a header on each allocation when metadata
 // iteration is enabled, and allows tools to know where each allocation came
 // from.
-//
-// Some of these values are also declared in SwiftRemoteMirrorTypes.h. Those
-// values must be kept stable to preserve compatibility.
 enum MetadataAllocatorTags : uint16_t {
-  UnusedTag = 0,
-  BoxesTag,
-  ObjCClassWrappersTag,
-  FunctionTypesTag,
-  MetatypeTypesTag,
-  ExistentialMetatypeValueWitnessTablesTag,
-  ExistentialMetatypesTag,
-  ExistentialTypesTag,
-  OpaqueExistentialValueWitnessTablesTag,
-  ClassExistentialValueWitnessTablesTag,
-  ForeignWitnessTablesTag,
-  ResilientMetadataAllocatorTag,
-  MetadataTag,
-  TupleCacheTag,
-  GenericMetadataCacheTag,
-  ForeignMetadataCacheTag,
-  GenericWitnessTableCacheTag,
-  GenericClassMetadataTag,
-  GenericValueMetadataTag,
+#define TAG(name, value) name##Tag = value,
+#include "../../../stdlib/public/runtime/MetadataAllocatorTags.def"
 };
 
 template <typename Runtime> struct MetadataAllocationBacktraceHeader {
@@ -313,6 +293,20 @@ const
 /// True if two context descriptors in the currently running program describe
 /// the same context.
 bool equalContexts(const ContextDescriptor *a, const ContextDescriptor *b);
+
+/// Determines whether two type context descriptors describe the same type
+/// context.
+///
+/// Runtime availability: Swift 5.4.
+///
+/// \param lhs The first type context descriptor to compare.
+/// \param rhs The second type context descriptor to compare.
+///
+/// \returns true if both describe the same type context, false otherwise.
+SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
+bool swift_compareTypeContextDescriptors(const TypeContextDescriptor *lhs,
+                                         const TypeContextDescriptor *rhs);
 
 /// Compute the bounds of class metadata with a resilient superclass.
 ClassMetadataBounds getResilientMetadataBounds(

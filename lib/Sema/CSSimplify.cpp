@@ -1482,6 +1482,20 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   if (!anchor)
     return impact;
 
+  // If this is a conditional requirement failure associated with a
+  // call, let's increase impact of the fix to show that such failure
+  // makes member/function unreachable in current context or with
+  // given arguments.
+  if (auto last = locator.last()) {
+    if (last->isConditionalRequirement()) {
+      if (auto *expr = getAsExpr(anchor)) {
+        auto *parent = cs.getParentExpr(expr);
+        if (parent && isa<ApplyExpr>(parent))
+          return 5;
+      }
+    }
+  }
+
   // If this requirement is associated with a member reference and it
   // was possible to check it before overload choice is bound, that means
   // types came from the context (most likely Self, or associated type(s))
@@ -1508,9 +1522,12 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
       return 10;
   }
 
-  // Increase the impact of a conformance fix for a standard library type,
-  // as it's unlikely to be a good suggestion. Also do the same for the builtin
-  // compiler types Any and AnyObject, which cannot conform to protocols.
+  // Increase the impact of a conformance fix for a standard library
+  // or foundation type, as it's unlikely to be a good suggestion.
+  //
+  // Also do the same for the builtin compiler types Any and AnyObject,
+  // which cannot conform to protocols.
+  //
   // FIXME: We ought not to have the is<TypeVariableType>() condition here, but
   // removing it currently regresses the diagnostic for the test case for
   // rdar://60727310. Once we better handle the separation of conformance fixes
@@ -1518,7 +1535,8 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   // remove it from the condition.
   auto resolvedTy = cs.simplifyType(requirementType);
   if ((requirementType->is<TypeVariableType>() && resolvedTy->isStdlibType()) ||
-      resolvedTy->isAny() || resolvedTy->isAnyObject()) {
+      resolvedTy->isAny() || resolvedTy->isAnyObject() ||
+      getKnownFoundationEntity(resolvedTy->getString())) {
     if (auto last = locator.last()) {
       if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
         auto kind = requirement->getRequirementKind();
@@ -3896,11 +3914,16 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
       break;
 
+    // If there is already a fix for contextual failure, let's not
+    // record a duplicate one.
+    if (hasFixFor(getConstraintLocator(locator)))
+      return true;
+
     auto purpose = getContextualTypePurpose(anchor);
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
       conversionsOrFixes.push_back(
-          RemoveReturn::create(*this, getConstraintLocator(locator)));
+          RemoveReturn::create(*this, lhs, getConstraintLocator(locator)));
       return true;
     }
 

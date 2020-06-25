@@ -2328,6 +2328,19 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   }
 }
 
+void TypeChecker::typeCheckForCodeCompletion(
+    Expr *expr, DeclContext *DC, Type contextualType, ContextualTypePurpose CTP,
+    llvm::function_ref<void(const Solution &)> callback) {
+  auto &Context = DC->getASTContext();
+
+  FrontendStatsTracer StatsTracer(Context.Stats,
+                                  "typecheck-for-code-completion", expr);
+  PrettyStackTraceExpr stackTrace(Context, "code-completion", expr);
+
+  ConstraintSystem::solveForCodeCompletion(expr, DC, contextualType, CTP,
+                                           callback);
+}
+
 bool TypeChecker::typeCheckBinding(
     Pattern *&pattern, Expr *&initializer, DeclContext *DC,
     Type patternType, PatternBindingDecl *PBD, unsigned patternNumber) {

@@ -199,10 +199,10 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
   return false;
 }
 
-static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
+static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
                                          const FrontendOptions &opts) {
-  return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &f) -> bool {
         return emitMakeDependenciesIfNeeded(diags, depTracker, opts, f);
       });
@@ -436,7 +436,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     importedModules.insert(import.importedModule);
 
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
-  for (auto &module : ctxt.LoadedModules) {
+  for (const auto &module : ctxt.getLoadedModules()) {
     ModuleDecl *loadedDecl = module.second;
     if (!loadedDecl)
       llvm::report_fatal_error("Expected loaded modules to be non-null.");
@@ -480,11 +480,11 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   return true;
 }
 
-static bool
+static void
 emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
                                              DependencyTracker *depTracker,
                                              const FrontendOptions &opts) {
-  return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         return emitLoadedModuleTraceIfNeeded(
           mainModule, depTracker, opts.PrebuiltModuleCachePath,
@@ -682,15 +682,15 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   }
 }
 
-static void countStatsPostSema(UnifiedStatsReporter &Stats,
-                               CompilerInstance& Instance) {
+static void countASTStats(UnifiedStatsReporter &Stats,
+                          CompilerInstance& Instance) {
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
   C.NumSourceBuffers = SM.getLLVMSourceMgr().getNumBuffers();
   C.NumLinkLibraries = Instance.getLinkLibraries().size();
 
   auto const &AST = Instance.getASTContext();
-  C.NumLoadedModules = AST.LoadedModules.size();
+  C.NumLoadedModules = AST.getNumLoadedModules();
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -1154,14 +1154,21 @@ static void emitIndexData(const CompilerInstance &Instance) {
 
 /// Emits all "one-per-module" supplementary outputs that don't depend on
 /// anything past type-checking.
-///
-/// These are extracted out so that they can be invoked early when using
-/// `-typecheck`, but skipped for any mode that runs SIL diagnostics if there's
-/// an error found there (to get those diagnostics back to the user faster).
 static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
+
+  // FIXME: Whole-module outputs with a non-whole-module action ought to
+  // be disallowed, but the driver implements -index-file mode by generating a
+  // regular whole-module frontend command line and modifying it to index just
+  // one file (by making it a primary) instead of all of them. If that
+  // invocation also has flags to emit whole-module supplementary outputs, the
+  // compiler can crash trying to access information for non-type-checked
+  // declarations in the non-primary files. For now, prevent those crashes by
+  // guarding the emission of whole-module supplementary outputs.
+  if (!opts.InputsAndOutputs.isWholeModule())
+    return false;
 
   // Record whether we failed to emit any of these outputs, but keep going; one
   // failure does not mean skipping the rest.
@@ -1223,23 +1230,51 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 static void performEndOfPipelineActions(CompilerInstance &Instance) {
   assert(Instance.hasASTContext());
   auto &ctx = Instance.getASTContext();
+  const auto &Invocation = Instance.getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+
+  // If we were asked to print Clang stats, do so.
+  if (opts.PrintClangStats && ctx.getClangModuleLoader())
+    ctx.getClangModuleLoader()->printStatistics();
+
+  // Report AST stats if needed.
+  if (auto *stats = ctx.Stats)
+    countASTStats(*stats, Instance);
 
   // Make sure we didn't load a module during a parse-only invocation, unless
   // it's -emit-imported-modules, which can load modules.
   auto action = Instance.getInvocation().getFrontendOptions().RequestedAction;
   if (FrontendOptions::shouldActionOnlyParse(action) &&
       action != FrontendOptions::ActionType::EmitImportedModules) {
-    assert(ctx.LoadedModules.size() == 1 &&
+    assert(ctx.getNumLoadedModules() == 1 &&
            "Loaded a module during parse-only");
-    assert(ctx.LoadedModules.front().second == Instance.getMainModule());
+    assert(ctx.getLoadedModules().begin()->second == Instance.getMainModule());
   }
 
   // Verify the AST for all the modules we've loaded.
   ctx.verifyAllLoadedModules();
 
+  // Verify generic signatures if we've been asked to.
+  verifyGenericSignaturesIfNeeded(Invocation, ctx);
+
+  // Emit any additional outputs that we only need for a successful compilation.
+  // We don't want to unnecessarily delay getting any errors back to the user.
+  if (!ctx.hadError()) {
+    emitLoadedModuleTraceForAllPrimariesIfNeeded(
+        Instance.getMainModule(), Instance.getDependencyTracker(), opts);
+    
+    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
+  }
+
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitIndexData(Instance);
+  emitMakeDependenciesIfNeeded(Instance.getDiags(),
+                               Instance.getDependencyTracker(), opts);
+
+  // Emit information about the parsed primaries.
+  emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
+  emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
 }
 
 /// Performs the compile requested by the user.
@@ -1280,13 +1315,23 @@ static bool performCompile(CompilerInstance &Instance,
       return true;
   }
 
+  bool didFinishPipeline = false;
   SWIFT_DEFER {
-    // We might have freed the ASTContext already, but in that case we would
-    // have already performed these actions.
-    if (Instance.hasASTContext())
-      performEndOfPipelineActions(Instance);
+    assert(didFinishPipeline && "Returned without calling finishPipeline");
   };
 
+  auto finishPipeline = [&](bool hadError) -> bool {
+    // We might have freed the ASTContext already, but in that case we would
+    // have already performed these actions.
+    if (Instance.hasASTContext()) {
+      performEndOfPipelineActions(Instance);
+      hadError |= Instance.getASTContext().hadError();
+    }
+    didFinishPipeline = true;
+    return hadError;
+  };
+
+  auto &Context = Instance.getASTContext();
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
     // Parsing gets triggered lazily, but let's make sure we have the right
     // input kind.
@@ -1298,11 +1343,11 @@ static bool performCompile(CompilerInstance &Instance,
     (void)kind;
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
+    return finishPipeline(Context.hadError());
   } else {
     Instance.performSema();
   }
 
-  ASTContext &Context = Instance.getASTContext();
   if (Action == FrontendOptions::ActionType::Parse) {
     // A -parse invocation only cares about the side effects of parsing, so
     // force the parsing of all the source files.
@@ -1310,26 +1355,14 @@ static bool performCompile(CompilerInstance &Instance,
       if (auto *SF = dyn_cast<SourceFile>(file))
         (void)SF->getTopLevelDecls();
     }
-    return Context.hadError();
+    return finishPipeline(Context.hadError());
   }
 
-  if (Action == FrontendOptions::ActionType::ScanDependencies) {
-    scanDependencies(Instance);
-  }
-
-  (void)emitMakeDependenciesIfNeeded(Instance.getDiags(),
-                                     Instance.getDependencyTracker(), opts);
-
-  if (Action == FrontendOptions::ActionType::ResolveImports ||
-      Action == FrontendOptions::ActionType::ScanDependencies)
-    return Context.hadError();
+  if (Action == FrontendOptions::ActionType::ScanDependencies)
+    return finishPipeline(scanDependencies(Instance));
 
   if (observer)
     observer->performedSemanticAnalysis(Instance);
-
-  if (auto *Stats = Context.Stats) {
-    countStatsPostSema(*Stats, Instance);
-  }
 
   {
     FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
@@ -1339,8 +1372,6 @@ static bool performCompile(CompilerInstance &Instance,
       debugFailWithCrash();
   }
 
-  verifyGenericSignaturesIfNeeded(Invocation, Context);
-
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
   if (Action == FrontendOptions::ActionType::REPL) {
@@ -1349,43 +1380,20 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (auto r = dumpASTIfNeeded(Instance))
-    return *r;
-
-  // If we were asked to print Clang stats, do so.
-  if (opts.PrintClangStats && Context.getClangModuleLoader())
-    Context.getClangModuleLoader()->printStatistics();
-
-  emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
-  emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
+    return finishPipeline(*r);
 
   if (Context.hadError())
-    return true;
-
-  (void)emitLoadedModuleTraceForAllPrimariesIfNeeded(
-      Instance.getMainModule(), Instance.getDependencyTracker(), opts);
+    return finishPipeline(/*hadError*/ true);
 
   // We've just been told to perform a typecheck, so we can return now.
-  if (Action == FrontendOptions::ActionType::Typecheck) {
-    // FIXME: Whole-module outputs with a non-whole-module -typecheck ought to
-    // be disallowed, but the driver implements -index-file mode by generating a
-    // regular whole-module frontend command line and modifying it to index just
-    // one file (by making it a primary) instead of all of them. If that
-    // invocation also has flags to emit whole-module supplementary outputs, the
-    // compiler can crash trying to access information for non-type-checked
-    // declarations in the non-primary files. For now, prevent those crashes by
-    // guarding the emission of whole-module supplementary outputs.
-    if (opts.InputsAndOutputs.isWholeModule()) {
-      if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance)) {
-        return true;
-      }
-    }
-    return false;
-  }
+  if (Action == FrontendOptions::ActionType::Typecheck)
+    return finishPipeline(/*hadError*/ false);
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
 
-  return performCompileStepsPostSema(Instance, ReturnValue, observer);
+  return finishPipeline(
+      performCompileStepsPostSema(Instance, ReturnValue, observer));
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
@@ -1649,8 +1657,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (observer)
     observer->performedSILProcessing(*SM);
-
-  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Context, MSF);

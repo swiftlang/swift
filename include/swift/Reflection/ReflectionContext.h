@@ -34,7 +34,6 @@
 #include "swift/Runtime/Unreachable.h"
 
 #include <set>
-#include <sstream>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -839,6 +838,18 @@ public:
     return 0;
   }
 
+  /// Get the name of a metadata tag, if known.
+  llvm::Optional<std::string> metadataAllocationTagName(int Tag) {
+    switch (Tag) {
+#define TAG(name, value)                                                       \
+  case value:                                                                  \
+    return std::string(#name);
+#include "../../../stdlib/public/runtime/MetadataAllocatorTags.def"
+    default:
+      return llvm::None;
+    }
+  }
+
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
@@ -946,10 +957,12 @@ public:
           reinterpret_cast<const MetadataAllocationBacktraceHeader<Runtime> *>(
               HeaderBytes.get());
       if (HeaderPtr == nullptr) {
-        std::stringstream stream;
-        stream << "unable to read Next pointer 0x" << std::hex
-               << BacktraceListNext.getAddressData();
-        return stream.str();
+        // FIXME: std::stringstream would be better, but LLVM's standard library
+        // introduces a vtable and we don't want that.
+        char result[128];
+        std::snprintf(result, sizeof(result), "unable to read Next pointer %p",
+            BacktraceListNext.getAddressData());
+        return std::string(result);
       }
       auto BacktraceAddrPtr =
           BacktraceListNext +

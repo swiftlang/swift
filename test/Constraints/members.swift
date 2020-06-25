@@ -617,12 +617,13 @@ func rdar50679161() {
 func rdar_50467583_and_50909555() {
   if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
     // rdar://problem/50467583
-    let _: Set = [Int][] // expected-error {{no exact matches in call to subscript}}
-    // expected-note@-1 {{found candidate with type '(Int) -> Int'}}
-    // expected-note@-2 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
-    // expected-note@-3 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
-    // expected-note@-4 {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
-    // expected-note@-5 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
+    let _: Set = [Int][] // expected-error {{no 'subscript' candidates produce the expected contextual result type 'Set'}}
+    // expected-error@-1 {{no exact matches in call to subscript}}
+    // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
+    // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
+    // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+    // expected-note@-5 {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
+    // expected-note@-6 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
   }
   
   // rdar://problem/50909555

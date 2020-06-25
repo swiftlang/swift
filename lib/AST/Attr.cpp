@@ -534,8 +534,8 @@ static std::string getDifferentiationParametersClauseString(
 /// - If `omitWrtClause` is true, omit printing the `wrt:` differentiation
 ///   parameters clause.
 static void printDifferentiableAttrArguments(
-    const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, bool omitWrtClause = false) {
+    const DifferentiableAttr *attr, ASTPrinter &printer,
+    const PrintOptions &Options, const Decl *D, bool omitWrtClause = false) {
   assert(D);
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
@@ -1726,9 +1726,8 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
 
 GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
     AbstractFunctionDecl *original) const {
-  GenericEnvironment *derivativeGenEnv = original->getGenericEnvironment();
   if (auto derivativeGenSig = getDerivativeGenericSignature())
-    return derivativeGenEnv = derivativeGenSig->getGenericEnvironment();
+    return derivativeGenSig->getGenericEnvironment();
   return original->getGenericEnvironment();
 }
 

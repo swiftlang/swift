@@ -457,6 +457,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         *Context,
         getDependencyTracker(), MLM,
         Invocation.getSearchPathOptions().ExplicitSwiftModules,
+        Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
         IgnoreSourceInfoFile);
     Context->addModuleLoader(std::move(ESML));
   }
@@ -751,7 +752,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
 
-    Context->LoadedModules[MainModule->getName()] = MainModule;
+    // Register the main module with the AST context.
+    Context->addLoadedModule(MainModule);
 
     // Create and add the module's files.
     SmallVector<FileUnit *, 16> files;
@@ -773,7 +775,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
 void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   assert(newMod->isMainModule());
   MainModule = newMod;
-  Context->LoadedModules[newMod->getName()] = newMod;
+  Context->addLoadedModule(newMod);
 }
 
 void CompilerInstance::performParseAndResolveImportsOnly() {

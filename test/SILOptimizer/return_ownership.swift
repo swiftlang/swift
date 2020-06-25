@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -enable-ownership-stripping-after-serialization -emit-sil -verify
+// RUN: %target-swift-frontend %s -emit-sil -verify
 
 class TuringMachine {
   func halt() -> Never {

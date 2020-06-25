@@ -662,11 +662,6 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   auto bytes = (char*) cache.getAllocator().withTag(GenericValueMetadataTag)
     .Allocate(totalSize, alignof(void*));
 
-#ifndef NDEBUG
-  // Fill the metadata record with garbage.
-  memset(bytes, 0xAA, totalSize);
-#endif
-
   auto addressPoint = bytes + sizeof(ValueMetadata::HeaderType);
   auto metadata = reinterpret_cast<ValueMetadata *>(addressPoint);
 
@@ -1916,6 +1911,33 @@ bool swift::equalContexts(const ContextDescriptor *a,
     // Conservatively return false.
     return false;
   }
+}
+
+SWIFT_CC(swift)
+bool swift::swift_compareTypeContextDescriptors(
+    const TypeContextDescriptor *a, const TypeContextDescriptor *b) {
+  // The implementation is the same as the implementation of
+  // swift::equalContexts except that the handling of non-type
+  // context descriptors and casts to TypeContextDescriptor are removed.
+
+  // Fast path: pointer equality.
+  if (a == b) return true;
+
+  // If either context is null, we're done.
+  if (a == nullptr || b == nullptr)
+    return false;
+
+  // If either descriptor is known to be unique, we're done.
+  if (a->isUnique() || b->isUnique()) return false;
+  
+  // Do the kinds match?
+  if (a->getKind() != b->getKind()) return false;
+  
+  // Do the parents match?
+  if (!equalContexts(a->Parent.get(), b->Parent.get()))
+    return false;
+
+  return TypeContextIdentity(a) == TypeContextIdentity(b);
 }
 
 /***************************************************************************/
@@ -5547,6 +5569,21 @@ static void recordBacktrace(void *allocation) {
   });
 }
 
+template <typename Pointee>
+static inline void memsetScribble(Pointee *bytes, size_t totalSize) {
+#ifndef NDEBUG
+  // When DEBUG is defined, always scribble.
+  memset(bytes, 0xAA, totalSize);
+#else
+  // When DEBUG is not defined, only scribble when the
+  // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE environment variable is set.
+  if (SWIFT_UNLIKELY(
+          runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE())) {
+    memset(bytes, 0xAA, totalSize);
+  }
+#endif
+}
+
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   assert(Tag != 0);
   assert(alignment <= alignof(void*));
@@ -5556,8 +5593,11 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   SWIFT_ONCE_F(getenvToken, checkAllocatorDebugEnvironmentVariable, nullptr);
 
   // If the size is larger than the maximum, just use malloc.
-  if (size > PoolRange::MaxPoolAllocationSize)
-    return malloc(size);
+  if (size > PoolRange::MaxPoolAllocationSize) {
+    void *allocation = malloc(size);
+    memsetScribble(allocation, size);
+    return allocation;
+  }
 
   // Allocate out of the pool.
   auto sizeWithHeader = size;
@@ -5601,7 +5641,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);
-      
+      memsetScribble(allocation, sizeWithHeader);
+
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
         AllocationHeader *header = (AllocationHeader *)allocation;
         header->Size = size;

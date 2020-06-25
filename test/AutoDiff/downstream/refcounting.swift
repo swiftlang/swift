@@ -62,9 +62,7 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-NOT:  release_value [[NEEDED_COTAN0]] : $Vector
 // CHECK:   [[NEEDED_COTAN1:%.*]] = apply [[PB1]]([[NEEDED_COTAN0]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 // CHECK:   strong_release [[PB1]]
-// CHECK:   retain_value [[NEEDED_COTAN1]] : $Vector
 // CHECK:   release_value [[NEEDED_COTAN0]] : $Vector
-// CHECK:   release_value [[NEEDED_COTAN1]] : $Vector
 // CHECK:   return [[NEEDED_COTAN1]] : $Vector
 
 // CHECK-LABEL: sil private @{{.*}}side_effect_release_zero{{.*}}__pullback_src_0_wrt_0

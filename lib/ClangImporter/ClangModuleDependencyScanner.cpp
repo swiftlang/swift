@@ -229,9 +229,23 @@ void ClangImporter::recordModuleDependencies(
       swiftArgs.push_back(arg.str());
     };
     // Add all args inheritted from creating the importer.
-    for (auto arg: allArgs) {
-      addClangArg(arg);
+    auto It = allArgs.begin();
+    while(It != allArgs.end()) {
+      StringRef arg = *It;
+      // Remove the -target arguments because we should use the target triple
+      // from the depending Swift modules.
+      if (arg == "-target") {
+        It += 2;
+      } else if (arg.startswith("-fapinotes-swift-version=")) {
+        // Remove the apinotes version because we should use the language version
+        // specified in the interface file.
+        It += 1;
+      } else {
+        addClangArg(*It);
+        ++ It;
+      }
     }
+
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");

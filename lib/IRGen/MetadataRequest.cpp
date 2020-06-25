@@ -2226,8 +2226,6 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   }
   Type superclassType = theType->getSuperclass(/*useArchetypes=*/false);
   if (superclassType) {
-    auto superclass = superclassType->getCanonicalType();
-    auto *superclassNominal = superclass->getAnyNominal();
     emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
         IGF, superclassType->getCanonicalType(), initializedTypes);
   }

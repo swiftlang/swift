@@ -1,67 +1,67 @@
 // Must be able to run xcrun-return-self.sh
 // REQUIRES: shell
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
-// RUN: not %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 | %FileCheck -check-prefix=SIMPLE_STATIC %s
+// RUN: not %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 | %FileCheck -check-prefix=SIMPLE_STATIC %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1-simulator %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-tvos9.0-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-tvos9.0-simulator %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix tvOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target i386-apple-watchos2.0-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target i386-apple-watchos2.0-simulator %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix watchOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-x86_64 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv6-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target armv6-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-armv6 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-armv7 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-thumbv7 %s < %t.linux.txt
 
 // RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7 %s < %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7-NEGATIVE %s < %t.android.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
 // RUN: %FileCheck -check-prefix CYGWIN-x86_64 %s < %t.cygwin.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.windows.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.windows.txt
 // RUN: %FileCheck -check-prefix WINDOWS-x86_64 %s < %t.windows.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target amd64-unknown-openbsd -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.openbsd.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target amd64-unknown-openbsd -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.openbsd.txt
 // RUN: %FileCheck -check-prefix OPENBSD-amd64 %s < %t.openbsd.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
 // RUN: %FileCheck -check-prefix LINUX_DYNLIB-x86_64 %s < %t.linux.dynlib.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Fsystem car -F cdr -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Fsystem car -F cdr -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1-simulator -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1-simulator -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS-linker-order %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-linker-order %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Xclang-linker -foo -Xclang-linker foopath %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -Xclang-linker -foo -Xclang-linker foopath %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-clang-linker-order %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Xclang-linker -foo -Xclang-linker foopath %s 2>&1 > %t.windows.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -Xclang-linker -foo -Xclang-linker foopath %s 2>&1 > %t.windows.txt
 // RUN: %FileCheck -check-prefix WINDOWS-clang-linker-order %s < %t.windows.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi -Xclang-linker -flag -Xclang-linker arg %s 2>&1 | %FileCheck -check-prefix WASI-clang-linker-order %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target wasm32-unknown-wasi -Xclang-linker -flag -Xclang-linker arg %s 2>&1 | %FileCheck -check-prefix WASI-clang-linker-order %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
 
 // RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-unknown-linux-gnu -toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix LINUX-STDLIB-RPATH %s
 // RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-unknown-linux-gnu -no-toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix LINUX-NO-STDLIB-RPATH %s
@@ -74,37 +74,37 @@
 // RUN: touch %t/a.swiftmodule
 // RUN: touch %t/b.o
 // RUN: touch %t/b.swiftmodule
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o %t/a.swiftmodule %t/b.o %t/b.swiftmodule -o linker | %FileCheck -check-prefix LINK-SWIFTMODULES %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o %t/a.swiftmodule %t/b.o %t/b.swiftmodule -o linker | %FileCheck -check-prefix LINK-SWIFTMODULES %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10   %s > %t.simple-macosx10.10.txt
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.10   %s > %t.simple-macosx10.10.txt
 // RUN: %FileCheck %s < %t.simple-macosx10.10.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
 
 // RUN: %empty-directory(%t)
 // RUN: echo "int dummy;" >%t/a.cpp
 // RUN: cc -c %t/a.cpp -o %t/a.o
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
-// RUN: %swiftc_driver -save-temps -driver-print-jobs  -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker  2>&1 | tee %t/forFilelistCapture | %FileCheck -check-prefix FILELIST %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
+// RUN: %swiftc_driver -sdk "" -save-temps -driver-print-jobs  -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker  2>&1 | tee %t/forFilelistCapture | %FileCheck -check-prefix FILELIST %s
 
 // Extract filelist name and check it out
 // RUN: tail -1 %t/forFilelistCapture | sed 's/.*-filelist //' | sed 's/ .*//' >%t/filelistName
 // RUN: %FileCheck -check-prefix FILELIST-CONTENTS %s < `cat %t/filelistName`
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
-// RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WASI %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-cygnus -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target wasm32-unknown-wasi -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WASI %s
 
 // Here we specify an output file name using '-o'. For ease of writing these
 // tests, we happen to specify the same file name as is inferred in the
 // INFERRED_NAMED_DARWIN tests above: 'libLINKER.dylib'.
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 
 // Check reading the SDKSettings.json from an SDK
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4 %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_UNVERSIONED %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4 %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_UNVERSIONED %s
 
 // MACOS_10_15: -platform_version macos 10.9.0 10.15.0
 // MACOS_10_15_4: -platform_version macos 10.9.0 10.15.4

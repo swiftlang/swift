@@ -164,7 +164,7 @@ func constPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstPointer([0, 1, 2])
   // <rdar://problem/22308330> QoI: CSDiags doesn't handle array -> pointer impl conversions well
   takesConstPointer([0.0, 1.0, 2.0])
-  // expected-error@-1 3 {{annot convert value of type 'Double' to expected element type 'Int'}}
+  // expected-error@-1 3 {{cannot convert value of type 'Double' to expected element type 'Int'}}
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Int> = &i // expected-error {{use of extraneous '&'}}
@@ -307,7 +307,7 @@ struct NotEquatable {}
 func arrayComparison(_ x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePointer<NotEquatable>) {
   var x = x
   // Don't allow implicit array-to-pointer conversions in operators.
-  let a: Bool = x == y // expected-error{{operator function '==' requires that 'NotEquatable' conform to 'Equatable'}}
+  let a: Bool = x == y // expected-error{{referencing operator function '==' on 'Array' requires that 'NotEquatable' conform to 'Equatable'}}
   let _: Bool = p == &x  // Allowed!
 }
 

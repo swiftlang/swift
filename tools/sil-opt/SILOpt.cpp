@@ -48,7 +48,13 @@ namespace cl = llvm::cl;
 
 namespace {
 
-enum class OptGroup { Unknown, Diagnostics, Performance, Lowering };
+enum class OptGroup {
+  Unknown,
+  Diagnostics,
+  OnonePerformance,
+  Performance,
+  Lowering
+};
 
 } // end anonymous namespace
 
@@ -80,11 +86,6 @@ static llvm::cl::opt<bool> DisableSILOwnershipVerifier(
     "disable-sil-ownership-verifier",
     llvm::cl::desc(
         "Do not verify SIL ownership invariants during SIL verification"));
-
-static llvm::cl::opt<bool> EnableOwnershipLoweringAfterDiagnostics(
-    "enable-ownership-lowering-after-diagnostics",
-    llvm::cl::desc("Enable ownership lowering after diagnostics"),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
@@ -150,6 +151,8 @@ static llvm::cl::opt<OptGroup> OptimizationGroup(
         clEnumValN(OptGroup::Diagnostics, "diagnostics",
                    "Run diagnostic passes"),
         clEnumValN(OptGroup::Performance, "O", "Run performance passes"),
+        clEnumValN(OptGroup::OnonePerformance, "Onone-performance",
+                   "Run Onone perf passes"),
         clEnumValN(OptGroup::Lowering, "lowering", "Run lowering passes")),
     llvm::cl::init(OptGroup::Unknown));
 
@@ -307,6 +310,7 @@ void anchorForGetMainExecutable() {}
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
@@ -380,8 +384,6 @@ int main(int argc, char **argv) {
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
-  SILOpts.StripOwnershipAfterSerialization =
-      EnableOwnershipLoweringAfterDiagnostics;
   SILOpts.OptRecordFile = RemarksFilename;
   SILOpts.OptRecordPasses = RemarksPasses;
 
@@ -502,18 +504,27 @@ int main(int argc, char **argv) {
     SILMod->installSILRemarkStreamer();
   }
 
-  if (OptimizationGroup == OptGroup::Diagnostics) {
+  switch (OptimizationGroup) {
+  case OptGroup::Diagnostics:
     runSILDiagnosticPasses(*SILMod.get());
-  } else if (OptimizationGroup == OptGroup::Performance) {
+    break;
+  case OptGroup::Performance:
     runSILOptimizationPasses(*SILMod.get());
-  } else if (OptimizationGroup == OptGroup::Lowering) {
+    break;
+  case OptGroup::Lowering:
     runSILLoweringPasses(*SILMod.get());
-  } else {
+    break;
+  case OptGroup::OnonePerformance:
+    runSILPassesForOnone(*SILMod.get());
+    break;
+  case OptGroup::Unknown: {
     auto T = irgen::createIRGenModule(
         SILMod.get(), Invocation.getOutputFilenameForAtMostOnePrimary(),
         Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "");
     runCommandLineSelectedPasses(SILMod.get(), T.second);
     irgen::deleteIRGenModule(T);
+    break;
+  }
   }
 
   if (EmitSIB) {

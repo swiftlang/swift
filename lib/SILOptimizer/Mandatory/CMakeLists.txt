@@ -15,7 +15,6 @@ target_sources(swiftSILOptimizer PRIVATE
   DiagnoseStaticExclusivity.cpp
   DiagnoseUnreachable.cpp
   Differentiation.cpp
-  GuaranteedARCOpts.cpp
   IRGenPrepare.cpp
   MandatoryInlining.cpp
   PredictableMemOpt.cpp

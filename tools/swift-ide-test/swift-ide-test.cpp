@@ -58,13 +58,16 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ManagedStatic.h"
 #include <system_error>
 
+#include <random>
 #include <string>
+#include <chrono>
 
 using namespace swift;
 using namespace ide;
@@ -74,6 +77,7 @@ namespace {
 
 enum class ActionType {
   None,
+  BatchCodeCompletion,
   CodeCompletion,
   REPLCodeCompletion,
   DumpCompletionCache,
@@ -158,6 +162,8 @@ static llvm::cl::opt<ActionType>
 Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
        llvm::cl::cat(Category),
        llvm::cl::values(
+           clEnumValN(ActionType::BatchCodeCompletion,
+                      "batch-code-completion", "Perform code completion in batch mode"),
            clEnumValN(ActionType::CodeCompletion,
                       "code-completion", "Perform code completion"),
            clEnumValN(ActionType::REPLCodeCompletion,
@@ -402,6 +408,29 @@ DebugForbidTypecheckPrefix("debug-forbid-typecheck-prefix",
   llvm::cl::desc("Triggers llvm fatal_error if typechecker tries to typecheck "
                  "a decl with the provided prefix name"),
   llvm::cl::cat(Category));
+
+// '-batch-code-completion' options.
+
+static llvm::cl::opt<uint64_t>
+RandomSeed("random-seed", llvm::cl::value_desc("seed"),
+                    llvm::cl::desc("Seed for the random number generator"),
+                    llvm::cl::cat(Category),
+                    llvm::cl::init(0));
+
+
+static llvm::cl::opt<std::string>
+CompletionOutputDir("completion-output-dir", llvm::cl::value_desc("path"),
+                    llvm::cl::desc("Directory for completion output"),
+                    llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+FileCheckPath("filecheck", llvm::cl::value_desc("path"),
+                           llvm::cl::desc("Path to 'FileCheck' utility"),
+                           llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+SkipFileCheck("skip-filecheck", llvm::cl::desc("Skip 'FileCheck' checking"),
+                                llvm::cl::cat(Category));
 
 // '-code-completion' options.
 
@@ -723,6 +752,10 @@ EnableSwiftSourceInfo("enable-swiftsourceinfo",
                  llvm::cl::cat(Category),
                  llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+ExplicitSwiftModuleMap("explicit-swift-module-map-file",
+                       llvm::cl::desc("JSON file to include explicit Swift modules"),
+                       llvm::cl::cat(Category));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -874,6 +907,397 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
                               SecondSourceFileName, CodeCompletionToken,
                               CodeCompletionDiagnostics);
+}
+
+namespace {
+struct CompletionTestToken {
+  unsigned Line;
+  unsigned Column;
+  unsigned Offset;
+  StringRef Name;
+  SmallVector<StringRef, 1> CheckPrefixes;
+  StringRef Skip;
+  Optional<bool> IncludeKeywords = None;
+  Optional<bool> IncludeComments = None;
+
+  CompletionTestToken(unsigned Line, unsigned Column, unsigned Offset)
+      : Line(Line), Column(Column), Offset(Offset){};
+
+  static bool isStartOfToken(const char *Ptr) {
+    return Ptr[0] == '#' && Ptr[1] == '^';
+  }
+
+  static bool isEndOfToken(const char *Ptr) {
+    return Ptr[0] == '^' && Ptr[1] == '#';
+  }
+
+  static bool isValidTokenChar(char Chr) {
+    return (Chr >= 'A' && Chr <= 'Z') || (Chr >= 'a' && Chr <= 'z') ||
+           (Chr >= '0' && Chr <= '9') || Chr == '_' || Chr == '-' || Chr == '.';
+  }
+
+  static bool parseBooleanValue(StringRef Value, bool &Result,
+                                std::string &Error) {
+    if (Value.empty() || Value == "true" || Value == "1") {
+      Result = true;
+      return false;
+    }
+    if (Value == "false" || Value == "0") {
+      Result = false;
+      return false;
+    }
+
+    Error = "invalid value for keywords";
+    return true;
+  }
+
+  // #^TOKEN_NAME?check-prefix=CHECK1,CHECK2&keywords=1&comments=true^#
+  static bool parse(const char *&InputPtr, CompletionTestToken &Result,
+                    std::string &Error) {
+    auto Ptr = InputPtr;
+    assert(isStartOfToken(Ptr));
+    Ptr += 2;
+
+    // Parse the token name.
+    auto NameStart = Ptr;
+    while (isValidTokenChar(*Ptr)) { ++Ptr; }
+    Result.Name = StringRef(NameStart, Ptr - NameStart);
+
+    // Parse optional query string.
+    if (*Ptr == '?') {
+      ++Ptr;
+      auto QueryStart = Ptr;
+      while (!isEndOfToken(Ptr) && *Ptr != 0 && *Ptr != '\n' && *Ptr != '\r')
+        ++Ptr;
+      StringRef QueryString(QueryStart, Ptr - QueryStart);
+
+      while (!QueryString.empty()) {
+        StringRef Query, Key, Value;
+        std::tie(Query, QueryString) = QueryString.split(';');
+        std::tie(Key, Value) = Query.split('=');
+
+        if (Key == "check") {
+          // This value is passed to 'FileCheck --check-prefixes' as is.
+          Result.CheckPrefixes.push_back(Value);
+          continue;
+        }
+        if (Key == "keywords") {
+          Result.IncludeKeywords.emplace();
+          if (parseBooleanValue(Value, *Result.IncludeKeywords, Error))
+            return true;
+          continue;
+        }
+        if (Key == "comments") {
+          Result.IncludeComments.emplace();
+          if (parseBooleanValue(Value, *Result.IncludeComments, Error))
+            return true;
+          continue;
+        }
+        if (Key == "skip") {
+          Result.Skip = Value;
+          continue;
+        }
+        Error = "unknown option (" + Key.str() + ") for token";
+        return true;
+      }
+    }
+
+    // Default check prefix is the token name.
+    if (Result.CheckPrefixes.empty())
+      Result.CheckPrefixes.push_back(Result.Name);
+
+    // Tokens must end with '^#'.
+    if (!isEndOfToken(Ptr)) {
+      Error = "expected '^#' at the end of completion token";
+      return true;
+    }
+
+    InputPtr = Ptr + 2;
+    return false;;
+  }
+};
+
+static std::unique_ptr<llvm::MemoryBuffer>
+removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
+                           SmallVectorImpl<CompletionTestToken> &Tokens,
+                           std::string &Error) {
+  const char *Start = Input->getBufferStart();
+  const char *End = Input->getBufferEnd();
+  assert(*End == 0 && "buffer must be nul terminated");
+
+  std::string Out;
+  Out.reserve(Input->getBufferSize());
+
+  llvm::StringSet<> seenTokenName;
+  const char *Ptr = Start;
+  const char *SegmentStart = Ptr;
+  unsigned Removed = 0;
+  unsigned Line = 1;
+  unsigned Column = 1;
+  while (Ptr != End) {
+    if (CompletionTestToken::isStartOfToken(Ptr)) {
+      Out.append(SegmentStart, Ptr - SegmentStart);
+
+      // Emplace a token with the offset, and parse it.
+      const char *TokenStart = Ptr;
+      Tokens.emplace_back(Line, Column, Ptr - Start - Removed);
+      if (CompletionTestToken::parse(Ptr, Tokens.back(), Error)) {
+        Error = "while parsing a token at " +
+                (llvm::utostr(Line) + ":" + llvm::utostr(Column)) + ": " +
+                Error;
+        return nullptr;
+      }
+
+      if (!seenTokenName.insert(Tokens.back().Name).second) {
+        Error = "Duplicated token name '" + Tokens.back().Name.str() +
+                "' at " + (llvm::utostr(Line) + ":" + llvm::utostr(Column));
+        return nullptr;
+      }
+
+      auto TokLen =  Ptr - TokenStart;
+      SegmentStart = Ptr;
+      Removed += TokLen;
+      Column += TokLen;
+      continue;
+    }
+    if (*Ptr == '\r' || *Ptr == '\n') {
+      Ptr += (Ptr[0] == '\r' && Ptr[1] == '\n') ? 2 : 1;
+      Line += 1;
+      Column = 1;
+      continue;
+    }
+    ++Ptr;
+    ++Column;
+  }
+  Out.append(SegmentStart, Ptr - SegmentStart);
+
+  return llvm::MemoryBuffer::getMemBufferCopy(Out,
+                                              Input->getBufferIdentifier());
+}
+
+} // namespace
+
+static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
+                                 StringRef SourceFilename,
+                                 bool CodeCompletionDiagnostics,
+                                 bool CodeCompletionKeywords,
+                                 bool CodeCompletionComments) {
+  auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+                 << FileBufOrErr.getError().message() << '\n';
+    return 1;
+  }
+
+  // Completion results are output to
+  // '${OutputDir}/complete-{Token.Name}.result'.
+  SmallString<128> OutputDir;
+  if (!options::CompletionOutputDir.empty()) {
+    OutputDir = options::CompletionOutputDir;
+    if (auto result = llvm::sys::fs::create_directories(OutputDir))
+      return result.value();
+  } else if (!options::SkipFileCheck) {
+    llvm::errs() << "error: -completion-output-dir is needed unless "
+                    "-skip-filecheck is specified.\n";
+    return 1;
+  }
+
+  std::string Error;
+
+  llvm::SmallVector<CompletionTestToken, 0> CCTokens;
+  auto CleanFile =
+      removeCodeCompletionTokens(FileBufOrErr.get().get(), CCTokens, Error);
+  if (!CleanFile) {
+    llvm::errs() << "error: " << Error << "\n";
+    return 1;
+  }
+
+  if (!options::CodeCompletionToken.empty()) {
+    // If `-code-completion-token` is specified, test only that token.
+    // TODO: Multiple tokens.
+    StringRef TargetTokName = options::CodeCompletionToken;
+    Optional<CompletionTestToken> FoundTok;
+    for (auto Tok : CCTokens) {
+      if (Tok.Name == TargetTokName) {
+        FoundTok = Tok;
+        break;
+      }
+    }
+    if (FoundTok) {
+      CCTokens = {*FoundTok};
+    } else {
+      llvm::errs() << "error: could not find code completion token \""
+                   << TargetTokName << "\"\n";
+      return 1;
+    }
+  } else {
+    // Shuffle tokens to detect order-dependent bugs.
+    if (CCTokens.empty()) {
+      llvm::errs()
+          << "error: could not find any code completion tokens in input file\n";
+      return 1;
+    }
+    unsigned RandomSeed = options::RandomSeed;
+    if (RandomSeed == 0)
+      RandomSeed = std::chrono::system_clock::now().time_since_epoch().count();
+    llvm::errs() << "Use --random-seed=" << RandomSeed
+                 << " to reproduce the order of this run.\n";
+
+    std::shuffle(CCTokens.begin(), CCTokens.end(),
+                 std::default_random_engine(RandomSeed));
+  }
+
+  CompilerInvocation Invocation(InitInvok);
+  auto FileSystem = llvm::vfs::getRealFileSystem();
+
+  CompletionInstance CompletionInst;
+
+  std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
+  if (!options::CompletionCachePath.empty())
+    OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
+        options::CompletionCachePath);
+  ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
+
+  // Process tokens.
+  SmallVector<StringRef, 0> FailedTokens;
+  for (const auto &Token : CCTokens) {
+    if (!options::CodeCompletionToken.empty() &&
+        options::CodeCompletionToken != Token.Name)
+      continue;
+
+    llvm::errs() << "----\n";
+    llvm::errs() << "Token: " << Token.Name << "; offset=" << Token.Offset
+                 << "; pos=" << Token.Line << ":" << Token.Column;
+    for (auto Prefix : Token.CheckPrefixes) {
+      llvm::errs() << "; check=" << Prefix;
+    }
+    llvm::errs() << "\n";
+
+    // Skip tokens with '?skip=${reason}'.
+    if (!Token.Skip.empty()) {
+      llvm::errs() << "Skipped: " << Token.Skip << "\n";
+      continue;
+    }
+
+    auto IncludeKeywords = CodeCompletionKeywords;
+    if (Token.IncludeKeywords)
+      IncludeKeywords = *Token.IncludeKeywords;
+
+    auto IncludeComments = CodeCompletionComments;
+    if (Token.IncludeComments)
+      IncludeComments = *Token.IncludeComments;
+
+    // Store the result to a string.
+    std::string ResultStr;
+    llvm::raw_string_ostream OS(ResultStr);
+    OS << "// Token: "  << Token.Name << "\n";
+
+    auto Offset = Token.Offset;
+    auto completionBuffer = ide::makeCodeCompletionMemoryBuffer(
+        CleanFile.get(), Offset, CleanFile->getBufferIdentifier());
+
+    PrintingDiagnosticConsumer PrintDiags;
+    auto completionStart = std::chrono::high_resolution_clock::now();
+    bool isSuccess = CompletionInst.performOperation(
+        Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
+        /*EnableASTCaching=*/true, Error,
+        CodeCompletionDiagnostics ? &PrintDiags : nullptr,
+        [&](CompilerInstance &CI, bool reusingASTContext) {
+          // Create a CodeCompletionConsumer.
+          std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
+              new ide::PrintingCodeCompletionConsumer(OS, IncludeKeywords,
+                                                      IncludeComments));
+
+          // Create a factory for code completion callbacks that will feed the
+          // Consumer.
+          ide::CodeCompletionContext CompletionContext(CompletionCache);
+          std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+              ide::makeCodeCompletionCallbacksFactory(CompletionContext,
+                                                      *Consumer));
+
+          auto *SF = CI.getCodeCompletionFile();
+          performCodeCompletionSecondPass(*SF, *callbacksFactory);
+        });
+    auto completionEnd = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        completionEnd - completionStart);
+    llvm::errs() << "Elapsed: " << elapsed.count() << " msec\n";
+    OS.flush();
+
+    if (OutputDir.empty()) {
+      // If output directory is not specified, print the results to STDOUT.
+      llvm::outs() << ResultStr;
+      continue;
+    }
+
+    // Print to '${OutputDir}/complete-{Token.Name}.result'.
+    int resultFD;
+    SmallString<128> resultFilename(OutputDir);
+    llvm::sys::path::append(resultFilename,
+                            "complete-" + Token.Name + ".result");
+    if (auto res = llvm::sys::fs::openFileForWrite(resultFilename, resultFD)) {
+      llvm::errs() << "error: failed to create output file: "
+                   << resultFilename << "\n";
+      return res.value();
+    }
+
+    llvm::raw_fd_ostream fileOut(resultFD, /*shouldClose=*/true);
+    fileOut << ResultStr;
+    fileOut.close();
+
+    if (!isSuccess) {
+      llvm::errs() << "error: " << Error << "\n";
+      return 1;
+    }
+
+    if (options::SkipFileCheck)
+      continue;
+
+    assert(!options::FileCheckPath.empty());
+
+    bool isFileCheckFailed = false;
+    for (auto Prefix : Token.CheckPrefixes) {
+      StringRef FileCheckArgs[] = {options::FileCheckPath, SourceFilename,
+                                   "--check-prefixes",     Prefix,
+                                   "--input-file",         resultFilename};
+
+      int result =
+          llvm::sys::ExecuteAndWait(options::FileCheckPath, FileCheckArgs,
+                                    /*Env=*/None,
+                                    /*Redirects=*/{},
+                                    /*SecondsToWait=*/0,
+                                    /*MemoryLimit=*/0,
+                                    /*ErrMsg=*/&Error);
+      if (result != 0) {
+        isFileCheckFailed = true;
+        if (!Error.empty())
+          llvm::errs() << "error: " << Error << "\n";
+
+        // Output the FileCheck invocation.
+        llvm::errs() << "+";
+        for (auto arg : FileCheckArgs)
+          llvm::errs() << " " << arg;
+        llvm::errs() << "\n";
+      }
+    }
+
+    if (isFileCheckFailed) {
+      FailedTokens.push_back(Token.Name);
+    } else {
+      // The result may be huge. Remove the result if it's succeeded.
+      llvm::sys::fs::remove(resultFilename);
+    }
+  }
+
+  if (!FailedTokens.empty()) {
+    llvm::errs() << "----\n";
+    llvm::errs() << "Unexpected failures: ";
+    llvm::interleave(
+        FailedTokens, [&](StringRef name) { llvm::errs() << name; },
+        [&]() { llvm::errs() << ", "; });
+  }
+
+  return !FailedTokens.empty();
 }
 
 static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
@@ -3462,6 +3886,11 @@ int main(int argc, char *argv[]) {
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);
 
+  if (!options::ExplicitSwiftModuleMap.empty()) {
+    InitInvok.getSearchPathOptions().ExplicitSwiftModuleMap =
+      options::ExplicitSwiftModuleMap;
+    InitInvok.getFrontendOptions().DisableImplicitModules = true;
+  }
   // Process the clang arguments last and allow them to override previously
   // set options.
   if (!CCArgs.empty()) {
@@ -3525,6 +3954,19 @@ int main(int argc, char *argv[]) {
   case ActionType::DiffModuleAPI:
   case ActionType::DumpCompletionCache:
     llvm_unreachable("should be handled above");
+
+  case ActionType::BatchCodeCompletion:
+    if (options::FileCheckPath.empty() && !options::SkipFileCheck) {
+      llvm::errs() << "'FileCheck' path required or explicitly specify "
+                   << "'-skip-filecheck'\n";
+      return 1;
+    }
+    ExitCode = doBatchCodeCompletion(InitInvok,
+                                     options::SourceFilename,
+                                     options::CodeCompletionDiagnostics,
+                                     options::CodeCompletionKeywords,
+                                     options::CodeCompletionComments);
+    break;
 
   case ActionType::CodeCompletion:
     if (options::CodeCompletionToken.empty()) {

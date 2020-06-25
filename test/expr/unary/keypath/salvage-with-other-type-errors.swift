@@ -52,7 +52,7 @@ protocol Bindable: class { }
 extension Bindable {
   func test<Value>(to targetKeyPath: ReferenceWritableKeyPath<Self, Value>, change: Value?) {
     if self[keyPath:targetKeyPath] != change {
-      // expected-error@-1 {{operator function '!=' requires that 'Value' conform to 'Equatable'}}
+      // expected-error@-1 {{binary operator '!=' cannot be applied to operands of type 'Value' and 'Value?'}}
       self[keyPath: targetKeyPath] = change!
     }
   }

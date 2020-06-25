@@ -2563,6 +2563,7 @@ namespace {
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
+      expr->setArg(cs.coerceToRValue(expr->getArg()));
       return expr;
     }
 

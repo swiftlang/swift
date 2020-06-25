@@ -505,63 +505,69 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
   }
 }
 
-void OwnershipLiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
-  while (!ownershipForwardingUses.empty()) {
-    auto *i = ownershipForwardingUses.back()->getUser();
-    ownershipForwardingUses = ownershipForwardingUses.drop_back();
+static void convertInstructionOwnership(SILInstruction *i,
+                                        ValueOwnershipKind oldOwnership,
+                                        ValueOwnershipKind newOwnership) {
+  // If this is a term inst, just convert all of its incoming values that are
+  // owned to be guaranteed.
+  if (auto *ti = dyn_cast<TermInst>(i)) {
+    for (auto &succ : ti->getSuccessors()) {
+      auto *succBlock = succ.getBB();
 
-    // If this is a term inst, just convert all of its incoming values that are
-    // owned to be guaranteed.
-    if (auto *ti = dyn_cast<TermInst>(i)) {
-      for (auto &succ : ti->getSuccessors()) {
-        auto *succBlock = succ.getBB();
+      // If we do not have any arguments, then continue.
+      if (succBlock->args_empty())
+        continue;
 
-        // If we do not have any arguments, then continue.
-        if (succBlock->args_empty())
-          continue;
-
-        for (auto *succArg : succBlock->getSILPhiArguments()) {
-          // If we have an any value, just continue.
-          if (succArg->getOwnershipKind() == ValueOwnershipKind::Owned) {
-            succArg->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-          }
+      for (auto *succArg : succBlock->getSILPhiArguments()) {
+        // If we have an any value, just continue.
+        if (succArg->getOwnershipKind() == oldOwnership) {
+          succArg->setOwnershipKind(newOwnership);
         }
+      }
+    }
+    return;
+  }
+
+  assert(i->hasResults());
+  for (SILValue result : i->getResults()) {
+    if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
+      if (svi->getOwnershipKind() == oldOwnership) {
+        svi->setOwnershipKind(newOwnership);
       }
       continue;
     }
 
-    assert(i->hasResults());
-    for (SILValue result : i->getResults()) {
-      if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
-        if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          svi->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
+    if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
+      if (ofci->getOwnershipKind() == oldOwnership) {
+        ofci->setOwnershipKind(newOwnership);
       }
-
-      if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
-        if (ofci->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          ofci->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
-        if (sei->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          sei->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
-        if (mvir->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          mvir->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      llvm_unreachable("unhandled forwarding instruction?!");
+      continue;
     }
+
+    if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
+      if (sei->getOwnershipKind() == oldOwnership) {
+        sei->setOwnershipKind(newOwnership);
+      }
+      continue;
+    }
+
+    if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
+      if (mvir->getOwnershipKind() == oldOwnership) {
+        mvir->setOwnershipKind(newOwnership);
+      }
+      continue;
+    }
+
+    llvm_unreachable("unhandled forwarding instruction?!");
+  }
+}
+
+void OwnershipLiveRange::convertOwnedGeneralForwardingUsesToGuaranteed() && {
+  while (!ownershipForwardingUses.empty()) {
+    auto *i = ownershipForwardingUses.back()->getUser();
+    ownershipForwardingUses = ownershipForwardingUses.drop_back();
+    convertInstructionOwnership(i, ValueOwnershipKind::Owned,
+                                ValueOwnershipKind::Guaranteed);
   }
 }
 
@@ -872,11 +878,20 @@ struct SemanticARCOptVisitor
   /// consumed operand.
   FrozenMultiMap<SILValue, Operand *> joinedOwnedIntroducerToConsumedOperands;
 
+  /// If set to true, then we should only run cheap optimizations that do not
+  /// build up data structures or analyze code in depth.
+  ///
+  /// As an example, we do not do load [copy] optimizations here since they
+  /// generally involve more complex analysis, but simple peepholes of
+  /// copy_values we /do/ allow.
+  bool onlyGuaranteedOpts;
+
   using FrozenMultiMapRange =
       decltype(joinedOwnedIntroducerToConsumedOperands)::PairToSecondEltRange;
 
-  explicit SemanticARCOptVisitor(SILFunction &F)
-      : F(F), addressToExhaustiveWriteListCache(constructCacheValue) {}
+  explicit SemanticARCOptVisitor(SILFunction &F, bool onlyGuaranteedOpts)
+      : F(F), addressToExhaustiveWriteListCache(constructCacheValue),
+        onlyGuaranteedOpts(onlyGuaranteedOpts) {}
 
   DeadEndBlocks &getDeadEndBlocks() {
     if (!TheDeadEndBlocks)
@@ -1432,6 +1447,10 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 //
 // TODO: This needs a better name.
 bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
+  // For now, do not run this optimization. This is just to be careful.
+  if (onlyGuaranteedOpts)
+    return false;
+
   SmallVector<BorrowedValue, 4> borrowScopeIntroducers;
 
   // Find all borrow introducers for our copy operand. If we are unable to find
@@ -1609,6 +1628,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
 bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
+  // This is a cheap optimization generally.
+
   // See if we are lucky and have a simple case.
   if (auto *op = cvi->getSingleUse()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
@@ -1807,6 +1828,10 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
   }
 
   // Otherwise, we couldn't handle this case, so return false.
+  //
+  // NOTE: We would generally do a more complex analysis here to handle the more
+  // general case. That would most likely /not/ be a guaranteed optimization
+  // until we investigate/measure.
   return false;
 }
 
@@ -2114,6 +2139,11 @@ bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load,
 // Convert a load [copy] from unique storage [read] that has all uses that can
 // accept a guaranteed parameter to a load_borrow.
 bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
+  // This optimization can use more complex analysis. We should do some
+  // experiments before enabling this by default as a guaranteed optimization.
+  if (onlyGuaranteedOpts)
+    return false;
+
   if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return false;
 
@@ -2156,6 +2186,11 @@ namespace {
 // case DiagnosticConstantPropagation exposed anything new in this assert
 // configuration.
 struct SemanticARCOpts : SILFunctionTransform {
+  bool guaranteedOptsOnly;
+
+  SemanticARCOpts(bool guaranteedOptsOnly)
+      : guaranteedOptsOnly(guaranteedOptsOnly) {}
+
   void run() override {
     SILFunction &f = *getFunction();
 
@@ -2168,7 +2203,7 @@ struct SemanticARCOpts : SILFunctionTransform {
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 
-    SemanticARCOptVisitor visitor(f);
+    SemanticARCOptVisitor visitor(f, guaranteedOptsOnly);
 
     // Add all the results of all instructions that we want to visit to the
     // worklist.
@@ -2194,4 +2229,10 @@ struct SemanticARCOpts : SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createSemanticARCOpts() { return new SemanticARCOpts(); }
+SILTransform *swift::createSemanticARCOpts() {
+  return new SemanticARCOpts(false /*guaranteed*/);
+}
+
+SILTransform *swift::createGuaranteedARCOpts() {
+  return new SemanticARCOpts(true /*guaranteed*/);
+}

@@ -1884,6 +1884,10 @@ public:
 
   void visitCodeCompletionExpr(CodeCompletionExpr *E) {
     printCommon(E, "code_completion_expr");
+    if (E->getBase()) {
+      OS << '\n';
+      printRec(E->getBase());
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3513,7 +3517,7 @@ namespace {
       if (T->getParent())
         printRec("parent", T->getParent());
 
-      for (auto arg : T->getInnermostGenericArgs())
+      for (const auto arg : T->getDirectGenericArgs())
         printRec(arg);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

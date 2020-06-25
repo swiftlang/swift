@@ -394,7 +394,6 @@ function(_compile_swift_files
       list(APPEND swift_flags "-enable-library-evolution")
     endif()
     # SWIFT_ENABLE_TENSORFLOW END
-    list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)

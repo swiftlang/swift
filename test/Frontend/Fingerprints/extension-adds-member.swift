@@ -21,7 +21,7 @@
 // RUN: touch -t 200101010101 %t/*.swift
 
 
-// RUN: cd %t && %swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json  >& %t/output1
+// RUN: cd %t && %target-swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json  >& %t/output1
 
 
 // Change one type, but uses of all types get recompiled
@@ -33,7 +33,7 @@
 // RUN: touch -t 200101010101 %t/*.swift
 // RUN: touch -t 200301010101 %t/definesAB.swift
 
-// RUN: cd %t && %swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift  -module-name main -output-file-map ofm.json  >& %t/output2
+// RUN: cd %t && %target-swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift  -module-name main -output-file-map ofm.json  >& %t/output2
 
 
 // This test checks for the status quo; it would be OK to be more conservative
@@ -60,7 +60,7 @@
 // Seeing weird failure on CI, so set the mod times
 // RUN: touch -t 200101010101 %t/*.swift
 
-// RUN: cd %t && %swiftc_driver  -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json  >& %t/output3
+// RUN: cd %t && %target-swiftc_driver  -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json  >& %t/output3
 
 // Change one type, only uses of that type get recompiled
 
@@ -71,7 +71,7 @@
 // RUN: touch -t 200101010101 %t/*.swift
 // RUN: touch -t 200301010101 %t/definesAB.swift
 
-// RUN: cd %t && %swiftc_driver  -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json  >& %t/output4
+// RUN: cd %t && %target-swiftc_driver  -enable-batch-mode -j2 -incremental -disable-direct-intramodule-dependencies -driver-show-incremental main.swift definesAB.swift usesA.swift usesB.swift -module-name main -output-file-map ofm.json  >& %t/output4
 
 // RUN: %FileCheck -check-prefix=CHECK-RECOMPILED-W %s < %t/output4
 // RUN: %FileCheck -check-prefix=CHECK-NOT-RECOMPILED-W %s < %t/output4

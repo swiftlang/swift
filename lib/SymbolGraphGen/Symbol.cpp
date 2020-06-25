@@ -280,8 +280,8 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
       }
 
       filterGenericRequirements(Generics->getRequirements(),
-                         Self,
-                         FilteredRequirements);
+                                Self,
+                                FilteredRequirements);
 
       if (FilteredParams.empty() && FilteredRequirements.empty()) {
         return;

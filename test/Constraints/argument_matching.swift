@@ -1465,34 +1465,30 @@ _ = acceptTuple2(tuple1)
 _ = acceptTuple2((1, "hello", 3.14159))
 
 
-func generic_and_missing_label(x: Int) {}
-func generic_and_missing_label<T>(x: T) {}
+func generic_and_missing_label(x: Int) {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
+func generic_and_missing_label<T>(x: T) {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
 
 generic_and_missing_label(42)
-// expected-error@-1 {{missing argument label 'x:' in call}} {{27-27=x: }}
+// expected-error@-1 {{no exact matches in call to global function 'generic_and_missing_label'}}
 
 // -------------------------------------------
 // Curried functions
 // -------------------------------------------
-
 func f7(_ a: Int) -> (_ b: Int) -> Int {
   return { b in a+b }
 }
 
 _ = f7(1)(1)
 f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
 f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
 let f10 = f7(2)
 _ = f10(1)
 f10(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
 f10(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 f10(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
 
 class CurriedClass {
   func method1() {}
@@ -1513,13 +1509,11 @@ c.method2(1)(2.0) // expected-error {{cannot convert value of type 'Double' to e
 c.method2(1.0)(2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1.0)(2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
 CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
 // expected-error@-1:27 {{argument passed to call that takes no arguments}}
-
 CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
@@ -1530,7 +1524,6 @@ CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of t
 CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{extraneous argument label 'c:'}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
 CurriedClass.method3(c)(32, b: 1)
 _ = CurriedClass.method3(c)
 _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
@@ -1542,7 +1535,6 @@ CurriedClass.method3(c)(1)               // expected-error {{missing argument fo
 CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument labels in call (have 'c:', expected '_:b:')}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 // expected-error@-2 {{missing argument for parameter #1 in call}}
-
 
 extension CurriedClass {
   func f() {
@@ -1557,64 +1549,51 @@ extension CurriedClass {
 
 extension CurriedClass {
   func m1(_ a : Int, b : Int) {}
-  
+
   func m2(_ a : Int) {}
 }
 
 // <rdar://problem/23718816> QoI: "Extra argument" error when accidentally currying a method
 CurriedClass.m1(2, b: 42)   // expected-error {{instance member 'm1' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 
-
 // <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
 CurriedClass.m2(12)  // expected-error {{instance member 'm2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
-
 // -------------------------------------------
 // Multiple label errors
 // -------------------------------------------
-
 func testLabelErrorsBasic() {
   func f(_ aa: Int, _ bb: Int, cc: Int, dd: Int, ee: Int, ff: Int) {}
 
   // 1 wrong
   f(0, 1, ccx: 2, dd: 3, ee: 4, ff: 5)
   // expected-error@-1 {{incorrect argument label in call (have '_:_:ccx:dd:ee:ff:', expected '_:_:cc:dd:ee:ff:')}} {{11-14=cc}} {{none}}
-
   // 1 missing
   f(0, 1, 2, dd: 3, ee: 4, ff: 5)
   // expected-error@-1 {{missing argument label 'cc:' in call}} {{11-11=cc: }} {{none}}
-
   // 1 extra
   f(aa: 0, 1, cc: 2, dd: 3, ee: 4, ff: 5)
   // expected-error@-1 {{extraneous argument label 'aa:' in call}} {{5-9=}} {{none}}
-
   // 1 ooo
   f(0, 1, dd: 3, cc: 2, ee: 4, ff: 5)
   // expected-error@-1 {{argument 'cc' must precede argument 'dd'}} {{16-23=}} {{11-11=cc: 2, }} {{none}}
-
   // 2 wrong
   f(0, 1, ccx: 2, ddx: 3, ee: 4, ff: 5)
   // expected-error@-1 {{incorrect argument labels in call (have '_:_:ccx:ddx:ee:ff:', expected '_:_:cc:dd:ee:ff:')}} {{11-14=cc}} {{19-22=dd}} {{none}}
-
   // 2 missing
   f(0, 1, 2, 3, ee: 4, ff: 5)
   // expected-error@-1 {{missing argument labels 'cc:dd:' in call}} {{11-11=cc: }} {{14-14=dd: }} {{none}}
-
   // 2 extra
   f(aa: 0, bb: 1, cc: 2, dd: 3, ee: 4, ff: 5)
   // expected-error@-1 {{extraneous argument labels 'aa:bb:' in call}} {{5-9=}} {{12-16=}} {{none}}
-
   // 2 ooo
   f(0, 1, dd: 3, cc: 2, ff: 5, ee: 4)
   // expected-error@-1 {{argument 'cc' must precede argument 'dd'}} {{16-23=}} {{11-11=cc: 2, }} {{none}}
-
   // 1 wrong + 1 missing
   f(0, 1, ccx: 2, 3, ee: 4, ff: 5)
   // expected-error@-1 {{incorrect argument labels in call (have '_:_:ccx:_:ee:ff:', expected '_:_:cc:dd:ee:ff:')}} {{11-14=cc}} {{19-19=dd: }} {{none}}
-
   // 1 wrong + 1 extra
   f(aa: 0, 1, ccx: 2, dd: 3, ee: 4, ff: 5)
   // expected-error@-1 {{incorrect argument labels in call (have 'aa:_:ccx:dd:ee:ff:', expected '_:_:cc:dd:ee:ff:')}} {{5-9=}} {{15-18=cc}} {{none}}
-
   // 1 wrong + 1 ooo
   f(0, 1, ccx: 2, dd: 3, ff: 5, ee: 4)
   // expected-error@-1 {{incorrect argument labels in call (have '_:_:ccx:dd:ff:ee:', expected '_:_:cc:dd:ee:ff:')}} {{11-14=cc}} {{26-28=ee}} {{33-35=ff}} {{none}}
@@ -1625,7 +1604,6 @@ struct DiagnoseAllLabels {
 
   func test() {
     f(aax: 0, bbx: 1, cc: 21, 22, 23, dd: 3, ff: 5) // expected-error {{incorrect argument labels in call (have 'aax:bbx:cc:_:_:dd:ff:', expected 'aa:bb:cc:_:_:dd:ff:')}} {{7-10=aa}} {{15-18=bb}} {{none}}
-
     f(aax: 0, bbx: 1, dd: 3, ff: 5) // expected-error {{incorrect argument labels in call (have 'aax:bbx:dd:ff:', expected 'aa:bb:dd:ff:')}} {{7-10=aa}} {{15-18=bb}} {{none}}
   }
 }
