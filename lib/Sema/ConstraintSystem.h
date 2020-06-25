@@ -5169,6 +5169,10 @@ bool isArgumentOfReferenceEqualityOperator(ConstraintLocator *locator);
 /// pattern-matching operator `~=`
 bool isPatternMatchingOperator(Expr *expr);
 
+/// Determine whether given expression is a reference to a
+/// "standard" comparison operator such as "==", "!=", ">" etc.
+bool isStandardComparisonOperator(Expr *expr);
+
 /// If given expression references operator overlaod(s)
 /// extract and produce name of the operator.
 Optional<Identifier> getOperatorName(Expr *expr);

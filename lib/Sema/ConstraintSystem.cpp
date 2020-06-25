@@ -2777,12 +2777,6 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
   auto *anchor = castToExpr(locator->getAnchor());
   auto *applyExpr = cast<ApplyExpr>(cs.getParentExpr(anchor));
 
-  auto isNameOfStandardComparisonOperator = [](Identifier opName) -> bool {
-    return opName.is("==") || opName.is("!=") || opName.is("===") ||
-           opName.is("!==") || opName.is("<") || opName.is(">") ||
-           opName.is("<=") || opName.is(">=");
-  };
-
   auto isEnumWithAssociatedValues = [](Type type) -> bool {
     if (auto *enumType = type->getAs<EnumType>())
       return !enumType->getDecl()->hasOnlyCasesWithoutAssociatedValues();
@@ -2805,7 +2799,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
           .highlight(lhs->getSourceRange())
           .highlight(rhs->getSourceRange());
 
-      if (isNameOfStandardComparisonOperator(operatorName) &&
+      if (isStandardComparisonOperator(binaryOp->getFn()) &&
           isEnumWithAssociatedValues(lhsType)) {
         DE.diagnose(applyExpr->getLoc(),
                     diag::no_binary_op_overload_for_enum_with_payload,
@@ -4226,6 +4220,15 @@ Optional<Identifier> constraints::getOperatorName(Expr *expr) {
 
 bool constraints::isPatternMatchingOperator(Expr *expr) {
   return isOperator(expr, "~=");
+}
+
+bool constraints::isStandardComparisonOperator(Expr *expr) {
+  if (auto opName = getOperatorName(expr)) {
+    return opName->is("==") || opName->is("!=") || opName->is("===") ||
+           opName->is("!==") || opName->is("<") || opName->is(">") ||
+           opName->is("<=") || opName->is(">=");
+  }
+  return false;
 }
 
 bool constraints::isOperatorArgument(ConstraintLocator *locator,
