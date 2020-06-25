@@ -1081,3 +1081,22 @@ func internal_original_fileprivate_derivative(_ x: Float) -> Float { x }
 fileprivate func _internal_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
+
+
+// Test nested types
+
+extension Class {
+  class nestedClass {
+    func nestedClassFunc() -> Float {
+      return 1
+    }
+  }
+}
+
+extension Class where T: Differentiable {
+  // expected-error @+1 {{'nestedClassFunc' is not defined in the current type context}}
+  @derivative(of: Class.nestedClass.nestedClassFunc)
+  func nestedDerivative() -> (value: Float, pullback: (Float) -> TangentVector) {
+    return (1, {_ in .zero })
+  } 
+}
