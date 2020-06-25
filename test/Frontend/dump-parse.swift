@@ -104,3 +104,22 @@ enum MyEnum {
 // CHECK-NEXT:            (parameter "v"))
 // CHECK-NEXT:          (brace_stmt range=[{{.+}}])))))
 _ = { (v: MyEnum) in }
+
+// CHECK-LABEL: (struct_decl range=[{{.+}}] "SelfParam"
+struct SelfParam {
+
+  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" type
+  // CHECK-NEXT:    (parameter "self")
+  // CHECK-NEXT:    (parameter_list range=[{{.+}}])
+  // CHECK-NEXT:    (result
+  // CHECK-NEXT:      (type_optional
+  // CHECK-NEXT:        (type_ident
+  // CHECK-NEXT:          (component id='SelfParam' bind=none))))
+  static func createOptional() -> SelfParam? {
+
+    // CHECK-LABEL: (call_expr type='<null>' arg_labels=
+    // CHECK-NEXT:    (unresolved_decl_ref_expr type='<null>' name=SelfParam function_ref=unapplied)
+    // CHECK-NEXT:    (tuple_expr type='()'{{.*}}))
+    SelfParam()
+  }
+}
