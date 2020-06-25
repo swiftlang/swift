@@ -1444,7 +1444,7 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
     }
   }
   assert(subscriptDecl && "No `Array.TangentVector.subscript`");
-  auto *subscriptGetterDecl = subscriptDecl->getAccessor(AccessorKind::Get);
+  auto *subscriptGetterDecl = subscriptDecl->getOpaqueAccessor(AccessorKind::Get);
   assert(subscriptGetterDecl && "No `Array.TangentVector.subscript` getter");
   SILOptFunctionBuilder fb(getContext().getTransform());
   auto *subscriptGetterFn = fb.getOrCreateFunction(

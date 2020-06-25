@@ -3655,7 +3655,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     // If the candidate is an `AbstractStorageDecl`, use its getter as the
     // candidate.
     if (auto *asd = dyn_cast<AbstractStorageDecl>(decl))
-      candidate = asd->getAccessor(AccessorKind::Get);
+      candidate = asd->getOpaqueAccessor(AccessorKind::Get);
     if (!candidate) {
       notFunction = true;
       continue;
@@ -4288,7 +4288,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     D->getAttrs().removeAttribute(attr);
     // Transfer `@differentiable` attribute from storage declaration to
     // getter accessor.
-    auto *getterDecl = asd->getAccessor(AccessorKind::Get);
+    auto *getterDecl = asd->getOpaqueAccessor(AccessorKind::Get);
     auto *newAttr = DifferentiableAttr::create(
         getterDecl, /*implicit*/ true, attr->AtLoc, attr->getRange(),
         attr->isLinear(), resolvedDiffParamIndices,
