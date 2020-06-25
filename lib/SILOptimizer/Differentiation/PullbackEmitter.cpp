@@ -179,6 +179,17 @@ Optional<TangentSpace> PullbackEmitter::getTangentSpace(CanType type) {
 }
 
 SILValueCategory PullbackEmitter::getTangentValueCategory(SILValue v) {
+  // Tangent value category table:
+  //
+  // Let $L be a loadable type and $*A be an address-only type.
+  //
+  // Original type | Tangent type loadable? | Tangent value category and type
+  // --------------|------------------------|--------------------------------
+  // $L            | loadable               | object, $L' (no mismatch)
+  // $*A           | loadable               | address, $*L' (create a buffer)
+  // $L            | address-only           | address, $*A' (no alternative)
+  // $*A           | address-only           | address, $*A' (no alternative)
+
   // Quick check: if the value has an address type, the tangent value category
   // is always "address".
   if (v->getType().isAddress())
@@ -187,7 +198,7 @@ SILValueCategory PullbackEmitter::getTangentValueCategory(SILValue v) {
   // then the tangent value category is "object".
   auto tanSpace = getTangentSpace(remapType(v->getType()).getASTType());
   auto tanASTType = tanSpace->getCanonicalType();
-  if (v->getType().isObject() && !getTypeLowering(tanASTType).isAddressOnly())
+  if (v->getType().isObject() && getTypeLowering(tanASTType).isLoadable())
     return SILValueCategory::Object;
   // Otherwise, the tangent value category is "address".
   return SILValueCategory::Address;
