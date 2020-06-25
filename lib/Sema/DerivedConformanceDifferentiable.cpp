@@ -45,7 +45,7 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
     if (auto *originalProperty = vd->getOriginalWrappedProperty()) {
       // Skip immutable wrapped properties. `mutating func move(along:)` cannot
       // be synthesized to update these properties.
-      if (!originalProperty->getAccessor(AccessorKind::Set))
+      if (!originalProperty->isSettable(DC))
         continue;
       // Use the original wrapped property.
       vd = originalProperty;
@@ -791,7 +791,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
       // Diagnose wrapped properties whose property wrappers do not define
       // `wrappedValue.set`. `mutating func move(along:)` cannot be synthesized
       // to update these properties.
-      if (!originalProperty->getAccessor(AccessorKind::Set)) {
+      if (!originalProperty->isSettable(DC)) {
         auto *wrapperDecl =
             vd->getInterfaceType()->getNominalOrBoundGenericNominal();
         auto loc =

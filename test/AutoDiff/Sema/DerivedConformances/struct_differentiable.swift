@@ -341,7 +341,6 @@ struct SR_12793: Differentiable {
 }
 
 // Test property wrappers.
-// TF-1190: Test `@noDerivative` warning for property wrapper backing storage properties.
 
 @propertyWrapper
 struct ImmutableWrapper<Value> {
@@ -372,10 +371,13 @@ struct WrappedProperties: Differentiable {
 
   @Wrapper var float: Generic<Float>
   @ClassWrapper var float2: Generic<Float>
+  // SR-13071: Test `@differentiable` wrapped property.
+  @differentiable @Wrapper var float3: Generic<Float>
+
   @noDerivative @ImmutableWrapper var nondiff: Generic<Int>
 
   static func testTangentMemberwiseInitializer() {
-    _ = TangentVector(float: .init(), float2: .init())
+    _ = TangentVector(float: .init(), float2: .init(), float3: .init())
   }
 }
 
