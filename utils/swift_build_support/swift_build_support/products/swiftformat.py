@@ -47,9 +47,6 @@ class SwiftFormat(product.Product):
     def is_swiftpm_unified_build_product(cls):
         return True
 
-    def package_name(self):
-        return 'SwiftFormat'
-
     def run_build_script_helper(self, action, additional_params=[]):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
