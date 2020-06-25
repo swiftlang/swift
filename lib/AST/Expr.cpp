@@ -2401,6 +2401,7 @@ TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
     assert(!Body->empty() &&
          Body->getFirstElement().isDecl(DeclKind::Var) &&
          "First element of Body should be a variable to init with the subExpr");
+    getVar()->setParentExpr(this);
   }
 }
 
