@@ -4389,7 +4389,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
             parameters);
 
         DeclNameRefWithLoc origName{
-          DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc(), None};
+            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc(), None};
         auto derivativeKind =
             getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
         if (!derivativeKind)

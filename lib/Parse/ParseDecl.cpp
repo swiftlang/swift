@@ -1042,6 +1042,7 @@ bool Parser::parseDifferentiableAttributeArguments(
 /// or to `nullptr` if not. A missing base type is not considered an error.
 static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   baseType = nullptr;
+  Parser::BacktrackingScope backtrack(P);
 
   // If base type cannot be parsed, return false (no error).
   if (!P.canParseBaseTypeForQualifiedDeclName())
@@ -1057,6 +1058,24 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   // `parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)` leaves the
   // leading period unparsed to avoid syntax verification errors.
   assert(P.startsWithSymbol(P.Tok, '.') && "false");
+
+  // Check if this is a reference to an accessor in a computed property.
+  // FIXME: There is an ambiguity here because instead of a computed
+  // property with an accessor, this could be a type with a function
+  // name like an accessor.
+  if (P.Tok.is(tok::period)) {
+     const Token &nextToken = P.peekToken();
+     if(nextToken.is(tok::identifier)) {
+        StringRef tokText = nextToken.getText();
+        for(auto accessor : allAccessorKinds()) {
+           if(tokText == getAccessorLabel(accessor)) {
+             return false;
+           }
+        }
+     }
+  }
+
+  backtrack.cancelBacktrack();
   P.consumeStartingCharacterOfCurrentToken(tok::period);
 
   // Set base type and return false (no error).
