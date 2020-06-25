@@ -83,21 +83,24 @@ bool UnwrapOptionalBase::diagnose(const Solution &solution, bool asNote) const {
   bool resultIsOptional =
       getKind() == FixKind::UnwrapOptionalBaseWithOptionalResult;
   MemberAccessOnOptionalBaseFailure failure(solution, getLocator(), MemberName,
-                                            resultIsOptional);
+                                            MemberBaseType, resultIsOptional);
   return failure.diagnose(asNote);
 }
 
 UnwrapOptionalBase *UnwrapOptionalBase::create(ConstraintSystem &cs,
                                                DeclNameRef member,
+                                               Type memberBaseType,
                                                ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      UnwrapOptionalBase(cs, FixKind::UnwrapOptionalBase, member, locator);
+  return new (cs.getAllocator()) UnwrapOptionalBase(
+      cs, FixKind::UnwrapOptionalBase, member, memberBaseType, locator);
 }
 
 UnwrapOptionalBase *UnwrapOptionalBase::createWithOptionalResult(
-    ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator) {
-  return new (cs.getAllocator()) UnwrapOptionalBase(
-      cs, FixKind::UnwrapOptionalBaseWithOptionalResult, member, locator);
+    ConstraintSystem &cs, DeclNameRef member, Type memberBaseType,
+    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      UnwrapOptionalBase(cs, FixKind::UnwrapOptionalBaseWithOptionalResult,
+                         member, memberBaseType, locator);
 }
 
 bool AddAddressOf::diagnose(const Solution &solution, bool asNote) const {

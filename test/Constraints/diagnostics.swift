@@ -1342,3 +1342,10 @@ func rdar62989214() {
     arr[flag].isTrue // expected-error {{cannot convert value of type 'Flag' to expected argument type 'Int'}}
   }
 }
+
+// SR-5688
+func SR5688_1() -> String? { "" }
+SR5688_1!.count // expected-error {{function 'SR5688_1' was used as a property; add () to call it}} {{9-9=()}}
+
+func SR5688_2() -> Int? { 0 }
+let _: Int = SR5688_2! // expected-error {{function 'SR5688_2' was used as a property; add () to call it}} {{22-22=()}}

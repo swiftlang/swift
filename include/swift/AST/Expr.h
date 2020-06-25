@@ -5380,6 +5380,13 @@ public:
       return Loc;
     }
     
+    SourceRange getSourceRange() const {
+      if (auto *indexExpr = getIndexExpr()) {
+        return indexExpr->getSourceRange();
+      }
+      return Loc;
+    }
+    
     Kind getKind() const {
       return KindValue;
     }

@@ -930,6 +930,85 @@ func testMissingMember() {
   _ = \String.x.y // expected-error {{value of type 'String' has no member 'x'}}
 }
 
+// SR-5688
+struct  SR5688_A {
+    var b: SR5688_B?
+}
+
+struct SR5688_AA {
+    var b: SR5688_B
+}
+
+struct SR5688_B {
+    var m: Int
+    var c: SR5688_C?
+}
+
+struct SR5688_C {
+    var d: Int
+}
+
+struct SR5688_S {
+  subscript(_ x: Int) -> String? { "" }
+}
+
+struct SR5688_O {
+  struct Nested {
+    var foo = ""
+  }
+}
+
+func SR5688_KP(_ kp: KeyPath<String?, Int>) {}
+
+func testMemberAccessOnOptionalKeyPathComponent() {
+
+  _ = \SR5688_A.b.m
+  // expected-error@-1 {{value of optional type 'SR5688_B?' must be unwrapped to refer to member 'm' of wrapped base type 'SR5688_B'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'm' only for non-'nil' base values}} {{18-18=?}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{18-18=!}}
+
+  _ = \SR5688_A.b.c.d 
+  // expected-error@-1 {{value of optional type 'SR5688_B?' must be unwrapped to refer to member 'c' of wrapped base type 'SR5688_B'}} 
+  // expected-note@-2 {{chain the optional using '?' to access member 'c' only for non-'nil' base values}} {{18-18=?}}
+  // expected-error@-3 {{value of optional type 'SR5688_C?' must be unwrapped to refer to member 'd' of wrapped base type 'SR5688_C'}} 
+  // expected-note@-4 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{20-20=?}}
+  // expected-note@-5 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{20-20=!}}
+  _ = \SR5688_A.b?.c.d 
+  // expected-error@-1 {{value of optional type 'SR5688_C?' must be unwrapped to refer to member 'd' of wrapped base type 'SR5688_C'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{21-21=?}}
+
+  _ = \SR5688_AA.b.c.d
+  // expected-error@-1 {{value of optional type 'SR5688_C?' must be unwrapped to refer to member 'd' of wrapped base type 'SR5688_C'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{21-21=?}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{21-21=!}}
+
+  \String?.count 
+  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
+  // expected-note@-2 {{use unwrapped type 'String' as key path root}} {{4-11=String}}
+  
+  \Optional<String>.count 
+  // expected-error@-1 {{value of optional type 'Optional<String>' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
+  // expected-note@-2 {{use unwrapped type 'String' as key path root}} {{4-20=String}}
+
+  \SR5688_S.[5].count 
+  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'count' only for non-'nil' base values}}{{16-16=?}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{16-16=!}}
+
+
+  \SR5688_O.Nested?.foo.count
+  // expected-error@-1 {{value of optional type 'SR5688_O.Nested?' must be unwrapped to refer to member 'foo' of wrapped base type 'SR5688_O.Nested'}}
+  // expected-note@-2 {{use unwrapped type 'SR5688_O.Nested' as key path root}}{{4-20=SR5688_O.Nested}}
+  
+  \(Int, Int)?.0
+  // expected-error@-1 {{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
+  // expected-note@-2 {{use unwrapped type '(Int, Int)' as key path root}}{{4-15=(Int, Int)}}
+  
+  // TODO(diagnostics) Improve diagnostics refering to key path root not able to be infered as an optional type.
+  SR5688_KP(\.count)
+  // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;

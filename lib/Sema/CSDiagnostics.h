@@ -479,16 +479,32 @@ public:
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
   DeclNameRef Member;
+  Type MemberBaseType;
   bool ResultTypeIsOptional;
 
 public:
   MemberAccessOnOptionalBaseFailure(const Solution &solution,
                                     ConstraintLocator *locator,
-                                    DeclNameRef memberName, bool resultOptional)
+                                    DeclNameRef memberName,
+                                    Type memberBaseType,
+                                    bool resultOptional)
       : FailureDiagnostic(solution, locator), Member(memberName),
+        MemberBaseType(resolveType(memberBaseType)),
         ResultTypeIsOptional(resultOptional) {}
 
   bool diagnoseAsError() override;
+  
+  Type getMemberBaseType() const {
+    return MemberBaseType;
+  }
+  
+  SourceLoc getLoc() const override {
+    // The end location points to the dot in the member access.
+    return getSourceRange().End;
+  }
+  
+  SourceRange getSourceRange() const override;
+
 };
 
 /// Diagnose errors associated with rvalues in positions
