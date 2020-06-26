@@ -437,81 +437,6 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 
-static Optional<Type> getTypeOfCompletionContextExpr(
-                        DeclContext *DC,
-                        CompletionTypeCheckKind kind,
-                        Expr *&parsedExpr,
-                        ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
-    return None;
-
-  switch (kind) {
-  case CompletionTypeCheckKind::Normal:
-    // Handle below.
-    break;
-
-  case CompletionTypeCheckKind::KeyPath:
-    referencedDecl = nullptr;
-    if (auto keyPath = dyn_cast<KeyPathExpr>(parsedExpr))
-      return TypeChecker::checkObjCKeyPathExpr(DC, keyPath,
-                                               /*requireResultType=*/true);
-
-    return None;
-  }
-
-  Type originalType = parsedExpr->getType();
-  if (auto T = TypeChecker::getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                 referencedDecl, FreeTypeVariableBinding::UnresolvedType))
-    return T;
-
-  // Try to recover if we've made any progress.
-  if (parsedExpr &&
-      !isa<ErrorExpr>(parsedExpr) &&
-      parsedExpr->getType() &&
-      !parsedExpr->getType()->hasError() &&
-      (originalType.isNull() ||
-       !parsedExpr->getType()->isEqual(originalType))) {
-    return parsedExpr->getType();
-  }
-
-  return None;
-}
-
-/// Return the type of an expression parsed during code completion, or
-/// a null \c Type on error.
-Optional<Type> swift::getTypeOfCompletionContextExpr(
-                        ASTContext &Ctx,
-                        DeclContext *DC,
-                        CompletionTypeCheckKind kind,
-                        Expr *&parsedExpr,
-                        ConcreteDeclRef &referencedDecl) {
-  DiagnosticSuppression suppression(Ctx.Diags);
-
-  // Try to solve for the actual type of the expression.
-  return ::getTypeOfCompletionContextExpr(DC, kind, parsedExpr,
-                                          referencedDecl);
-}
-
-/// Return the type of operator function for specified LHS, or a null
-/// \c Type on error.
-FunctionType *
-swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                   Identifier opName, DeclRefKind refKind,
-                                   ConcreteDeclRef &referencedDecl) {
-  auto &ctx = DC->getASTContext();
-  DiagnosticSuppression suppression(ctx.Diags);
-  return TypeChecker::getTypeOfCompletionOperator(DC, LHS, opName, refKind,
-                                                  referencedDecl);
-}
-
-bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
-  auto &ctx = DC->getASTContext();
-  DiagnosticSuppression suppression(ctx.Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, Type(),
-                                                   CTP_Unused);
-  return !resultTy;
-}
-
 bool swift::typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
                                                SourceLoc TargetLoc) {
   auto &Ctx = AFD->getASTContext();
@@ -556,9 +481,4 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
-}
-
-LookupResult
-swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
-  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }

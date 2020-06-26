@@ -5787,16 +5787,9 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
   return cs.cacheType(arg);
 }
 
-static ClosureExpr *getClosureLiteralExpr(Expr *expr) {
+static bool isClosureLiteralExpr(Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
-
-  if (auto *captureList = dyn_cast<CaptureListExpr>(expr))
-    return captureList->getClosureBody();
-
-  if (auto *closure = dyn_cast<ClosureExpr>(expr))
-    return closure;
-
-  return nullptr;
+  return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
 }
 
 /// If the expression is an explicit closure expression (potentially wrapped in
@@ -7339,7 +7332,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // An immediate application of a closure literal is always noescape.
-  if (getClosureLiteralExpr(fn)) {
+  if (isClosureLiteralExpr(fn)) {
     if (auto fnTy = cs.getType(fn)->getAs<FunctionType>()) {
       fnTy = cast<FunctionType>(
         fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape()));

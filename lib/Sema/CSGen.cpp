@@ -3783,30 +3783,26 @@ namespace {
     }
   };
 
-  /// AST walker that "sanitizes" an expression for the
-  /// constraint-based type checker.
+  /// AST walker that "sanitizes" an expression for re-typechecking during
+  /// code completion.
   ///
-  /// This is necessary because Sema fills in too much type information before
-  /// the type-checker runs, causing redundant work, and for expression that
-  /// have already been typechecked and may contain unhandled AST nodes.
-  ///
-  /// FIXME: Remove this one we no longer re-type check expressions during
-  /// diagnostics and code completion.
+  /// FIXME: Remove this.
   class SanitizeExpr : public ASTWalker {
-    ConstraintSystem &CS;
+    ASTContext &C;
+    bool ShouldReusePrecheckedType;
     llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
 
   public:
-    SanitizeExpr(ConstraintSystem &cs) : CS(cs){ }
-
-    ASTContext &getASTContext() const { return CS.getASTContext(); }
+    SanitizeExpr(ASTContext &C,
+                 bool shouldReusePrecheckedType)
+      : C(C), ShouldReusePrecheckedType(shouldReusePrecheckedType) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       while (true) {
 
         // If we should reuse pre-checked types, don't sanitize the expression
         // if it's already type-checked.
-        if (CS.shouldReusePrecheckedType() && expr->getType())
+        if (ShouldReusePrecheckedType && expr->getType())
           return { false, expr };
 
         // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
@@ -3899,7 +3895,7 @@ namespace {
             };
 
             if (TE->isImplicit() && TE->getNumElements() == 1 &&
-                TE->getElementName(0) == getASTContext().Id_dynamicMember &&
+                TE->getElementName(0) == C.Id_dynamicMember &&
                 isImplicitKeyPathExpr(TE->getElement(0))) {
               auto *keyPathExpr = cast<KeyPathExpr>(TE->getElement(0));
               auto *componentExpr = keyPathExpr->getParsedPath();
@@ -3964,15 +3960,15 @@ namespace {
           argList.labels[0].empty() &&
           !isa<VarargExpansionExpr>(argList.args[0])) {
         auto *result =
-          new (getASTContext()) ParenExpr(argList.lParenLoc,
-                                          argList.args[0],
-                                          argList.rParenLoc,
-                                          argList.hasTrailingClosure);
+          new (C) ParenExpr(argList.lParenLoc,
+                            argList.args[0],
+                            argList.rParenLoc,
+                            argList.hasTrailingClosure);
         result->setImplicit();
         return result;
       }
 
-      return TupleExpr::create(getASTContext(),
+      return TupleExpr::create(C,
                                argList.lParenLoc,
                                argList.args,
                                argList.labels,
@@ -3983,32 +3979,18 @@ namespace {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      if (CS.hasType(expr)) {
-        Type type = CS.getType(expr);
-        if (type->hasOpenedExistential()) {
-          type = type.transform([&](Type type) -> Type {
-            if (auto archetype = type->getAs<OpenedArchetypeType>())
-              return archetype->getOpenedExistentialType();
-            return type;
-          });
-          CS.setType(expr, type);
-          // Set new type to the expression directly.
-          expr->setType(type);
-        }
-      }
-
       assert(!isa<ImplicitConversionExpr>(expr) &&
              "ImplicitConversionExpr should be eliminated in walkToExprPre");
 
       auto buildMemberRef = [&](Type memberType, Expr *base, SourceLoc dotLoc,
                                 ConcreteDeclRef member, DeclNameLoc memberLoc,
                                 bool implicit) -> Expr * {
-        auto *memberRef = new (getASTContext())
+        auto *memberRef = new (C)
             MemberRefExpr(base, dotLoc, member, memberLoc, implicit);
 
         if (memberType) {
           memberRef->setType(memberType);
-          return CS.cacheType(memberRef);
+          return memberRef;
         }
 
         return memberRef;
@@ -4195,7 +4177,8 @@ namespace {
 static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
                                     DeclContext *DC) {
   // Remove implicit conversions from the expression.
-  expr = expr->walk(SanitizeExpr(cs));
+  expr = expr->walk(SanitizeExpr(cs.getASTContext(),
+                                 cs.shouldReusePrecheckedType()));
 
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(cs, DC);
