@@ -415,28 +415,23 @@ extension Struct {
   var computedProperty: T { x }
 }
 extension Struct where T: Differentiable & AdditiveArithmetic {
-
-  @derivative(of: computedProperty.get)
+  @derivative(of: computedProperty)
   func vjpProperty() -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
     return (x, { v in .init(x: v) })
   }
   
-  // expected-error @+2 {{a derivative already exists for '_'}}
-  // expected-note @-6 {{other attribute declared here}}
-  @derivative(of: computedProperty)
-  func vjpProperty2() -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
-    return (x, { v in .init(x: v) })
+  @derivative(of: computedProperty.get)
+  func jvpProperty() -> (value: T, differential: (TangentVector) -> T.TangentVector) {
+    fatalError()
   }
   
-  //FIXME: Error: cannot differentiate void function.
-  /*
+  // expected-error @+1 {{'computedProperty' does not have a 'set' accessor}}
   @derivative(of: computedProperty.set)
   mutating func vjpPropertySetter(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
   ) {
     fatalError()
   }
-  */
 }
 
 // Test initializers.
@@ -550,9 +545,8 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
 
-
   // Error: original subscript has no setter.
-  // expected-error @+1 {{The set accessor has not been found in 'subscript(_:)'}}
+  // expected-error @+1 {{'subscript(_:)' does not have a 'set' accessor}}
   @derivative(of: subscript(_:).set, wrt: self)
   mutating func vjpSubscriptGeneric_NoSetter<T: Differentiable>(x: T) -> (
     value: T, pullback: (T.TangentVector) -> TangentVector
@@ -608,7 +602,7 @@ func jvpDuplicate2(_ x: Float) -> (value: Float, differential: (Float) -> Float)
 // Test invalid original declaration kind.
 
 var globalVariable: Float
-// expected-error @+1 {{'globalVariable' is not a 'func', 'init', 'subscript', or 'var' computed property declaration}}
+// expected-error @+1 {{'globalVariable' does not have a 'get' accessor}}
 @derivative(of: globalVariable)
 func invalidOriginalDeclaration(x: Float) -> (
   value: Float, differential: (Float) -> (Float)
@@ -1079,23 +1073,4 @@ func internal_original_fileprivate_derivative(_ x: Float) -> Float { x }
 // expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-12=internal}}
 fileprivate func _internal_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
-}
-
-
-// Test nested types
-
-extension Class {
-  class nestedClass {
-    func nestedClassFunc() -> Float {
-      return 1
-    }
-  }
-}
-
-extension Class where T: Differentiable {
-  // expected-error @+1 {{'nestedClassFunc' is not defined in the current type context}}
-  @derivative(of: Class.nestedClass.nestedClassFunc)
-  func nestedDerivative() -> (value: Float, pullback: (Float) -> TangentVector) {
-    return (1, {_ in .zero })
-  } 
 }

@@ -3621,7 +3621,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     const std::function<void()> &noneValidDiagnostic,
     const std::function<void()> &ambiguousDiagnostic,
     const std::function<void()> &notFunctionDiagnostic,
-    const std::function<void()> &notAccessorDiagnostic,
+    const std::function<void()> &missingAccessorDiagnostic,
     NameLookupOptions lookupOptions,
     const Optional<std::function<bool(AbstractFunctionDecl *)>>
         &hasValidTypeCtx,
@@ -3647,7 +3647,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
   bool wrongTypeContext = false;
   bool ambiguousFuncDecl = false;
   bool foundInvalid = false;
-  bool notAccessor = false;
+  bool missingAccessor = false;
 
   // Filter lookup results.
   for (auto choice : results) {
@@ -3656,15 +3656,16 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
       continue;
     // Cast the candidate to an `AbstractFunctionDecl`.
     auto *candidate = dyn_cast<AbstractFunctionDecl>(decl);
-    // If the candidate is an `AbstractStorageDecl`, use its getter as the
-    // candidate.
+    // If the candidate is an `AbstractStorageDecl`, use one of its accessors as
+    // the candidate.
     if (auto *asd = dyn_cast<AbstractStorageDecl>(decl)) {
-      if (accessorKind != None) {
-        candidate = asd->getAccessor(accessorKind.getValue());
-        if (!candidate)
-          notAccessor = true;
-      } else
-        candidate = asd->getAccessor(AccessorKind::Get);
+      // If accessor kind is specified, use corresponding accessor from the
+      // candidate. Otherwise, use the getter by default.
+      candidate =
+          asd->getOpaqueAccessor(accessorKind.getValueOr(AccessorKind::Get));
+      // Error if candidate is missing the requested accessor.
+      if (!candidate)
+        missingAccessor = true;
     }
     if (!candidate) {
       notFunction = true;
@@ -3699,6 +3700,10 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     ambiguousDiagnostic();
     return nullptr;
   }
+  if (missingAccessor) {
+    missingAccessorDiagnostic();
+    return nullptr;
+  }
   if (wrongTypeContext) {
     assert(invalidTypeCtxDiagnostic &&
            "Type context diagnostic should've been specified");
@@ -3707,11 +3712,6 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
   }
   if (foundInvalid) {
     noneValidDiagnostic();
-    return nullptr;
-  }
-
-  if (notAccessor) {
-    notAccessorDiagnostic();
     return nullptr;
   }
   assert(notFunction && "Expected 'not a function' error");
@@ -4448,12 +4448,10 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                    diag::autodiff_attr_original_decl_invalid_kind,
                    originalName.Name);
   };
-
-  auto notAccessorDiagnostic = [&]() {
-    auto accessorLabel = originalName.AccessorKind != None ?
-                         getAccessorLabel(originalName.AccessorKind.getValue()) : "get";
-    diags.diagnose(originalName.Loc,
-             diag::autodiff_attr_accessor_not_found,
+  auto missingAccessorDiagnostic = [&]() {
+    auto accessorKind = originalName.AccessorKind.getValueOr(AccessorKind::Get);
+    auto accessorLabel = getAccessorLabel(accessorKind);
+    diags.diagnose(originalName.Loc, diag::autodiff_attr_accessor_not_found,
              originalName.Name, accessorLabel);
   };
 
@@ -4501,10 +4499,11 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Look up original function.
   auto *originalAFD = findAbstractFunctionDecl(
-      originalName.Name, originalName.Loc.getBaseNameLoc(), originalName.AccessorKind,
+      originalName.Name, originalName.Loc.getBaseNameLoc(),
+      originalName.AccessorKind,
       baseType, derivativeTypeCtx, isValidOriginal, noneValidDiagnostic,
-      ambiguousDiagnostic, notFunctionDiagnostic, notAccessorDiagnostic, lookupOptions,
-      hasValidTypeContext, invalidTypeContextDiagnostic);
+      ambiguousDiagnostic, notFunctionDiagnostic, missingAccessorDiagnostic,
+      lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!originalAFD)
     return true;
   // Diagnose original stored properties. Stored properties cannot have custom
@@ -5026,12 +5025,10 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
              diag::autodiff_attr_original_decl_invalid_kind,
              originalName.Name);
   };
-
-  auto notAccessorDiagnostic = [&]() {
-    auto accessorLabel = originalName.AccessorKind != None ?
-                         getAccessorLabel(originalName.AccessorKind.getValue()) : "get";
-    diagnose(originalName.Loc,
-             diag::autodiff_attr_accessor_not_found,
+  auto missingAccessorDiagnostic = [&]() {
+    auto accessorKind = originalName.AccessorKind.getValueOr(AccessorKind::Get);
+    auto accessorLabel = getAccessorLabel(accessorKind);
+    diagnose(originalName.Loc, diag::autodiff_attr_accessor_not_found,
              originalName.Name, accessorLabel);
   };
 
@@ -5067,7 +5064,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto *originalAFD = findAbstractFunctionDecl(
       originalName.Name, funcLoc, originalName.AccessorKind, baseType,
       transposeTypeCtx, isValidOriginal, noneValidDiagnostic,
-      ambiguousDiagnostic, notFunctionDiagnostic, notAccessorDiagnostic,
+      ambiguousDiagnostic, notFunctionDiagnostic, missingAccessorDiagnostic,
       lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!originalAFD) {
     attr->setInvalid();

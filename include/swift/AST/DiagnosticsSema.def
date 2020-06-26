@@ -3130,7 +3130,7 @@ ERROR(autodiff_attr_original_decl_invalid_kind,none,
       "%0 is not a 'func', 'init', 'subscript', or 'var' computed property "
       "declaration", (DeclNameRef))
 ERROR(autodiff_attr_accessor_not_found,none,
-      "The %1 accessor has not been found in %0", (DeclNameRef, StringRef))
+      "%0 does not have a '%1' accessor", (DeclNameRef, StringRef))
 ERROR(autodiff_attr_original_decl_none_valid_found,none,
       "could not find function %0 with expected type %1", (DeclNameRef, Type))
 ERROR(autodiff_attr_original_decl_not_same_type_context,none,
