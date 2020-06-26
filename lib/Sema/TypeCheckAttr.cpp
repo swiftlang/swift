@@ -1900,17 +1900,13 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   }
 
   auto funcDeclRef = ConcreteDeclRef(mainFunction, substitutionMap);
-  auto *funcDeclRefExpr = new (context) DeclRefExpr(
-      funcDeclRef, DeclNameLoc(location), /*Implicit*/ true);
-  funcDeclRefExpr->setImplicit(true);
-  funcDeclRefExpr->setType(mainFunction->getInterfaceType());
 
-  auto *dotSyntaxCallExpr = new (context) DotSyntaxCallExpr(
-      funcDeclRefExpr, /*DotLoc*/ SourceLoc(), typeExpr, voidToVoidFunctionType);
-  dotSyntaxCallExpr->setImplicit(true);
-  dotSyntaxCallExpr->setThrows(mainFunctionThrows);
+  auto *memberRefExpr = new (context) MemberRefExpr(
+      typeExpr, SourceLoc(), funcDeclRef, DeclNameLoc(location),
+      /*Implicit*/ true);
+  memberRefExpr->setImplicit(true);
 
-  auto *callExpr = CallExpr::createImplicit(context, dotSyntaxCallExpr, {}, {});
+  auto *callExpr = CallExpr::createImplicit(context, memberRefExpr, {}, {});
   callExpr->setImplicit(true);
   callExpr->setThrows(mainFunctionThrows);
   callExpr->setType(context.TheEmptyTupleType);
