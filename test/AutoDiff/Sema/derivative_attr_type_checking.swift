@@ -558,6 +558,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
 extension Class {
   subscript() -> Float {
     get { 1 }
+    // expected-note @+1 {{'subscript()' declared here}}
     set {}
   }
 }
@@ -574,9 +575,11 @@ extension Class where T: Differentiable {
     return (1, { _ in .zero })
   }
 
-  // FIXME: Change derivative type calculation rules for functions with class-typed parameters.
-  // We need to assume that all functions taking class-typed operands may mutate those operands.
-  // Related to TF-1175.
+  // FIXME(SR-13096): Enable derivative registration for class property/subscript setters.
+  // This requires changing derivative type calculation rules for functions with
+  // class-typed parameters. We need to assume that all functions taking
+  // class-typed operands may mutate those operands.
+  // expected-error @+1 {{cannot yet register derivative for class property or subscript setters}}
   @derivative(of: subscript.set)
   func vjpSubscriptSetter(_ newValue: Float) -> (
     value: (), pullback: (inout TangentVector) -> Float

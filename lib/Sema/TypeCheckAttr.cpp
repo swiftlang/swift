@@ -4506,14 +4506,26 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!originalAFD)
     return true;
-  // Diagnose original stored properties. Stored properties cannot have custom
-  // registered derivatives.
+
   if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
+    // Diagnose original stored properties. Stored properties cannot have custom
+    // registered derivatives.
     auto *asd = accessorDecl->getStorage();
     if (asd->hasStorage()) {
       diags.diagnose(originalName.Loc,
                      diag::derivative_attr_original_stored_property_unsupported,
                      originalName.Name);
+      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
+                     asd->getName());
+      return true;
+    }
+    // Diagnose original class property and subscript setters.
+    // TODO(SR-13096): Fix derivative function typing results regarding
+    // class-typed function parameters.
+    if (asd->getDeclContext()->getSelfClassDecl() &&
+        accessorDecl->getAccessorKind() == AccessorKind::Set) {
+      diags.diagnose(originalName.Loc,
+                     diag::derivative_attr_class_setter_unsupported);
       diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
                      asd->getName());
       return true;
