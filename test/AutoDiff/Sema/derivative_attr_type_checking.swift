@@ -552,8 +552,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
 
 
   // Error: original subscript has no setter.
-  // FIXME: Improve diagnostic. The current one makes no sense.
-  // expected-error @+1 {{'subscript(_:)' is not a 'func', 'init', 'subscript', or 'var' computed property declaration}}
+  // expected-error @+1 {{The set accessor has not been found in 'subscript(_:)'}}
   @derivative(of: subscript(_:).set, wrt: self)
   mutating func vjpSubscriptGeneric_NoSetter<T: Differentiable>(x: T) -> (
     value: T, pullback: (T.TangentVector) -> TangentVector
