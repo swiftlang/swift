@@ -900,6 +900,12 @@ namespace {
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
       printCommon(EED, "enum_element_decl");
+      if (auto *paramList = EED->getParameterList()) {
+        Indent += 2;
+        OS << "\n";
+        printParameterList(paramList);
+        Indent -= 2;
+      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -1011,7 +1017,7 @@ namespace {
       if (P->isAutoClosure())
         OS << " autoclosure";
 
-      if (P->isNonEphemeral())
+      if (P->getAttrs().hasAttribute<NonEphemeralAttr>())
         OS << " nonEphemeral";
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
@@ -1038,11 +1044,6 @@ namespace {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ParameterColor) << "parameter_list";
-      Indent += 2;
-      for (auto P : *params) {
-        OS << '\n';
-        printParameter(P);
-      }
 
       if (!ctx && params->size() != 0 && params->get(0))
         ctx = &params->get(0)->getASTContext();
@@ -1056,8 +1057,14 @@ namespace {
         }
       }
 
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      Indent += 2;
+      for (auto P : *params) {
+        OS << '\n';
+        printParameter(P);
+      }
       Indent -= 2;
+
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {

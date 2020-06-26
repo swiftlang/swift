@@ -6318,6 +6318,36 @@ SourceRange ParamDecl::getSourceRange() const {
   return startLoc;
 }
 
+bool ParamDecl::isNonEphemeral() const {
+  if (getAttrs().hasAttribute<NonEphemeralAttr>())
+    return true;
+
+  // Only enum element parameters are non-ephemeral without '@_nonEphemeral'.
+  auto *parentDecl = getDeclContext()->getAsDecl();
+  if (!parentDecl || !isa<EnumElementDecl>(parentDecl))
+    return false;
+
+  // Only pointer parameters can be non-ephemeral.
+  auto ty = getInterfaceType();
+  if (!ty->lookThroughSingleOptionalType()->getAnyPointerElementType())
+    return false;
+
+  return true;
+}
+
+void ParamDecl::setNonEphemeralIfPossible() {
+  assert(hasInterfaceType() && "Must be pre-typechecked.");
+  // Don't apply the attribute if this isn't a pointer param.
+  auto type = getInterfaceType();
+  if (!type->lookThroughSingleOptionalType()->getAnyPointerElementType())
+    return;
+
+  if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
+    auto &ctx = getASTContext();
+    getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
+  }
+}
+
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   TypeBase *T = VarArgT.getPointer();
   if (auto *AT = dyn_cast<ArraySliceType>(T))
