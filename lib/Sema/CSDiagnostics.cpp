@@ -446,6 +446,32 @@ bool MissingConformanceFailure::diagnoseAsError() {
     }
   }
 
+  // If the problem has been (unambiguously) determined to be related
+  // to one of of the standard comparison operators and argument is
+  // enum with associated values, let's produce a tailored note which
+  // says that conformances for enums with associated values can't be
+  // synthesized.
+  if (isStandardComparisonOperator(anchor)) {
+    auto isEnumWithAssociatedValues = [](Type type) -> bool {
+      if (auto *enumType = type->getAs<EnumType>())
+        return !enumType->getDecl()->hasOnlyCasesWithoutAssociatedValues();
+      return false;
+    };
+
+    // Limit this to `Equatable` and `Comparable` protocols for now.
+    auto *protocol = getRHS()->castTo<ProtocolType>()->getDecl();
+    if (isEnumWithAssociatedValues(getLHS()) &&
+        (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+         protocol->isSpecificProtocol(KnownProtocolKind::Comparable))) {
+      if (RequirementFailure::diagnoseAsError()) {
+        auto opName = getOperatorName(anchor);
+        emitDiagnostic(diag::no_binary_op_overload_for_enum_with_payload,
+                       opName->str());
+        return true;
+      }
+    }
+  }
+
   if (diagnoseAsAmbiguousOperatorRef())
     return true;
 
