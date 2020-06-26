@@ -862,7 +862,7 @@ extension Dictionary {
   ///     let message = "Hello, Elle!"
   ///     var letterCounts: [Character: Int] = [:]
   ///     for letter in message {
-  ///         letterCounts[letter, defaultValue: 0] += 1
+  ///         letterCounts[letter, default: 0] += 1
   ///     }
   ///     // letterCounts == ["H": 1, "e": 2, "l": 4, "o": 1, ...]
   ///
