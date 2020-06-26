@@ -1208,8 +1208,8 @@ public:
     ImmutableTextSnapshotRef InputSnap;
     if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(InputFile))
       InputSnap = EditorDoc->getLatestSnapshot();
-      if (!InputSnap)
-        return false;
+    if (!InputSnap)
+      return false;
 
     auto mappedBackOffset = [&]()->llvm::Optional<unsigned> {
       for (auto &Snap : Snapshots) {
