@@ -176,7 +176,7 @@ void SwiftLangSupport::getConformingMethodList(
 
   if (!swiftConformingMethodListImpl(*this, UnresolvedInputFile, Offset, Args,
                                      ExpectedTypeNames, Consumer, fileSystem,
-                                     /*EnableASTCaching=*/false, error)) {
+                                     /*EnableASTCaching=*/true, error)) {
     SKConsumer.failed(error);
   }
 }
