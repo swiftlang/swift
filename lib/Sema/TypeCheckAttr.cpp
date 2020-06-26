@@ -4450,7 +4450,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     auto accessorKind = originalName.AccessorKind.getValueOr(AccessorKind::Get);
     auto accessorLabel = getAccessorLabel(accessorKind);
     diags.diagnose(originalName.Loc, diag::autodiff_attr_accessor_not_found,
-             originalName.Name, accessorLabel);
+                   originalName.Name, accessorLabel);
   };
 
   std::function<void()> invalidTypeContextDiagnostic = [&]() {
@@ -4498,10 +4498,10 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   // Look up original function.
   auto *originalAFD = findAbstractFunctionDecl(
       originalName.Name, originalName.Loc.getBaseNameLoc(),
-      originalName.AccessorKind,
-      baseType, derivativeTypeCtx, isValidOriginal, noneValidDiagnostic,
-      ambiguousDiagnostic, notFunctionDiagnostic, missingAccessorDiagnostic,
-      lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
+      originalName.AccessorKind, baseType, derivativeTypeCtx, isValidOriginal,
+      noneValidDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
+      missingAccessorDiagnostic, lookupOptions, hasValidTypeContext,
+      invalidTypeContextDiagnostic);
   if (!originalAFD)
     return true;
 
