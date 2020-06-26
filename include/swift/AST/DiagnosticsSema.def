@@ -1741,6 +1741,10 @@ ERROR(spi_attribute_on_protocol_requirement,none,
 ERROR(spi_attribute_on_frozen_stored_properties,none,
       "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
       (DeclName))
+ERROR(default_spi_attribute_on_non_import,none,
+      "%0 %1 needs an SPI identifier; "
+      "only import declarations can use an empty '@_spi'",
+      (DescriptiveDeclKind, DeclName))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,

@@ -8,6 +8,7 @@
 @_spi(+) public func invalidSPIName() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 @_spi(🤔) public func emojiNamedSPI() {}
 @_spi() public func emptyParensSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
+@_spi public func defaultSPI() {} // expected-error {{global function 'defaultSPI()' needs an SPI identifier; only import declarations can use an empty '@_spi'}} {{1-7=}}
 @_spi(set) public func keywordSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 
 @_spi(S) public class SPIClass {} // expected-note 2 {{type declared here}}

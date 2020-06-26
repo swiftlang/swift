@@ -2221,7 +2221,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       SmallVector<IdentifierID, 4> spis;
       for (auto spi : theAttr->getSPIGroups()) {
-        assert(!spi.empty() && "Empty SPI name");
+        assert(!spi.empty() && "Empty SPI name on a non-import decl");
         spis.push_back(S.addDeclBaseNameRef(spi));
       }
 

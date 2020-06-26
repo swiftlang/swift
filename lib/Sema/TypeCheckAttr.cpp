@@ -917,6 +917,17 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
                                 VD->getName());
+
+    // Allow the default @_spi on imports only.
+    if (!isa<ImportDecl>(D)) {
+      for (Identifier spi : attr->getSPIGroups())
+        if (spi.empty()) {
+          diagnoseAndRemoveAttr(attr,
+                                diag::default_spi_attribute_on_non_import,
+                                VD->getDescriptiveKind(), VD->getName());
+          break;
+        }
+    }
   }
 }
 
