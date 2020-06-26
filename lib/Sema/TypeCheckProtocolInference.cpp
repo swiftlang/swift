@@ -868,32 +868,32 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
   return defaultType;
 }
 
-Type AssociatedTypeInference::computeDerivedTypeWitness(
+std::pair<Type, TypeDecl *>
+AssociatedTypeInference::computeDerivedTypeWitness(
                                               AssociatedTypeDecl *assocType) {
   if (adoptee->hasError())
-    return Type();
+    return std::make_pair(Type(), nullptr);
 
   // Can we derive conformances for this protocol and adoptee?
   NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
   if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
                                                       proto))
-    return Type();
+    return std::make_pair(Type(), nullptr);
 
   // Try to derive the type witness.
-  Type derivedType =
-      TypeChecker::deriveTypeWitness(dc, derivingTypeDecl, assocType);
-  if (!derivedType)
-    return Type();
+  auto result = TypeChecker::deriveTypeWitness(dc, derivingTypeDecl, assocType);
+  if (!result.first)
+    return std::make_pair(Type(), nullptr);
 
-  // Make sure that the derived type is sane.
-  if (checkTypeWitness(derivedType, assocType, conformance)) {
+  // Make sure that the derived type satisfies requirements.
+  if (checkTypeWitness(result.first, assocType, conformance)) {
     /// FIXME: Diagnose based on this.
     failedDerivedAssocType = assocType;
-    failedDerivedWitness = derivedType;
-    return Type();
+    failedDerivedWitness = result.first;
+    return std::make_pair(Type(), nullptr);
   }
 
-  return derivedType;
+  return result;
 }
 
 Type
@@ -907,10 +907,6 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   // If we can form a default type, do so.
   if (Type defaultType = computeDefaultTypeWitness(assocType))
     return defaultType;
-
-  // If we can derive a type witness, do so.
-  if (Type derivedType = computeDerivedTypeWitness(assocType))
-    return derivedType;
 
   // If there is a generic parameter of the named type, use that.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
@@ -1876,10 +1872,23 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
       continue;
 
     case ResolveWitnessResult::Missing:
-      // Note that we haven't resolved this associated type yet.
-      unresolvedAssocTypes.insert(assocType);
+      // We did not find the witness via name lookup. Try to derive
+      // it below.
       break;
     }
+
+    // Finally, try to derive the witness if we know how.
+    auto derivedType = computeDerivedTypeWitness(assocType);
+    if (derivedType.first) {
+      checker.recordTypeWitness(assocType,
+                                derivedType.first->mapTypeOutOfContext(),
+                                derivedType.second);
+      continue;
+    }
+
+    // We failed to derive the witness. We're going to go on to try
+    // to infer it from potential value witnesses next.
+    unresolvedAssocTypes.insert(assocType);
   }
 
   // Result variable to use for returns so that we get NRVO.

@@ -822,7 +822,8 @@ private:
 
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
-  Type computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
+  std::pair<Type, TypeDecl *>
+  computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Compute a type witness without using a specific potential witness,
   /// e.g., using a fixed type (from a refined protocol), default type

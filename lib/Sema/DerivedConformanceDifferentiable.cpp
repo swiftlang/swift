@@ -814,7 +814,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
 }
 
 /// Get or synthesize `TangentVector` struct type.
-static Type
+static std::pair<Type, TypeDecl *>
 getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
   auto *parentDC = derived.getConformanceContext();
   auto *nominal = derived.Nominal;
@@ -824,17 +824,20 @@ getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
   auto *tangentStruct =
       getOrSynthesizeTangentVectorStruct(derived, C.Id_TangentVector);
   if (!tangentStruct)
-    return nullptr;
+    return std::make_pair(nullptr, nullptr);
+
   // Check and emit warnings for implicit `@noDerivative` members.
   checkAndDiagnoseImplicitNoDerivative(C, nominal, parentDC);
 
   // Return the `TangentVector` struct type.
-  return parentDC->mapTypeIntoContext(
-      tangentStruct->getDeclaredInterfaceType());
+  return std::make_pair(
+    parentDC->mapTypeIntoContext(
+      tangentStruct->getDeclaredInterfaceType()),
+    tangentStruct);
 }
 
 /// Synthesize the `TangentVector` struct type.
-static Type
+static std::pair<Type, TypeDecl *>
 deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
   auto *parentDC = derived.getConformanceContext();
   auto *nominal = derived.Nominal;
@@ -842,7 +845,7 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
   // If nominal type can derive `TangentVector` as the contextual `Self` type,
   // return it.
   if (canDeriveTangentVectorAsSelf(nominal, parentDC))
-    return parentDC->getSelfTypeInContext();
+    return std::make_pair(parentDC->getSelfTypeInContext(), nullptr);
 
   // Otherwise, get or synthesize `TangentVector` struct type.
   return getOrSynthesizeTangentVectorStructType(derived);
@@ -883,16 +886,17 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
   return nullptr;
 }
 
-Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
+std::pair<Type, TypeDecl *>
+DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
   // Diagnose unknown requirements.
   if (requirement->getBaseName() != Context.Id_TangentVector) {
     Context.Diags.diagnose(requirement->getLoc(),
                            diag::broken_differentiable_requirement);
-    return nullptr;
+    return std::make_pair(nullptr, nullptr);
   }
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
-    return nullptr;
+    return std::make_pair(nullptr, nullptr);
 
   // Start an error diagnostic before attempting derivation.
   // If derivation succeeds, cancel the diagnostic.
@@ -908,5 +912,5 @@ Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
   }
 
   // Otherwise, return nullptr.
-  return nullptr;
+  return std::make_pair(nullptr, nullptr);
 }
