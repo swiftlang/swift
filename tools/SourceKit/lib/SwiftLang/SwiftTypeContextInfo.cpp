@@ -151,7 +151,7 @@ void SwiftLangSupport::getExpressionContextInfo(
   } Consumer(SKConsumer);
 
   if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Consumer,
-                                Args, fileSystem, /*EnableASTCaching=*/false,
+                                Args, fileSystem, /*EnableASTCaching=*/true,
                                 error)) {
     SKConsumer.failed(error);
   }
