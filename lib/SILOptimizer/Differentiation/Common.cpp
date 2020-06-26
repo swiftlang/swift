@@ -378,7 +378,7 @@ void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
   auto zeroDeclLookup = additiveArithmeticProto->lookupDirect(astCtx.Id_zero);
   auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
   assert(zeroDecl->isProtocolRequirement());
-  auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
+  auto *accessorDecl = zeroDecl->getOpaqueAccessor(AccessorKind::Get);
   SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
   auto silFnType = typeConverter.getConstantType(
       TypeExpansionContext::minimal(), accessorDeclRef);
