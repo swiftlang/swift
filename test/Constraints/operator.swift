@@ -288,5 +288,6 @@ func rdar_62054241() {
 
   func test(_ arr: [Foo]) -> [Foo] {
     return arr.sorted(by: <) // expected-error {{no exact matches in reference to operator function '<'}}
+    // expected-note@-1 {{found candidate with type '(Foo, Foo) -> Bool'}}
   }
 }

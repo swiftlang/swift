@@ -1949,20 +1949,13 @@ private:
 
   /// The list of all generic requirements fixed along the current
   /// solver path.
-  using FixedRequirement = std::tuple<TypeBase *, RequirementKind, TypeBase *>;
-  SmallVector<FixedRequirement, 4> FixedRequirements;
+  using FixedRequirement =
+      std::tuple<GenericTypeParamType *, unsigned, TypeBase *>;
+  llvm::SmallSetVector<FixedRequirement, 4> FixedRequirements;
 
-  bool hasFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
-    auto reqInfo = std::make_tuple(lhs.getPointer(), kind, rhs.getPointer());
-    return llvm::any_of(
-        FixedRequirements,
-        [&reqInfo](const FixedRequirement &entry) { return entry == reqInfo; });
-  }
-
-  void recordFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
-    FixedRequirements.push_back(
-        std::make_tuple(lhs.getPointer(), kind, rhs.getPointer()));
-  }
+  bool isFixedRequirement(ConstraintLocator *reqLocator, Type requirementTy);
+  void recordFixedRequirement(ConstraintLocator *reqLocator,
+                              Type requirementTy);
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
@@ -3547,6 +3540,19 @@ public:
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
                           OpenedTypeMap *replacements = nullptr);
+
+  /// Retrieve a list of conformances established along the current solver path.
+  ArrayRef<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
+  getCheckedConformances() const {
+    return CheckedConformances;
+  }
+
+  /// Retrieve a list of generic parameter types solver has "opened" (replaced
+  /// with a type variable) along the current path.
+  ArrayRef<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>>
+  getOpenedTypes() const {
+    return OpenedTypes;
+  }
 
 private:
   /// Adjust the constraint system to accomodate the given selected overload, and
@@ -5164,6 +5170,10 @@ bool isArgumentOfReferenceEqualityOperator(ConstraintLocator *locator);
 /// Determine whether given expression is a reference to a
 /// pattern-matching operator `~=`
 bool isPatternMatchingOperator(Expr *expr);
+
+/// Determine whether given expression is a reference to a
+/// "standard" comparison operator such as "==", "!=", ">" etc.
+bool isStandardComparisonOperator(Expr *expr);
 
 /// If given expression references operator overlaod(s)
 /// extract and produce name of the operator.
