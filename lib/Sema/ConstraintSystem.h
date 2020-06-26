@@ -917,6 +917,7 @@ public:
           (lhs.storage.patternBindingEntry.index
              == rhs.storage.patternBindingEntry.index);
     }
+    llvm_unreachable("invalid SolutionApplicationTargetsKey kind");
   }
 
   friend bool operator!=(
@@ -951,6 +952,7 @@ public:
           DenseMapInfo<unsigned>::getHashValue(
               storage.patternBindingEntry.index));
     }
+    llvm_unreachable("invalid statement kind");
   }
 };
 
