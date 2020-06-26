@@ -898,8 +898,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
 
 Type
 AssociatedTypeInference::computeAbstractTypeWitness(
-                                              AssociatedTypeDecl *assocType,
-                                              bool allowDerived) {
+                                              AssociatedTypeDecl *assocType) {
   // We don't have a type witness for this associated type, so go
   // looking for more options.
   if (Type concreteType = computeFixedTypeWitness(assocType))
@@ -910,10 +909,8 @@ AssociatedTypeInference::computeAbstractTypeWitness(
     return defaultType;
 
   // If we can derive a type witness, do so.
-  if (allowDerived) {
-    if (Type derivedType = computeDerivedTypeWitness(assocType))
-      return derivedType;
-  }
+  if (Type derivedType = computeDerivedTypeWitness(assocType))
+    return derivedType;
 
   // If there is a generic parameter of the named type, use that.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
@@ -1197,8 +1194,7 @@ void AssociatedTypeInference::findSolutionsRec(
 
       // Try to compute the type without the aid of a specific potential
       // witness.
-      if (Type type = computeAbstractTypeWitness(assocType,
-                                                 /*allowDerived=*/true)) {
+      if (Type type = computeAbstractTypeWitness(assocType)) {
         if (type->hasError()) {
           recordMissing();
           return;
