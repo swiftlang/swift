@@ -74,39 +74,21 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
   FuncDecl *cmpFunc = C.getLessThanIntDecl();
   assert(cmpFunc && "should have a < for int as we already checked for it");
 
-  auto fnType = cmpFunc->getInterfaceType()->castTo<FunctionType>();
+  Expr *cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
+                                          /*implicit*/ true,
+                                          AccessSemantics::Ordinary);
 
-  Expr *cmpFuncExpr;
-  if (cmpFunc->getDeclContext()->isTypeContext()) {
-    auto contextTy = cmpFunc->getDeclContext()->getSelfInterfaceType();
-    Expr *base = TypeExpr::createImplicitHack(SourceLoc(), contextTy, C);
-    Expr *ref = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(), /*Implicit*/ true,
-                                    AccessSemantics::Ordinary, fnType);
-
-    fnType = fnType->getResult()->castTo<FunctionType>();
-    cmpFuncExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
-    cmpFuncExpr->setImplicit();
-  } else {
-    cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
-                                      /*implicit*/ true,
-                                      AccessSemantics::Ordinary,
-                                      fnType);
-  }
-
-  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true,
-                                         TupleType::get(abTupleElts, C));
+                                         /*Implicit*/ true);
 
   auto *cmpExpr = new (C) BinaryExpr(
-      cmpFuncExpr, abTuple, /*implicit*/ true,
-      fnType->castTo<FunctionType>()->getResult());
+      cmpFuncExpr, abTuple, /*implicit*/ true);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return { body, /*isTypeChecked=*/true };
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the
