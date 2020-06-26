@@ -1132,18 +1132,24 @@ namespace {
                                       TVO_CanBindToLValue |
                                       TVO_CanBindToNoEscape);
 
-      // Defaults to the type of the base expression if we have a base
-      // expression.
-      // FIXME: This is just to keep the old behavior where `foo(base.<HERE>)`
-      // the argument is type checked to the type of the 'base'. Ideally, code
-      // completion expression should be defauled to 'UnresolvedType'
-      // regardless of the existence of the base expression. But the constraint
-      // system is simply not ready for that.
       if (auto base = E->getBase()) {
+        // Defaults to the type of the base expression if we have a base
+        // expression.
+        // FIXME: This is just to keep the old behavior where `foo(base.<HERE>)`
+        // the argument is type checked to the type of the 'base'. Ideally, code
+        // completion expression should be defauled to 'UnresolvedType'
+        // regardless of the existence of the base expression. But the
+        // constraint system is simply not ready for that.
         CS.addConstraint(ConstraintKind::Defaultable, ty, CS.getType(base),
                          locator);
+
+        // Apply a viable solution even if it's ambiguous.
+        // FIXME: Remove this. This is a hack for code completion which only
+        // see solution applied AST. In future, code completion collects all
+        // viable solutions so we need to apply any solution at all.
+        CS.Options |= ConstraintSystemFlags::ForceApplyViableSolution;
       }
-      
+
       return ty;
     }
 

@@ -1207,6 +1207,10 @@ enum class ConstraintSystemFlags {
   /// for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x10,
+
+  /// For apply a viable solution even if they are ambiguous. So that the client
+  /// get a solution.
+  ForceApplyViableSolution = 0x20,
 };
 
 /// Options that affect the constraint system as a whole.
