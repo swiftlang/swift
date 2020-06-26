@@ -675,24 +675,6 @@ typeCheckExpression(constraints::SolutionApplicationTarget &target,
                     bool &unresolvedTypeExprs,
                     TypeCheckExprOptions options = TypeCheckExprOptions());
 
-/// Type check the given expression and return its type without
-/// applying the solution.
-///
-/// \param expr The expression to type-check.
-///
-/// \param referencedDecl Will be set to the declaration that is referenced by
-/// the expression.
-///
-/// \param allowFreeTypeVariables Whether free type variables are allowed in
-/// the solution, and what to do with them.
-///
-/// \returns the type of \p expr on success, Type() otherwise.
-/// FIXME: expr may still be modified...
-Type getTypeOfExpressionWithoutApplying(
-    Expr *&expr, DeclContext *dc, ConcreteDeclRef &referencedDecl,
-    FreeTypeVariableBinding allowFreeTypeVariables =
-        FreeTypeVariableBinding::Disallow);
-
 /// Return the type of operator function for specified LHS, or a null
 /// \c Type on error.
 FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,

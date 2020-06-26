@@ -268,16 +268,14 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
       if (auto *witness = confRef.getConcrete()->getWitnessDecl(requirement))
         memberWitnessDecl = witness;
     assert(memberWitnessDecl && "Member witness declaration must exist");
-    auto *memberMethodDRE = new (C)
-        DeclRefExpr(memberWitnessDecl, DeclNameLoc(), /*Implicit*/ true);
-    memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `self.<member>.move(along:)`.
     Expr *memberExpr =
         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);
     auto *memberMethodExpr =
-        new (C) DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberExpr);
+        new (C) MemberRefExpr(memberExpr, SourceLoc(), memberWitnessDecl,
+                              DeclNameLoc(), /*Implicit*/ true);
 
     // Create reference to parameter member: `direction.<member>`.
     VarDecl *paramMember = nullptr;
