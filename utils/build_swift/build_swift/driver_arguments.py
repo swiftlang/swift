@@ -572,7 +572,7 @@ def create_argument_parser():
     option(['--skstresstester'], store_true('build_skstresstester'),
            help='build the SourceKit stress tester')
 
-    option(['--swiftformat '], store_true('build_swiftformat'),
+    option(['--swiftformat'], store_true('build_swiftformat'),
            help='build swift-format')
 
     option(['--swiftevolve'], store_true('build_swiftevolve'),

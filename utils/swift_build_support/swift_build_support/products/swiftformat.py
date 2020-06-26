@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import platform
 
 from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
 
@@ -57,7 +56,7 @@ class SwiftFormat(product.Product):
             script_path,
             action,
             '--toolchain', self.install_toolchain_path(),
-            '--config', configuration,
+            '--configuration', configuration,
             '--build-path', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
             # There might have been a Package.resolved created by other builds
