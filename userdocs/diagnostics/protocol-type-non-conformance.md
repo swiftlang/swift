@@ -39,3 +39,28 @@ GenericStruct<AnotherProtocol>().faz()
 Constructing the instance of the struct `GenericStruct` with type `AnotherProtocol` will not compile because there is no concrete implementation for the static requirement of the protocol. 
 There is no implementation for for() used above.
 
+We, however have an exception for `@objc` protocols that conforms to itself as shown below
+
+```swift
+import Foundation
+
+@objc protocol SomeProtocol {
+  func foo()
+}
+
+class SomeClass : SomeProtocol {
+  func foo() {
+    print("foo called")
+  }
+}
+
+func faz<T : SomeProtocol>(_ t: T) {
+  t.foo()
+}
+
+let c: SomeProtocol = SomeClass()
+faz(c)
+```
+
+The function `faz` requires that `T` conforms to `SomeProtocol` and we can easily substitute in `SomeProtocol` for `T` because it has no static requirements.
+
