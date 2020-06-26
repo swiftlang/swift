@@ -1238,7 +1238,8 @@ static void performAddOnDiagnostics(BraceStmt *stmt, DeclContext *dc) {
           expr, dcStack.back(), /*isExprStmt=*/false);
 
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        if (closure->wasSeparatelyTypeChecked()) {
+        if (!closure->hasSingleExpressionBody() &&
+            !closure->hasAppliedFunctionBuilder()) {
           dcStack.push_back(closure);
           return { true, expr };
         }
@@ -1249,7 +1250,8 @@ static void performAddOnDiagnostics(BraceStmt *stmt, DeclContext *dc) {
 
     Expr *walkToExprPost(Expr *expr) override {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        if (closure->wasSeparatelyTypeChecked()) {
+        if (!closure->hasSingleExpressionBody() &&
+            !closure->hasAppliedFunctionBuilder()) {
           assert(dcStack.back() == closure);
           dcStack.pop_back();
         }
