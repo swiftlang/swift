@@ -1,3 +1,4 @@
+// REQUIRES: rdar64812676
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/range-lifecycle/* %t && cp %t/fileB{0-baseline,}.swift
 
