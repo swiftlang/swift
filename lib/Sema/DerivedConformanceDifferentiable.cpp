@@ -729,34 +729,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   return structDecl;
 }
 
-/// Add a typealias declaration with the given name and underlying target
-/// struct type to the given source nominal declaration context.
-static void addAssociatedTypeAliasDecl(Identifier name, DeclContext *sourceDC,
-                                       StructDecl *target,
-                                       ASTContext &Context) {
-  auto *nominal = sourceDC->getSelfNominalTypeDecl();
-  assert(nominal && "Expected `DeclContext` to be a nominal type");
-  auto lookup = nominal->lookupDirect(name);
-  assert(lookup.size() < 2 &&
-         "Expected at most one associated type named member");
-  // If implicit type declaration with the given name already exists in source
-  // struct, return it.
-  if (lookup.size() == 1) {
-    auto existingTypeDecl = dyn_cast<TypeDecl>(lookup.front());
-    assert(existingTypeDecl && existingTypeDecl->isImplicit() &&
-           "Expected lookup result to be an implicit type declaration");
-    return;
-  }
-  // Otherwise, create a new typealias.
-  auto *aliasDecl = new (Context)
-      TypeAliasDecl(SourceLoc(), SourceLoc(), name, SourceLoc(), {}, sourceDC);
-  aliasDecl->setUnderlyingType(target->getDeclaredInterfaceType());
-  aliasDecl->setImplicit();
-  aliasDecl->setGenericSignature(sourceDC->getGenericSignatureOfContext());
-  cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
-  aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-};
-
 /// Diagnose stored properties in the nominal that do not have an explicit
 /// `@noDerivative` attribute, but either:
 /// - Do not conform to `Differentiable`.
@@ -855,9 +827,6 @@ getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
     return nullptr;
   // Check and emit warnings for implicit `@noDerivative` members.
   checkAndDiagnoseImplicitNoDerivative(C, nominal, parentDC);
-  // Add `TangentVector` typealias for `TangentVector` struct.
-  addAssociatedTypeAliasDecl(C.Id_TangentVector, tangentStruct, tangentStruct,
-                             C);
 
   // Return the `TangentVector` struct type.
   return parentDC->mapTypeIntoContext(
