@@ -405,10 +405,7 @@ deriveBodyDifferentiable_zeroTangentVectorInitializer(
                               DeclNameLoc(), /*Implicit*/ true);
 
     // Create closure expression.
-    DiscriminatorFinder DF;
-    for (Decl *D : parentDC->getParentSourceFile()->getTopLevelDecls())
-      D->walk(DF);
-    auto discriminator = DF.getNextDiscriminator();
+    unsigned discriminator = 0;
     auto resultTy = funcDecl->getMethodInterfaceType()
                         ->castTo<AnyFunctionType>()
                         ->getResult();
@@ -519,10 +516,7 @@ deriveBodyDifferentiable_zeroTangentVectorInitializer(
 
   // Create closure expression:
   // `{ TangentVector(x: x_zeroTangentVectorInitializer(), ...) }`.
-  DiscriminatorFinder DF;
-  for (Decl *D : parentDC->getParentSourceFile()->getTopLevelDecls())
-    D->walk(DF);
-  auto discriminator = DF.getNextDiscriminator();
+  unsigned discriminator = 0;
   auto resultTy = funcDecl->getMethodInterfaceType()
                       ->castTo<AnyFunctionType>()
                       ->getResult();

@@ -331,7 +331,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
   ASTContext &ctx = witness->getASTContext();
   auto *witnessAFD = dyn_cast<AbstractFunctionDecl>(witness);
   if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness))
-    witnessAFD = witnessASD->getAccessor(AccessorKind::Get);
+    witnessAFD = witnessASD->getOpaqueAccessor(AccessorKind::Get);
   // NOTE: Validate `@differentiable` attributes by calling
   // `getParameterIndices`. This is important for type-checking
   // `@differentiable` attributes in non-primary files to skip invalid
@@ -2935,7 +2935,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
       // wondering why a conformance fails.
       if (!AdopterIsClass)
         if (const auto VD = dyn_cast<VarDecl>(Requirement))
-          if (const auto Set = VD->getAccessor(AccessorKind::Set))
+          if (const auto Set = VD->getOpaqueAccessor(AccessorKind::Set))
             if (Set->getAttrs().hasAttribute<NonMutatingAttr>())
               Options.PrintPropertyAccessors = true;
     }
