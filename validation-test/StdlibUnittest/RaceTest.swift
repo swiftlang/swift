@@ -1,3 +1,4 @@
+// REQUIRES: rdar64809498
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
 // RUN: %target-run %t.out | %FileCheck %s
 // REQUIRES: stress_test
