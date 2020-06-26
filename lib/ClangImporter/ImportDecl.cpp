@@ -1277,11 +1277,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), call, /*implicit*/ true);
   assign->setType(emptyTuple);
 
-  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
-                                       /*Implicit=*/true);
-  result->setType(emptyTuple);
-
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), nullptr, /*Implicit=*/true);
 
   // Create the function body.
   auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
