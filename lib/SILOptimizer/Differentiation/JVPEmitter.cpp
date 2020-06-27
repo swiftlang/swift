@@ -1412,7 +1412,7 @@ void JVPEmitter::visitReturnInst(ReturnInst *ri) {
         /*withoutActuallyEscaping*/ false);
   } else {
     // When `diag::autodiff_loadable_value_addressonly_tangent_unsupported`
-    // applies, the return type may be ABI-incomaptible with the type of the
+    // applies, the return type may be ABI-incompatible with the type of the
     // partially applied differential. In these cases, produce an undef and rely
     // on other code to emit a diagnostic.
     differentialValue = SILUndef::get(differentialType, *jvp);

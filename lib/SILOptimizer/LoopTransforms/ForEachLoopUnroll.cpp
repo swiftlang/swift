@@ -31,7 +31,7 @@
 //         - There are no forEach calls on the array.
 //         - The array is too large to unroll forEach calls. This check uses
 //            SILModule::UnrollThreshold parameter.
-//    If none of the above conditions hold, procede to unrolling every forEach
+//    If none of the above conditions hold, proceed to unrolling every forEach
 //    call on the array (Step 3). Step 2 is implemented in the function:
 //    `tryUnrollForEachCallsOverArrayLiteral`.
 //
@@ -47,7 +47,7 @@
 //
 //    Secondly, the body closure uses @in_guaranteed convention for the
 //    parameter. Therefore, an alloc_stack is created before the unrolled code
-//    begins to hold the elements, and is destoryed once the unrolled code ends.
+//    begins to hold the elements, and is destroyed once the unrolled code ends.
 //
 //    Thirdly, the body closure throws. Hence, it has to be try_applied. This
 //    means that we need to chain the try_applies in such a way that when the

@@ -118,7 +118,7 @@ void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
 void SILGenFunction::mergeCleanupBlocks() {
   for (auto bbPos = F.begin(), bbEnd = F.end(), nextPos = bbPos; bbPos != bbEnd;
        bbPos = nextPos) {
-    // A forward iterator refering to the next unprocessed block in the block
+    // A forward iterator referring to the next unprocessed block in the block
     // list. If blocks are merged and moved, then this will be updated.
     nextPos = std::next(bbPos);
 
@@ -142,7 +142,7 @@ void SILGenFunction::mergeCleanupBlocks() {
     auto beforeSucc = std::next(SILFunction::reverse_iterator(succBB));
 
     // Remember the position before the current predecessor to avoid skipping
-    // blocks or revisiting blocks unnecessarilly.
+    // blocks or revisiting blocks unnecessarily.
     auto beforePred = std::next(SILFunction::reverse_iterator(predBB));
     // Since succBB will be erased, move before it.
     if (beforePred == SILFunction::reverse_iterator(succBB))

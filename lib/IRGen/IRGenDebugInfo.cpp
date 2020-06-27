@@ -1307,7 +1307,7 @@ private:
                                 llvm::dwarf::DW_LANG_Swift, MangledName);
       else
         // No line numbers are attached to type forward declarations.  This is
-        // intentional: It interfers with the efficacy of incremental builds. We
+        // intentional: It interferes with the efficacy of incremental builds. We
         // don't want a whitespace change to an secondary file trigger a
         // recompilation of the debug info of a primary source file.
         return createOpaqueStruct(Scope, Decl->getName().str(), File,
@@ -1807,7 +1807,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // command line. This does not include any macros defined by ClangImporter.
   llvm::raw_svector_ostream OS(ConfigMacros);
   unsigned I = 0;
-  // Translate the macro definitions back into a commmand line.
+  // Translate the macro definitions back into a command line.
   for (auto &Macro : Opts.ClangDefines) {
     if (++I > 1)
       OS << ' ';

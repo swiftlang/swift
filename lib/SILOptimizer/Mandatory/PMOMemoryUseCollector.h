@@ -33,7 +33,7 @@
 /// all of the various cases that made it difficult to understand which code was
 /// needed for Predictable Mem Opts and what was needed for DI. The introduction
 /// of the SIL ownership model to SIL was used as an opportunity to split the
-/// two, flatten the sphagetti conditional code so the logic was clear, and
+/// two, flatten the spaghetti conditional code so the logic was clear, and
 /// allow the two passes to diverge and hew their form closer to their function.
 ///
 //===----------------------------------------------------------------------===//

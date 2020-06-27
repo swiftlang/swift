@@ -1247,7 +1247,7 @@ void IRGenModule::emitAutolinkInfo() {
         getLLVMContext(), EntriesString, /*AddNull=*/false);
     // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
     // to get the linker to drop it in the final linked binary.
-    // LLVM doesn't provide an interface to specify section attributs in the IR
+    // LLVM doesn't provide an interface to specify section attributes in the IR
     // so we pass the attribute with inline assembly.
     if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
       Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"

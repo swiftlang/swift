@@ -163,7 +163,7 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
         if (potentialEscapePoints.count(inst) != 0) {
           if (auto *store = dyn_cast<StoreInst>(inst)) {
             // Don't immediately bail on a store instruction. Instead, remember
-            // it and check if it interfers with any (potential) load.
+            // it and check if it interferes with any (potential) load.
             storeAddrs.insert(store->getDest());
           } else {
             return false;

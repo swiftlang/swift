@@ -1901,7 +1901,7 @@ bool EscapeAnalysis::canOptimizeArrayUninitializedResult(
 
 // Handle @_semantics("array.uninitialized")
 //
-// This call is analagous to a 'struct(storageRef)' instruction--we want a defer
+// This call is analogous to a 'struct(storageRef)' instruction--we want a defer
 // edge from the returned Array struct to the storage Reference that it
 // contains.
 //

@@ -59,7 +59,7 @@
 /// Code Overview:
 ///
 /// The function 'OSLogOptimization::run' implements the overall driver for
-/// steps 1 to 4. The function 'beginOfInterpolation' identifies the begining of
+/// steps 1 to 4. The function 'beginOfInterpolation' identifies the beginning of
 /// interpolation (step 1) and the function 'getEndPointsOfDataDependentChain'
 /// identifies the last transitive users of the OSLogMessage instance (step 1).
 /// The function 'constantFold' is a driver for the steps 2 to 4. Step 2 is
@@ -132,7 +132,7 @@ static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
 }
 
 // A cache of string-related, SIL information that is needed to create and
-// initalize strings from raw string literals. This information is
+// initialize strings from raw string literals. This information is
 // extracted from instructions while they are constant evaluated. Though the
 // information contained here can be constructed from scratch, extracting it
 // from existing instructions is more efficient.
@@ -457,7 +457,7 @@ static Optional<SymbolicValue> collectConstants(FoldState &foldState) {
 
   // The loop will break when it sees a return instruction or an instruction in
   // endInstructions or when the next instruction to evaluate cannot be
-  // determined (which may happend due to non-constant branches).
+  // determined (which may happened due to non-constant branches).
   while (true) {
     SILInstruction *currInst = &(*currI);
     if (endInstructions.count(currInst))
@@ -480,7 +480,7 @@ static Optional<SymbolicValue> collectConstants(FoldState &foldState) {
     }
 
     if (!nextI) {
-      // We cannnot find the next instruction to continue evaluation, and we
+      // We cannot find the next instruction to continue evaluation, and we
       // haven't seen any reportable errors during evaluation. Therefore,
       // consider this the end point of evaluation.
       return None; // No error.
@@ -905,12 +905,12 @@ getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
 static Optional<BorrowedValue>
 getUniqueBorrowScopeIntroducingValue(SILValue value) {
   assert(value.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
-         "parameter must be a guarenteed value");
+         "parameter must be a guaranteed value");
   return getSingleBorrowIntroducingValue(value);
 }
 
 /// Replace all uses of \c originalVal by \c foldedVal and adjust lifetimes of
-/// original and folded values by emitting required destory/release instructions
+/// original and folded values by emitting required destroy/release instructions
 /// at the right places. Note that this function does not remove any
 /// instruction.
 ///
@@ -942,7 +942,7 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   if (originalVal.getOwnershipKind() == ValueOwnershipKind::Owned) {
     originalVal->replaceAllUsesWith(foldedVal);
     // Destroy originalVal, which is now unused, immediately after its
-    // definition. Note that originalVal's destorys are now transferred to
+    // definition. Note that originalVal's destroys are now transferred to
     // foldedVal.
     SILInstruction *insertionPoint = &(*std::next(originalInst->getIterator()));
     SILBuilderWithScope builder(insertionPoint);
@@ -1014,7 +1014,7 @@ static void substituteConstants(FoldState &foldState) {
           getUniqueBorrowScopeIntroducingValue(constantSILValue);
       if (!borrowIntroducer) {
         // This case happens only if constantSILValue is derived from a
-        // guaranteed basic block parameter. This is unlikley because the values
+        // guaranteed basic block parameter. This is unlikely because the values
         // that have to be folded should just be a struct-extract of an owned
         // instance of OSLogMessage.
         continue;
@@ -1067,7 +1067,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
     return true;
   }
 
-  // Check if every proprety of the OSLogInterpolation instance has a constant
+  // Check if every property of the OSLogInterpolation instance has a constant
   // value.
   SILType osLogMessageType = osLogMessage->getType();
   StructDecl *structDecl = osLogMessageType.getStructOrBoundGenericStruct();
@@ -1307,7 +1307,7 @@ static bool constantFold(SILInstruction *start,
 
 /// Given a call to the initializer of OSLogMessage, which conforms to
 /// 'ExpressibleByStringInterpolation', find the first instruction, if any, that
-/// marks the begining of the string interpolation that is used to create an
+/// marks the beginning of the string interpolation that is used to create an
 /// OSLogMessage instance. This function traverses the backward data-dependence
 /// chain of the given OSLogMessage initializer: \p oslogInit. As a special case
 /// it avoids chasing the data-dependencies from the captured values of
@@ -1357,7 +1357,7 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
         seenInstructions.insert(definingInstruction);
         candidateStartInstructions.insert(definingInstruction);
       }
-      // If there is no definining instruction for this operand, it could be a
+      // If there is no defining instruction for this operand, it could be a
       // basic block or function parameter. Such operands are not considered
       // in the backward slice. Dependencies through them are safe to ignore
       // in this context.
@@ -1420,7 +1420,7 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
     }
     if (!firstBB) {
       // This case will be reached only if the log call appears in unreachable
-      // code and, for some reason, its data depedencies extend beyond a basic
+      // code and, for some reason, its data dependencies extend beyond a basic
       // block. This case should generally not happen unless the library
       // implementation of the os log APIs change. It is better to warn in this
       // case, rather than skipping the call silently.

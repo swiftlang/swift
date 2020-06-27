@@ -781,7 +781,7 @@ bool SILGlobalOpt::run() {
     }
   } while (changed);
 
-  // This is similiar to optimizeInitializer, but it's for globals which are
+  // This is similar to optimizeInitializer, but it's for globals which are
   // initialized in the "main" function and not by an initializer function.
   for (auto &Init : GlobalVarStore) {
     // Don't optimize functions that are marked with the opt.never attribute.

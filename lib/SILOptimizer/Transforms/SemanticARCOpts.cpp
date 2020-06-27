@@ -1224,7 +1224,7 @@ bool SemanticARCOptVisitor::performPostPeepholeOwnedArgElimination() {
         // results since we are deleting one of our stashed values.
         auto iter = find(originalIncomingValues, cvi);
         if (iter != originalIncomingValues.end()) {
-          // We use an auxillary array here so we can continue to bisect on
+          // We use an auxiliary array here so we can continue to bisect on
           // original incoming values. Once we are done processing here, we will
           // not need that property anymore.
           unsigned updateOffset =
@@ -1699,7 +1699,7 @@ static bool canSafelyJoinSimpleRange(SILValue cviOperand,
   // causing guaranteedUser to be a use-after-free.
   //
   // As an extra wrinkle, until all interior pointer constructs (e.x.:
-  // project_box) are guaranteed to be guaranted by a begin_borrow, we can not
+  // project_box) are guaranteed to be guaranteed by a begin_borrow, we can not
   // in general safely shrink lifetimes. So even if we think we can prove that
   // all non-consuming uses of %0 are before apply %cviConsumer, we may miss
   // implicit uses that are not guarded yet by a begin_borrow, resulting in

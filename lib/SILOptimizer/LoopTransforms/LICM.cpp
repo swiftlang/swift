@@ -1075,7 +1075,7 @@ void LoopTreeOptimization::hoistLoadsAndStores(SILValue addr, SILLoop *loop, Ins
 
       // If a store just stores the loaded value, bail. The operand (= the load)
       // will be removed later, so it cannot be used as available value.
-      // This corner case is suprisingly hard to handle, so we just give up.
+      // This corner case is surprisingly hard to handle, so we just give up.
       if (isLoadFromAddr(dyn_cast<LoadInst>(SI->getSrc()), addr))
         return;
 
