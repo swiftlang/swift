@@ -105,7 +105,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
   if (!decl)
     return ConcreteDeclRef();
 
-  // Get the generic signatue of the decl and compute the substitutions.
+  // Get the generic signatures of the decl and compute the substitutions.
   auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
   return ConcreteDeclRef(decl, computeSubstitutions(sig, locator));
 }
@@ -865,7 +865,7 @@ namespace {
       if (selfParamTy->hasOpenedExistential()) {
         // If we're opening an existential:
         // - the type of 'ref' inside the closure is written in terms of the
-        //   open existental archetype
+        //   open existential archetype
         // - the type of the closure, 'selfFnTy' is written in terms of the
         //   erased existential bounds
         if (selfParam.isInOut())
@@ -6620,7 +6620,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           expr = cs.cacheType(
               new (ctx) FunctionConversionExpr(expr, escapingToFuncTy));
         }
-        // Apply an explict function conversion *only* for the escape to
+        // Apply an explicit function conversion *only* for the escape to
         // noescape conversion. This conversion will be stripped by the
         // default argument generator. (We can't return a @noescape function)
         auto newExpr =

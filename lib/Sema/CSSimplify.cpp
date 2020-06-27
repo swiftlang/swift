@@ -7575,7 +7575,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     return SolutionKind::Solved;
   }
 
-  // In a previous version of Swift, we could accidently drop the coercion
+  // In a previous version of Swift, we could accidentally drop the coercion
   // constraint in certain cases. In most cases this led to either miscompiles
   // or crashes later down the pipeline, but for coercions between collections
   // we generated somewhat reasonable code that performed a force cast. To
@@ -9487,7 +9487,7 @@ ConstraintSystem::simplifyRestrictedConstraint(
   case SolutionKind::Solved: {
     // If we have an application of a non-ephemeral parameter, then record a
     // fix if we have to treat an ephemeral conversion as non-ephemeral. It's
-    // important that this is solved as an independant constraint, as the
+    // important that this is solved as an independent constraint, as the
     // solving of this restriction may be required in order to evaluate it. For
     // example, when solving `foo(&.x)`, we need to first match types for the
     // inout-to-pointer conversion, which then allows us to resolve the overload
@@ -9663,7 +9663,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // Create a new tuple type the size of the smaller tuple with elements
     // from the larger tuple whenever either side contains a type variable.
     // For example (A, $0, B, $2) and (X, Y, $1) produces: (X, $0, B).
-    // This allows us to guarentee that the types will match, and all
+    // This allows us to guarantee that the types will match, and all
     // type variables will get bound to something as long as we default
     // excess types in the larger tuple to Any. In the prior example,
     // when the tuples (X, Y, $1) and (X, $0, B) get matched, $0 is equated

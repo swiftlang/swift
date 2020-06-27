@@ -913,7 +913,7 @@ static void collectNonOveriddenSuperclassInits(
   auto superclassTy = subclass->getSuperclass();
   assert(superclassTy);
 
-  // Record all of the initializers the subclass has overriden, excluding stub
+  // Record all of the initializers the subclass has overridden, excluding stub
   // overrides, which we don't want to consider as viable delegates for
   // convenience inits.
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
@@ -1066,7 +1066,7 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   if (canInheritDesignatedInits(eval, decl))
     return true;
 
-  // Otherwise we need to check whether the user has overriden all of the
+  // Otherwise we need to check whether the user has overridden all of the
   // superclass' designed inits.
   SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
   collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);

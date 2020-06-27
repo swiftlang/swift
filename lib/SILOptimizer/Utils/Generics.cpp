@@ -257,7 +257,7 @@ static bool growingSubstitutions(SubstitutionMap Subs1,
   auto Replacements2 = Subs2.getReplacementTypes();
   assert(Replacements1.size() == Replacements2.size());
   TypeComparator TypeCmp;
-  // Perform component-wise comparisions for substitutions.
+  // Perform component-wise comparisons for substitutions.
   for (unsigned idx : indices(Replacements1)) {
     auto Type1 = Replacements1[idx]->getCanonicalType();
     auto Type2 = Replacements2[idx]->getCanonicalType();
@@ -280,7 +280,7 @@ static bool growingSubstitutions(SubstitutionMap Subs1,
     // They are not comparable in this sense.
   }
 
-  // The substitition list is not growing.
+  // The substitution list is not growing.
   return false;
 }
 

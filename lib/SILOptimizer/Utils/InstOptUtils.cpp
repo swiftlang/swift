@@ -1516,7 +1516,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     return true;
   }
 
-  // Collect all destroys of the closure (transitively including destorys of
+  // Collect all destroys of the closure (transitively including destroys of
   // copies) and check if those are the only uses of the closure.
   SmallVector<SILInstruction *, 16> closureDestroys;
   if (!collectDestroys(closure, closureDestroys))
@@ -1532,7 +1532,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
       if (!keepArgsOfPartialApplyAlive(pai, closureDestroys, builderCtxt))
         return false;
     } else {
-      // A preceeding partial_apply -> apply conversion (done in
+      // A preceding partial_apply -> apply conversion (done in
       // tryOptimizeApplyOfPartialApply) already ensured that the arguments are
       // kept alive until the end of the partial_apply's lifetime.
       SmallVector<Operand *, 8> argsToHandle;
@@ -1787,7 +1787,7 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
     return;
   }
 
-  // Incidental uses of an addres are meaningless with regard to the loaded
+  // Incidental uses of an address are meaningless with regard to the loaded
   // value.
   if (isIncidentalUse(inst) || isa<BeginUnpairedAccessInst>(inst))
     return;

@@ -3555,7 +3555,7 @@ public:
   }
 
 private:
-  /// Adjust the constraint system to accomodate the given selected overload, and
+  /// Adjust the constraint system to accommodate the given selected overload, and
   /// recompute the type of the referenced declaration.
   ///
   /// \returns a pair containing the adjusted opened type of a reference to
@@ -5175,7 +5175,7 @@ bool isPatternMatchingOperator(Expr *expr);
 /// "standard" comparison operator such as "==", "!=", ">" etc.
 bool isStandardComparisonOperator(Expr *expr);
 
-/// If given expression references operator overlaod(s)
+/// If given expression references operator overload(s)
 /// extract and produce name of the operator.
 Optional<Identifier> getOperatorName(Expr *expr);
 
@@ -5370,7 +5370,7 @@ private:
   /// be supertypes extracted from one of the current bindings
   /// or default literal types etc.
   ///
-  /// \returns true if some new bindings were sucessfully computed,
+  /// \returns true if some new bindings were successfully computed,
   /// false otherwise.
   bool computeNext();
 };

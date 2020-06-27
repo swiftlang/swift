@@ -80,7 +80,7 @@ killInstAndIncidentalUses(SingleValueInstruction *inst,
 // intruction that wasn't erased.
 static Optional<SILBasicBlock::iterator>
 simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
-  // FIXME: temporarily bypass simplification untill all simplifications
+  // FIXME: temporarily bypass simplification until all simplifications
   // preserve ownership SIL.
   if (inst->getFunction()->hasOwnership())
     return None;
