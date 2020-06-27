@@ -194,7 +194,7 @@ protected:
   const Children &getChildren() const { return storedChildren; }
 
   /// Get ride of descendants and remove them from scopedNodes so the scopes
-  /// can be recreated. Needed because typechecking inserts a return statment
+  /// can be recreated. Needed because typechecking inserts a return statement
   /// into intiailizers.
   void disownDescendants(ScopeCreator &);
 
@@ -658,7 +658,7 @@ public:
 
     /// Make whole portion lazy to avoid circularity in lookup of generic
     /// parameters of extensions. When \c bindExtension is called, it needs to
-    /// unqualifed-lookup the type being extended. That causes an \c
+    /// unqualified-lookup the type being extended. That causes an \c
     /// ExtensionScope
     /// (\c GenericTypeOrExtensionWholePortion) to be built.
     /// The building process needs the generic parameters, but that results in a
@@ -697,7 +697,7 @@ public:
     static NullablePtr<DeclContext>
     computeSelfDC(ArrayRef<const ASTScopeImpl *> history);
     
-    /// If we find a lookup result that requires the dynamic implict self value,
+    /// If we find a lookup result that requires the dynamic implicit self value,
     /// we need to check the nested scopes to see if any closures explicitly
     /// captured \c self. In that case, the appropriate selfDC is that of the
     /// innermost closure which captures a \c self value from one of this type's
@@ -944,7 +944,7 @@ public:
   Decl *getDecl() const override { return decl; }
 };
 
-/// Since each generic parameter can "see" the preceeding ones,
+/// Since each generic parameter can "see" the preceding ones,
 /// (e.g. <A, B: A>) -- it's not legal but that's how lookup behaves --
 /// Each GenericParamScope scopes just ONE parameter, and we next
 /// each one within the previous one.

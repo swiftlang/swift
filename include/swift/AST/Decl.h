@@ -2368,7 +2368,7 @@ class ValueDecl : public Decl {
     unsigned isFinalComputed : 1;
 
     /// Whether this declaration is 'final'. A final class can't be subclassed,
-    /// a final class member can't be overriden.
+    /// a final class member can't be overridden.
     unsigned isFinal : 1;
 
     /// Whether the "isIUO" bit" has been computed yet.
@@ -3019,7 +3019,7 @@ public:
   UnboundGenericType *getUnboundGenericType() const;
 
   /// Retrieve a sugared interface type containing the structure of the interface
-  /// type before any semantic validation has occured.
+  /// type before any semantic validation has occurred.
   Type getStructuralType() const;
   
   bool isCompatibilityAlias() const {
@@ -5213,7 +5213,7 @@ public:
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
 
-  /// Retreive the storage wrapper for a property that has an attached
+  /// Retrieve the storage wrapper for a property that has an attached
   /// property wrapper.
   VarDecl *getPropertyWrapperStorageWrapper() const;
 

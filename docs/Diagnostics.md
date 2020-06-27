@@ -100,7 +100,7 @@ Educational notes should:
 - Explain a single language concept. This makes them easy to reuse across related diagnostics and helps keep them clear, concise, and easy to understand.
 - Be written in unabbreviated English. These are longer-form messages compared to the main diagnostic, so there's no need to omit needless words and punctuation.
 - Not generally exceed 3-4 paragraphs. Educational notes should be clear and easily digestible. Messages which are too long also have the potential to create UX issues on the command line.
-- Be accessible. Educational notes should be beginner friendly and avoid assuming unnecesary prior knowledge. The goal is not only to help users understand what a diagnostic is telling them, but also to turn errors and warnings into "teachable moments".
+- Be accessible. Educational notes should be beginner friendly and avoid assuming unnecessary prior knowledge. The goal is not only to help users understand what a diagnostic is telling them, but also to turn errors and warnings into "teachable moments".
 - Include references to relevant chapters of _The Swift Programming Language_.
 - Be written in Markdown, but avoid excessive markup which negatively impacts the terminal UX.
 
