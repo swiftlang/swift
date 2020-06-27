@@ -508,82 +508,6 @@ class ModuleInterfaceLoaderImpl {
     return true;
   }
 
-  Optional<StringRef>
-  computePrebuiltModulePath(llvm::SmallString<256> &scratch) {
-    namespace path = llvm::sys::path;
-    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
-
-    // Check if the interface file comes from the SDK
-    if (sdkPath.empty() || !hasPrefix(path::begin(interfacePath),
-                                      path::end(interfacePath),
-                                      path::begin(sdkPath),
-                                      path::end(sdkPath)))
-      return None;
-
-    // Assemble the expected path: $PREBUILT_CACHE/Foo.swiftmodule or
-    // $PREBUILT_CACHE/Foo.swiftmodule/arch.swiftmodule. Note that there's no
-    // cache key here.
-    scratch = prebuiltCacheDir;
-
-    // FIXME: Would it be possible to only have architecture-specific names
-    // here? Then we could skip this check.
-    StringRef inParentDirName =
-      path::filename(path::parent_path(interfacePath));
-    if (path::extension(inParentDirName) == ".swiftmodule") {
-      assert(path::stem(inParentDirName) == moduleName);
-      path::append(scratch, inParentDirName);
-    }
-    path::append(scratch, path::filename(modulePath));
-
-    // If there isn't a file at this location, skip returning a path.
-    if (!fs.exists(scratch))
-      return None;
-
-    return scratch.str();
-  }
-
-  /// Hack to deal with build systems (including the Swift standard library, at
-  /// the time of this comment) that aren't yet using target-specific names for
-  /// multi-target swiftmodules, in case the prebuilt cache is.
-  Optional<StringRef>
-  computeFallbackPrebuiltModulePath(llvm::SmallString<256> &scratch) {
-    namespace path = llvm::sys::path;
-    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
-
-    // Check if the interface file comes from the SDK
-    if (sdkPath.empty() || !hasPrefix(path::begin(interfacePath),
-                                      path::end(interfacePath),
-                                      path::begin(sdkPath),
-                                      path::end(sdkPath)))
-      return None;
-
-    // If the module isn't target-specific, there's no fallback path.
-    StringRef inParentDirName =
-        path::filename(path::parent_path(interfacePath));
-    if (path::extension(inParentDirName) != ".swiftmodule")
-      return None;
-
-    // If the interface is already using the target-specific name, there's
-    // nothing else to try.
-    auto normalizedTarget = getTargetSpecificModuleTriple(ctx.LangOpts.Target);
-    if (path::stem(modulePath) == normalizedTarget.str())
-      return None;
-
-    // Assemble the expected path:
-    // $PREBUILT_CACHE/Foo.swiftmodule/target.swiftmodule. Note that there's no
-    // cache key here.
-    scratch = prebuiltCacheDir;
-    path::append(scratch, inParentDirName);
-    path::append(scratch, normalizedTarget.str());
-    scratch += ".swiftmodule";
-
-    // If there isn't a file at this location, skip returning a path.
-    if (!fs.exists(scratch))
-      return None;
-
-    return scratch.str();
-  }
-
   bool isInResourceDir(StringRef path) {
     StringRef resourceDir = ctx.SearchPathOpts.RuntimeResourcePath;
     if (resourceDir.empty()) return false;
@@ -715,12 +639,12 @@ class ModuleInterfaceLoaderImpl {
     if (!prebuiltCacheDir.empty()) {
       llvm::SmallString<256> scratch;
       std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-      Optional<StringRef> path = computePrebuiltModulePath(scratch);
-      if (!path) {
-        // Hack: deal with prebuilds of modules that still use the target-based
-        // names.
-        path = computeFallbackPrebuiltModulePath(scratch);
-      }
+      Optional<StringRef> path = computePrebuiltModulePath(ctx,
+                                                           interfacePath,
+                                                           prebuiltCacheDir,
+                                                           moduleName,
+                                                           scratch);
+
       if (path) {
         if (swiftModuleIsUpToDate(*path, deps, moduleBuffer)) {
           LLVM_DEBUG(llvm::dbgs() << "Found up-to-date prebuilt module at "
