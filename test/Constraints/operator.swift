@@ -1,3 +1,4 @@
+// REQUIRES: rdar64844584
 // RUN: %target-typecheck-verify-swift
 
 // Test constraint simplification of chains of binary operators.
