@@ -4318,6 +4318,10 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   if (ctx.LangOpts.EnableObjCInterop)
     CD->recordObjCMethod(DD, DD->getObjCSelector());
 
+  // Mark it as synthesized to make its location in getEmittedMembers()
+  // deterministic.
+  DD->setSynthesized(true);
+
   return DD;
 }
 
