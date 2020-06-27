@@ -2741,7 +2741,7 @@ void ASTMangler::appendConstructorEntity(const ConstructorDecl *ctor,
 }
 
 void ASTMangler::appendDestructorEntity(const DestructorDecl *dtor,
-                                     bool isDeallocating) {
+                                        bool isDeallocating) {
   appendContextOf(dtor);
   appendOperator(isDeallocating ? "fD" : "fd");
 }
