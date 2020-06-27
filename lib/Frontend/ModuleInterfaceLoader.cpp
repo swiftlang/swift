@@ -1145,15 +1145,15 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   }
   // Pass down -explicit-swift-module-map-file
   // FIXME: we shouldn't need this. Remove it?
-  StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
+  StringRef explicitSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   subInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
-    explictSwiftModuleMap;
-  if (!explictSwiftModuleMap.empty()) {
+    explicitSwiftModuleMap;
+  if (!explicitSwiftModuleMap.empty()) {
     GenericArgs.push_back("-explicit-swift-module-map-file");
-    GenericArgs.push_back(explictSwiftModuleMap);
+    GenericArgs.push_back(explicitSwiftModuleMap);
   }
   if (clangImporter) {
-    // We need to add these extra clang flags because explict module building
+    // We need to add these extra clang flags because explicit module building
     // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
     // and -fmodule-file=.
     // If we don't add these flags, the interface will be built with implicit
