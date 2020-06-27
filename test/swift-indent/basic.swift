@@ -225,7 +225,7 @@ func foo(
 }
 
 
-// Sequence expressions should indent realtive to their first element. Leading
+// Sequence expressions should indent relative to their first element. Leading
 // "=" should be considered part of the sequence when present.
 //
 let arrayA = [0]
@@ -407,7 +407,7 @@ func a() {
 }
 
 
-// Array/Dictionay/Tuple/Closure within arg list shouldn't cause their solo
+// Array/Dictionary/Tuple/Closure within arg list shouldn't cause their solo
 // closing tokens to indent.
 //
 foo(a: [

@@ -105,7 +105,7 @@ enum class NodeMatchReason: uint8_t {
   // The second node is missing.
   Removed,
 
-  // The nodes are considered a pair becuase they have same/similar name.
+  // The nodes are considered a pair because they have same/similar name.
   Name,
 
   // The nodes are matched because they're in the same order, e.g. ith child of
@@ -352,7 +352,7 @@ class SDKNodeDecl: public SDKNode {
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   // In ABI mode, this field is populated as a user-friendly version of GenericSig.
-  // Dignostic preferes the sugared versions if they differ as well.
+  // Dignostic prefers the sugared versions if they differ as well.
   StringRef SugaredGenericSig;
   Optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
