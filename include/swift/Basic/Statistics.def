@@ -149,7 +149,7 @@ FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopes)
 /// Number of expansions of body scopes for iterable types
 FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopeExpansions)
 
-/// Number of brace statment scopes for iterable types
+/// Number of brace statement scopes for iterable types
 FRONTEND_STATISTIC(AST, NumBraceStmtASTScopes)
 
 /// Number of expansions of brace statement scopes for iterable types

@@ -4177,7 +4177,7 @@ public:
   create(ASTContext &ctx, SourceRange range, Type ty, Expr *wrappedValue);
 
   /// The original wrappedValue initialization expression provided via
-  /// \c = on a proprety with attached property wrappers.
+  /// \c = on a property with attached property wrappers.
   Expr *getOriginalWrappedValue() const {
     return WrappedValue;
   }

@@ -266,7 +266,7 @@ REMARK(platform_previous_install_name, none,
        "previous install name for %0 in %1 is %2", (StringRef, StringRef, StringRef))
 
 ERROR(unknown_platform_name, none,
-      "unkown platform name %0", (StringRef))
+      "unknown platform name %0", (StringRef))
 
 ERROR(unknown_swift_module_name, none,
       "cannot find Swift module with name %0", (StringRef))
