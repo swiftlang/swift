@@ -52,7 +52,7 @@ func testFloatConvertOverflow() {
   _blackHole(e2)
   _blackHole(e3)
 
-  // All warnings are disabled during explict conversions, except when the
+  // All warnings are disabled during explicit conversions, except when the
   // input literal overflows the largest available FP type.
   _blackHole(Float(1E309))
   _blackHole(Double(1E309))
@@ -82,7 +82,7 @@ func testFloatConvertUnderflow() {
   let e3: Double = 0x11p-1074 // expected-warning {{'0x11p-1074' underflows and loses precision during conversion to 'Double'}}
   _blackHole(e3)
 
-  // All warnings are disabled during explict conversions
+  // All warnings are disabled during explicit conversions
   _blackHole(Float(1E-400))
   _blackHole(Double(1E-309))
   _blackHole(Double(5E-324))

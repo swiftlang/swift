@@ -6,9 +6,9 @@ import Foundation
 
 class A : NSObject {
     func a1() {} // never overridden
-    func x() {} // overriden 1x
-    func y() {} // overriden 2x
-    func z() {} // overriden 3x
+    func x() {} // overridden 1x
+    func y() {} // overridden 2x
+    func z() {} // overridden 3x
 }
 
 class B : A {

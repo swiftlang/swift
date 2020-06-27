@@ -120,7 +120,7 @@ class PresetError(Exception):
 
 
 class DuplicatePresetError(PresetError):
-    """Raised when an existing preset would be overriden.
+    """Raised when an existing preset would be overridden.
     """
 
     def __init__(self, preset_name):

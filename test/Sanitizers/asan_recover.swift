@@ -88,7 +88,7 @@ fflush(stdout)
 // CHECK-RECOVER-STDOUT: Read first element:0
 
 // Second error
-// NOTE: Very loose regex is to accomodate if name demangling
+// NOTE: Very loose regex is to accommodate if name demangling
 // fails. rdar://problem/57235673
 // CHECK-RECOVER-STDERR: AddressSanitizer: use-after-poison
 // CHECK-RECOVER-STDERR: #0 0x{{.+}} in {{.*}}foo{{.*}}

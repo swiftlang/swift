@@ -268,7 +268,7 @@ bb5:
   %17 = tuple ()
   return %17 : $()
     // We must have all string literals at the beginning of the borrowed scope,
-    // and destorys of the literals at the end of the borrow scope.
+    // and destroys of the literals at the end of the borrow scope.
 
     // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "test message: %lld"
     // CHECK: [[STRINGINIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC

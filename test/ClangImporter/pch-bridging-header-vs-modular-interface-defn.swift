@@ -63,7 +63,7 @@
 // ~~~~~~~~~~~~~~
 //
 // One might hope that this can be fixed by having the merge-modules step take a
-// PCH as well as other steps in the compilation. That unfortuantely only
+// PCH as well as other steps in the compilation. That unfortunately only
 // inverts the problem, which resurfaces in the definition-order of Bar itself:
 // an XRef to __ObjC.Bar gets serialized, and then _it_ can't be found during
 // merge-modules, because the *last-read* defn of Bar -- the modular one, M.Bar

@@ -4,7 +4,7 @@
 
 class Converter<Input, Output> {
   func convert(input: Input) -> Output {
-    fatalError("Has to be overriden")
+    fatalError("Has to be overridden")
   }
 }
 

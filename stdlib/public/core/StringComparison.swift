@@ -393,7 +393,7 @@ extension _StringGutsSlice {
   }
   
   
-  @inline(__always) //Avoid unecessary overhead from the closures.
+  @inline(__always) //Avoid unnecessary overhead from the closures.
   internal func _normalizedCompareImpl(
     left_outputBuffer: UnsafeMutableBufferPointer<UInt8>,
     left_icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,

@@ -56,7 +56,7 @@ bb0(%0 : $B):
 
 // This function calls @impl. The optimizer generates a specialization of impl
 // based on the arguments passed to it here. Even though this function isn't
-// directly checked, it is essentail for the optimization.
+// directly checked, it is essential for the optimization.
 // test(x:y:)
 sil @test :$@convention(thin) (@guaranteed B, @guaranteed C) -> Int64 {
 // %0                                             // users: %5, %4, %2

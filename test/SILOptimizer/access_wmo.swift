@@ -110,7 +110,7 @@ func setKeyPath(_ c: C, _ kp: ReferenceWritableKeyPath<C, Int>, _ v: Int) {
 //
 // inlinedProp and internalProp could be also be promoted to static, but are
 // accessed via begin_unpaired_access in materializeForSet. (When the class
-// definition is in another file, the compiler unfortunately and unnecessarilly
+// definition is in another file, the compiler unfortunately and unnecessarily
 // generates materializeForSet calls even in "wmo" mode). These unpaired access
 // cannot (easily) be marked [no_nested_conflict]. Failing to mark the modify
 // as [no_nested_access] in turn inhibits optimization of the property reads.

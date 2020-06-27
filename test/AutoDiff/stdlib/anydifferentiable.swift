@@ -14,7 +14,7 @@ struct Generic<T: Differentiable & Equatable>: Differentiable, Equatable {
 }
 
 extension AnyDerivative {
-  // This exists only to faciliate testing.
+  // This exists only to facilitate testing.
   func moved(along direction: TangentVector) -> Self {
     var result = self
     result.move(along: direction)

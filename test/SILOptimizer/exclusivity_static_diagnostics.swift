@@ -616,7 +616,7 @@ func nestedConflict(x: inout Int) {
   // expected-note@-2 2{{conflicting access is here}}
 }
 
-// Avoid diagnosing a conflict on disjoint struct properies when one is a `let`.
+// Avoid diagnosing a conflict on disjoint struct properties when one is a `let`.
 // This requires an address projection before loading the `let` property.
 //
 // <rdar://problem/35561050> [SR-10145][Exclusivity] SILGen loads entire struct when reading captured 'let' stored property

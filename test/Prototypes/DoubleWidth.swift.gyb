@@ -6,7 +6,7 @@ import StdlibUnittest
 
 // XXX: Auxiliary tests & benchmark for DoubleWidth were removed in PR #23024.
 // When the DoubleWidth makes comeback, revert the commits from there to
-// ressurect what was just a dead code in the meantime…
+// resurrect what was just a dead code in the meantime…
 
 /// A fixed-width integer that has twice the bit width of its base type.
 ///

@@ -906,7 +906,7 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
   %10 = copy_value %0 : $Klass
   store %10 to [init] %9 : $*Klass
 
-  // builtin "add" is maked read none so it could be removed below. However,
+  // builtin "add" is marked read none so it could be removed below. However,
   // builtin "generic_add" does modify memory so, it cannot be removed.
   // Make sure we don't remove it.
   %12 = builtin "generic_add"<Klass>(%3 : $*Klass, %6 : $*Klass, %9 : $*Klass) : $()

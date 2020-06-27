@@ -134,7 +134,7 @@ fileprivate struct _CapacityAndFlags {
  Tail Allocations:
 
  `__StringStorage.create` takes a requested minimum code unit capacity and a
- count (which it uses to gurantee null-termination invariant). This will
+ count (which it uses to guarantee null-termination invariant). This will
  allocate the class header and a tail allocation for the requested capacity plus
  one (for the null-terminator), plus any excess `malloc` bucket space. If
  breadcrumbs need be present, they appear at the very end of the allocation.

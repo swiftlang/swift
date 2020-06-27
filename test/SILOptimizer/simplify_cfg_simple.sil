@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -simplify-cfg %s | %FileCheck %s
 //
-// Make sure that we can succesfully call simplify-cfg with that name via sil-opt.
+// Make sure that we can successfully call simplify-cfg with that name via sil-opt.
 
 sil_stage canonical
 
