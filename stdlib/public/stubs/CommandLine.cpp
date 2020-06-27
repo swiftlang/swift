@@ -89,7 +89,7 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   }
   fclose(cmdline);
   *outArgLen = argvec.size();
-  char **outBuf = (char **)calloc(argvec.size() + 1, sizeof(char *));
+  auto outBuf = static_cast<char **>(calloc(argvec.size() + 1, sizeof(char *)));
   std::copy(argvec.begin(), argvec.end(), outBuf);
   outBuf[argvec.size()] = nullptr;
 
@@ -121,23 +121,27 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
         WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, szArgList[i], -1,
                             nullptr, 0, nullptr, nullptr);
     if (szBufferSize == 0) {
-      for (char *arg : argv)
-        free(arg);
+      swift::fatalError(0,
+                        "Fatal error: Could not retrieve commandline "
+                        "arguments: %u\n",
+                        GetLastError());
       return nullptr;
     }
 
     char *buffer = static_cast<char *>(
         calloc(static_cast<size_t>(szBufferSize), sizeof(char)));
     if (buffer == nullptr) {
-      for (char *arg : argv)
-        free(arg);
+      swift::fatalError(0,
+                        "Fatal error: Could not allocate space for commandline"
+                        "arguments");
       return nullptr;
     }
 
     if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, szArgList[i], -1,
                              buffer, szBufferSize, nullptr, nullptr)) {
-      for (char *arg : argv)
-        free(arg);
+      swift::fatalError(0,
+                        "Fatal error: Conversion to UTF-8 failed for "
+                        "commandline arguments");
       return nullptr;
     }
 
@@ -175,7 +179,7 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   size_t argPtrSize = 0;
   for (int i = 0; i < 3 && !argPtr; ++i) { // give up after 3 tries
     if (sysctl(mib, 4, nullptr, &argPtrSize, nullptr, 0) != -1) {
-      argPtr = (char *)malloc(argPtrSize);
+      argPtr = static_cast<char *>(malloc(argPtrSize));
       if (sysctl(mib, 4, argPtr, &argPtrSize, nullptr, 0) == -1) {
         free(argPtr);
         argPtr = nullptr;
@@ -199,7 +203,7 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   for (; curPtr < endPtr; curPtr += strlen(curPtr) + 1)
     argvec.push_back(strdup(curPtr));
   *outArgLen = argvec.size();
-  char **outBuf = (char **)calloc(argvec.size() + 1, sizeof(char *));
+  auto outBuf = static_cast<char **>(calloc(argvec.size() + 1, sizeof(char *)));
   std::copy(argvec.begin(), argvec.end(), outBuf);
   outBuf[argvec.size()] = nullptr;
 
@@ -223,20 +227,24 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   __wasi_errno_t err;
 
-  size_t argv_buf_size;
-  size_t argc;
+  size_t argv_buf_size = 0;
+  size_t argc = 0;
   err = __wasi_args_sizes_get(&argc, &argv_buf_size);
-  if (err != __WASI_ERRNO_SUCCESS)
+  if (err != __WASI_ERRNO_SUCCESS) {
+    swift::fatalError(0,
+                      "Fatal error: Could not retrieve commandline "
+                      "arguments: %d.\n", static_cast<int>(err));
     return nullptr;
+  }
 
-  size_t num_ptrs = argc + 1;
-  char *argv_buf = (char *)malloc(argv_buf_size);
-  char **argv = (char **)calloc(num_ptrs, sizeof(char *));
+  char *argv_buf = static_cast<char *>(malloc(argv_buf_size));
+  char **argv = static_cast<char **>(calloc(argc + 1, sizeof(char *)));
 
   err = __wasi_args_get((uint8_t **)argv, (uint8_t *)argv_buf);
   if (err != __WASI_ERRNO_SUCCESS) {
-    free(argv_buf);
-    free(argv);
+    swift::fatalError(0,
+                      "Fatal error: Could not retrieve commandline "
+                      "arguments: %d.\n", static_cast<int>(err));
     return nullptr;
   }
 

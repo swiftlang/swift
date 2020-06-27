@@ -247,8 +247,7 @@ protocol Addable {
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  // FIXME(diagnostics): This should report the "no exact matches" diagnostic.
-  u + u // expected-error{{referencing operator function '+' on 'RangeReplaceableCollection' requires that 'U' conform to 'RangeReplaceableCollection'}}
+  u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
   return x+y
 }
 

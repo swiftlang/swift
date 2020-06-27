@@ -5605,15 +5605,16 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   llvm_unreachable("unknown derivable protocol kind");
 }
 
-Type TypeChecker::deriveTypeWitness(DeclContext *DC,
-                                    NominalTypeDecl *TypeDecl,
-                                    AssociatedTypeDecl *AssocType) {
+std::pair<Type, TypeDecl *>
+TypeChecker::deriveTypeWitness(DeclContext *DC,
+                               NominalTypeDecl *TypeDecl,
+                               AssociatedTypeDecl *AssocType) {
   auto *protocol = cast<ProtocolDecl>(AssocType->getDeclContext());
 
   auto knownKind = protocol->getKnownProtocolKind();
   
   if (!knownKind)
-    return nullptr;
+    return std::make_pair(nullptr, nullptr);
 
   auto Decl = DC->getInnermostDeclarationDeclContext();
 
@@ -5621,9 +5622,9 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
                              protocol);
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
-    return derived.deriveRawRepresentable(AssocType);
+    return std::make_pair(derived.deriveRawRepresentable(AssocType), nullptr);
   case KnownProtocolKind::CaseIterable:
-    return derived.deriveCaseIterable(AssocType);
+    return std::make_pair(derived.deriveCaseIterable(AssocType), nullptr);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   // SWIFT_ENABLE_TENSORFLOW
@@ -5633,7 +5634,7 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveVectorProtocol(AssocType);
   // SWIFT_ENABLE_TENSORFLOW END
   default:
-    return nullptr;
+    return std::make_pair(nullptr, nullptr);
   }
 }
 
