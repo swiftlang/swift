@@ -183,7 +183,7 @@ internal final class __DataStorage {
     @inlinable // This is inlinable as trivially computable.
     var isExternallyOwned: Bool {
         // all __DataStorages will have some sort of capacity, because empty cases hit the .empty enum _Representation
-        // anything with 0 capacity means that we have not allocated this pointer and concequently mutation is not ours to make.
+        // anything with 0 capacity means that we have not allocated this pointer and consequently mutation is not ours to make.
         return _capacity == 0
     }
     

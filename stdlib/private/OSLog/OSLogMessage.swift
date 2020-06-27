@@ -242,7 +242,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
     isScalar: Bool
   ) -> UInt8 {
     var preamble = self.preamble
-    // Equality comparisions on enums is not yet supported by the constant
+    // Equality comparisons on enums is not yet supported by the constant
     // evaluator.
     if case .private = privacy {
       preamble |= PreambleBitMask.privateBitMask.rawValue

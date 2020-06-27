@@ -1932,7 +1932,7 @@ bool hasNItemsOrMore(
 /// Returns a raw pointer that represents the same address as the argument.
 ///
 /// This implementation can be removed once we move to C++20 where it's defined
-/// as std::to_addres().
+/// as std::to_address().
 ///
 /// The std::pointer_traits<>::to_address(p) variations of these overloads has
 /// not been implemented.

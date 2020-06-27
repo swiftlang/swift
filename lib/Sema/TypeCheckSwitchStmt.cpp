@@ -1148,7 +1148,7 @@ namespace {
       // If there's nothing else to diagnose, bail.
       if (uncovered.isEmpty()) return;
 
-      // Check if we still have to emit the main diganostic.
+      // Check if we still have to emit the main diagnostic.
       if (mainDiagType.hasValue())
         DE.diagnose(startLoc, mainDiagType.getValue());
 
@@ -1388,7 +1388,7 @@ namespace {
           if (auto *subPattern = IP->getSubPattern()) {
             // Project the cast target's subpattern.
             Space castSubSpace = projectPattern(subPattern);
-            // If we recieved a type space from a named pattern or a wildcard
+            // If we received a type space from a named pattern or a wildcard
             // we have to re-project with the cast's target type to maintain
             // consistency with the scrutinee's type.
             if (castSubSpace.getKind() == SpaceKind::Type) {
