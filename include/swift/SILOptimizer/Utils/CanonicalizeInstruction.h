@@ -35,7 +35,7 @@ namespace swift {
 /// Abstract base class. Implements all canonicalization transforms. Extended by
 /// passes to be notified of each SIL modification.
 struct CanonicalizeInstruction {
-  // May be overriden by passes.
+  // May be overridden by passes.
   static constexpr const char *defaultDebugType = "sil-canonicalize";
   const char *debugType = defaultDebugType;
 

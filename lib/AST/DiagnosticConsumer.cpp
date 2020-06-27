@@ -196,7 +196,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumer(SourceManager &SM,
                                                 const DiagnosticInfo &Info) {
-  // Ensure that a note goes to the same place as the preceeding non-note.
+  // Ensure that a note goes to the same place as the preceding non-note.
   switch (Info.Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:

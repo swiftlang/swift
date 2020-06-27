@@ -64,7 +64,7 @@ class BitPatternBuilder {
 
   // Little-endian byte order implies that elements should be
   // appended to the most significant bit. If this flag is false
-  // then elements should be appended to the least signficant
+  // then elements should be appended to the least significant
   // bit (big-endian byte order).
   bool LittleEndian;
 

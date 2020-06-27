@@ -1232,7 +1232,7 @@ bool RefactoringActionExtractFunction::performChange() {
   // Correct the given name if collision happens.
   PreferredName = correctNewDeclName(InsertToDC, PreferredName);
 
-  // Collect the paramters to pass down to the new function.
+  // Collect the parameters to pass down to the new function.
   std::vector<ReferencedDecl> Parameters;
   for (auto &RD: RangeInfo.ReferencedDecls) {
     // If the referenced decl is declared elsewhere, no need to pass as parameter
@@ -3659,7 +3659,7 @@ bool RefactoringActionSimplifyNumberLiteral::performChange() {
 static CallExpr *findTrailingClosureTarget(SourceManager &SM,
                                            ResolvedCursorInfo CursorInfo) {
   if (CursorInfo.Kind == CursorInfoKind::StmtStart)
-    // StmtStart postion can't be a part of CallExpr.
+    // StmtStart position can't be a part of CallExpr.
     return nullptr;
 
   // Find inner most CallExpr

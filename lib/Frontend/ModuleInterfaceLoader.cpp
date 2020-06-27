@@ -936,7 +936,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
                                               TrackSystemDependencies);
   // At this point we don't have an ClangImporter instance because the instance
   // is created later when we create a new ASTContext to build the interface.
-  // Thus, we have to add these extra clang flags manually here to ensure explict
+  // Thus, we have to add these extra clang flags manually here to ensure explicit
   // module building works.
   for (auto &Arg: ClangOpts.ExtraArgs) {
     astDelegate.addExtraClangArg(Arg);
@@ -1136,7 +1136,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   }
   subInvocation.getSearchPathOptions().ExplicitSwiftModules =
     searchPathOpts.ExplicitSwiftModules;
-  // Dependencies scanner shouldn't know any explict Swift modules to use.
+  // Dependencies scanner shouldn't know any explicit Swift modules to use.
   // Adding these argumnets may not be necessary.
   // FIXME: remove it?
   for (auto EM: searchPathOpts.ExplicitSwiftModules) {

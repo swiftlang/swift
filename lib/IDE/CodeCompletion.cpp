@@ -2227,7 +2227,7 @@ public:
     if (!idealTy)
       return false;
     /// Consider optional object type is the ideal.
-    /// For exmaple:
+    /// For example:
     ///   enum MyEnum { case foo, bar }
     ///   func foo(_: MyEnum?)
     ///   fooo(.<HERE>)
@@ -4785,7 +4785,7 @@ public:
     auto genericSig = VD->getDeclContext()->getGenericSignatureOfContext();
 
     if (genericSig->isConcreteType(ResultT))
-      // If it has same type requrement, we will emit the concrete type.
+      // If it has same type requirement, we will emit the concrete type.
       return nullptr;
 
     // Collect requirements on the associatedtype.

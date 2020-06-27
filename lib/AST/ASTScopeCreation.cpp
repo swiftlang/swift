@@ -261,7 +261,7 @@ public:
       return false;
     if (n.is<Expr *>())
       return true;
-    // Cannot ignore implicit statements because implict return can contain
+    // Cannot ignore implicit statements because implicit return can contain
     // scopes in the expression, such as closures.
     // But must ignore other implicit statements, e.g. brace statments
     // if they can have no children and no stmt source range.
@@ -1360,7 +1360,7 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
   return {
       insertionPoint,
-      "For top-level code decls, need the scope under, say a guard statment."};
+      "For top-level code decls, need the scope under, say a guard statement."};
 }
 
 AnnotatedInsertionPoint
