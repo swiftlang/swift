@@ -1756,7 +1756,7 @@ DeclName formDeclName(ASTContext &ctx,
                       bool isFunctionName,
                       bool isInitializer);
 
-/// Form a Swift declaration name referemce from its constituent parts.
+/// Form a Swift declaration name reference from its constituent parts.
 DeclNameRef formDeclNameRef(ASTContext &ctx,
                             StringRef baseName,
                             ArrayRef<StringRef> argumentLabels,

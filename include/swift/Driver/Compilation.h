@@ -83,7 +83,7 @@ public:
     const bool &EnableIncrementalBuild;
     const bool EnableSourceRangeDependencies;
 
-    /// If not empty, the path to use to log the comparision.
+    /// If not empty, the path to use to log the comparison.
     const StringRef CompareIncrementalSchemesPath;
 
     const unsigned SwiftInputCount;
