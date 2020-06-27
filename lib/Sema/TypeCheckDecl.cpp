@@ -25,6 +25,7 @@
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -2417,6 +2418,53 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   return namingPattern;
 }
 
+namespace {
+
+// Utility class for deterministically ordering vtable entries for
+// synthesized methods.
+struct SortedFuncList {
+  using Entry = std::pair<std::string, AbstractFunctionDecl *>;
+  SmallVector<Entry, 2> elts;
+  bool sorted = false;
+
+  void add(AbstractFunctionDecl *afd) {
+    Mangle::ASTMangler mangler;
+    std::string mangledName;
+    if (auto *cd = dyn_cast<ConstructorDecl>(afd))
+      mangledName = mangler.mangleConstructorEntity(cd, /*allocator=*/false);
+    else if (auto *dd = dyn_cast<DestructorDecl>(afd))
+      mangledName = mangler.mangleDestructorEntity(dd, /*deallocating=*/false);
+    else
+      mangledName = mangler.mangleEntity(afd);
+
+    elts.push_back(std::make_pair(mangledName, afd));
+  }
+
+  bool empty() { return elts.empty(); }
+
+  void sort() {
+    assert(!sorted);
+    sorted = true;
+    std::sort(elts.begin(),
+              elts.end(),
+              [](const Entry &lhs, const Entry &rhs) -> bool {
+                return lhs.first < rhs.first;
+              });
+  }
+
+  decltype(elts)::const_iterator begin() const {
+    assert(sorted);
+    return elts.begin();
+  }
+
+  decltype(elts)::const_iterator end() const {
+    assert(sorted);
+    return elts.end();
+  }
+};
+
+} // end namespace
+
 ArrayRef<Decl *>
 EmittedMembersRequest::evaluate(Evaluator &evaluator,
                                 ClassDecl *CD) const {
@@ -2457,16 +2505,37 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
 
-  // The projected storage wrapper ($foo) might have dynamically-dispatched
-  // accessors, so force them to be synthesized.
   for (auto *member : CD->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      // The projected storage wrapper ($foo) might have dynamically-dispatched
+      // accessors, so force them to be synthesized.
       if (var->hasAttachedPropertyWrapper())
         (void) var->getPropertyWrapperBackingProperty();
+    }
   }
 
-  auto members = CD->getMembers();
-  result.append(members.begin(), members.end());
+  SortedFuncList synthesizedMembers;
+
+  for (auto *member : CD->getMembers()) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+      // Add synthesized members to a side table and sort them by their mangled
+      // name, since they could have been added to the class in any order.
+      if (afd->isSynthesized()) {
+        synthesizedMembers.add(afd);
+        continue;
+      }
+    }
+
+    result.push_back(member);
+  }
+
+  if (!synthesizedMembers.empty()) {
+    synthesizedMembers.sort();
+
+    for (const auto &pair : synthesizedMembers)
+      result.push_back(pair.second);
+  }
+
   return Context.AllocateCopy(result);
 }
 
