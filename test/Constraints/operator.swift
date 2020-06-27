@@ -1,4 +1,3 @@
-// REQUIRES: rdar64844584
 // RUN: %target-typecheck-verify-swift
 
 // Test constraint simplification of chains of binary operators.
@@ -217,11 +216,13 @@ func rdar46459603() {
   let e = E.foo(value: "String")
   var arr = ["key": e]
 
+  // FIXME(rdar://problem/64844584) - on iOS simulator this diagnostic is flaky,
+  // either `referencing operator function '==' on 'Equatable'` or `operator function '==' requires`
   _ = arr.values == [e]
-  // expected-error@-1 {{referencing operator function '==' on 'Equatable' requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-1 {{requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
   // expected-error@-2 {{cannot convert value of type '[E]' to expected argument type 'Dictionary<String, E>.Values'}}
   _ = [arr.values] == [[e]]
-  // expected-error@-1 {{referencing operator function '==' on 'Array' requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-1 {{requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
   // expected-error@-2 {{cannot convert value of type '[E]' to expected element type 'Dictionary<String, E>.Values'}}
 }
 
