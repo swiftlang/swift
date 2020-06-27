@@ -20,7 +20,7 @@
 /// interface.
 ///
 /// SIL memory addresses used for formal access need to meet special
-/// requirements. In particular, it must be possible to identifiy the storage by
+/// requirements. In particular, it must be possible to identify the storage by
 /// following the pointer's provenance. This is *not* true for SIL memory
 /// operations in general. The utilities cannot simply bailout on unrecognized
 /// patterns. Doing so would lead to undefined program behavior, which isn't
@@ -140,7 +140,7 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 /// AccessedStorage is always valid.
 ///
 /// Note that the SILValue that represents a storage object is not
-/// necessarilly an address type. It may instead be a SILBoxType.
+/// necessarily an address type. It may instead be a SILBoxType.
 ///
 /// AccessedStorage hashing and comparison (via DenseMapInfo) is used to
 /// determine when two 'begin_access' instructions access the same or disjoint
