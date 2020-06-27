@@ -1503,8 +1503,10 @@ struct ExplicitSwiftModuleLoader::Implementation {
       return;
     }
     StringRef Buffer = fileBufOrErr->get()->getBuffer();
-    Stream Stream(llvm::MemoryBufferRef(Buffer, fileName),
-                        Ctx.SourceMgr.getLLVMSourceMgr());
+    // Use a new source manager instead of the one from ASTContext because we
+    // don't want the JSON file to be persistent.
+    llvm::SourceMgr SM;
+    Stream Stream(llvm::MemoryBufferRef(Buffer, fileName), SM);
     for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
       assert(DI != Stream.end() && "Failed to read a document");
       if (auto *MN = dyn_cast_or_null<SequenceNode>(DI->getRoot())) {
