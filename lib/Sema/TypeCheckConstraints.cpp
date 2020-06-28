@@ -3250,7 +3250,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   auto checkElementCast = [&](Type fromElt, Type toElt,
                               CheckedCastKind castKind) -> CheckedCastKind {
     // Let's not emit diagnostic when the element type is erased because
-    // we can't statically known about if element is convertible.
+    // we can't statically known if element is convertible.
     if (fromElt->isAny() || toElt->isAny())
       return castKind;
     
