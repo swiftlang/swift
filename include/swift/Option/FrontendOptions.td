@@ -221,7 +221,7 @@ def swift_module_file
   : Separate<["-"], "swift-module-file">, MetaVarName<"<path>">,
     HelpText<"Specify Swift module explicitly built from textual interface">;
 
-def explict_swift_module_map
+def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
 }
