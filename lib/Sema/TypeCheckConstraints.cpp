@@ -3249,6 +3249,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   auto checkElementCast = [&](Type fromElt, Type toElt,
                               CheckedCastKind castKind) -> CheckedCastKind {
+    // Let's not emit diagnostic when the element type is erased because
+    // we can't statically known about if element is convertible.
+    if (fromElt->isAny() || toElt->isAny())
+      return castKind;
+    
     switch (typeCheckCheckedCast(fromElt, toElt, CheckedCastContextKind::None,
                                  dc, SourceLoc(), nullptr, SourceRange())) {
     case CheckedCastKind::Coercion:
@@ -3357,7 +3362,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         const auto &fromElt = fromTuple->getElement(i);
         const auto &toElt = toTuple->getElement(i);
 
-        if (fromElt.getName() != toElt.getName())
+        // We only should perform name validation if both element have name
+        // bacause unlabeled tuple elements can be converted to labeled ones
+        // e.g.
+        // 
+        // let tup: (Any, Any) = (1, 1)
+        // _ = tup as! (a: Int, Int)
+        if ((!fromElt.getName().empty() && !toElt.getName().empty()) &&
+            fromElt.getName() != toElt.getName())
           return failed();
 
         auto result = checkElementCast(fromElt.getType(), toElt.getType(),
@@ -3487,6 +3499,17 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool toExistential = toType->isExistentialType();
   bool fromExistential = fromType->isExistentialType();
 
+  auto genericTypeHasExistentialArgument = [](Type type) {
+    if (auto toGeneric = type->getAs<BoundGenericType>()) {
+      return llvm::any_of(toGeneric->getGenericArgs(), [](Type argumentType) {
+        return argumentType->isExistentialType();
+      });
+    }
+    return false;
+  };
+
+  bool toHasGenericExistential = genericTypeHasExistentialArgument(toType);
+
   bool toRequiresClass;
   if (toType->isExistentialType())
     toRequiresClass = toType->getExistentialLayout().requiresClass();
@@ -3544,7 +3567,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // Note: we relax the restriction if the type we're casting to is a
     // non-final class because it's possible that we might have a subclass
     // that conforms to the protocol.
-    if (fromExistential && !toExistential) {
+    //
+    // Also, relax the restriction when toType is a bounded generic with
+    // an existential argument because it may have conditional protocol 
+    // conformances. e.g.
+    //
+    //  func encodable(_ value: Encodable) {
+    //    _ = value as! [String : Encodable]
+    //  }
+    //
+    if (fromExistential && (!toExistential && !toHasGenericExistential)) {
       if (auto NTD = toType->getAnyNominal()) {
         if (!toType->is<ClassType>() || NTD->isFinal()) {
           auto protocolDecl =
@@ -3619,7 +3651,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // If the destination type can be a supertype of the source type, we are
   // performing what looks like an upcast except it rebinds generic
   // parameters.
-  if (fromType->isBindableTo(toType))
+  if (toType->isBindableTo(fromType))
     return CheckedCastKind::ValueCast;
   
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
