@@ -980,9 +980,21 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
   
   if (Builtin.ID == BuiltinValueKind::ZeroInitializer) {
-    // Build a zero initializer of the result type.
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
+    auto genericArg = substitutions.getReplacementTypes()[0];
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM, genericArg);
+    // If the builtin returns void (and the generic argument isn't void), this
+    // is an address.
+    if (resultType.isVoid() && !genericArg->isVoid()) {
+      // The first (and only) argument will be a pointer. All we need to do is
+      // null it out.
+      IGF.Builder.CreateMemSet(
+          args.claimNext(), llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0),
+          valueTy.second.getSize(IGF, valueTy.first),
+          llvm::MaybeAlign(valueTy.second.getBestKnownAlignment()));
+      return;
+    }
+
+    // Otherwise, build a zero initializer of the result type.
     auto schema = valueTy.second.getSchema();
     for (auto &elt : schema) {
       out.add(llvm::Constant::getNullValue(elt.getScalarType()));

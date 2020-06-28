@@ -1,0 +1,58 @@
+// RUN: %swift -module-name main %s -emit-ir | %FileCheck %s
+
+import Builtin
+
+// CHECK-LABEL: define swiftcc void @test_trivial_type
+// CHECK: [[I32PTR:%.*]] = alloca i32, align 4
+// CHECK: [[I8PTR:%.*]] = bitcast i32* [[I32PTR]] to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8(i64 4, i8* [[I8PTR]])
+// CHECK: [[I8PTR2:%.*]] = bitcast i32* [[I32PTR]] to i8*
+// CHECK: call void @llvm.memset.p0i8.i64(i8* align 4 [[I8PTR2]], i8 0, i64 4, i1 false)
+// CHECK: ret void
+sil @test_trivial_type : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  %1 = builtin "zeroInitializer"<Builtin.Int32>(%0 : $*Builtin.Int32) : $()
+  dealloc_stack %0 : $*Builtin.Int32
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: define swiftcc void @test_object_type
+// CHECK: [[PTR:%.*]] = alloca %AnyObject, align 8
+// CHECK: [[I8PTR:%.*]] = bitcast %AnyObject* [[PTR]] to i8*
+// CHECK: call void @llvm.lifetime.start.p0i8(i64 8, i8* [[I8PTR]])
+// CHECK: [[I8PTR2:%.*]] = bitcast %AnyObject* [[PTR]] to i8*
+// CHECK: call void @llvm.memset.p0i8.i64(i8* align 8 [[I8PTR2]], i8 0, i64 8, i1 false)
+// CHECK: ret void
+sil @test_object_type : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.AnyObject
+  %1 = builtin "zeroInitializer"<Builtin.AnyObject>(%0 : $*Builtin.AnyObject) : $()
+  dealloc_stack %0 : $*Builtin.AnyObject
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK_LABEL: define swiftcc void @test_generic (%swift.type* %0, %swift.type* %T)
+// CHECK: [[TYPE_PTR:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_PTR:%.*]], i64 -1
+// CHECK: [[T_WITNESS:%.*]] = load i8**, i8*** [[WITNESS_PTR]]
+// CHECK: [[WITNESS:%.*]] = bitcast i8** [[T_WITNESS]] to %swift.vwtable*
+// CHECK: [[SIZE_PTR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[WITNESS]], i32 0, i32 8
+// CHECK: [[SIZE:%.*]] = load i64, i64* [[SIZE_PTR]]
+// CHECK: [[SIZE_TMP:%.*]] = alloca i8, i64 %size
+// CHECK: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[SIZE_TMP]])
+// CHECK: [[OBJECT_PTR:%.*]] = bitcast i8* [[SIZE_TMP]] to %swift.opaque*
+// CHECK: [[OBJECT_RAW_PTR:%.*]] = bitcast %swift.opaque* [[OBJECT_PTR]] to i8*
+// CHECK: call void @llvm.memset.p0i8.i64(i8* align 1 [[OBJECT_RAW_PTR]], i8 0, i64 [[SIZE]], i1 false)
+// CHECK: ret void
+sil @test_generic : $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  %1 = alloc_stack $T
+  %2 = builtin "zeroInitializer"<T>(%1 : $*T) : $()
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  %t = tuple ()
+  return %t : $()
+}
