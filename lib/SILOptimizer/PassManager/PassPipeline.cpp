@@ -445,10 +445,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // the stdlib and then everything else.
   P.addNonStdlibNonTransparentFunctionOwnershipModelEliminator();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions.
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
 
@@ -456,6 +452,10 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // temp-rvalue opt is here so that we can hit copies from non-ossa code that
   // is linked in from the stdlib.
   P.addTempRValueOpt();
+
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Needed to serialize static initializers of globals for cross-module
   // optimization.
