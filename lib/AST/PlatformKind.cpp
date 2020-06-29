@@ -24,6 +24,15 @@
 using namespace swift;
 
 StringRef swift::platformString(PlatformKind platform) {
+  // FIXME: Update PlatformKinds.def to use the macOS spelling by default.
+  switch (platform) {
+  case PlatformKind::OSX:
+    return "macOS";
+  case PlatformKind::OSXApplicationExtension:
+    return "macOSApplicationExtension";
+  default: break;
+  }
+
   switch (platform) {
   case PlatformKind::none:
     return "*";

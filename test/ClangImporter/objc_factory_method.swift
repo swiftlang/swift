@@ -45,7 +45,7 @@ func testFactoryWithLaterIntroducedInit() {
     // expected-note @-1 {{add 'if #available' version check}}
   
   _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available in macOS 10.52 or newer}}
-  // expected-note @-1 {{add 'if #available' version check}}  {{3-63=if #available(OSX 10.52, *) {\n      _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5)\n  \} else {\n      // Fallback on earlier versions\n  \}}}
+  // expected-note @-1 {{add 'if #available' version check}}  {{3-63=if #available(macOS 10.52, *) {\n      _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5)\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 
   
   // Don't prefer more available factory initializer over less
