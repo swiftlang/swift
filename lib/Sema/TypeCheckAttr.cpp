@@ -3661,11 +3661,13 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     if (auto *asd = dyn_cast<AbstractStorageDecl>(decl)) {
       // If accessor kind is specified, use corresponding accessor from the
       // candidate. Otherwise, use the getter by default.
-      candidate =
-          asd->getOpaqueAccessor(accessorKind.getValueOr(AccessorKind::Get));
-      // Error if candidate is missing the requested accessor.
-      if (!candidate)
-        missingAccessor = true;
+      if (accessorKind != None) {
+        candidate = asd->getAccessor(accessorKind.getValue());
+        // Error if candidate is missing the requested accessor.
+        if (!candidate)
+          missingAccessor = true;
+      } else
+        candidate = asd->getAccessor(AccessorKind::Get);
     }
     if (!candidate) {
       notFunction = true;

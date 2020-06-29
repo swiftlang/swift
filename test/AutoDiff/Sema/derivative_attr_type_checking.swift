@@ -605,7 +605,7 @@ func jvpDuplicate2(_ x: Float) -> (value: Float, differential: (Float) -> Float)
 // Test invalid original declaration kind.
 
 var globalVariable: Float
-// expected-error @+1 {{'globalVariable' does not have a 'get' accessor}}
+// expected-error @+1 {{'globalVariable' is not a 'func', 'init', 'subscript', or 'var' computed property declaration}}
 @derivative(of: globalVariable)
 func invalidOriginalDeclaration(x: Float) -> (
   value: Float, differential: (Float) -> (Float)

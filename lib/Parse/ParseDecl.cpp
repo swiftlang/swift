@@ -1098,6 +1098,7 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
 static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
                                    TypeRepr *&baseType,
                                    DeclNameRefWithLoc &original) {
+  {
   SyntaxParsingContext DeclNameContext(P.SyntaxContext,
                                        SyntaxKind::QualifiedDeclName);
   // Parse base type.
@@ -1113,7 +1114,8 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   // not. If name could not be parsed, return true for error.
   if (!original.Name)
     return true;
-
+  }
+  
   // Parse to see if this is an accessor  and set it's type.  This is an optional field.
   if (P.Tok.is(tok::period)) {
      const Token &nextToken = P.peekToken();
