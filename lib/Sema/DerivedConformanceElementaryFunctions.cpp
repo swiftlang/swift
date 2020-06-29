@@ -117,8 +117,9 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(DeclNameLoc(), nominal,
-                                                  funcDecl, funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), nominal, funcDecl,
+      funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
   // Get operator protocol requirement.
@@ -167,7 +168,7 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
       secondParamDRE =
           new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
     Expr *firstArg = new (C) MemberRefExpr(firstParamDRE, SourceLoc(), member,
-                                         DeclNameLoc(), /*Implicit*/ true);
+                                           DeclNameLoc(), /*Implicit*/ true);
     Expr *secondArg = nullptr;
     if (secondParamDRE) {
       if (op == PowInt || op == Root)

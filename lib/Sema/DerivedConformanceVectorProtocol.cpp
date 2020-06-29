@@ -105,8 +105,9 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(DeclNameLoc(), nominal,
-                                                  funcDecl, funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), nominal, funcDecl,
+      funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
   // Get method protocol requirement.
@@ -250,7 +251,8 @@ ValueDecl *DerivedConformance::deriveVectorProtocol(ValueDecl *requirement) {
   if (requirement->getBaseName() == Context.Id_subtracting)
     return deriveVectorProtocol_unaryMethodOnScalar(
         *this, C.Id_subtracting, Identifier(), C.Id_x);
-  Context.Diags.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_vector_protocol_requirement);
   return nullptr;
 }
 
@@ -261,6 +263,7 @@ Type DerivedConformance::deriveVectorProtocol(AssociatedTypeDecl *requirement) {
   if (requirement->getBaseName() == Context.Id_VectorSpaceScalar)
     return deriveVectorProtocol_VectorSpaceScalar(
         Nominal, getConformanceContext());
-  Context.Diags.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_vector_protocol_requirement);
   return nullptr;
 }
