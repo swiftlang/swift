@@ -147,11 +147,10 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
       memberOpDecl = confRef.getConcrete()->getWitnessDecl(
           operatorReq);
     assert(memberOpDecl && "Member operator declaration must exist");
-    auto memberOpDRE =
-        new (C) DeclRefExpr(memberOpDecl, DeclNameLoc(), /*Implicit*/ true);
     auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
     auto memberOpExpr =
-        new (C) DotSyntaxCallExpr(memberOpDRE, SourceLoc(), memberTypeExpr);
+        new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), memberOpDecl,
+                              DeclNameLoc(), /*Implicit*/ true);
 
     // - For unary ops, create expression:
     //   `<op>(x.member)`.

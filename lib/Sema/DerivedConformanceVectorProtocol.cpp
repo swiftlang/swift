@@ -140,22 +140,20 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
       assert(memberMethodDecl);
     }
     assert(memberMethodDecl && "Member method declaration must exist");
-    auto memberMethodDRE =
-        new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
-    memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `x.scaled(by:)`.
     // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
     // `ConstraintSystem::resolveOverload` error.
     auto *selfDRE =
         new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
-    auto *paramDRE =
-        new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
     auto memberExpr =
         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);
     auto memberMethodExpr =
-        new (C) DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberExpr);
+        new (C) MemberRefExpr(memberExpr, SourceLoc(), memberMethodDecl,
+                              DeclNameLoc(), /*Implicit*/ true);
+    auto *paramDRE =
+        new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
 
     // Create expression: `x.scaled(by: scalar)`.
     return CallExpr::createImplicit(C, memberMethodExpr, {paramDRE},
