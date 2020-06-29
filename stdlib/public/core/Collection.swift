@@ -1664,8 +1664,10 @@ extension Collection where SubSequence == Self {
   public mutating func removeFirst(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: k)..<endIndex]
+    guard let idx = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    self = self[idx..<endIndex]
   }
 }
