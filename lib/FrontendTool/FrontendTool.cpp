@@ -1270,6 +1270,19 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
   }
 
+  // Verify reference dependencies of the current compilation job. Note this
+  // must be run *before* verifying diagnostics so that the former can be tested
+  // via the latter.
+  if (opts.EnableIncrementalDependencyVerifier) {
+    if (!Instance.getPrimarySourceFiles().empty()) {
+      swift::verifyDependencies(Instance.getSourceMgr(),
+                                Instance.getPrimarySourceFiles());
+    } else {
+      swift::verifyDependencies(Instance.getSourceMgr(),
+                                Instance.getMainModule()->getFiles());
+    }
+  }
+
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitIndexData(Instance);
@@ -1552,12 +1565,6 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // the ASTContext, as that would cause the module to be freed prematurely.
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   if (!opts.DumpAPIPath.empty()) {
-    return;
-  }
-
-  // Verifying incremental dependencies relies on access to the Swift Module's
-  // source files.
-  if (opts.EnableIncrementalDependencyVerifier) {
     return;
   }
 
@@ -2226,19 +2233,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance->getMainModule(),
                        Invocation.getFrontendOptions().DumpAPIPath);
-  }
-
-  // Verify reference dependencies of the current compilation job *before*
-  // verifying diagnostics so that the former can be tested via the latter.
-  if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
-    if (!Instance->getPrimarySourceFiles().empty()) {
-      HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
-                                            Instance->getPrimarySourceFiles());
-    } else {
-      HadError |= swift::verifyDependencies(
-          Instance->getSourceMgr(),
-          Instance->getMainModule()->getFiles());
-    }
   }
 
   if (verifierEnabled) {
