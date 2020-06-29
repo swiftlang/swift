@@ -1224,9 +1224,12 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   return hadAnyError;
 }
 
-/// Returns true if an error occurred.
-static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
+static void dumpAPIIfNeeded(const CompilerInstance &Instance) {
   using namespace llvm::sys;
+  const auto &Invocation = Instance.getInvocation();
+  StringRef OutDir = Invocation.getFrontendOptions().DumpAPIPath;
+  if (OutDir.empty())
+    return;
 
   auto getOutPath = [&](SourceFile *SF) -> std::string {
     SmallString<256> Path = OutDir;
@@ -1274,16 +1277,14 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
   if (EC) {
     llvm::errs() << "error creating directory '" << OutDir << "': "
                  << EC.message() << '\n';
-    return true;
+    return;
   }
 
-  for (auto *FU : Mod->getFiles()) {
+  for (auto *FU : Instance.getMainModule()->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(FU))
       if (dumpFile(SF))
-        return true;
+        return;
   }
-
-  return false;
 }
 
 /// Perform any actions that must have access to the ASTContext, and need to be
@@ -1330,6 +1331,8 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
     
     emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
+
+    dumpAPIIfNeeded(Instance);
   }
 
   // Verify reference dependencies of the current compilation job. Note this
@@ -1623,12 +1626,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
     return;
   }
 
-  // If we're going to dump the API of the module, we cannot tear down
-  // the ASTContext, as that would cause the module to be freed prematurely.
   const auto &opts = Instance.getInvocation().getFrontendOptions();
-  if (!opts.DumpAPIPath.empty()) {
-    return;
-  }
 
   // If there are multiple primary inputs it is too soon to free
   // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
@@ -2230,10 +2228,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   int ReturnValue = 0;
   bool HadError = performCompile(*Instance, Args, ReturnValue, observer);
-  if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
-    HadError = dumpAPI(Instance->getMainModule(),
-                       Invocation.getFrontendOptions().DumpAPIPath);
-  }
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();
