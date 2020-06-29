@@ -80,7 +80,7 @@ constants.""")
         # Since we want to use pattern as a regex in some platforms, we need
         # to escape it first, and then replace the escaped slash
         # literal (r'\\/') for our platform-dependent slash regex.
-        stdin = re.sub(re.sub(b'\\\\/', slashes_re, re.escape(pattern)),
+        stdin = re.sub(re.sub(br'[/\\]', slashes_re, re.escape(pattern)),
                        replacement,
                        stdin)
 
