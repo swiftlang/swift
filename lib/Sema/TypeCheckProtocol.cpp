@@ -5629,9 +5629,9 @@ TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveDifferentiable(AssocType);
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::KeyPathIterable:
-    return derived.deriveKeyPathIterable(AssocType);
+    return std::make_pair(derived.deriveKeyPathIterable(AssocType), nullptr);
   case KnownProtocolKind::VectorProtocol:
-    return derived.deriveVectorProtocol(AssocType);
+    return std::make_pair(derived.deriveVectorProtocol(AssocType), nullptr);
   // SWIFT_ENABLE_TENSORFLOW END
   default:
     return std::make_pair(nullptr, nullptr);
