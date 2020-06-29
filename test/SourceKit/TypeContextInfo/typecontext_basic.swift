@@ -27,3 +27,10 @@ func test(obj: C) {
 
 // RUN: %sourcekitd-test -req=typecontextinfo -repeat-request=2 -pos=25:22 %s -- %s > %t.response
 // RUN: %diff -u %s.response %t.response
+// RUN: %sourcekitd-test -req=typecontextinfo -repeat-request=2 -pos=25:22 %s -req-opts=reuseastcontext=0 -- %s | %FileCheck %s --check-prefix=DISABLED
+
+// DISABLED-NOT: key.reuseastcontext
+// DISABLED: key.results: [
+// DISABLED-NOT: key.reuseastcontext
+// DISABLED: key.results: [
+// DISABLED-NOT: key.reuseastcontext

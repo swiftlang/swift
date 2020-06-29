@@ -220,6 +220,18 @@ public:
 };
 } // end namespace CodeCompletion
 
+namespace TypeContextInfo {
+struct Options {
+  bool reuseASTContextIfPossible = true;
+};
+} // namespace TypeContextInfo
+
+namespace ConformingMethodList {
+struct Options {
+  bool reuseASTContextIfPossible = true;
+};
+} // namespace ConformingMethodList
+
 class SwiftInterfaceGenMap {
   llvm::StringMap<SwiftInterfaceGenContextRef> IFaceGens;
   mutable llvm::sys::Mutex Mtx;
@@ -596,11 +608,13 @@ public:
                std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) override;
 
   void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                                OptionsDictionary *options,
                                 ArrayRef<const char *> Args,
                                 TypeContextInfoConsumer &Consumer,
                                 Optional<VFSOptions> vfsOptions) override;
 
   void getConformingMethodList(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                               OptionsDictionary *options,
                                ArrayRef<const char *> Args,
                                ArrayRef<const char *> ExpectedTypes,
                                ConformingMethodListConsumer &Consumer,
