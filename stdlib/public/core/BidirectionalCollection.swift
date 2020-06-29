@@ -342,9 +342,12 @@ extension BidirectionalCollection where SubSequence == Self {
   public mutating func removeLast(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
-    self = self[startIndex..<index(endIndex, offsetBy: -k)]
+    guard let end = index(endIndex, offsetBy: -k, limitedBy: startIndex)
+    else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    self = self[startIndex..<end]
   }
 }
 
