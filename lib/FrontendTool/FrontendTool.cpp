@@ -1224,6 +1224,68 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   return hadAnyError;
 }
 
+/// Returns true if an error occurred.
+static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
+  using namespace llvm::sys;
+
+  auto getOutPath = [&](SourceFile *SF) -> std::string {
+    SmallString<256> Path = OutDir;
+    StringRef Filename = SF->getFilename();
+    path::append(Path, path::filename(Filename));
+    return std::string(Path.str());
+  };
+
+  std::unordered_set<std::string> Filenames;
+
+  auto dumpFile = [&](SourceFile *SF) -> bool {
+    SmallString<512> TempBuf;
+    llvm::raw_svector_ostream TempOS(TempBuf);
+
+    PrintOptions PO = PrintOptions::printInterface();
+    PO.PrintOriginalSourceText = true;
+    PO.Indent = 2;
+    PO.PrintAccess = false;
+    PO.SkipUnderscoredStdlibProtocols = true;
+    SF->print(TempOS, PO);
+    if (TempOS.str().trim().empty())
+      return false; // nothing to show.
+
+    std::string OutPath = getOutPath(SF);
+    bool WasInserted = Filenames.insert(OutPath).second;
+    if (!WasInserted) {
+      llvm::errs() << "multiple source files ended up with the same dump API "
+                      "filename to write to: " << OutPath << '\n';
+      return true;
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(OutPath, EC, fs::FA_Read | fs::FA_Write);
+    if (EC) {
+      llvm::errs() << "error opening file '" << OutPath << "': "
+                   << EC.message() << '\n';
+      return true;
+    }
+
+    OS << TempOS.str();
+    return false;
+  };
+
+  std::error_code EC = fs::create_directories(OutDir);
+  if (EC) {
+    llvm::errs() << "error creating directory '" << OutDir << "': "
+                 << EC.message() << '\n';
+    return true;
+  }
+
+  for (auto *FU : Mod->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(FU))
+      if (dumpFile(SF))
+        return true;
+  }
+
+  return false;
+}
+
 /// Perform any actions that must have access to the ASTContext, and need to be
 /// delayed until the Swift compile pipeline has finished. This may be called
 /// before or after LLVM depending on when the ASTContext gets freed.
@@ -1794,68 +1856,6 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  isDebugCompilation, Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker());
   }
-}
-
-/// Returns true if an error occurred.
-static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
-  using namespace llvm::sys;
-
-  auto getOutPath = [&](SourceFile *SF) -> std::string {
-    SmallString<256> Path = OutDir;
-    StringRef Filename = SF->getFilename();
-    path::append(Path, path::filename(Filename));
-    return std::string(Path.str());
-  };
-
-  std::unordered_set<std::string> Filenames;
-
-  auto dumpFile = [&](SourceFile *SF) -> bool {
-    SmallString<512> TempBuf;
-    llvm::raw_svector_ostream TempOS(TempBuf);
-
-    PrintOptions PO = PrintOptions::printInterface();
-    PO.PrintOriginalSourceText = true;
-    PO.Indent = 2;
-    PO.PrintAccess = false;
-    PO.SkipUnderscoredStdlibProtocols = true;
-    SF->print(TempOS, PO);
-    if (TempOS.str().trim().empty())
-      return false; // nothing to show.
-
-    std::string OutPath = getOutPath(SF);
-    bool WasInserted = Filenames.insert(OutPath).second;
-    if (!WasInserted) {
-      llvm::errs() << "multiple source files ended up with the same dump API "
-                      "filename to write to: " << OutPath << '\n';
-      return true;
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream OS(OutPath, EC, fs::FA_Read | fs::FA_Write);
-    if (EC) {
-      llvm::errs() << "error opening file '" << OutPath << "': "
-                   << EC.message() << '\n';
-      return true;
-    }
-
-    OS << TempOS.str();
-    return false;
-  };
-
-  std::error_code EC = fs::create_directories(OutDir);
-  if (EC) {
-    llvm::errs() << "error creating directory '" << OutDir << "': "
-                 << EC.message() << '\n';
-    return true;
-  }
-
-  for (auto *FU : Mod->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(FU))
-      if (dumpFile(SF))
-        return true;
-  }
-
-  return false;
 }
 
 /// Creates a diagnostic consumer that handles dispatching diagnostics to
