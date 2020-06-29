@@ -288,8 +288,24 @@ void CompilerInstance::setupDiagnosticVerifierIfNeeded() {
   }
 }
 
+void CompilerInstance::setupDependencyTrackerIfNeeded() {
+  const auto &Invocation = getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+
+  if (opts.InputsAndOutputs.hasDependencyTrackerPath() ||
+      !opts.IndexStorePath.empty() || opts.TrackSystemDeps) {
+    // Note that we're tracking dependencies even when we don't need to write
+    // them directly; in particular, -track-system-dependencies affects how
+    // module interfaces get loaded, and so we need to be consistently tracking
+    // system dependencies throughout the compiler.
+    createDependencyTracker(opts.TrackSystemDeps);
+  }
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
+
+  setupDependencyTrackerIfNeeded();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.

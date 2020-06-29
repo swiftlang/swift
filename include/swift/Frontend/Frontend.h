@@ -582,6 +582,7 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDiagnosticVerifierIfNeeded();
+  void setupDependencyTrackerIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.

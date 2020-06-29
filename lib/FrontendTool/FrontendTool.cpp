@@ -2202,18 +2202,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
-  if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasDependencyTrackerPath() ||
-      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-      Invocation.getFrontendOptions().TrackSystemDeps) {
-    // Note that we're tracking dependencies even when we don't need to write
-    // them directly; in particular, -track-system-dependencies affects how
-    // module interfaces get loaded, and so we need to be consistently tracking
-    // system dependencies throughout the compiler.
-    Instance->createDependencyTracker(
-        Invocation.getFrontendOptions().TrackSystemDeps);
-  }
-
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
