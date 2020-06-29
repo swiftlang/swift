@@ -3250,7 +3250,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   auto checkElementCast = [&](Type fromElt, Type toElt,
                               CheckedCastKind castKind) -> CheckedCastKind {
     // Let's not emit diagnostic when the element type is erased because
-    // we can't statically known if element is convertible.
+    // we can't statically know if element is convertible.
     if (fromElt->isAny() || toElt->isAny())
       return castKind;
     
@@ -3362,8 +3362,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         const auto &fromElt = fromTuple->getElement(i);
         const auto &toElt = toTuple->getElement(i);
 
-        // We only should perform name validation if both element have name
-        // bacause unlabeled tuple elements can be converted to labeled ones
+        // We should only perform name validation if both element have a label,
+        // because unlabeled tuple elements can be converted to labeled ones
         // e.g.
         // 
         // let tup: (Any, Any) = (1, 1)
