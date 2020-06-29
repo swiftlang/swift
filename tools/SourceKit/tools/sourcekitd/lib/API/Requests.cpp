@@ -178,11 +178,13 @@ static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 
 static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
                                              int64_t Offset,
+                                             Optional<RequestDict> optionsDict,
                                              ArrayRef<const char *> Args,
                                              Optional<VFSOptions> vfsOptions);
 
 static sourcekitd_response_t
 conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                     Optional<RequestDict> optionsDict,
                      ArrayRef<const char *> Args,
                      ArrayRef<const char *> ExpectedTypes,
                      Optional<VFSOptions> vfsOptions);
@@ -995,7 +997,9 @@ static void handleSemanticRequest(
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return Rec(typeContextInfo(InputBuf.get(), Offset, Args,
+    Optional<RequestDict> options =
+        Req.getDictionary(KeyTypeContextInfoOptions);
+    return Rec(typeContextInfo(InputBuf.get(), Offset, options, Args,
                                std::move(vfsOptions)));
   }
 
@@ -1010,9 +1014,11 @@ static void handleSemanticRequest(
     SmallVector<const char *, 8> ExpectedTypeNames;
     if (Req.getStringArray(KeyExpectedTypes, ExpectedTypeNames, true))
       return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
+    Optional<RequestDict> options =
+        Req.getDictionary(KeyConformingMethodListOptions);
     return Rec(
-        conformingMethodList(InputBuf.get(), Offset, Args, ExpectedTypeNames,
-                             std::move(vfsOptions)));
+        conformingMethodList(InputBuf.get(), Offset, options, Args,
+                             ExpectedTypeNames, std::move(vfsOptions)));
   }
 
   if (!SourceFile.hasValue())
@@ -2266,6 +2272,7 @@ void SKGroupedCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
 
 static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
                                              int64_t Offset,
+                                             Optional<RequestDict> optionsDict,
                                              ArrayRef<const char *> Args,
                                              Optional<VFSOptions> vfsOptions) {
   ResponseBuilder RespBuilder;
@@ -2310,8 +2317,12 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
     }
   } Consumer(RespBuilder);
 
+  std::unique_ptr<SKOptionsDictionary> options;
+  if (optionsDict)
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
+
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getExpressionContextInfo(InputBuf, Offset, Args, Consumer,
+  Lang.getExpressionContextInfo(InputBuf, Offset, options.get(), Args, Consumer,
                                 std::move(vfsOptions));
 
   if (Consumer.isError())
@@ -2325,6 +2336,7 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
 
 static sourcekitd_response_t
 conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                     Optional<RequestDict> optionsDict,
                      ArrayRef<const char *> Args,
                      ArrayRef<const char *> ExpectedTypes,
                      Optional<VFSOptions> vfsOptions) {
@@ -2368,9 +2380,13 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
     }
   } Consumer(RespBuilder);
 
+  std::unique_ptr<SKOptionsDictionary> options;
+  if (optionsDict)
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
+
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getConformingMethodList(InputBuf, Offset, Args, ExpectedTypes, Consumer,
-                               std::move(vfsOptions));
+  Lang.getConformingMethodList(InputBuf, Offset, options.get(), Args,
+                               ExpectedTypes, Consumer, std::move(vfsOptions));
 
   if (Consumer.isError())
     return createErrorRequestFailed(Consumer.getErrorDescription());
