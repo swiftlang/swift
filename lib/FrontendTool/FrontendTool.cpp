@@ -793,7 +793,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps, LoaderOpts);
+      FEOpts.shouldTrackSystemDependencies(), LoaderOpts);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {

@@ -289,17 +289,28 @@ void CompilerInstance::setupDiagnosticVerifierIfNeeded() {
 }
 
 void CompilerInstance::setupDependencyTrackerIfNeeded() {
+  assert(!Context && "Must be called before the ASTContext is created");
+
   const auto &Invocation = getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
 
-  if (opts.InputsAndOutputs.hasDependencyTrackerPath() ||
-      !opts.IndexStorePath.empty() || opts.TrackSystemDeps) {
-    // Note that we're tracking dependencies even when we don't need to write
-    // them directly; in particular, -track-system-dependencies affects how
-    // module interfaces get loaded, and so we need to be consistently tracking
-    // system dependencies throughout the compiler.
-    createDependencyTracker(opts.TrackSystemDeps);
+  // Note that we may track dependencies even when we don't need to write them
+  // directly; in particular, -track-system-dependencies affects how module
+  // interfaces get loaded, and so we need to be consistently tracking system
+  // dependencies throughout the compiler.
+  auto collectionMode = opts.IntermoduleDependencyTracking;
+  if (!collectionMode) {
+    // If we have an output path specified, but no other tracking options,
+    // default to non-system dependency tracking.
+    if (opts.InputsAndOutputs.hasDependencyTrackerPath() ||
+        !opts.IndexStorePath.empty()) {
+      collectionMode = IntermoduleDepTrackingMode::ExcludeSystem;
+    }
   }
+  if (!collectionMode)
+    return;
+
+  DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -701,8 +712,8 @@ bool CompilerInvocation::shouldImportSwiftONoneSupport() const {
   // This optimization is disabled by -track-system-dependencies to preserve
   // the explicit dependency.
   const auto &options = getFrontendOptions();
-  return options.TrackSystemDeps
-      || FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
+  return options.shouldTrackSystemDependencies() ||
+         FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {

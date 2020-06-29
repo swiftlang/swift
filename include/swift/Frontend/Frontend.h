@@ -498,10 +498,6 @@ public:
     Diagnostics.removeConsumer(*DC);
   }
 
-  void createDependencyTracker(bool TrackSystemDeps) {
-    assert(!Context && "must be called before setup()");
-    DepTracker = std::make_unique<DependencyTracker>(TrackSystemDeps);
-  }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
