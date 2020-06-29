@@ -133,15 +133,13 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
       memberMethodDecl = confRef.getConcrete()->
       getWitnessDecl(methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
-    auto memberMethodDRE = new (C) DeclRefExpr(
-        memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
-    memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `Member._unpackTensorHandles(into:)`.
     auto *memberDRE = new (C) MemberRefExpr(
         selfDRE, SourceLoc(), member, DeclNameLoc(), /*Implicit*/ true);
-    auto memberMethodExpr = new (C)
-        DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberDRE);
+    auto memberMethodExpr =
+        new (C) MemberRefExpr(memberDRE, SourceLoc(), memberMethodDecl,
+                              DeclNameLoc(), /*Implicit*/ true);
 
     // Obtain the method call argument.
     auto *addressDRE = new (C) DeclRefExpr(
