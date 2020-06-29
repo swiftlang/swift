@@ -74,7 +74,8 @@ def main(arguments):
         f.write(to_unicode(json.dumps(all_records, ensure_ascii=False)))
 
     if args.response_output_file is not None:
-        with io.open(args.response_output_file, 'w', encoding='utf-8', newline='\n') as f:
+        with io.open(args.response_output_file, 'w',
+                     encoding='utf-8', newline='\n') as f:
             for line in response_file_contents:
                 f.write(to_unicode(line + " "))
 
