@@ -1241,9 +1241,13 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (auto *stats = ctx.Stats)
     countASTStats(*stats, Instance);
 
+  // Report mangling stats if there was no error.
+  if (!ctx.hadError())
+    Mangle::printManglingStats();
+
   // Make sure we didn't load a module during a parse-only invocation, unless
   // it's -emit-imported-modules, which can load modules.
-  auto action = Instance.getInvocation().getFrontendOptions().RequestedAction;
+  auto action = opts.RequestedAction;
   if (FrontendOptions::shouldActionOnlyParse(action) &&
       action != FrontendOptions::ActionType::EmitImportedModules) {
     assert(ctx.getNumLoadedModules() == 1 &&
@@ -2219,10 +2223,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   int ReturnValue = 0;
   bool HadError = performCompile(*Instance, Args, ReturnValue, observer);
-  if (!HadError) {
-    Mangle::printManglingStats();
-  }
-
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance->getMainModule(),
                        Invocation.getFrontendOptions().DumpAPIPath);
