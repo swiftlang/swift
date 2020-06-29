@@ -429,6 +429,35 @@ BUILTIN_SIL_OPERATION(IsUnique, "isUnique", Special)
 /// BridgeObject to be treated as a native object by the runtime.
 BUILTIN_SIL_OPERATION(IsUnique_native, "isUnique_native", Special)
 
+/// beginCOWMutation<T : AnyObject>(inout T) -> Int1
+///
+/// Begins a copy-on-write mutation for a buffer reference which is passed as
+/// inout argument. It returns a true if the buffer is uniquely referenced.
+/// In this case the buffer may be mutated after calling this builtin.
+///
+/// The beginCOWMutation builtin is very similar to isUnique. It just translates
+/// to a different SIL instruction (begin_cow_mutation), which is the preferred
+/// representation of COW in SIL.
+BUILTIN_SIL_OPERATION(BeginCOWMutation, "beginCOWMutation", Special)
+
+/// beginCOWMutation_native<T : AnyObject>(inout T) -> Int1
+///
+/// Like beginCOWMutation, but it's assumed that T has native Swift reference
+/// counting.
+BUILTIN_SIL_OPERATION(BeginCOWMutation_native, "beginCOWMutation_native", Special)
+
+/// endCOWMutation<T : AnyObject>(inout T)
+///
+/// Ends a copy-on-write mutation for a buffer reference which is passed as
+/// inout argument. After calling this builtin, the buffer must not be mutated.
+BUILTIN_SIL_OPERATION(EndCOWMutation, "endCOWMutation", Special)
+
+/// COWBufferForReading has type <T: AnyObject> T -> T
+///
+/// Returns the buffer reference which is passed as argument.
+/// This builtin indicates to the optimizer that the buffer is not mutable.
+BUILTIN_SIL_OPERATION(COWBufferForReading, "COWBufferForReading", Special)
+
 /// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
 BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
 

@@ -600,6 +600,31 @@ func castBitPatternFromBridgeObject(_ bo: Builtin.BridgeObject) -> Builtin.Word 
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins16beginCOWMutationySbAA1CCzF
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*C
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*C
+// CHECK: return
+func beginCOWMutation(_ c: inout C) -> Bool {
+  return Bool(_builtinBooleanLiteral: Builtin.beginCOWMutation(&c))
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins23beginCOWMutation_nativeySbAA1CCzF
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*C
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[WRITE]] : $*C to $*Builtin.NativeObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[CAST]] : $*Builtin.NativeObject
+// CHECK: return
+func beginCOWMutation_native(_ c: inout C) -> Bool {
+  return Bool(_builtinBooleanLiteral: Builtin.beginCOWMutation_native(&c))
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins14endCOWMutationyyAA1CCzF
+// CHECK:      begin_access
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: end_access
+func endCOWMutation(_ c: inout C) {
+  Builtin.endCOWMutation(&c)
+}
+
 // ----------------------------------------------------------------------------
 // isUnique variants
 // ----------------------------------------------------------------------------

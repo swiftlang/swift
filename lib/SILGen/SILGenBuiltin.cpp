@@ -901,6 +901,45 @@ emitBuiltinIsUnique_native(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(result);
 }
 
+static ManagedValue
+emitBuiltinBeginCOWMutation(SILGenFunction &SGF,
+                            SILLocation loc,
+                            SubstitutionMap subs,
+                            ArrayRef<ManagedValue> args,
+                            SGFContext C) {
+  return emitBuiltinIsUnique(SGF, loc, subs, args, C);
+}
+
+static ManagedValue
+emitBuiltinBeginCOWMutation_native(SILGenFunction &SGF,
+                            SILLocation loc,
+                            SubstitutionMap subs,
+                            ArrayRef<ManagedValue> args,
+                            SGFContext C) {
+  return emitBuiltinIsUnique_native(SGF, loc, subs, args, C);
+}
+
+static ManagedValue
+emitBuiltinEndCOWMutation(SILGenFunction &SGF,
+                           SILLocation loc,
+                           SubstitutionMap subs,
+                           ArrayRef<ManagedValue> args,
+                           SGFContext C) {
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
+static ManagedValue
+emitBuiltinCOWBufferForReading(SILGenFunction &SGF,
+                           SILLocation loc,
+                           SubstitutionMap subs,
+                           ArrayRef<ManagedValue> args,
+                           SGFContext C) {
+                          
+                          
+  assert(args.size() == 1 && "isUnique_native should have one arg.");
+  return args[0];
+}
+
 static ManagedValue emitBuiltinBindMemory(SILGenFunction &SGF,
                                           SILLocation loc,
                                           SubstitutionMap subs,
