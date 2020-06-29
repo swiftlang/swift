@@ -418,11 +418,14 @@ func testNonExhaustiveSwitch(e: E) {
 // rdar://problem/59856491
 struct TestConstraintGenerationErrors {
   @TupleBuilder var buildTupleFnBody: String {
+    let a = nil // expected-error {{'nil' requires a contextual type}}
     String(nothing) // expected-error {{cannot find 'nothing' in scope}}
   }
 
   func buildTupleClosure() {
-    tuplify(true) { _ in
+    // FIXME: suppress the ambiguity error
+    tuplify(true) { _ in // expected-error {{type of expression is ambiguous without more context}}
+      let a = nothing // expected-error {{cannot find 'nothing' in scope}}
       String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
   }
