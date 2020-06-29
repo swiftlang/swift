@@ -2266,12 +2266,14 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
   ResponseBuilder RespBuilder;
 
   class Consumer : public TypeContextInfoConsumer {
+    ResponseBuilder RespBuilder;
     ResponseBuilder::Array SKResults;
     Optional<std::string> ErrorDescription;
 
   public:
     Consumer(ResponseBuilder Builder)
-        : SKResults(Builder.getDictionary().setArray(KeyResults)) {}
+        : RespBuilder(Builder),
+          SKResults(Builder.getDictionary().setArray(KeyResults)) {}
 
     void handleResult(const TypeContextInfoItem &Item) override {
       auto SKElem = SKResults.appendDictionary();
@@ -2286,6 +2288,11 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
         if (!member.DocBrief.empty())
           memberElem.set(KeyDocBrief, member.DocBrief);
       }
+    }
+
+    void setReusingASTContext(bool flag) override {
+      if (flag)
+        RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
     }
 
     void failed(StringRef ErrDescription) override {
@@ -2339,6 +2346,11 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
         if (!member.DocBrief.empty())
           memberElem.set(KeyDocBrief, member.DocBrief);
       }
+    }
+
+    void setReusingASTContext(bool flag) override {
+      if (flag)
+        SKResult.setBool(KeyReusingASTContext, flag);
     }
 
     void failed(StringRef ErrDescription) override {

@@ -25,5 +25,5 @@ func test(obj: C) {
   let _ = obj.foo(x: 
 }
 
-// RUN: %sourcekitd-test -req=typecontextinfo -pos=25:22 %s -- %s > %t.response
+// RUN: %sourcekitd-test -req=typecontextinfo -repeat-request=2 -pos=25:22 %s -- %s > %t.response
 // RUN: %diff -u %s.response %t.response

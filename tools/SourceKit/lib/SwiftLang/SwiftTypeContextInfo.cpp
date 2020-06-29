@@ -41,6 +41,7 @@ static bool swiftTypeContextInfoImpl(
 
         auto SF = CI.getCodeCompletionFile();
         performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        Consumer.setReusingASTContext(reusingASTContext);
       });
 }
 
@@ -144,9 +145,13 @@ void SwiftLangSupport::getExpressionContextInfo(
     Consumer(SourceKit::TypeContextInfoConsumer &SKConsumer)
         : SKConsumer(SKConsumer){};
 
-    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) {
+    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) override {
       for (auto &Item : Results)
         handleSingleResult(Item);
+    }
+
+    void setReusingASTContext(bool flag) override {
+      SKConsumer.setReusingASTContext(flag);
     }
   } Consumer(SKConsumer);
 
