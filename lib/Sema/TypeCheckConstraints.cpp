@@ -3648,9 +3648,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ValueCast;
   }
 
-  // If the destination type can be a supertype of the source type, we are
-  // performing what looks like an upcast except it rebinds generic
-  // parameters.
+  // If it is possible to substitute the generic arguments of source type
+  // with the destination generic archetypes, we are performing what looks
+  // like an upcast except it rebinds generic parameters.
   if (toType->isBindableTo(fromType))
     return CheckedCastKind::ValueCast;
   

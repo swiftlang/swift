@@ -343,7 +343,7 @@ extension Int: JSONLeaf { }
 extension Array: JSON where Element: JSON { }
 
 protocol SR13035Error: Error {}
-struct ChildError: SR13035Error {}
+class ChildError: SR13035Error {}
 
 protocol AnyC {
   func foo()
@@ -385,7 +385,11 @@ func tests_SR13088_false_positive_always_fail_casts() {
 
   // SR-13035
   func SR13035<SomeError: SR13035Error>(_ mockResult: Result<String, ChildError>, _: Result<String, SomeError>) {
-      let _ = mockResult as? Result<String, SomeError> // Ok
+    let _ = mockResult as? Result<String, SomeError> // Ok
+  }
+
+  func SR13035_1<SomeError: SR13035Error, Child: ChildError>(_ mockResult: Result<String, Child>, _: Result<String, SomeError>) {
+    let _ = mockResult as? Result<String, SomeError> // Ok
   }
 
   // SR-11434 and SR-12321
