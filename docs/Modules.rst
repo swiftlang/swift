@@ -441,10 +441,6 @@ Glossary
 
     __ https://en.wikipedia.org/wiki/Name_mangling#C.2B.2B
 
-  module
-    An entity containing the API for a library, to be `imported <import>` into
-    a source file.
-
   qualified name
     A multi-piece name like ``Foundation.NSWindow``, which names an entity
     within a particular context. This document is concerned with the case where
@@ -463,9 +459,3 @@ Glossary
   SIL
     "Swift Intermediate Language", a stable IR for the distribution of
     inlineable code.
-
-
-  target
-    A dynamic library, framework, plug-in, or application to be built.
-    A natural LTO boundary, and roughly the same as what Xcode requires
-    separate targets to build.
