@@ -13,11 +13,14 @@ protocol P {
 extension P {
   func protocolMethod(asc: Assoc) -> Self { return self }
 }
+enum MyEnum {
+    case foo, bar
+}
 
 class C : P {
   typealias Assoc = String
   static func staticMethod() -> Self {}
-  func instanceMethod(x: Int) -> C {}
+  func instanceMethod(x: MyEnum) -> C {}
   func methodForTarget1() -> ConcreteTarget1 {}
   func methodForTarget2() -> ConcreteTarget2 {}
 }
@@ -25,6 +28,14 @@ class C : P {
 func testing(obj: C) {
   let _ = obj.
 }
+func testing(obj: C) {
+  let _ = obj.instanceMethod(x: )
+}
 
-// RUN: %sourcekitd-test -req=conformingmethods -pos=26:14 -repeat-request=2 %s -req-opts=expectedtypes='$s8MyModule7Target2PD;$s8MyModule7Target1PD' -- -module-name MyModule %s > %t.response
+
+// RUN: %sourcekitd-test \
+// RUN:   -req=complete -pos=29:14 %s -- %s -module-name MyModule == \
+// RUN:   -req=conformingmethods -pos=29:14 -req-opts=expectedtypes='$s8MyModule7Target2PD;$s8MyModule7Target1PD' %s -- %s -module-name MyModule == \
+// RUN:   -req=typecontextinfo -pos=32:33 %s -- %s -module-name MyModule == \
+// RUN:   -req=complete -pos=29:14 %s -- %s -module-name MyModule > %t.response
 // RUN: %diff -u %s.response %t.response

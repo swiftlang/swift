@@ -619,6 +619,7 @@ public:
 
   virtual void handleResult(const TypeContextInfoItem &Result) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
 };
 
 struct ConformingMethodListResult {
@@ -643,6 +644,7 @@ public:
   virtual ~ConformingMethodListConsumer() {}
 
   virtual void handleResult(const ConformingMethodListResult &Result) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
 };
 

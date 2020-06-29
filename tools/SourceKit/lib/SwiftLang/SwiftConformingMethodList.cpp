@@ -44,6 +44,7 @@ static bool swiftConformingMethodListImpl(
 
         auto *SF = CI.getCodeCompletionFile();
         performCodeCompletionSecondPass(*SF, *callbacksFactory);
+        Consumer.setReusingASTContext(reusingASTContext);
       });
 }
 
@@ -68,7 +69,7 @@ void SwiftLangSupport::getConformingMethodList(
         : SKConsumer(SKConsumer) {}
 
     /// Convert an IDE result to a SK result and send it to \c SKConsumer .
-    void handleResult(const ide::ConformingMethodListResult &Result) {
+    void handleResult(const ide::ConformingMethodListResult &Result) override {
       SmallString<512> SS;
       llvm::raw_svector_ostream OS(SS);
 
@@ -171,6 +172,10 @@ void SwiftLangSupport::getConformingMethodList(
       SKResult.Members = SKMembers;
 
       SKConsumer.handleResult(SKResult);
+    }
+
+    void setReusingASTContext(bool flag) override {
+      SKConsumer.setReusingASTContext(flag);
     }
   } Consumer(SKConsumer);
 
