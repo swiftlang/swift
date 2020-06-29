@@ -415,14 +415,13 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
   while (VD->isImplicit() && VD->getOverriddenDecl())
     VD = VD->getOverriddenDecl();
 
-  // If this is a property wrapper backing property (_foo) or projected value
-  // ($foo) and the wrapped property is not implicit, still print it.
-  if (auto *VarD = dyn_cast<VarDecl>(VD)) {
-    if (auto *Wrapped = VarD->getOriginalWrappedProperty()) {
-      if (!Wrapped->isImplicit())
-        PO.TreatAsExplicitDeclList.push_back(VD);
-    }
-  }
+  // VD may be a compiler synthesized member, constructor, or shorthand argument
+  // so always print it even if it's implicit.
+  //
+  // FIXME: Update PrintOptions::printQuickHelpDeclaration to print implicit
+  // decls by default. That causes issues due to newlines being printed before
+  // implicit OpaqueTypeDecls at time of writing.
+  PO.TreatAsExplicitDeclList.push_back(VD);
 
   // Wrap this up in XML, as that's what we'll use for documentation comments.
   OS<<"<Declaration>";
@@ -446,14 +445,14 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   while (VD->isImplicit() && VD->getOverriddenDecl())
     VD = VD->getOverriddenDecl();
 
-  // If this is a property wrapper backing property (_foo) or projected value
-  // ($foo) and the wrapped property is not implicit, still print it.
-  if (auto *VarD = dyn_cast<VarDecl>(VD)) {
-    if (auto *Wrapped = VarD->getOriginalWrappedProperty()) {
-      if (!Wrapped->isImplicit())
-        PO.TreatAsExplicitDeclList.push_back(VD);
-    }
-  }
+  // VD may be a compiler synthesized member, constructor, or shorthand argument
+  // so always print it even if it's implicit.
+  //
+  // FIXME: Update PrintOptions::printQuickHelpDeclaration to print implicit
+  // decls by default. That causes issues due to newlines being printed before
+  // implicit OpaqueTypeDecls at time of writing.
+  PO.TreatAsExplicitDeclList.push_back(VD);
+
   VD->print(Printer, PO);
 }
 
