@@ -878,10 +878,6 @@ Optional<Type> ConstraintSystem::isSetType(Type type) {
   return None;
 }
 
-bool ConstraintSystem::isCollectionType(Type type) {
-  return type->isStdlibCollectionType();
-}
-
 bool ConstraintSystem::isAnyHashableType(Type type) {
   if (auto st = type->getAs<StructType>()) {
     auto &ctx = type->getASTContext();

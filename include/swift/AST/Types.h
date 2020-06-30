@@ -789,7 +789,7 @@ public:
   
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
-  bool isStdlibCollectionType();
+  bool isKnownStdlibCollectionType();
 
   /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.

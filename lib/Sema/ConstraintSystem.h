@@ -3348,9 +3348,6 @@ public:
   /// element type of the set.
   static Optional<Type> isSetType(Type t);
 
-  /// Determine if the type in question is one of the known collection types.
-  static bool isCollectionType(Type t);
-
   /// Determine if the type in question is AnyHashable.
   static bool isAnyHashableType(Type t);
 

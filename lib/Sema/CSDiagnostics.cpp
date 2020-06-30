@@ -3373,7 +3373,7 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
 
   auto parentType = getType(parentExpr);
 
-  if (!isCollectionType(parentType) && !parentType->is<TupleType>())
+  if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
     return false;
 
   if (isa<TupleExpr>(parentExpr)) {

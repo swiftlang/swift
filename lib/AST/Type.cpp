@@ -759,15 +759,13 @@ bool TypeBase::isStdlibType() {
   return false;
 }
 
-bool TypeBase::isStdlibCollectionType() {
+bool TypeBase::isKnownStdlibCollectionType() {
   if (auto *structType = getAs<BoundGenericStructType>()) {
     auto &ctx = getASTContext();
     auto *decl = structType->getDecl();
-    if (decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
-        decl == ctx.getSetDecl())
-      return true;
+    return decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
+           decl == ctx.getSetDecl();
   }
-
   return false;
 }
 
