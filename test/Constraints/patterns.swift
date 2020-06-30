@@ -495,3 +495,14 @@ func rdar63510989() {
     // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
   }
 }
+
+// rdar://problem/64157451 - compiler crash when using undefined type in pattern
+func rdar64157451() {
+  enum E {
+  case foo(Int)
+  }
+
+  func test(e: E) {
+    if case .foo(let v as DoeNotExist) = e {} // expected-error {{cannot find type 'DoeNotExist' in scope}}
+  }
+}
