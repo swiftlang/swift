@@ -1037,6 +1037,19 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
+// Helper function that returns the accessorkind if a token is an accessor label.
+static Optional<AccessorKind> isAccessorLabel(const Token& token) {
+  if (token.is(tok::identifier)) {
+    StringRef tokText = token.getText();
+    for (auto accessor : allAccessorKinds()) {
+       if (tokText == getAccessorLabel(accessor)) {
+          return accessor;
+       }
+    }
+  }
+  return None;
+}
+
 /// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
 /// Returns true on error. Sets `baseType` to the parsed base type if present,
 /// or to `nullptr` if not. A missing base type is not considered an error.
@@ -1065,14 +1078,8 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   // name like an accessor.
   if (P.Tok.is(tok::period)) {
      const Token &nextToken = P.peekToken();
-     if(nextToken.is(tok::identifier)) {
-        StringRef tokText = nextToken.getText();
-        for(auto accessor : allAccessorKinds()) {
-           if(tokText == getAccessorLabel(accessor)) {
-             return false;
-           }
-        }
-     }
+     if (isAccessorLabel(nextToken) != None)
+       return false;
   }
 
   backtrack.cancelBacktrack();
@@ -1115,24 +1122,20 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   if (!original.Name)
     return true;
   }
-  
-  // Parse to see if this is an accessor  and set it's type.  This is an optional field.
+
+  // Parse to see if this is an accessor and set it's type.  This is an optional field.
   if (P.Tok.is(tok::period)) {
      const Token &nextToken = P.peekToken();
-     if(nextToken.is(tok::identifier)) {
-       StringRef tokText = nextToken.getText();
-       for(auto accessor : allAccessorKinds()) {
-         if(tokText == getAccessorLabel(accessor)) {
-           original.AccessorKind = accessor;
-           P.consumeIf(tok::period);
-           P.consumeIf(tok::identifier);
-         }
-       }
+     Optional<AccessorKind> kind = isAccessorLabel(nextToken);
+     if (kind != None) {
+       original.AccessorKind = kind;
+       P.consumeIf(tok::period);
+       P.consumeIf(tok::identifier);
      }
   }
 
   return false;
-  
+
 }
 
 /// Parse a `@derivative(of:)` attribute, returning true on error.
