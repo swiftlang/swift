@@ -1126,9 +1126,14 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back("-prebuilt-module-cache-path");
     GenericArgs.push_back(prebuiltCachePath);
   }
-  subInvocation.getFrontendOptions().TrackSystemDeps = trackSystemDependencies;
   if (trackSystemDependencies) {
+    subInvocation.getFrontendOptions().IntermoduleDependencyTracking =
+        IntermoduleDepTrackingMode::IncludeSystem;
     GenericArgs.push_back("-track-system-dependencies");
+  } else {
+    // Always track at least the non-system dependencies for interface building.
+    subInvocation.getFrontendOptions().IntermoduleDependencyTracking =
+        IntermoduleDepTrackingMode::ExcludeSystem;
   }
   if (LoaderOpts.disableImplicitSwiftModule) {
     subInvocation.getFrontendOptions().DisableImplicitModules = true;
@@ -1263,7 +1268,7 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath) {
 
       // Whether or not we're tracking system dependencies affects the
       // invalidation behavior of this cache item.
-      subInvocation.getFrontendOptions().TrackSystemDeps);
+      subInvocation.getFrontendOptions().shouldTrackSystemDependencies());
 
   return llvm::APInt(64, H).toString(36, /*Signed=*/false);
 }
@@ -1341,8 +1346,6 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
 
   ForwardingDiagnosticConsumer FDC(Diags);
   subInstance.addDiagnosticConsumer(&FDC);
-  subInstance.createDependencyTracker(subInvocation.getFrontendOptions()
-    .TrackSystemDeps);
   if (subInstance.setup(subInvocation)) {
     return true;
   }

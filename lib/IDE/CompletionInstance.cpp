@@ -495,10 +495,10 @@ bool CompletionInstance::performNewOperation(
 
   auto TheInstance = std::make_unique<CompilerInstance>();
 
-  // Track dependencies in fast-completion mode to invalidate the compiler
-  // instance if any dependent files are modified.
-  if (isCachedCompletionRequested)
-    TheInstance->createDependencyTracker(false);
+  // Track non-system dependencies in fast-completion mode to invalidate the
+  // compiler instance if any dependent files are modified.
+  Invocation.getFrontendOptions().IntermoduleDependencyTracking =
+      IntermoduleDepTrackingMode::ExcludeSystem;
 
   {
     auto &CI = *TheInstance;

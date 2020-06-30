@@ -175,7 +175,7 @@ public:
   /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.
   static std::shared_ptr<clang::DependencyCollector>
-  createDependencyCollector(bool TrackSystemDeps,
+  createDependencyCollector(IntermoduleDepTrackingMode Mode,
                             std::shared_ptr<llvm::FileCollector> FileCollector);
 
   /// Append visible module names to \p names. Note that names are possibly

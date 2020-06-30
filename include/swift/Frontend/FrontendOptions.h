@@ -27,7 +27,7 @@ namespace llvm {
 }
 
 namespace swift {
-
+enum class IntermoduleDepTrackingMode;
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
@@ -237,9 +237,10 @@ public:
   /// See the \ref SILOptions.EmitSortedSIL flag.
   bool EmitSortedSIL = false;
 
-  /// Indicates whether the dependency tracker should track system
-  /// dependencies as well.
-  bool TrackSystemDeps = false;
+  /// Specifies the collection mode for the intermodule dependency tracker.
+  /// Note that if set, the dependency tracker will be enabled even if no
+  /// output path is configured.
+  Optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
 
   /// Should we serialize the hashes of dependencies (vs. the modification
   /// times) when compiling a module interface?
@@ -314,6 +315,9 @@ public:
   ArrayRef<std::string> getImplicitImportModuleNames() const {
     return ImplicitImportModuleNames;
   }
+
+  /// Whether we're configured to track system intermodule dependencies.
+  bool shouldTrackSystemDependencies() const;
 
 private:
   static bool canActionEmitDependencies(ActionType);

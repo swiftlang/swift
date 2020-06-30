@@ -81,14 +81,19 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
-  Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
+  if (Args.hasArg(OPT_track_system_dependencies)) {
+    Opts.IntermoduleDependencyTracking =
+        IntermoduleDepTrackingMode::IncludeSystem;
+  }
 
   Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
 
   // Always track system dependencies when scanning dependencies.
   if (const Arg *ModeArg = Args.getLastArg(OPT_modes_Group)) {
-    if (ModeArg->getOption().matches(OPT_scan_dependencies))
-      Opts.TrackSystemDeps = true;
+    if (ModeArg->getOption().matches(OPT_scan_dependencies)) {
+      Opts.IntermoduleDependencyTracking =
+          IntermoduleDepTrackingMode::IncludeSystem;
+    }
   }
 
   Opts.SerializeModuleInterfaceDependencyHashes |=

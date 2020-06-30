@@ -63,13 +63,22 @@ enum class Bridgeability : unsigned {
   Full
 };
 
+/// Specifies which dependencies the intermodule dependency tracker records.
+enum class IntermoduleDepTrackingMode {
+  /// Records both system and non-system dependencies.
+  IncludeSystem,
+
+  /// Records only non-system dependencies.
+  ExcludeSystem,
+};
+
 /// Records dependencies on files outside of the current module;
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
   explicit DependencyTracker(
-      bool TrackSystemDeps,
+      IntermoduleDepTrackingMode Mode,
       std::shared_ptr<llvm::FileCollector> FileCollector = {});
 
   /// Adds a file as a dependency.
