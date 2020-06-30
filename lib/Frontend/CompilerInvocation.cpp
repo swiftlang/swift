@@ -34,6 +34,11 @@ using namespace llvm::opt;
 /// The path for Swift libraries in the OS on Darwin.
 #define DARWIN_OS_LIBRARY_PATH "/usr/lib/swift"
 
+static constexpr const char *const localeCodes[] = {
+#define SUPPORTED_LOCALE(Code, Language) #Code,
+#include "swift/AST/LocalizationLanguages.def"
+};
+
 swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
@@ -57,6 +62,14 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::append(DiagnosticDocsPath, "share", "doc", "swift",
                           "diagnostics");
   DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath.str());
+
+  // Compute the path of the YAML diagnostic messages directory files
+  // in the toolchain.
+  llvm::SmallString<128> DiagnosticMessagesDir(Path);
+  llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /swift
+  llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift");
+  DiagnosticOpts.LocalizationPath = std::string(DiagnosticMessagesDir.str());
 }
 
 void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
@@ -927,6 +940,43 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
+  }
+  if (Arg *A = Args.getLastArg(OPT_locale)) {
+    std::string localeCode = A->getValue();
+
+    // Check if the locale code is available.
+    if (llvm::none_of(localeCodes, [&](const char *locale) {
+          return localeCode == locale;
+        })) {
+      std::string availableLocaleCodes = "";
+      llvm::interleave(
+          std::begin(localeCodes), std::end(localeCodes),
+          [&](std::string locale) { availableLocaleCodes += locale; },
+          [&] { availableLocaleCodes += ", "; });
+
+      Diags.diagnose(SourceLoc(), diag::error_invalid_locale_code,
+                     availableLocaleCodes);
+      return true;
+    }
+    Opts.LocalizationCode = localeCode;
+  }
+  if (Arg *A = Args.getLastArg(OPT_localization_path)) {
+    if (!llvm::sys::fs::exists(A->getValue()))
+      Diags.diagnose(SourceLoc(), diag::warning_locale_path_not_found,
+                     A->getValue());
+    else {
+      assert(!Opts.LocalizationCode.empty());
+      // Check if the localization path exists but it doesn't have a file
+      // for the specified locale code.
+      llvm::SmallString<128> localizationPath(A->getValue());
+      llvm::sys::path::append(localizationPath, Opts.LocalizationCode);
+      llvm::sys::path::replace_extension(localizationPath, ".yaml");
+      if (!llvm::sys::fs::exists(localizationPath))
+        Diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
+                       Opts.LocalizationCode, localizationPath);
+
+      Opts.LocalizationPath = A->getValue();
+    }
   }
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");
