@@ -294,8 +294,8 @@ ATTRIBUTE_NODES = [
                    description='The referenced original declaration name.'),
              Child('Period', kind='PeriodToken',
                    description='''
-                   The period separating the computed var or subscript
-                   and accessor name.
+                   The period separating the original declaration name and the
+                   accessor name.
                    ''', is_optional=True),
              Child('AccessorKind', kind='IdentifierToken',
                    description='The accessor name.',
