@@ -1,3 +1,4 @@
+// REQUIRES: rdar64941662
 // UNSUPPORTED: -windows-msvc
 
 // 1) If there is no swiftmodule, use the swiftinterface
