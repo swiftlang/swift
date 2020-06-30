@@ -516,7 +516,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     return (x, { _ in .zero })
   }
 
-
+  // expected-error @+1 {{'subscript' does not have a 'set' accessor}}
   @derivative(of: subscript.set)
   mutating func vjpSubscriptSetter(_ newValue: Float) -> (
     value: (), pullback: (inout TangentVector) -> Float
@@ -1076,4 +1076,51 @@ func internal_original_fileprivate_derivative(_ x: Float) -> Float { x }
 // expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-12=internal}}
 fileprivate func _internal_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
+}
+
+// Test invalid reference to an accessor of a non-storage declaration.
+
+func function(_ x: Float) -> Float {
+  x
+}
+
+// expected-error @+1 {{'function' does not have a 'get' accessor}}
+@derivative(of: function(_:).get)
+func vjpFunction(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// Test ambiguity that exists when Type function name is the same
+// as an accessor label.
+
+extension Float {
+  // Original function name conflicts with an accessor name ("set").
+  func set() -> Float {
+    self
+  }
+
+  // Original function name does not conflict with an accessor name.
+  func method() -> Float {
+    self
+  }
+
+  // Test ambiguous parse.
+  // Expected:
+  // - Base type: `Float`
+  // - Declaration name: `set`
+  // - Accessor kind: <none>
+  // Actual:
+  // - Base type: <none>
+  // - Declaration name: `Float`
+  // - Accessor kind: `set`
+  // expected-error @+1 {{cannot find 'Float' in scope}}
+  @derivative(of: Float.set)
+  func jvpSet() -> (value: Float, differential: (Float) -> Float) {
+    fatalError()
+  }
+
+  @derivative(of: Float.method)
+  func jvpMethod() -> (value: Float, differential: (Float) -> Float) {
+    fatalError()
+  }
 }

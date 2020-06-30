@@ -3668,6 +3668,8 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
           missingAccessor = true;
       } else
         candidate = asd->getAccessor(AccessorKind::Get);
+    } else if (accessorKind != None) {
+        missingAccessor = true;
     }
     if (!candidate) {
       notFunction = true;
@@ -3688,8 +3690,9 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     }
     resolvedCandidate = candidate;
   }
+
   // If function declaration was resolved, return it.
-  if (resolvedCandidate)
+  if (resolvedCandidate && !missingAccessor)
     return resolvedCandidate;
 
   // Otherwise, emit the appropriate diagnostic and return nullptr.
