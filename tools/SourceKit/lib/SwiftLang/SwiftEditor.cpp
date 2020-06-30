@@ -660,7 +660,7 @@ public:
   }
 
 private:
-  std::vector<SwiftSemanticToken> takeSemanticTokens(
+  std::vector<SwiftSemanticToken> getSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
 
   Optional<std::vector<DiagnosticEntryInfo>> getSemanticDiagnostics(
@@ -763,12 +763,12 @@ void SwiftDocumentSemanticInfo::readSemanticInfo(
 
   llvm::sys::ScopedLock L(Mtx);
 
-  Tokens = takeSemanticTokens(NewSnapshot);
+  Tokens = getSemanticTokens(NewSnapshot);
   Diags = getSemanticDiagnostics(NewSnapshot, ParserDiags);
 }
 
 std::vector<SwiftSemanticToken>
-SwiftDocumentSemanticInfo::takeSemanticTokens(
+SwiftDocumentSemanticInfo::getSemanticTokens(
     ImmutableTextSnapshotRef NewSnapshot) {
 
   llvm::sys::ScopedLock L(Mtx);
@@ -776,13 +776,15 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
   if (SemaToks.empty())
     return {};
 
+  auto result = SemaToks;
+
   // Adjust the position of the tokens.
   TokSnapshot->foreachReplaceUntil(NewSnapshot,
     [&](ReplaceImmutableTextUpdateRef Upd) -> bool {
-      if (SemaToks.empty())
+      if (result.empty())
         return false;
 
-      auto ReplaceBegin = std::lower_bound(SemaToks.begin(), SemaToks.end(),
+      auto ReplaceBegin = std::lower_bound(result.begin(), result.end(),
           Upd->getByteOffset(),
           [&](const SwiftSemanticToken &Tok, unsigned StartOffset) -> bool {
             return Tok.ByteOffset+Tok.Length < StartOffset;
@@ -792,7 +794,7 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
       if (Upd->getLength() == 0) {
         ReplaceEnd = ReplaceBegin;
       } else {
-        ReplaceEnd = std::upper_bound(ReplaceBegin, SemaToks.end(),
+        ReplaceEnd = std::upper_bound(ReplaceBegin, result.end(),
             Upd->getByteOffset() + Upd->getLength(),
             [&](unsigned EndOffset, const SwiftSemanticToken &Tok) -> bool {
               return EndOffset < Tok.ByteOffset;
@@ -803,14 +805,14 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
       int Delta = InsertLen - Upd->getLength();
       if (Delta != 0) {
         for (std::vector<SwiftSemanticToken>::iterator
-               I = ReplaceEnd, E = SemaToks.end(); I != E; ++I)
+               I = ReplaceEnd, E = result.end(); I != E; ++I)
           I->ByteOffset += Delta;
       }
-      SemaToks.erase(ReplaceBegin, ReplaceEnd);
+      result.erase(ReplaceBegin, ReplaceEnd);
       return true;
     });
 
-  return std::move(SemaToks);
+  return result;
 }
 
 Optional<std::vector<DiagnosticEntryInfo>>
