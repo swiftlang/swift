@@ -155,32 +155,18 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   auto origParams = origTy->getParameters();
   auto indices = witness->getSILAutoDiffIndices();
 
-  // Add pullback parameter for the seed.
-  Optional<SILParameterInfo> inoutParam;
-  bool isWrtInoutParam = false;
+  // Add pullback parameters based on original result indices.
+  SmallVector<unsigned, 4> inoutParamIndices;
   for (auto i : range(origTy->getNumParameters())) {
     auto origParam = origParams[i];
     if (!origParam.isIndirectInOut())
       continue;
-    isWrtInoutParam = indices.parameters->contains(i);
-    inoutParam = origParam;
+    inoutParamIndices.push_back(i);
   }
-  if (inoutParam) {
-    auto origResult = inoutParam->getWithInterfaceType(
-        inoutParam->getInterfaceType()->getCanonicalType(witnessCanGenSig));
-    auto inoutParamTanConvention =
-        isWrtInoutParam ? inoutParam->getConvention()
-                        : ParameterConvention::Indirect_In_Guaranteed;
-    SILParameterInfo inoutParamTanParam(
-        origResult.getInterfaceType()
-            ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()
-            ->getCanonicalType(witnessCanGenSig),
-        inoutParamTanConvention);
-    pbParams.push_back(inoutParamTanParam);
-  } else {
-    for (auto i : indices.results->getIndices()) {
-      auto origResult = origTy->getResults()[i];
+  for (auto resultIndex : indices.results->getIndices()) {
+    // Handle formal result.
+    if (resultIndex < origTy->getNumResults()) {
+      auto origResult = origTy->getResults()[resultIndex];
       origResult = origResult.getWithInterfaceType(
           origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
       pbParams.push_back(getTangentParameterInfoForOriginalResult(
@@ -189,7 +175,36 @@ SILFunction *VJPEmitter::createEmptyPullback() {
               ->getType()
               ->getCanonicalType(witnessCanGenSig),
           origResult.getConvention()));
+      continue;
     }
+    // Handle `inout` parameter.
+    unsigned paramIndex = 0;
+    unsigned inoutParamIndex = 0;
+    for (auto i : range(origTy->getNumParameters())) {
+      auto origParam = origTy->getParameters()[i];
+      if (!origParam.isIndirectMutating()) {
+        ++paramIndex;
+        continue;
+      }
+      if (inoutParamIndex == resultIndex - origTy->getNumResults())
+        break;
+      ++paramIndex;
+      ++inoutParamIndex;
+    }
+    auto inoutParam = origParams[paramIndex];
+    auto origResult = inoutParam.getWithInterfaceType(
+        inoutParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
+    auto inoutParamTanConvention =
+        indices.isWrtParameter(paramIndex)
+            ? inoutParam.getConvention()
+            : ParameterConvention::Indirect_In_Guaranteed;
+    SILParameterInfo inoutParamTanParam(
+        origResult.getInterfaceType()
+            ->getAutoDiffTangentSpace(lookupConformance)
+            ->getType()
+            ->getCanonicalType(witnessCanGenSig),
+        inoutParamTanConvention);
+    pbParams.push_back(inoutParamTanParam);
   }
 
   // Accept a pullback struct in the pullback parameter list. This is the
@@ -587,15 +602,6 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
                  activeResultIndices.begin(), activeResultIndices.end(),
                  [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
              s << "}\n";);
-  // Diagnose multiple active results.
-  // TODO(TF-983): Support multiple active results.
-  if (activeResultIndices.size() > 1) {
-    context.emitNondifferentiabilityError(
-        ai, invoker,
-        diag::autodiff_cannot_differentiate_through_multiple_results);
-    errorOccurred = true;
-    return;
-  }
 
   // Form expected indices.
   auto numSemanticResults =
