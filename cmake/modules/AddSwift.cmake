@@ -88,6 +88,9 @@ function(_add_host_variant_c_compile_link_flags name)
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     target_compile_options(${name} PRIVATE -target;${target})
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+      target_link_options(${name} PRIVATE -target;${target})
+    endif()
   endif()
 
   set(_sysroot
