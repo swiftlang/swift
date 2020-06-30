@@ -961,19 +961,19 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Opts.LocalizationCode = localeCode;
   }
   if (Arg *A = Args.getLastArg(OPT_localization_path)) {
-    if (!llvm::sys::fs::exists(A->getValue()))
+    if (!llvm::sys::fs::exists(A->getValue())) {
       Diags.diagnose(SourceLoc(), diag::warning_locale_path_not_found,
                      A->getValue());
-    else {
-      assert(!Opts.LocalizationCode.empty());
+    } else if (!Opts.LocalizationCode.empty()) {
       // Check if the localization path exists but it doesn't have a file
       // for the specified locale code.
       llvm::SmallString<128> localizationPath(A->getValue());
       llvm::sys::path::append(localizationPath, Opts.LocalizationCode);
       llvm::sys::path::replace_extension(localizationPath, ".yaml");
-      if (!llvm::sys::fs::exists(localizationPath))
+      if (!llvm::sys::fs::exists(localizationPath)) {
         Diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
                        Opts.LocalizationCode, localizationPath);
+      }
 
       Opts.LocalizationPath = A->getValue();
     }
