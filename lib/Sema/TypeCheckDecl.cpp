@@ -2504,6 +2504,10 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
+  // SWIFT_ENABLE_TENSORFLOW
+  forceConformance(
+      Context.getProtocol(KnownProtocolKind::EuclideanDifferentiable));
+  // SWIFT_ENABLE_TENSORFLOW END
 
   for (auto *member : CD->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
