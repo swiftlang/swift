@@ -105,7 +105,7 @@ def run_command(args, dry_run):
     try:
         out, err = proc.communicate()
         exitcode = proc.returncode
-        return (exitcode, out, err)
+        return (exitcode, out.decode('utf-8'), err.decode('utf-8'))
     except KeyboardInterrupt:
         proc.terminate()
         raise
