@@ -2282,12 +2282,17 @@ namespace {
 
         return setType(ParenType::get(CS.getASTContext(), underlyingType));
       }
-      case PatternKind::Var:
+      case PatternKind::Var: {
+        auto *subPattern = cast<VarPattern>(pattern)->getSubPattern();
+        auto type = getTypeForPattern(subPattern, locator, externalPatternType,
+                                      bindPatternVarsOneWay);
+
+        if (!type)
+          return Type();
+
         // Var doesn't affect the type.
-        return setType(
-            getTypeForPattern(
-              cast<VarPattern>(pattern)->getSubPattern(), locator,
-              externalPatternType, bindPatternVarsOneWay));
+        return setType(type);
+      }
 
       case PatternKind::Any: {
         return setType(
@@ -3925,7 +3930,9 @@ static bool generateInitPatternConstraints(
       pattern, locator, target.shouldBindPatternVarsOneWay(),
       target.getInitializationPatternBindingDecl(),
       target.getInitializationPatternBindingIndex());
-  assert(patternType && "All patterns have a type");
+
+  if (!patternType)
+    return true;
 
   if (auto wrappedVar = target.getInitializationWrappedVar()) {
     Type propertyType = generateWrappedPropertyTypeConstraints(
