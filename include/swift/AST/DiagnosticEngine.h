@@ -740,10 +740,9 @@ namespace swift {
     }
 
     void setLocalization(std::string locale, std::string path) {
-      assert(!locale.empty());
-      assert(!path.empty());
-      localization =
-          std::make_unique<diag::YAMLLocalizationProducer>(locale, path);
+      if (!locale.empty() && !path.empty())
+        localization =
+            std::make_unique<diag::YAMLLocalizationProducer>(locale, path);
     }
 
     void ignoreDiagnostic(DiagID id) {
