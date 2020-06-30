@@ -3499,17 +3499,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool toExistential = toType->isExistentialType();
   bool fromExistential = fromType->isExistentialType();
 
-  auto genericTypeHasExistentialArgument = [](Type type) {
-    if (auto toGeneric = type->getAs<BoundGenericType>()) {
-      return llvm::any_of(toGeneric->getGenericArgs(), [](Type argumentType) {
-        return argumentType->isExistentialType();
-      });
-    }
-    return false;
-  };
-
-  bool toHasGenericExistential = genericTypeHasExistentialArgument(toType);
-
   bool toRequiresClass;
   if (toType->isExistentialType())
     toRequiresClass = toType->getExistentialLayout().requiresClass();
@@ -3568,21 +3557,22 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // non-final class because it's possible that we might have a subclass
     // that conforms to the protocol.
     //
-    // Also, relax the restriction when toType is a bounded generic with
-    // an existential argument because it may have conditional protocol 
-    // conformances. e.g.
+    //  Also, relax the restriction when toType is a stdlib collection type
+    //  (Array, Set, Dictionary) that could have conditional conformances
+    //  because of custom casting implemented for those types e.g.
     //
     //  func encodable(_ value: Encodable) {
     //    _ = value as! [String : Encodable]
     //  }
     //
-    if (fromExistential && (!toExistential && !toHasGenericExistential)) {
+    if (fromExistential && !toExistential) {
       if (auto NTD = toType->getAnyNominal()) {
         if (!toType->is<ClassType>() || NTD->isFinal()) {
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
-          if (protocolDecl &&
-              !conformsToProtocol(toType, protocolDecl, dc)) {
+          if (protocolDecl && !conformsToProtocol(toType, protocolDecl, dc) &&
+              !(toType->isStdlibCollectionType() &&
+                getStdlibModule(dc)->lookupConformance(toType, protocolDecl))) {
             return failed();
           }
         }
