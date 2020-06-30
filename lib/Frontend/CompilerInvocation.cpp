@@ -956,8 +956,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
       Diags.diagnose(SourceLoc(), diag::warning_invalid_locale_code,
                      availableLocaleCodes);
+    } else {
+      Opts.LocalizationCode = localeCode;
     }
-    Opts.LocalizationCode = localeCode;
   }
   if (Arg *A = Args.getLastArg(OPT_localization_path)) {
     if (!llvm::sys::fs::exists(A->getValue())) {
