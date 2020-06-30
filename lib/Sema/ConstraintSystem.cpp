@@ -879,15 +879,7 @@ Optional<Type> ConstraintSystem::isSetType(Type type) {
 }
 
 bool ConstraintSystem::isCollectionType(Type type) {
-  if (auto *structType = type->getAs<BoundGenericStructType>()) {
-    auto &ctx = type->getASTContext();
-    auto *decl = structType->getDecl();
-    if (decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
-        decl == ctx.getSetDecl())
-      return true;
-  }
-
-  return false;
+  return type->isStdlibCollectionType();
 }
 
 bool ConstraintSystem::isAnyHashableType(Type type) {
