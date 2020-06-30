@@ -383,6 +383,11 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
+  if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
+    Diagnostics.setLocalization(
+        Invocation.getDiagnosticOptions().LocalizationCode,
+        Invocation.getDiagnosticOptions().LocalizationPath);
+  }
 }
 
 // The ordering of ModuleLoaders is important!
