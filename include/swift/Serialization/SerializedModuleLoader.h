@@ -445,12 +445,7 @@ public:
   }
 };
 
-Optional<StringRef>
-computePrebuiltModulePath(ASTContext &ctx,
-                          StringRef interfacePath,
-                          StringRef prebuiltCacheDir,
-                          StringRef moduleName,
-                          llvm::SmallString<256> &scratch);
+
 } // end namespace swift
 
 #endif
