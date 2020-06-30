@@ -575,6 +575,7 @@ function(add_swift_host_tool executable)
   add_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
   _add_host_variant_c_compile_flags(${executable})
   _add_host_variant_link_flags(${executable})
+  _add_host_variant_c_compile_link_flags(${executable})
   target_link_directories(${executable} PRIVATE
     ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
   add_dependencies(${executable} ${LLVM_COMMON_DEPENDS})
@@ -589,11 +590,6 @@ function(add_swift_host_tool executable)
     set_target_properties(${executable} PROPERTIES
       BUILD_WITH_INSTALL_RPATH YES
       INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    target_link_options(${executable} PRIVATE -target;${target})
   endif()
 
   llvm_update_compile_flags(${executable})
