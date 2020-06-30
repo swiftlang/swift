@@ -13,6 +13,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
@@ -591,4 +592,9 @@ FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
 const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return InputsAndOutputs.getPrimarySpecificPathsForPrimary(filename);
+}
+
+bool FrontendOptions::shouldTrackSystemDependencies() const {
+  return IntermoduleDependencyTracking ==
+         IntermoduleDepTrackingMode::IncludeSystem;
 }
