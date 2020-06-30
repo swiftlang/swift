@@ -26,20 +26,22 @@ import re
 import sys
 import time
 import urllib
-if sys.version_info[0] < 3:
-    import urllib2
-    Request = urllib2.Request
-    URLOpen = urllib2.urlopen
-else:
-    import urllib.request, urllib.parse, urllib.error
-    Request = urllib.request.Request
-    URLOpen = urllib.request.urlopen
 from collections import namedtuple
 from operator import attrgetter
 
 from jobstats import (list_stats_dir_profiles,
                       load_stats_dir, merge_all_jobstats)
 
+if sys.version_info[0] < 3:
+    import urllib2
+    Request = urllib2.Request
+    URLOpen = urllib2.urlopen
+else:
+    import urllib.request
+    import urllib.parse
+    import urllib.error
+    Request = urllib.request.Request
+    URLOpen = urllib.request.urlopen
 
 MODULE_PAT = re.compile(r'^(\w+)\.')
 
