@@ -416,6 +416,10 @@ def main():
     non_stdlib_module_files = (
         x for x in module_files if x.name != STDLIB_NAME)
     status = process_module_files(pool, non_stdlib_module_files)
+    if os.name == 'nt':
+        import ctypes
+        Kernel32 = ctypes.cdll.LoadLibrary("Kernel32.dll")
+        Kernel32.ExitProcess(ctypes.c_ulong(status))
     sys.exit(status)
 
 
