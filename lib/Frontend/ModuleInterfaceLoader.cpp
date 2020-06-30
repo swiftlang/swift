@@ -590,11 +590,9 @@ class ModuleInterfaceLoaderImpl {
     return path.startswith(resourceDir);
   }
 
-  /// Finds the most appropriate .swiftmodule, whose dependencies are up to
-  /// date, that we can load for the provided .swiftinterface file.
-  llvm::ErrorOr<DiscoveredModule> discoverUpToDateModuleForInterface(
-    StringRef modulePath, StringRef cachedOutputPath,
-    SmallVectorImpl<FileDependency> &deps) {
+  llvm::ErrorOr<DiscoveredModule>
+  discoverUpToDateCompiledModuleForInterface(SmallVectorImpl<FileDependency> &deps,
+                                             std::string &UsableModulePath) {
     auto notFoundError =
       std::make_error_code(std::errc::no_such_file_or_directory);
 
@@ -619,50 +617,6 @@ class ModuleInterfaceLoaderImpl {
     case ModuleLoadingMode::OnlySerialized:
       llvm_unreachable("module interface loader should not have been created");
     }
-
-
-    // First, check the cached module path. Whatever's in this cache represents
-    // the most up-to-date knowledge we have about the module.
-    if (auto cachedBufOrError = fs.getBufferForFile(cachedOutputPath)) {
-      auto buf = std::move(*cachedBufOrError);
-
-      // Check to see if the module is a serialized AST. If it's not, then we're
-      // probably dealing with a Forwarding Module, which is a YAML file.
-      bool isForwardingModule =
-        !serialization::isSerializedAST(buf->getBuffer());
-
-      // If it's a forwarding module, load the YAML file from disk and check
-      // if it's up-to-date.
-      if (isForwardingModule) {
-        if (auto forwardingModule = ForwardingModule::load(*buf)) {
-          std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-          if (forwardingModuleIsUpToDate(cachedOutputPath,
-                                         *forwardingModule, deps,
-                                         moduleBuffer)) {
-            LLVM_DEBUG(llvm::dbgs() << "Found up-to-date forwarding module at "
-                                    << cachedOutputPath << "\n");
-            return DiscoveredModule::forwarded(
-              forwardingModule->underlyingModulePath, std::move(moduleBuffer));
-          }
-
-          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date forwarding module at "
-                     << cachedOutputPath << "\n");
-          rebuildInfo.setModuleKind(cachedOutputPath,
-                                    ModuleRebuildInfo::ModuleKind::Forwarding);
-        }
-      // Otherwise, check if the AST buffer itself is up to date.
-      } else if (serializedASTBufferIsUpToDate(cachedOutputPath, *buf, deps)) {
-        LLVM_DEBUG(llvm::dbgs() << "Found up-to-date cached module at "
-                                << cachedOutputPath << "\n");
-        return DiscoveredModule::normal(cachedOutputPath, std::move(buf));
-      } else {
-        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date cached module at "
-                   << cachedOutputPath << "\n");
-        rebuildInfo.setModuleKind(cachedOutputPath,
-                                  ModuleRebuildInfo::ModuleKind::Cached);
-      }
-    }
-
     // [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]
     // If there's a module adjacent to the .swiftinterface that we can
     // _likely_ load (it validates OK and is up to date), bail early with
@@ -680,6 +634,7 @@ class ModuleInterfaceLoaderImpl {
           LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
                                   << modulePath
                                   << "; deferring to serialized module loader\n");
+          UsableModulePath = modulePath.str();
           return std::make_error_code(std::errc::not_supported);
         } else if (isInResourceDir(modulePath) &&
                    loadMode == ModuleLoadingMode::PreferSerialized) {
@@ -725,6 +680,7 @@ class ModuleInterfaceLoaderImpl {
         if (swiftModuleIsUpToDate(*path, deps, moduleBuffer)) {
           LLVM_DEBUG(llvm::dbgs() << "Found up-to-date prebuilt module at "
                                   << path->str() << "\n");
+          UsableModulePath = path->str();
           return DiscoveredModule::prebuilt(*path, std::move(moduleBuffer));
         } else {
           LLVM_DEBUG(llvm::dbgs() << "Found out-of-date prebuilt module at "
@@ -738,6 +694,57 @@ class ModuleInterfaceLoaderImpl {
     // Couldn't find an up-to-date .swiftmodule, will need to build module from
     // interface.
     return notFoundError;
+  }
+
+  /// Finds the most appropriate .swiftmodule, whose dependencies are up to
+  /// date, that we can load for the provided .swiftinterface file.
+  llvm::ErrorOr<DiscoveredModule> discoverUpToDateModuleForInterface(
+    StringRef cachedOutputPath,
+    SmallVectorImpl<FileDependency> &deps) {
+
+    // First, check the cached module path. Whatever's in this cache represents
+    // the most up-to-date knowledge we have about the module.
+    if (auto cachedBufOrError = fs.getBufferForFile(cachedOutputPath)) {
+      auto buf = std::move(*cachedBufOrError);
+
+      // Check to see if the module is a serialized AST. If it's not, then we're
+      // probably dealing with a Forwarding Module, which is a YAML file.
+      bool isForwardingModule =
+        !serialization::isSerializedAST(buf->getBuffer());
+
+      // If it's a forwarding module, load the YAML file from disk and check
+      // if it's up-to-date.
+      if (isForwardingModule) {
+        if (auto forwardingModule = ForwardingModule::load(*buf)) {
+          std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+          if (forwardingModuleIsUpToDate(cachedOutputPath,
+                                         *forwardingModule, deps,
+                                         moduleBuffer)) {
+            LLVM_DEBUG(llvm::dbgs() << "Found up-to-date forwarding module at "
+                                    << cachedOutputPath << "\n");
+            return DiscoveredModule::forwarded(
+              forwardingModule->underlyingModulePath, std::move(moduleBuffer));
+          }
+
+          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date forwarding module at "
+                     << cachedOutputPath << "\n");
+          rebuildInfo.setModuleKind(cachedOutputPath,
+                                    ModuleRebuildInfo::ModuleKind::Forwarding);
+        }
+      // Otherwise, check if the AST buffer itself is up to date.
+      } else if (serializedASTBufferIsUpToDate(cachedOutputPath, *buf, deps)) {
+        LLVM_DEBUG(llvm::dbgs() << "Found up-to-date cached module at "
+                                << cachedOutputPath << "\n");
+        return DiscoveredModule::normal(cachedOutputPath, std::move(buf));
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date cached module at "
+                   << cachedOutputPath << "\n");
+        rebuildInfo.setModuleKind(cachedOutputPath,
+                                  ModuleRebuildInfo::ModuleKind::Cached);
+      }
+    }
+    std::string usableModulePath;
+    return discoverUpToDateCompiledModuleForInterface(deps, usableModulePath);
   }
 
   /// Writes the "forwarding module" that will forward to a module in the
@@ -847,7 +854,7 @@ class ModuleInterfaceLoaderImpl {
     // in the cache, or in the prebuilt cache.
     SmallVector<FileDependency, 16> allDeps;
     auto moduleOrErr =
-      discoverUpToDateModuleForInterface(modulePath, cachedOutputPath, allDeps);
+      discoverUpToDateModuleForInterface(cachedOutputPath, allDeps);
 
     // If we errored with anything other than 'no such file or directory',
     // fail this load and let the other module loader diagnose it.
@@ -993,6 +1000,25 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
+std::string
+ModuleInterfaceLoader::getUpToDateCompiledModuleForInterface(StringRef moduleName,
+                                                      StringRef interfacePath) {
+  // Derive .swiftmodule path from the .swiftinterface path.
+  auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
+  llvm::SmallString<32> modulePath = interfacePath;
+  llvm::sys::path::replace_extension(modulePath, newExt);
+  ModuleInterfaceLoaderImpl Impl(
+                Ctx, modulePath, interfacePath, moduleName,
+                CacheDir, PrebuiltCacheDir, SourceLoc(),
+                Opts,
+                dependencyTracker,
+                llvm::is_contained(PreferInterfaceForModules, moduleName) ?
+                  ModuleLoadingMode::PreferInterface : LoadMode);
+  SmallVector<FileDependency, 16> allDeps;
+  std::string usableModulePath;
+  Impl.discoverUpToDateCompiledModuleForInterface(allDeps, usableModulePath);
+  return usableModulePath;
+}
 
 bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
