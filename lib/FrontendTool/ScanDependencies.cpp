@@ -78,7 +78,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                               ModuleCachePath,
                                               FEOpts.PrebuiltModuleCachePath,
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                              FEOpts.TrackSystemDeps);
+                                              FEOpts.shouldTrackSystemDependencies());
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
