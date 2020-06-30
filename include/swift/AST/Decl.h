@@ -535,16 +535,13 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1,
     /// Whether this class inherits its superclass's convenience initializers.
     InheritsSuperclassInits : 1,
     ComputedInheritsSuperclassInits : 1,
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
-
-    /// \see ClassDecl::getEmittedMembers()
-    HasForcedEmittedMembers : 1,
 
     HasMissingDesignatedInitializers : 1,
     ComputedHasMissingDesignatedInitializers : 1,
@@ -3870,14 +3867,6 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
-  bool hasForcedEmittedMembers() const {
-    return Bits.ClassDecl.HasForcedEmittedMembers;
-  }
-
-  void setHasForcedEmittedMembers() {
-    Bits.ClassDecl.HasForcedEmittedMembers = true;
-  }
-
   Optional<bool> getCachedInheritsSuperclassInitializers() const {
     if (Bits.ClassDecl.ComputedInheritsSuperclassInits)
       return Bits.ClassDecl.InheritsSuperclassInits;
@@ -4103,7 +4092,7 @@ public:
 
   /// Get all the members of this class, synthesizing any implicit members
   /// that appear in the vtable if needed.
-  DeclRange getEmittedMembers() const;
+  ArrayRef<Decl *> getEmittedMembers() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

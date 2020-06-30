@@ -24,7 +24,7 @@
 // RUN: %target-build-swift -typecheck -incremental -enable-bridging-pch -output-file-map %t.json -import-objc-header %S/Inputs/bridging-header.h %s
 
 // RUN: mkdir %t/tmp
-// RUN: env TMP="%t/tmp/" TMPDIR="%t/tmp/" not %target-build-swift -typecheck -import-objc-header %S/../Inputs/empty.h -driver-use-frontend-path "%{python};%S/Inputs/crash-after-generating-pch.py" -v %s
+// RUN: env TMP="%t/tmp/" TMPDIR="%t/tmp/" not %target-build-swift -typecheck -import-objc-header %S/../Inputs/empty.h -driver-use-frontend-path "%{python.unquoted};%S/Inputs/crash-after-generating-pch.py" -v %s
 // RUN: ls %/t/tmp/ | grep .*pch
 
 // Test persistent PCH

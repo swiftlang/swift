@@ -4310,11 +4310,11 @@ DestructorDecl *ClassDecl::getDestructor() const {
                            nullptr);
 }
 
-DeclRange ClassDecl::getEmittedMembers() const {
+ArrayRef<Decl *> ClassDecl::getEmittedMembers() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
                            EmittedMembersRequest{const_cast<ClassDecl *>(this)},
-                           getMembers());
+                           ArrayRef<Decl *>());
 }
 
 /// Synthesizer callback for an empty implicit function body.
@@ -4342,6 +4342,10 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
   if (ctx.LangOpts.EnableObjCInterop)
     CD->recordObjCMethod(DD, DD->getObjCSelector());
+
+  // Mark it as synthesized to make its location in getEmittedMembers()
+  // deterministic.
+  DD->setSynthesized(true);
 
   return DD;
 }

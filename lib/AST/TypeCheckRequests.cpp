@@ -789,23 +789,6 @@ void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
 }
 
 //----------------------------------------------------------------------------//
-// EmittedMembersRequest computation.
-//----------------------------------------------------------------------------//
-
-Optional<DeclRange>
-EmittedMembersRequest::getCachedResult() const {
-  auto *classDecl = std::get<0>(getStorage());
-  if (classDecl->hasForcedEmittedMembers())
-    return classDecl->getMembers();
-  return None;
-}
-
-void EmittedMembersRequest::cacheResult(DeclRange result) const {
-  auto *classDecl = std::get<0>(getStorage());
-  classDecl->setHasForcedEmittedMembers();
-}
-
-//----------------------------------------------------------------------------//
 // IsImplicitlyUnwrappedOptionalRequest computation.
 //----------------------------------------------------------------------------//
 

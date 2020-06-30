@@ -1,7 +1,7 @@
 # Differentiable Programming Manifesto
 
 *   Authors: [Richard Wei], [Dan Zheng], [Marc Rasi], [Bart Chrzaszcz]
-*   Status: Partially implemented
+*   Status: Partially implemented on master, feature gated under `import _Differentiation`
 
 ## Table of contents
 
