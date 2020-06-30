@@ -320,10 +320,8 @@ public:
         
         // FIXME: This code needs to be cleaned up and updated
         // to make it work for 32 bit platforms.
-        if (SectionName != ".sw5cptr" && SectionName != ".sw5bltn") {
-          Begin = Begin.atByteOffset(8);
-          Size -= 16;
-        }
+        Begin = Begin.atByteOffset(8);
+        Size -= 16;
 
         return {Begin, Size};
       }
