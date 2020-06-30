@@ -3105,7 +3105,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       }
 
       // In the context of collection element we just return a value cast
-      // becasue there may be situation where this can be convertible
+      // because there may be situations where this can be convertible
       // at runtime. e.g.
       //
       // func f(a: [Any], b: [AnyObject]) {
@@ -3568,9 +3568,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // non-final class because it's possible that we might have a subclass
     // that conforms to the protocol.
     //
-    //  Also, relax the restriction when toType is a stdlib collection type
+    //  Also, relax the restriction when toType is a stdlib collection
     //  (Array, Set, Dictionary) that could have conditional conformances
-    //  because of custom casting implemented for those types e.g.
+    //  because of custom casting mechanism implemented for those types e.g.
     //
     //  func encodable(_ value: Encodable) {
     //    _ = value as! [String : Encodable]
@@ -3651,8 +3651,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // If it is possible to substitute the generic arguments of source type
   // with the destination generic archetypes, we are performing what looks
-  // like an upcast except it rebinds generic parameters.
-  if (toType->isBindableTo(fromType))
+  // like an upcast except it rebinds generic parameters. Or substitute
+  // destination to source generic archetypes, where we are performing
+  // what looks like an downcast except it also rebinds generic parameters.
+  if (toType->isBindableTo(fromType) || fromType->isBindableTo(toType))
     return CheckedCastKind::ValueCast;
   
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,

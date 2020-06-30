@@ -387,12 +387,13 @@ func tests_SR13088_false_positive_always_fail_casts() {
   _ = b as? [String?] // Ok
 
   // SR-13035
-  func SR13035<SomeError: SR13035Error>(_ mockResult: Result<String, ChildError>, _: Result<String, SomeError>) {
-    let _ = mockResult as? Result<String, SomeError> // Ok
+  func SR13035<SomeError: SR13035Error>(_ child: Result<String, ChildError>, _: Result<String, SomeError>) {
+    let _ = child as? Result<String, SomeError> // Ok
   }
 
-  func SR13035_1<SomeError: SR13035Error, Child: ChildError>(_ mockResult: Result<String, Child>, _: Result<String, SomeError>) {
-    let _ = mockResult as? Result<String, SomeError> // Ok
+  func SR13035_1<SomeError: SR13035Error, Child: ChildError>(_ child: Result<String, Child>, parent: Result<String, SomeError>) {
+    _ = child as? Result<String, SomeError> // Ok
+    _ = parent as? Result<String, Child> // OK
   }
 
   // SR-11434 and SR-12321
