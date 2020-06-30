@@ -283,8 +283,10 @@ protected:
       auto target = SolutionApplicationTarget::forInitialization(
           patternBinding->getInit(index), dc, patternType, pattern,
           /*bindPatternVarsOneWay=*/true);
-      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+        hadError = true;
         continue;
+      }
 
       // Keep track of this binding entry.
       applied.patternBindingEntries.insert({{patternBinding, index}, target});
