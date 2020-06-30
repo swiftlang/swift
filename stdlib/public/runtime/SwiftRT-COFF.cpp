@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ImageInspectionCOFF.h"
+#include "ImageInspectionCommon.h"
+#include "../SwiftShims/MetadataSections.h"
 
 #include <cstdint>
 
@@ -46,7 +47,9 @@ DECLARE_SWIFT_SECTION(sw5flmd)
 DECLARE_SWIFT_SECTION(sw5asty)
 DECLARE_SWIFT_SECTION(sw5repl)
 DECLARE_SWIFT_SECTION(sw5reps)
-}
+DECLARE_SWIFT_SECTION(sw5bltn)
+DECLARE_SWIFT_SECTION(sw5cptr)
+ }
 
 namespace {
 static swift::MetadataSections sections{};
@@ -74,6 +77,8 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(sw5asty),
       SWIFT_SECTION_RANGE(sw5repl),
       SWIFT_SECTION_RANGE(sw5reps),
+      SWIFT_SECTION_RANGE(sw5bltn),
+      SWIFT_SECTION_RANGE(sw5cptr),
   };
 
 #undef SWIFT_SECTION_RANGE

@@ -45,6 +45,7 @@ set(swift_runtime_sources
     Float16Support.cpp
     Heap.cpp
     HeapObject.cpp
+    ImageInspectionCommon.cpp
     ImageInspectionMachO.cpp
     ImageInspectionELF.cpp
     ImageInspectionCOFF.cpp
