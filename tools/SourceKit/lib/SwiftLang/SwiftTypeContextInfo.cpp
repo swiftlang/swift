@@ -25,6 +25,13 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+static void translateTypeContextInfoOptions(OptionsDictionary &from,
+                                            TypeContextInfo::Options &to) {
+  static UIdent KeyReuseASTContext("key.typecontextinfo.reuseastcontext");
+
+  from.valueForOption(KeyReuseASTContext, to.reuseASTContextIfPossible);
+}
+
 static bool swiftTypeContextInfoImpl(
     SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
     unsigned Offset, ide::TypeContextInfoConsumer &Consumer,
@@ -41,15 +48,21 @@ static bool swiftTypeContextInfoImpl(
 
         auto SF = CI.getCodeCompletionFile();
         performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        Consumer.setReusingASTContext(reusingASTContext);
       });
 }
 
 void SwiftLangSupport::getExpressionContextInfo(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args,
+    OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
     SourceKit::TypeContextInfoConsumer &SKConsumer,
     Optional<VFSOptions> vfsOptions) {
   std::string error;
+
+  TypeContextInfo::Options options;
+  if (optionsDict) {
+    translateTypeContextInfoOptions(*optionsDict, options);
+  }
 
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
@@ -144,15 +157,19 @@ void SwiftLangSupport::getExpressionContextInfo(
     Consumer(SourceKit::TypeContextInfoConsumer &SKConsumer)
         : SKConsumer(SKConsumer){};
 
-    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) {
+    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) override {
       for (auto &Item : Results)
         handleSingleResult(Item);
+    }
+
+    void setReusingASTContext(bool flag) override {
+      SKConsumer.setReusingASTContext(flag);
     }
   } Consumer(SKConsumer);
 
   if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Consumer,
-                                Args, fileSystem, /*EnableASTCaching=*/false,
-                                error)) {
+                                Args, fileSystem,
+                                options.reuseASTContextIfPossible, error)) {
     SKConsumer.failed(error);
   }
 }

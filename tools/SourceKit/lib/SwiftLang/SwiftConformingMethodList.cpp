@@ -26,6 +26,13 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+static void translateConformingMethodListOptions(OptionsDictionary &from,
+                                                 ConformingMethodList::Options &to) {
+  static UIdent KeyReuseASTContext("key.conformingmethods.reuseastcontext");
+
+  from.valueForOption(KeyReuseASTContext, to.reuseASTContextIfPossible);
+}
+
 static bool swiftConformingMethodListImpl(
     SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
     unsigned Offset, ArrayRef<const char *> Args,
@@ -44,12 +51,14 @@ static bool swiftConformingMethodListImpl(
 
         auto SF = CI.getCodeCompletionFile();
         performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
+        Consumer.setReusingASTContext(reusingASTContext);
       });
 }
 
 void SwiftLangSupport::getConformingMethodList(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedTypeNames,
+    OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
+    ArrayRef<const char *> ExpectedTypeNames,
     SourceKit::ConformingMethodListConsumer &SKConsumer,
     Optional<VFSOptions> vfsOptions) {
   std::string error;
@@ -60,6 +69,11 @@ void SwiftLangSupport::getConformingMethodList(
   if (!fileSystem)
     return SKConsumer.failed(error);
 
+  ConformingMethodList::Options options;
+  if (optionsDict) {
+    translateConformingMethodListOptions(*optionsDict, options);
+  }
+
   class Consumer : public ide::ConformingMethodListConsumer {
     SourceKit::ConformingMethodListConsumer &SKConsumer;
 
@@ -68,7 +82,7 @@ void SwiftLangSupport::getConformingMethodList(
         : SKConsumer(SKConsumer) {}
 
     /// Convert an IDE result to a SK result and send it to \c SKConsumer .
-    void handleResult(const ide::ConformingMethodListResult &Result) {
+    void handleResult(const ide::ConformingMethodListResult &Result) override {
       SmallString<512> SS;
       llvm::raw_svector_ostream OS(SS);
 
@@ -172,11 +186,15 @@ void SwiftLangSupport::getConformingMethodList(
 
       SKConsumer.handleResult(SKResult);
     }
+
+    void setReusingASTContext(bool flag) override {
+      SKConsumer.setReusingASTContext(flag);
+    }
   } Consumer(SKConsumer);
 
   if (!swiftConformingMethodListImpl(*this, UnresolvedInputFile, Offset, Args,
                                      ExpectedTypeNames, Consumer, fileSystem,
-                                     /*EnableASTCaching=*/false, error)) {
+                                     options.reuseASTContextIfPossible, error)) {
     SKConsumer.failed(error);
   }
 }
