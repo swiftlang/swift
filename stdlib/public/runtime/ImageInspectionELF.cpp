@@ -20,6 +20,7 @@
 
 #if defined(__ELF__)
 
+#include "../SwiftShims/MetadataSections.h"
 #include "ImageInspection.h"
 #include "ImageInspectionELF.h"
 #include <dlfcn.h>
@@ -27,9 +28,9 @@
 using namespace swift;
 
 namespace {
-static const swift::MetadataSections *registered = nullptr;
+static swift::MetadataSections *registered = nullptr;
 
-void record(const swift::MetadataSections *sections) {
+void record(swift::MetadataSections *sections) {
   if (registered == nullptr) {
     registered = sections;
     sections->next = sections->prev = sections;
@@ -45,7 +46,7 @@ void record(const swift::MetadataSections *sections) {
 void swift::initializeProtocolLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
-    const swift::MetadataSections::Range &protocols =
+    const swift::MetadataSectionRange &protocols =
         sections->swift5_protocols;
     if (protocols.length)
       addImageProtocolsBlockCallbackUnsafe(
@@ -59,7 +60,7 @@ void swift::initializeProtocolLookup() {
 void swift::initializeProtocolConformanceLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
-    const swift::MetadataSections::Range &conformances =
+    const swift::MetadataSectionRange &conformances =
         sections->swift5_protocol_conformances;
     if (conformances.length)
       addImageProtocolConformanceBlockCallbackUnsafe(
@@ -74,7 +75,7 @@ void swift::initializeProtocolConformanceLookup() {
 void swift::initializeTypeMetadataRecordLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
-    const swift::MetadataSections::Range &type_metadata =
+    const swift::MetadataSectionRange &type_metadata =
         sections->swift5_type_metadata;
     if (type_metadata.length)
       addImageTypeMetadataRecordBlockCallbackUnsafe(
@@ -98,7 +99,11 @@ void swift_addNewDSOImage(const void *addr) {
   const swift::MetadataSections *sections =
       static_cast<const swift::MetadataSections *>(addr);
 
-  record(sections);
+  // We cast off the const in order to update the linked list
+  // data structure. This is safe to do since we don't touch 
+  // any other fields.
+  auto casted_sections = const_cast<MetadataSections *>(sections);
+  record(casted_sections);
 
   const auto &protocols_section = sections->swift5_protocols;
   const void *protocols =

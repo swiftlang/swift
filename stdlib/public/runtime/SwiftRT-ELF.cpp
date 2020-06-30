@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImageInspectionELF.h"
+#include "../SwiftShims/MetadataSections.h"
 
 #include <cstddef>
 

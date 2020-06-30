@@ -2339,7 +2339,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
               auto *fix = fixRequirementFailure(*this, type1, type2, locator);
               if (fix && !recordFix(fix)) {
-                recordFixedRequirement(type1, RequirementKind::Layout, type2);
+                recordFixedRequirement(getConstraintLocator(locator), type2);
                 return getTypeMatchSuccess();
               }
             }
@@ -3875,14 +3875,13 @@ bool ConstraintSystem::repairFailures(
     if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
       break;
 
-    auto reqElt = elt.castTo<LocatorPathElt::AnyRequirement>();
-    auto reqKind = reqElt.getRequirementKind();
+    auto *reqLoc = getConstraintLocator(locator);
 
-    if (hasFixedRequirement(lhs, reqKind, rhs))
+    if (isFixedRequirement(reqLoc, rhs))
       return true;
 
     if (auto *fix = fixRequirementFailure(*this, lhs, rhs, anchor, path)) {
-      recordFixedRequirement(lhs, reqKind, rhs);
+      recordFixedRequirement(reqLoc, rhs);
       conversionsOrFixes.push_back(fix);
     }
     break;
@@ -5404,7 +5403,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   auto protocolTy = protocol->getDeclaredType();
 
   // If this conformance has been fixed already, let's just consider this done.
-  if (hasFixedRequirement(type, RequirementKind::Conformance, protocolTy))
+  if (isFixedRequirement(getConstraintLocator(locator), protocolTy))
     return SolutionKind::Solved;
 
   // If this is a generic requirement let's try to record that
@@ -5491,7 +5490,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         auto impact = assessRequirementFailureImpact(*this, rawType, locator);
         if (!recordFix(fix, impact)) {
           // Record this conformance requirement as "fixed".
-          recordFixedRequirement(type, RequirementKind::Conformance,
+          recordFixedRequirement(getConstraintLocator(anchor, path),
                                  protocolTy);
           return SolutionKind::Solved;
         }
@@ -5697,26 +5696,41 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   // If the base type is not optional, let's attempt a fix (if possible)
   // and assume that `!` is just not there.
   if (!objectTy) {
-    // Let's see if we can apply a specific fix here.
-    if (shouldAttemptFixes()) {
-      if (optTy->isHole())
-        return SolutionKind::Solved;
-
-      auto *fix =
-          RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
-
-      if (recordFix(fix))
-        return SolutionKind::Error;
-
-      // If the fix was successful let's record
-      // "fixed" object type and continue.
-      objectTy = optTy;
-    } else {
-      // If fixes are not allowed, no choice but to fail.
+    if (!shouldAttemptFixes())
       return SolutionKind::Error;
+    
+    // Let's see if we can apply a specific fix here.
+    if (optTy->isHole())
+      return SolutionKind::Solved;
+    
+    auto fnType = optTy->getAs<FunctionType>();
+    if (fnType && fnType->getNumParams() == 0) {
+      // For function types with no parameters, let's try to
+      // offer a "make it a call" fix if possible.
+      auto optionalResultType = fnType->getResult()->getOptionalObjectType();
+      if (optionalResultType) {
+        if (matchTypes(optionalResultType, second, ConstraintKind::Bind,
+                       flags | TMF_ApplyingFix, locator)
+                .isSuccess()) {
+          auto *fix =
+              InsertExplicitCall::create(*this, getConstraintLocator(locator));
+
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+        }
+      }
     }
+
+    auto *fix =
+        RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
+
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    // If the fix was successful let's record
+    // "fixed" object type and continue.
+    objectTy = optTy;
   }
-  
+
   // The object type is an lvalue if the optional was.
   if (optLValueTy->is<LValueType>())
     objectTy = LValueType::get(objectTy);
@@ -6950,11 +6964,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       SmallVector<Constraint *, 2> optionalities;
       auto nonoptionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::create(*this, member, locator), memberTy, innerTV,
-          locator);
+          UnwrapOptionalBase::create(*this, member, baseObjTy, locator),
+          memberTy, innerTV, locator);
       auto optionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::createWithOptionalResult(*this, member, locator),
+          UnwrapOptionalBase::createWithOptionalResult(*this, member,
+                                                       baseObjTy, locator),
           optTy, memberTy, locator);
       optionalities.push_back(nonoptionalResult);
       optionalities.push_back(optionalResult);
