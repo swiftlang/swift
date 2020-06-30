@@ -82,11 +82,8 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
                                                     ProtocolDecl *proto) {
   target = context->mapTypeIntoContext(target);
 
-  if (isIUO) {
-    return typeConformsToCodable(context,
-                                 target->lookThroughSingleOptionalType(),
-                                 false, proto);
-  }
+  if (isIUO)
+    target = target->lookThroughSingleOptionalType();
 
   auto conf = TypeChecker::conformsToProtocol(target, proto, context);
   return conf.isInvalid() ? DoesNotConform : Conforms;
