@@ -1123,7 +1123,7 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
     return true;
   }
 
-  // Parse to see if this is an accessor and set it's type.  This is an optional field.
+  // Parse an optional accessor kind.
   if (P.Tok.is(tok::period)) {
      const Token &nextToken = P.peekToken();
      Optional<AccessorKind> kind = isAccessorLabel(nextToken);
