@@ -18,6 +18,9 @@
 //
 // REQUIRES: objc_interop
 
+// The UIKit overlay isn't present on iOS 10.3.
+// UNSUPPORTED: CPU=i386
+
 import StdlibUnittest
 import StdlibUnittestFoundationExtras
 import Foundation
