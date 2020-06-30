@@ -1037,15 +1037,14 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
-// Helper function that returns the accessorkind if a token is an accessor label.
-static Optional<AccessorKind> isAccessorLabel(const Token& token) {
+// Helper function that returns the accessor kind if a token is an accessor
+// label.
+static Optional<AccessorKind> isAccessorLabel(const Token &token) {
   if (token.is(tok::identifier)) {
     StringRef tokText = token.getText();
-    for (auto accessor : allAccessorKinds()) {
-       if (tokText == getAccessorLabel(accessor)) {
-          return accessor;
-       }
-    }
+    for (auto accessor : allAccessorKinds())
+      if (tokText == getAccessorLabel(accessor))
+        return accessor;
   }
   return None;
 }
@@ -1077,9 +1076,9 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   // property with an accessor, this could be a type with a function
   // name like an accessor.
   if (P.Tok.is(tok::period)) {
-     const Token &nextToken = P.peekToken();
-     if (isAccessorLabel(nextToken) != None)
-       return false;
+    const Token &nextToken = P.peekToken();
+    if (isAccessorLabel(nextToken).hasValue())
+      return false;
   }
 
   backtrack.cancelBacktrack();
@@ -1106,36 +1105,35 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
                                    TypeRepr *&baseType,
                                    DeclNameRefWithLoc &original) {
   {
-  SyntaxParsingContext DeclNameContext(P.SyntaxContext,
-                                       SyntaxKind::QualifiedDeclName);
-  // Parse base type.
-  if (parseBaseTypeForQualifiedDeclName(P, baseType))
-    return true;
-  // Parse final declaration name.
-  original.Name = P.parseDeclNameRef(
-      original.Loc, nameParseError,
-      Parser::DeclNameFlag::AllowZeroArgCompoundNames |
-      Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
-      Parser::DeclNameFlag::AllowOperators);
-  // The base type is optional, but the final unqualified declaration name is
-  // not. If name could not be parsed, return true for error.
-  if (!original.Name)
-    return true;
+    SyntaxParsingContext DeclNameContext(P.SyntaxContext,
+                                         SyntaxKind::QualifiedDeclName);
+    // Parse base type.
+    if (parseBaseTypeForQualifiedDeclName(P, baseType))
+      return true;
+    // Parse final declaration name.
+    original.Name = P.parseDeclNameRef(
+        original.Loc, nameParseError,
+        Parser::DeclNameFlag::AllowZeroArgCompoundNames |
+            Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
+            Parser::DeclNameFlag::AllowOperators);
+    // The base type is optional, but the final unqualified declaration name is
+    // not. If name could not be parsed, return true for error.
+    if (!original.Name)
+      return true;
   }
 
   // Parse an optional accessor kind.
   if (P.Tok.is(tok::period)) {
-     const Token &nextToken = P.peekToken();
-     Optional<AccessorKind> kind = isAccessorLabel(nextToken);
-     if (kind != None) {
-       original.AccessorKind = kind;
-       P.consumeIf(tok::period);
-       P.consumeIf(tok::identifier);
-     }
+    const Token &nextToken = P.peekToken();
+    Optional<AccessorKind> kind = isAccessorLabel(nextToken);
+    if (kind.hasValue()) {
+      original.AccessorKind = kind;
+      P.consumeIf(tok::period);
+      P.consumeIf(tok::identifier);
+    }
   }
 
   return false;
-
 }
 
 /// Parse a `@derivative(of:)` attribute, returning true on error.
