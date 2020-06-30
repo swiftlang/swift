@@ -379,9 +379,12 @@ func tests_SR13088_false_positive_always_fail_casts() {
 
   // SR-7187
   let a: [Any] = [String?.some("hello") as Any, String?.none as Any]
+  let b: [AnyObject] = [String?.some("hello") as AnyObject, String?.none as AnyObject]
 
   _ = a is [String?] // Ok
   _ = a as? [String?] // Ok
+  _ = b is [String?] // Ok
+  _ = b as? [String?] // Ok
 
   // SR-13035
   func SR13035<SomeError: SR13035Error>(_ mockResult: Result<String, ChildError>, _: Result<String, SomeError>) {

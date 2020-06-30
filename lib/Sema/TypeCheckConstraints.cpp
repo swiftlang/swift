@@ -3037,7 +3037,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                                   Expr *fromExpr,
                                                   SourceRange diagToRange) {
   // Determine whether we should suppress diagnostics.
-  const bool suppressDiagnostics = contextKind == CheckedCastContextKind::None;
+  const bool suppressDiagnostics =
+      contextKind == CheckedCastContextKind::None ||
+      contextKind == CheckedCastContextKind::CollectionElement;
   assert((suppressDiagnostics || diagLoc.isValid()) &&
          "diagnostics require a valid source location");
 
@@ -3101,7 +3103,18 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           .highlight(diagFromRange)
           .highlight(diagToRange);
       }
-      return CheckedCastKind::Unresolved;
+
+      // In the context of collection element we just return a value cast
+      // becasue there may be situation where this can be convertible
+      // at runtime. e.g.
+      //
+      // func f(a: [Any], b: [AnyObject]) {
+      //   _ = a is [String?] // Ok
+      //   - = b is [String?] // Ok
+      // }
+      return (contextKind != CheckedCastContextKind::CollectionElement)
+                 ? CheckedCastKind::Unresolved
+                 : CheckedCastKind::ValueCast;
     }
 
     toType = toValueType;
@@ -3132,6 +3145,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           !fromType->isEqual(toType) && !isConvertibleTo(fromType, toType, dc);
 
         switch (contextKind) {
+        case CheckedCastContextKind::CollectionElement:
         case CheckedCastContextKind::None:
           llvm_unreachable("suppressing diagnostics");
 
@@ -3249,12 +3263,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   auto checkElementCast = [&](Type fromElt, Type toElt,
                               CheckedCastKind castKind) -> CheckedCastKind {
-    // Let's not emit diagnostic when the element type is erased because
-    // we can't statically know if element is convertible.
-    if (fromElt->isAny() || toElt->isAny())
-      return castKind;
-    
-    switch (typeCheckCheckedCast(fromElt, toElt, CheckedCastContextKind::None,
+    switch (typeCheckCheckedCast(fromElt, toElt,
+                                 CheckedCastContextKind::CollectionElement,
                                  dc, SourceLoc(), nullptr, SourceRange())) {
     case CheckedCastKind::Coercion:
       return CheckedCastKind::Coercion;
@@ -3428,6 +3438,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     case CheckedCastContextKind::EnumElementPattern:
     case CheckedCastContextKind::IsExpr:
     case CheckedCastContextKind::None:
+    case CheckedCastContextKind::CollectionElement:
       break;
     }
   }

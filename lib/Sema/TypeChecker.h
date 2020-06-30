@@ -341,6 +341,8 @@ enum class CheckedCastContextKind {
   IsPattern,
   /// An enum-element pattern.
   EnumElementPattern,
+  /// A collection element type.
+  CollectionElement,
 };
 
 namespace TypeChecker {
