@@ -1,66 +1,45 @@
 # Protocol type not conforming to itself
-Swift disallows us from using a protocol as a type that conforms to itself as illustrated in the examples below
+Protocols in Swift may be used as types. Protocols as types are sometimes called existential types.
 
-```swift
-protocol SomeProtocol {
-    init()
-}
 
-struct SomeStruct: SomeProtocol {}
-struct AnotherStruct: SomeProtocol {}
+```swift 
+protocol P {}
 
-var arr: [SomeProtocol] = [SomeStruct(), AnotherStruct()]
-arr.appendNewItem()
+struct S: P {}
 
-extension Array where Element: SomeProtocol {
-    mutating func appendNewItem() {
-        append(Element())
-    }
-}
+var s: P = S() // This creates existential type because the protocol P is used as a type
 ```
 
-The code snippet above would not compile because we are using `SomeProtocol` as a type that conforms to itself. There is no concrete implementation for the protocol.
-
-Consider also the case of using protocol as a type in a generic type - 
-
-```swift
-protocol AnotherProtocol {
-  static func foo()
-}
-
-struct GenericStruct<T: AnotherProtocol> {
-    func faz() {
-        T.foo()
-    }
-}
-
-GenericStruct<AnotherProtocol>().faz()
-```
-Constructing the instance of the struct `GenericStruct` with type `AnotherProtocol` will not compile because there is no concrete implementation for the static requirement of the protocol. 
-There is no implementation for for() used above.
-
-We, however have an exception for `@objc` protocols that conforms to itself as shown below
+However, a protocol type does not conform to protocols - not even the protocol itself. 
+Allowing existential types to conform to protocols is unsound because some protocol with static methods, initializers, or associated types requirements cannot be accessed from the protocol type itself - these kinds of requirements require a concrete type.
+Let's walk through the example below:
 
 ```swift
-import Foundation
-
-@objc protocol SomeProtocol {
-  func foo()
+protocol Word: Hashable {
+    var word: String { get }
 }
 
-class SomeClass : SomeProtocol {
-  func foo() {
-    print("foo called")
-  }
+struct Singular: Word {
+    var word: String
 }
 
-func faz<T : SomeProtocol>(_ t: T) {
-  t.foo()
+struct Plural: Word {
+    var word: String
 }
 
-let c: SomeProtocol = SomeClass()
-faz(c)
+let singularWord = Singular(word: "mango")
+let pluralWord = Plural(word: "mangoes")
+
+let wordPairDict: [Word: Word] = [singularWord: pluralWord] // Error
 ```
 
-The function `faz` requires that `T` conforms to `SomeProtocol` and we can easily substitute in `SomeProtocol` for `T` because it has no static requirements.
+One workaround to fix this problem is to write a type erasure for the protocol `Word`. Think of type erasure as a way to hide an object's type. Since `Word` is of type `Hashable`, we already have `AnyHashable` type erasure available in the standard library which we can easily use here.
+
+```swift 
+// The fix
+let wordPairDict: [AnyHashable: AnyHashable] = [singularWord: pluralWord]
+```
+
+# Exceptions
+`@objc` protocol type with no static requirements however do conform to its own protocol. One example is the `Error` protocol.
 
