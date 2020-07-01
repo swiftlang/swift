@@ -534,6 +534,11 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
+def enable_experimental_trailing_closure_matching : Flag<["-"],
+    "enable-experimental-trailing-closure-matching">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable the experimental 'forward' matching rule for trailing closures">;
+
 def enable_direct_intramodule_dependencies : Flag<["-"],
     "enable-direct-intramodule-dependencies">,
   Flags<[FrontendOption, HelpHidden]>,

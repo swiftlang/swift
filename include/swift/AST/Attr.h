@@ -54,6 +54,7 @@ class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
 class PatternBindingInitializer;
+enum class TrailingClosureMatching: uint8_t;
 class TrailingWhereClause;
 class TypeExpr;
 
@@ -2043,6 +2044,26 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Transpose;
+  }
+};
+
+/// Attribute that controls the matching of trailing closures.
+class TrailingClosureMatchingAttr final : public DeclAttribute {
+  TrailingClosureMatching matchingRule;
+
+public:
+  TrailingClosureMatchingAttr(SourceLoc atLoc, SourceRange range,
+                              TrailingClosureMatching matchingRule,
+                              bool implicit)
+    : DeclAttribute(DAK_TrailingClosureMatching, atLoc, range, implicit),
+      matchingRule(matchingRule) {}
+
+  TrailingClosureMatching getMatchingRule() const {
+    return matchingRule;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_TrailingClosureMatching;
   }
 };
 

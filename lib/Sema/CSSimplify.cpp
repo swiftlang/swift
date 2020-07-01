@@ -215,6 +215,23 @@ static bool acceptsTrailingClosure(const AnyFunctionType::Param &param) {
       paramTy->isAny();
 }
 
+/// Determine the trailing closure matching rule to apply.
+static TrailingClosureMatching getTrailingClosureMatching(
+    const ParameterListInfo &paramInfo, const ASTContext *ctx) {
+  if (auto explicitRule = paramInfo.getTrailingClosureMatching())
+    return *explicitRule;
+
+  if (ctx) {
+    return ctx->LangOpts.EnableForwardTrailingClosureMatching
+      ? TrailingClosureMatching::Forward
+      : TrailingClosureMatching::Backward;
+  }
+
+  // No context only happens when there are no parameters, so it doesn't
+  // matter what we choose.
+  return TrailingClosureMatching::Forward;
+}
+
 // FIXME: This should return ConstraintSystem::TypeMatchResult instead
 //        to give more information to the solver about the failure.
 bool constraints::
@@ -228,6 +245,16 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   assert(params.size() == paramInfo.size() && "Default map does not match");
   assert(!unlabeledTrailingClosureArgIndex ||
          *unlabeledTrailingClosureArgIndex < args.size());
+
+  // Determine which rule we will use for matching trailing closures.
+  TrailingClosureMatching trailingClosureMatching;
+  {
+    const ASTContext *ctx = nullptr;
+    if (!params.empty())
+      ctx = &params.front().getPlainType()->getASTContext();
+
+    trailingClosureMatching = getTrailingClosureMatching(paramInfo, ctx);
+  }
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
@@ -285,6 +312,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   auto skipClaimedArgs = [&](unsigned &nextArgIdx) {
     while (nextArgIdx != numArgs && claimedArgs[nextArgIdx])
       ++nextArgIdx;
+    return nextArgIdx;
   };
 
   // Local function that retrieves the next unclaimed argument with the given
@@ -297,6 +325,14 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
+      return None;
+
+    // If we're claiming variadic arguments, do not claim an unlabeled trailing
+    // closure argument during a forward scan.
+    if (forVariadic &&
+        trailingClosureMatching == TrailingClosureMatching::Forward &&
+        unlabeledTrailingClosureArgIndex &&
+        nextArgIdx == *unlabeledTrailingClosureArgIndex)
       return None;
 
     // Go hunting for an unclaimed argument whose name does match.
@@ -387,12 +423,31 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   auto bindNextParameter = [&](unsigned paramIdx, unsigned &nextArgIdx,
                                bool ignoreNameMismatch) {
     const auto &param = params[paramIdx];
+    Identifier paramLabel = param.getLabel();
+
+    // If we have the trailing closure argument and are performing a forward
+    // match, look for the matching parameter.
+    if (trailingClosureMatching == TrailingClosureMatching::Forward &&
+        unlabeledTrailingClosureArgIndex &&
+        skipClaimedArgs(nextArgIdx) == *unlabeledTrailingClosureArgIndex) {
+
+      // If the parameter we are looking at does not supports the (unlabeled)
+      // trailing closure argument, this parameter is unfulfilled.
+      if (!paramInfo.acceptsUnlabeledTrailingClosureArgument(paramIdx)) {
+        haveUnfulfilledParams = true;
+        return;
+      }
+
+      // The argument is unlabeled, so mark the parameter as unlabeled as
+      // well.
+      paramLabel = Identifier();
+    }
 
     // Handle variadic parameters.
     if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
       auto claimed =
-          claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch);
+          claimNextNamed(nextArgIdx, paramLabel, ignoreNameMismatch);
 
       // If there was no such argument, leave the parameter unfulfilled.
       if (!claimed) {
@@ -425,7 +480,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
     // Try to claim an argument for this parameter.
     if (auto claimed =
-            claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch)) {
+            claimNextNamed(nextArgIdx, paramLabel, ignoreNameMismatch)) {
       parameterBindings[paramIdx].push_back(*claimed);
       return;
     }
@@ -436,7 +491,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
   // If we have an unlabeled trailing closure, we match trailing closure
   // labels from the end, then match the trailing closure arg.
-  if (unlabeledTrailingClosureArgIndex) {
+  if (unlabeledTrailingClosureArgIndex &&
+      trailingClosureMatching == TrailingClosureMatching::Backward) {
     unsigned unlabeledArgIdx = *unlabeledTrailingClosureArgIndex;
 
     // One past the next parameter index to look at.

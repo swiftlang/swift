@@ -3492,10 +3492,23 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 
+/// Describes the matching rules for trailing closures.
+enum class TrailingClosureMatching: uint8_t {
+  /// Match trailing closures from the end of the parameter list, which is
+  /// the default rule for Swift < 6.
+  Backward,
+  /// Match trailing closures by scanning "forward" from the previously-
+  /// matched parameter and skipping over parameters that aren't structurally
+  /// function types.
+  Forward,
+};
+
 /// Provides information about the parameter list of a given declaration, including whether each parameter
 /// has a default argument.
 struct ParameterListInfo {
   SmallBitVector defaultArguments;
+  SmallBitVector acceptsUnlabeledTrailingClosures;
+  Optional<TrailingClosureMatching> trailingClosureMatching;
 
 public:
   ParameterListInfo() { }
@@ -3503,8 +3516,18 @@ public:
   ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
                     const ValueDecl *paramOwner, bool skipCurriedSelf);
 
+  /// Retrieve the trailing closure matching rule, if one was explicitly
+  /// specified.
+  Optional<TrailingClosureMatching> getTrailingClosureMatching() const {
+    return trailingClosureMatching;
+  }
+
   /// Whether the parameter at the given index has a default argument.
   bool hasDefaultArgument(unsigned paramIdx) const;
+
+  /// Whether the parameter accepts an unlabeled trailing closure argument
+  /// according to the "forward-scan" rule.
+  bool acceptsUnlabeledTrailingClosureArgument(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {

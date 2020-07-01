@@ -1075,6 +1075,22 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_TrailingClosureMatching: {
+    Printer.printAttrName("@_trailingClosureMatching");
+    Printer << '(';
+    switch (cast<TrailingClosureMatchingAttr>(this)->getMatchingRule()) {
+    case TrailingClosureMatching::Backward:
+      Printer << ".backward";
+      break;
+
+    case TrailingClosureMatching::Forward:
+      Printer << ".forward";
+      break;
+    }
+    Printer << ')';
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1217,6 +1233,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "derivative";
   case DAK_Transpose:
     return "transpose";
+  case DAK_TrailingClosureMatching:
+    return "_trailingClosureMatching";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

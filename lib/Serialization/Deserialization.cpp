@@ -4446,6 +4446,18 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::TrailingClosureMatching_DECL_ATTR: {
+        bool isImplicit;
+        uint8_t matchingRule;
+        serialization::decls_block::TrailingClosureMatchingDeclAttrLayout
+            ::readRecord(scratch, isImplicit, matchingRule);
+
+        Attr = new (ctx) TrailingClosureMatchingAttr(
+             SourceLoc(), SourceRange(),
+             static_cast<TrailingClosureMatching>(matchingRule), isImplicit);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

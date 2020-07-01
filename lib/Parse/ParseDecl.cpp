@@ -2301,6 +2301,49 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         name, AtLoc, range, /*implicit*/ false));
     break;
   }
+
+  case DAK_TrailingClosureMatching: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (!consumeIf(tok::period_prefix)) {
+      diagnose(Loc, diag::trailing_closure_matching_missing_dot_identifier);
+      return false;
+    }
+
+    if (Tok.isNot(tok::identifier)) {
+      diagnose(Loc, diag::trailing_closure_matching_missing_dot_identifier);
+      return false;
+    }
+
+    Identifier name;
+    consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
+
+    TrailingClosureMatching matchingRule;
+    if (name.str() == "forward")
+      matchingRule = TrailingClosureMatching::Forward;
+    else if (name.str() == "backward")
+      matchingRule = TrailingClosureMatching::Backward;
+    else {
+      diagnose(Loc, diag::trailing_closure_matching_missing_dot_identifier);
+      return false;
+    }
+
+    auto range = SourceRange(Loc, Tok.getRange().getStart());
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    Attributes.add(new (Context) TrailingClosureMatchingAttr(
+        AtLoc, range, matchingRule, /*implicit=*/false));
+    break;
+  }
   }
 
   if (DuplicateAttribute) {

@@ -271,6 +271,9 @@ namespace swift {
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
 
+    /// Whether to default to the "forward" scan for trailing closure matching.
+    bool EnableForwardTrailingClosureMatching = false;
+
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.

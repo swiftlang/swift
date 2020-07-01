@@ -1705,6 +1705,12 @@ namespace decls_block {
     BCArray<IdentifierIDField>  // SPI names
   >;
 
+  using TrailingClosureMatchingDeclAttrLayout = BCRecordLayout<
+    TrailingClosureMatching_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCFixed<1>  // matching rule
+  >;
+
   using AlignmentDeclAttrLayout = BCRecordLayout<
     Alignment_DECL_ATTR,
     BCFixed<1>, // implicit flag

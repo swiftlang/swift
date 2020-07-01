@@ -2230,6 +2230,17 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_TrailingClosureMatching: {
+      auto theAttr = cast<TrailingClosureMatchingAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[TrailingClosureMatchingDeclAttrLayout::Code];
+
+      TrailingClosureMatchingDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          static_cast<uint8_t>(theAttr->getMatchingRule()));
+      return;
+    }
+
     case DAK_Alignment: {
       auto *theAlignment = cast<AlignmentAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];

@@ -821,16 +821,46 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
+/// Whether this parameter accepts an unlabeled trailing closure argument
+/// using the more-restrictive forward-scan rule.
+static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
+  // Variadic parameters never allow an unlabeled trailing closure.
+  if (param->isVariadic())
+    return false;
+
+  // inout parameters never allow an unlabeled trailing closure.
+  if (param->isInOut())
+    return false;
+
+  Type paramType =
+      param->getInterfaceType()->getRValueType()->lookThroughAllOptionalTypes();
+
+  // For autoclosure parameters, look through the autoclosure result type
+  // to get the actual argument type.
+  if (param->isAutoClosure()) {
+    auto fnType = paramType->getAs<AnyFunctionType>();
+    if (!fnType)
+      return false;
+
+    paramType = fnType->getResult()->lookThroughAllOptionalTypes();
+  }
+
+  // After lookup through all optional types, this parameter allows an
+  // unlabeled trailing closure if it is (structurally) a function type.
+  return paramType->is<AnyFunctionType>();
+}
+
 ParameterListInfo::ParameterListInfo(
     ArrayRef<AnyFunctionType::Param> params,
     const ValueDecl *paramOwner,
     bool skipCurriedSelf) {
   defaultArguments.resize(params.size());
+  acceptsUnlabeledTrailingClosures.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
-  // FIXME: We ought to not request default argument info in this case.
+  // FIXME: We ought to not request paramer list info in this case.
   if (!paramOwner)
     return;
 
@@ -846,6 +876,12 @@ ParameterListInfo::ParameterListInfo(
     paramList = subscript->getIndices();
   } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
     paramList = enumElement->getParameterList();
+  }
+
+  // Retrieve the explicitly-specified trailing closure matching rule.
+  if (auto attr =
+          paramOwner->getAttrs().getAttribute<TrailingClosureMatchingAttr>()) {
+    trailingClosureMatching = attr->getMatchingRule();
   }
 
   // No parameter list means no default arguments - hand back the zeroed
@@ -864,11 +900,16 @@ ParameterListInfo::ParameterListInfo(
   if (params.size() != paramList->size())
     return;
 
-  // Note which parameters have default arguments and/or function builders.
+  // Note which parameters have default arguments and/or accept unlabeled
+  // trailing closure arguments with the forward-scan rule.
   for (auto i : range(0, params.size())) {
     auto param = paramList->get(i);
     if (param->isDefaultArgument()) {
       defaultArguments.set(i);
+    }
+
+    if (allowsUnlabeledTrailingClosureParameter(param)) {
+      acceptsUnlabeledTrailingClosures.set(i);
     }
   }
 }
@@ -876,6 +917,12 @@ ParameterListInfo::ParameterListInfo(
 bool ParameterListInfo::hasDefaultArgument(unsigned paramIdx) const {
   return paramIdx < defaultArguments.size() ? defaultArguments[paramIdx]
       : false;
+}
+
+bool ParameterListInfo::acceptsUnlabeledTrailingClosureArgument(
+    unsigned paramIdx) const {
+  return paramIdx < acceptsUnlabeledTrailingClosures.size() &&
+      acceptsUnlabeledTrailingClosures[paramIdx];
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
