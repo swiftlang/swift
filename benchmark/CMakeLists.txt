@@ -188,6 +188,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Walsh
     single-source/WordCount
     single-source/XorLoop
+    cxx-source/CreateObjects
 )
 
 set(SWIFT_MULTISOURCE_SWIFT_BENCHES

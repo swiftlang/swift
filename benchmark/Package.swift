@@ -49,6 +49,11 @@ var singleSourceLibraries: [String] = singleSourceLibraryDirs.flatMap {
   getSingleSourceLibraries(subDirectory: $0)
 }
 
+var cxxSingleSourceLibraryDirs: [String] = ["cxx-source"]
+var cxxSingleSourceLibraries: [String] = cxxSingleSourceLibraryDirs.flatMap {
+  getSingleSourceLibraries(subDirectory: $0)
+}
+
 //===---
 // Multi Source Libraries
 //
@@ -80,6 +85,7 @@ products.append(.library(name: "ObjectiveCTests", type: .static, targets: ["Obje
 products.append(.executable(name: "SwiftBench", targets: ["SwiftBench"]))
 
 products += singleSourceLibraries.map { .library(name: $0, type: .static, targets: [$0]) }
+products += cxxSingleSourceLibraries.map { .library(name: $0, type: .static, targets: [$0]) }
 products += multiSourceLibraries.map {
   return .library(name: $0.name, type: .static, targets: [$0.name])
 }
@@ -103,13 +109,18 @@ swiftBenchDeps.append(.target(name: "ObjectiveCTests"))
 #endif
 swiftBenchDeps.append(.target(name: "DriverUtils"))
 swiftBenchDeps += singleSourceLibraries.map { .target(name: $0) }
+swiftBenchDeps += cxxSingleSourceLibraries.map { .target(name: $0) }
 swiftBenchDeps += multiSourceLibraries.map { .target(name: $0.name) }
 
 targets.append(
     .target(name: "SwiftBench",
     dependencies: swiftBenchDeps,
     path: "utils",
-    sources: ["main.swift"]))
+    sources: ["main.swift"],
+    swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                  "-enable-cxx-interop",
+                                  "-I",
+                                  "utils/CxxTests"])]))
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 targets.append(
@@ -137,6 +148,18 @@ targets += singleSourceLibraries.map { name in
       dependencies: singleSourceDeps,
       path: "single-source",
       sources: ["\(name).swift"])
+}
+
+targets += cxxSingleSourceLibraries.map { name in
+  return .target(
+    name: name,
+    dependencies: singleSourceDeps,
+    path: "cxx-source",
+    sources: ["\(name).swift"],
+    swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                  "-enable-cxx-interop",
+                                  "-I",
+                                  "utils/CxxTests"])])
 }
 
 targets += multiSourceLibraries.map { lib in
