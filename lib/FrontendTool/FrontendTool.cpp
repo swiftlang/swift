@@ -1625,11 +1625,11 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   }
 }
 
-static void freeASTContextIfPossible(CompilerInstance &Instance) {
+static bool canFreeASTContextBeforeLLVM(CompilerInstance &Instance) {
   // If the stats reporter is installed, we need the ASTContext to live through
   // the entire compilation process.
   if (Instance.getASTContext().Stats) {
-    return;
+    return false;
   }
 
   const auto &opts = Instance.getInvocation().getFrontendOptions();
@@ -1640,14 +1640,10 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // unlikely to reduce the peak heap size. So, only optimize the
   // single-primary-case (or WMO).
   if (opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
-    return;
+    return false;
   }
 
-  // Make sure to perform the end of pipeline actions now, because they need
-  // access to the ASTContext.
-  performEndOfPipelineActions(Instance);
-
-  Instance.freeASTContext();
+  return true;
 }
 
 static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
@@ -1659,8 +1655,20 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   version::Version EffectiveLanguageVersion =
       Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
 
-  // Free up some compiler resources now that we have an IRModule.
-  freeASTContextIfPossible(Instance);
+  // Try and free up some compiler resources now that we have an IRModule.
+  Optional<std::thread> ctxFreeingThread;
+  if (canFreeASTContextBeforeLLVM(Instance)) {
+    // Make sure to perform the end of pipeline actions now, because they need
+    // access to the ASTContext.
+    performEndOfPipelineActions(Instance);
+
+    auto ctxRelease = [&]() { Instance.freeASTContext(); };
+    ctxFreeingThread.emplace(std::thread(ctxRelease));
+  }
+  SWIFT_DEFER {
+    if (ctxFreeingThread)
+      ctxFreeingThread->join();
+  };
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
