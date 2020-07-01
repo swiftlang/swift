@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -disable-type-layout -prespecialize-generic-metadata %s -target %module-target-future -gnone -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native --check-prefix=CHECK-native-%target-ptrsize --check-prefix=CHECK-%target-os --check-prefix=CHECK-native-%target-os
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
