@@ -158,16 +158,18 @@ SILLocation getValidLocation(SILInstruction *inst);
 // Tangent property lookup utilities
 //===----------------------------------------------------------------------===//
 
-/// Returns the tangent stored property of `originalField`. On error, emits
-/// diagnostic and returns nullptr.
+/// Returns the tangent stored property of the given original stored property
+/// and base type. On error, emits diagnostic and returns nullptr.
 VarDecl *getTangentStoredProperty(ADContext &context, VarDecl *originalField,
-                                  SILLocation loc,
+                                  CanType baseType, SILLocation loc,
                                   DifferentiationInvoker invoker);
 
 /// Returns the tangent stored property of the original stored property
-/// referenced by `inst`. On error, emits diagnostic and returns nullptr.
+/// referenced by the given projection instruction with the given base type.
+/// On error, emits diagnostic and returns nullptr.
 VarDecl *getTangentStoredProperty(ADContext &context,
                                   FieldIndexCacheBase *projectionInst,
+                                  CanType baseType,
                                   DifferentiationInvoker invoker);
 
 //===----------------------------------------------------------------------===//

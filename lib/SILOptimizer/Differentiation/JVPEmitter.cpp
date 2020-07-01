@@ -548,17 +548,18 @@ CLONE_AND_EMIT_TANGENT(StructExtract, sei) {
          "`struct_extract` with `@noDerivative` field should not be "
          "differentiated; activity analysis should not marked as varied.");
   auto diffBuilder = getDifferentialBuilder();
+  auto loc = getValidLocation(sei);
   // Find the corresponding field in the tangent space.
-  auto *tanField = getTangentStoredProperty(context, sei, invoker);
+  auto structType =
+      remapSILTypeInDifferential(sei->getOperand()->getType()).getASTType();
+  auto *tanField = getTangentStoredProperty(context, sei, structType, invoker);
   if (!tanField) {
     errorOccurred = true;
     return;
   }
   // Emit tangent `struct_extract`.
-  auto tanStruct =
-      materializeTangent(getTangentValue(sei->getOperand()), sei->getLoc());
-  auto tangentInst =
-      diffBuilder.createStructExtract(sei->getLoc(), tanStruct, tanField);
+  auto tanStruct = materializeTangent(getTangentValue(sei->getOperand()), loc);
+  auto tangentInst = diffBuilder.createStructExtract(loc, tanStruct, tanField);
   // Update tangent value mapping for `struct_extract` result.
   auto tangentResult = makeConcreteTangentValue(tangentInst);
   setTangentValue(sei->getParent(), sei, tangentResult);
@@ -575,8 +576,11 @@ CLONE_AND_EMIT_TANGENT(StructElementAddr, seai) {
          "differentiated; activity analysis should not marked as varied.");
   auto diffBuilder = getDifferentialBuilder();
   auto *bb = seai->getParent();
+  auto loc = getValidLocation(seai);
   // Find the corresponding field in the tangent space.
-  auto *tanField = getTangentStoredProperty(context, seai, invoker);
+  auto structType =
+      remapSILTypeInDifferential(seai->getOperand()->getType()).getASTType();
+  auto *tanField = getTangentStoredProperty(context, seai, structType, invoker);
   if (!tanField) {
     errorOccurred = true;
     return;
@@ -584,7 +588,7 @@ CLONE_AND_EMIT_TANGENT(StructElementAddr, seai) {
   // Emit tangent `struct_element_addr`.
   auto tanOperand = getTangentBuffer(bb, seai->getOperand());
   auto tangentInst =
-      diffBuilder.createStructElementAddr(seai->getLoc(), tanOperand, tanField);
+      diffBuilder.createStructElementAddr(loc, tanOperand, tanField);
   // Update tangent buffer map for `struct_element_addr`.
   setTangentBuffer(bb, seai, tangentInst);
 }
