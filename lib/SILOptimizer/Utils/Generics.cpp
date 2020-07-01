@@ -13,21 +13,22 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Strings.h"
 
 using namespace swift;
@@ -57,6 +58,12 @@ llvm::cl::opt<bool> PrintGenericSpecializationLoops(
     "sil-print-generic-specialization-loops", llvm::cl::init(false),
     llvm::cl::desc("Print detected infinite generic specialization loops that "
                    "were prevented"));
+
+llvm::cl::opt<bool> VerifyFunctionsAfterSpecialization(
+    "sil-generic-verify-after-specialization", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Verify functions after they are specialized "
+        "'PrettyStackTraceFunction'-ing the original function if we fail."));
 
 static bool OptimizeGenericSubstitutions = false;
 
@@ -1885,6 +1892,15 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   SpecializedF->setClassSubclassScope(SubclassScope::NotApplicable);
   SpecializedF->setSpecializationInfo(
       GenericSpecializationInformation::create(Caller, GenericFunc, Subs));
+
+  if (VerifyFunctionsAfterSpecialization) {
+    PrettyStackTraceSILFunction SILFunctionDumper(
+        llvm::Twine("Generic function: ") + GenericFunc->getName() +
+            ". Specialized Function: " + SpecializedF->getName(),
+        GenericFunc);
+    SpecializedF->verify();
+  }
+
   return SpecializedF;
 }
 
@@ -2457,6 +2473,20 @@ void swift::trySpecializeApplyOfGeneric(
            << NV("FuncType", OS.str());
   });
 
+  // Verify our function after we have finished fixing up call sites/etc. Dump
+  // the generic function if there is an assertion failure (or a crash) to make
+  // it easier to debug such problems since the original generic function is
+  // easily at hand.
+  SWIFT_DEFER {
+    if (VerifyFunctionsAfterSpecialization) {
+      PrettyStackTraceSILFunction SILFunctionDumper(
+          llvm::Twine("Generic function: ") + RefF->getName() +
+              ". Specialized Function: " + SpecializedF->getName(),
+          RefF);
+      SpecializedF->verify();
+    }
+  };
+
   assert(ReInfo.getSpecializedType()
          == SpecializedF->getLoweredFunctionType() &&
          "Previously specialized function does not match expected type.");
@@ -2471,6 +2501,13 @@ void swift::trySpecializeApplyOfGeneric(
     SILFunction *Thunk =
       ReabstractionThunkGenerator(FuncBuilder, ReInfo, PAI, SpecializedF)
         .createThunk();
+    if (VerifyFunctionsAfterSpecialization) {
+      PrettyStackTraceSILFunction SILFunctionDumper(
+          llvm::Twine("Thunk For Generic function: ") + RefF->getName() +
+              ". Specialized Function: " + SpecializedF->getName(),
+          RefF);
+      Thunk->verify();
+    }
     NewFunctions.push_back(Thunk);
     SILBuilderWithScope Builder(PAI);
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);
