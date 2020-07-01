@@ -161,6 +161,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::GlobalValueInst:
+  case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::StringLiteralInst:
