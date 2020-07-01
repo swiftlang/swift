@@ -1033,7 +1033,7 @@ extension ${Self} {
     _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(v._value)
   }
 
-  // Fast-path for conversion when the source is representable as a 64-bit int,
+  // Fast-path for conversion when the source is representable as int,
   // falling back on the generic _convert operation otherwise.
   @inlinable // FIXME(inline-always)
   @inline(__always)
@@ -1043,14 +1043,64 @@ extension ${Self} {
         let asInt = Int(truncatingIfNeeded: value)
         _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(asInt._value)
       } else {
-        let asUInt = Int(truncatingIfNeeded: value)
+        let asUInt = UInt(truncatingIfNeeded: value)
         _value = Builtin.uitofp_Int${word_bits}_FPIEEE${bits}(asUInt._value)
       }
     } else {
+      // TODO: we can do much better than the generic _convert here for Float
+      // and Double by pulling out the high-order 32/64b of the integer, ORing
+      // in a sticky bit, and then using the builtin.
       self = ${Self}._convert(from: value).value
     }
   }
 
+  // Fast-path for conversion when the source is representable as int,
+  // falling back on the generic _convert operation otherwise.
+  @_alwaysEmitIntoClient @inline(never)
+  public init?<Source: BinaryInteger>(exactly value: Source) {
+    if value.bitWidth <= ${word_bits} {
+      // If the source is small enough to fit in a word, we can use the LLVM
+      // conversion intrinsic, then check if we can round-trip back to the
+      // the original value; if so, the conversion was exact. We need to be
+      // careful, however, to make sure that the first conversion does not
+      // round to a value that is out of the defined range of the second
+      // converion. E.g. Float(Int.max) rounds to Int.max + 1, and converting
+      // that back to Int will trap. For Float, Double, and Float80, this is
+      // only an issue for the upper bound (because the lower bound of [U]Int
+      // is either zero or a power of two, both of which are exactly
+      // representable). For Float16, we also need to check for overflow to
+      // -.infinity.
+      if Source.isSigned {
+        let extended = Int(truncatingIfNeeded: value)
+        _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(extended._value)
+% if bits == 16:
+        guard self.isFinite && Int(self) == extended else {
+% else:
+        guard self < 0x1.0p${word_bits-1} && Int(self) == extended else {
+% end
+          return nil
+        }
+      } else {
+        let extended = UInt(truncatingIfNeeded: value)
+        _value = Builtin.uitofp_Int${word_bits}_FPIEEE${bits}(extended._value)
+% if bits == 16:
+        guard self.isFinite && UInt(self) == extended else {
+% else:
+        guard self < 0x1.0p${word_bits} && UInt(self) == extended else {
+% end
+          return nil
+        }
+      }
+    } else {
+      // TODO: we can do much better than the generic _convert here for Float
+      // and Double by pulling out the high-order 32/64b of the integer, ORing
+      // in a sticky bit, and then using the builtin.
+      let (value_, exact) = Self._convert(from: value)
+      guard exact else { return nil }
+      self = value_
+    }
+  }
+  
 % for src_type in all_floating_point_types():
 %   srcBits = src_type.bits
 %   That = src_type.stdlib_name
