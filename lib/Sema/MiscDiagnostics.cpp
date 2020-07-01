@@ -474,18 +474,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     Optional<MagicIdentifierLiteralExpr::Kind>
     getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
       switch (param->getDefaultArgumentKind()) {
-      case DefaultArgumentKind::Column:
-        return MagicIdentifierLiteralExpr::Kind::Column;
-      case DefaultArgumentKind::DSOHandle:
-        return MagicIdentifierLiteralExpr::Kind::DSOHandle;
-      case DefaultArgumentKind::File:
-        return MagicIdentifierLiteralExpr::Kind::File;
-      case DefaultArgumentKind::FilePath:
-        return MagicIdentifierLiteralExpr::Kind::FilePath;
-      case DefaultArgumentKind::Function:
-        return MagicIdentifierLiteralExpr::Kind::Function;
-      case DefaultArgumentKind::Line:
-        return MagicIdentifierLiteralExpr::Kind::Line;
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case DefaultArgumentKind::NAME: \
+        return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
 
       case DefaultArgumentKind::None:
       case DefaultArgumentKind::Normal:

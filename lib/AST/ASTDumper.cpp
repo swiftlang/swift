@@ -321,13 +321,10 @@ getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
 static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
   switch (value) {
     case DefaultArgumentKind::None: return "none";
-    case DefaultArgumentKind::Column: return "#column";
-    case DefaultArgumentKind::DSOHandle: return "#dsohandle";
-    case DefaultArgumentKind::File: return "#file";
-    case DefaultArgumentKind::FilePath: return "#filePath";
-    case DefaultArgumentKind::Function: return "#function";
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case DefaultArgumentKind::NAME: return STRING;
+#include "swift/AST/MagicIdentifierKinds.def"
     case DefaultArgumentKind::Inherited: return "inherited";
-    case DefaultArgumentKind::Line: return "#line";
     case DefaultArgumentKind::NilLiteral: return "nil";
     case DefaultArgumentKind::EmptyArray: return "[]";
     case DefaultArgumentKind::EmptyDictionary: return "[:]";

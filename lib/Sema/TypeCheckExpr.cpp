@@ -729,35 +729,12 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
                                          SourceLoc loc) {
   auto &ctx = param->getASTContext();
   switch (param->getDefaultArgumentKind()) {
-  case DefaultArgumentKind::Column:
-    return new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Column, loc,
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case DefaultArgumentKind::NAME: \
+    return new (ctx) \
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::NAME, loc, \
                                    /*implicit=*/true);
-
-  case DefaultArgumentKind::File:
-    return new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::File, loc,
-                                   /*implicit=*/true);
-
-  case DefaultArgumentKind::FilePath:
-    return new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::FilePath, loc,
-                                   /*implicit=*/true);
-
-  case DefaultArgumentKind::Line:
-    return new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Line, loc,
-                                   /*implicit=*/true);
-
-  case DefaultArgumentKind::Function:
-    return new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Function, loc,
-                                   /*implicit=*/true);
-
-  case DefaultArgumentKind::DSOHandle:
-    return new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::DSOHandle, loc,
-                                   /*implicit=*/true);
+#include "swift/AST/MagicIdentifierKinds.def"
 
   case DefaultArgumentKind::NilLiteral:
     return new (ctx) NilLiteralExpr(loc, /*Implicit=*/true);
