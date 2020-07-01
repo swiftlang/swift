@@ -4611,11 +4611,11 @@ StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
   return getSourceManager().getDisplayNameForLoc(loc);
 }
 
-std::string SILGenFunction::getMagicFileString(SourceLoc loc) {
+std::string SILGenFunction::getMagicFileIDString(SourceLoc loc) {
   auto path = getMagicFilePathString(loc);
 
-  auto result = SGM.MagicFileStringsByFilePath.find(path);
-  if (result != SGM.MagicFileStringsByFilePath.end())
+  auto result = SGM.FileIDsByFilePath.find(path);
+  if (result != SGM.FileIDsByFilePath.end())
     return std::get<0>(result->second);
 
   return path.str();
@@ -4850,7 +4850,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {
     case MagicIdentifierLiteralExpr::File: {
-      std::string value = loc.isValid() ? getMagicFileString(loc) : "";
+      std::string value = loc.isValid() ? getMagicFileIDString(loc) : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
