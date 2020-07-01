@@ -304,7 +304,7 @@ struct IntWrapper {
 }
 
 @propertyWrapper
-struct WrapperForHashable<T: Hashable> { // expected-note{{property wrapper type 'WrapperForHashable' declared here}}
+struct WrapperForHashable<T: Hashable> { // expected-note{{where 'T' = 'NotHashable'}}
   var wrappedValue: T
 }
 
@@ -319,9 +319,8 @@ struct UseWrappersWithDifferentForm {
   @IntWrapper
   var x: Int
 
-  // FIXME: Diagnostic should be better here
-  @WrapperForHashable
-  var y: NotHashable // expected-error{{property type 'NotHashable' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperForHashable'}}
+  @WrapperForHashable // expected-error {{generic struct 'WrapperForHashable' requires that 'NotHashable' conform to 'Hashable'}}
+  var y: NotHashable
 
   @WrapperForHashable
   var yOkay: Int
@@ -329,9 +328,8 @@ struct UseWrappersWithDifferentForm {
   @WrapperWithTwoParams
   var zOkay: (Int, Float)
 
-  // FIXME: Need a better diagnostic here
-  @HasNestedWrapper.NestedWrapper
-  var w: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'HasNestedWrapper.NestedWrapper'}}
+  @HasNestedWrapper.NestedWrapper // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify}}
+  var w: Int
 
   @HasNestedWrapper<Double>.NestedWrapper
   var wOkay: Int
@@ -341,14 +339,16 @@ struct UseWrappersWithDifferentForm {
 }
 
 @propertyWrapper
-struct Function<T, U> { // expected-note{{property wrapper type 'Function' declared here}}
+struct Function<T, U> { // expected-note{{'U' declared as parameter to type 'Function'}}
   var wrappedValue: (T) -> U?
 }
 
 struct TestFunction {
   @Function var f: (Int) -> Float?
-  
-  @Function var f2: (Int) -> Float // expected-error{{property type '(Int) -> Float' does not match that of the 'wrappedValue' property of its wrapper type 'Function'}}
+
+  // FIXME: This diagnostic should be more specific
+  @Function var f2: (Int) -> Float // expected-error{{generic parameter 'U' could not be inferred}}
+  // expected-note@-1 {{explicitly specify}}
 
   func test() {
     let _: Int = _f // expected-error{{cannot convert value of type 'Function<Int, Float>' to specified type 'Int'}}
@@ -358,9 +358,9 @@ struct TestFunction {
 // ---------------------------------------------------------------------------
 // Nested wrappers
 // ---------------------------------------------------------------------------
-struct HasNestedWrapper<T> {
+struct HasNestedWrapper<T> { // expected-note {{'T' declared as parameter to type 'HasNestedWrapper'}}
   @propertyWrapper
-  struct NestedWrapper<U> { // expected-note{{property wrapper type 'NestedWrapper' declared here}}
+  struct NestedWrapper<U> {
     var wrappedValue: U
     init(wrappedValue initialValue: U) {
       self.wrappedValue = initialValue
@@ -1026,7 +1026,7 @@ struct WrapperB<Value> {
 }
 
 @propertyWrapper
-struct WrapperC<Value> {
+struct WrapperC<Value> { // expected-note {{'Value' declared as parameter to type 'WrapperC'}}
   var wrappedValue: Value?
 
   init(wrappedValue initialValue: Value?) {
@@ -1035,7 +1035,7 @@ struct WrapperC<Value> {
 }
 
 @propertyWrapper
-struct WrapperD<Value, X, Y> { // expected-note{{property wrapper type 'WrapperD' declared here}}
+struct WrapperD<Value, X, Y> {
   var wrappedValue: Value
 }
 
@@ -1049,7 +1049,8 @@ struct TestComposition {
   @WrapperA @WrapperB @WrapperC var p2 = "Hello"
   @WrapperD<WrapperE, Int, String> @WrapperE var p3: Int?
   @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
-  @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperD<WrapperC, Int, String>'}}
+  @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{generic parameter 'Value' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
 
 	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
 		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{8-8=Int(}} {{9-9=)}}
