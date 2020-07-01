@@ -1592,6 +1592,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
     break;
   }
+  case SILInstructionKind::BaseAddrForOffsetInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createBaseAddrForOffset(Loc,
+              getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    break;
   case SILInstructionKind::DeallocStackInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createDeallocStack(

@@ -1319,6 +1319,10 @@ public:
     *this << " : " << GVI->getType();
   }
 
+  void visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *BAI) {
+    *this << BAI->getType();
+  }
+
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
     *this << ILI->getType() << ", " << lit;

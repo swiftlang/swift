@@ -3573,6 +3573,20 @@ the encoding is ``objc_selector``, the string literal produces a
 reference to a UTF-8-encoded Objective-C selector in the Objective-C
 method name segment.
 
+base_addr_for_offset
+````````````````````
+::
+
+  sil-instruction ::= 'base_addr_for_offset' sil-type
+
+  %1 = base_addr_for_offset $*S
+  // %1 has type $*S
+
+Creates a base address for offset calculations. The result can be used by
+address projections, like ``struct_element_addr``, which themselves return the
+offset of the projected fields.
+IR generation simply creates a null pointer for ``base_addr_for_offset``.
+
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
 
