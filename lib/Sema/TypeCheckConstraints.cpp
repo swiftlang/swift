@@ -3548,27 +3548,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     //
-    // Note: we relax the restriction if the type we're casting to is a
-    // non-final class because it's possible that we might have a subclass
-    // that conforms to the protocol.
-    //
-    //  Also, relax the restriction when toType is a stdlib collection
-    //  (Array, Set, Dictionary) that could have conditional conformances
-    //  because of custom casting mechanism implemented for those types e.g.
-    //
-    //  func encodable(_ value: Encodable) {
-    //    _ = value as! [String : Encodable]
-    //  }
-    //
-    if (fromExistential && !toExistential) {
-      if (auto NTD = toType->getAnyNominal()) {
-        if (!toType->is<ClassType>() || NTD->isFinal()) {
-          auto protocolDecl =
-              dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
-          if (protocolDecl && !couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
-            return failed();
-          }
-        }
+    // Except when the toType is a generic archetype, because then it may
+    // have protocol conformances we cannot know statically.
+    if (fromExistential && (!toExistential && !toArchetype)) {
+      auto protocolDecl =
+          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
+      // Checking for possible dynamic conformances because we cannot fail
+      // in thoses cases.
+      if (protocolDecl &&
+          !couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
+        return failed();
       }
     }
 

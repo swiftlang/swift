@@ -4472,11 +4472,27 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 
 bool
 TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
-                                                DeclContext *DC) {
+                                               DeclContext *DC) {
+  // If the type we're checking is a non-final class because it's
+  // possible that we might have a subclass that conforms to the protocol.
+  //
+  // Or when type is a stdlib collection (Array, Set, Dictionary) that
+  // could have conditional conformances because of custom casting
+  // mechanism implemented for those types e.g.
+  //
+  //  func encodable(_ value: Encodable) {
+  //    _ = value as! [String : Encodable]
+  //  }
+  //
+  if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+    if (!classDecl->isFinal() || type->is<ArchetypeType>())
+      return true;
+  }
+
   ModuleDecl *M = DC->getParentModule();
-  return conformsToProtocol(type, Proto, DC) ||
-         (type->isKnownStdlibCollectionType() &&
-          M->lookupConformance(type, Proto));
+  if (type->isKnownStdlibCollectionType())
+    return !M->lookupConformance(type, Proto).isInvalid();
+  return !conformsToProtocol(type, Proto, DC).isInvalid();
 }
 
 /// Exposes TypeChecker functionality for querying protocol conformance.

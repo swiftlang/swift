@@ -884,16 +884,17 @@ ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
                                           DeclContext *DC,
                                           SourceLoc ComplainLoc = SourceLoc());
 
-/// Determine whether the given type could dynamically conform to the given protocol.
-/// Meaning it may have conditional requirements to the protocol.
+/// This is similar to \c conformsToProtocol, but returns \c true for cases where
+/// the type  \p T could be dynamically cast to \p Proto protocol, such as a non-final
+/// class where a subclass conforms to.
 ///
 /// \param DC The context in which to check conformance. This affects, for
 /// example, extension visibility.
 ///
 ///
-/// \returns True if \c T conforms to the protocol \c Proto, false otherwise.
+/// \returns True if \p T conforms to the protocol \p Proto, false otherwise.
 bool couldDynamicallyConformToProtocol(Type T, ProtocolDecl *Proto,
-                                        DeclContext *DC);
+                                       DeclContext *DC);
 /// Completely check the given conformance.
 void checkConformance(NormalProtocolConformance *conformance);
 
