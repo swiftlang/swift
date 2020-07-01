@@ -11,6 +11,6 @@ In addition to its formal requirements, `init(literalCapacity:interpolationCount
 
 There are no restrictions on an `appendInterpolation` method's argument list, generic parameters, availability, or error-throwing behavior.
 
-If `appendInterpolation` is overloaded, the Swift compiler will choose an appropriate overload using the labels and argument types of each interpolation. When choosing an overload, any accessible `appendInterpolation` instance method may be used, even if it does not meet all of the requirements above. However, if a `StringInterpolationProtocol` conformer doesn't have any `appendInterpolation` methods which meet all of the requirments, an error will be reported at compile time.
+If `appendInterpolation` is overloaded, the Swift compiler will choose an appropriate overload using the labels and argument types of each interpolation. When choosing an overload, any accessible `appendInterpolation` instance method may be used, even if it does not meet all of the requirements above. However, if a `StringInterpolationProtocol` conformer doesn't have any `appendInterpolation` methods which meet all of the requirements, an error will be reported at compile time.
 
 To learn more about customizing string interpolation behavior, see the standard library documentation of the `ExpressibleByStringInterpolation` and `StringInterpolationProtocol` protocols.

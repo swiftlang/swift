@@ -6,10 +6,10 @@ func markUsed<T>(_ t: T) {}
 
 public class DWARF {
 // CHECK-DAG: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "$ss6UInt32VD"
-// CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s9typealias5DWARFC9DIEOffsetaD",{{.*}} line: [[@LINE+1]], baseType: ![[BASE]])
+// CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s9typealias5DWARFC9DIEOffsetaD",{{.*}} baseType: ![[BASE]])
   typealias DIEOffset = UInt32
   // CHECK-DAG: ![[VOID:.*]] = !DICompositeType({{.*}}identifier: "$sytD"
-  // CHECK-DAG: ![[PRIVATETYPE:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s9typealias5DWARFC11PrivateType{{.+}}aD",{{.*}} line: [[@LINE+1]], baseType: ![[VOID]])
+  // CHECK-DAG: ![[PRIVATETYPE:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s9typealias5DWARFC11PrivateType{{.+}}aD",{{.*}} baseType: ![[VOID]])
   fileprivate typealias PrivateType = ()
   fileprivate static func usePrivateType() -> PrivateType { return () }
 }

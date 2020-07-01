@@ -298,13 +298,14 @@ static int printDiags();
 
 static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename);
 
-static void addCodeCompleteOptions(sourcekitd_object_t Req, TestOptions &Opts) {
+static void addRequestOptions(sourcekitd_object_t Req, TestOptions &Opts,
+                              sourcekitd_uid_t Key, StringRef(prefix)) {
   if (!Opts.RequestOptions.empty()) {
     sourcekitd_object_t CCOpts =
         sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
     for (auto &Opt : Opts.RequestOptions) {
       auto KeyValue = StringRef(Opt).split('=');
-      std::string KeyStr("key.codecomplete.");
+      std::string KeyStr(prefix.str());
       KeyStr.append(KeyValue.first.str());
       sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
 
@@ -312,14 +313,27 @@ static void addCodeCompleteOptions(sourcekitd_object_t Req, TestOptions &Opts) {
       if (KeyValue.first == "filtertext") {
         sourcekitd_request_dictionary_set_stringbuf(
             CCOpts, Key, KeyValue.second.data(), KeyValue.second.size());
+      } else if (KeyValue.first == "expectedtypes") {
+        SmallVector<StringRef, 4> expectedTypeNames;
+        KeyValue.second.split(expectedTypeNames, ';');
+
+        auto typenames = sourcekitd_request_array_create(nullptr, 0);
+        for (auto &name : expectedTypeNames) {
+          std::string n = name.str();
+          sourcekitd_request_array_set_string(typenames,
+                                              SOURCEKITD_ARRAY_APPEND,
+                                              n.c_str());
+        }
+        // NOTE: 'key.expectedtypes' directly to the request.
+        sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes,
+                                                typenames);
       } else {
         int64_t Value = 0;
         KeyValue.second.getAsInteger(0, Value);
         sourcekitd_request_dictionary_set_int64(CCOpts, Key, Value);
       }
     }
-    sourcekitd_request_dictionary_set_value(Req, KeyCodeCompleteOptions,
-                                            CCOpts);
+    sourcekitd_request_dictionary_set_value(Req, Key, CCOpts);
     sourcekitd_request_release(CCOpts);
   }
 }
@@ -440,28 +454,6 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     }
     // We will sync with the service before exiting; don't do so here.
     printBufferedNotifications(/*syncWithService=*/false);
-  }
-  return 0;
-}
-
-static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
-                            sourcekitd_object_t Req) {
-  for (auto &Opt : Opts.RequestOptions) {
-    auto KeyValue = StringRef(Opt).split('=');
-    if (KeyValue.first == "expectedtypes") {
-      SmallVector<StringRef, 4> expectedTypeNames;
-      KeyValue.second.split(expectedTypeNames, ';');
-
-      auto typenames = sourcekitd_request_array_create(nullptr, 0);
-      for (auto &name : expectedTypeNames) {
-        std::string n = name.str();
-        sourcekitd_request_array_set_string(typenames, SOURCEKITD_ARRAY_APPEND, n.c_str());
-      }
-      sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes, typenames);
-    } else {
-      llvm::errs() << "invalid key '" << KeyValue.first << "' in -req-opts\n";
-      return 1;
-    }
   }
   return 0;
 }
@@ -601,7 +593,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     // Default to sort by name.
     Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
-    addCodeCompleteOptions(Req, Opts);
+    addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
   case SourceKitRequest::CodeCompleteOpen:
@@ -609,7 +601,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           RequestCodeCompleteOpen);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    addCodeCompleteOptions(Req, Opts);
+    addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
   case SourceKitRequest::CodeCompleteClose:
@@ -624,7 +616,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           RequestCodeCompleteUpdate);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    addCodeCompleteOptions(Req, Opts);
+    addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
   case SourceKitRequest::CodeCompleteCacheOnDisk:
@@ -673,13 +665,16 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestTypeContextInfo);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    addRequestOptions(Req, Opts, KeyTypeContextInfoOptions,
+                      "key.typecontextinfo.");
     break;
 
   case SourceKitRequest::ConformingMethodList:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestConformingMethodList);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    setExpectedTypes(Opts, Req);
+    addRequestOptions(Req, Opts, KeyConformingMethodListOptions,
+                      "key.conformingmethods.");
     break;
 
   case SourceKitRequest::CursorInfo:
@@ -711,7 +706,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::CollectExpresstionType: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCollectExpressionType);
-    setExpectedTypes(Opts, Req);
+    // NOTE: KeyCodeCompletion and the prefix are just dummy. This request
+    // only accepts 'expectedtypes' which is placed to the Req root dictionary.
+    addRequestOptions(Req, Opts, KeyCodeCompleteOptions,
+                      "key.expression.type.");
     break;
   }
 

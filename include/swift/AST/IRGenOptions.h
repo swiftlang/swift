@@ -169,6 +169,9 @@ public:
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
+  /// Path prefixes that should be rewritten in coverage info.
+  PathRemapper CoveragePrefixMap;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
@@ -190,9 +193,6 @@ public:
   /// Whether we should run LLVM SLP vectorizer.
   unsigned DisableLLVMSLPVectorizer : 1;
 
-  /// Disable frame pointer elimination?
-  unsigned DisableFPElim : 1;
-  
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
 
@@ -319,7 +319,7 @@ public:
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
-        DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
+        Playground(false), EmitStackPromotionChecks(false),
         FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         HasValueNamesSetting(false), ValueNames(false),
         EnableReflectionMetadata(true), EnableReflectionNames(true),

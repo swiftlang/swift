@@ -1387,7 +1387,7 @@ namespace {
       assert(ElementsWithPayload.size() >= 1);
       if (PayloadSchema) {
         PayloadSchema.forEachType(IGM, [&](llvm::Type *t){
-          PayloadElementCount++;
+          ++PayloadElementCount;
           PayloadBitCount += IGM.DataLayout.getTypeSizeInBits(t);
         });
       } else {
@@ -2059,7 +2059,7 @@ namespace {
       auto nextCase = [&]() -> EnumElementDecl* {
         assert(elti != eltEnd);
         Element elt = *elti;
-        elti++;
+        ++elti;
         return elt.decl;
       };
       
@@ -6010,7 +6010,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       TC.IGM.getResilienceExpansionForLayout(theEnum);
 
   for (auto elt : theEnum->getAllElements()) {
-    numElements++;
+    ++numElements;
 
     if (!elt->hasAssociatedValues()) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});

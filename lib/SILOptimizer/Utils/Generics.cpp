@@ -13,21 +13,22 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/AST/TypeMatcher.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Strings.h"
 
 using namespace swift;
@@ -58,6 +59,12 @@ llvm::cl::opt<bool> PrintGenericSpecializationLoops(
     llvm::cl::desc("Print detected infinite generic specialization loops that "
                    "were prevented"));
 
+llvm::cl::opt<bool> VerifyFunctionsAfterSpecialization(
+    "sil-generic-verify-after-specialization", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Verify functions after they are specialized "
+        "'PrettyStackTraceFunction'-ing the original function if we fail."));
+
 static bool OptimizeGenericSubstitutions = false;
 
 /// Max depth of a type which can be processed by the generic
@@ -84,7 +91,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
       auto StoredProperties = NTD->getStoredProperties();
       Width += StoredProperties.size();
     }
-    Depth++;
+    ++Depth;
     unsigned MaxTypeDepth = 0;
     auto GenericArgs = BGT->getGenericArgs();
     for (auto Ty : GenericArgs) {
@@ -101,7 +108,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
 
   if (auto *TupleTy = t->getAs<TupleType>()) {
     Width += TupleTy->getNumElements();
-    Depth++;
+    ++Depth;
     unsigned MaxTypeDepth = 0;
     auto ElementTypes = TupleTy->getElementTypes();
     for (auto Ty : ElementTypes) {
@@ -117,7 +124,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   }
 
   if (auto *FnTy = t->getAs<SILFunctionType>()) {
-    Depth++;
+    ++Depth;
     unsigned MaxTypeDepth = 0;
     auto Params = FnTy->getParameters();
     Width += Params.size();
@@ -156,7 +163,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   }
 
   if (auto *FnTy = t->getAs<FunctionType>()) {
-    Depth++;
+    ++Depth;
     unsigned MaxTypeDepth = 0;
     auto Params = FnTy->getParams();
     Width += Params.size();
@@ -345,7 +352,7 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
         // contain small specialization cycles.
         if (numAcceptedCycles == 0)
           return true;
-        numAcceptedCycles--;
+        --numAcceptedCycles;
       }
     }
 
@@ -441,7 +448,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                << IndentDebug(4)
                << "Cannot specialize because the generic type is too deep";
       });
-      NumPreventedTooComplexGenericSpecializations++;
+      ++NumPreventedTooComplexGenericSpecializations;
       return false;
     }
   }
@@ -525,7 +532,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       llvm::errs() << "Detected and prevented an infinite "
                       "generic specialization loop for callee: "
                    << Callee->getName() << '\n';
-    NumPreventedGenericSpecializationLoops++;
+    ++NumPreventedGenericSpecializationLoops;
     return false;
   }
 
@@ -1871,6 +1878,15 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   SpecializedF->setClassSubclassScope(SubclassScope::NotApplicable);
   SpecializedF->setSpecializationInfo(
       GenericSpecializationInformation::create(Caller, GenericFunc, Subs));
+
+  if (VerifyFunctionsAfterSpecialization) {
+    PrettyStackTraceSILFunction SILFunctionDumper(
+        llvm::Twine("Generic function: ") + GenericFunc->getName() +
+            ". Specialized Function: " + SpecializedF->getName(),
+        GenericFunc);
+    SpecializedF->verify();
+  }
+
   return SpecializedF;
 }
 
@@ -1939,89 +1955,94 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
-static ApplySite replaceWithSpecializedCallee(ApplySite AI,
-                                              SILValue Callee,
-                                              const ReabstractionInfo &ReInfo) {
-  SILBuilderWithScope Builder(AI.getInstruction());
-  SILLocation Loc = AI.getLoc();
-  SmallVector<SILValue, 4> Arguments;
-  SILValue StoreResultTo;
+static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
+                                              SILValue callee,
+                                              const ReabstractionInfo &reInfo) {
+  SILBuilderWithScope builder(applySite.getInstruction());
+  SILLocation loc = applySite.getLoc();
+  SmallVector<SILValue, 4> arguments;
+  SILValue resultOut;
 
-  prepareCallArguments(AI, Builder, ReInfo, Arguments, StoreResultTo);
+  prepareCallArguments(applySite, builder, reInfo, arguments, resultOut);
 
   // Create a substituted callee type.
-  auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
-  SubstitutionMap Subs;
-  if (ReInfo.getSpecializedType()->isPolymorphic()) {
-    Subs = ReInfo.getCallerParamSubstitutionMap();
-    Subs = SubstitutionMap::get(CanFnTy->getSubstGenericSignature(), Subs);
+  auto canFnTy = callee->getType().castTo<SILFunctionType>();
+  SubstitutionMap subs;
+  if (reInfo.getSpecializedType()->isPolymorphic()) {
+    subs = reInfo.getCallerParamSubstitutionMap();
+    subs = SubstitutionMap::get(canFnTy->getSubstGenericSignature(), subs);
   }
 
-  auto CalleeSubstFnTy =
-      CanFnTy->substGenericArgs(*Callee->getModule(), Subs,
-                                ReInfo.getResilienceExpansion());
-  auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
-  SILFunctionConventions substConv(CalleeSubstFnTy, Builder.getModule());
+  auto calleeSubstFnTy = canFnTy->substGenericArgs(
+      *callee->getModule(), subs, reInfo.getResilienceExpansion());
+  auto calleeSILSubstFnTy = SILType::getPrimitiveObjectType(calleeSubstFnTy);
+  SILFunctionConventions substConv(calleeSubstFnTy, builder.getModule());
 
-  if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
-    SILBasicBlock *ResultBB = TAI->getNormalBB();
-    assert(ResultBB->getSinglePredecessorBlock() == TAI->getParent());
-    auto *NewTAI = Builder.createTryApply(Loc, Callee, Subs, Arguments,
-                                          ResultBB, TAI->getErrorBB());
-    if (StoreResultTo) {
+  switch (applySite.getKind()) {
+  case ApplySiteKind::TryApplyInst: {
+    auto *tai = cast<TryApplyInst>(applySite);
+    SILBasicBlock *resultBlock = tai->getNormalBB();
+    assert(resultBlock->getSinglePredecessorBlock() == tai->getParent());
+    auto *newTAI = builder.createTryApply(loc, callee, subs, arguments,
+                                          resultBlock, tai->getErrorBB());
+    if (resultOut) {
       assert(substConv.useLoweredAddresses());
       // The original normal result of the try_apply is an empty tuple.
-      assert(ResultBB->getNumArguments() == 1);
-      Builder.setInsertionPoint(ResultBB->begin());
-      fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
+      assert(resultBlock->getNumArguments() == 1);
+      builder.setInsertionPoint(resultBlock->begin());
+      fixUsedVoidType(resultBlock->getArgument(0), loc, builder);
 
-      SILArgument *Arg = ResultBB->replacePhiArgument(
-          0, StoreResultTo->getType().getObjectType(),
-          ValueOwnershipKind::Owned);
+      SILArgument *arg = resultBlock->replacePhiArgument(
+          0, resultOut->getType().getObjectType(), ValueOwnershipKind::Owned);
       // Store the direct result to the original result address.
-      Builder.createStore(Loc, Arg, StoreResultTo,
+      builder.createStore(loc, arg, resultOut,
                           StoreOwnershipQualifier::Unqualified);
     }
-    return NewTAI;
+    return newTAI;
   }
-  if (auto *A = dyn_cast<ApplyInst>(AI)) {
-    auto *NewAI = Builder.createApply(Loc, Callee, Subs, Arguments,
-                                      A->isNonThrowing());
-    if (StoreResultTo) {
+  case ApplySiteKind::ApplyInst: {
+    auto *ai = cast<ApplyInst>(applySite);
+    auto *newAI =
+        builder.createApply(loc, callee, subs, arguments, ai->isNonThrowing());
+    if (resultOut) {
       assert(substConv.useLoweredAddresses());
-      if (!CalleeSILSubstFnTy.isNoReturnFunction(
-              Builder.getModule(), Builder.getTypeExpansionContext())) {
+      if (!calleeSILSubstFnTy.isNoReturnFunction(
+              builder.getModule(), builder.getTypeExpansionContext())) {
         // Store the direct result to the original result address.
-        fixUsedVoidType(A, Loc, Builder);
-        Builder.createStore(Loc, NewAI, StoreResultTo,
+        fixUsedVoidType(ai, loc, builder);
+        builder.createStore(loc, newAI, resultOut,
                             StoreOwnershipQualifier::Unqualified);
       } else {
-        Builder.createUnreachable(Loc);
+        builder.createUnreachable(loc);
         // unreachable should be the terminator instruction.
         // So, split the current basic block right after the
         // inserted unreachable instruction.
-        Builder.getInsertionPoint()->getParent()->split(
-            Builder.getInsertionPoint());
+        builder.getInsertionPoint()->getParent()->split(
+            builder.getInsertionPoint());
       }
     }
-    A->replaceAllUsesWith(NewAI);
-    return NewAI;
+    ai->replaceAllUsesWith(newAI);
+    return newAI;
   }
-  if (auto *A = dyn_cast<BeginApplyInst>(AI)) {
-    assert(!StoreResultTo);
-    auto *NewAI = Builder.createBeginApply(Loc, Callee, Subs, Arguments,
-                                           A->isNonThrowing());
-    A->replaceAllUsesPairwiseWith(NewAI);
-    return NewAI;
+  case ApplySiteKind::BeginApplyInst: {
+    auto *bai = cast<BeginApplyInst>(applySite);
+    assert(!resultOut);
+    auto *newBAI = builder.createBeginApply(loc, callee, subs, arguments,
+                                            bai->isNonThrowing());
+    bai->replaceAllUsesPairwiseWith(newBAI);
+    return newBAI;
   }
-  if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
-    auto *NewPAI = Builder.createPartialApply(
-        Loc, Callee, Subs, Arguments,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
-        PAI->isOnStack());
-    PAI->replaceAllUsesWith(NewPAI);
-    return NewPAI;
+  case ApplySiteKind::PartialApplyInst: {
+    auto *pai = cast<PartialApplyInst>(applySite);
+    auto *newPAI = builder.createPartialApply(
+        loc, callee, subs, arguments,
+        pai->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        pai->isOnStack());
+    pai->replaceAllUsesWith(newPAI);
+    return newPAI;
   }
+  }
+
   llvm_unreachable("unhandled kind of apply");
 }
 
@@ -2438,6 +2459,20 @@ void swift::trySpecializeApplyOfGeneric(
            << NV("FuncType", OS.str());
   });
 
+  // Verify our function after we have finished fixing up call sites/etc. Dump
+  // the generic function if there is an assertion failure (or a crash) to make
+  // it easier to debug such problems since the original generic function is
+  // easily at hand.
+  SWIFT_DEFER {
+    if (VerifyFunctionsAfterSpecialization) {
+      PrettyStackTraceSILFunction SILFunctionDumper(
+          llvm::Twine("Generic function: ") + RefF->getName() +
+              ". Specialized Function: " + SpecializedF->getName(),
+          RefF);
+      SpecializedF->verify();
+    }
+  };
+
   assert(ReInfo.getSpecializedType()
          == SpecializedF->getLoweredFunctionType() &&
          "Previously specialized function does not match expected type.");
@@ -2452,6 +2487,13 @@ void swift::trySpecializeApplyOfGeneric(
     SILFunction *Thunk =
       ReabstractionThunkGenerator(FuncBuilder, ReInfo, PAI, SpecializedF)
         .createThunk();
+    if (VerifyFunctionsAfterSpecialization) {
+      PrettyStackTraceSILFunction SILFunctionDumper(
+          llvm::Twine("Thunk For Generic function: ") + RefF->getName() +
+              ". Specialized Function: " + SpecializedF->getName(),
+          RefF);
+      Thunk->verify();
+    }
     NewFunctions.push_back(Thunk);
     SILBuilderWithScope Builder(PAI);
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);

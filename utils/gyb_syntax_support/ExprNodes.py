@@ -1,5 +1,5 @@
-from Child import Child
-from Node import Node  # noqa: I201
+from .Child import Child
+from .Node import Node  # noqa: I201
 
 EXPR_NODES = [
     # An inout expression.
@@ -424,7 +424,7 @@ EXPR_NODES = [
                    is_optional=True),
              Child('AdditionalTrailingClosures',
                    kind='MultipleTrailingClosureElementList',
-                   collection_element_name='AdditionalTralingClosure',
+                   collection_element_name='AdditionalTrailingClosure',
                    is_optional=True),
          ]),
 
@@ -440,7 +440,7 @@ EXPR_NODES = [
                    is_optional=True),
              Child('AdditionalTrailingClosures',
                    kind='MultipleTrailingClosureElementList',
-                   collection_element_name='AdditionalTralingClosure',
+                   collection_element_name='AdditionalTrailingClosure',
                    is_optional=True),
          ]),
 

@@ -1,0 +1,3 @@
+module Reference {
+  header "reference.h"
+}

@@ -59,51 +59,26 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
   }
 }
 
-struct InterfaceSubASTContextDelegate: SubASTContextDelegate {
-  bool runInSubContext(ASTContext &ctx, StringRef interfacePath,
-                       llvm::function_ref<bool(ASTContext&)> action) override {
-    // Parse the interface file using the current context to get the additional
-    // compiler arguments we should use when creating a sub-ASTContext.
-    // These arguments are in "swift-module-flags:"
-    version::Version Vers;
-    StringRef CompilerVersion;
-    llvm::BumpPtrAllocator Allocator;
-    llvm::StringSaver SubArgSaver(Allocator);
-    SmallVector<const char *, 64> SubArgs;
-    if (extractSwiftInterfaceVersionAndArgs(ctx.SourceMgr, ctx.Diags,
-                                            interfacePath, Vers, CompilerVersion,
-                                            SubArgSaver, SubArgs)) {
-      return true;
-    }
-    CompilerInvocation invok;
-
-    // Inherit options from the parent ASTContext so we have all search paths, etc.
-    inheritOptionsForBuildingInterface(invok, ctx.SearchPathOpts, ctx.LangOpts);
-    CompilerInstance inst;
-    // Use the additional flags to setup the compiler instance.
-    if (invok.parseArgs(SubArgs, ctx.Diags)) {
-      return true;
-    }
-    if (inst.setup(invok)) {
-      return true;
-    }
-    // Add the diag consumers to the sub context to make sure we don't lose
-    // diagnostics.
-    for (auto *consumer: ctx.Diags.getConsumers()) {
-      inst.getDiags().addConsumer(*consumer);
-    }
-    // Run the action under the sub-ASTContext.
-    return action(inst.getASTContext());
-  }
-};
-
 /// Resolve the direct dependencies of the given module.
 static std::vector<ModuleDependencyID> resolveDirectDependencies(
-    ASTContext &ctx, ModuleDependencyID module,
+    CompilerInstance &instance, ModuleDependencyID module,
     ModuleDependenciesCache &cache) {
+  auto &ctx = instance.getASTContext();
   auto knownDependencies = *cache.findDependencies(module.first, module.second);
   auto isSwift = knownDependencies.isSwiftModule();
-  InterfaceSubASTContextDelegate ASTDelegate;
+  auto ModuleCachePath = getModuleCachePathFromClang(ctx
+    .getClangModuleLoader()->getClangInstance());
+  auto &FEOpts = instance.getInvocation().getFrontendOptions();
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+  InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
+                                              ctx.SearchPathOpts, ctx.LangOpts,
+                                              LoaderOpts,
+                                              ctx.getClangModuleLoader(),
+                                              /*buildModuleCacheDirIfAbsent*/false,
+                                              ModuleCachePath,
+                                              FEOpts.PrebuiltModuleCachePath,
+                                              FEOpts.SerializeModuleInterfaceDependencyHashes,
+                                              FEOpts.shouldTrackSystemDependencies());
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
@@ -155,12 +130,46 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
     for (const auto &clangDep : allClangModules) {
       if (auto found = ctx.getModuleDependencies(
               clangDep, /*onlyClangModule=*/false, cache, ASTDelegate)) {
-        if (found->getKind() == ModuleDependenciesKind::Swift)
+        // ASTContext::getModuleDependencies returns dependencies for a module with a given name.
+        // This Clang module may have the same name as the Swift module we are resolving, so we
+        // need to make sure we don't add a dependency from a Swift module to itself.
+        if (found->getKind() == ModuleDependenciesKind::Swift && clangDep != module.first)
           result.push_back({clangDep, found->getKind()});
       }
     }
   }
-
+  // Only resolve cross-import overlays when this is the main module.
+  // For other modules, these overlays are explicitly written.
+  bool isMainModule =
+    instance.getMainModule()->getName().str() == module.first &&
+    module.second == ModuleDependenciesKind::Swift;
+  if (isMainModule) {
+    // Modules explicitly imported. Only these can be secondary module.
+    std::vector<ModuleDependencyID> explicitImports = result;
+    for (unsigned I = 0; I != result.size(); ++I) {
+      auto dep = result[I];
+      auto moduleName = dep.first;
+      auto dependencies = *cache.findDependencies(moduleName, dep.second);
+      // Collect a map from secondary module name to cross-import overlay names.
+      auto overlayMap = dependencies.collectCrossImportOverlayNames(
+        instance.getASTContext(), moduleName);
+      if (overlayMap.empty())
+        continue;
+      std::for_each(explicitImports.begin(), explicitImports.end(),
+                    [&](ModuleDependencyID Id) {
+        // check if any explicitly imported modules can serve as a secondary
+        // module, and add the overlay names to the dependencies list.
+        for (auto overlayName: overlayMap[Id.first]) {
+          if (auto found = ctx.getModuleDependencies(overlayName.str(),
+                                                     /*onlyClangModule=*/false,
+                                                     cache,
+                                                     ASTDelegate)) {
+            result.emplace_back(overlayName.str(), found->getKind());
+          }
+        }
+      });
+    }
+  }
   return result;
 }
 
@@ -248,7 +257,7 @@ namespace {
 }
 
 static void writeJSON(llvm::raw_ostream &out,
-                      ASTContext &ctx,
+                      CompilerInstance &instance,
                       ModuleDependenciesCache &cache,
                       ArrayRef<ModuleDependencyID> allModules) {
   // Write out a JSON description of all of the dependencies.
@@ -268,7 +277,7 @@ static void writeJSON(llvm::raw_ostream &out,
   };
   for (const auto &module : allModules) {
     auto directDependencies = resolveDirectDependencies(
-        ctx, ModuleDependencyID(module.first, module.second), cache);
+        instance, ModuleDependencyID(module.first, module.second), cache);
 
     // Grab the completed module dependencies.
     auto moduleDeps = *cache.findDependencies(module.first, module.second);
@@ -315,7 +324,35 @@ static void writeJSON(llvm::raw_ostream &out,
         writeJSONSingleField(
             out, "moduleInterfacePath",
             *swiftDeps->swiftInterfaceFile, 5,
-            /*trailingComma=*/swiftDeps->bridgingHeaderFile.hasValue());
+            /*trailingComma=*/true);
+        writeJSONSingleField(out, "contextHash",
+                             swiftDeps->contextHash, 5,
+                             /*trailingComma=*/true);
+        out.indent(5 * 2);
+        out << "\"commandLine\": [\n";
+        for (auto &arg :swiftDeps->buildCommandLine) {
+          out.indent(6 * 2);
+          out << "\"" << arg << "\"";
+          if (&arg != &swiftDeps->buildCommandLine.back())
+            out << ",";
+          out << "\n";
+        }
+        out.indent(5 * 2);
+        out << "],\n";
+      }
+
+      if (!swiftDeps->extraPCMArgs.empty()) {
+        out.indent(5 * 2);
+        out << "\"extraPcmArgs\": [\n";
+        for (auto &arg :swiftDeps->extraPCMArgs) {
+          out.indent(6 * 2);
+          out << "\"" << arg << "\"";
+          if (&arg != &swiftDeps->extraPCMArgs.back())
+            out << ",";
+          out << "\n";
+        }
+        out.indent(5 * 2);
+        out << (swiftDeps->bridgingHeaderFile.hasValue() ? "],\n" : "]\n");
       }
 
       /// Bridging header and its source file dependencies, if any.
@@ -389,9 +426,16 @@ bool swift::scanDependencies(CompilerInstance &instance) {
   llvm::SmallString<32> mainModulePath = mainModule->getName().str();
   llvm::sys::path::replace_extension(mainModulePath, newExt);
 
+  std::string apinotesVer = (llvm::Twine("-fapinotes-swift-version=")
+    + instance.getASTContext().LangOpts.EffectiveLanguageVersion
+      .asAPINotesVersionString()).str();
   // Compute the dependencies of the main module.
   auto mainDependencies =
-      ModuleDependencies::forSwiftModule(mainModulePath.str().str());
+    ModuleDependencies::forMainSwiftModule(mainModulePath.str().str(), {
+      // ExtraPCMArgs
+      "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str(),
+      "-Xcc", apinotesVer
+    });
   {
     llvm::StringSet<> alreadyAddedModules;
     for (auto fileUnit : mainModule->getFiles()) {
@@ -413,12 +457,6 @@ bool swift::scanDependencies(CompilerInstance &instance) {
     case ImplicitStdlibKind::Stdlib:
       mainDependencies.addModuleDependency("Swift", alreadyAddedModules);
       break;
-    }
-
-    // Swift -Onone support library.
-    if (invocation.shouldImportSwiftONoneSupport()) {
-      mainDependencies.addModuleDependency(
-          SWIFT_ONONE_SUPPORT, alreadyAddedModules);
     }
 
     // Add any implicit module names.
@@ -462,12 +500,12 @@ bool swift::scanDependencies(CompilerInstance &instance) {
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
-        resolveDirectDependencies(Context, module, cache);
+        resolveDirectDependencies(instance, module, cache);
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
 
   // Write out the JSON description.
-  writeJSON(out, Context, cache, allModules.getArrayRef());
+  writeJSON(out, instance, cache, allModules.getArrayRef());
 
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {

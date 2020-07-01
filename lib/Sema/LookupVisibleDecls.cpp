@@ -539,7 +539,7 @@ static void
 // wrappers.
 static void
 synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC) {
-  auto SF = IDC->getDecl()->getDeclContext()->getParentSourceFile();
+  auto SF = IDC->getAsGenericContext()->getParentSourceFile();
   if (!SF || SF->Kind == SourceFileKind::Interface)
     return;
 
@@ -864,7 +864,7 @@ public:
       if (DeclAndReason.D != Decls[index])
         continue;
 
-      index++;
+      ++index;
 
       auto *const VD = DeclAndReason.D;
       const auto Reason = DeclAndReason.Reason;

@@ -707,6 +707,14 @@ extension InoutParameters {
   ) { fatalError() }
 }
 
+// Test no semantic results.
+
+func noSemanticResults(_ x: Float) {}
+
+// expected-error @+1 {{cannot differentiate void function 'noSemanticResults'}}
+@derivative(of: noSemanticResults)
+func vjpNoSemanticResults(_ x: Float) -> (value: Void, pullback: Void) {}
+
 // Test multiple semantic results.
 
 extension InoutParameters {
@@ -834,6 +842,27 @@ private func _private_original_private_derivative(_ x: Float) -> (value: Float, 
 fileprivate func fileprivate_original_fileprivate_derivative(_ x: Float) -> Float { x }
 @derivative(of: fileprivate_original_fileprivate_derivative)
 fileprivate func _fileprivate_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_usablefrominline_derivative(_ x: Float) -> Float { x }
+@usableFromInline
+@derivative(of: internal_original_usablefrominline_derivative)
+func _internal_original_usablefrominline_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_inlinable_derivative(_ x: Float) -> Float { x }
+@inlinable
+@derivative(of: internal_original_inlinable_derivative)
+func _internal_original_inlinable_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
+@_alwaysEmitIntoClient
+@derivative(of: internal_original_alwaysemitintoclient_derivative)
+func _internal_original_alwaysemitintoclient_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
 

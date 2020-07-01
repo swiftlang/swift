@@ -82,7 +82,7 @@ func testRawRepresentable() {
 // MYENUM_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#rawValue: String#})[#MyEnum?#];
 // MYENUM_DOT-DAG: Decl[TypeAlias]/CurrNominal:        AllCases[#[MyEnum]#];
 // MYENUM_DOT-DAG: Decl[StaticVar]/CurrNominal:        allCases[#[MyEnum]#];
-// MYENUM_DOT-DAG: Decl[InstanceMethod]/Super:         hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
+// MYENUM_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // MYENUM_DOT: End completions
 }
 func testRawRepesentableInstance(value: MyEnum) {
@@ -90,8 +90,8 @@ func testRawRepesentableInstance(value: MyEnum) {
 // MYENUM_INSTANCE_DOT: Begin completions, 4 items
 // MYENUM_INSTANCE_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum#];
 // MYENUM_INSTANCE_DOT-DAG: Decl[InstanceVar]/CurrNominal:      rawValue[#String#];
-// MYENUM_INSTANCE_DOT-DAG: Decl[InstanceVar]/Super:            hashValue[#Int#];
-// MYENUM_INSTANCE_DOT-DAG: Decl[InstanceMethod]/Super:         hash({#into: &Hasher#})[#Void#];
+// MYENUM_INSTANCE_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:   hashValue[#Int#];
+// MYENUM_INSTANCE_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem: hash({#into: &Hasher#})[#Void#];
 // MYENUM_INSTANCE_DOT: End completions
 }
 func testHasWrappedValue(value: HasWrapped) {

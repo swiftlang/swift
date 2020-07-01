@@ -14,10 +14,12 @@
 #define SWIFT_DEMANGLING_MANGLINGUTILS_H
 
 #include "llvm/ADT/StringRef.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Demangling/Punycode.h"
 
 namespace swift {
 namespace Mangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 using llvm::StringRef;
 
@@ -190,9 +192,8 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
       // Mangle the sub-string up to the next word substitution (or to the end
       // of the identifier - that's why we added the dummy-word).
       // The first thing: we add the encoded sub-string length.
+      bool first = true;
       M.Buffer << (Repl.StringPos - Pos);
-      assert(!isDigit(ident[Pos]) &&
-             "first char of sub-string may not be a digit");
       do {
         // Update the start position of new added words, so that they refer to
         // the begin of the whole mangled Buffer.
@@ -201,9 +202,16 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
           M.Words[WordsInBuffer].start = M.getBufferStr().size();
           WordsInBuffer++;
         }
+        // Error recovery. We sometimes need to mangle identifiers coming
+        // from invalid code.
+        if (first && isDigit(ident[Pos]))
+          M.Buffer << 'X';
         // Add a literal character of the sub-string.
-        M.Buffer << ident[Pos];
+        else
+          M.Buffer << ident[Pos];
+
         Pos++;
+        first = false;
       } while (Pos < Repl.StringPos);
     }
     // Is it a "real" word substitution (and not the dummy-word)?
@@ -311,6 +319,7 @@ public:
   }
 };
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Mangle
 } // end namespace swift
 

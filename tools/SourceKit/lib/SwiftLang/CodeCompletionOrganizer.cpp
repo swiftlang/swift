@@ -110,13 +110,26 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
         // FIXME: because other-module results are cached, they will not be
         // given a type-relation of invalid.  As a hack, we look at the text of
         // the result type and look for 'Void'.
-        for (auto &chunk : result->getCompletionString()->getChunks()) {
+        bool isVoid = false;
+        auto chunks = result->getCompletionString()->getChunks();
+        for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
           using ChunkKind = ide::CodeCompletionString::Chunk::ChunkKind;
-          if (chunk.is(ChunkKind::TypeAnnotation) && chunk.hasText() &&
-              chunk.getText() == "Void") {
-            builder.setExpectedTypeRelation(Completion::Invalid);
+          bool isVoid = false;
+          if (i->is(ChunkKind::TypeAnnotation)) {
+            isVoid = i->getText() == "Void";
+            break;
+          } else if (i->is(ChunkKind::TypeAnnotationBegin)) {
+            auto n = i + 1, t = i + 2;
+            isVoid =
+                // i+1 has text 'Void'.
+                n != e && n->hasText() && n->getText() == "Void" &&
+                // i+2 terminates the group.
+                (t == e || t->endsPreviousNestedGroup(i->getNestingLevel()));
+            break;
           }
         }
+        if (isVoid)
+          builder.setExpectedTypeRelation(Completion::Invalid);
       }
     }
 
@@ -342,12 +355,11 @@ ImportDepth::ImportDepth(ASTContext &context,
 
   // Private imports from this module.
   // FIXME: only the private imports from the current source file.
-  ModuleDecl::ImportFilter importFilter;
-  importFilter |= ModuleDecl::ImportFilterKind::Private;
-  importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
-  main->getImportedModules(mainImports, importFilter);
+  main->getImportedModules(mainImports,
+                           {ModuleDecl::ImportFilterKind::Private,
+                            ModuleDecl::ImportFilterKind::ImplementationOnly});
   for (auto &import : mainImports) {
     uint8_t depth = 1;
     if (auxImports.count(import.importedModule->getName().str()))
@@ -1240,14 +1252,11 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
       case ChunkKind::Ampersand:
       case ChunkKind::OptionalMethodCallTail:
         continue;
-      case ChunkKind::CallParameterTypeBegin: {
-        // Skip call parameter type type structure.
+      case ChunkKind::CallParameterTypeBegin:
+      case ChunkKind::TypeAnnotationBegin: {
+        // Skip call parameter type or type annotation structure.
         auto nestingLevel = C.getNestingLevel();
-        ++i;
-        for (; i != e; ++i) {
-          if (i->endsPreviousNestedGroup(nestingLevel))
-            break;
-        }
+        do { ++i; } while (i != e && !i->endsPreviousNestedGroup(nestingLevel));
         --i;
         continue;
       }
@@ -1315,10 +1324,11 @@ Completion *CompletionBuilder::finish() {
     if (current.getKind() == SwiftResult::Declaration) {
       base = SwiftResult(
           semanticContext, current.getNumBytesToErase(), completionString,
-          current.getAssociatedDeclKind(), current.getModuleName(),
-          current.isNotRecommended(),  current.getNotRecommendedReason(),
-          current.getBriefDocComment(), current.getAssociatedUSRs(),
-          current.getDeclKeywords(), typeRelation, opKind);
+          current.getAssociatedDeclKind(), current.isSystem(),
+          current.getModuleName(), current.isNotRecommended(),
+          current.getNotRecommendedReason(), current.getBriefDocComment(),
+          current.getAssociatedUSRs(), current.getDeclKeywords(),
+          typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext,
                          current.getNumBytesToErase(), completionString,

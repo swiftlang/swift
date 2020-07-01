@@ -17,32 +17,30 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 
+#include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
+#include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
 
 namespace swift {
+
+namespace autodiff {
+
+class ADContext;
 
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
 
-namespace autodiff {
-
 /// Prints an "[AD] " prefix to `llvm::dbgs()` and returns the debug stream.
 /// This is being used to print short debug messages within the AD pass.
 raw_ostream &getADDebugStream();
-
-/// Returns true if this is an full apply site whose callee has
-/// `array.uninitialized_intrinsic` semantics.
-bool isArrayLiteralIntrinsic(FullApplySite applySite);
-
-/// If the given value `v` corresponds to an `ApplyInst` with
-/// `array.uninitialized_intrinsic` semantics, returns the corresponding
-/// `ApplyInst`. Otherwise, returns `nullptr`.
-ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v);
 
 /// Given an element address from an `array.uninitialized_intrinsic` `apply`
 /// instruction, returns the `apply` instruction. The element address is either
@@ -55,6 +53,8 @@ ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v);
 ///     %index_1 = integer_literal $Builtin.Word, 1
 ///     %elt1 = index_addr %elt0, %index_1           // element address
 ///     ...
+// TODO(SR-12894): Find a better name and move this general utility to
+// ArraySemantic.h.
 ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v);
 
 /// Given a value, finds its single `destructure_tuple` user if the value is
@@ -140,6 +140,34 @@ template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
     return peerThroughFunctionConversions<Inst>(pai->getCallee());
   return nullptr;
 }
+
+//===----------------------------------------------------------------------===//
+// Diagnostic utilities
+//===----------------------------------------------------------------------===//
+
+// Returns `v`'s location if it is valid. Otherwise, returns `v`'s function's
+// location as as a fallback. Used for diagnostics.
+SILLocation getValidLocation(SILValue v);
+
+// Returns `inst`'s location if it is valid. Otherwise, returns `inst`'s
+// function's location as as a fallback. Used for diagnostics.
+SILLocation getValidLocation(SILInstruction *inst);
+
+//===----------------------------------------------------------------------===//
+// Tangent property lookup utilities
+//===----------------------------------------------------------------------===//
+
+/// Returns the tangent stored property of `originalField`. On error, emits
+/// diagnostic and returns nullptr.
+VarDecl *getTangentStoredProperty(ADContext &context, VarDecl *originalField,
+                                  SILLocation loc,
+                                  DifferentiationInvoker invoker);
+
+/// Returns the tangent stored property of the original stored property
+/// referenced by `inst`. On error, emits diagnostic and returns nullptr.
+VarDecl *getTangentStoredProperty(ADContext &context,
+                                  FieldIndexCacheBase *projectionInst,
+                                  DifferentiationInvoker invoker);
 
 //===----------------------------------------------------------------------===//
 // Code emission utilities

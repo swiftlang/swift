@@ -69,42 +69,42 @@ llvm::cl::opt<std::string>
                                     "whose name contains this substring"));
 
 llvm::cl::list<std::string>
-    SILPrintBefore("sil-print-before",
+    SILPrintBefore("sil-print-before", llvm::cl::CommaSeparated,
                    llvm::cl::desc("Print out the sil before passes which "
                                   "contain a string from this list."));
 
 llvm::cl::list<std::string>
-    SILPrintAfter("sil-print-after",
+    SILPrintAfter("sil-print-after", llvm::cl::CommaSeparated,
                   llvm::cl::desc("Print out the sil after passes which contain "
                                  "a string from this list."));
 
 llvm::cl::list<std::string>
-    SILPrintAround("sil-print-around",
+    SILPrintAround("sil-print-around", llvm::cl::CommaSeparated,
                    llvm::cl::desc("Print out the sil before and after passes "
                                   "which contain a string from this list"));
 
 llvm::cl::list<std::string>
-    SILDisablePass("sil-disable-pass",
+    SILDisablePass("sil-disable-pass", llvm::cl::CommaSeparated,
                      llvm::cl::desc("Disable passes "
                                     "which contain a string from this list"));
 
 llvm::cl::list<std::string> SILVerifyBeforePass(
-    "sil-verify-before-pass",
+    "sil-verify-before-pass", llvm::cl::CommaSeparated,
     llvm::cl::desc("Verify the module/analyses before we run "
                    "a pass from this list"));
 
 llvm::cl::list<std::string> SILVerifyAroundPass(
-    "sil-verify-around-pass",
+    "sil-verify-around-pass", llvm::cl::CommaSeparated,
     llvm::cl::desc("Verify the module/analyses before/after we run "
                    "a pass from this list"));
 
 llvm::cl::list<std::string>
-    SILVerifyAfterPass("sil-verify-after-pass",
+    SILVerifyAfterPass("sil-verify-after-pass", llvm::cl::CommaSeparated,
                        llvm::cl::desc("Verify the module/analyses after we run "
                                       "a pass from this list"));
 
 llvm::cl::list<std::string> SILForceVerifyAroundPass(
-    "sil-verify-force-analysis-around-pass",
+    "sil-verify-force-analysis-around-pass", llvm::cl::CommaSeparated,
     llvm::cl::desc("For the given passes, precompute analyses before the pass "
                    "and verify analyses after the pass"));
 
@@ -491,8 +491,9 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
     return;
 
   BasicCalleeAnalysis *BCA = getAnalysis<BasicCalleeAnalysis>();
-  BottomUpFunctionOrder BottomUpOrder(*Mod, BCA);
-  auto BottomUpFunctions = BottomUpOrder.getFunctions();
+  BottomUpFunctionOrder BottomUpOrder(BCA);
+  BottomUpOrder.computeBottomUpOrder(Mod);
+  auto BottomUpFunctions = BottomUpOrder.getBottomUpOrder();
 
   assert(FunctionWorklist.empty() && "Expected empty function worklist!");
 
@@ -545,6 +546,47 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
       ++Entry.PipelineIdx;
     }
     clearRestartPipeline();
+
+    if (TailIdx == (FunctionWorklist.size() - 1))  {
+      // No new functions to process
+      continue;
+    }
+
+    // Compute the bottom up order of the new functions and the callees in it
+    BottomUpFunctionOrder SubBottomUpOrder(BCA);
+    // Initialize BottomUpFunctionOrder with new functions
+    for (auto It = FunctionWorklist.begin() + TailIdx + 1;
+         It != FunctionWorklist.end(); It++) {
+      SubBottomUpOrder.computeBottomUpOrder(It->F);
+    }
+    auto NewFunctionsBottomUp = SubBottomUpOrder.getBottomUpOrder();
+    SmallPtrSet<SILFunction *, 8> NewBottomUpSet(NewFunctionsBottomUp.begin(),
+                                                 NewFunctionsBottomUp.end());
+
+    // Remove all the functions in the new bottom up order from FunctionWorklist
+    llvm::DenseMap<SILFunction *, WorklistEntry> FunctionsToReorder;
+    auto RemoveFn = [&FunctionsToReorder,
+                     &NewBottomUpSet](WorklistEntry Entry) {
+      if (NewBottomUpSet.find(Entry.F) == NewBottomUpSet.end()) {
+        return false;
+      }
+      FunctionsToReorder.insert(std::make_pair(Entry.F, Entry));
+      return true;
+    };
+    std::remove_if(FunctionWorklist.begin(), FunctionWorklist.end(), RemoveFn);
+    FunctionWorklist.erase((FunctionWorklist.begin() + FunctionWorklist.size() -
+                            FunctionsToReorder.size()),
+                           FunctionWorklist.end());
+
+    // Add back the functions in the new bottom up order to the FunctionWorklist
+    for (auto it = NewFunctionsBottomUp.rbegin();
+         it != NewFunctionsBottomUp.rend(); it++) {
+      auto Entry = FunctionsToReorder.find(*it);
+      if (Entry == FunctionsToReorder.end()) {
+        continue;
+      }
+      FunctionWorklist.push_back((*Entry).second);
+    }
   }
 }
 
@@ -875,7 +917,7 @@ namespace {
       child_iterator &operator++() { baseIter++; return *this; }
       child_iterator operator++(int) {
         auto tmp = *this;
-        baseIter++;
+        ++baseIter;
         return tmp;
       }
       Node *operator*() const { return baseIter->Child; }

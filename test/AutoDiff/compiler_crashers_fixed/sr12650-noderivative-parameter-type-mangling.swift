@@ -3,6 +3,9 @@
 // SR-12650: IRGenDebugInfo type reconstruction crash because `@noDerivative`
 // parameters are not mangled.
 
+// FIXME(SR-13021): Disabled due to flakiness on Linux.
+// REQUIRES: SR13021
+
 import _Differentiation
 func id(_ x: Float, _ y: Float) -> Float { x }
 let transformed: @differentiable (Float, @noDerivative Float) -> Float = id

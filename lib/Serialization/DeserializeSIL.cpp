@@ -739,7 +739,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     return fn;
   }
 
-  NumDeserializedFunc++;
+  ++NumDeserializedFunc;
 
   assert(!(fn->getGenericEnvironment() && !fn->empty())
          && "function already has context generic params?!");
@@ -799,9 +799,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       // occurred and this is a declaration. Work around that for now.
       if (!CurrentBB)
         return fn;
+      Builder.setInsertionPoint(CurrentBB);
 
       // Handle a SILInstruction record.
-      if (readSILInstruction(fn, CurrentBB, Builder, kind, scratch)) {
+      if (readSILInstruction(fn, Builder, kind, scratch)) {
         LLVM_DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         MF->fatal();
       }
@@ -1031,19 +1032,15 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   llvm_unreachable("invalid key path component kind encoding");
 }
 
-bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
+bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                          SILBuilder &Builder,
                                          unsigned RecordKind,
                                          SmallVectorImpl<uint64_t> &scratch) {
-  // Return error if Basic Block is null.
-  if (!BB)
-    return true;
-
-  Builder.setInsertionPoint(BB);
-  Builder.setCurrentDebugScope(Fn->getDebugScope());
+  if (Fn)
+    Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
-           Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
-           IsNonThrowingApply = 0;
+           Attr = 0, Attr2 = 0, Attr3 = 0, Attr4 = 0, NumSubs = 0,
+           NumConformances = 0, IsNonThrowingApply = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -1149,14 +1146,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_DIFFERENTIABLE_FUNCTION:
     SILInstDifferentiableFunctionLayout::readRecord(
-        scratch, /*numParams*/ Attr, /*hasDerivativeFunctions*/ Attr2,
-        ListOfValues);
+        scratch, /*numParams*/ Attr, /*numResults*/ Attr2,
+        /*numDiffParams*/ Attr3,
+        /*hasDerivativeFunctions*/ Attr4, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionInst;
     break;
   case SIL_INST_LINEAR_FUNCTION:
-    SILInstLinearFunctionLayout::readRecord(
-        scratch, /*numParams*/ Attr, /*hasTransposeFunction*/ Attr2,
-        ListOfValues);
+    SILInstLinearFunctionLayout::readRecord(scratch, /*numDiffParams*/ Attr,
+                                            /*hasTransposeFunction*/ Attr2,
+                                            ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionInst;
     break;
   case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
@@ -1457,7 +1455,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(substConventions.getNumSILArguments() == ListOfValues.size()
            && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I)
       Args.push_back(getLocalValue(ListOfValues[I],
                                    substConventions.getSILArgumentType(
                                        I, Builder.getTypeExpansionContext())));
@@ -1494,7 +1492,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(substConventions.getNumSILArguments() == ListOfValues.size()
            && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I)
       Args.push_back(getLocalValue(ListOfValues[I],
                                    substConventions.getSILArgumentType(
                                        I, Builder.getTypeExpansionContext())));
@@ -1527,7 +1525,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue FnVal = getLocalValue(ValID, FnTy);
     SmallVector<SILValue, 4> Args;
     unsigned unappliedArgs = numArgs - ListOfValues.size();
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I)
       Args.push_back(getLocalValue(
           ListOfValues[I],
           fnConv.getSILArgumentType(I + unappliedArgs,
@@ -1837,6 +1835,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
+  case SILInstructionKind::BeginCOWMutationInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned isNative = Attr;
+    ResultVal = Builder.createBeginCOWMutation(
+        Loc,
+        getLocalValue(ValID,
+            getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn)),
+        isNative != 0);
+    break;
+  }
+
+  case SILInstructionKind::EndCOWMutationInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned keepUnique = Attr;
+    ResultVal = Builder.createEndCOWMutation(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID),
+                                        (SILValueCategory)TyCategory, Fn)),
+        keepUnique != 0);
+    break;
+  }
+
   case SILInstructionKind::DestructureTupleInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     SILValue Operand = getLocalValue(
@@ -2062,7 +2082,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     TupleType *TT = Ty->castTo<TupleType>();
     assert(TT && "Type of a TupleInst should be TupleType");
     SmallVector<SILValue, 4> OpList;
-    for (unsigned I = 0, E = ListOfValues.size(); I < E; I++) {
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I) {
       Type EltTy = TT->getElement(I).getType();
       OpList.push_back(
         getLocalValue(ListOfValues[I],
@@ -2073,7 +2093,22 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case SILInstructionKind::ObjectInst: {
-    llvm_unreachable("Serialization of global initializers not supported");
+    assert(RecordKind == SIL_ONE_TYPE_VALUES &&
+           "Layout should be OneTypeValues.");
+    unsigned NumVals = ListOfValues.size();
+    assert(NumVals >= 1 && "Not enough values");
+    unsigned numBaseElements = ListOfValues[0];
+    SILType ClassTy =
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
+    SmallVector<SILValue, 4> elements;
+    for (unsigned i = 1; i < NumVals; i += 2) {
+      SILType elementType = getSILType(MF->getType(ListOfValues[i + 1]),
+                                       SILValueCategory::Object, Fn);
+      SILValue elementVal = getLocalValue(ListOfValues[i], elementType);
+      elements.push_back(elementVal);
+    }
+    ResultVal = Builder.createObject(Loc, ClassTy, elements, numBaseElements);
+    break;
   }
   case SILInstructionKind::BranchInst: {
     SmallVector<SILValue, 4> Args;
@@ -2298,19 +2333,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto ResultTy = Val->getType().getFieldType(
         Field, SILMod, Builder.getTypeExpansionContext());
     ResultVal = Builder.createRefElementAddr(Loc, Val, Field,
-                                             ResultTy);
+                                          ResultTy, /*Immutable*/ Attr & 0x1);
     break;
   }
   case SILInstructionKind::RefTailAddrInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
-    assert(Attr == 0);
     assert((SILValueCategory)TyCategory == SILValueCategory::Address);
     ResultVal = Builder.createRefTailAddr(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                         (SILValueCategory)TyCategory2, Fn)),
-        getSILType(MF->getType(TyID), SILValueCategory::Address, Fn));
+        getSILType(MF->getType(TyID), SILValueCategory::Address, Fn),
+        /*Immutable*/ Attr & 0x1);
     break;
   }
   case SILInstructionKind::ClassMethodInst:
@@ -2598,19 +2633,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case SILInstructionKind::DifferentiableFunctionInst: {
-    bool hasDerivativeFunctions = (bool)Attr2;
+    auto numParams = Attr;
+    auto numResults = Attr2;
+    auto numParamIndices = Attr3;
+    bool hasDerivativeFunctions = (bool)Attr4;
     unsigned numOperands = hasDerivativeFunctions ? 3 : 1;
-    auto numParamIndices = ListOfValues.size() - numOperands * 3;
-    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
+    auto numResultIndices =
+        ListOfValues.size() - numOperands * 3 - numParamIndices;
+    assert(ListOfValues.size() ==
+           numParamIndices + numResultIndices + numOperands * 3);
     auto rawParamIndices =
         map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
                                       [](uint64_t i) { return (unsigned)i; });
-    auto numParams = Attr;
     auto *paramIndices =
         IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+    auto rawResultIndices = map<SmallVector<unsigned, 8>>(
+        ListOfValues.slice(numParamIndices, numResultIndices),
+        [](uint64_t i) { return (unsigned)i; });
+    auto *resultIndices =
+        IndexSubset::get(MF->getContext(), numResults, rawResultIndices);
     SmallVector<SILValue, 3> operands;
-    for (auto i = numParamIndices; i < numParamIndices + numOperands * 3;
-         i += 3) {
+    for (auto i = numParamIndices + numResultIndices;
+         i < numParamIndices + numOperands * 3; i += 3) {
       auto astTy = MF->getType(ListOfValues[i]);
       auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i + 1], Fn);
       operands.push_back(getLocalValue(ListOfValues[i + 2], silTy));
@@ -2619,10 +2663,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     if (hasDerivativeFunctions)
       derivativeFunctions = std::make_pair(operands[1], operands[2]);
     ResultVal = Builder.createDifferentiableFunction(
-        Loc, paramIndices, operands[0], derivativeFunctions);
+        Loc, paramIndices, resultIndices, operands[0], derivativeFunctions);
     break;
   }
   case SILInstructionKind::LinearFunctionInst: {
+    auto numDiffParams = Attr;
     bool hasLinearFunction = (bool)Attr2;
     unsigned numOperands = hasLinearFunction ? 2 : 1;
     auto numParamIndices = ListOfValues.size() - numOperands * 3;
@@ -2630,9 +2675,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto rawParamIndices =
        map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
                                      [](uint64_t i) { return (unsigned)i; });
-    auto numParams = Attr;
     auto *paramIndices =
-        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+        IndexSubset::get(MF->getContext(), numDiffParams, rawParamIndices);
     SmallVector<SILValue, 3> operands;
     for (auto i = numParamIndices;
          i < numParamIndices + numOperands * 3; i += 3) {
@@ -2895,7 +2939,60 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   globalVarOrOffset = v;
   v->setDeclaration(IsDeclaration);
 
-  if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), v);
+  if (Callback)
+    Callback->didDeserialize(MF->getAssociatedModule(), v);
+
+  scratch.clear();
+  maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  entry = maybeEntry.get();
+  if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+    return v;
+
+  maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  kind = maybeKind.get();
+
+  SILBuilder Builder(v);
+  
+  llvm::DenseMap<uint32_t, ValueBase*> SavedLocalValues;
+  llvm::DenseMap<uint32_t, ValueBase*> SavedForwardLocalValues;
+  serialization::ValueID SavedLastValueID = 1;
+  
+  SavedLocalValues.swap(LocalValues);
+  SavedForwardLocalValues.swap(ForwardLocalValues);
+  std::swap(SavedLastValueID, LastValueID);
+
+  while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
+         kind != SIL_WITNESS_TABLE && kind != SIL_DIFFERENTIABILITY_WITNESS) {
+    if (readSILInstruction(nullptr, Builder, kind, scratch)) {
+      LLVM_DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
+      MF->fatal();
+    }
+
+    // Fetch the next record.
+    scratch.clear();
+    llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      MF->fatal(maybeEntry.takeError());
+    llvm::BitstreamEntry entry = maybeEntry.get();
+
+    // EndBlock means the end of this SILFunction.
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      break;
+    maybeKind = SILCursor.readRecord(entry.ID, scratch);
+    if (!maybeKind)
+      MF->fatal(maybeKind.takeError());
+    kind = maybeKind.get();
+  }
+
+  SavedLocalValues.swap(LocalValues);
+  SavedForwardLocalValues.swap(ForwardLocalValues);
+  std::swap(SavedLastValueID, LastValueID);
+
   return v;
 }
 
@@ -3000,8 +3097,10 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
-    unsigned RawEntryKind;
-    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, ListOfValues);
+    unsigned RawEntryKind, IsNonOverridden;
+    VTableEntryLayout::readRecord(scratch, NameID,
+                                  RawEntryKind, IsNonOverridden,
+                                  ListOfValues);
 
     auto EntryKind = fromStableVTableEntryKind(RawEntryKind);
 
@@ -3009,7 +3108,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     if (Func) {
       unsigned NextValueIndex = 0;
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
-                                 Func, EntryKind.getValue());
+                                 Func, EntryKind.getValue(), (bool)IsNonOverridden);
     }
 
     // Fetch the next record.
@@ -3059,7 +3158,7 @@ void SILDeserializer::getAllVTables() {
   if (!VTableList)
     return;
 
-  for (unsigned I = 0, E = VTables.size(); I < E; I++)
+  for (unsigned I = 0, E = VTables.size(); I < E; ++I)
     readVTable(I+1);
 }
 
@@ -3339,7 +3438,7 @@ llvm::Expected<SILWitnessTable *>
 void SILDeserializer::getAllWitnessTables() {
   if (!WitnessTableList)
     return;
-  for (unsigned I = 0, E = WitnessTables.size(); I < E; I++) {
+  for (unsigned I = 0, E = WitnessTables.size(); I < E; ++I) {
     auto maybeTable = readWitnessTableChecked(I + 1, nullptr);
     if (!maybeTable) {
       if (maybeTable.errorIsA<XRefNonLoadedModuleError>()) {
@@ -3478,7 +3577,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
 void SILDeserializer::getAllDefaultWitnessTables() {
   if (!DefaultWitnessTableList)
     return;
-  for (unsigned I = 0, E = DefaultWitnessTables.size(); I < E; I++)
+  for (unsigned I = 0, E = DefaultWitnessTables.size(); I < E; ++I)
     readDefaultWitnessTable(I + 1, nullptr);
 }
 

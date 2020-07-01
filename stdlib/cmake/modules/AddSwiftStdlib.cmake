@@ -2,6 +2,20 @@
 include(AddSwift)
 include(SwiftSource)
 
+function(is_darwin_based_sdk sdk_name out_var)
+  if ("${sdk_name}" STREQUAL "OSX" OR
+      "${sdk_name}" STREQUAL "IOS" OR
+      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
+      "${sdk_name}" STREQUAL "TVOS" OR
+      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
+      "${sdk_name}" STREQUAL "WATCHOS" OR
+      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
       ADMT # prefix
@@ -93,7 +107,7 @@ function(_add_target_variant_c_compile_link_flags)
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     # lld can handle targeting the android build.  However, if lld is not
     # enabled, then fallback to the linker included in the android NDK.
-    if(NOT SWIFT_ENABLE_LLD_LINKER)
+    if(NOT SWIFT_USE_LINKER STREQUAL "lld")
       swift_android_tools_path(${CFLAGS_ARCH} tools_path)
       list(APPEND result "-B" "${tools_path}")
     endif()
@@ -307,6 +321,10 @@ function(_add_target_variant_c_compile_flags)
     endif()
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-D_WASI_EMULATED_MMAN")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -346,6 +364,8 @@ function(_add_target_variant_link_flags)
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
     list(APPEND link_libraries "pthread" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
+    list(APPEND link_libraries "pthread")
+  elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
@@ -410,20 +430,11 @@ function(_add_target_variant_link_flags)
     list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR}")
   endif()
 
-  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
-    find_program(LDLLD_PATH "ld.lld")
-    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
-       ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
-        NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
-      list(APPEND result "-fuse-ld=lld")
-    elseif(SWIFT_ENABLE_GOLD_LINKER AND
-        "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-      if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-        list(APPEND result "-fuse-ld=gold.exe")
-      else()
-        list(APPEND result "-fuse-ld=gold")
-      endif()
+  if(SWIFT_USE_LINKER AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+      list(APPEND result "-fuse-ld=${SWIFT_USE_LINKER}.exe")
+    else()
+      list(APPEND result "-fuse-ld=${SWIFT_USE_LINKER}")
     endif()
   endif()
 
@@ -845,6 +856,10 @@ function(_add_swift_target_library_single target name)
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
               ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
+  # NOTE: always inject the LLVMSupport directory before anything else.  We want
+  # to ensure that the runtime is built with our local copy of LLVMSupport
+  target_include_directories(${target} BEFORE PRIVATE
+    ${SWIFT_SOURCE_DIR}/stdlib/include)
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF") AND
      SWIFTLIB_SINGLE_TARGET_LIBRARY)
@@ -869,12 +884,17 @@ function(_add_swift_target_library_single target name)
   endif()
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
+  # Target libraries that include libDemangling must define the name to use for
+  # the inline namespace to distinguish symbols from those built for the
+  # compiler, in order to avoid possible ODR violations if both are statically
+  # linked into the same binary.
+  target_compile_definitions("${target}" PRIVATE
+                             SWIFT_INLINE_NAMESPACE=__runtime)
+
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
-    target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
-    set_target_properties(${target}
-                          PROPERTIES
-                            CXX_STANDARD 14)
+    target_include_directories("${target}" SYSTEM PRIVATE
+      ${SWIFTLIB_INCLUDE})
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
@@ -1106,6 +1126,8 @@ function(_add_swift_target_library_single target name)
   if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
       list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
   endif()
+
+  list(APPEND library_search_directories "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift")
 
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
@@ -1407,6 +1429,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_HAIKU
 #   Swift modules this library depends on when built for Haiku.
 #
+# SWIFT_MODULE_DEPENDS_WASI
+#   Swift modules this library depends on when built for WASI.
+#
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
 #
@@ -1519,6 +1544,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_LINUX
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
+        SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WATCHOS
         SWIFT_MODULE_DEPENDS_WINDOWS
         SWIFT_MODULE_DEPENDS_FROM_SDK
@@ -1684,6 +1710,9 @@ function(add_swift_target_library name)
     elseif(${sdk} STREQUAL HAIKU)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_HAIKU})
+    elseif(${sdk} STREQUAL WASI)
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WASI})
     elseif(${sdk} STREQUAL WINDOWS)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WINDOWS})

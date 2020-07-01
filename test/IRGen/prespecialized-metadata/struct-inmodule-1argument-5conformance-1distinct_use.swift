@@ -72,7 +72,42 @@ doit()
 // CHECK:   %"load argument at index 0 from buffer" = load i8*, i8** [[ERASED_TYPE_ADDRESS]]
 // CHECK:   [[EQUAL_TYPE:%[0-9]+]] = icmp eq i8* bitcast (%swift.type* @"$sSiN" to i8*), %"load argument at index 0 from buffer"
 // CHECK:   [[EQUAL_TYPES:%[0-9]+]] = and i1 true, [[EQUAL_TYPE]]
-// CHECK:   br i1 [[EQUAL_TYPES]], label %[[EXIT_PRESPECIALIZED:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
+// CHECK:   [[POINTER_TO_ERASED_TABLE_1:%[0-9]+]] = getelementptr i8*, i8** %1, i64 1
+// CHECK:   [[ERASED_TABLE_1:%"load argument at index 1 from buffer"]] = load i8*, i8** [[POINTER_TO_ERASED_TABLE_1]], align 1
+// CHECK:   [[UNERASED_TABLE_1:%[0-9]+]] = bitcast i8* [[ERASED_TABLE_1]] to i8**
+// CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_1:%[0-9]+]] = load i8*, i8** [[UNERASED_TABLE_1]], align 1
+// CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR_1:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_1]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS_1:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_1]], %swift.protocol_conformance_descriptor* @"$sSi4main1PAAMc")
+// CHECK:   [[EQUAL_ARGUMENTS_1:%[0-9]+]] = and i1 [[EQUAL_TYPES]], [[EQUAL_DESCRIPTORS_1]]
+// CHECK:   [[POINTER_TO_ERASED_TABLE_2:%[0-9]+]] = getelementptr i8*, i8** %1, i64 2
+// CHECK:   [[ERASED_TABLE_2:%"load argument at index 2 from buffer"]] = load i8*, i8** [[POINTER_TO_ERASED_TABLE_2]], align 1
+// CHECK:   [[UNERASED_TABLE_2:%[0-9]+]] = bitcast i8* [[ERASED_TABLE_2]] to i8**
+// CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_2:%[0-9]+]] = load i8*, i8** [[UNERASED_TABLE_2]], align 1
+// CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR_2:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_2]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS_2:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_2]], %swift.protocol_conformance_descriptor* @"$sSi4main1QAAMc")
+// CHECK:   [[EQUAL_ARGUMENTS_2:%[0-9]+]] = and i1 [[EQUAL_ARGUMENTS_1]], [[EQUAL_DESCRIPTORS_2]]
+// CHECK:   [[POINTER_TO_ERASED_TABLE_3:%[0-9]+]] = getelementptr i8*, i8** %1, i64 3
+// CHECK:   [[ERASED_TABLE_3:%"load argument at index 3 from buffer"]] = load i8*, i8** [[POINTER_TO_ERASED_TABLE_3]], align 1
+// CHECK:   [[UNERASED_TABLE_3:%[0-9]+]] = bitcast i8* [[ERASED_TABLE_3]] to i8**
+// CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_3:%[0-9]+]] = load i8*, i8** [[UNERASED_TABLE_3]], align 1
+// CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR_3:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_3]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS_3:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_3]], %swift.protocol_conformance_descriptor* @"$sSi4main1RAAMc")
+// CHECK:   [[EQUAL_ARGUMENTS_3:%[0-9]+]] = and i1 [[EQUAL_ARGUMENTS_2]], [[EQUAL_DESCRIPTORS_3]]
+// CHECK:   [[POINTER_TO_ERASED_TABLE_4:%[0-9]+]] = getelementptr i8*, i8** %1, i64 4
+// CHECK:   [[ERASED_TABLE_4:%"load argument at index 4 from buffer"]] = load i8*, i8** [[POINTER_TO_ERASED_TABLE_4]], align 1
+// CHECK:   [[UNERASED_TABLE_4:%[0-9]+]] = bitcast i8* [[ERASED_TABLE_4]] to i8**
+// CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_4:%[0-9]+]] = load i8*, i8** [[UNERASED_TABLE_4]], align 1
+// CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR_4:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_4]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS_4:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_4]], %swift.protocol_conformance_descriptor* @"$sSi4main1SAAMc")
+// CHECK:   [[EQUAL_ARGUMENTS_4:%[0-9]+]] = and i1 [[EQUAL_ARGUMENTS_3]], [[EQUAL_DESCRIPTORS_4]]
+// CHECK:   [[POINTER_TO_ERASED_TABLE_5:%[0-9]+]] = getelementptr i8*, i8** %1, i64 5
+// CHECK:   [[ERASED_TABLE_5:%"load argument at index 5 from buffer"]] = load i8*, i8** [[POINTER_TO_ERASED_TABLE_5]], align 1
+// CHECK:   [[UNERASED_TABLE_5:%[0-9]+]] = bitcast i8* [[ERASED_TABLE_5]] to i8**
+// CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_5:%[0-9]+]] = load i8*, i8** [[UNERASED_TABLE_5]], align 1
+// CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR_5:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_5]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS_5:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_5]], %swift.protocol_conformance_descriptor* @"$sSi4main1TAAMc")
+// CHECK:   [[EQUAL_ARGUMENTS_5:%[0-9]+]] = and i1 [[EQUAL_ARGUMENTS_4]], [[EQUAL_DESCRIPTORS_5]]
+// CHECK:   br i1 [[EQUAL_ARGUMENTS_5]], label %[[EXIT_PRESPECIALIZED:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
 // CHECK: [[EXIT_PRESPECIALIZED]]:
 // CHECK:   ret %swift.metadata_response { %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* bitcast (<{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, i8**, i8**, i8**, i8**, i8**, i32{{(, \[4 x i8\])?}}, i64 }>* @"$s4main5ValueVySiGMf" to %swift.full_type*), i32 0, i32 1), [[INT]] 0 }
 // CHECK: [[EXIT_NORMAL]]:

@@ -29,7 +29,7 @@ class TypeRepr;
 
 /// TypeLoc - Provides source location information for a parsed type.
 /// A TypeLoc is stored in AST nodes which use an explicitly written type.
-class alignas(1 << TypeLocAlignInBits) TypeLoc {
+class alignas(1 << TypeReprAlignInBits) TypeLoc final {
   Type Ty;
   TypeRepr *TyR = nullptr;
 
@@ -65,8 +65,6 @@ public:
   void setInvalidType(ASTContext &C);
   void setType(Type Ty);
 
-  TypeLoc clone(ASTContext &ctx) const;
-  
   friend llvm::hash_code hash_value(const TypeLoc &owner) {
     return llvm::hash_combine(owner.Ty.getPointer(), owner.TyR);
   }

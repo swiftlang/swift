@@ -1,4 +1,2 @@
-sil_register_sources(
-  ParseSIL.cpp
-)
-
+target_sources(swiftSIL PRIVATE
+  ParseSIL.cpp)

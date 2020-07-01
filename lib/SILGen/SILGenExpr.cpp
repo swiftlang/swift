@@ -717,11 +717,12 @@ SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
 
 namespace {
 
-/// This is a simple cleanup class that is only meant to help with delegating
-/// initializers. Specifically, if the delegating initializer fails to consume
-/// the loaded self, we want to write back self into the slot to ensure that
-/// ownership is preserved.
-struct DelegateInitSelfWritebackCleanup : Cleanup {
+/// This is a simple cleanup class that at the end of a lexical scope consumes
+/// an owned value by writing it back to memory. The user can forward this
+/// cleanup to take ownership of the value and thus prevent it form being
+/// written back.
+struct OwnedValueWritebackCleanup final : Cleanup {
+  using Flags = Cleanup::Flags;
 
   /// We store our own loc so that we can ensure that DI ignores our writeback.
   SILLocation loc;
@@ -729,9 +730,14 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
   SILValue lvalueAddress;
   SILValue value;
 
-  DelegateInitSelfWritebackCleanup(SILLocation loc, SILValue lvalueAddress,
-                                   SILValue value)
+  OwnedValueWritebackCleanup(SILLocation loc, SILValue lvalueAddress,
+                             SILValue value)
       : loc(loc), lvalueAddress(lvalueAddress), value(value) {}
+
+  bool getWritebackBuffer(function_ref<void(SILValue)> func) override {
+    func(lvalueAddress);
+    return true;
+  }
 
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
     SILValue valueToStore = value;
@@ -749,14 +755,13 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
                                                   lvalueObjTy);
     }
 
-    auto &lowering = SGF.B.getTypeLowering(lvalueAddress->getType());
-    lowering.emitStore(SGF.B, loc, valueToStore, lvalueAddress,
-                       StoreOwnershipQualifier::Init);
+    SGF.B.emitStoreValueOperation(loc, valueToStore, lvalueAddress,
+                                  StoreOwnershipQualifier::Init);
   }
 
   void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
-    llvm::errs() << "SimpleWritebackCleanup "
+    llvm::errs() << "OwnedValueWritebackCleanup "
                  << "State:" << getState() << "\n"
                  << "lvalueAddress:" << lvalueAddress << "value:" << value
                  << "\n";
@@ -766,10 +771,9 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
 
 } // end anonymous namespace
 
-CleanupHandle SILGenFunction::enterDelegateInitSelfWritebackCleanup(
+CleanupHandle SILGenFunction::enterOwnedValueWritebackCleanup(
     SILLocation loc, SILValue address, SILValue newValue) {
-  Cleanups.pushCleanup<DelegateInitSelfWritebackCleanup>(loc, address,
-                                                         newValue);
+  Cleanups.pushCleanup<OwnedValueWritebackCleanup>(loc, address, newValue);
   return Cleanups.getTopCleanup();
 }
 
@@ -815,8 +819,8 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
     // Forward our initial value for init delegation self and create a new
     // cleanup that performs a writeback at the end of lexical scope if our
     // value is not consumed.
-    InitDelegationSelf = ManagedValue(
-        self, enterDelegateInitSelfWritebackCleanup(*InitDelegationLoc, addr, self));
+    InitDelegationSelf = ManagedValue::forExclusivelyBorrowedOwnedObjectRValue(
+        self, enterOwnedValueWritebackCleanup(*InitDelegationLoc, addr, self));
     InitDelegationSelfBox = addr;
     return RValue(*this, loc, refType, InitDelegationSelf);
   }
@@ -1968,7 +1972,7 @@ static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
 }
 RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
-                         E->getCastTypeLoc().getType(), E->getCastKind());
+                         E->getCastType(), E->getCastKind());
   return emitBoolLiteral(SGF, E, isa, C);
 }
 
@@ -2109,10 +2113,11 @@ ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
   // Reactivate the result cleanup.
-  auto result = varargs.getArray();
-  if (result.hasCleanup())
-    SGF.Cleanups.setCleanupState(result.getCleanup(), CleanupState::Active);
-  return result;
+  auto array = varargs.getArray();
+  if (array.hasCleanup())
+    SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Active);
+
+  return SGF.emitUninitializedArrayFinalization(loc, std::move(array));
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
@@ -4099,8 +4104,6 @@ static bool isVerbatimNullableTypeInC(SILModule &M, Type ty) {
 
   // Other types like UnsafePointer can also be nullable.
   const DeclContext *DC = M.getAssociatedContext();
-  if (!DC)
-    DC = M.getSwiftModule();
   ty = OptionalType::get(ty);
   return ty->isTriviallyRepresentableIn(ForeignLanguage::C, DC);
 }
@@ -5449,7 +5452,8 @@ RValue RValueEmitter::visitDifferentiableFunctionExpr(
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   auto *diffFunc = SGF.B.createDifferentiableFunction(
-      E, destTy->getDifferentiabilityParameterIndices(), origFunc.forward(SGF));
+      E, destTy->getDifferentiabilityParameterIndices(),
+      destTy->getDifferentiabilityResultIndices(), origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 

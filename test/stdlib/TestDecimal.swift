@@ -501,7 +501,7 @@ class TestDecimal : TestDecimalSuper {
     }
 
     func test_Round() {
-        let testCases = [
+        var testCases = [
             // expected, start, scale, round
             ( 0, 0.5, 0, Decimal.RoundingMode.down ),
             ( 1, 0.5, 0, Decimal.RoundingMode.up ),
@@ -515,14 +515,18 @@ class TestDecimal : TestDecimalSuper {
             
             ( -1, -0.5, 0, Decimal.RoundingMode.down ),
             ( -2, -2.5, 0, Decimal.RoundingMode.up ),
-            ( -3, -2.5, 0, Decimal.RoundingMode.bankers ),
-            ( -4, -3.5, 0, Decimal.RoundingMode.bankers ),
             ( -5, -5.2, 0, Decimal.RoundingMode.plain ),
             ( -4.5, -4.5, 1, Decimal.RoundingMode.down ),
             ( -5.5, -5.5, 1, Decimal.RoundingMode.up ),
             ( -6.5, -6.5, 1, Decimal.RoundingMode.plain ),
             ( -7.5, -7.5, 1, Decimal.RoundingMode.bankers ),
+        ]
+        if #available(macOS 10.16, iOS 14, watchOS 7, tvOS 14, *) {
+            testCases += [
+                ( -2, -2.5, 0, Decimal.RoundingMode.bankers ),
+                ( -4, -3.5, 0, Decimal.RoundingMode.bankers ),
             ]
+        }
         for testCase in testCases {
             let (expected, start, scale, mode) = testCase
             var num = Decimal(start)

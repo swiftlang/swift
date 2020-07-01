@@ -212,7 +212,7 @@ unsigned swift::getNumInOutArguments(FullApplySite applySite) {
     switch (ParamConvention) {
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable: {
-      numInOutArguments++;
+      ++numInOutArguments;
       break;
     default:
       break;
@@ -641,7 +641,7 @@ void swift::eraseUsesOfInstruction(SILInstruction *inst, CallbackTy callback) {
 
 void swift::collectUsesOfValue(SILValue v,
                                llvm::SmallPtrSetImpl<SILInstruction *> &insts) {
-  for (auto ui = v->use_begin(), E = v->use_end(); ui != E; ui++) {
+  for (auto ui = v->use_begin(), E = v->use_end(); ui != E; ++ui) {
     auto *user = ui->getUser();
     // Instruction has been processed.
     if (!insts.insert(user).second)
@@ -927,7 +927,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
   if (auto srcTupleTy = srcTy.getAs<TupleType>()) {
     SmallVector<SILValue, 8> expectedTuple;
     bool changedCFG = false;
-    for (unsigned i = 0, e = srcTupleTy->getNumElements(); i < e; i++) {
+    for (unsigned i = 0, e = srcTupleTy->getNumElements(); i < e; ++i) {
       SILValue element = builder->createTupleExtract(loc, value, i);
       // Cast the value if necessary.
       bool neededCFGChange;
@@ -966,7 +966,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
 ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *abi,
                                              unsigned index) {
   SILBasicBlock::iterator iter(abi);
-  iter++;
+  ++iter;
   assert(iter != abi->getParent()->end()
          && "alloc_box cannot be the last instruction of a block");
   SILInstruction *nextInst = &*iter;
@@ -1815,12 +1815,8 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
 /// knowable based on the Decl and the compilation mode?
 bool swift::calleesAreStaticallyKnowable(SILModule &module,
                                          AbstractFunctionDecl *afd) {
-  const DeclContext *assocDC = module.getAssociatedContext();
-  if (!assocDC)
-    return false;
-
   // Only handle members defined within the SILModule's associated context.
-  if (!afd->isChildContextOf(assocDC))
+  if (!afd->isChildContextOf(module.getAssociatedContext()))
     return false;
 
   if (afd->isDynamic()) {
@@ -1859,12 +1855,8 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module,
 // FIXME: Merge this with calleesAreStaticallyKnowable above
 bool swift::calleesAreStaticallyKnowable(SILModule &module,
                                          EnumElementDecl *eed) {
-  const DeclContext *assocDC = module.getAssociatedContext();
-  if (!assocDC)
-    return false;
-
   // Only handle members defined within the SILModule's associated context.
-  if (!eed->isChildContextOf(assocDC))
+  if (!eed->isChildContextOf(module.getAssociatedContext()))
     return false;
 
   if (eed->isDynamic()) {

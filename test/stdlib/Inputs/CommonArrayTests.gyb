@@ -116,7 +116,7 @@ ${Suite}.test("${ArrayType}/appendNonUnique")
 %   if ArrayType != 'ArraySlice':
 ${Suite}.test("${ArrayType}/removeNonUnique")
   .code {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     var x = ${ArrayType}<Int>(repeating: 27, count: 200)
     x.reserveCapacity(10002)
     for _ in 1...100 {

@@ -203,7 +203,7 @@ protected:
 
     // Deallocate the node.  The static_cast here is required
     // because LLVM's allocator API is insane.
-    this->Deallocate(static_cast<void*>(node), allocSize);
+    this->Deallocate(static_cast<void*>(node), allocSize, alignof(Node));
   }
 };
 
@@ -434,7 +434,7 @@ private:
     }
 
     void deallocate() {
-      for (size_t i = 0; i < Count; i++) {
+      for (size_t i = 0; i < Count; ++i) {
         data()[i].~ElemTy();
       }
       free(this);

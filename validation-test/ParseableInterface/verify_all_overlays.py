@@ -50,7 +50,6 @@ for filename in os.listdir(sdk_overlay_dir):
         continue
 
     if module_name in [
-        "_Differentiation",
         "DifferentiationUnittest",
         "Swift",
         "SwiftLang",

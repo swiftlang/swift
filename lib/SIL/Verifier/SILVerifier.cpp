@@ -42,6 +42,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -545,6 +546,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::KeyPathInst:
       case SILInstructionKind::SwitchEnumAddrInst:
+      case SILInstructionKind::SelectEnumAddrInst:
         break;
       case SILInstructionKind::AddressToPointerInst:
         // We assume that the user is attempting to do something unsafe since we
@@ -2923,9 +2925,8 @@ public:
     require(selfRequirement &&
             selfRequirement->getKind() == RequirementKind::Conformance,
             "first non-same-typerequirement should be conformance requirement");
-    auto conformsTo = genericSig->getConformsTo(selfGenericParam);
-    require(std::find(conformsTo.begin(), conformsTo.end(), protocol)
-              != conformsTo.end(),
+    const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
+    require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
             "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
@@ -3569,7 +3570,7 @@ public:
 
       fromCanTy = fromMetaty.getInstanceType();
       toCanTy = toMetaty.getInstanceType();
-      MetatyLevel++;
+      ++MetatyLevel;
     }
 
     if (isExact) {
@@ -4659,7 +4660,7 @@ public:
       require(!jvpType->isDifferentiable(),
               "The JVP function must not be @differentiable");
       auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
-          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          dfi->getParameterIndices(), dfi->getResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(jvpType),
@@ -4671,7 +4672,7 @@ public:
       require(!vjpType->isDifferentiable(),
               "The VJP function must not be @differentiable");
       auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
-          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          dfi->getParameterIndices(), dfi->getResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(vjpType),
@@ -5360,13 +5361,27 @@ void SILProperty::verify(const SILModule &M) const {
 void SILVTable::verify(const SILModule &M) const {
   if (!verificationEnabled(M))
     return;
-
-  for (auto &entry : getEntries()) {
+  
+  // Compare against the base class vtable if there is one.
+  const SILVTable *superVTable = nullptr;
+  auto superclass = getClass()->getSuperclassDecl();
+  if (superclass) {
+    for (auto &vt : M.getVTables()) {
+      if (vt->getClass() == superclass) {
+        superVTable = vt;
+        break;
+      }
+    }
+  }
+  
+  for (unsigned i : indices(getEntries())) {
+    auto &entry = getEntries()[i];
+    
     // All vtable entries must be decls in a class context.
-    assert(entry.Method.hasDecl() && "vtable entry is not a decl");
-    auto baseInfo =
-        M.Types.getConstantInfo(TypeExpansionContext::minimal(), entry.Method);
-    ValueDecl *decl = entry.Method.getDecl();
+    assert(entry.getMethod().hasDecl() && "vtable entry is not a decl");
+    auto baseInfo = M.Types.getConstantInfo(TypeExpansionContext::minimal(),
+                                            entry.getMethod());
+    ValueDecl *decl = entry.getMethod().getDecl();
 
     assert((!isa<AccessorDecl>(decl)
             || !cast<AccessorDecl>(decl)->isObservingAccessor())
@@ -5374,7 +5389,7 @@ void SILVTable::verify(const SILModule &M) const {
 
     // For ivar destroyers, the decl is the class itself.
     ClassDecl *theClass;
-    if (entry.Method.kind == SILDeclRef::Kind::IVarDestroyer)
+    if (entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer)
       theClass = dyn_cast<ClassDecl>(decl);
     else
       theClass = dyn_cast<ClassDecl>(decl->getDeclContext());
@@ -5386,22 +5401,77 @@ void SILVTable::verify(const SILModule &M) const {
            "vtable entry must refer to a member of the vtable's class");
 
     // Foreign entry points shouldn't appear in vtables.
-    assert(!entry.Method.isForeign && "vtable entry must not be foreign");
-    
+    assert(!entry.getMethod().isForeign && "vtable entry must not be foreign");
+
     // The vtable entry must be ABI-compatible with the overridden vtable slot.
     SmallString<32> baseName;
     {
       llvm::raw_svector_ostream os(baseName);
-      entry.Method.print(os);
+      entry.getMethod().print(os);
     }
 
     if (M.getStage() != SILStage::Lowered) {
-      SILVerifier(*entry.Implementation)
+      SILVerifier(*entry.getImplementation())
           .requireABICompatibleFunctionTypes(
               baseInfo.getSILType().castTo<SILFunctionType>(),
-              entry.Implementation->getLoweredFunctionType(),
+              entry.getImplementation()->getLoweredFunctionType(),
               "vtable entry for " + baseName + " must be ABI-compatible",
-              *entry.Implementation);
+              *entry.getImplementation());
+    }
+    
+    // Validate the entry against its superclass vtable.
+    if (!superclass) {
+      // Root methods should not have inherited or overridden entries.
+      bool validKind;
+      switch (entry.getKind()) {
+      case Entry::Normal:
+        validKind = true;
+        break;
+        
+      case Entry::Inherited:
+      case Entry::Override:
+        validKind = false;
+        break;
+      }
+      assert(validKind && "vtable entry in root class must not be inherited or override");
+    } else if (superVTable) {
+      // Validate the entry against the matching entry from the superclass
+      // vtable.
+
+      const Entry *superEntry = nullptr;
+      for (auto &se : superVTable->getEntries()) {
+        if (se.getMethod().getOverriddenVTableEntry() ==
+            entry.getMethod().getOverriddenVTableEntry()) {
+          superEntry = &se;
+          break;
+        }
+      }
+
+      switch (entry.getKind()) {
+      case Entry::Normal:
+        assert(!superEntry && "non-root vtable entry must be inherited or override");
+        break;
+
+      case Entry::Inherited:
+        if (!superEntry)
+          break;
+
+        assert(entry.isNonOverridden() == superEntry->isNonOverridden()
+               && "inherited vtable entry must share overridden-ness of superclass entry");
+        break;
+          
+      case Entry::Override:
+        assert(!entry.isNonOverridden()
+               && "override entry can't claim to be nonoverridden");
+        if (!superEntry)
+          break;
+
+        // The superclass entry must not prohibit overrides.
+        assert(!superEntry->isNonOverridden()
+               && "vtable entry overrides an entry that claims to have no overrides");
+        // TODO: Check the root vtable entry for the method too.
+        break;
+      }
     }
   }
 }
@@ -5518,20 +5588,22 @@ void SILModule::verify() const {
   // Check all vtables and the vtable cache.
   llvm::DenseSet<ClassDecl*> vtableClasses;
   unsigned EntriesSZ = 0;
-  for (const SILVTable &vt : getVTables()) {
-    if (!vtableClasses.insert(vt.getClass()).second) {
-      llvm::errs() << "Vtable redefined: " << vt.getClass()->getName() << "!\n";
+  for (const auto &vt : getVTables()) {
+    if (!vtableClasses.insert(vt->getClass()).second) {
+      llvm::errs() << "Vtable redefined: " << vt->getClass()->getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    vt.verify(*this);
+    vt->verify(*this);
     // Check if there is a cache entry for each vtable entry
-    for (auto entry : vt.getEntries()) {
-      if (VTableEntryCache.find({&vt, entry.Method}) == VTableEntryCache.end()) {
+    for (auto entry : vt->getEntries()) {
+      if (VTableEntryCache.find({vt, entry.getMethod()}) ==
+          VTableEntryCache.end()) {
         llvm::errs() << "Vtable entry for function: "
-                     << entry.Implementation->getName() << "not in cache!\n";
+                     << entry.getImplementation()->getName()
+                     << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
-      EntriesSZ++;
+      ++EntriesSZ;
     }
   }
   assert(EntriesSZ == VTableEntryCache.size() &&

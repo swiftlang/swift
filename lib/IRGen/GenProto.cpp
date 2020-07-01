@@ -101,8 +101,8 @@ protected:
 
   FulfillmentMap Fulfillments;
 
-  GenericSignature::ConformsToArray getConformsTo(Type t) {
-    return Generics->getConformsTo(t);
+  GenericSignature::RequiredProtocols getRequiredProtocols(Type t) {
+    return Generics->getRequiredProtocols(t);
   }
 
   CanType getSuperclassBound(Type t) {
@@ -166,9 +166,9 @@ private:
     bool hasLimitedInterestingConformances(CanType type) const override {
       return true;
     }
-    GenericSignature::ConformsToArray
+    GenericSignature::RequiredProtocols
     getInterestingConformances(CanType type) const override {
-      return Self.getConformsTo(type);
+      return Self.getRequiredProtocols(type);
     }
     CanType getSuperclassBound(CanType type) const override {
       return Self.getSuperclassBound(type);
@@ -1203,7 +1203,7 @@ public:
           bool hasLimitedInterestingConformances(CanType type) const override {
             return false;
           }
-          GenericSignature::ConformsToArray
+          GenericSignature::RequiredProtocols
           getInterestingConformances(CanType type) const override {
             llvm_unreachable("no limits");
           }
@@ -2749,12 +2749,10 @@ static void addAbstractConditionalRequirements(
     auto *proto =
         req.getSecondType()->castTo<ProtocolType>()->getDecl();
     auto ty = req.getFirstType()->getCanonicalType();
-    if (!isa<ArchetypeType>(ty))
+    auto archetype = dyn_cast<ArchetypeType>(ty);
+    if (!archetype)
       continue;
-    auto conformance = subMap.lookupConformance(ty, proto);
-    if (!conformance.isAbstract())
-      continue;
-    requirements.insert({ty, conformance.getAbstract()});
+    requirements.insert({ty, proto});
   }
   // Recursively add conditional requirements.
   for (auto &conf : subMap.getConformances()) {

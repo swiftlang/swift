@@ -507,8 +507,24 @@ where T: AdditiveArithmetic {}
 extension NoMemberwiseInitializerExtended: Differentiable
 where T: Differentiable & AdditiveArithmetic {}
 
+// SR-12793: Test interaction with `@differentiable` and `@derivative` type-checking.
+
+class SR_12793: Differentiable {
+  @differentiable
+  var x: Float = 0
+
+  @differentiable
+  func method() -> Float { x }
+
+  @derivative(of: method)
+  func vjpMethod() -> (value: Float, pullback: (Float) -> TangentVector) { fatalError() }
+
+  // Test usage of synthesized `TangentVector` type.
+  // This should not produce an error: "reference to invalid associated type 'TangentVector'".
+  func move(along direction: TangentVector) {}
+}
+
 // Test property wrappers.
-// TF-1190: Test `@noDerivative` warning for property wrapper backing storage properties.
 
 @propertyWrapper
 struct ImmutableWrapper<Value> {
@@ -524,18 +540,32 @@ struct Wrapper<Value> {
   var wrappedValue: Value
 }
 
+@propertyWrapper
+class ClassWrapper<Value> {
+  var wrappedValue: Value
+  init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
+}
+
 struct Generic<T> {}
 extension Generic: Differentiable where T: Differentiable {}
 
 class WrappedProperties: Differentiable {
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires all stored properties not marked with `@noDerivative` to be mutable; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires 'wrappedValue' in property wrapper 'ImmutableWrapper' to be mutable; add an explicit '@noDerivative' attribute}}
   @ImmutableWrapper var immutableInt: Generic<Int> = Generic()
 
   // expected-warning @+1 {{stored property 'mutableInt' has no derivative because 'Generic<Int>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
   @Wrapper var mutableInt: Generic<Int> = Generic()
 
   @Wrapper var float: Generic<Float> = Generic()
+  @ClassWrapper var float2: Generic<Float> = Generic()
+  // SR-13071: Test `@differentiable` wrapped property.
+  @differentiable @Wrapper var float3: Generic<Float> = Generic()
+
   @noDerivative @ImmutableWrapper var nondiff: Generic<Int> = Generic()
+
+  static func testTangentMemberwiseInitializer() {
+    _ = TangentVector(float: .init(), float2: .init(), float3: .init())
+  }
 }
 
 // Test derived conformances in disallowed contexts.

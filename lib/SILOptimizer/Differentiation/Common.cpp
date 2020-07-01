@@ -17,6 +17,8 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/Common.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 namespace swift {
 namespace autodiff {
@@ -27,18 +29,6 @@ raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
 // Helpers
 //===----------------------------------------------------------------------===//
 
-bool isArrayLiteralIntrinsic(FullApplySite applySite) {
-  return doesApplyCalleeHaveSemantics(applySite.getCalleeOrigin(),
-                                      "array.uninitialized_intrinsic");
-}
-
-ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
-  if (auto *ai = dyn_cast<ApplyInst>(v))
-    if (isArrayLiteralIntrinsic(ai))
-      return ai;
-  return nullptr;
-}
-
 ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
   // Find the `pointer_to_address` result, peering through `index_addr`.
   auto *ptai = dyn_cast<PointerToAddressInst>(v);
@@ -48,10 +38,9 @@ ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
     return nullptr;
   // Return the `array.uninitialized_intrinsic` application, if it exists.
   if (auto *dti = dyn_cast<DestructureTupleInst>(
-          ptai->getOperand()->getDefiningInstruction())) {
-    if (auto *ai = getAllocateUninitializedArrayIntrinsic(dti->getOperand()))
-      return ai;
-  }
+          ptai->getOperand()->getDefiningInstruction()))
+    return ArraySemanticsCall(dti->getOperand(),
+                              semantics::ARRAY_UNINITIALIZED_INTRINSIC);
   return nullptr;
 }
 
@@ -258,6 +247,97 @@ void collectMinimalIndicesForFunctionCall(
 }
 
 //===----------------------------------------------------------------------===//
+// Diagnostic utilities
+//===----------------------------------------------------------------------===//
+
+SILLocation getValidLocation(SILValue v) {
+  auto loc = v.getLoc();
+  if (loc.isNull() || loc.getSourceLoc().isInvalid())
+    loc = v->getFunction()->getLocation();
+  return loc;
+}
+
+SILLocation getValidLocation(SILInstruction *inst) {
+  auto loc = inst->getLoc();
+  if (loc.isNull() || loc.getSourceLoc().isInvalid())
+    loc = inst->getFunction()->getLocation();
+  return loc;
+}
+
+//===----------------------------------------------------------------------===//
+// Tangent property lookup utilities
+//===----------------------------------------------------------------------===//
+
+VarDecl *getTangentStoredProperty(ADContext &context, VarDecl *originalField,
+                                  SILLocation loc,
+                                  DifferentiationInvoker invoker) {
+  auto &astCtx = context.getASTContext();
+  auto tanFieldInfo = evaluateOrDefault(
+      astCtx.evaluator, TangentStoredPropertyRequest{originalField},
+      TangentPropertyInfo(nullptr));
+  // If no error, return the tangent property.
+  if (tanFieldInfo)
+    return tanFieldInfo.tangentProperty;
+  // Otherwise, diagnose error and return nullptr.
+  assert(tanFieldInfo.error);
+  auto *parentDC = originalField->getDeclContext();
+  assert(parentDC->isTypeContext());
+  auto parentDeclName = parentDC->getSelfNominalTypeDecl()->getNameStr();
+  auto fieldName = originalField->getNameStr();
+  auto sourceLoc = loc.getSourceLoc();
+  switch (tanFieldInfo.error->kind) {
+  case TangentPropertyInfo::Error::Kind::NoDerivativeOriginalProperty:
+    llvm_unreachable(
+        "`@noDerivative` stored property accesses should not be "
+        "differentiated; activity analysis should not mark as varied");
+  case TangentPropertyInfo::Error::Kind::NominalParentNotDifferentiable:
+    context.emitNondifferentiabilityError(
+        sourceLoc, invoker,
+        diag::autodiff_stored_property_parent_not_differentiable,
+        parentDeclName, fieldName);
+    break;
+  case TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable:
+    context.emitNondifferentiabilityError(
+        sourceLoc, invoker, diag::autodiff_stored_property_not_differentiable,
+        parentDeclName, fieldName, originalField->getInterfaceType());
+    break;
+  case TangentPropertyInfo::Error::Kind::ParentTangentVectorNotStruct:
+    context.emitNondifferentiabilityError(
+        sourceLoc, invoker, diag::autodiff_stored_property_tangent_not_struct,
+        parentDeclName, fieldName);
+    break;
+  case TangentPropertyInfo::Error::Kind::TangentPropertyNotFound:
+    context.emitNondifferentiabilityError(
+        sourceLoc, invoker,
+        diag::autodiff_stored_property_no_corresponding_tangent, parentDeclName,
+        fieldName);
+    break;
+  case TangentPropertyInfo::Error::Kind::TangentPropertyWrongType:
+    context.emitNondifferentiabilityError(
+        sourceLoc, invoker, diag::autodiff_tangent_property_wrong_type,
+        parentDeclName, fieldName, tanFieldInfo.error->getType());
+    break;
+  case TangentPropertyInfo::Error::Kind::TangentPropertyNotStored:
+    context.emitNondifferentiabilityError(
+        sourceLoc, invoker, diag::autodiff_tangent_property_not_stored,
+        parentDeclName, fieldName);
+    break;
+  }
+  return nullptr;
+}
+
+VarDecl *getTangentStoredProperty(ADContext &context,
+                                  FieldIndexCacheBase *projectionInst,
+                                  DifferentiationInvoker invoker) {
+  assert(isa<StructExtractInst>(projectionInst) ||
+         isa<StructElementAddrInst>(projectionInst) ||
+         isa<RefElementAddrInst>(projectionInst));
+  auto loc = getValidLocation(projectionInst);
+  return getTangentStoredProperty(context, projectionInst->getField(), loc,
+                                  invoker);
+}
+
+//===----------------------------------------------------------------------===//
 // Code emission utilities
 //===----------------------------------------------------------------------===//
 
@@ -298,7 +378,7 @@ void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
   auto zeroDeclLookup = additiveArithmeticProto->lookupDirect(astCtx.Id_zero);
   auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
   assert(zeroDecl->isProtocolRequirement());
-  auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
+  auto *accessorDecl = zeroDecl->getOpaqueAccessor(AccessorKind::Get);
   SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
   auto silFnType = typeConverter.getConstantType(
       TypeExpansionContext::minimal(), accessorDeclRef);

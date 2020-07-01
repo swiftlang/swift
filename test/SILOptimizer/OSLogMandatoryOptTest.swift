@@ -56,7 +56,9 @@ func testSimpleInterpolation() {
   // We need to wade through some borrows and copy values here.
   // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
-  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
+  // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+  // CHECK-DAG: [[FINARR]] = apply [[FINARRFUNC]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARGSARRAY:%[0-9]+]])
   // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
   // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
   // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
@@ -105,7 +107,9 @@ func testInterpolationWithFormatOptions() {
   // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
   // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
-  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
+  // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+  // CHECK-DAG: [[FINARR]] = apply [[FINARRFUNC]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARGSARRAY:%[0-9]+]])
   // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
   // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
   // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
@@ -156,7 +160,9 @@ func testInterpolationWithFormatOptionsAndPrivacy() {
   // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
   // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
-  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
+  // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+  // CHECK-DAG: [[FINARR]] = apply [[FINARRFUNC]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARGSARRAY:%[0-9]+]])
   // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
   // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
   // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
@@ -213,7 +219,9 @@ func testInterpolationWithMultipleArguments() {
   // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
   // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
-  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
+  // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+  // CHECK-DAG: [[FINARR]] = apply [[FINARRFUNC]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARGSARRAY:%[0-9]+]])
   // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
   // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
   // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
@@ -359,7 +367,9 @@ func testMessageWithTooManyArguments() {
   // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
   // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
-  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
+  // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+  // CHECK-DAG: [[FINARR]] = apply [[FINARRFUNC]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARGSARRAY:%[0-9]+]])
   // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
   // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
   // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
@@ -452,7 +462,9 @@ func testDynamicStringArguments() {
   // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
   // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
-  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
+  // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+  // CHECK-DAG: [[FINARR]] = apply [[FINARRFUNC]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARGSARRAY:%[0-9]+]])
   // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
   // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
   // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
@@ -508,7 +520,9 @@ func testNSObjectInterpolation() {
     // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
     // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
     // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
-    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
+    // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+    // CHECK-DAG: [[FINARR]] = apply {{.*}}<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARGSARRAY:%[0-9]+]])
     // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
@@ -559,7 +573,9 @@ func testDoubleInterpolation() {
     // CHECK-DAG: store_borrow [[ARGSARRAY2:%[0-9]+]] to [[ARGSARRAYADDR]]
     // CHECK-DAG: [[ARGSARRAY2]] = begin_borrow [[ARGSARRAY3:%[0-9]+]]
     // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
-    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
+    // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
+    // CHECK-DAG: [[FINARR]] = apply [[FINARRFUNC]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARGSARRAY:%[0-9]+]])
     // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF

@@ -41,7 +41,7 @@ public:
   int UnrollThreshold = 250;
 
   /// The number of threads for multi-threaded code generation.
-  int NumThreads = 0;
+  unsigned NumThreads = 0;
   
   /// Controls whether to pull in SIL from partial modules during the
   /// merge modules step. Could perhaps be merged with the link mode
@@ -160,10 +160,6 @@ public:
 
   /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
-
-  /// Should the default pass pipelines strip ownership during the diagnostic
-  /// pipeline or after serialization.
-  bool StripOwnershipAfterSerialization = true;
 
   /// The name of the file to which the backend should save optimization
   /// records.

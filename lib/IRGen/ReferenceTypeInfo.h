@@ -45,6 +45,10 @@ public:
   virtual void strongRelease(IRGenFunction &IGF, Explosion &in,
                              Atomicity atomicity) const = 0;
 
+  virtual ReferenceCounting getReferenceCountingType() const {
+    llvm_unreachable("not supported");
+  }
+
 #define REF_STORAGE_HELPER(Name) \
   virtual const TypeInfo *create##Name##StorageType(TypeConverter &TC, \
                                                     bool isOptional) const = 0;

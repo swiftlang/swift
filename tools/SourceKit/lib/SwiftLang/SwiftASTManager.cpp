@@ -507,7 +507,7 @@ bool SwiftASTManager::initCompilerInvocation(
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
       Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
     return Invocation.parseArgs(FrontendArgs, Diags);
-  });
+  }, /*ForceNoOutputs=*/true);
 
   // Remove the StreamDiagConsumer as it's no longer needed.
   Diags.removeConsumer(DiagConsumer);
@@ -907,9 +907,9 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
 
   auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
 
-  ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  ModuleDecl::ImportFilter ImportFilter = {
+      ModuleDecl::ImportFilterKind::Public,
+      ModuleDecl::ImportFilterKind::Private};
   if (Visited.empty()) {
     // Only collect implementation-only dependencies from the main module.
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
@@ -1051,7 +1051,7 @@ ASTUnitRef ASTProducer::createASTUnit(
     if (auto SF = CompIns.getPrimarySourceFile()) {
       SILOptions SILOpts = Invocation.getSILOptions();
       auto &TC = CompIns.getSILTypes();
-      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, TC, SILOpts);
+      std::unique_ptr<SILModule> SILMod = performASTLowering(*SF, TC, SILOpts);
       runSILDiagnosticPasses(*SILMod);
     }
   }

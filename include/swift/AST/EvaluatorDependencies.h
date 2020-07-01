@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_EVALUATOR_DEPENDENCIES_H
 #define SWIFT_AST_EVALUATOR_DEPENDENCIES_H
 
+#include "swift/AST/AnyRequest.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/SourceFile.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -106,30 +107,95 @@ inline DependencyScope getScopeForAccessLevel(AccessLevel l) {
 // of individual contexts.
 using DependencySource = llvm::PointerIntPair<SourceFile *, 1, DependencyScope>;
 
-/// A \c DependencyCollector is an aggregator of named references discovered in a
-/// particular \c DependencyScope during the course of request evaluation.
+struct DependencyRecorder;
+
+/// A \c DependencyCollector defines an abstract write-only buffer of
+/// \c Reference objects. References are added to a collector during the write
+/// phase of request evaluation (in \c writeDependencySink) with the various
+/// \c add* functions below..
+///
+/// A \c DependencyCollector cannot be created directly. You must invoke
+/// \c DependencyRecorder::record, which will wire a dependency collector into
+/// the provided continuation block.
 struct DependencyCollector {
-private:
-  /// A stack of dependency sources in the order they were evaluated.
-  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
+  friend DependencyRecorder;
+
+  struct Reference {
+  public:
+    enum class Kind {
+      Empty,
+      Tombstone,
+      UsedMember,
+      PotentialMember,
+      TopLevel,
+      Dynamic,
+    } kind;
+
+    NominalTypeDecl *subject;
+    DeclBaseName name;
+    bool cascades;
+
+  private:
+    Reference(Kind kind, NominalTypeDecl *subject, DeclBaseName name,
+              bool cascades)
+        : kind(kind), subject(subject), name(name), cascades(cascades) {}
+
+  public:
+    static Reference empty() {
+      return {Kind::Empty, llvm::DenseMapInfo<NominalTypeDecl *>::getEmptyKey(),
+              llvm::DenseMapInfo<DeclBaseName>::getEmptyKey(), false};
+    }
+
+    static Reference tombstone() {
+      return {Kind::Tombstone,
+              llvm::DenseMapInfo<NominalTypeDecl *>::getTombstoneKey(),
+              llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey(), false};
+    }
+
+  public:
+    static Reference usedMember(NominalTypeDecl *subject, DeclBaseName name,
+                                bool cascades) {
+      return {Kind::UsedMember, subject, name, cascades};
+    }
+
+    static Reference potentialMember(NominalTypeDecl *subject, bool cascades) {
+      return {Kind::PotentialMember, subject, DeclBaseName(), cascades};
+    }
+
+    static Reference topLevel(DeclBaseName name, bool cascades) {
+      return {Kind::TopLevel, nullptr, name, cascades};
+    }
+
+    static Reference dynamic(DeclBaseName name, bool cascades) {
+      return {Kind::Dynamic, nullptr, name, cascades};
+    }
+
+  public:
+    struct Info {
+      static inline Reference getEmptyKey() { return Reference::empty(); }
+      static inline Reference getTombstoneKey() {
+        return Reference::tombstone();
+      }
+      static inline unsigned getHashValue(const Reference &Val) {
+        return llvm::hash_combine(Val.kind, Val.subject,
+                                  Val.name.getAsOpaquePointer());
+      }
+      static bool isEqual(const Reference &LHS, const Reference &RHS) {
+        return LHS.kind == RHS.kind && LHS.subject == RHS.subject &&
+               LHS.name == RHS.name;
+      }
+    };
+  };
 
 public:
-  enum class Mode {
-    // Enables the current "status quo" behavior of the dependency collector.
-    //
-    // By default, the dependency collector moves to register dependencies in
-    // the referenced name trackers at the top of the active dependency stack.
-    StatusQuo,
-    // Enables an experimental mode to only register private dependencies.
-    //
-    // This mode restricts the dependency collector to ignore changes of
-    // scope. This has practical effect of charging all unqualified lookups to
-    // the primary file being acted upon instead of to the destination file.
-    ExperimentalPrivateDependencies,
-  };
-  Mode mode;
+  using ReferenceSet = llvm::DenseSet<Reference, Reference::Info>;
 
-  explicit DependencyCollector(Mode mode) : mode{mode} {};
+private:
+  DependencyRecorder &parent;
+  ReferenceSet scratch;
+
+public:
+  explicit DependencyCollector(DependencyRecorder &parent) : parent(parent) {}
 
 public:
   /// Registers a named reference from the current dependency scope to a member
@@ -169,6 +235,109 @@ public:
   void addDynamicLookupName(DeclBaseName name);
 
 public:
+  /// Retrieves the dependency recorder that created this dependency collector.
+  const DependencyRecorder &getRecorder() const { return parent; }
+
+  /// Returns \c true if this collector has not accumulated
+  /// any \c Reference objects.
+  bool empty() const { return scratch.empty(); }
+};
+
+/// A \c DependencyRecorder is an aggregator of named references discovered in a
+/// particular \c DependencyScope during the course of request evaluation.
+struct DependencyRecorder {
+  friend DependencyCollector;
+
+  enum class Mode {
+    // Enables the status quo of recording direct dependencies.
+    //
+    // This mode restricts the dependency collector to ignore changes of
+    // scope. This has practical effect of charging all unqualified lookups to
+    // the primary file being acted upon instead of to the destination file.
+    DirectDependencies,
+    // Enables a legacy mode of dependency tracking that makes a distinction
+    // between private and cascading edges, and does not directly capture
+    // transitive dependencies.
+    //
+    // By default, the dependency collector moves to register dependencies in
+    // the referenced name trackers at the top of the active dependency stack.
+    LegacyCascadingDependencies,
+  };
+
+private:
+  /// A stack of dependency sources in the order they were evaluated.
+  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
+  llvm::DenseMap<SourceFile *, DependencyCollector::ReferenceSet>
+      fileReferences;
+  llvm::DenseMap<AnyRequest, DependencyCollector::ReferenceSet>
+      requestReferences;
+  Mode mode;
+  bool isRecording;
+
+public:
+  explicit DependencyRecorder(Mode mode) : mode{mode}, isRecording{false} {};
+
+private:
+  /// Records the given \c Reference as a dependency of the current dependency
+  /// source.
+  ///
+  /// This is as opposed to merely collecting a \c Reference, which may just buffer
+  /// it for realization or replay later.
+  void realize(const DependencyCollector::Reference &ref);
+
+public:
+  /// Begins the recording of references by invoking the given continuation
+  /// with a fresh \c DependencyCollector object. This object should be used
+  /// to buffer dependency-relevant references to names looked up by a
+  /// given request.
+  ///
+  /// Recording only occurs for requests that are dependency sinks.
+  void record(const llvm::SetVector<swift::ActiveRequest> &stack,
+              llvm::function_ref<void(DependencyCollector &)> rec);
+
+  /// Replays the \c Reference objects collected by a given cached request and
+  /// its sub-requests into the current dependency scope.
+  ///
+  /// Dependency replay ensures that cached requests do not "hide" names from
+  /// the active dependency scope. This would otherwise occur frequently in
+  /// batch mode, where cached requests effectively block the re-evaluation of
+  /// a large quantity of computations that perform name lookups by design.
+  ///
+  /// Replay need only occur for requests that are (separately) cached.
+  void replay(const llvm::SetVector<swift::ActiveRequest> &stack,
+              const swift::ActiveRequest &req);
+private:
+  /// Given the current stack of requests and a buffer of \c Reference objects
+  /// walk the active stack looking for the next-innermost cached request. If
+  /// found, insert the buffer of references into that request's known reference
+  /// set.
+  ///
+  /// This algorithm ensures that references propagate lazily up the request
+  /// graph from cached sub-requests to their cached parents. Once this process
+  /// completes, all cached requests in the request graph will see the
+  /// union of all references recorded while evaluating their sub-requests.
+  ///
+  /// This algorithm *must* be tail-called during
+  /// \c DependencyRecorder::record or \c DependencyRecorder::replay
+  /// or the corresponding set of references for the active dependency scope
+  /// will become incoherent.
+  void
+  unionNearestCachedRequest(ArrayRef<swift::ActiveRequest> stack,
+                            const DependencyCollector::ReferenceSet &scratch);
+
+public:
+  using ReferenceEnumerator =
+      llvm::function_ref<void(const DependencyCollector::Reference &)>;
+
+  /// Enumerates the set of references associated with a given source file,
+  /// passing them to the given enumeration callback.
+  ///
+  /// The order of enumeration is completely undefined. It is the responsibility
+  /// of callers to ensure they are order-invariant or are sorting the result.
+  void enumerateReferencesInFile(const SourceFile *SF,
+                                 ReferenceEnumerator f) const ;
+
+public:
   /// Returns the scope of the current active scope.
   ///
   /// If there is no active scope, the result always cascades.
@@ -189,7 +358,12 @@ public:
   SourceFile *getActiveDependencySourceOrNull() const {
     if (dependencySources.empty())
       return nullptr;
-    return dependencySources.back().getPointer();
+    switch (mode) {
+    case Mode::LegacyCascadingDependencies:
+      return dependencySources.back().getPointer();
+    case Mode::DirectDependencies:
+      return dependencySources.front().getPointer();
+    }
   }
 
 public:
@@ -197,14 +371,14 @@ public:
   /// dependency source stack. It is specialized to be zero-cost for
   /// requests that are not dependency sources.
   template <typename Request, typename = detail::void_t<>> struct StackRAII {
-    StackRAII(DependencyCollector &DC, const Request &Req) {}
+    StackRAII(DependencyRecorder &DR, const Request &Req) {}
   };
 
   template <typename Request>
   struct StackRAII<Request,
                    typename std::enable_if<Request::isDependencySource>::type> {
-    NullablePtr<DependencyCollector> Coll;
-    StackRAII(DependencyCollector &coll, const Request &Req) {
+    NullablePtr<DependencyRecorder> Coll;
+    StackRAII(DependencyRecorder &coll, const Request &Req) {
       auto Source = Req.readDependencySource(coll);
       // If there is no source to introduce, bail. This can occur if
       // a request originates in the context of a module.
@@ -222,41 +396,14 @@ public:
   };
 
 private:
-  /// Returns the first dependency source registered with the tracker, or
-  /// \c nullptr if no dependency sources have been registered.
-  SourceFile *getFirstDependencySourceOrNull() const {
-    if (dependencySources.empty())
-      return nullptr;
-    return dependencySources.front().getPointer();
-  }
-
-  /// If there is an active dependency source, returns its
-  /// \c ReferencedNameTracker. Else, returns \c nullptr.
-  ReferencedNameTracker *getActiveDependencyTracker() const {
-    SourceFile *source = nullptr;
-    switch (mode) {
-    case Mode::StatusQuo:
-      source = getActiveDependencySourceOrNull();
-      break;
-    case Mode::ExperimentalPrivateDependencies:
-      source = getFirstDependencySourceOrNull();
-      break;
-    }
-    
-    if (!source)
-      return nullptr;
-
-    return source->getRequestBasedReferencedNameTracker();
-  }
-
   /// Returns \c true if the scope of the current active source cascades.
   ///
   /// If there is no active scope, the result always cascades.
   bool isActiveSourceCascading() const {
     switch (mode) {
-    case Mode::StatusQuo:
+    case Mode::LegacyCascadingDependencies:
       return getActiveSourceScope() == evaluator::DependencyScope::Cascading;
-    case Mode::ExperimentalPrivateDependencies:
+    case Mode::DirectDependencies:
       return false;
     }
     llvm_unreachable("invalid mode");

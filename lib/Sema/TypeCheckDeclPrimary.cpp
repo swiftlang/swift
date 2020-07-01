@@ -41,7 +41,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
@@ -430,26 +429,29 @@ static void checkOperatorOrPrecedenceGroupRedeclaration(
 
   auto *module = currentFile->getParentModule();
   auto &ctx = module->getASTContext();
-  auto desc = OperatorLookupDescriptor::forModule(module, decl->getName(),
-                                                  /*cascades*/ true,
-                                                  /*diagLoc*/ SourceLoc());
+  auto desc = OperatorLookupDescriptor::forModule(module, decl->getName());
   auto otherDecls = lookupOthers(desc);
   for (auto *other : otherDecls) {
     if (other == decl || other->isInvalid())
       continue;
 
-    // Emit a redeclaration error if the two declarations occur in the same
-    // source file. We currently allow redeclarations across source files to
-    // allow the user to shadow operator decls from imports, as we currently
-    // favor those decls over ones from other files.
-    // FIXME: Once we prefer operator decls from the same module, start
-    // diagnosing redeclarations across files.
+    bool shouldDiagnose = false;
     if (currentFile == other->getDeclContext()->getParentSourceFile()) {
-      // Make sure we get the diagnostic ordering to be sensible.
+      // For a same-file redeclaration, make sure we get the diagnostic ordering
+      // to be sensible.
       if (decl->getLoc().isValid() && other->getLoc().isValid() &&
           ctx.SourceMgr.isBeforeInBuffer(decl->getLoc(), other->getLoc())) {
         std::swap(decl, other);
       }
+      shouldDiagnose = true;
+    } else {
+      // If the declarations are in different files, only diagnose if we've
+      // enabled the new operator lookup behaviour where decls in the current
+      // module are now favored over imports.
+      shouldDiagnose = ctx.LangOpts.EnableNewOperatorLookup;
+    }
+
+    if (shouldDiagnose) {
       ctx.Diags.diagnose(decl, diagID);
       ctx.Diags.diagnose(other, noteID);
       decl->setInvalid();
@@ -698,7 +700,75 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
             current->diagnose(diag::invalid_redecl_init,
                               current->getName(),
                               otherInit->isMemberwiseInitializer());
-        } else if (!current->isImplicit() && !other->isImplicit()) {
+        } else if (current->isImplicit() || other->isImplicit()) {
+          // If both declarations are implicit, we do not diagnose anything
+          // as it would lead to misleading diagnostics and it's likely that
+          // there's nothing actionable about it due to its implicit nature.
+          // One special case for this is property wrappers.
+          //
+          // Otherwise, if 'current' is implicit, then we diagnose 'other'
+          // since 'other' is a redeclaration of 'current'. Similarly, if
+          // 'other' is implicit, we diagnose 'current'.
+          const Decl *declToDiagnose = nullptr;
+          if (current->isImplicit() && other->isImplicit()) {
+            // If 'current' is a property wrapper backing storage property
+            // or projected value property, then diagnose the wrapped
+            // property.
+            if (auto VD = dyn_cast<VarDecl>(current)) {
+              if (auto originalWrappedProperty =
+                      VD->getOriginalWrappedProperty()) {
+                declToDiagnose = originalWrappedProperty;
+              }
+            }
+          } else {
+            declToDiagnose = current->isImplicit() ? other : current;
+          }
+
+          if (declToDiagnose) {
+            // Figure out if the the declaration we've redeclared is a
+            // synthesized witness for a protocol requirement.
+            bool isProtocolRequirement = false;
+            if (auto VD = dyn_cast<ValueDecl>(current->isImplicit() ? current
+                                                                    : other)) {
+              isProtocolRequirement = llvm::any_of(
+                  VD->getSatisfiedProtocolRequirements(), [&](ValueDecl *req) {
+                    return req->getName() == VD->getName();
+                  });
+            }
+            declToDiagnose->diagnose(diag::invalid_redecl_implicit,
+                                     current->getDescriptiveKind(),
+                                     isProtocolRequirement, other->getName());
+          }
+
+          // Emit a specialized note if the one of the declarations is
+          // the backing storage property ('_foo') or projected value
+          // property ('$foo') for a wrapped property. The backing or
+          // projected var has the same source location as the wrapped
+          // property we diagnosed above, so we don't need to extract
+          // the original property.
+          const VarDecl *varToDiagnose = nullptr;
+          auto kind = PropertyWrapperSynthesizedPropertyKind::Backing;
+          if (auto currentVD = dyn_cast<VarDecl>(current)) {
+            if (auto currentKind =
+                    currentVD->getPropertyWrapperSynthesizedPropertyKind()) {
+              varToDiagnose = currentVD;
+              kind = *currentKind;
+            }
+          }
+          if (auto otherVD = dyn_cast<VarDecl>(other)) {
+            if (auto otherKind =
+                    otherVD->getPropertyWrapperSynthesizedPropertyKind()) {
+              varToDiagnose = otherVD;
+              kind = *otherKind;
+            }
+          }
+
+          if (varToDiagnose) {
+            varToDiagnose->diagnose(
+                diag::invalid_redecl_implicit_wrapper, varToDiagnose->getName(),
+                kind == PropertyWrapperSynthesizedPropertyKind::Backing);
+          }
+        } else {
           ctx.Diags.diagnoseWithNotes(
             current->diagnose(diag::invalid_redecl,
                               current->getName()), [&]() {
@@ -854,7 +924,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
           if (reqRepr &&
               req.getFirstType()->isEqual(proto->getSelfInterfaceType())) {
             auto &diags = proto->getASTContext().Diags;
-            diags.diagnose(reqRepr->getSubjectLoc().getLoc(),
+            diags.diagnose(reqRepr->getSubjectRepr()->getLoc(),
                            diag::protocol_where_clause_self_requirement);
           }
 
@@ -1220,7 +1290,7 @@ public:
 
   void visit(Decl *decl) {
     if (auto *Stats = getASTContext().Stats)
-      Stats->getFrontendCounters().NumDeclsTypechecked++;
+      ++Stats->getFrontendCounters().NumDeclsTypechecked;
 
     FrontendStatsTracer StatsTracer(getASTContext().Stats,
                                     "typecheck-decl", decl);
@@ -1660,7 +1730,8 @@ public:
       auto mentionsItself =
         defaultType.findIf([&](Type defaultType) {
           if (auto DMT = defaultType->getAs<DependentMemberType>()) {
-            return DMT->getAssocType() == AT;
+            return (DMT->getAssocType() == AT &&
+                    DMT->getBase()->isEqual(proto->getSelfInterfaceType()));
           }
           return false;
         });
@@ -1759,7 +1830,7 @@ public:
 
     TypeChecker::checkDeclCircularity(ED);
 
-    TypeChecker::checkConformancesInContext(ED, ED);
+    TypeChecker::checkConformancesInContext(ED);
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -1789,7 +1860,7 @@ public:
 
     TypeChecker::checkDeclCircularity(SD);
 
-    TypeChecker::checkConformancesInContext(SD, SD);
+    TypeChecker::checkConformancesInContext(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -2023,7 +2094,7 @@ public:
 
     TypeChecker::checkDeclCircularity(CD);
 
-    TypeChecker::checkConformancesInContext(CD, CD);
+    TypeChecker::checkConformancesInContext(CD);
 
     maybeDiagnoseClassWithoutInitializers(CD);
   }
@@ -2362,7 +2433,7 @@ public:
 
     TypeChecker::checkPatternBindingCaptures(ED);
 
-    TypeChecker::checkConformancesInContext(ED, ED);
+    TypeChecker::checkConformancesInContext(ED);
 
     TypeChecker::checkDeclAttributes(ED);
     checkAccessControl(ED);

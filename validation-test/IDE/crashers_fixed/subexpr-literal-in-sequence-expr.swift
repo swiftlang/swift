@@ -8,4 +8,4 @@ func test2() {
   "" + [""]#^B^#
 }
 // Sanity check results.
-// CHECK: Decl[InstanceVar]/CurrNominal:      .startIndex[#Int#]; name=startIndex
+// CHECK: Decl[InstanceVar]/CurrNominal/IsSystem:      .startIndex[#Int#]; name=startIndex

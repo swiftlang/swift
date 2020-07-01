@@ -345,6 +345,16 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 #endif
 }
 
+#if INTERNAL_CHECKS_ENABLED
+@usableFromInline
+@_silgen_name("_swift_isImmutableCOWBuffer")
+internal func _swift_isImmutableCOWBuffer(_ object: AnyObject) -> Bool
+
+@usableFromInline
+@_silgen_name("_swift_setImmutableCOWBuffer")
+internal func _swift_setImmutableCOWBuffer(_ object: AnyObject, _ immutable: Bool) -> Bool
+#endif
+
 @inlinable
 internal func _isValidAddress(_ address: UInt) -> Bool {
   // TODO: define (and use) ABI max valid pointer value
@@ -681,6 +691,13 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
   _internalInvariant(_usesNativeSwiftReferenceCounting(
       type(of: Builtin.reinterpretCast(object) as AnyObject)))
   return Bool(Builtin.isUnique_native(&object))
+}
+
+@_alwaysEmitIntoClient
+@_transparent
+public // @testable
+func _COWBufferForReading<T: AnyObject>(_ object: T) -> T {
+  return Builtin.COWBufferForReading(object)
 }
 
 /// Returns `true` if type is a POD type. A POD type is a type that does not

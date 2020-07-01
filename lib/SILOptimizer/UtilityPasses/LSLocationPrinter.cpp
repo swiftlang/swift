@@ -171,7 +171,7 @@ public:
 
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : Locs) {
-          Loc.print(llvm::outs(), &Fn.getModule(), TypeExpansionContext(Fn));
+          Loc.print(llvm::outs());
         }
         Locs.clear();
       }
@@ -227,7 +227,7 @@ public:
         LSLocation::reduce(L, &Fn.getModule(), TypeExpansionContext(Fn), SLocs);
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : SLocs) {
-          Loc.print(llvm::outs(), &Fn.getModule(), TypeExpansionContext(Fn));
+          Loc.print(llvm::outs());
         }
         L.reset();
         Locs.clear();

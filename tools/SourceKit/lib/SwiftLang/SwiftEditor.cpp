@@ -149,7 +149,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
 
     SKInfo.Offset = SM.getLocOffsetInBuffer(Info.Loc, BufferID);
     std::tie(SKInfo.Line, SKInfo.Column) =
-        SM.getLineAndColumn(Info.Loc, BufferID);
+        SM.getPresumedLineAndColumnForLoc(Info.Loc, BufferID);
     SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc).str();
 
     for (auto R : Info.Ranges) {
@@ -719,9 +719,7 @@ public:
   }
 
   void parse() {
-    auto root = Parser->parse();
-    if (SynTreeCreator)
-      SynTreeCreator->acceptSyntaxRoot(root, Parser->getSourceFile());
+    Parser->parse();
   }
 
   SourceFile &getSourceFile() {
@@ -1615,27 +1613,9 @@ private:
 
       bool walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
-        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (auto closure = dyn_cast<ClosureExpr>(E)) {
-            if (closure->hasSingleExpressionBody()) {
-              // Treat a single-expression body like a brace statement and reset
-              // the enclosing context. Note: when the placeholder is the whole
-              // body it is handled specially as wrapped in braces by
-              // shouldUseTrailingClosureInTuple().
-              auto SR = closure->getSingleExpressionBody()->getSourceRange();
-              if (SR.isValid() && SR.Start != TargetLoc &&
-                  SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-                OuterStmt = nullptr;
-                OuterExpr = nullptr;
-                EnclosingCallAndArg = {nullptr, nullptr};
-                return true;
-              }
-            }
-          }
-
-          if (!checkCallExpr(E) && !EnclosingCallAndArg.first) {
-            OuterExpr = E;
-          }
+        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
+            !checkCallExpr(E) && !EnclosingCallAndArg.first) {
+          OuterExpr = E;
         }
         return true;
       }
@@ -1646,11 +1626,30 @@ private:
         return true;
       }
 
+      /// Whether this statement body consists of only an implicit "return",
+      /// possibly within braces.
+      bool isImplicitReturnBody(Stmt *S) {
+        if (auto RS = dyn_cast<ReturnStmt>(S))
+          return RS->isImplicit() && RS->getSourceRange().Start == TargetLoc;
+
+        if (auto BS = dyn_cast<BraceStmt>(S)) {
+          if (BS->getNumElements() == 1) {
+            if (auto innerS = BS->getFirstElement().dyn_cast<Stmt *>())
+              return isImplicitReturnBody(innerS);
+          }
+        }
+
+        return false;
+      }
+
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
-        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
+        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
+            !isImplicitReturnBody(S)) {
           // A statement inside an expression - e.g. `foo({ if ... })` - resets
           // the enclosing context.
+          //
+          // ... unless it's an implicit return.
           OuterExpr = nullptr;
           EnclosingCallAndArg = {nullptr, nullptr};
 
@@ -1697,13 +1696,13 @@ private:
 
   struct ParamClosureInfo {
     Optional<ClosureInfo> placeholderClosure;
-    bool isNonPlacholderClosure = false;
+    bool isNonPlaceholderClosure = false;
     bool isWrappedWithBraces = false;
   };
 
   /// Scan the given TupleExpr collecting parameter closure information and
   /// returning the index of the given target placeholder (if found).
-  Optional<unsigned> scanTupleExpr(TupleExpr *TE, SourceLoc targetPlacholderLoc,
+  Optional<unsigned> scanTupleExpr(TupleExpr *TE, SourceLoc targetPlaceholderLoc,
                                    std::vector<ParamClosureInfo> &outParams) {
     if (TE->getElements().empty())
       return llvm::None;
@@ -1711,7 +1710,7 @@ private:
     outParams.clear();
     outParams.reserve(TE->getNumElements());
 
-    Optional<unsigned> targetPlacholderIndex;
+    Optional<unsigned> targetPlaceholderIndex;
 
     for (Expr *E : TE->getElements()) {
       outParams.emplace_back();
@@ -1720,8 +1719,8 @@ private:
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         if (CE->hasSingleExpressionBody() &&
             CE->getSingleExpressionBody()->getStartLoc() ==
-                targetPlacholderLoc) {
-          targetPlacholderIndex = outParams.size() - 1;
+                targetPlaceholderLoc) {
+          targetPlaceholderIndex = outParams.size() - 1;
           if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(
                   CE->getSingleExpressionBody())) {
             outParam.isWrappedWithBraces = true;
@@ -1732,7 +1731,7 @@ private:
           }
         }
         // else...
-        outParam.isNonPlacholderClosure = true;
+        outParam.isNonPlaceholderClosure = true;
         continue;
       }
 
@@ -1741,15 +1740,15 @@ private:
         if (scanClosureType(PHE, info))
           outParam.placeholderClosure = info;
       } else if (containClosure(E)) {
-        outParam.isNonPlacholderClosure = true;
+        outParam.isNonPlaceholderClosure = true;
       }
 
-      if (E->getStartLoc() == targetPlacholderLoc) {
-        targetPlacholderIndex = outParams.size() - 1;
+      if (E->getStartLoc() == targetPlaceholderLoc) {
+        targetPlaceholderIndex = outParams.size() - 1;
       }
     }
 
-    return targetPlacholderIndex;
+    return targetPlaceholderIndex;
   }
 
 public:
@@ -1766,7 +1765,6 @@ public:
                                ArrayRef<ClosureInfo> trailingClosures)>
                 MultiClosureCallback,
             std::function<bool(EditorPlaceholderExpr *)> NonClosureCallback) {
-
     SourceLoc PlaceholderStartLoc = SM.getLocForOffset(BufID, Offset);
 
     // See if the placeholder is encapsulated with an EditorPlaceholderExpr
@@ -1785,21 +1783,21 @@ public:
     // and if the call parens can be removed in that case.
     // We'll first find the enclosing CallExpr, and then do further analysis.
     std::vector<ParamClosureInfo> params;
-    Optional<unsigned> targetPlacholderIndex;
+    Optional<unsigned> targetPlaceholderIndex;
     auto ECE = enclosingCallExprArg(SF, PlaceholderStartLoc);
     Expr *Args = ECE.first;
     if (Args && ECE.second) {
       if (isa<ParenExpr>(Args)) {
         params.emplace_back();
         params.back().placeholderClosure = TargetClosureInfo;
-        targetPlacholderIndex = 0;
+        targetPlaceholderIndex = 0;
       } else if (auto *TE = dyn_cast<TupleExpr>(Args)) {
-        targetPlacholderIndex = scanTupleExpr(TE, PlaceholderStartLoc, params);
+        targetPlaceholderIndex = scanTupleExpr(TE, PlaceholderStartLoc, params);
       }
     }
 
     // If there was no appropriate parent call expression, it's non-trailing.
-    if (!targetPlacholderIndex.hasValue()) {
+    if (!targetPlaceholderIndex.hasValue()) {
       OneClosureCallback(Args, /*useTrailingClosure=*/false,
                          /*isWrappedWithBraces=*/false, TargetClosureInfo);
       return true;
@@ -1811,23 +1809,23 @@ public:
     // Find the first parameter eligible to be trailing.
     while (firstTrailingIndex != 0) {
       unsigned i = firstTrailingIndex - 1;
-      if (params[i].isNonPlacholderClosure ||
+      if (params[i].isNonPlaceholderClosure ||
           !params[i].placeholderClosure.hasValue())
         break;
       firstTrailingIndex = i;
     }
 
-    if (firstTrailingIndex > targetPlacholderIndex) {
+    if (firstTrailingIndex > targetPlaceholderIndex) {
       // Target comes before the eligible trailing closures.
       OneClosureCallback(Args, /*isTrailing=*/false,
-                         params[*targetPlacholderIndex].isWrappedWithBraces,
+                         params[*targetPlaceholderIndex].isWrappedWithBraces,
                          TargetClosureInfo);
       return true;
-    } else if (targetPlacholderIndex == end - 1 &&
+    } else if (targetPlaceholderIndex == end - 1 &&
                firstTrailingIndex == end - 1) {
       // Target is the only eligible trailing closure.
       OneClosureCallback(Args, /*isTrailing=*/true,
-                         params[*targetPlacholderIndex].isWrappedWithBraces,
+                         params[*targetPlaceholderIndex].isWrappedWithBraces,
                          TargetClosureInfo);
       return true;
     }

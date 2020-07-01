@@ -7,12 +7,12 @@
 // CHECK-LABEL: sil @{{.*}}testit
 // CHECK:  alloc_ref [stack] [tail_elems
 
-public func testit(_ N: Int) {
+public func testit(_ N: Int, _ x: Int) {
   for _ in 0..<N {
     for _ in 0..<10 {
        var nums = [Int]()
        for _ in 0..<40_000 {
-         nums += [1, 2, 3, 4, 5, 6, 7]
+         nums += [1, 2, 3, 4, 5, 6, x]
        }
     }
   }

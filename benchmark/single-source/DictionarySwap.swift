@@ -19,7 +19,7 @@ let numberMap = Dictionary(uniqueKeysWithValues: zip(1...size, 1...size))
 let boxedNums = (1...size).lazy.map { Box($0) }
 let boxedNumMap = Dictionary(uniqueKeysWithValues: zip(boxedNums, boxedNums))
 
-let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
+let t: [BenchmarkCategory] = [.validation, .api, .Dictionary, .cpubench]
 
 public let DictionarySwap = [
   BenchmarkInfo(name: "DictionarySwap",

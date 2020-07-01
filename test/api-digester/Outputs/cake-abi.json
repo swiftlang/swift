@@ -615,6 +615,7 @@
       "usr": "s:4cake6NumberO",
       "moduleName": "cake",
       "enumRawTypeName": "Int",
+      "isEnumExhaustive": true,
       "conformances": [
         {
           "kind": "Conformance",

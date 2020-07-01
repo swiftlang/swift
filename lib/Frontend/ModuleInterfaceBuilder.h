@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "llvm/Support/StringSaver.h"
 
@@ -35,17 +36,14 @@ class DependencyTracker;
 class ModuleInterfaceBuilder {
   SourceManager &sourceMgr;
   DiagnosticEngine &diags;
+  InterfaceSubContextDelegate &subASTDelegate;
   const StringRef interfacePath;
   const StringRef moduleName;
   const StringRef moduleCachePath;
   const StringRef prebuiltCachePath;
-  const bool serializeDependencyHashes;
-  const bool trackSystemDependencies;
-  const bool remarkOnRebuildFromInterface;
   const bool disableInterfaceFileLock;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
-  CompilerInvocation subInvocation;
   SmallVector<StringRef, 3> extraDependencies;
 
 public:
@@ -75,12 +73,6 @@ private:
                     ID, std::move(Args)...);
   }
 
-  void configureSubInvocationInputsAndOutputs(StringRef OutPath);
-
-  void configureSubInvocation(const SearchPathOptions &SearchPathOpts,
-                              const LangOptions &LangOpts,
-                              ClangModuleLoader *ClangLoader);
-
   /// Populate the provided \p Deps with \c FileDependency entries for all
   /// dependencies \p SubInstance's DependencyTracker recorded while compiling
   /// the module, excepting .swiftmodules in \p moduleCachePath or
@@ -92,41 +84,24 @@ private:
       SmallVectorImpl<SerializationOptions::FileDependency> &Deps,
       bool IsHashBased);
 
-  bool extractSwiftInterfaceVersionAndArgs(
-      version::Version &Vers, StringRef &CompilerVersion,
-      llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs);
-
   bool buildSwiftModuleInternal(StringRef OutPath, bool ShouldSerializeDeps,
                                 std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer);
 public:
   ModuleInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
-                            const SearchPathOptions &searchPathOpts,
-                            const LangOptions &langOpts,
-                            ClangModuleLoader *clangImporter,
+                            InterfaceSubContextDelegate &subASTDelegate,
                             StringRef interfacePath,
                             StringRef moduleName,
                             StringRef moduleCachePath,
                             StringRef prebuiltCachePath,
-                            bool serializeDependencyHashes = false,
-                            bool trackSystemDependencies = false,
-                            bool remarkOnRebuildFromInterface = false,
                             bool disableInterfaceFileLock = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
     : sourceMgr(sourceMgr), diags(diags),
+      subASTDelegate(subASTDelegate),
       interfacePath(interfacePath), moduleName(moduleName),
       moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
-      serializeDependencyHashes(serializeDependencyHashes),
-      trackSystemDependencies(trackSystemDependencies),
-      remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
       disableInterfaceFileLock(disableInterfaceFileLock),
-      diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
-    configureSubInvocation(searchPathOpts, langOpts, clangImporter);
-  }
-
-  const CompilerInvocation &getSubInvocation() const {
-    return subInvocation;
-  }
+      diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {}
 
   /// Ensures the requested file name is added as a dependency of the resulting
   /// module.

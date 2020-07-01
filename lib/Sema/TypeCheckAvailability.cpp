@@ -524,7 +524,7 @@ private:
           Context, Query, LastElement, CurrentTRC, NewConstraint);
 
       pushContext(TRC, ParentTy());
-      NestedCount++;
+      ++NestedCount;
     }
 
 
@@ -1128,7 +1128,8 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
       [](ASTNode Node, ASTWalker::ParentTy Parent) {
         if (Expr *ParentExpr = Parent.getAsExpr()) {
           auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
-          if (!ParentClosure || !ParentClosure->hasSingleExpressionBody()) {
+          if (!ParentClosure ||
+              ParentClosure->wasSeparatelyTypeChecked()) {
             return false;
           }
         } else if (auto *ParentStmt = Parent.getAsStmt()) {
@@ -1834,7 +1835,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
           ++I;
 
           // Two or more arguments: Insert empty labels after the first one.
-          variadicArgsNum--;
+          --variadicArgsNum;
           I = argumentLabelIDs.insert(I, variadicArgsNum, Identifier());
           I += variadicArgsNum;
         }
@@ -2342,8 +2343,8 @@ public:
     return true;
   }
 
-  bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-    return expr->hasAppliedFunctionBuilder();
+  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+    return false;
   }
 
   bool shouldWalkIntoTapExpression() override { return false; }

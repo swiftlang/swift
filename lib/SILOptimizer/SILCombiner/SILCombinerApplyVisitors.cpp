@@ -207,9 +207,9 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // we got this far it is legal to perform the transformation (since
   // otherwise, we would be creating malformed SIL).
   bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
-  SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
-                                            Args, setNonThrowing);
-  assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsSubstType(
+  ApplyInst *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
+                                       Args, setNonThrowing);
+  assert(FullApplySite(NAI).getSubstCalleeType()->getAllResultsSubstType(
              AI.getModule(), AI.getFunction()->getTypeExpansionContext()) ==
              AI.getSubstCalleeType()->getAllResultsSubstType(
                  AI.getModule(), AI.getFunction()->getTypeExpansionContext()) &&
@@ -658,7 +658,8 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
     llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
     SILBuilderContext &BuilderCtx,
     SILOpenedArchetypesTracker &OpenedArchetypesTracker) {
-  for (unsigned ArgIdx = 0; ArgIdx < Apply.getNumArguments(); ArgIdx++) {
+  for (unsigned ArgIdx = 0, e = Apply.getNumArguments(); ArgIdx < e;
+       ++ArgIdx) {
     auto ArgASTType = Apply.getArgument(ArgIdx)->getType().getASTType();
     if (!ArgASTType->hasArchetype())
       continue;
@@ -770,7 +771,7 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
 
   // This bailout check is also needed for non-Self arguments [including Self].
   unsigned NumApplyArgs = Apply.getNumArguments();
-  for (unsigned Idx = 0; Idx < NumApplyArgs; Idx++) {
+  for (unsigned Idx = 0; Idx < NumApplyArgs; ++Idx) {
     if (Idx == ArgIdx)
       continue;
     if (Apply.getArgument(Idx)->getType().getASTType().findIf(
@@ -952,8 +953,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
             return CEI.lookupExistentialConformance(proto);
           }
           return ProtocolConformanceRef(proto);
-        },
-        SubstFlags::ForceSubstituteOpenedExistentials);
+        });
   }
 
   // We need to make sure that we can a) update Apply to use the new args and b)
@@ -1417,7 +1417,7 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
          "mismatching number of arguments for the same destination block");
 
   // Check if both blocks pass the same arguments to the common destination.
-  for (unsigned Idx = 0, End = NormalBr->getNumArgs(); Idx < End; Idx++) {
+  for (unsigned Idx = 0, End = NormalBr->getNumArgs(); Idx < End; ++Idx) {
     if (NormalBr->getArg(Idx) != ErrorBr->getArg(Idx))
       return false;
   }

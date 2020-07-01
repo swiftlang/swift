@@ -52,7 +52,7 @@ bb0(%0 : @owned $B):
 // ends the borrow's lifetime.
 //
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'value_subobject_with_use_after_end_borrow'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %1 = begin_borrow %0 : $B
 // CHECK: Consuming User:   end_borrow %1 : $B
 // CHECK: Non Consuming User:   %4 = struct_extract %2 : $A, #A.ptr
@@ -96,7 +96,7 @@ bb0(%0 : @owned $B):
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'value_different_subobject_kinds_multiple_levels'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %1 = begin_borrow %0 : $B
 // CHECK: Consuming User:   end_borrow %1 : $B
 // CHECK: Non Consuming User:   %6 = tuple_extract %4 : $(Builtin.NativeObject, Builtin.NativeObject), 1

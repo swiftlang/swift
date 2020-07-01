@@ -1,4 +1,4 @@
-silopt_register_sources(
+target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementSelection.cpp
   AccessMarkerElimination.cpp
   AddressLowering.cpp
@@ -12,7 +12,6 @@ silopt_register_sources(
   DiagnoseStaticExclusivity.cpp
   DiagnoseUnreachable.cpp
   Differentiation.cpp
-  GuaranteedARCOpts.cpp
   IRGenPrepare.cpp
   MandatoryInlining.cpp
   PredictableMemOpt.cpp
@@ -22,5 +21,4 @@ silopt_register_sources(
   YieldOnceCheck.cpp
   MandatoryCombine.cpp
   OSLogOptimization.cpp
-  OwnershipModelEliminator.cpp
-)
+  OwnershipModelEliminator.cpp)

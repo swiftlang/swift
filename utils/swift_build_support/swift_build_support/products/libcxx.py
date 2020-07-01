@@ -10,8 +10,21 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import llvm
 from . import product
 
 
 class LibCXX(product.Product):
-    pass
+    @classmethod
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM]

@@ -22,7 +22,6 @@
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Mutex.h"
@@ -58,7 +57,6 @@ namespace swift {
   class SerializationOptions;
   class SILOptions;
   class SILModule;
-  class SILParserTUState;
   class SourceFile;
   enum class SourceFileKind;
   class SourceManager;
@@ -73,17 +71,6 @@ namespace swift {
   namespace Lowering {
     class TypeConverter;
   }
-
-  /// Used to optionally maintain SIL parsing context for the parser.
-  ///
-  /// When not parsing SIL, this has no overhead.
-  class SILParserState {
-  public:
-    std::unique_ptr<SILParserTUState> Impl;
-
-    explicit SILParserState(SILModule *M);
-    ~SILParserState();
-  };
 
   /// @{
 
@@ -152,14 +139,6 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
-  /// Checks to see if any of the imports in \p M use `@_implementationOnly` in
-  /// one file and not in another.
-  ///
-  /// Like redeclaration checking, but for imports. This isn't part of
-  /// swift::performWholeModuleTypeChecking because it's linear in the number
-  /// of declarations in the module.
-  void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
-
   /// Recursively validate the specified type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
@@ -192,13 +171,13 @@ namespace swift {
   /// The module must contain source files. The optimizer will assume that the
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
-                       const SILOptions &options);
+  performASTLowering(ModuleDecl *M, Lowering::TypeConverter &TC,
+                     const SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
-                       const SILOptions &options);
+  performASTLowering(FileUnit &SF, Lowering::TypeConverter &TC,
+                     const SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 

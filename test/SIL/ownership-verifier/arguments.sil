@@ -237,7 +237,7 @@ bb5:
 // Make sure that we only flag the end_borrow "use after free" in bb2.
 //
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'bad_order'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject
@@ -273,7 +273,7 @@ bb5:
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'bad_order_add_a_level'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject
@@ -329,9 +329,8 @@ bb5:
 // from uses that are not reachable from the definition of the value.
 //
 // CHECK-LABEL: Error#: 5. Begin Error in Function: 'bad_order_add_a_level'
-// CHECK: Found outside of lifetime uses!
+// CHECK: Found outside of lifetime use!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %9, %7
-// CHECK: User List:
 // CHECK: User:  %9 = begin_borrow %5 : $Builtin.NativeObject    // user: %10
 // CHECK: Block: bb3
 // CHECK: Error#: 5. End Error in Function: 'bad_order_add_a_level'
@@ -386,7 +385,7 @@ bb7:
 //
 //
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'bad_order_add_a_level_2'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %22, %16, %12, %6, %3
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject           // id: %6
 // CHECK: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %7
@@ -394,7 +393,7 @@ bb7:
 // CHECK: Error#: 0. End Error in Function: 'bad_order_add_a_level_2'
 //
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'bad_order_add_a_level_2'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %22, %16, %12, %6, %3
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject           // id: %12
 // CHECK: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %13
@@ -402,7 +401,7 @@ bb7:
 // CHECK: Error#: 1. End Error in Function: 'bad_order_add_a_level_2'
 //
 // CHECK-LABEL: Error#: 2. Begin Error in Function: 'bad_order_add_a_level_2'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %22, %16, %12, %6, %3
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject           // id: %16
 // CHECK: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %17
@@ -435,7 +434,7 @@ bb7:
 // CHECK: Error#: 4. End Error in Function: 'bad_order_add_a_level_2'
 //
 // CHECK-LABEL: Error#: 5. Begin Error in Function: 'bad_order_add_a_level_2'
-// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Found outside of lifetime use?!
 // CHECK-NEXT: Value: %5 = argument of bb2 : $Builtin.NativeObject
 // CHECK-NEXT: Consuming User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Non Consuming User:   end_borrow %11 : $Builtin.NativeObject
@@ -614,12 +613,9 @@ bb3:
 // begin_borrow.
 //
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'simple_loop_carry_implicitregularusers_do_not_loop_carry'
-// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
-// CHECK-NEXT: Value:   %8 = copy_value %4 : $Builtin.NativeObject      // users: %12, %9
-// CHECK-NEXT:     Remaining Users:
-// CHECK-NEXT: User:   %9 = begin_borrow %8 : $Builtin.NativeObject    // user: %12
-// CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject           // id: %13
-// CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject           // id: %10
+// CHECK: Found non consuming use outside of the lifetime being verified.
+// CHECK: Value:   %8 = copy_value %4 : $Builtin.NativeObject      // users: %12, %9
+// CHECK: User:   end_borrow %4 : $Builtin.NativeObject           // id: %13
 // CHECK: Error#: 0. End Error in Function: 'simple_loop_carry_implicitregularusers_do_not_loop_carry'
 //
 // CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'simple_loop_carry_implicitregularusers_do_not_loop_carry'
@@ -669,7 +665,7 @@ bb3:
 // borrowed from, %5.
 //
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'simple_loop_carry_over_consume'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %11, %10, %8
 // CHECK: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
 // CHECK: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
@@ -680,7 +676,7 @@ bb3:
 // amount of circularity here. The important thing is we flag it.
 //
 // CHECK-LABEL: Error#: 2. Begin Error in Function: 'simple_loop_carry_over_consume'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %11, %10, %8
 // CHECK: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
 // CHECK: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %12
@@ -747,7 +743,7 @@ bb3:
 // This is slightly non-sensical since we are feeding the verifier broken SIL.
 //
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
-// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Found outside of lifetime use?!
 // CHECK-NEXT: Value: %5 = argument of bb1 : $Builtin.NativeObject      // users: %11, %10, %8
 // CHECK-NEXT: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
 // CHECK-NEXT: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
@@ -759,7 +755,7 @@ bb3:
 // consuming %3 via the loop carry.
 //
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %5 = argument of bb1 : $Builtin.NativeObject      // users: %11, %10, %8
 // CHECK: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
 // CHECK: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %12

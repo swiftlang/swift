@@ -117,8 +117,21 @@ private:
   /// Get the lowered SIL type of the given nominal type declaration.
   SILType getNominalDeclLoweredType(NominalTypeDecl *nominal);
 
-  /// Build a pullback struct value for the original block corresponding to the
-  /// given terminator.
+  // Creates a trampoline block for given original terminator instruction, the
+  // pullback struct value for its parent block, and a successor basic block.
+  //
+  // The trampoline block has the same arguments as and branches to the remapped
+  // successor block, but drops the last predecessor enum argument.
+  //
+  // Used for cloning branching terminator instructions with specific
+  // requirements on successor block arguments, where an additional predecessor
+  // enum argument is not acceptable.
+  SILBasicBlock *createTrampolineBasicBlock(TermInst *termInst,
+                                            StructInst *pbStructVal,
+                                            SILBasicBlock *succBB);
+
+  /// Build a pullback struct value for the given original terminator
+  /// instruction.
   StructInst *buildPullbackValueStructValue(TermInst *termInst);
 
   /// Build a predecessor enum instance using the given builder for the given
@@ -140,6 +153,12 @@ public:
   void visitSwitchEnumInst(SwitchEnumInst *sei);
 
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai);
+
+  void visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi);
+
+  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *ccvbi);
+
+  void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi);
 
   // If an `apply` has active results or active inout arguments, replace it
   // with an `apply` of its VJP.

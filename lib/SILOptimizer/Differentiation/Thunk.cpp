@@ -237,7 +237,6 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
     interfaceErrorResult = errorResult.map(mapTypeOutOfContext);
-    ;
   }
 
   // The type of the thunk function.
@@ -330,7 +329,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Convert direct result to indirect result.
     // Increment thunk argument iterator; reabstraction handled later.
-    toArgIter++;
+    ++toArgIter;
   }
 
   // Reabstract parameters.
@@ -381,6 +380,23 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   for (unsigned resIdx : range(toType->getNumResults())) {
     auto fromRes = fromConv.getResults()[resIdx];
     auto toRes = toConv.getResults()[resIdx];
+    // Check function-typed results.
+    if (isa<SILFunctionType>(fromRes.getInterfaceType()) &&
+        isa<SILFunctionType>(toRes.getInterfaceType())) {
+      auto fromFnType = cast<SILFunctionType>(fromRes.getInterfaceType());
+      auto toFnType = cast<SILFunctionType>(toRes.getInterfaceType());
+      auto fromUnsubstFnType = fromFnType->getUnsubstitutedType(module);
+      auto toUnsubstFnType = toFnType->getUnsubstitutedType(module);
+      // If unsubstituted function types are not equal, perform reabstraction.
+      if (fromUnsubstFnType != toUnsubstFnType) {
+        auto fromFn = *fromDirResultsIter++;
+        auto newFromFn = reabstractFunction(
+            builder, fb, loc, fromFn, toFnType,
+            [](SubstitutionMap substMap) { return substMap; });
+        results.push_back(newFromFn);
+        continue;
+      }
+    }
     // No abstraction mismatch.
     if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
       // If result types are direct, add call result as direct thunk result.
@@ -562,7 +578,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     unsigned indexInBitVec = 0;
     for (auto index : actualIndices.parameters->getIndices()) {
       actualParamIndicesMap[index] = indexInBitVec;
-      indexInBitVec++;
+      ++indexInBitVec;
     }
   }
   auto mapOriginalParameterIndex = [&](unsigned index) -> unsigned {
@@ -622,7 +638,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
         continue;
       auto resultInfo = linearMapType->getResults()[pullbackResultIndex];
       assert(pullbackResultIndex < linearMapType->getNumResults());
-      pullbackResultIndex++;
+      ++pullbackResultIndex;
       // Skip pullback direct results. Only indirect results are relevant as
       // arguments.
       if (resultInfo.isFormalDirect())
@@ -725,7 +741,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffDerivativeFunctionType(
-      desiredIndices.parameters, desiredIndices.source, kind, module.Types,
+      desiredIndices.parameters, desiredIndices.results, kind, module.Types,
       lookupConformance);
   auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {

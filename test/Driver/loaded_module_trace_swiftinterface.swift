@@ -1,4 +1,5 @@
 // UNSUPPORTED: -windows-msvc
+// REQUIRES: SR13034
 
 // 1) If there is no swiftmodule, use the swiftinterface
 //

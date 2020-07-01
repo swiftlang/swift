@@ -288,8 +288,35 @@ void CompilerInstance::setupDiagnosticVerifierIfNeeded() {
   }
 }
 
+void CompilerInstance::setupDependencyTrackerIfNeeded() {
+  assert(!Context && "Must be called before the ASTContext is created");
+
+  const auto &Invocation = getInvocation();
+  const auto &opts = Invocation.getFrontendOptions();
+
+  // Note that we may track dependencies even when we don't need to write them
+  // directly; in particular, -track-system-dependencies affects how module
+  // interfaces get loaded, and so we need to be consistently tracking system
+  // dependencies throughout the compiler.
+  auto collectionMode = opts.IntermoduleDependencyTracking;
+  if (!collectionMode) {
+    // If we have an output path specified, but no other tracking options,
+    // default to non-system dependency tracking.
+    if (opts.InputsAndOutputs.hasDependencyTrackerPath() ||
+        !opts.IndexStorePath.empty()) {
+      collectionMode = IntermoduleDepTrackingMode::ExcludeSystem;
+    }
+  }
+  if (!collectionMode)
+    return;
+
+  DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
+
+  setupDependencyTrackerIfNeeded();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
@@ -298,32 +325,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
-  const auto &frontendOpts = Invocation.getFrontendOptions();
-
-  // If we are asked to emit a module documentation file, configure lexing and
-  // parsing to remember comments.
-  if (frontendOpts.InputsAndOutputs.hasModuleDocOutputPath())
-    Invocation.getLangOptions().AttachCommentsToDecls = true;
-
-  // If we are doing index-while-building, configure lexing and parsing to
-  // remember comments.
-  if (!frontendOpts.IndexStorePath.empty()) {
-    Invocation.getLangOptions().AttachCommentsToDecls = true;
-  }
-
-  // Set up the type checker options.
-  auto &typeCkOpts = Invocation.getTypeCheckerOptions();
-  if (isWholeModuleCompilation()) {
-    typeCkOpts.DelayWholeModuleChecking = true;
-  }
-  if (FrontendOptions::isActionImmediate(frontendOpts.RequestedAction)) {
-    typeCkOpts.InImmediateMode = true;
-  }
-
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
-
-  if (isInSILMode())
-    Invocation.getLangOptions().EnableAccessControl = false;
 
   if (setUpInputs())
     return true;
@@ -475,17 +477,28 @@ bool CompilerInstance::setUpModuleLoaders() {
     return true;
   }
 
+  // If implicit modules are disabled, we need to install an explicit module
+  // loader.
+  if (Invocation.getFrontendOptions().DisableImplicitModules) {
+    auto ESML = ExplicitSwiftModuleLoader::create(
+        *Context,
+        getDependencyTracker(), MLM,
+        Invocation.getSearchPathOptions().ExplicitSwiftModules,
+        Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+        IgnoreSourceInfoFile);
+    Context->addModuleLoader(std::move(ESML));
+  }
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
     auto &FEOpts = Invocation.getFrontendOptions();
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
+    ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface,
-        IgnoreSourceInfoFile,
-        FEOpts.DisableInterfaceFileLock);
+        LoaderOpts,
+        IgnoreSourceInfoFile);
     Context->addModuleLoader(std::move(PIML));
   }
 
@@ -512,6 +525,12 @@ Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
                                      codeCompletePoint.second);
   }
   return codeCompletionBufferID;
+}
+
+SourceFile *CompilerInstance::getCodeCompletionFile() const {
+  auto *mod = getMainModule();
+  auto &eval = mod->getASTContext().evaluator;
+  return evaluateOrDefault(eval, CodeCompletionFileRequest{mod}, nullptr);
 }
 
 static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
@@ -693,8 +712,8 @@ bool CompilerInvocation::shouldImportSwiftONoneSupport() const {
   // This optimization is disabled by -track-system-dependencies to preserve
   // the explicit dependency.
   const auto &options = getFrontendOptions();
-  return options.TrackSystemDeps
-      || FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
+  return options.shouldTrackSystemDependencies() ||
+         FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
@@ -714,10 +733,42 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   return imports;
 }
 
+bool CompilerInstance::createFilesForMainModule(
+    ModuleDecl *mod, SmallVectorImpl<FileUnit *> &files) const {
+  // Make sure the main file is the first file in the module.
+  if (MainBufferID != NO_SUCH_BUFFER) {
+    auto *mainFile = createSourceFileForMainModule(
+        mod, Invocation.getSourceFileKind(), MainBufferID);
+    files.push_back(mainFile);
+  }
+
+  // If we have partial modules to load, do so now, bailing if any failed to
+  // load.
+  if (!PartialModules.empty()) {
+    if (loadPartialModulesAndImplicitImports(mod, files))
+      return true;
+  }
+
+  // Finally add the library files.
+  // FIXME: This is the only demand point for InputSourceCodeBufferIDs. We
+  // should compute this list of source files lazily.
+  for (auto BufferID : InputSourceCodeBufferIDs) {
+    // Skip the main buffer, we've already handled it.
+    if (BufferID == MainBufferID)
+      continue;
+
+    auto *libraryFile =
+        createSourceFileForMainModule(mod, SourceFileKind::Library, BufferID);
+    files.push_back(libraryFile);
+  }
+  return false;
+}
+
 ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = ModuleDecl::create(ID, *Context, getImplicitImportInfo());
+    MainModule = ModuleDecl::createMainModule(*Context, ID,
+                                              getImplicitImportInfo());
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
     if (Invocation.getFrontendOptions().EnablePrivateImports)
@@ -727,60 +778,58 @@ ModuleDecl *CompilerInstance::getMainModule() const {
 
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+
+    // Register the main module with the AST context.
+    Context->addLoadedModule(MainModule);
+
+    // Create and add the module's files.
+    SmallVector<FileUnit *, 16> files;
+    if (!createFilesForMainModule(MainModule, files)) {
+      for (auto *file : files)
+        MainModule->addFile(*file);
+    } else {
+      // If we failed to load a partial module, mark the main module as having
+      // "failed to load", as it will contain no files. Note that we don't try
+      // to add any of the successfully loaded partial modules. This ensures
+      // that we don't encounter cases where we try to resolve a cross-reference
+      // into a partial module that failed to load.
+      MainModule->setFailedToLoad();
+    }
   }
   return MainModule;
 }
 
+void CompilerInstance::setMainModule(ModuleDecl *newMod) {
+  assert(newMod->isMainModule());
+  MainModule = newMod;
+  Context->addLoadedModule(newMod);
+}
+
 void CompilerInstance::performParseAndResolveImportsOnly() {
-  performSemaUpTo(SourceFile::ImportsResolved);
-}
+  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
 
-void CompilerInstance::performSema() {
-  performSemaUpTo(SourceFile::TypeChecked);
-}
-
-void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
-  assert(LimitStage > SourceFile::Unprocessed);
-
-  FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
-
-  ModuleDecl *mainModule = getMainModule();
-  Context->LoadedModules[mainModule->getName()] = mainModule;
-
-  if (Invocation.getImplicitStdlibKind() == ImplicitStdlibKind::Stdlib) {
-    if (!loadStdlib())
-      return;
+  // Resolve imports for all the source files.
+  auto *mainModule = getMainModule();
+  for (auto *file : mainModule->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file))
+      performImportResolution(*SF);
   }
 
-  // Force loading implicit imports. This is currently needed to allow
-  // deserialization to resolve cross references into bridging headers.
-  // FIXME: Once deserialization loads all the modules it needs for cross
-  // references, this can be removed.
-  (void)MainModule->getImplicitImports();
-
-  // Make sure the main file is the first file in the module, so do this now.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    (void)createSourceFileForMainModule(Invocation.getSourceFileKind(),
-                                        MainBufferID);
-  }
-
-  bool hadLoadError = parsePartialModulesAndInputFiles();
-  if (hadLoadError)
-    return;
-
-  assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
+  assert(llvm::all_of(mainModule->getFiles(), [](const FileUnit *File) -> bool {
     auto *SF = dyn_cast<SourceFile>(File);
     if (!SF)
       return true;
     return SF->ASTStage >= SourceFile::ImportsResolved;
   }) && "some files have not yet had their imports resolved");
-  MainModule->setHasResolvedImports();
+  mainModule->setHasResolvedImports();
 
-  bindExtensions(*MainModule);
+  bindExtensions(*mainModule);
+}
 
-  // If the limiting AST stage is import resolution, we're done.
-  if (LimitStage == SourceFile::ImportsResolved)
-    return;
+void CompilerInstance::performSema() {
+  performParseAndResolveImportsOnly();
+
+  FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
@@ -789,93 +838,103 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   finishTypeChecking();
 }
 
-bool CompilerInstance::loadStdlib() {
+bool CompilerInstance::loadStdlibIfNeeded() {
+  // If we aren't expecting an implicit stdlib import, there's nothing to do.
+  if (getImplicitImportInfo().StdlibKind != ImplicitStdlibKind::Stdlib)
+    return false;
+
   FrontendStatsTracer tracer(getStatsReporter(), "load-stdlib");
-  ModuleDecl *M = Context->getStdlibModule(true);
+  ModuleDecl *M = Context->getStdlibModule(/*loadIfAbsent*/ true);
 
   if (!M) {
     Diagnostics.diagnose(SourceLoc(), diag::error_stdlib_not_found,
                          Invocation.getTargetTriple());
-    return false;
+    return true;
   }
 
-  // If we failed to load, we should have already diagnosed
+  // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {
     assert(Diagnostics.hadAnyError() &&
            "Module failed to load but nothing was diagnosed?");
-    return false;
+    return true;
   }
-  return true;
+  return false;
 }
 
-bool CompilerInstance::parsePartialModulesAndInputFiles() {
+bool CompilerInstance::loadPartialModulesAndImplicitImports(
+    ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const {
   FrontendStatsTracer tracer(getStatsReporter(),
-                             "parse-partial-modules-and-input-files");
+                             "load-partial-modules-and-implicit-imports");
+  // Force loading implicit imports. This is currently needed to allow
+  // deserialization to resolve cross references into bridging headers.
+  // FIXME: Once deserialization loads all the modules it needs for cross
+  // references, this can be removed.
+  (void)mod->getImplicitImports();
+
+  // Load in the partial modules.
   bool hadLoadError = false;
-  // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
-    if (!SML->loadAST(*MainModule, SourceLoc(), /*moduleInterfacePath*/"",
-                      std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
-                      std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false,
-                      /*treatAsPartialModule*/true))
-      hadLoadError = true;
-  }
-
-  // Then parse all the input files.
-  for (auto BufferID : InputSourceCodeBufferIDs) {
-    SourceFile *SF;
-    if (BufferID == MainBufferID) {
-      // If this is the main file, we've already created it.
-      SF = &getMainModule()->getMainSourceFile(Invocation.getSourceFileKind());
+    auto *file =
+        SML->loadAST(*mod, /*diagLoc*/ SourceLoc(), /*moduleInterfacePath*/ "",
+                     std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
+                     std::move(PM.ModuleSourceInfoBuffer),
+                     /*isFramework*/ false);
+    if (file) {
+      partialModules.push_back(file);
     } else {
-      // Otherwise create a library file.
-      SF = createSourceFileForMainModule(SourceFileKind::Library, BufferID);
+      hadLoadError = true;
     }
-    // Import resolution will lazily trigger parsing of the file.
-    performImportResolution(*SF);
   }
   return hadLoadError;
-}
-
-static void
-forEachSourceFileIn(ModuleDecl *module,
-                    llvm::function_ref<void(SourceFile &)> fn) {
-  for (auto fileName : module->getFiles()) {
-    if (auto SF = dyn_cast<SourceFile>(fileName))
-      fn(*SF);
-  }
 }
 
 void CompilerInstance::forEachFileToTypeCheck(
     llvm::function_ref<void(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
-    forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
+    for (auto fileName : getMainModule()->getFiles()) {
+      auto *SF = dyn_cast<SourceFile>(fileName);
+      if (!SF) {
+        continue;
+      }
+      fn(*SF);
+    }
   } else {
-    for (auto *SF : PrimarySourceFiles) {
+    for (auto *SF : getPrimarySourceFiles()) {
       fn(*SF);
     }
   }
 }
 
 void CompilerInstance::finishTypeChecking() {
-  if (getASTContext().TypeCheckerOpts.DelayWholeModuleChecking) {
-    forEachSourceFileIn(MainModule, [&](SourceFile &SF) {
-      performWholeModuleTypeChecking(SF);
-    });
-  }
-
-  checkInconsistentImplementationOnlyImports(MainModule);
+  forEachFileToTypeCheck([](SourceFile &SF) {
+    performWholeModuleTypeChecking(SF);
+  });
 }
 
-SourceFile *CompilerInstance::createSourceFileForMainModule(
-    SourceFileKind fileKind, Optional<unsigned> bufferID,
-    SourceFile::ParsingOptions opts) {
-  ModuleDecl *mainModule = getMainModule();
+SourceFile::ParsingOptions
+CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto action = frontendOpts.RequestedAction;
 
-  auto isPrimary = bufferID && isPrimaryInput(*bufferID);
-  if (isPrimary || isWholeModuleCompilation()) {
-    // Disable delayed body parsing for primaries.
+  auto opts = SourceFile::getDefaultParsingOptions(getASTContext().LangOpts);
+  if (FrontendOptions::shouldActionOnlyParse(action)) {
+    // Generally in a parse-only invocation, we want to disable #if evaluation.
+    // However, there are a couple of modes where we need to know which clauses
+    // are active.
+    if (action != FrontendOptions::ActionType::EmitImportedModules &&
+        action != FrontendOptions::ActionType::ScanDependencies) {
+      opts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
+    }
+
+    // If we need to dump the parse tree, disable delayed bodies as we want to
+    // show everything.
+    if (action == FrontendOptions::ActionType::DumpParse)
+      opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+  }
+
+  if (forPrimary || isWholeModuleCompilation()) {
+    // Disable delayed body parsing for primaries and in WMO.
     opts |= SourceFile::ParsingFlags::DisableDelayedBodies;
   } else {
     // Suppress parse warnings for non-primaries, as they'll get parsed multiple
@@ -883,70 +942,27 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
     opts |= SourceFile::ParsingFlags::SuppressWarnings;
   }
 
-  SourceFile *inputFile = new (*Context)
-      SourceFile(*mainModule, fileKind, bufferID,
-                 Invocation.getLangOptions().CollectParsedToken,
-                 Invocation.getLangOptions().BuildSyntaxTree, opts);
-  MainModule->addFile(*inputFile);
-
-  if (isPrimary) {
-    PrimarySourceFiles.push_back(inputFile);
-    inputFile->enableInterfaceHash();
-    inputFile->createReferencedNameTracker();
+  // Enable interface hash computation for primaries, but not in WMO, as it's
+  // only currently needed for incremental mode.
+  if (forPrimary) {
+    opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
-
-  if (bufferID == SourceMgr.getCodeCompletionBufferID()) {
-    assert(!CodeCompletionFile && "Multiple code completion files?");
-    CodeCompletionFile = inputFile;
-  }
-
-  return inputFile;
+  return opts;
 }
 
-void CompilerInstance::performParseOnly(bool EvaluateConditionals,
-                                        bool CanDelayBodies) {
-  const InputFileKind Kind = Invocation.getInputKind();
-  ModuleDecl *const MainModule = getMainModule();
-  Context->LoadedModules[MainModule->getName()] = MainModule;
+SourceFile *CompilerInstance::createSourceFileForMainModule(
+    ModuleDecl *mod, SourceFileKind fileKind,
+    Optional<unsigned> bufferID) const {
+  auto isPrimary = bufferID && isPrimaryInput(*bufferID);
+  auto opts = getSourceFileParsingOptions(isPrimary);
 
-  assert((Kind == InputFileKind::Swift ||
-          Kind == InputFileKind::SwiftLibrary ||
-          Kind == InputFileKind::SwiftModuleInterface) &&
-         "only supports parsing .swift files");
-  (void)Kind;
+  auto *inputFile = new (*Context)
+      SourceFile(*mod, fileKind, bufferID, opts, isPrimary);
 
-  SourceFile::ParsingOptions parsingOpts;
-  if (!EvaluateConditionals)
-    parsingOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
-  if (!CanDelayBodies)
-    parsingOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+  if (bufferID == MainBufferID)
+    inputFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
-  // Make sure the main file is the first file in the module.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == InputFileKind::Swift ||
-           Kind == InputFileKind::SwiftModuleInterface);
-    auto *mainFile = createSourceFileForMainModule(
-        Invocation.getSourceFileKind(), MainBufferID, parsingOpts);
-    mainFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
-  }
-
-  // Parse all of the input files.
-  for (auto bufferID : InputSourceCodeBufferIDs) {
-    SourceFile *SF;
-    if (bufferID == MainBufferID) {
-      // If this is the main file, we've already created it.
-      SF = &MainModule->getMainSourceFile(Invocation.getSourceFileKind());
-    } else {
-      // Otherwise create a library file.
-      SF = createSourceFileForMainModule(SourceFileKind::Library, bufferID,
-                                         parsingOpts);
-    }
-    // Force the parsing of the top level decls.
-    (void)SF->getTopLevelDecls();
-  }
-
-  assert(Context->LoadedModules.size() == 1 &&
-         "Loaded a module during parse-only");
+  return inputFile;
 }
 
 void CompilerInstance::freeASTContext() {
@@ -956,7 +972,6 @@ void CompilerInstance::freeASTContext() {
   SML = nullptr;
   MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
-  PrimarySourceFiles.clear();
 }
 
 /// Perform "stable" optimizations that are invariant across compiler versions.
@@ -1014,7 +1029,7 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time, via the dense maps.
   C.NumSILOptFunctions += Module.getFunctionList().size();
-  C.NumSILOptVtables += Module.getVTableList().size();
+  C.NumSILOptVtables += Module.getVTables().size();
   C.NumSILOptWitnessTables += Module.getWitnessTableList().size();
   C.NumSILOptDefaultWitnessTables += Module.getDefaultWitnessTableList().size();
   C.NumSILOptGlobalVariables += Module.getSILGlobalList().size();

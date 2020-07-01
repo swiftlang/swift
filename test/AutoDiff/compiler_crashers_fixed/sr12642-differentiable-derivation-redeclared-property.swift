@@ -16,10 +16,12 @@ struct Generic<T> {}
 extension Generic: Differentiable where T: Differentiable {}
 
 struct WrappedProperties: Differentiable {
-  // expected-note @+2 {{'int' previously declared here}}
-  // expected-warning @+1 {{stored property 'int' has no derivative because 'Generic<Int>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
   @Wrapper var int: Generic<Int>
+  // expected-note@-1 {{'int' previously declared here}}
+  // expected-note@-2 {{'_int' synthesized for property wrapper backing storage}}
+  // expected-warning@-3 {{stored property 'int' has no derivative because 'Generic<Int>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
 
-  // expected-error @+1 {{invalid redeclaration of 'int'}}
   @Wrapper var int: Generic<Int>
+  // expected-error@-1 {{invalid redeclaration of 'int'}}
+  // expected-error@-2 {{invalid redeclaration of synthesized property '_int'}}
 }

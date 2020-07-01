@@ -64,14 +64,13 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
     // Collect the applies for this block in reverse order so that we
     // can pop them off the end of our vector and process them in
     // forward order.
-    for (auto It = BB.rbegin(), End = BB.rend(); It != End; ++It) {
-      auto *I = &*It;
+    for (auto &I : llvm::reverse(BB)) {
 
       // Skip non-apply instructions, apply instructions with no
       // substitutions, apply instructions where we do not statically
       // know the called function, and apply instructions where we do
       // not have the body of the called function.
-      ApplySite Apply = ApplySite::isa(I);
+      ApplySite Apply = ApplySite::isa(&I);
       if (!Apply || !Apply.hasSubstitutions())
         continue;
 
@@ -81,7 +80,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       if (!Callee->isDefinition()) {
         ORE.emit([&]() {
           using namespace OptRemark;
-          return RemarkMissed("NoDef", *I)
+          return RemarkMissed("NoDef", I)
                  << "Unable to specialize generic function "
                  << NV("Callee", Callee) << " since definition is not visible";
         });

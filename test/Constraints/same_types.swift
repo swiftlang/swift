@@ -89,15 +89,14 @@ func test6<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y {
 }
 
 func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
-	// expected-warning@-1{{redundant same-type constraint 'T.Bar.Foo' == 'X'}}
-        // expected-note@-2{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+	// expected-warning@-1{{neither type in same-type constraint ('Y.Foo' (aka 'X') or 'X') refers to a generic parameter or associated type}}
   return (t.bar, t.bar.foo)
 }
 
 func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   where
-  T.Bar == Y, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
-  T.Bar.Foo == Z { // expected-error{{'T.Bar.Foo' cannot be equal to both 'Z' and 'Y.Foo' (aka 'X')}}
+  T.Bar == Y,
+  T.Bar.Foo == Z { // expected-error{{generic signature requires types 'Y.Foo' (aka 'X') and 'Z' to be the same}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 

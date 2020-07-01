@@ -115,10 +115,10 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // then delete them.
       for (auto *Inst : RetainList) {
         Inst->eraseFromParent();
-        NumRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        ++NumRetainReleasesEliminatedByMergingIntoRetainReleaseN;
       }
 
-      NumRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      --NumRetainReleasesEliminatedByMergingIntoRetainReleaseN;
     }
     RetainList.clear();
 
@@ -140,10 +140,10 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Remove all old release instructions.
       for (auto *Inst : ReleaseList) {
         Inst->eraseFromParent();
-        NumRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        ++NumRetainReleasesEliminatedByMergingIntoRetainReleaseN;
       }
 
-      NumRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      --NumRetainReleasesEliminatedByMergingIntoRetainReleaseN;
     }
     ReleaseList.clear();
 
@@ -166,10 +166,10 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // then delete them.
       for (auto *Inst : UnknownObjectRetainList) {
         Inst->eraseFromParent();
-        NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        ++NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN;
       }
 
-      NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      --NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN;
     }
     UnknownObjectRetainList.clear();
 
@@ -193,10 +193,10 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Remove all old release instructions.
       for (auto *Inst : UnknownObjectReleaseList) {
         Inst->eraseFromParent();
-        NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        ++NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN;
       }
 
-      NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      --NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN;
     }
     UnknownObjectReleaseList.clear();
 
@@ -226,10 +226,10 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
         B.setInsertPoint(Inst);
         Inst->replaceAllUsesWith(B.maybeCast(I, Inst->getType()));
         Inst->eraseFromParent();
-        NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        ++NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN;
       }
 
-      NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      --NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN;
     }
     BridgeRetainList.clear();
 
@@ -252,10 +252,10 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Remove all old release instructions.
       for (auto *Inst : BridgeReleaseList) {
         Inst->eraseFromParent();
-        NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        ++NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN;
       }
 
-      NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      --NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN;
     }
     BridgeReleaseList.clear();
   }

@@ -39,6 +39,7 @@
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -557,7 +558,7 @@ public:
   
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool allowsOwnership(GenericSignatureImpl *sig = nullptr);
+  bool allowsOwnership(const GenericSignatureImpl *sig = nullptr);
 
   /// Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
@@ -851,7 +852,17 @@ public:
   /// \returns The superclass of this type, or a null type if it has no
   ///          superclass.
   Type getSuperclass(bool useArchetypes = true);
-  
+
+  /// Retrieve the root class of this type by repeatedly retrieving the
+  /// superclass.
+  ///
+  /// \param useArchetypes Whether to use context archetypes for outer generic
+  /// parameters if the class is nested inside a generic function.
+  ///
+  /// \returns The base class of this type, or this type itself if it has no
+  ///          superclasses.
+  Type getRootClass(bool useArchetypes = true);
+
   /// True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.
@@ -1802,13 +1813,10 @@ public:
     return *getTrailingObjects<SubstitutionMap>();
   }
 
-  /// Get the innermost generic arguments, which correspond to the generic
-  /// arguments that are directly applied to the typealias declaration in
-  /// produced by \c getDecl().
-  ///
-  /// The result can be empty, if the declaration itself is non-generic but
-  /// the parent is generic.
-  SmallVector<Type, 2> getInnermostGenericArgs() const;
+  /// Get the direct generic arguments, which correspond to the generic
+  /// arguments that are directly applied to the typealias declaration
+  /// this type references.
+  ArrayRef<Type> getDirectGenericArgs() const;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -2695,10 +2703,10 @@ enum class FunctionTypeRepresentation : uint8_t {
   /// A "thin" function that needs no context.
   Thin,
   
-  /// A C function pointer, which is thin and also uses the C calling
-  /// convention.
+  /// A C function pointer (or reference), which is thin and also uses the C
+  /// calling convention.
   CFunctionPointer,
-  
+
   /// The value of the greatest AST function representation.
   Last = CFunctionPointer,
 };
@@ -2877,6 +2885,10 @@ public:
 
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
 
+    Param withLabel(Identifier newLabel) const {
+      return Param(Ty, newLabel, Flags);
+    }
+
     Param withType(Type newType) const { return Param(newType, Label, Flags); }
 
     Param withFlags(ParameterTypeFlags flags) const {
@@ -2979,8 +2991,8 @@ public:
       // We preserve a full clang::Type *, not a clang::FunctionType * as:
       // 1. We need to keep sugar in case we need to present an error to the user.
       // 2. The actual type being stored is [ignoring sugar] either a
-      //    clang::PointerType or a clang::BlockPointerType which points to a
-      //    clang::FunctionType.
+      //    clang::PointerType, a clang::BlockPointerType, or a
+      //    clang::ReferenceType which points to a clang::FunctionType.
       const clang::Type *ClangFunctionType;
 
       bool empty() const { return !ClangFunctionType; }
@@ -3350,7 +3362,7 @@ public:
   /// first. `makeSelfParamFirst` should be true when working with user-facing
   /// derivative function types, e.g. when type-checking `@differentiable` and
   /// `@derivative` attributes.
-  AnyFunctionType *getAutoDiffDerivativeFunctionLinearMapType(
+  llvm::Expected<AnyFunctionType *> getAutoDiffDerivativeFunctionLinearMapType(
       IndexSubset *parameterIndices, AutoDiffLinearMapKind kind,
       LookupConformanceFn lookupConformance, bool makeSelfParamFirst = false);
 
@@ -3931,13 +3943,34 @@ inline bool isIndirectFormalResult(ResultConvention convention) {
   return convention == ResultConvention::Indirect;
 }
 
+/// The differentiability of a SIL function type result.
+enum class SILResultDifferentiability : unsigned {
+  /// Either differentiable or not applicable.
+  ///
+  /// - If the function type is not `@differentiable`, result
+  ///   differentiability is not applicable. This case is the default value.
+  /// - If the function type is `@differentiable`, the function is
+  ///   differentiable with respect to this result.
+  DifferentiableOrNotApplicable,
+
+  /// Not differentiable: a `@noDerivative` result.
+  ///
+  /// May be applied only to result of `@differentiable` function types.
+  /// The function type is not differentiable with respect to this result.
+  NotDifferentiable,
+};
+
 /// A result type and the rules for returning it.
 class SILResultInfo {
   llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
+  SILResultDifferentiability Differentiability : 1;
+
 public:
   SILResultInfo() = default;
-  SILResultInfo(CanType type, ResultConvention conv)
-    : TypeAndConvention(type, conv) {
+  SILResultInfo(CanType type, ResultConvention conv,
+                SILResultDifferentiability differentiability =
+                    SILResultDifferentiability::DifferentiableOrNotApplicable)
+      : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILResultInfo has illegal SIL type");
   }
 
@@ -3958,6 +3991,17 @@ public:
   ResultConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
+
+  SILResultDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
+
+  SILResultInfo
+  getWithDifferentiability(SILResultDifferentiability differentiability) const {
+    return SILResultInfo(getInterfaceType(), getConvention(),
+                         differentiability);
+  }
+
   /// The SIL storage type determines the ABI for arguments based purely on the
   /// formal result conventions. The actual SIL type for the result values may
   /// differ in canonical SIL. In particular, opaque values require indirect
@@ -4014,6 +4058,7 @@ public:
 
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(TypeAndConvention.getOpaqueValue());
+    id.AddInteger((unsigned)getDifferentiability());
   }
 
   SWIFT_DEBUG_DUMP;
@@ -4703,24 +4748,31 @@ public:
   /// `@noDerivative` ones).
   IndexSubset *getDifferentiabilityParameterIndices();
 
+  /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
+  /// function type, returns an `IndexSubset` corresponding to the
+  /// differentiability/linearity results (e.g. all results except the
+  /// `@noDerivative` ones).
+  IndexSubset *getDifferentiabilityResultIndices();
+
   /// Returns the `@differentiable` or `@differentiable(linear)` function type
-  /// for the given differentiability kind and parameter indices representing
-  /// differentiability/linearity parameters.
+  /// for the given differentiability kind and differentiability/linearity
+  /// parameter/result indices.
   CanSILFunctionType getWithDifferentiability(DifferentiabilityKind kind,
-                                              IndexSubset *parameterIndices);
+                                              IndexSubset *parameterIndices,
+                                              IndexSubset *resultIndices);
 
   /// Returns the SIL function type stripping differentiability kind and
   /// differentiability from all parameters.
   CanSILFunctionType getWithoutDifferentiability();
 
   /// Returns the type of the derivative function for the given parameter
-  /// indices, result index, derivative function kind, derivative function
+  /// indices, result indices, derivative function kind, derivative function
   /// generic signature (optional), and other auxiliary parameters.
   ///
   /// Preconditions:
   /// - Parameters corresponding to parameter indices must conform to
   ///   `Differentiable`.
-  /// - The result corresponding to the result index must conform to
+  /// - Results corresponding to result indices must conform to
   ///   `Differentiable`.
   ///
   /// Typing rules, given:
@@ -4792,14 +4844,8 @@ public:
   ///     function - this is more direct. It may be possible to implement
   ///     reabstraction thunk derivatives using "reabstraction thunks for
   ///     the original function's derivative", avoiding extra code generation.
-  ///
-  /// Caveats:
-  /// - We may support multiple result indices instead of a single result index
-  ///   eventually. At the SIL level, this enables differentiating wrt multiple
-  ///   function results. At the Swift level, this enables differentiating wrt
-  ///   multiple tuple elements for tuple-returning functions.
   CanSILFunctionType getAutoDiffDerivativeFunctionType(
-      IndexSubset *parameterIndices, unsigned resultIndex,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,

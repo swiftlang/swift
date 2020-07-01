@@ -19,6 +19,7 @@
 #ifndef SWIFT_SEMANTICS_H
 #define SWIFT_SEMANTICS_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {

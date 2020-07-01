@@ -778,6 +778,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::YieldInst:
+  case SILInstructionKind::EndCOWMutationInst:
     return InlineCost::Free;
 
   case SILInstructionKind::AbortApplyInst:
@@ -869,6 +870,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::InitBlockStorageHeaderInst:
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::SelectEnumInst:

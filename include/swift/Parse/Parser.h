@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
@@ -35,7 +36,6 @@
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/References.h"
 #include "swift/Config.h"
-#include "llvm/ADT/SetVector.h"
 
 namespace llvm {
   template <typename...  PTs> class PointerUnion;
@@ -50,7 +50,7 @@ namespace swift {
   class Lexer;
   class ParsedTypeSyntax;
   class PersistentParserState;
-  class SILParserTUStateBase;
+  class SILParserStateBase;
   class ScopeInfo;
   class SourceManager;
   class TupleType;
@@ -93,8 +93,11 @@ public:
   /// This is called to update the kind of a token whose start location is Loc.
   virtual void registerTokenKindChange(SourceLoc Loc, tok NewKind) {};
 
-  /// This is called when a source file is fully parsed.
-  virtual void finalize() {};
+  /// This is called when a source file is fully parsed. It returns the
+  /// finalized vector of tokens, or \c None if the receiver isn't configured to
+  /// record them.
+  virtual Optional<std::vector<Token>> finalize() { return None; }
+
   virtual ~ConsumeTokenReceiver() = default;
 };
 
@@ -114,7 +117,7 @@ public:
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
-  SILParserTUStateBase *SIL; // Non-null when parsing SIL decls.
+  SILParserStateBase *SIL; // Non-null when parsing SIL decls.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
@@ -125,7 +128,10 @@ public:
   /// Tracks parsed decls that LLDB requires to be inserted at the top-level.
   std::vector<Decl *> ContextSwitchedTopLevelDecls;
 
-  NullablePtr<llvm::MD5> CurrentTokenHash;
+  /// The current token hash, or \c None if the parser isn't computing a hash
+  /// for the token stream.
+  Optional<llvm::MD5> CurrentTokenHash;
+
   void recordTokenHash(const Token Tok) {
     if (!Tok.getText().empty())
       recordTokenHash(Tok.getText());
@@ -396,14 +402,13 @@ public:
 
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
-         SILParserTUStateBase *SIL,
-         PersistentParserState *PersistentState,
+         SILParserStateBase *SIL, PersistentParserState *PersistentState,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
-  Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
+  Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-         SILParserTUStateBase *SIL = nullptr,
+         SILParserStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
          std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   ~Parser();
@@ -416,6 +421,14 @@ public:
   OpaqueSyntaxNode finalizeSyntaxTree() {
     assert(Tok.is(tok::eof) && "not done parsing yet");
     return SyntaxContext->finalizeRoot();
+  }
+
+  /// Retrieve the token receiver from the parser once it has finished parsing.
+  std::unique_ptr<ConsumeTokenReceiver> takeTokenReceiver() {
+    assert(Tok.is(tok::eof) && "not done parsing yet");
+    auto *receiver = TokReceiver;
+    TokReceiver = nullptr;
+    return std::unique_ptr<ConsumeTokenReceiver>(receiver);
   }
 
   //===--------------------------------------------------------------------===//
@@ -474,6 +487,9 @@ public:
       void receive(Token tok) override {
         delayedTokens.push_back(tok);
       }
+      Optional<std::vector<Token>> finalize() override {
+        llvm_unreachable("Cannot finalize a DelayedTokenReciever");
+      }
       ~DelayedTokenReceiver() {
         if (!shouldTransfer)
           return;
@@ -494,13 +510,7 @@ public:
     ~BacktrackingScope();
     bool willBacktrack() const { return Backtrack; }
 
-    void cancelBacktrack() {
-      Backtrack = false;
-      SynContext->setTransparent();
-      SynContext.reset();
-      DT.commit();
-      TempReceiver.shouldTransfer = true;
-    }
+    void cancelBacktrack();
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -936,9 +946,8 @@ public:
   std::pair<std::vector<Decl *>, Optional<std::string>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
-  bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                           SourceLoc PosBeforeLB,
-                           Diag<> ErrorDiag,
+  bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
+                           Diag<> LBraceDiag, Diag<> RBraceDiag,
                            IterableDeclContext *IDC);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
@@ -1365,8 +1374,7 @@ public:
   ParserResult<Pattern> parsePatternTuple();
   
   ParserResult<Pattern>
-  parseOptionalPatternTypeAnnotation(ParserResult<Pattern> P,
-                                     bool isOptional);
+  parseOptionalPatternTypeAnnotation(ParserResult<Pattern> P);
   ParserResult<Pattern> parseMatchingPattern(bool isExprBasic);
   ParserResult<Pattern> parseMatchingPatternAsLetOrVar(bool isLet,
                                                        SourceLoc VarLoc,

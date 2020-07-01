@@ -189,6 +189,12 @@ private:
     return getNodeHandler()(&node);
   }
 
+  Optional<SourceFileSyntax> realizeSyntaxRoot(OpaqueSyntaxNode root,
+                                               const SourceFile &SF) override {
+    // We don't support realizing syntax nodes from the C layout.
+    return None;
+  }
+
   void discardRecordedNode(OpaqueSyntaxNode node) override {
     // FIXME: This method should not be called at all.
   }

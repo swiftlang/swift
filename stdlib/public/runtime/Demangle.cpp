@@ -19,6 +19,7 @@
 #include "swift/Strings.h"
 
 #include <vector>
+#include <inttypes.h>
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -34,7 +35,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
   NodePointer node = nullptr;
 
   // Walk up the context tree.
-  SmallVector<const ContextDescriptor *, 8> descriptorPath;
+  llvm::SmallVector<const ContextDescriptor *, 8> descriptorPath;
   {
     const ContextDescriptor *parent = context;
     while (parent) {
@@ -285,11 +286,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 
   // Gather the complete set of generic arguments that must be written to
   // form this type.
-  SmallVector<const Metadata *, 8> allGenericArgs;
+  llvm::SmallVector<const Metadata *, 8> allGenericArgs;
   gatherWrittenGenericArgs(type, description, allGenericArgs, Dem);
 
   // Demangle the generic arguments.
-  SmallVector<NodePointer, 8> demangledGenerics;
+  llvm::SmallVector<NodePointer, 8> demangledGenerics;
   for (auto genericArg : allGenericArgs) {
     // When there is no generic argument, put in a placeholder.
     if (!genericArg) {
@@ -470,7 +471,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       break;
     }
 
-    SmallVector<std::pair<NodePointer, bool>, 8> inputs;
+    llvm::SmallVector<std::pair<NodePointer, bool>, 8> inputs;
     for (unsigned i = 0, e = func->getNumParameters(); i < e; ++i) {
       auto param = func->getParameter(i);
       auto flags = func->getParameterFlags(i);

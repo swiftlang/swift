@@ -20,6 +20,7 @@
 #include <iterator>
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <functional>
 #include <pthread.h>
 #include <stdint.h>
@@ -352,7 +353,7 @@ private:
     }
 
     void deallocate() {
-      for (size_t i = 0; i < Count; i++) {
+      for (size_t i = 0; i < Count; ++i) {
         data()[i].~ElemTy();
       }
       free(this);

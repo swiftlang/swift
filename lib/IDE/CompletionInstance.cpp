@@ -169,11 +169,10 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
 /// returns \c true. Returns \c true if any callback call returns \c true, \c
 /// false otherwise.
 static bool
-forEachDependencyUntilTrue(CompilerInstance &CI, ModuleDecl *CurrentModule,
-                           unsigned excludeBufferID,
+forEachDependencyUntilTrue(CompilerInstance &CI, unsigned excludeBufferID,
                            llvm::function_ref<bool(StringRef)> callback) {
   // Check files in the current module.
-  for (FileUnit *file : CurrentModule->getFiles()) {
+  for (FileUnit *file : CI.getMainModule()->getFiles()) {
     StringRef filename;
     if (auto SF = dyn_cast<SourceFile>(file)) {
       if (SF->getBufferID() == excludeBufferID)
@@ -203,12 +202,11 @@ forEachDependencyUntilTrue(CompilerInstance &CI, ModuleDecl *CurrentModule,
 
 /// Collect hash codes of the dependencies into \c Map.
 static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
-                                        ModuleDecl *CurrentModule,
                                         unsigned excludeBufferID,
                                         llvm::StringMap<llvm::hash_code> &Map) {
   auto &FS = CI.getFileSystem();
   forEachDependencyUntilTrue(
-      CI, CurrentModule, excludeBufferID, [&](StringRef filename) {
+      CI, excludeBufferID, [&](StringRef filename) {
         if (Map.count(filename))
           return false;
 
@@ -229,12 +227,12 @@ static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
 
 /// Check if any dependent files are modified since \p timestamp.
 static bool areAnyDependentFilesInvalidated(
-    CompilerInstance &CI, ModuleDecl *CurrentModule, llvm::vfs::FileSystem &FS,
+    CompilerInstance &CI, llvm::vfs::FileSystem &FS,
     unsigned excludeBufferID, llvm::sys::TimePoint<> timestamp,
     llvm::StringMap<llvm::hash_code> &Map) {
 
   return forEachDependencyUntilTrue(
-      CI, CurrentModule, excludeBufferID, [&](StringRef filePath) {
+      CI, excludeBufferID, [&](StringRef filePath) {
         auto stat = FS.status(filePath);
         if (!stat)
           // Missing.
@@ -291,7 +289,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
     return false;
 
   auto &CI = *CachedCI;
-  auto *oldSF = CI.getCodeCompletionFile().get();
+  auto *oldSF = CI.getCodeCompletionFile();
 
   auto *oldState = oldSF->getDelayedParserState();
   assert(oldState->hasCodeCompletionDelayedDeclState());
@@ -304,7 +302,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   if (shouldCheckDependencies()) {
     if (areAnyDependentFilesInvalidated(
-            CI, CurrentModule, *FileSystem, SM.getCodeCompletionBufferID(),
+            CI, *FileSystem, SM.getCodeCompletionBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
       return false;
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
@@ -315,10 +313,12 @@ bool CompletionInstance::performCachedOperationIfPossible(
   auto tmpBufferID = tmpSM.addMemBufferCopy(completionBuffer);
   tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
 
-  LangOptions langOpts;
+  LangOptions langOpts = CI.getASTContext().LangOpts;
   langOpts.DisableParserLookup = true;
-  TypeCheckerOptions typeckOpts;
-  SearchPathOptions searchPathOpts;
+  // Ensure all non-function-body tokens are hashed into the interface hash
+  langOpts.EnableTypeFingerprints = false;
+  TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
+  SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
@@ -327,13 +327,16 @@ bool CompletionInstance::performCachedOperationIfPossible(
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
-  SourceFile *tmpSF = new (*tmpCtx) SourceFile(*tmpM, oldSF->Kind, tmpBufferID);
-  tmpSF->enableInterfaceHash();
-  // Ensure all non-function-body tokens are hashed into the interface hash
-  tmpCtx->LangOpts.EnableTypeFingerprints = false;
+  SourceFile *tmpSF = new (*tmpCtx)
+      SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
 
-  // Couldn't find any completion token?
+  // FIXME: Since we don't setup module loaders on the temporary AST context,
+  // 'canImport()' conditional compilation directive always fails. That causes
+  // interface hash change and prevents fast-completion.
+
+  // Parse and get the completion context.
   auto *newState = tmpSF->getDelayedParserState();
+  // Couldn't find any completion token?
   if (!newState->hasCodeCompletionDelayedDeclState())
     return false;
 
@@ -385,7 +388,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
     newBufferID = SM.addMemBufferCopy(sourceText, bufferName);
     SM.openVirtualFile(SM.getLocForBufferStart(newBufferID),
                        tmpSM.getDisplayNameForLoc(startLoc),
-                       tmpSM.getLineAndColumn(startLoc).first - 1);
+                       tmpSM.getPresumedLineAndColumnForLoc(startLoc).first -
+                           1);
     SM.setCodeCompletionPoint(newBufferID, newOffset);
 
     // Construct dummy scopes. We don't need to restore the original scope
@@ -433,22 +437,20 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
     // Create a new module and a source file using the current AST context.
     auto &Ctx = oldM->getASTContext();
-    auto *newM =
-        ModuleDecl::create(oldM->getName(), Ctx, oldM->getImplicitImportInfo());
-    auto *newSF =
-        new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID);
+    auto *newM = ModuleDecl::createMainModule(Ctx, oldM->getName(),
+                                              oldM->getImplicitImportInfo());
+    auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
+                                       oldSF->getParsingOptions());
     newM->addFile(*newSF);
-    newSF->enableInterfaceHash();
 
-    // Tell the compiler instance we've replaced the code completion file.
-    CI.setCodeCompletionFile(newSF);
+    // Tell the compiler instance we've replaced the main module.
+    CI.setMainModule(newM);
 
     // Re-process the whole file (parsing will be lazily triggered). Still
     // re-use imported modules.
     performImportResolution(*newSF);
     bindExtensions(*newM);
 
-    CurrentModule = newM;
     traceDC = newM;
 #ifndef NDEBUG
     const auto *reparsedState = newSF->getDelayedParserState();
@@ -475,7 +477,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   }
 
   CachedReuseCount += 1;
-  cacheDependencyHashIfNeeded(CI, CurrentModule, SM.getCodeCompletionBufferID(),
+  cacheDependencyHashIfNeeded(CI, SM.getCodeCompletionBufferID(),
                               InMemoryDependencyHash);
 
   return true;
@@ -493,10 +495,10 @@ bool CompletionInstance::performNewOperation(
 
   auto TheInstance = std::make_unique<CompilerInstance>();
 
-  // Track dependencies in fast-completion mode to invalidate the compiler
-  // instance if any dependent files are modified.
-  if (isCachedCompletionRequested)
-    TheInstance->createDependencyTracker(false);
+  // Track non-system dependencies in fast-completion mode to invalidate the
+  // compiler instance if any dependent files are modified.
+  Invocation.getFrontendOptions().IntermoduleDependencyTracking =
+      IntermoduleDepTrackingMode::ExcludeSystem;
 
   {
     auto &CI = *TheInstance;
@@ -519,16 +521,16 @@ bool CompletionInstance::performNewOperation(
     }
     registerIDERequestFunctions(CI.getASTContext().evaluator);
 
-    CI.performParseAndResolveImportsOnly();
-
-    // If we didn't create a source file for completion, bail. This can happen
-    // if for example we fail to load the stdlib.
-    auto completionFile = CI.getCodeCompletionFile();
-    if (!completionFile)
+    // If we're expecting a standard library, but there either isn't one, or it
+    // failed to load, let's bail early and hand back an empty completion
+    // result to avoid any downstream crashes.
+    if (CI.loadStdlibIfNeeded())
       return true;
 
+    CI.performParseAndResolveImportsOnly();
+
     // If we didn't find a code completion token, bail.
-    auto *state = completionFile.get()->getDelayedParserState();
+    auto *state = CI.getCodeCompletionFile()->getDelayedParserState();
     if (!state->hasCodeCompletionDelayedDeclState())
       return true;
 
@@ -545,14 +547,13 @@ bool CompletionInstance::performNewOperation(
 void CompletionInstance::cacheCompilerInstance(
     std::unique_ptr<CompilerInstance> CI, llvm::hash_code ArgsHash) {
   CachedCI = std::move(CI);
-  CurrentModule = CachedCI->getMainModule();
   CachedArgHash = ArgsHash;
   auto now = std::chrono::system_clock::now();
   DependencyCheckedTimestamp = now;
   CachedReuseCount = 0;
   InMemoryDependencyHash.clear();
   cacheDependencyHashIfNeeded(
-      *CachedCI, CurrentModule,
+      *CachedCI,
       CachedCI->getASTContext().SourceMgr.getCodeCompletionBufferID(),
       InMemoryDependencyHash);
 }

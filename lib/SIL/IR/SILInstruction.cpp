@@ -383,6 +383,16 @@ namespace {
       }
       return true;
     }
+    
+    bool visitBeginCOWMutationInst(const BeginCOWMutationInst *RHS) {
+      auto *left = cast<BeginCOWMutationInst>(LHS);
+      return left->isNative() == RHS->isNative();
+    }
+
+    bool visitEndCOWMutationInst(const EndCOWMutationInst *RHS) {
+      auto *left = cast<EndCOWMutationInst>(LHS);
+      return left->doKeepUnique() == RHS->doKeepUnique();
+    }
 
     bool visitAllocRefDynamicInst(const AllocRefDynamicInst *RHS) {
       return true;
@@ -1126,6 +1136,7 @@ bool SILInstruction::mayRelease() const {
 bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::IsEscapingClosureInst:
     return true;
   default:

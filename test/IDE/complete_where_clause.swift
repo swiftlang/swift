@@ -141,7 +141,7 @@ enum E2<T> where T.#^ENUM_2^# {}
 // ANYTYPE: Begin completions
 // ANYTYPE-DAG: Decl[GenericTypeParam]/Local: T[#T#];
 // ANYTYPE-DAG: Decl[Class]/CurrModule: A1[#A1#];
-// ANYTYPE-DAG: Decl[Struct]/OtherModule[Swift]: Int[#Int#];
+// ANYTYPE-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#];
 // ANYTYPE: End completions
 
 protocol P2 {

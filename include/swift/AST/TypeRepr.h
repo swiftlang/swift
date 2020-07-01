@@ -48,7 +48,7 @@ enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 /// Representation of a type as written in source.
-class alignas(8) TypeRepr {
+class alignas(1 << TypeReprAlignInBits) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
@@ -163,9 +163,6 @@ public:
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
   SWIFT_DEBUG_DUMP;
-
-  /// Clone the given type representation.
-  TypeRepr *clone(const ASTContext &ctx) const;
 };
 
 /// A TypeRepr for a type with a syntax error.  Can be used both as a

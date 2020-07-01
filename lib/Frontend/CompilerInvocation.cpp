@@ -409,6 +409,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
+  Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
+                                              OPT_disable_new_operator_lookup,
+                                              /*default*/ false);
   Opts.UseClangFunctionTypes |= Args.hasArg(OPT_use_clang_function_types);
 
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
@@ -432,8 +435,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
-  if (Args.hasArg(OPT_experimental_private_intransitive_dependencies))
-    Opts.EnableExperientalPrivateIntransitiveDependencies = true;
+  Opts.DirectIntramoduleDependencies =
+      Args.hasFlag(OPT_enable_direct_intramodule_dependencies,
+                   OPT_disable_direct_intramodule_dependencies,
+                   Opts.DirectIntramoduleDependencies);
 
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
@@ -629,6 +634,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::EmitSyntax) {
+    Opts.BuildSyntaxTree = true;
+    Opts.VerifySyntaxTree = true;
+  }
+
+  // If we are asked to emit a module documentation file, configure lexing and
+  // parsing to remember comments.
+  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath()) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
+  // If we are doing index-while-building, configure lexing and parsing to
+  // remember comments.
+  if (!FrontendOpts.IndexStorePath.empty()) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
+  // If we're parsing SIL, access control doesn't make sense to enforce.
+  if (FrontendOpts.InputKind == InputFileKind::SIL) {
+    Opts.EnableAccessControl = false;
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -677,6 +704,17 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // body skipping.
   Opts.SkipNonInlinableFunctionBodies |= Args.hasArg(OPT_tbd_is_installapi);
 
+  if (Opts.SkipNonInlinableFunctionBodies &&
+      FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
+    // Disable this optimization if we're compiling SwiftOnoneSupport, because
+    // we _definitely_ need to look inside every declaration to figure out
+    // what gets prespecialized.
+    Opts.SkipNonInlinableFunctionBodies = false;
+    Diags.diagnose(SourceLoc(),
+                   diag::module_incompatible_with_skip_function_bodies,
+                   SWIFT_ONONE_SUPPORT);
+  }
+
   Opts.DisableConstraintSolverPerformanceHacks |=
       Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
 
@@ -688,6 +726,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   Opts.SolverEnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_solver_enable_operator_designated_types);
+  Opts.EnableOneWayClosureParameters |=
+      Args.hasArg(OPT_experimental_one_way_closure_params);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
@@ -766,6 +806,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
+  Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
+
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
@@ -827,6 +869,11 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   Opts.DisableModulesValidateSystemDependencies |=
       Args.hasArg(OPT_disable_modules_validate_system_headers);
 
+  for (auto A: Args.filtered(OPT_swift_module_file)) {
+    Opts.ExplicitSwiftModules.push_back(resolveSearchPath(A->getValue()));
+  }
+  if (const Arg *A = Args.getLastArg(OPT_explict_swift_module_map))
+    Opts.ExplicitSwiftModuleMap = A->getValue();
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
@@ -851,10 +898,26 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
+
   Opts.UseColor |=
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
+  // If no style options are specified, default to LLVM style.
+  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
+  if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
+    StringRef contents = arg->getValue();
+    if (contents == "llvm") {
+      Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
+    } else if (contents == "swift") {
+      Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                     arg->getOption().getPrefixedName(), arg->getValue());
+      return true;
+    }
+  }
+
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
@@ -862,8 +925,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                        false);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
-  Opts.EnableExperimentalFormatting |=
-      Args.hasArg(OPT_enable_experimental_diagnostic_formatting);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
   }
@@ -903,12 +964,14 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts,
-                         FrontendOptions &FEOpts,
+                         const FrontendOptions &FEOpts,
+                         const TypeCheckerOptions &TCOpts,
                          DiagnosticEngine &Diags,
                          const llvm::Triple &Triple,
                          ClangImporterOptions &ClangOpts) {
   using namespace options;
 
+  
   if (const Arg *A = Args.getLastArg(OPT_sil_inline_threshold)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.InlineThreshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -951,8 +1014,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
-  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies))
-    Opts.SkipNonInlinableFunctionBodies = true;
+  // Propagate the typechecker's understanding of
+  // -experimental-skip-non-inlinable-function-bodies to SIL.
+  Opts.SkipNonInlinableFunctionBodies = TCOpts.SkipNonInlinableFunctionBodies;
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -1039,7 +1103,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.StripOwnershipAfterSerialization |= Args.hasArg(OPT_enable_ownership_stripping_after_serialization);
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
 
@@ -1243,6 +1306,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);
+  }
+
+  for (auto A : Args.getAllArgValues(options::OPT_coverage_prefix_map)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.CoveragePrefixMap.addMapping(SplitMap.first, SplitMap.second);
   }
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
@@ -1624,7 +1692,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags,
+  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts,
+                   TypeCheckerOpts, Diags,
                    LangOpts.Target, ClangImporterOpts)) {
     return true;
   }

@@ -97,6 +97,13 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   return getReplacementTypesBuffer();
 }
 
+ArrayRef<Type> SubstitutionMap::getInnermostReplacementTypes() const {
+  if (empty()) return { };
+
+  return getReplacementTypes().take_back(
+      getGenericSignature()->getInnermostGenericParams().size());
+}
+
 GenericSignature SubstitutionMap::getGenericSignature() const {
   return storage ? storage->getGenericSignature() : nullptr;
 }
@@ -271,7 +278,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
   // The generic parameter may have been made concrete by the generic signature,
   // substitute into the concrete type.
-  if (auto concreteType = genericSig->getConcreteType(genericParam)){
+  if (auto concreteType = genericSig->getConcreteType(genericParam)) {
     // Set the replacement type to an error, to block infinite recursion.
     replacementType = ErrorType::get(concreteType);
 
@@ -333,7 +340,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
           reqt.getSecondType()->isEqual(proto->getDeclaredType()))
         return getConformances()[index];
 
-      index++;
+      ++index;
     }
   }
 
@@ -368,7 +375,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
-  if (!genericSig->conformsToProtocol(type, proto))
+  if (!genericSig->requiresProtocol(type, proto))
     return ProtocolConformanceRef::forInvalid();
 
   auto accessPath =

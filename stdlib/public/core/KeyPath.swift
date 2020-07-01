@@ -134,6 +134,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   
   // Prevent normal initialization. We use tail allocation via
   // allocWithTailElems().
+  @available(*, unavailable)
   internal init() {
     _internalInvariantFailure("use _create(...)")
   }
@@ -158,7 +159,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return result
   }
   
-  internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
+  final internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
     defer { _fixLifetime(self) }
     
     let base = UnsafeRawPointer(Builtin.projectTailElems(self, Int32.self))
@@ -347,14 +348,6 @@ public class ReferenceWritableKeyPath<
   // MARK: Implementation detail
 
   internal final override class var kind: Kind { return .reference }
-  
-  internal final override func _projectMutableAddress(
-    from base: UnsafePointer<Root>
-  ) -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
-    // Since we're a ReferenceWritableKeyPath, we know we don't mutate the base
-    // in practice.
-    return _projectMutableAddress(from: base.pointee)
-  }
   
   @usableFromInline
   internal final func _projectMutableAddress(from origBase: Root)

@@ -10,6 +10,6 @@ set_target_properties(swift-remoteast-test PROPERTIES ENABLE_EXPORTS 1)
 
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)
-  add_dependencies(swift clang-resource-headers)
+  add_dependencies(swift-frontend clang-resource-headers)
 endif()
 

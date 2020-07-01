@@ -53,15 +53,6 @@ public func testInitializers() {
   _ = Bar(__: 1)
 }
 
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC8__noArgsABSgyt_tcfcTO"
-// CHECK: @"\01L_selector(initWithNoArgs)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC8__oneArgABSgs5Int32V_tcfcTO"
-// CHECK: @"\01L_selector(initWithOneArg:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC9__twoArgs5otherABSgs5Int32V_AGtcfcTO"
-// CHECK: @"\01L_selector(initWithTwoArgs:other:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC2__ABSgs5Int32V_tcfcTO"
-// CHECK: @"\01L_selector(init:)"
-
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @{{.+}}18testFactoryMethods
 public func testFactoryMethods() {
   // CHECK: @"\01L_selector(fooWithOneArg:)"
@@ -135,3 +126,12 @@ func testRawNames() {
   let _ = Foo.__foo // expected-error{{'__foo' has been replaced by 'init(__:)'}}
 }
 #endif
+
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC8__noArgsABSgyt_tcfcTO"
+// CHECK: @"\01L_selector(initWithNoArgs)"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC8__oneArgABSgs5Int32V_tcfcTO"
+// CHECK: @"\01L_selector(initWithOneArg:)"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC9__twoArgs5otherABSgs5Int32V_AGtcfcTO"
+// CHECK: @"\01L_selector(initWithTwoArgs:other:)"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC2__ABSgs5Int32V_tcfcTO"
+// CHECK: @"\01L_selector(init:)"

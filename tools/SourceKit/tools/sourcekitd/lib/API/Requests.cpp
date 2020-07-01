@@ -178,11 +178,13 @@ static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 
 static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
                                              int64_t Offset,
+                                             Optional<RequestDict> optionsDict,
                                              ArrayRef<const char *> Args,
                                              Optional<VFSOptions> vfsOptions);
 
 static sourcekitd_response_t
 conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                     Optional<RequestDict> optionsDict,
                      ArrayRef<const char *> Args,
                      ArrayRef<const char *> ExpectedTypes,
                      Optional<VFSOptions> vfsOptions);
@@ -995,7 +997,9 @@ static void handleSemanticRequest(
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return Rec(typeContextInfo(InputBuf.get(), Offset, Args,
+    Optional<RequestDict> options =
+        Req.getDictionary(KeyTypeContextInfoOptions);
+    return Rec(typeContextInfo(InputBuf.get(), Offset, options, Args,
                                std::move(vfsOptions)));
   }
 
@@ -1010,9 +1014,11 @@ static void handleSemanticRequest(
     SmallVector<const char *, 8> ExpectedTypeNames;
     if (Req.getStringArray(KeyExpectedTypes, ExpectedTypeNames, true))
       return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
+    Optional<RequestDict> options =
+        Req.getDictionary(KeyConformingMethodListOptions);
     return Rec(
-        conformingMethodList(InputBuf.get(), Offset, Args, ExpectedTypeNames,
-                             std::move(vfsOptions)));
+        conformingMethodList(InputBuf.get(), Offset, options, Args,
+                             ExpectedTypeNames, std::move(vfsOptions)));
   }
 
   if (!SourceFile.hasValue())
@@ -1354,6 +1360,9 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
       AttrDict.set(KeyAttribute, Attr);
     }
   }
+
+  if (Info.EffectiveAccess)
+    Elem.set(KeyEffectiveAccess, Info.EffectiveAccess.getValue());
 
   EntitiesStack.push_back({ Info.Kind, Elem, ResponseBuilder::Array(),
                             ResponseBuilder::Array()});
@@ -1948,6 +1957,7 @@ public:
 
   void setCompletionKind(UIdent kind) override;
   void setReusingASTContext(bool flag) override;
+  void setAnnotatedTypename(bool flag) override;
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
 } // end anonymous namespace
@@ -1984,6 +1994,11 @@ void SKCodeCompletionConsumer::setReusingASTContext(bool flag) {
     RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
 }
 
+void SKCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyAnnotatedTypename, flag);
+}
+
 bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
   Optional<StringRef> ModuleNameOpt;
   if (!R.ModuleName.empty())
@@ -2008,6 +2023,7 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
                      R.SemanticContext,
                      R.TypeRelation,
                      R.NotRecommended,
+                     R.IsSystem,
                      R.NumBytesToErase);
   return true;
 }
@@ -2041,6 +2057,7 @@ public:
   void endGroup() override;
   void setNextRequestStart(unsigned offset) override;
   void setReusingASTContext(bool flag) override;
+  void setAnnotatedTypename(bool flag) override;
 };
 } // end anonymous namespace
 
@@ -2183,6 +2200,8 @@ bool SKGroupedCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) 
     result.set(KeyModuleImportDepth, *R.ModuleImportDepth);
   if (R.NotRecommended)
     result.set(KeyNotRecommended, R.NotRecommended);
+  if (R.IsSystem)
+    result.set(KeyIsSystem, R.IsSystem);
   result.set(KeyNumBytesToErase, R.NumBytesToErase);
 
   if (R.descriptionStructure) {
@@ -2242,6 +2261,10 @@ void SKGroupedCodeCompletionConsumer::setReusingASTContext(bool flag) {
   if (flag)
     RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
 }
+void SKGroupedCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyAnnotatedTypename, flag);
+}
 
 //===----------------------------------------------------------------------===//
 // Type Context Info
@@ -2249,17 +2272,20 @@ void SKGroupedCodeCompletionConsumer::setReusingASTContext(bool flag) {
 
 static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
                                              int64_t Offset,
+                                             Optional<RequestDict> optionsDict,
                                              ArrayRef<const char *> Args,
                                              Optional<VFSOptions> vfsOptions) {
   ResponseBuilder RespBuilder;
 
   class Consumer : public TypeContextInfoConsumer {
+    ResponseBuilder RespBuilder;
     ResponseBuilder::Array SKResults;
     Optional<std::string> ErrorDescription;
 
   public:
     Consumer(ResponseBuilder Builder)
-        : SKResults(Builder.getDictionary().setArray(KeyResults)) {}
+        : RespBuilder(Builder),
+          SKResults(Builder.getDictionary().setArray(KeyResults)) {}
 
     void handleResult(const TypeContextInfoItem &Item) override {
       auto SKElem = SKResults.appendDictionary();
@@ -2276,6 +2302,11 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
       }
     }
 
+    void setReusingASTContext(bool flag) override {
+      if (flag)
+        RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
+    }
+
     void failed(StringRef ErrDescription) override {
       ErrorDescription = ErrDescription.str();
     }
@@ -2286,8 +2317,12 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
     }
   } Consumer(RespBuilder);
 
+  std::unique_ptr<SKOptionsDictionary> options;
+  if (optionsDict)
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
+
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getExpressionContextInfo(InputBuf, Offset, Args, Consumer,
+  Lang.getExpressionContextInfo(InputBuf, Offset, options.get(), Args, Consumer,
                                 std::move(vfsOptions));
 
   if (Consumer.isError())
@@ -2301,6 +2336,7 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
 
 static sourcekitd_response_t
 conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                     Optional<RequestDict> optionsDict,
                      ArrayRef<const char *> Args,
                      ArrayRef<const char *> ExpectedTypes,
                      Optional<VFSOptions> vfsOptions) {
@@ -2329,6 +2365,11 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
       }
     }
 
+    void setReusingASTContext(bool flag) override {
+      if (flag)
+        SKResult.setBool(KeyReusingASTContext, flag);
+    }
+
     void failed(StringRef ErrDescription) override {
       ErrorDescription = ErrDescription.str();
     }
@@ -2339,9 +2380,13 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
     }
   } Consumer(RespBuilder);
 
+  std::unique_ptr<SKOptionsDictionary> options;
+  if (optionsDict)
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
+
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getConformingMethodList(InputBuf, Offset, Args, ExpectedTypes, Consumer,
-                               std::move(vfsOptions));
+  Lang.getConformingMethodList(InputBuf, Offset, options.get(), Args,
+                               ExpectedTypes, Consumer, std::move(vfsOptions));
 
   if (Consumer.isError())
     return createErrorRequestFailed(Consumer.getErrorDescription());
@@ -3167,6 +3212,21 @@ public:
 };
 } // end anonymous namespace
 
+static Optional<UIdent> getUIDForOperationKind(trace::OperationKind OpKind) {
+  static UIdent CompileOperationIndexSource("source.compile.operation.index-source");
+  static UIdent CompileOperationCodeCompletion("source.compile.operation.code-completion");
+  switch (OpKind) {
+    case trace::OperationKind::PerformSema:
+      return None;
+    case trace::OperationKind::IndexSource:
+      return CompileOperationIndexSource;
+    case trace::OperationKind::CodeCompletion:
+      return CompileOperationCodeCompletion;
+    default:
+      llvm_unreachable("Unknown operation kind");
+  }
+}
+
 void CompileTrackingConsumer::operationStarted(
     uint64_t OpId, trace::OperationKind OpKind,
     const trace::SwiftInvocation &Inv, const trace::StringPairs &OpArgs) {
@@ -3179,7 +3239,9 @@ void CompileTrackingConsumer::operationStarted(
   Dict.set(KeyNotification, CompileWillStartUID);
   Dict.set(KeyCompileID, std::to_string(OpId));
   Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
-  // FIXME: OperationKind
+  if (auto OperationUID = getUIDForOperationKind(OpKind)) {
+    Dict.set(KeyCompileOperation, OperationUID.getValue());
+  }
   Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
@@ -3195,6 +3257,9 @@ void CompileTrackingConsumer::operationFinished(
   auto Dict = RespBuilder.getDictionary();
   Dict.set(KeyNotification, CompileDidFinishUID);
   Dict.set(KeyCompileID, std::to_string(OpId));
+  if (auto OperationUID = getUIDForOperationKind(OpKind)) {
+    Dict.set(KeyCompileOperation, OperationUID.getValue());
+  }
   auto DiagArray = Dict.setArray(KeyDiagnostics);
   for (const auto &DiagInfo : Diagnostics) {
     fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);

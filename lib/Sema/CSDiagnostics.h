@@ -25,6 +25,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -218,7 +219,6 @@ protected:
   }
 
   bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
-  Type isRawRepresentable(Type type, KnownProtocolKind protocol) const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -479,16 +479,32 @@ public:
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
   DeclNameRef Member;
+  Type MemberBaseType;
   bool ResultTypeIsOptional;
 
 public:
   MemberAccessOnOptionalBaseFailure(const Solution &solution,
                                     ConstraintLocator *locator,
-                                    DeclNameRef memberName, bool resultOptional)
+                                    DeclNameRef memberName,
+                                    Type memberBaseType,
+                                    bool resultOptional)
       : FailureDiagnostic(solution, locator), Member(memberName),
+        MemberBaseType(resolveType(memberBaseType)),
         ResultTypeIsOptional(resultOptional) {}
 
   bool diagnoseAsError() override;
+  
+  Type getMemberBaseType() const {
+    return MemberBaseType;
+  }
+  
+  SourceLoc getLoc() const override {
+    // The end location points to the dot in the member access.
+    return getSourceRange().End;
+  }
+  
+  SourceRange getSourceRange() const override;
+
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -619,23 +635,6 @@ public:
 
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
-
-  /// Attempts to add fix-its for these two mistakes:
-  ///
-  /// - Passing an integer where a type conforming to RawRepresentable is
-  ///   expected, by wrapping the expression in a call to the contextual
-  ///   type's initializer
-  ///
-  /// - Passing a type conforming to RawRepresentable where an integer is
-  ///   expected, by wrapping the expression in a call to the rawValue
-  ///   accessor
-  ///
-  /// - Return true on the fixit is added, false otherwise.
-  ///
-  /// This helps migration with SDK changes.
-  bool
-  tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
-                            KnownProtocolKind rawRepresentablePrococol) const;
 
   /// Attempts to add fix-its for these two mistakes:
   ///
@@ -813,7 +812,7 @@ private:
   bool exprNeedsParensBeforeAddingAs(const Expr *expr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
     if (!asPG)
       return true;
     return exprNeedsParensInsideFollowingOperator(DC, const_cast<Expr *>(expr),
@@ -823,7 +822,7 @@ private:
   bool exprNeedsParensAfterAddingAs(const Expr *expr, const Expr *rootExpr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
     if (!asPG)
       return true;
 
@@ -1056,7 +1055,7 @@ protected:
 ///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
 /// }
 /// ```
-class MissingMemberFailure final : public InvalidMemberRefFailure {
+class MissingMemberFailure : public InvalidMemberRefFailure {
 public:
   MissingMemberFailure(const Solution &solution, Type baseType,
                        DeclNameRef memberName, ConstraintLocator *locator)
@@ -1083,6 +1082,22 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
+};
+
+class UnintendedExtraGenericParamMemberFailure final
+    : public MissingMemberFailure {
+  Identifier ParamName;
+
+public:
+  UnintendedExtraGenericParamMemberFailure(const Solution &solution,
+                                           Type baseType,
+                                           DeclNameRef memberName,
+                                           Identifier paramName,
+                                           ConstraintLocator *locator)
+      : MissingMemberFailure(solution, baseType, memberName, locator),
+        ParamName(paramName) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose cases where a member only accessible on generic constraints
@@ -1519,6 +1534,25 @@ class InvalidStaticMemberRefInKeyPath final : public InvalidMemberRefInKeyPath {
 public:
   InvalidStaticMemberRefInKeyPath(const Solution &solution, ValueDecl *member,
                                   ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference an enum case as a key path component
+/// e.g.
+///
+/// ```swift
+/// enum E {
+///   case foo
+/// }
+///
+/// _ = \E.Type.foo
+/// ```
+class InvalidEnumCaseRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidEnumCaseRefInKeyPath(const Solution &solution, ValueDecl *member,
+                              ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(solution, member, locator) {}
 
   bool diagnoseAsError() override;
@@ -1971,6 +2005,15 @@ public:
   bool diagnoseAsError();
 };
 
+class UnableToInferClosureParameterType final : public FailureDiagnostic {
+public:
+  UnableToInferClosureParameterType(const Solution &solution,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError();
+};
+
 class UnableToInferClosureReturnType final : public FailureDiagnostic {
 public:
   UnableToInferClosureReturnType(const Solution &solution,
@@ -2056,6 +2099,100 @@ public:
   functionType(functionType) {}
 
   bool diagnoseAsError() override;
+};
+
+/// Diagnose a failure to infer a KeyPath type by context.
+///
+/// ```swift
+/// _ = \.x
+/// let _ : AnyKeyPath = \.x
+/// ```
+class UnableToInferKeyPathRootFailure final : public FailureDiagnostic {
+public:
+  UnableToInferKeyPathRootFailure(const Solution &solution,
+                                  ConstraintLocator *locator)
+  : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class AbstractRawRepresentableFailure : public FailureDiagnostic {
+protected:
+  Type RawReprType;
+  Type ExpectedType;
+
+  AbstractRawRepresentableFailure(const Solution &solution, Type rawReprType,
+                                  Type expectedType, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        RawReprType(resolveType(rawReprType)),
+        ExpectedType(resolveType(expectedType)) {}
+
+public:
+  virtual Type getFromType() const = 0;
+  virtual Type getToType() const = 0;
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+protected:
+  Optional<Diag<Type, Type>> getDiagnostic() const;
+
+  virtual void fixIt(InFlightDiagnostic &diagnostic) const = 0;
+};
+
+/// Diagnose an attempt to initialize raw representable type or convert to it
+/// a value of some other type that matches its `RawValue` type.
+///
+/// ```swift
+/// enum E : Int {
+///   case a, b, c
+/// }
+///
+/// let _: E = 0
+/// ```
+///
+/// `0` has to be wrapped into `E(rawValue: 0)` and either defaulted via `??` or
+/// force unwrapped to constitute a valid binding.
+class MissingRawRepresentableInitFailure final
+    : public AbstractRawRepresentableFailure {
+public:
+  MissingRawRepresentableInitFailure(const Solution &solution, Type rawReprType,
+                                     Type expectedType,
+                                     ConstraintLocator *locator)
+      : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
+                                        locator) {}
+
+  Type getFromType() const override { return ExpectedType; }
+  Type getToType() const override { return RawReprType; }
+
+protected:
+  void fixIt(InFlightDiagnostic &diagnostic) const override;
+};
+
+/// Diagnose an attempt to pass raw representable type where its raw value
+/// is expected instead.
+///
+/// ```swift
+/// enum E : Int {
+///   case one = 1
+/// }
+///
+/// let _: Int = E.one
+/// ```
+///
+/// `E.one` has to use `.rawValue` to match `Int` expected by pattern binding.
+class MissingRawValueFailure final : public AbstractRawRepresentableFailure {
+public:
+  MissingRawValueFailure(const Solution &solution, Type rawReprType,
+                         Type expectedType, ConstraintLocator *locator)
+      : AbstractRawRepresentableFailure(solution, rawReprType, expectedType,
+                                        locator) {}
+
+  Type getFromType() const override { return RawReprType; }
+  Type getToType() const override { return ExpectedType; }
+
+private:
+  void fixIt(InFlightDiagnostic &diagnostic) const override;
 };
 
 } // end namespace constraints

@@ -440,19 +440,19 @@ class DeadFunctionElimination : FunctionLivenessComputation {
 
   void collectMethodImplementations() {
     // Collect vtable method implementations.
-    for (SILVTable &vTable : Module->getVTableList()) {
-      for (const SILVTable::Entry &entry : vTable.getEntries()) {
+    for (auto &vTable : Module->getVTables()) {
+      for (const SILVTable::Entry &entry : vTable->getEntries()) {
         // We don't need to collect destructors because we mark them as alive
         // anyway.
-        if (entry.Method.kind == SILDeclRef::Kind::Deallocator ||
-            entry.Method.kind == SILDeclRef::Kind::IVarDestroyer) {
+        if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator ||
+            entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer) {
           continue;
         }
-        SILFunction *F = entry.Implementation;
-        auto *fd = getBaseMethod(cast<AbstractFunctionDecl>(
-                                                    entry.Method.getDecl()));
+        SILFunction *F = entry.getImplementation();
+        auto *fd = getBaseMethod(
+            cast<AbstractFunctionDecl>(entry.getMethod().getDecl()));
         MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ false);
-        mi->addClassMethodImpl(F, vTable.getClass());
+        mi->addClassMethodImpl(F, vTable->getClass());
       }
     }
 
@@ -500,18 +500,18 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     collectMethodImplementations();
 
     // Check vtable methods.
-    for (SILVTable &vTable : Module->getVTableList()) {
-      for (const SILVTable::Entry &entry : vTable.getEntries()) {
-        if (entry.Method.kind == SILDeclRef::Kind::Deallocator ||
-            entry.Method.kind == SILDeclRef::Kind::IVarDestroyer) {
+    for (auto &vTable : Module->getVTables()) {
+      for (const SILVTable::Entry &entry : vTable->getEntries()) {
+        if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator ||
+            entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer) {
           // Destructors are alive because they are called from swift_release
-          ensureAlive(entry.Implementation);
+          ensureAlive(entry.getImplementation());
           continue;
         }
 
-        SILFunction *F = entry.Implementation;
-        auto *fd = getBaseMethod(cast<AbstractFunctionDecl>(
-                                                     entry.Method.getDecl()));
+        SILFunction *F = entry.getImplementation();
+        auto *fd = getBaseMethod(
+            cast<AbstractFunctionDecl>(entry.getMethod().getDecl()));
 
         if (// We also have to check the method declaration's access level.
             // Needed if it's a public base method declared in another
@@ -600,23 +600,24 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   /// Removes all dead methods from vtables and witness tables.
   bool removeDeadEntriesFromTables() {
     bool changedTable = false;
-    for (SILVTable &vTable : Module->getVTableList()) {
-      vTable.removeEntries_if([this, &changedTable]
-                              (SILVTable::Entry &entry) -> bool {
-        if (!isAlive(entry.Implementation)) {
-          LLVM_DEBUG(llvm::dbgs() << "  erase dead vtable method "
-                                  << entry.Implementation->getName() << "\n");
-          changedTable = true;
-          return true;
-        }
-        return false;
-      });
+    for (auto &vTable : Module->getVTables()) {
+      vTable->removeEntries_if(
+          [this, &changedTable](SILVTable::Entry &entry) -> bool {
+            if (!isAlive(entry.getImplementation())) {
+              LLVM_DEBUG(llvm::dbgs()
+                         << "  erase dead vtable method "
+                         << entry.getImplementation()->getName() << "\n");
+              changedTable = true;
+              return true;
+            }
+            return false;
+          });
     }
 
     auto &WitnessTables = Module->getWitnessTableList();
     for (auto WI = WitnessTables.begin(), EI = WitnessTables.end(); WI != EI;) {
       SILWitnessTable *WT = &*WI;
-      WI++;
+      ++WI;
       WT->clearMethods_if([this, &changedTable]
                           (const SILWitnessTable::MethodWitness &MW) -> bool {
         if (!isAlive(MW.Witness)) {
@@ -634,7 +635,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
               EI = DefaultWitnessTables.end();
          WI != EI;) {
       SILDefaultWitnessTable *WT = &*WI;
-      WI++;
+      ++WI;
       WT->clearMethods_if([this, &changedTable](SILFunction *MW) -> bool {
         if (!MW)
           return false;
@@ -691,7 +692,7 @@ public:
 
       LLVM_DEBUG(llvm::dbgs() << "  erase dead function " << F->getName()
                               << "\n");
-      NumDeadFunc++;
+      ++NumDeadFunc;
       DFEPass->notifyWillDeleteFunction(F);
       Module->eraseFunction(F);
     }

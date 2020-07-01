@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -module-name bridged_casts_folding -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name bridged_casts_folding -O -emit-sil %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

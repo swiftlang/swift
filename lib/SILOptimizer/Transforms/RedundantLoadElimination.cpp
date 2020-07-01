@@ -159,6 +159,7 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::SetDeallocatingInst:
@@ -1585,8 +1586,7 @@ bool RLEContext::run() {
 
   LLVM_DEBUG(for (unsigned i = 0; i < LocationVault.size(); ++i) {
     llvm::dbgs() << "LSLocation #" << i;
-    getLocation(i).print(llvm::dbgs(), &Fn->getModule(),
-                         TypeExpansionContext(*Fn));
+    getLocation(i).print(llvm::dbgs());
   });
 
   if (Optimistic)

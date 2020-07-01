@@ -169,7 +169,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
       LLVM_DEBUG(llvm::dbgs() << "        Found a load of the projection.\n");
       Loads.push_back(LI);
       for (auto useIter = LI->use_begin(), End = LI->use_end();
-           !hasBenefit && useIter != End; useIter++) {
+           !hasBenefit && useIter != End; ++useIter) {
         hasBenefit = (isa<StructExtractInst>(useIter->get()) ||
                       isa<TupleExtractInst>(useIter->get()));
       }

@@ -485,6 +485,12 @@ void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
   case OwnedValueIntroducerKind::Phi:
     os << "Phi";
     return;
+  case OwnedValueIntroducerKind::Struct:
+    os << "Struct";
+    return;
+  case OwnedValueIntroducerKind::Tuple:
+    os << "Tuple";
+    return;
   case OwnedValueIntroducerKind::FunctionArgument:
     os << "FunctionArgument";
     return;

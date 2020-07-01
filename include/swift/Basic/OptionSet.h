@@ -21,6 +21,7 @@
 
 #include <type_traits>
 #include <cstdint>
+#include <initializer_list>
 
 namespace swift {
 
@@ -57,6 +58,10 @@ public:
 
   /// Create an option set with only the given option set.
   constexpr OptionSet(Flags flag) : Storage(static_cast<StorageType>(flag)) {}
+
+  /// Create an option set containing the given options.
+  constexpr OptionSet(std::initializer_list<Flags> flags)
+      : Storage(combineFlags(flags)) {}
 
   /// Create an option set from raw storage.
   explicit constexpr OptionSet(StorageType storage) : Storage(storage) {}
@@ -135,6 +140,14 @@ private:
   static auto _checkResultTypeOperatorOr(T t) -> decltype(t | t) { return T(); }
 
   static void _checkResultTypeOperatorOr(...) {}
+
+  static constexpr StorageType
+  combineFlags(const std::initializer_list<Flags> &flags) {
+    OptionSet result;
+    for (Flags flag : flags)
+      result |= flag;
+    return result.Storage;
+  }
 
   static_assert(!std::is_same<decltype(_checkResultTypeOperatorOr(Flags())),
                               Flags>::value,

@@ -371,10 +371,13 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
 
   auto Iter = End;
   while (Start != Iter) {
-    Projection AP(Iter);
-    if (!AP.isValid())
-      break;
-    P.Path.push_back(AP);
+    // end_cow_mutation is not a projection, but we want to "see through" it.
+    if (!isa<EndCOWMutationInst>(Iter)) {
+      Projection AP(Iter);
+      if (!AP.isValid())
+        break;
+      P.Path.push_back(AP);
+    }
     Iter = cast<SingleValueInstruction>(*Iter).getOperand(0);
   }
 
@@ -425,8 +428,8 @@ ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
     }
 
     // Continue if we are accessing the same field.
-    LHSIter++;
-    RHSIter++;
+    ++LHSIter;
+    ++RHSIter;
   }
 
   // All path elements are the same. The symmetric difference is empty.
@@ -439,12 +442,12 @@ ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
   for (unsigned li = i, e = size(); li != e; ++li) {
     if (LHSIter->isAliasingCast())
       return false;
-    LHSIter++;
+    ++LHSIter;
   }
   for (unsigned ri = i, e = RHS.size(); ri != e; ++ri) {
     if (RHSIter->isAliasingCast())
       return false;
-    RHSIter++;
+    ++RHSIter;
   }
 
   // If we don't have any casts in our symmetric difference (i.e. only typed
@@ -490,8 +493,8 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
       return SubSeqRelation_t::Unknown;
 
     // Otherwise increment reverse iterators.
-    LHSIter++;
-    RHSIter++;
+    ++LHSIter;
+    ++RHSIter;
   }
 
   // Ok, we now know that one of the paths is a subsequence of the other. If
@@ -530,7 +533,7 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
 
   // First make sure that the prefix matches.
   Optional<ProjectionPath> P = ProjectionPath(Path.BaseType);
-  for (unsigned i = 0; i < PrefixSize; i++) {
+  for (unsigned i = 0; i < PrefixSize; ++i) {
     if (Path.Path[i] != Prefix.Path[i]) {
       P.reset();
       return P;
@@ -546,42 +549,46 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
 }
 
 void Projection::print(raw_ostream &os, SILType baseType) const {
-  if (isNominalKind()) {
+  switch (getKind()) {
+  case ProjectionKind::Struct:
+  case ProjectionKind::Class: {
     auto *Decl = getVarDecl(baseType);
     os << "Field: ";
     Decl->print(os);
-    return;
+    break;
   }
-
-  if (getKind() == ProjectionKind::Tuple) {
+  case ProjectionKind::Enum: {
+    auto *Decl = getEnumElementDecl(baseType);
+    os << "Enum: ";
+    Decl->print(os);
+    break;
+  }
+  case ProjectionKind::Index:
+  case ProjectionKind::Tuple: {
     os << "Index: " << getIndex();
-    return;
+    break;
   }
-  if (getKind() == ProjectionKind::BitwiseCast) {
-    os << "BitwiseCast";
-    return;
-  }
-  if (getKind() == ProjectionKind::Index) {
-    os << "Index: " << getIndex();
-    return;
-  }
-  if (getKind() == ProjectionKind::Upcast) {
-    os << "UpCast";
-    return;
-  }
-  if (getKind() == ProjectionKind::RefCast) {
-    os << "RefCast";
-    return;
-  }
-  if (getKind() == ProjectionKind::Box) {
+  case ProjectionKind::Box: {
     os << " Box over";
-    return;
+    break;
   }
-  if (getKind() == ProjectionKind::TailElems) {
+  case ProjectionKind::Upcast: {
+    os << "UpCast";
+    break;
+  }
+  case ProjectionKind::RefCast: {
+    os << "RefCast";
+    break;
+  }
+  case ProjectionKind::BitwiseCast: {
+    os << "BitwiseCast";
+    break;
+  }
+  case ProjectionKind::TailElems: {
     os << " TailElems";
-    return;
+    break;
   }
-  os << "<unexpected projection>";
+  }
 }
 
 raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M,
@@ -800,10 +807,9 @@ Projection::operator<(const Projection &Other) const {
 }
 
 NullablePtr<SingleValueInstruction>
-Projection::
-createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
-                                   SILType BaseType,
-                                   llvm::SmallVectorImpl<SILValue> &Values) {
+Projection::createAggFromFirstLevelProjections(
+    SILBuilder &B, SILLocation Loc, SILType BaseType,
+    ArrayRef<SILValue> Values) {
   if (BaseType.getStructOrBoundGenericStruct()) {
     return B.createStruct(Loc, BaseType, Values);
   }

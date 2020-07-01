@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -parse-stdlib -emit-sil -verify %s
-// RUN: %target-swift-frontend -parse-stdlib -emit-sil -verify %s -enable-ownership-stripping-after-serialization
+// RUN: %target-swift-frontend -parse-stdlib -emit-sil -verify %s
 
 import Swift
 

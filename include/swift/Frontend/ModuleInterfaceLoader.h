@@ -108,6 +108,7 @@
 #define SWIFT_FRONTEND_MODULEINTERFACELOADER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/Support/StringSaver.h"
@@ -126,6 +127,50 @@ class LangOptions;
 class SearchPathOptions;
 class CompilerInvocation;
 
+/// A ModuleLoader that loads explicitly built Swift modules specified via
+/// -swift-module-file
+class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
+  explicit ExplicitSwiftModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
+                                     ModuleLoadingMode loadMode,
+                                     bool IgnoreSwiftSourceInfoFile);
+  std::error_code findModuleFilesInDirectory(
+    AccessPathElem ModuleID,
+    const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+
+  bool isCached(StringRef DepPath) override { return false; };
+
+  struct Implementation;
+  Implementation &Impl;
+public:
+  static std::unique_ptr<ExplicitSwiftModuleLoader>
+  create(ASTContext &ctx,
+         DependencyTracker *tracker, ModuleLoadingMode loadMode,
+         ArrayRef<std::string> ExplicitModulePaths,
+         StringRef ExplicitSwiftModuleMap,
+         bool IgnoreSwiftSourceInfoFile);
+
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+  ~ExplicitSwiftModuleLoader();
+};
+
+struct ModuleInterfaceLoaderOptions {
+  bool remarkOnRebuildFromInterface = false;
+  bool disableInterfaceLock = false;
+  bool disableImplicitSwiftModule = false;
+  ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
+    remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
+    disableInterfaceLock(Opts.DisableInterfaceFileLock),
+    disableImplicitSwiftModule(Opts.DisableImplicitModules) {}
+  ModuleInterfaceLoaderOptions() = default;
+};
+
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
 /// files on the fly, caching the resulting .swiftmodules in the module cache
@@ -136,21 +181,17 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
-      bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile,
-      bool DisableInterfaceFileLock)
+      bool IgnoreSwiftSourceInfoFile, ModuleInterfaceLoaderOptions Opts)
   : SerializedModuleLoaderBase(ctx, tracker, loadMode,
                                IgnoreSwiftSourceInfoFile),
   CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
-  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
-  DisableInterfaceFileLock(DisableInterfaceFileLock),
-  PreferInterfaceForModules(PreferInterfaceForModules)
-  {}
+  PreferInterfaceForModules(PreferInterfaceForModules),
+  Opts(Opts) {}
 
   std::string CacheDir;
   std::string PrebuiltCacheDir;
-  bool RemarkOnRebuildFromInterface;
-  bool DisableInterfaceFileLock;
   ArrayRef<std::string> PreferInterfaceForModules;
+  ModuleInterfaceLoaderOptions Opts;
 
   std::error_code findModuleFilesInDirectory(
     AccessPathElem ModuleID,
@@ -167,16 +208,14 @@ public:
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          ArrayRef<std::string> PreferInterfaceForModules = {},
-         bool RemarkOnRebuildFromInterface = false,
-         bool IgnoreSwiftSourceInfoFile = false,
-         bool DisableInterfaceFileLock = false) {
+         ModuleInterfaceLoaderOptions Opts = ModuleInterfaceLoaderOptions(),
+         bool IgnoreSwiftSourceInfoFile = false) {
     return std::unique_ptr<ModuleInterfaceLoader>(
       new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
                                          tracker, loadMode,
                                          PreferInterfaceForModules,
-                                         RemarkOnRebuildFromInterface,
                                          IgnoreSwiftSourceInfoFile,
-                                         DisableInterfaceFileLock));
+                                         Opts));
   }
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -191,30 +230,74 @@ public:
   static bool buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    const ClangImporterOptions &ClangOpts,
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock);
+    ModuleInterfaceLoaderOptions Opts);
 };
 
-/// Extract the specified-or-defaulted -module-cache-path that winds up in
-/// the clang importer, for reuse as the .swiftmodule cache path when
-/// building a ModuleInterfaceLoader.
-std::string
-getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
+struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
+private:
+  SourceManager &SM;
+  DiagnosticEngine &Diags;
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver ArgSaver;
+  std::vector<StringRef> GenericArgs;
+  CompilerInvocation subInvocation;
 
-bool extractSwiftInterfaceVersionAndArgs(SourceManager &SM,
-                                         DiagnosticEngine &Diags,
-                                         StringRef InterfacePath,
-                                         version::Version &Vers,
-                                         StringRef &CompilerVersion,
-                                         llvm::StringSaver &SubArgSaver,
-                                         SmallVectorImpl<const char *> &SubArgs,
-                                         SourceLoc diagnosticLoc = SourceLoc());
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(StringRef interfacePath,
+                              SourceLoc diagnosticLoc,
+                              Diag<ArgTypes...> ID,
+                        typename detail::PassArgument<ArgTypes>::type... Args) {
+    SourceLoc loc = diagnosticLoc;
+    if (diagnosticLoc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
+    }
+    return Diags.diagnose(loc, ID, std::move(Args)...);
+  }
+  void inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
+                                          const LangOptions &LangOpts);
+  bool extractSwiftInterfaceVersionAndArgs(SmallVectorImpl<const char *> &SubArgs,
+                                           std::string &CompilerVersion,
+                                           StringRef interfacePath,
+                                           SourceLoc diagnosticLoc);
+public:
+  InterfaceSubContextDelegateImpl(SourceManager &SM,
+                                  DiagnosticEngine &Diags,
+                                  const SearchPathOptions &searchPathOpts,
+                                  const LangOptions &langOpts,
+                                  ModuleInterfaceLoaderOptions LoaderOpts,
+                                  ClangModuleLoader *clangImporter,
+                                  bool buildModuleCacheDirIfAbsent,
+                                  StringRef moduleCachePath,
+                                  StringRef prebuiltCachePath,
+                                  bool serializeDependencyHashes,
+                                  bool trackSystemDependencies);
+  bool runInSubContext(StringRef moduleName,
+                       StringRef interfacePath,
+                       StringRef outputPath,
+                       SourceLoc diagLoc,
+    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>,
+                            ArrayRef<StringRef>, StringRef)> action) override;
+  bool runInSubCompilerInstance(StringRef moduleName,
+                                StringRef interfacePath,
+                                StringRef outputPath,
+                                SourceLoc diagLoc,
+            llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) override;
 
-void inheritOptionsForBuildingInterface(CompilerInvocation &Invok,
-                                        const SearchPathOptions &SearchPathOpts,
-                                        const LangOptions &LangOpts);
+  ~InterfaceSubContextDelegateImpl() = default;
+
+  /// includes a hash of relevant key data.
+  StringRef computeCachedOutputPath(StringRef moduleName,
+                                    StringRef UseInterfacePath,
+                                    llvm::SmallString<256> &OutPath,
+                                    StringRef &CacheHash);
+  std::string getCacheHash(StringRef useInterfacePath);
+  void addExtraClangArg(StringRef Arg);
+};
 }
 
 #endif

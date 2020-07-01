@@ -60,7 +60,7 @@ public:
       auto paramResultType = paramFnType->getResult();
       if (!paramResultType->isTypeParameter()) continue;
       auto sig = fn->getGenericSignature();
-      if (!sig->conformsToProtocol(paramResultType, ViewProtocol)) continue;
+      if (!sig->requiresProtocol(paramResultType, ViewProtocol)) continue;
 
       // The parameter must not be a @ViewBuilder parameter.
       if (param->getFunctionBuilderType()) continue;

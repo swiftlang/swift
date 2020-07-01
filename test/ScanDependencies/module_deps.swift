@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -disable-implicit-swift-modules -Xcc -Xclang -Xcc -fno-implicit-modules
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
@@ -11,7 +11,9 @@
 // Check that the JSON parses correctly into the canonical Swift data
 // structures.
 
-// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift -o %t/main
+// RUN: mkdir -p %t/PrintGraph
+// RUN: cp %S/Inputs/PrintGraph.swift %t/main.swift
+// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/main.swift -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/deps.json
 
@@ -21,6 +23,7 @@
 import C
 import E
 import G
+import SubE
 
 // CHECK: "mainModuleName": "deps"
 
@@ -40,6 +43,9 @@ import G
 // CHECK-NEXT: "swift": "G"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
+// CHECK-NEXT: "swift": "SubE"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
 // CHECK-NEXT: "swift": "Swift"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
@@ -51,6 +57,16 @@ import G
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "A"
 // CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT:   "swift": "_cross_import_E"
+// CHECK-NEXT: }
+// CHECK-NEXT: ],
+
+// CHECK:      "extraPcmArgs": [
+// CHECK-NEXT:    "-Xcc",
+// CHECK-NEXT:    "-target",
+// CHECK-NEXT:    "-Xcc",
+// CHECK:         "-fapinotes-swift-version=4"
 
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
@@ -82,7 +98,11 @@ import G
 // CHECK-SAME: "{{.*}}"
 
 // CHECK: "commandLine": [
-// CHECK-NEXT: "-remove-preceeding-explicit-module-build-incompatible-options"
+// CHECK-NEXT: "-frontend"
+// CHECK-NEXT: "-only-use-extra-clang-opts"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "clang"
+// CHECK: "-fno-implicit-modules"
 
 /// --------Swift module E
 // CHECK: "swift": "E"
@@ -98,11 +118,28 @@ import G
 // CHECK-LABEL: "modulePath": "G.swiftmodule"
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
-// CHECK-NEXT: "clang": "G"
+// CHECK-NEXT:   "swift": "Swift"
 // CHECK-NEXT: },
 // CHECK-NEXT: {
-// CHECK-NEXT: "swift": "G"
+// CHECK-NEXT:   "clang": "G"
 // CHECK-NEXT: }
+// CHECK-NEXT: ],
+// CHECK-NEXT: "details": {
+
+// CHECK: "contextHash": "{{.*}}",
+// CHECK: "commandLine": [
+// CHECK: "-compile-module-from-interface"
+// CHECK: "-target"
+// CHECK: "-sdk"
+// CHECK: "-module-name"
+// CHECK: "G"
+// CHECK: "-swift-version"
+// CHECK: "5"
+// CHECK: ],
+// CHECK" "extraPcmArgs": [
+// CHECK"   "-target",
+// CHECK"   "-fapinotes-swift-version=5"
+// CHECK" ]
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "Swift.swiftmodule",
@@ -116,7 +153,10 @@ import G
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "clang": "A"
+// CHECK-NEXT:   "swift": "Swift"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "clang": "A"
 // CHECK-NEXT: }
 
 /// --------Clang module B

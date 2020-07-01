@@ -71,6 +71,11 @@ ERROR(could_not_find_value_dynamic_member_corrected,none,
 ERROR(could_not_find_value_dynamic_member,none,
       "value of type %0 has no dynamic member %2 using key path from root type %1",
       (Type, Type, DeclNameRef))
+ERROR(cannot_infer_contextual_keypath_type_specify_root,none,
+      "cannot infer key path type from context; consider explicitly specifying a root type", ())
+ERROR(cannot_infer_keypath_root_anykeypath_context,none,
+     "'AnyKeyPath' does not provide enough context for root type to be inferred; "
+     "consider explicitly specifying a root type", ())
 
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclNameRef))
@@ -89,6 +94,9 @@ ERROR(could_not_find_enum_case,none,
 
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
+     
+NOTE(did_you_mean_generic_param_as_conformance,none,
+     "did you mean to declare %0 as a protocol conformance for %1?", (DeclName, Type))
 
 NOTE(any_as_anyobject_fixit, none,
      "cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members", ())
@@ -245,6 +253,13 @@ ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
 
+ERROR(no_candidates_match_argument_type,none,
+      "no '%0' candidates produce the expected type %1 for parameter #%2",
+      (StringRef, Type, unsigned))
+
+ERROR(cannot_infer_closure_parameter_type,none,
+      "unable to infer type of a closure parameter %0 in the current context",
+       (StringRef))
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
 ERROR(cannot_infer_closure_result_type,none,
@@ -549,6 +564,9 @@ ERROR(expr_keypath_mutating_getter,none,
 ERROR(expr_keypath_static_member,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
       (DeclName, bool))
+ERROR(expr_keypath_enum_case,none,
+      "%select{key path|dynamic key path member lookup}1 cannot refer to enum case %0",
+      (DeclName, bool))
 ERROR(expr_keypath_empty,none,
       "empty key path does not refer to a property", ())
 ERROR(expr_unsupported_objc_key_path_component,none,
@@ -752,12 +770,20 @@ ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 ERROR(invalid_redecl_init,none,
       "invalid redeclaration of synthesized %select{|memberwise }1%0",
       (DeclName, bool))
+ERROR(invalid_redecl_implicit,none,
+      "invalid redeclaration of synthesized "
+      "%select{%0|implementation for protocol requirement}1 %2",
+      (DescriptiveDeclKind, bool, DeclName))
 WARNING(invalid_redecl_swift5_warning,none,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
 
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
+NOTE(invalid_redecl_implicit_wrapper,none,
+     "%0 synthesized for property wrapper "
+     "%select{projected value|backing storage}1",
+     (DeclName, bool))
 
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))
@@ -1049,6 +1075,9 @@ ERROR(optional_base_not_unwrapped,none,
 NOTE(optional_base_chain,none,
      "chain the optional using '?' to access member %0 only for non-'nil' "
      "base values", (DeclNameRef))
+NOTE(optional_base_remove_optional_for_keypath_root, none,
+     "use unwrapped type %0 as key path root", (Type))
+
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
@@ -1705,6 +1734,13 @@ ERROR(spi_attribute_on_non_public,none,
       "cannot be declared '@_spi' because only public and open "
       "declarations can be '@_spi'",
       (AccessLevel, DescriptiveDeclKind))
+ERROR(spi_attribute_on_protocol_requirement,none,
+      "protocol requirement %0 cannot be declared '@_spi' without "
+      "a default implementation in a protocol extension",
+      (DeclName))
+ERROR(spi_attribute_on_frozen_stored_properties,none,
+      "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
+      (DeclName))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -2639,6 +2675,9 @@ ERROR(enum_non_integer_convertible_raw_type_no_value,none,
       "expressible by integer or string literal", ())
 ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
+ERROR(enum_raw_value_magic_literal,none,
+      "use of '%0' literal as raw value for enum case is not supported",
+      (StringRef))
 NOTE(enum_raw_value_used_here,none,
      "raw value previously used here", ())
 NOTE(enum_raw_value_incrementing_from_here,none,
@@ -2653,7 +2692,8 @@ ERROR(decl_from_hidden_module,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
-      "it is an SPI imported from %3}4",
+      "it is an SPI imported from %3|"
+      "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -2738,10 +2778,10 @@ WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
-      "requires all stored properties not marked with `@noDerivative` to be "
-      "mutable; add an explicit '@noDerivative' attribute"
+      "requires 'wrappedValue' in property wrapper %0 to be mutable; "
+      "add an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
-      (/*wrapperType*/ StringRef, /*nominalName*/ Identifier,
+      (/*wrapperType*/ Identifier, /*nominalName*/ Identifier,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %0 "
@@ -2978,8 +3018,6 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
-ERROR(differentiable_attr_void_result,none,
-      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -2998,9 +3036,6 @@ ERROR(differentiable_attr_invalid_access,none,
       "derivative function %0 is required to either be public or "
       "'@usableFromInline' because the original function %1 is public or "
       "'@usableFromInline'", (DeclNameRef, DeclName))
-ERROR(differentiable_attr_result_not_differentiable,none,
-      "can only differentiate functions with results that conform to "
-      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
@@ -3107,6 +3142,9 @@ ERROR(autodiff_attr_original_void_result,none,
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
       "cannot differentiate functions with both an 'inout' parameter and a "
       "result", ())
+ERROR(autodiff_attr_result_not_differentiable,none,
+      "can only differentiate functions with results that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
@@ -4262,8 +4300,8 @@ ERROR(objc_invalid_on_subscript,none,
 ERROR(objc_invalid_on_static_subscript,none,
       "%0 cannot be %" OBJC_ATTR_SELECT "1", (DescriptiveDeclKind, unsigned))
 ERROR(objc_invalid_with_generic_params,none,
-      "method cannot be %" OBJC_ATTR_SELECT "0 because it has generic "
-      "parameters", (unsigned))
+      "%0 cannot be %" OBJC_ATTR_SELECT "1 because it has generic parameters",
+      (DescriptiveDeclKind, unsigned))
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
@@ -4729,7 +4767,8 @@ WARNING(resilience_decl_unavailable_warn,
 ERROR(inlinable_decl_ref_from_hidden_module,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
       "because %select{%3 was imported implementation-only|"
-      "it is an SPI imported from %3}4",
+      "it is an SPI imported from %3|"
+      "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 #undef FRAGILE_FUNC_KIND
@@ -5045,6 +5084,14 @@ NOTE(function_builder_remove_attr, none,
      "remove the attribute to explicitly disable the function builder", ())
 NOTE(function_builder_remove_returns, none,
      "remove 'return' statements to apply the function builder", ())
+ERROR(function_builder_infer_ambig, none,
+      "ambiguous function builder inferred for %0: %1 or %2",
+      (DeclName, Type, Type))
+NOTE(function_builder_infer_add_return, none,
+     "add an explicit 'return' statement to not use a function builder", ())
+NOTE(function_builder_infer_pick_specific, none,
+     "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
+     (Type, unsigned, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

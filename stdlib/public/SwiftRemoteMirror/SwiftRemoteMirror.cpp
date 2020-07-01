@@ -33,14 +33,15 @@ using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
-using NativeReflectionContext = swift::reflection::ReflectionContext<
-    External<RuntimeTarget<sizeof(uintptr_t)>>>;
+using Runtime = External<RuntimeTarget<sizeof(uintptr_t)>>;
+using NativeReflectionContext = swift::reflection::ReflectionContext<Runtime>;
 
 struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;
   std::vector<std::function<void()>> freeFuncs;
   std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
-  
+  std::string lastString;
+
   SwiftReflectionContext(MemoryReaderImpl impl) {
     auto Reader = std::make_shared<CMemoryReader>(impl);
     nativeContext = new NativeReflectionContext(Reader);
@@ -280,6 +281,18 @@ swift_reflection_copyDemangledNameForTypeRef(
   return strdup(Name.c_str());
 }
 
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForProtocolDescriptor(
+  SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t Proto) {
+  auto Context = ContextRef->nativeContext;
+
+  Demangle::Demangler Dem;
+  auto Demangling = Context->readDemanglingForContextDescriptor(Proto, Dem);
+  auto Name = nodeToString(Demangling);
+  return strdup(Name.c_str());
+}
+
 swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index) {
@@ -408,6 +421,15 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
     getTypeInfoKind(FieldInfo->TI),
     reinterpret_cast<swift_typeref_t>(FieldInfo->TR),
   };
+}
+
+static const char *returnableCString(SwiftReflectionContextRef ContextRef,
+                                      llvm::Optional<std::string> String) {
+  if (String) {
+    ContextRef->lastString = *String;
+    return ContextRef->lastString.c_str();
+  }
+  return nullptr;
 }
 
 swift_typeinfo_t
@@ -571,4 +593,69 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
   auto Demangled = Demangle::demangleTypeAsString(Mangled);
   strncpy(OutDemangledName, Demangled.c_str(), MaxLength);
   return Demangled.size();
+}
+
+const char *swift_reflection_iterateConformanceCache(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_reflection_ptr_t Type,
+               swift_reflection_ptr_t Proto,
+               void *ContextPtr),
+  void *ContextPtr) {
+  auto Context = ContextRef->nativeContext;
+  auto Error = Context->iterateConformances([&](auto Type, auto Proto) {
+    Call(Type, Proto, ContextPtr);
+  });
+  return returnableCString(ContextRef, Error);
+}
+
+const char *swift_reflection_iterateMetadataAllocations(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_metadata_allocation_t Allocation,
+               void *ContextPtr),
+  void *ContextPtr) {
+  auto Context = ContextRef->nativeContext;
+  auto Error = Context->iterateMetadataAllocations([&](auto Allocation) {
+    swift_metadata_allocation CAllocation;
+    CAllocation.Tag = Allocation.Tag;
+    CAllocation.Ptr = Allocation.Ptr;
+    CAllocation.Size = Allocation.Size;
+    Call(CAllocation, ContextPtr);
+  });
+  return returnableCString(ContextRef, Error);
+}
+
+swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
+  SwiftReflectionContextRef ContextRef,
+  swift_metadata_allocation_t Allocation) {
+  auto Context = ContextRef->nativeContext;
+  MetadataAllocation<Runtime> NativeAllocation;
+  NativeAllocation.Tag = Allocation.Tag;
+  NativeAllocation.Ptr = Allocation.Ptr;
+  NativeAllocation.Size = Allocation.Size;
+  return Context->allocationMetadataPointer(NativeAllocation);
+}
+
+const char *swift_reflection_metadataAllocationTagName(
+    SwiftReflectionContextRef ContextRef, swift_metadata_allocation_tag_t Tag) {
+  auto Context = ContextRef->nativeContext;
+  auto Result = Context->metadataAllocationTagName(Tag);
+  return returnableCString(ContextRef, Result);
+}
+
+const char *swift_reflection_iterateMetadataAllocationBacktraces(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadataAllocationBacktraceIterator Call, void *ContextPtr) {
+  auto Context = ContextRef->nativeContext;
+  auto Error = Context->iterateMetadataAllocationBacktraces(
+      [&](auto AllocationPtr, auto Count, auto Ptrs) {
+        // Ptrs is an array of StoredPointer, but the callback expects an array
+        // of swift_reflection_ptr_t. Those may are not always the same type.
+        // (For example, swift_reflection_ptr_t can be 64-bit on 32-bit systems,
+        // while StoredPointer is always the pointer size of the target system.)
+        // Convert the array to an array of swift_reflection_ptr_t.
+        std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
+                                                          &Ptrs[Count]};
+        Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
+      });
+  return returnableCString(ContextRef, Error);
 }

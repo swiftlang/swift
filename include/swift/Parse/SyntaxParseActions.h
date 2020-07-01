@@ -24,11 +24,13 @@ namespace swift {
 
 class CharSourceRange;
 class ParsedTriviaPiece;
+class SourceFile;
 class SourceLoc;
 enum class tok;
 
 namespace syntax {
-  enum class SyntaxKind;
+class SourceFileSyntax;
+enum class SyntaxKind;
 }
 
 typedef void *OpaqueSyntaxNode;
@@ -54,6 +56,12 @@ public:
   virtual OpaqueSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
                                            ArrayRef<OpaqueSyntaxNode> elements,
                                            CharSourceRange range) = 0;
+
+  /// Attempt to realize an opaque raw syntax node for a source file into a
+  /// SourceFileSyntax node. This will return \c None if the parsing action
+  /// doesn't support the realization of syntax nodes.
+  virtual Optional<syntax::SourceFileSyntax>
+  realizeSyntaxRoot(OpaqueSyntaxNode root, const SourceFile &SF) = 0;
 
   /// Discard raw syntax node.
   /// 

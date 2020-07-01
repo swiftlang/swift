@@ -316,7 +316,7 @@ public:
 
   std::pair<unsigned, unsigned> indentLineAndColumn() {
     if (InnermostCtx)
-      return SM.getLineAndColumn(InnermostCtx->ContextLoc);
+      return SM.getPresumedLineAndColumnForLoc(InnermostCtx->ContextLoc);
     return std::make_pair(0, 0);
   }
 
@@ -446,7 +446,7 @@ private:
       }
     }
     for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-      if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }
@@ -993,8 +993,13 @@ class ListAligner {
   SourceLoc AlignLoc;
   SourceLoc LastEndLoc;
   bool HasOutdent = false;
+  bool BreakAlignment = false;
 
 public:
+
+  /// Don't column-align if any element starts on the same line as IntroducerLoc
+  /// but ends on a later line.
+  bool BreakAlignmentIfSpanning = false;
 
   /// Constructs a new \c ListAligner for a list bounded by separate opening and
   /// closing tokens, e.g. tuples, array literals, parameter lists, etc.
@@ -1068,8 +1073,11 @@ public:
     assert(Range.isValid());
     LastEndLoc = Range.End;
 
-    HasOutdent |= isOnSameLine(SM, IntroducerLoc, Range.Start) &&
-      OutdentChecker::hasOutdent(SM, Range, WalkableParent);
+    if (isOnSameLine(SM, IntroducerLoc, Range.Start)) {
+      HasOutdent |= OutdentChecker::hasOutdent(SM, Range, WalkableParent);
+      if (BreakAlignmentIfSpanning)
+        BreakAlignment |= !isOnSameLine(SM, IntroducerLoc, Range.End);
+    }
 
     if (HasOutdent || !SM.isBeforeInBuffer(Range.Start, TargetLoc))
       return;
@@ -1128,7 +1136,7 @@ public:
     }
 
     bool ShouldIndent = shouldIndent(HasTrailingComma, TargetIsTrailing);
-    if (ShouldIndent && AlignLoc.isValid()) {
+    if (ShouldIndent && !BreakAlignment && AlignLoc.isValid()) {
       setAlignmentIfNeeded(Override);
       return IndentContext {AlignLoc, false, IndentContext::Exact};
     }
@@ -1140,7 +1148,7 @@ public:
   /// This should be called before returning an \c IndentContext for a subrange
   /// of the list.
   void setAlignmentIfNeeded(ContextOverride &Override) {
-    if (HasOutdent || AlignLoc.isInvalid())
+    if (HasOutdent || BreakAlignment || AlignLoc.isInvalid())
       return;
     Override.setExact(SM, AlignLoc);
   }
@@ -1252,7 +1260,7 @@ private:
       }
     }
     for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-      if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }
@@ -1467,7 +1475,7 @@ private:
       return;
     for (auto Invalid = Loc.isInvalid(); CurrentTokIt != TokenList.end() &&
          (Invalid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
-         CurrentTokIt++) {
+         ++CurrentTokIt) {
       if (CurrentTokIt->getKind() == tok::comment) {
         CharSourceRange CommentRange = CurrentTokIt->getRange();
         SourceLoc StartLineLoc = Lexer::getLocForStartOfLine(
@@ -1676,6 +1684,36 @@ private:
       SourceLoc ContextLoc = PBD->getStartLoc(), IntroducerLoc = PBD->getLoc();
 
       ListAligner Aligner(SM, TargetLocation, ContextLoc, IntroducerLoc);
+
+      // Don't column align PBD entries if any entry spans from the same line as
+      // the IntroducerLoc (var/let) to another line. E.g.
+      //
+      // let foo = someItem
+      //       .getValue(), // Column-alignment looks ok here, but...
+      //     bar = otherItem
+      //       .getValue()
+      //
+      // getAThing()
+      //   .andDoStuffWithIt()
+      // let foo = someItem
+      //       .getValue() // looks over-indented here, which is more common...
+      // getOtherThing()
+      //   .andDoStuffWithIt()
+      //
+      // getAThing()
+      //   .andDoStuffWithIt()
+      // let foo = someItem
+      //   .getValue() // so break column alignment in this case...
+      // doOtherThing()
+      //
+      // let foo = someItem.getValue(),
+      //     bar = otherItem.getValue() // but not in this case.
+      //
+      // Using this rule, rather than handling single and multi-entry PBDs
+      // differently, ensures that the as-typed-out indentation matches the
+      // re-indented indentation for multi-entry PBDs.
+      Aligner.BreakAlignmentIfSpanning = true;
+
       for (auto I: range(PBD->getNumPatternEntries())) {
         SourceRange EntryRange = PBD->getEqualLoc(I);
         VarDecl *SingleVar = nullptr;
@@ -1868,6 +1906,11 @@ private:
         Aligner.updateAlignment(PD->getSourceRange(), PD);
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }
+
+    // There are no parens at this point, so if there are no parameters either,
+    // this shouldn't be a context (it's an implicit parameter list).
+    if (!PL->size())
+      return None;
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, Range.Start);
     for (auto *PD: *PL)
@@ -2299,8 +2342,17 @@ private:
         return None;
 
       ListAligner Aligner(SM, TargetLocation, L, L, R, true);
-      for (auto *Elem: AE->getElements())
-        Aligner.updateAlignment(Elem->getStartLoc(), Elem->getEndLoc(), Elem);
+      for (auto *Elem: AE->getElements()) {
+        SourceRange ElemRange = Elem->getSourceRange();
+        Aligner.updateAlignment(ElemRange, Elem);
+        if (isTargetContext(ElemRange)) {
+          Aligner.setAlignmentIfNeeded(CtxOverride);
+          return IndentContext {
+            ElemRange.Start,
+            !OutdentChecker::hasOutdent(SM, ElemRange, Elem)
+          };
+        }
+      }
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }
 

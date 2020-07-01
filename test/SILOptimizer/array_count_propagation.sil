@@ -29,6 +29,7 @@ sil [_semantics "array.uninitialized"] @adoptStorage : $@convention(thin) (@owne
 sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
 sil [_semantics "array.get_element"] @getElement : $@convention(method) (MyInt, MyBool, @guaranteed MyArray<MyInt>) -> @out MyInt
 sil [_semantics "array.uninitialized"] @allocateUninitialized : $@convention(thin) (MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+sil [_semantics "array.finalize_intrinsic"] @finalize : $@convention(thin) (@owned MyArray<MyInt>) -> @owned MyArray<MyInt>
 sil [_semantics "array.init"] @initRepeatedValueCount : $@convention(thin) (@in MyInt, MyInt, @thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
 sil [_semantics "array.init"] @initEmpty : $@convention(thin) (@thin MyArray<MyInt>.Type) -> @owned MyArray<MyInt>
 
@@ -50,9 +51,11 @@ bb0:
  %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
  %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
  debug_value %7 : $MyArray<MyInt>
+ %f = function_ref @finalize : $@convention(thin) (@owned MyArray<MyInt>) -> @owned MyArray<MyInt>
+ %a = apply %f(%7) : $@convention(thin) (@owned MyArray<MyInt>) -> @owned MyArray<MyInt>
  %9 = function_ref @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
- %10 = apply %9(%7) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
- %12 = struct_extract %7 : $MyArray<MyInt>, #MyArray._buffer
+ %10 = apply %9(%a) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
+ %12 = struct_extract %a : $MyArray<MyInt>, #MyArray._buffer
  %13 = struct_extract %12 : $_MyArrayBuffer<MyInt>, #_MyArrayBuffer._storage
  %14 = struct_extract %13 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
  strong_release %14 : $Builtin.BridgeObject

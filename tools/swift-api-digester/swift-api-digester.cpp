@@ -1145,6 +1145,8 @@ public:
     // Decls with @_alwaysEmitIntoClient aren't required to have an
     // @available attribute.
     if (!Ctx.getOpts().SkipOSCheck &&
+        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::DAK_Available,
+                                                    D->getDeclKind()) &&
         !D->getIntroducingVersion().hasOSAvailability() &&
         !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
       D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
@@ -1214,7 +1216,9 @@ public:
       if (!Ctx.checkingABI()) {
         if (auto *Var = dyn_cast<SDKNodeDeclVar>(Right)) {
           if (Var->getDeclKind() == DeclKind::EnumElement) {
-            Var->emitDiag(Var->getLoc(), diag::enum_case_added);
+            if (Var->getParent()->getAs<SDKNodeDeclType>()->isEnumExhaustive()) {
+              Var->emitDiag(Var->getLoc(), diag::enum_case_added);
+            }
           }
         }
       }
@@ -2649,7 +2653,9 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
   Opts.LocationFilter = options::LocationFilter;
   Opts.PrintModule = options::PrintModule;
-  Opts.SwiftOnly = options::SwiftOnly;
+  // When ABI checking is enabled, we should only include Swift symbols because
+  // the checking logics are language-specific.
+  Opts.SwiftOnly = options::Abi || options::SwiftOnly;
   Opts.SkipOSCheck = options::DisableOSChecks;
   for (int i = 1; i < argc; ++i)
     Opts.ToolArgs.push_back(argv[i]);

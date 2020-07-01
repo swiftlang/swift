@@ -25,6 +25,7 @@
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -35,10 +36,10 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
@@ -764,7 +765,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     ++NumLazyRequirementSignaturesLoaded;
     // FIXME: (transitional) increment the redundant "always-on" counter.
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded++;
+      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
 
     auto contextData = static_cast<LazyProtocolData *>(
         ctx.getOrCreateLazyContextData(proto, nullptr));
@@ -830,11 +831,15 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   if (!isa<ClassDecl>(dc))
     return true;
 
+  // Destructors always use a fixed vtable entry.
+  if (isa<DestructorDecl>(decl))
+    return false;
+  
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
+  if (decl->isFinal() || decl->shouldUseObjCDispatch() || decl->hasClangNode())
     return false;
 
   auto &ctx = dc->getASTContext();
@@ -864,7 +869,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 
   auto base = decl->getOverriddenDecl();
 
-  if (!base || base->hasClangNode() || base->isObjCDynamic())
+  if (!base || base->hasClangNode() || base->shouldUseObjCDispatch())
     return true;
 
   // As above, convenience initializers are not formally overridable in Swift
@@ -1078,6 +1083,21 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     if (ED->LazySemanticInfo.hasFixedRawValues())
       continue;
 
+    // Using magic literals like #file as raw value is not supported right now.
+    // TODO: We could potentially support #file, #function, #line and #column.
+    auto &Diags = ED->getASTContext().Diags;
+    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
+                            ? elt->getLoc()
+                            : uncheckedRawValueOf(elt)->getLoc();
+    if (auto magicLiteralExpr =
+            dyn_cast<MagicIdentifierLiteralExpr>(prevValue)) {
+      auto kindString =
+          magicLiteralExpr->getKindString(magicLiteralExpr->getKind());
+      Diags.diagnose(diagLoc, diag::enum_raw_value_magic_literal, kindString);
+      elt->setInvalid();
+      continue;
+    }
+
     // Check that the raw value is unique.
     RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};
@@ -1087,9 +1107,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       continue;
 
     // Diagnose the duplicate value.
-    auto &Diags = ED->getASTContext().Diags;
-    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
-        ? elt->getLoc() : uncheckedRawValueOf(elt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
     assert(lastExplicitValueElt &&
            "should not be able to have non-unique raw values when "
@@ -1151,6 +1168,10 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   if (decl->getAccessorKind() != AccessorKind::DidSet) {
     return false;
   }
+
+  // Always assume non-simple 'didSet' in code completion mode.
+  if (decl->getASTContext().SourceMgr.hasCodeCompletionBuffer())
+    return false;
 
   // didSet must have a single parameter.
   if (decl->getParameters()->size() != 1) {
@@ -1321,21 +1342,6 @@ static void checkPrecedenceCircularity(DiagnosticEngine &D,
   } while (!stack.empty());
 }
 
-static PrecedenceGroupDecl *
-lookupPrecedenceGroup(const PrecedenceGroupDescriptor &descriptor) {
-  auto *dc = descriptor.dc;
-  if (auto sf = dc->getParentSourceFile()) {
-    auto desc = OperatorLookupDescriptor::forFile(
-        sf, descriptor.ident, dc->isCascadingContextForLookup(false),
-        descriptor.nameLoc);
-    return evaluateOrDefault(sf->getASTContext().evaluator,
-                             LookupPrecedenceGroupRequest{desc}, nullptr);
-  } else {
-    return dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
-                                                        descriptor.nameLoc);
-  }
-}
-
 static PrecedenceGroupDecl *lookupPrecedenceGroupForRelation(
     DeclContext *dc, PrecedenceGroupDecl::Relation rel,
     PrecedenceGroupDescriptor::PathDirection direction) {
@@ -1350,10 +1356,8 @@ static PrecedenceGroupDecl *lookupPrecedenceGroupForRelation(
     llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
     return nullptr;
   }
-  if (!result.get()) {
-    ctx.Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-  }
-  return result.get();
+  return PrecedenceGroupLookupResult(dc, rel.Name, std::move(*result))
+      .getSingleOrDiagnose(rel.NameLoc);
 }
 
 void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
@@ -1392,10 +1396,8 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     // If we didn't find anything, try doing a raw lookup for the group before
     // diagnosing the 'lowerThan' within the same-module restriction. This can
     // allow us to diagnose even if we have a precedence group cycle.
-    if (!group) {
-      group = lookupPrecedenceGroup(PrecedenceGroupDescriptor{
-          dc, rel.Name, rel.NameLoc, PrecedenceGroupDescriptor::LowerThan});
-    }
+    if (!group)
+      group = dc->lookupPrecedenceGroup(rel.Name).getSingle();
 
     if (group &&
         group->getDeclContext()->getParentModule() == dc->getParentModule()) {
@@ -1416,22 +1418,25 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     checkPrecedenceCircularity(Diags, PGD);
 }
 
-PrecedenceGroupDecl * ValidatePrecedenceGroupRequest::evaluate(
+TinyPtrVector<PrecedenceGroupDecl *> ValidatePrecedenceGroupRequest::evaluate(
     Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
-  if (auto *group = lookupPrecedenceGroup(descriptor)) {
+  auto groups = descriptor.dc->lookupPrecedenceGroup(descriptor.ident);
+  for (auto *group : groups)
     validatePrecedenceGroup(group);
-    return group;
-  }
 
-  return nullptr;
+  // Return the raw results vector, which will get wrapped back in a
+  // PrecedenceGroupLookupResult by the TypeChecker entry point. This dance
+  // avoids unnecessarily caching the name and context for the lookup.
+  return std::move(groups).get();
 }
 
-PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
-                                                        Identifier name,
-                                                        SourceLoc nameLoc) {
-  return evaluateOrDefault(
+PrecedenceGroupLookupResult
+TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
+                                   SourceLoc nameLoc) {
+  auto groups = evaluateOrDefault(
       dc->getASTContext().evaluator,
-      ValidatePrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
+      ValidatePrecedenceGroupRequest({dc, name, nameLoc, None}), {});
+  return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
 static NominalTypeDecl *resolveSingleNominalTypeDecl(
@@ -1480,7 +1485,6 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   auto enableOperatorDesignatedTypes =
       ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
 
-  auto &Diags = ctx.Diags;
   PrecedenceGroupDecl *group = nullptr;
 
   auto identifiers = IOD->getIdentifiers();
@@ -1488,20 +1492,18 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
     auto name = identifiers[0].Item;
     auto loc = identifiers[0].Loc;
 
-    group = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
+    auto canResolveType = [&]() -> bool {
+      return enableOperatorDesignatedTypes &&
+             resolveSingleNominalTypeDecl(dc, loc, name, ctx,
+                                          TypeResolutionFlags::SilenceErrors);
+    };
 
-    if (group) {
+    // Make sure not to diagnose in the case where we failed to find a
+    // precedencegroup, but we could resolve a type instead.
+    auto groups = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
+    if (groups.hasResults() || !canResolveType()) {
+      group = groups.getSingleOrDiagnose(loc);
       identifiers = identifiers.slice(1);
-    } else {
-      // If we're either not allowing types, or we are allowing them
-      // and this identifier is not a type, emit an error as if it's
-      // a precedence group.
-      if (!(enableOperatorDesignatedTypes &&
-            resolveSingleNominalTypeDecl(dc, loc, name, ctx,
-                                         TypeResolutionFlags::SilenceErrors))) {
-        Diags.diagnose(loc, diag::unknown_precedence_group, name);
-        identifiers = identifiers.slice(1);
-      }
     }
   }
 
@@ -1511,13 +1513,9 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   assert(identifiers.empty() || enableOperatorDesignatedTypes);
 
   if (!group) {
-    group = TypeChecker::lookupPrecedenceGroup(dc, ctx.Id_DefaultPrecedence,
-                                               SourceLoc());
-  }
-
-  if (!group) {
-    Diags.diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
-                   ctx.Id_DefaultPrecedence);
+    auto groups = TypeChecker::lookupPrecedenceGroup(
+        dc, ctx.Id_DefaultPrecedence, SourceLoc());
+    group = groups.getSingleOrDiagnose(IOD->getLoc(), /*forBuiltin*/ true);
   }
 
   auto nominalTypes = IOD->getDesignatedNominalTypes();
@@ -1797,24 +1795,15 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     FD->diagnose(diag::operator_in_local_scope);
   }
 
-  auto desc = OperatorLookupDescriptor::forFile(
-      FD->getDeclContext()->getParentSourceFile(), operatorName,
-      FD->isCascadingContextForLookup(false), FD->getLoc());
-  OperatorDecl *op = nullptr;
+  NullablePtr<OperatorDecl> op;
   if (FD->isUnaryOperator()) {
     if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
-      op = evaluateOrDefault(evaluator,
-                             LookupPrefixOperatorRequest{desc}, nullptr);
+      op = FD->lookupPrefixOperator(operatorName);
     } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
-      op = evaluateOrDefault(evaluator,
-                             LookupPostfixOperatorRequest{desc}, nullptr);
+      op = FD->lookupPostfixOperator(operatorName);
     } else {
-      auto prefixOp = evaluateOrDefault(evaluator,
-                                        LookupPrefixOperatorRequest{desc},
-                                        nullptr);
-      auto postfixOp = evaluateOrDefault(evaluator,
-                                         LookupPostfixOperatorRequest{desc},
-                                         nullptr);
+      auto *prefixOp = FD->lookupPrefixOperator(operatorName);
+      auto *postfixOp = FD->lookupPostfixOperator(operatorName);
 
       // If we found both prefix and postfix, or neither prefix nor postfix,
       // complain. We can't fix this situation.
@@ -1823,9 +1812,11 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 
         // If we found both, point at them.
         if (prefixOp) {
-          diags.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
+          diags.diagnose(prefixOp, diag::unary_operator_declaration_here,
+                         /*isPostfix*/ false)
             .fixItInsert(FD->getLoc(), "prefix ");
-          diags.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
+          diags.diagnose(postfixOp, diag::unary_operator_declaration_here,
+                         /*isPostfix*/ true)
             .fixItInsert(FD->getLoc(), "postfix ");
         } else {
           // FIXME: Introduce a Fix-It that adds the operator declaration?
@@ -1842,7 +1833,8 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       // Fix the AST and determine the insertion text.
       const char *insertionText;
       auto &C = FD->getASTContext();
-      if (postfixOp) {
+      auto isPostfix = static_cast<bool>(postfixOp);
+      if (isPostfix) {
         insertionText = "postfix ";
         op = postfixOp;
         FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
@@ -1854,15 +1846,20 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 
       // Emit diagnostic with the Fix-It.
       diags.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
-                  static_cast<bool>(postfixOp))
+                     isPostfix)
         .fixItInsert(FD->getFuncLoc(), insertionText);
-      diags.diagnose(op, diag::unary_operator_declaration_here,
-                  static_cast<bool>(postfixOp));
+      op.get()->diagnose(diag::unary_operator_declaration_here, isPostfix);
     }
   } else if (FD->isBinaryOperator()) {
-    op = evaluateOrDefault(evaluator,
-                           LookupInfixOperatorRequest{desc},
-                           nullptr);
+    auto results = FD->lookupInfixOperator(operatorName);
+
+    // If we have an ambiguity, diagnose and return. Otherwise fall through, as
+    // we have a custom diagnostic for missing operator decls.
+    if (results.isAmbiguous()) {
+      results.diagnoseAmbiguity(FD->getLoc());
+      return nullptr;
+    }
+    op = results.getSingle();
   } else {
     diags.diagnose(FD, diag::invalid_arg_count_for_operator);
     return nullptr;
@@ -1910,8 +1907,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       opDiagnostic.fixItInsert(insertionLoc, insertion);
     return nullptr;
   }
-
-  return op;
+  return op.get();
 }
 
 bool swift::isMemberOperator(FuncDecl *decl, Type type) {
@@ -2122,7 +2118,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   if (decl->isVariadic()) {
     Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
-    if (Ty.isNull()) {
+    if (Ty->hasError()) {
       decl->setInvalid();
       return ErrorType::get(ctx);
     }
@@ -2385,23 +2381,33 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   if (!namingPattern) {
     auto *canVD = VD->getCanonicalVarDecl();
     namingPattern = canVD->NamingPattern;
+  }
 
+  if (!namingPattern) {
+    // Try type checking parent conditional statement.
+    if (auto parentStmt = VD->getParentPatternStmt()) {
+      if (auto LCS = dyn_cast<LabeledConditionalStmt>(parentStmt)) {
+        TypeChecker::typeCheckConditionForStatement(LCS, VD->getDeclContext());
+        namingPattern = VD->NamingPattern;
+      }
+    }
+  }
+
+  if (!namingPattern) {
     // HACK: If no other diagnostic applies, emit a generic diagnostic about
     // a variable being unbound. We can't do better than this at the
     // moment because TypeCheckPattern does not reliably invalidate parts of
     // the pattern AST on failure.
     //
     // Once that's through, this will only fire during circular validation.
-    if (!namingPattern) {
-      if (VD->hasInterfaceType() &&
-          !VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
-        VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
-      }
-
-      VD->getParentPattern()->setType(ErrorType::get(Context));
-      setBoundVarsTypeError(VD->getParentPattern(), Context);
-      return nullptr;
+    if (VD->hasInterfaceType() &&
+        !VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
+      VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
     }
+
+    VD->getParentPattern()->setType(ErrorType::get(Context));
+    setBoundVarsTypeError(VD->getParentPattern(), Context);
+    return nullptr;
   }
 
   if (!namingPattern->hasType()) {
@@ -2412,13 +2418,64 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   return namingPattern;
 }
 
-DeclRange
+namespace {
+
+// Utility class for deterministically ordering vtable entries for
+// synthesized methods.
+struct SortedFuncList {
+  using Entry = std::pair<std::string, AbstractFunctionDecl *>;
+  SmallVector<Entry, 2> elts;
+  bool sorted = false;
+
+  void add(AbstractFunctionDecl *afd) {
+    Mangle::ASTMangler mangler;
+    std::string mangledName;
+    if (auto *cd = dyn_cast<ConstructorDecl>(afd))
+      mangledName = mangler.mangleConstructorEntity(cd, /*allocator=*/false);
+    else if (auto *dd = dyn_cast<DestructorDecl>(afd))
+      mangledName = mangler.mangleDestructorEntity(dd, /*deallocating=*/false);
+    else
+      mangledName = mangler.mangleEntity(afd);
+
+    elts.push_back(std::make_pair(mangledName, afd));
+  }
+
+  bool empty() { return elts.empty(); }
+
+  void sort() {
+    assert(!sorted);
+    sorted = true;
+    std::sort(elts.begin(),
+              elts.end(),
+              [](const Entry &lhs, const Entry &rhs) -> bool {
+                return lhs.first < rhs.first;
+              });
+  }
+
+  decltype(elts)::const_iterator begin() const {
+    assert(sorted);
+    return elts.begin();
+  }
+
+  decltype(elts)::const_iterator end() const {
+    assert(sorted);
+    return elts.end();
+  }
+};
+
+} // end namespace
+
+ArrayRef<Decl *>
 EmittedMembersRequest::evaluate(Evaluator &evaluator,
                                 ClassDecl *CD) const {
-  if (!CD->getParentSourceFile())
-    return CD->getMembers();
-
   auto &Context = CD->getASTContext();
+  SmallVector<Decl *, 8> result;
+
+  if (!CD->getParentSourceFile()) {
+    auto members = CD->getMembers();
+    result.append(members.begin(), members.end());
+    return Context.AllocateCopy(result);
+  }
 
   // We need to add implicit initializers because they
   // affect vtable layout.
@@ -2446,16 +2503,40 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
+  forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
 
-  // The projected storage wrapper ($foo) might have dynamically-dispatched
-  // accessors, so force them to be synthesized.
   for (auto *member : CD->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      // The projected storage wrapper ($foo) might have dynamically-dispatched
+      // accessors, so force them to be synthesized.
       if (var->hasAttachedPropertyWrapper())
         (void) var->getPropertyWrapperBackingProperty();
+    }
   }
 
-  return CD->getMembers();
+  SortedFuncList synthesizedMembers;
+
+  for (auto *member : CD->getMembers()) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+      // Add synthesized members to a side table and sort them by their mangled
+      // name, since they could have been added to the class in any order.
+      if (afd->isSynthesized()) {
+        synthesizedMembers.add(afd);
+        continue;
+      }
+    }
+
+    result.push_back(member);
+  }
+
+  if (!synthesizedMembers.empty()) {
+    synthesizedMembers.sort();
+
+    for (const auto &pair : synthesizedMembers)
+      result.push_back(pair.second);
+  }
+
+  return Context.AllocateCopy(result);
 }
 
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,

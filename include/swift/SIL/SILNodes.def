@@ -413,6 +413,7 @@ ABSTRACT_VALUE(SILArgument, ValueBase)
 
 ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
   MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
+  MULTIPLE_VALUE_INST_RESULT(BeginCOWMutationResult, MultipleValueInstructionResult)
   MULTIPLE_VALUE_INST_RESULT(DestructureStructResult, MultipleValueInstructionResult)
   MULTIPLE_VALUE_INST_RESULT(DestructureTupleResult, MultipleValueInstructionResult)
   VALUE_RANGE(MultipleValueInstructionResult, BeginApplyResult, DestructureTupleResult)
@@ -578,6 +579,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // the isUnique instruction. It appears to write a new object reference.
   SINGLE_VALUE_INST(IsUniqueInst, is_unique,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+
+  SINGLE_VALUE_INST(EndCOWMutationInst, end_cow_mutation,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
                     SingleValueInstruction, MayRead, DoesNotRelease)
@@ -876,6 +880,13 @@ NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
 FULLAPPLYSITE_MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
                                   MultipleValueInstruction, MayHaveSideEffects, MayRelease)
+                                  
+// begin_cow_mutation is defined to have side effects, because it has
+// dependencies with instructions which retain the buffer operand. This prevents
+// optimizations from moving begin_cow_mutation instructions across such retain
+// instructions.
+MULTIPLE_VALUE_INST(BeginCOWMutationInst, begin_cow_mutation,
+                    MultipleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
                     MultipleValueInstruction, None, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,

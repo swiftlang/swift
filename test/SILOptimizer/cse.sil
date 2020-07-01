@@ -617,21 +617,18 @@ bb0(%0 : $FakeOptional):
 class C {}
 class D : C { }
 
-// CHECK-LABEL: sil @test1cse : $@convention(thin) (C) -> () {
-// CHECK: unchecked_ref_cast
+// CHECK-LABEL: sil @test1cse
+// CHECK: [[C:%[0-9]+]] = unchecked_ref_cast
 // CHECK-NOT: unchecked_ref_cast
-// CHECK: strong_release
-// CHECK: strong_release
-// CHECK: return
-sil @test1cse : $@convention(thin) (C) -> () {
+// CHECK: [[T:%[0-9]+]] = tuple ([[C]] : $Builtin.NativeObject, [[C]] : $Builtin.NativeObject)
+// CHECK: return [[T]]
+sil @test1cse : $@convention(thin) (C) -> (Builtin.NativeObject, Builtin.NativeObject) {
 bb0(%0 : $C):
   strong_retain %0 : $C
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
   %2 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
-  strong_release %1 : $Builtin.NativeObject
-  strong_release %2 : $Builtin.NativeObject
-  %5 = tuple()
-  return %5 : $()
+  %5 = tuple(%1 : $Builtin.NativeObject, %2 : $Builtin.NativeObject)
+  return %5 : $(Builtin.NativeObject, Builtin.NativeObject)
 }
 
 // CHECK-LABEL: sil @test2cse : $@convention(thin) (C) -> () {
@@ -704,23 +701,20 @@ bb0(%0 : $*Builtin.Int8):
 }
 
 // CHECK-LABEL: sil @cse_unchecked_ref_cast
-// CHECK: unchecked_ref_cast
+// CHECK: [[C:%[0-9]+]] = unchecked_ref_cast
 // CHECK-NOT: unchecked_ref_cast
-// CHECK: strong_release
-// CHECK: strong_release
-// CHECK: return
-sil @cse_unchecked_ref_cast : $@convention(thin) (@owned B, Builtin.Int1) -> () {
+// CHECK: [[T:%[0-9]+]] = tuple ([[C]] : $Builtin.NativeObject, [[C]] : $Builtin.NativeObject)
+// CHECK: return [[T]]
+sil @cse_unchecked_ref_cast : $@convention(thin) (@owned B, Builtin.Int1) -> (Builtin.NativeObject, Builtin.NativeObject) {
 bb0(%0: $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
-  strong_release %5 : $Builtin.NativeObject
   cond_br %1, bb1, bb2
 bb1:
   br bb2
 bb2:
   %21 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
-  strong_release %21 : $Builtin.NativeObject
-  %32 = tuple ()
-  return %32 : $()
+  %32 = tuple(%5 : $Builtin.NativeObject, %21 : $Builtin.NativeObject)
+  return %32 : $(Builtin.NativeObject, Builtin.NativeObject)
 }
 
 // CHECK-LABEL: sil @cse_raw_pointer_to_ref

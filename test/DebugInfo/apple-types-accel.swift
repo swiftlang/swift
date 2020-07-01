@@ -20,7 +20,6 @@
 
 // Verify the IR interface:
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "foo"
-// CHECK-SAME:             line: [[@LINE+2]]
 // CHECK-SAME:             identifier: "$s4main3fooCD"
 class foo {
 	var x : Int64 = 1

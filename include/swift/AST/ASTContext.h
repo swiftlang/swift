@@ -111,7 +111,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
   class SILBoxType;
@@ -121,7 +120,7 @@ namespace swift {
   class UnifiedStatsReporter;
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
-  struct SubASTContextDelegate;
+  struct InterfaceSubContextDelegate;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -238,10 +237,10 @@ public:
   UnifiedStatsReporter *Stats = nullptr;
 
   /// The language options used for translation.
-  LangOptions &LangOpts;
+  const LangOptions &LangOpts;
 
   /// The type checker options.
-  TypeCheckerOptions &TypeCheckerOpts;
+  const TypeCheckerOptions &TypeCheckerOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -254,11 +253,6 @@ public:
 
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
-
-  /// The set of top-level modules we have loaded.
-  /// This map is used for iteration, therefore it's a MapVector and not a
-  /// DenseMap.
-  llvm::MapVector<Identifier, ModuleDecl*> LoadedModules;
 
   /// The builtin module.
   ModuleDecl * const TheBuiltinModule;
@@ -275,9 +269,6 @@ public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
-
-  /// A consumer of type checker debug output.
-  std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
 
   /// Cache for names of canonical GenericTypeParamTypes.
   mutable llvm::DenseMap<unsigned, Identifier>
@@ -411,6 +402,12 @@ public:
                               array.size());
   }
 
+  template <typename T>
+  MutableArrayRef<T>
+  AllocateCopy(const std::vector<T> &vec,
+               AllocationArena arena = AllocationArena::Permanent) const {
+    return AllocateCopy(ArrayRef<T>(vec), arena);
+  }
 
   template<typename T>
   ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &vec,
@@ -652,6 +649,15 @@ public:
   /// metadata.
   AvailabilityContext getPrespecializedGenericMetadataAvailability();
 
+  /// Get the runtime availability of the swift_compareTypeContextDescriptors
+  /// for the target platform.
+  AvailabilityContext getCompareTypeContextDescriptorsAvailability();
+
+  /// Get the runtime availability of the
+  /// swift_compareProtocolConformanceDescriptors entry point for the target
+  /// platform.
+  AvailabilityContext getCompareProtocolConformanceDescriptorsAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -721,7 +727,7 @@ public:
       StringRef moduleName,
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
-      SubASTContextDelegate &delegate);
+      InterfaceSubContextDelegate &delegate);
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -752,11 +758,13 @@ public:
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested. This list will be
   /// extended with any methods found in subsequent generations.
-  void loadObjCMethods(ClassDecl *classDecl,
-                       ObjCSelector selector,
-                       bool isInstanceMethod,
-                       unsigned previousGeneration,
-                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+  ///
+  /// \param swiftOnly If true, only loads methods from imported Swift modules,
+  /// skipping the Clang importer.
+  void loadObjCMethods(ClassDecl *classDecl, ObjCSelector selector,
+                       bool isInstanceMethod, unsigned previousGeneration,
+                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods,
+                       bool swiftOnly = false);
 
   /// Load derivative function configurations for the given
   /// AbstractFunctionDecl.
@@ -783,7 +791,23 @@ public:
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
 
+public:
   namelookup::ImportCache &getImportCache() const;
+
+  /// Returns an iterator over the modules that are known by this context
+  /// to be loaded.
+  ///
+  /// Iteration order is guaranteed to match the order in which
+  /// \c addLoadedModule was called to register the loaded module
+  /// with this context.
+  iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
+  getLoadedModules() const;
+
+  /// Returns the number of loaded modules known by this context to be loaded.
+  unsigned getNumLoadedModules() const {
+    auto eltRange = getLoadedModules();
+    return std::distance(eltRange.begin(), eltRange.end());
+  }
 
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
@@ -824,6 +848,11 @@ public:
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
 
+  /// Insert an externally-sourced module into the set of known loaded modules
+  /// in this context.
+  void addLoadedModule(ModuleDecl *M);
+
+public:
   /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.

@@ -224,8 +224,8 @@ func foo_38149042(bar: Bar_38149042) {
 // RDAR_38149042: Begin completions
 // RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
 // RDAR_38149042-DAG: Keyword[self]/CurrNominal: .self[#Baz_38149042#]; name=self
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
-// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
 // RDAR_38149042: End completions
 
 // rdar://problem/38272904
@@ -291,7 +291,7 @@ public final class IntStore {
   }
 }
 // RDAR_41232519: Begin completions
-// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#Int#}[#Int#]; name=+ Int
+// RDAR_41232519: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#Int#}[#Int#]; name=+ Int
 // RDAR_41232519: End completions
 
 // rdar://problem/28188259
@@ -355,8 +355,8 @@ extension Foo {
 }
 #endif
 // RDAR_41234606: Begin completion
-// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal:         .Element; name=Element
-// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal:         .Iterator; name=Iterator
+// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal/IsSystem: .Element; name=Element
+// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal/IsSystem: .Iterator; name=Iterator
 // RDAR_41234606: End completions
 
 // rdar://problem/41071587

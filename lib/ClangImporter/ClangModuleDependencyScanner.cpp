@@ -28,11 +28,11 @@ using namespace clang::tooling;
 using namespace clang::tooling::dependencies;
 
 class swift::ClangModuleDependenciesCacheImpl {
-  /// The name of the file used for the "import hack" to compute module
+  /// Cache the names of the files used for the "import hack" to compute module
   /// dependencies.
   /// FIXME: This should go away once Clang's dependency scanning library
   /// can scan by module name.
-  std::string importHackFile;
+  llvm::StringMap<std::string> importHackFileCache;
 
 public:
   /// Set containing all of the Clang modules that have already been seen.
@@ -43,38 +43,41 @@ public:
   DependencyScanningTool tool;
 
   ClangModuleDependenciesCacheImpl()
-      : service(ScanningMode::MinimizedSourcePreprocessing,
-                ScanningOutputFormat::Full),
+      : importHackFileCache(),
+        service(ScanningMode::MinimizedSourcePreprocessing, ScanningOutputFormat::Full),
         tool(service) { }
   ~ClangModuleDependenciesCacheImpl();
 
   /// Retrieve the name of the file used for the "import hack" that is
   /// used to scan the dependencies of a Clang module.
-  llvm::ErrorOr<StringRef> getImportHackFile();
+  llvm::ErrorOr<StringRef> getImportHackFile(StringRef moduleName);
 };
 
 ClangModuleDependenciesCacheImpl::~ClangModuleDependenciesCacheImpl() {
-  if (!importHackFile.empty()) {
-    llvm::sys::fs::remove(importHackFile);
+  if (!importHackFileCache.empty()) {
+    for (auto& it: importHackFileCache) {
+      llvm::sys::fs::remove(it.second);
+    }
   }
 }
 
-llvm::ErrorOr<StringRef> ClangModuleDependenciesCacheImpl::getImportHackFile() {
-  if (!importHackFile.empty())
-    return importHackFile;
+llvm::ErrorOr<StringRef> ClangModuleDependenciesCacheImpl::getImportHackFile(StringRef moduleName) {
+  auto cacheIt = importHackFileCache.find(moduleName.str());
+  if (cacheIt != importHackFileCache.end())
+    return cacheIt->second;
 
   // Create a temporary file.
   int resultFD;
   SmallString<128> resultPath;
   if (auto error = llvm::sys::fs::createTemporaryFile(
-          "import-hack", "m", resultFD, resultPath))
+          "import-hack-" + moduleName.str(), "c", resultFD, resultPath))
     return error;
 
   llvm::raw_fd_ostream out(resultFD, /*shouldClose=*/true);
-  out << "@import HACK_MODULE_NAME;\n";
+  out << "#pragma clang module import " << moduleName.str() << ";\n";
   llvm::sys::RemoveFileOnSignal(resultPath);
-  importHackFile = resultPath.str().str();
-  return importHackFile;
+  importHackFileCache.insert(std::make_pair(moduleName, resultPath.str().str()));
+  return importHackFileCache[moduleName];
 }
 
 namespace {
@@ -190,9 +193,15 @@ static ClangModuleDependenciesCacheImpl *getOrCreateClangImpl(
 
 /// Record the module dependencies we found by scanning Clang modules into
 /// the module dependencies cache.
-static void recordModuleDependencies(
+void ClangImporter::recordModuleDependencies(
     ModuleDependenciesCache &cache,
     const FullDependenciesResult &clangDependencies) {
+  struct ModuleInfo {
+    std::string PCMPath;
+    std::string ModuleMapPath;
+  };
+  auto ModuleCacheDir = swift::getModuleCachePathFromClang(getClangInstance());
+
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
     // If we've already cached this information, we're done.
     if (cache.hasDependencies(clangModuleDep.ModuleName,
@@ -204,14 +213,56 @@ static void recordModuleDependencies(
     for (const auto &fileDep : clangModuleDep.FileDeps) {
       fileDeps.push_back(fileDep.getKey().str());
     }
+    // Inherit all Clang driver args when creating the clang importer.
+    ArrayRef<std::string> allArgs = Impl.ClangArgs;
+    ClangImporterOptions Opts;
 
+    // Ensure the arguments we collected is sufficient to create a Clang
+    // invocation.
+    assert(createClangInvocation(this, Opts, allArgs));
+
+    std::vector<std::string> swiftArgs;
+    // We are using Swift frontend mode.
+    swiftArgs.push_back("-frontend");
+    // We pass the entire argument list via -Xcc, so the invocation should
+    // use extra clang options alone.
+    swiftArgs.push_back("-only-use-extra-clang-opts");
+    auto addClangArg = [&](StringRef arg) {
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back(arg.str());
+    };
+    // Add all args inheritted from creating the importer.
+    auto It = allArgs.begin();
+    while(It != allArgs.end()) {
+      StringRef arg = *It;
+      // Remove the -target arguments because we should use the target triple
+      // from the depending Swift modules.
+      if (arg == "-target") {
+        It += 2;
+      } else if (arg.startswith("-fapinotes-swift-version=")) {
+        // Remove the apinotes version because we should use the language version
+        // specified in the interface file.
+        It += 1;
+      } else {
+        addClangArg(*It);
+        ++ It;
+      }
+    }
+
+    // Swift frontend action: -emit-pcm
+    swiftArgs.push_back("-emit-pcm");
+    swiftArgs.push_back("-module-name");
+    swiftArgs.push_back(clangModuleDep.ModuleName);
+
+    // Swift frontend option for input file path (Foo.modulemap).
+    swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
         clangModuleDep.ImplicitModulePCMPath,
         clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ContextHash,
-        clangModuleDep.NonPathCommandLine,
+        swiftArgs,
         fileDeps);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleDependency(moduleName.ModuleName, alreadyAddedModules);
@@ -225,7 +276,7 @@ static void recordModuleDependencies(
 
 Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
-    SubASTContextDelegate &delegate) {
+    InterfaceSubContextDelegate &delegate) {
   // Check whether there is already a cached result.
   if (auto found = cache.findDependencies(
           moduleName, ModuleDependenciesKind::Clang))
@@ -235,12 +286,11 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   auto clangImpl = getOrCreateClangImpl(cache);
 
   // HACK! Replace the module import buffer name with the source file hack.
-  auto importHackFile = clangImpl->getImportHackFile();
+  auto importHackFile = clangImpl->getImportHackFile(moduleName);
   if (!importHackFile) {
     // FIXME: Emit a diagnostic here.
     return None;
   }
-
   // Reform the Clang importer options.
   // FIXME: Just save a reference or copy so we can get this back.
   ClangImporterOptions importerOpts;
@@ -251,12 +301,6 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
     getClangDepScanningInvocationArguments(
       ctx, importerOpts, *importHackFile);
 
-  // HACK! Trick out a .m file to use to import the module we name.
-  std::string moduleNameHackDefine =
-      ("-DHACK_MODULE_NAME=" + moduleName).str();
-  commandLineArgs.push_back(moduleNameHackDefine);
-  commandLineArgs.push_back("-fmodules-ignore-macro=HACK_MODULE_NAME");
-
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
   CompileCommand command(workingDir, *importHackFile, commandLineArgs, "-");
@@ -264,7 +308,6 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
 
   auto clangDependencies = clangImpl->tool.getFullDependencies(
       database, workingDir, clangImpl->alreadySeen);
-
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());
@@ -273,7 +316,6 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
 
   // Record module dependencies for each module we found.
   recordModuleDependencies(cache, *clangDependencies);
-
   return cache.findDependencies(moduleName, ModuleDependenciesKind::Clang);
 }
 

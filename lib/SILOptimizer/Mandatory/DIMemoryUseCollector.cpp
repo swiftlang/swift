@@ -68,7 +68,7 @@ static unsigned getElementCountRec(TypeExpansionContext context,
   if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
     unsigned NumElements = 0;
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++)
+    for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i)
       NumElements +=
           getElementCountRec(context, Module, T.getTupleElementType(i), false);
     return NumElements;
@@ -162,7 +162,7 @@ static SILType getElementTypeRec(TypeExpansionContext context,
   // If this is a tuple type, walk into it.
   if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+    for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
       auto FieldType = T.getTupleElementType(i);
       unsigned NumFieldElements =
           getElementCountRec(context, Module, FieldType, false);
@@ -230,7 +230,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
 
       // Figure out which field we're walking into.
       unsigned FieldNo = 0;
-      for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+      for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
         auto EltTy = PointeeType.getTupleElementType(i);
         unsigned NumSubElt = getElementCountRec(
             TypeExpansionContext(B.getFunction()), Module, EltTy, false);
@@ -320,7 +320,7 @@ static void getPathStringToElementRec(TypeExpansionContext context,
   }
 
   unsigned FieldNo = 0;
-  for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+  for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
     auto Field = TT->getElement(i);
     SILType FieldTy = T.getTupleElementType(i);
     unsigned NumFieldElements = getElementCountRec(context, Module, FieldTy, false);
@@ -1128,7 +1128,7 @@ void ElementUseCollector::collectClassSelfUses() {
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
           if (Arg->getParent() == TheMemory.getParentBlock()) {
-            StoresOfArgumentToSelf++;
+            ++StoresOfArgumentToSelf;
             continue;
           }
         }
@@ -1633,12 +1633,13 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
           if (Arg->getParent() == uninitMemory->getParent()) {
-            StoresOfArgumentToSelf++;
+            ++StoresOfArgumentToSelf;
             continue;
           }
         }
 
         // A store of a load from the box is ignored.
+        //
         // SILGen emits these if delegation to another initializer was
         // interrupted before the initializer was called.
         SILValue src = SI->getSrc();
@@ -1778,14 +1779,30 @@ void ClassInitElementUseCollector::collectClassInitSelfLoadUses(
       }
     }
 
-    // If this load's value is being stored back into the delegating
-    // mark_uninitialized buffer and it is a self init use, skip the
-    // use. This is to handle situations where due to usage of a metatype to
-    // allocate, we do not actually consume self.
+    // If this load's value is being stored immediately back into the delegating
+    // mark_uninitialized buffer, skip the use.
+    //
+    // This is to handle situations where we do not actually consume self as a
+    // result of situations such as:
+    //
+    // 1. The usage of a metatype to allocate the object.
+    //
+    // 2. If our self init call has a throwing function as an argument that
+    //    actually throws.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
-      if (SI->getDest() == MUI &&
-          (isSelfInitUse(User) || isSuperInitUse(User))) {
-        continue;
+      if (SI->getDest() == MUI) {
+        SILValue src = SI->getSrc();
+
+        // Look through conversions.
+        while (auto *conversion = dyn_cast<ConversionInst>(src)) {
+          src = conversion->getConverted();
+        }
+
+        if (auto *li = dyn_cast<LoadInst>(src)) {
+          if (li->getOperand() == MUI) {
+            continue;
+          }
+        }
       }
     }
 

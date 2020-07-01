@@ -45,12 +45,25 @@ public:
 
 /// Observe that we are doing some processing of a SIL function.
 class PrettyStackTraceSILFunction : public llvm::PrettyStackTraceEntry {
-  const SILFunction *TheFn;
-  const char *Action;
+  const SILFunction *func;
+
+  /// An inline buffer of characters used if we are passed a twine.
+  SmallString<256> data;
+
+  /// This points either at a user provided const char * string or points at the
+  /// inline message buffer that is initialized with data from a twine on
+  /// construction.
+  StringRef action;
+
 public:
-  PrettyStackTraceSILFunction(const char *action, const SILFunction *F)
-    : TheFn(F), Action(action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  PrettyStackTraceSILFunction(const char *action, const SILFunction *func)
+      : func(func), data(), action(action) {}
+
+  PrettyStackTraceSILFunction(llvm::Twine &&twine, const SILFunction *func)
+      : func(func), data(), action(twine.toNullTerminatedStringRef(data)) {}
+
+  virtual void print(llvm::raw_ostream &os) const;
+
 protected:
   void printFunctionInfo(llvm::raw_ostream &out) const;
 };
