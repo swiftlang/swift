@@ -3565,10 +3565,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         if (!toType->is<ClassType>() || NTD->isFinal()) {
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
-          if (protocolDecl && !conformsToProtocol(toType, protocolDecl, dc) &&
-              !(toType->isKnownStdlibCollectionType() &&
-                dc->getParentModule()->lookupConformance(toType,
-                                                         protocolDecl))) {
+          if (protocolDecl && !couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
             return failed();
           }
         }

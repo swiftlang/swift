@@ -4470,6 +4470,15 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
   return lookupResult;
 }
 
+bool
+TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
+                                                DeclContext *DC) {
+  ModuleDecl *M = DC->getParentModule();
+  return conformsToProtocol(type, Proto, DC) ||
+         (type->isKnownStdlibCollectionType() &&
+          M->lookupConformance(type, Proto));
+}
+
 /// Exposes TypeChecker functionality for querying protocol conformance.
 /// Returns a valid ProtocolConformanceRef only if all conditional
 /// requirements are successfully resolved.
