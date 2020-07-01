@@ -24,7 +24,7 @@ public func _stdlib_isOSVersionAtLeast(
   _ minor: Builtin.Word,
   _ patch: Builtin.Word
 ) -> Builtin.Int1 {
-#if canImport(Darwin)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   if Int(major) == 9999 {
     return true._value
   }
