@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-//// REQUIRES: VENDOR=apple || OS=linux-androideabi || OS=linux-android || OS=linux-gnu
+// REQUIRES: VENDOR=apple || OS=linux-androideabi || OS=linux-android || OS=linux-gnu
 
 import Swift
 import StdlibUnittest
