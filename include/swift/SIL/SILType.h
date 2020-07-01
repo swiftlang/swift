@@ -19,13 +19,11 @@
 #define SWIFT_SIL_SILTYPE_H
 
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILArgumentConvention.h"
 #include "llvm/ADT/Hashing.h"
-#include "swift/SIL/SILDeclRef.h"
 
 namespace swift {
 
@@ -627,14 +625,6 @@ NON_SIL_TYPE(Function)
 NON_SIL_TYPE(AnyFunction)
 NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
-
-CanSILFunctionType getNativeSILFunctionType(
-    Lowering::TypeConverter &TC, TypeExpansionContext context,
-    Lowering::AbstractionPattern origType, CanAnyFunctionType substType,
-    Optional<SILDeclRef> origConstant = None,
-    Optional<SILDeclRef> constant = None,
-    Optional<SubstitutionMap> reqtSubs = None,
-    ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);
