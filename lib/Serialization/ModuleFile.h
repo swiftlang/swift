@@ -20,6 +20,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/AST/Type.h"
