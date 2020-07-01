@@ -155,6 +155,9 @@ func nongenericAnyIsPProtocol(type: Any.Type) -> Bool {
 func nongenericAnyIsPAndAnyObjectType(type: Any.Type) -> Bool {
   return type is (P & AnyObject).Type
 }
+func nongenericAnyIsPAndAnyObjectProtocol(type: Any.Type) -> Bool {
+  return type is (P & AnyObject).Protocol
+}
 func nongenericAnyIsPAndPCSubType(type: Any.Type) -> Bool {
   return type is (P & PCSub).Type
 }
@@ -177,6 +180,9 @@ func nongenericAnyAsConditionalPProtocol(type: Any.Type) -> Bool {
 }
 func nongenericAnyAsConditionalPAndAnyObjectType(type: Any.Type) -> Bool {
   return (type as? (P & AnyObject).Type) != nil
+}
+func nongenericAnyAsConditionalPAndAnyObjectProtocol(type: Any.Type) -> Bool {
+  return (type as? (P & AnyObject).Protocol) != nil
 }
 func nongenericAnyAsConditionalPAndPCSubType(type: Any.Type) -> Bool {
   return (type as? (P & PCSub).Type) != nil
@@ -230,16 +236,16 @@ print(#line, PS() is P) // CHECK: [[@LINE]] true
 // But that theory is not the one that Swift currently
 // implements.
 print(#line, nongenericAnyIsPProtocol(type: PS.self)) // CHECK: [[@LINE]] false
-print(#line, genericAnyIs(type: PS.self, to: P.self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PS.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyIsPType(type: PE.self)) // CHECK: [[@LINE]] true
 print(#line, nongenericAnyIsPProtocol(type: PE.self)) // CHECK: [[@LINE]] false
-print(#line, genericAnyIs(type: PE.self, to: P.self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PE.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyIsPType(type: PC.self)) // CHECK: [[@LINE]] true
 print(#line, nongenericAnyIsPProtocol(type: PC.self)) // CHECK: [[@LINE]] false
-print(#line, genericAnyIs(type: PC.self, to: P.self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PC.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyIsPType(type: PCSub.self)) // CHECK: [[@LINE]] true
 print(#line, nongenericAnyIsPProtocol(type: PCSub.self)) // CHECK: [[@LINE]] false
-print(#line, genericAnyIs(type: PCSub.self, to: P.self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PCSub.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 
 // CHECK-LABEL: conditionally casting types to protocols with generics:
 print(#line, "conditionally casting types to protocols with generics:")
@@ -248,16 +254,16 @@ print(#line, nongenericAnyAsConditionalPProtocol(type: P.self)) // CHECK: [[@LIN
 print(#line, genericAnyAsConditional(type: P.self, to: P.self, expected: true)) // CHECK: [[@LINE]] true
 print(#line, nongenericAnyAsConditionalPType(type: PS.self)) // CHECK: [[@LINE]] true
 print(#line, nongenericAnyAsConditionalPProtocol(type: PS.self)) // CHECK: [[@LINE]] false
-print(#line, genericAnyAsConditional(type: PS.self, to: P.self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PS.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPType(type: PE.self)) // CHECK: [[@LINE]] true
 print(#line, nongenericAnyAsConditionalPProtocol(type: PE.self)) // CHECK: [[@LINE]] false
-print(#line, genericAnyAsConditional(type: PE.self, to: P.self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PE.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPType(type: PC.self)) // CHECK: [[@LINE]] true
 print(#line, nongenericAnyAsConditionalPProtocol(type: PC.self)) // CHECK: [[@LINE]] false
-print(#line, genericAnyAsConditional(type: PC.self, to: P.self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PC.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPType(type: PCSub.self)) // CHECK: [[@LINE]] true
 print(#line, nongenericAnyAsConditionalPProtocol(type: PCSub.self)) // CHECK: [[@LINE]] false
-print(#line, genericAnyAsConditional(type: PCSub.self, to: P.self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PCSub.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 
 // CHECK-LABEL: unconditionally casting types to protocols with generics:
 print(#line, "unconditionally casting types to protocols with generics:")
@@ -280,17 +286,20 @@ print(#line, genericAnyIs(type: PS.self, to: (P & AnyObject).self, expected: fal
 print(#line, nongenericAnyIsPAndAnyObjectType(type: PE.self)) // CHECK: [[@LINE]] false
 print(#line, genericAnyIs(type: PE.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyIsPAndAnyObjectType(type: PC.self)) // CHECK: [[@LINE]] true
-print(#line, genericAnyIs(type: PC.self, to: (P & AnyObject).self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPAndAnyObjectProtocol(type: PC.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PC.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyIsPAndAnyObjectType(type: PCSub.self)) // CHECK: [[@LINE]] true
-print(#line, genericAnyIs(type: PCSub.self, to: (P & AnyObject).self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPAndAnyObjectProtocol(type: PCSub.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PCSub.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndAnyObjectType(type: PS.self)) // CHECK: [[@LINE]] false
 print(#line, genericAnyAsConditional(type: PS.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndAnyObjectType(type: PE.self)) // CHECK: [[@LINE]] false
 print(#line, genericAnyAsConditional(type: PE.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndAnyObjectType(type: PC.self)) // CHECK: [[@LINE]] true
-print(#line, genericAnyAsConditional(type: PC.self, to: (P & AnyObject).self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPAndAnyObjectProtocol(type: PC.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PC.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndAnyObjectType(type: PCSub.self)) // CHECK: [[@LINE]] true
-print(#line, genericAnyAsConditional(type: PCSub.self, to: (P & AnyObject).self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PCSub.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
 
 // CHECK-LABEL: casting types to protocol & class existentials:
 print(#line, "casting types to protocol & class existentials:")
@@ -301,7 +310,7 @@ print(#line, genericAnyIs(type: PE.self, to: (P & PCSub).self, expected: false))
 //print(#line, nongenericAnyIsPAndPCSubType(type: PC.self)) // CHECK-SR-11565: [[@LINE]] false -- FIXME: reenable this when SR-11565 is fixed
 print(#line, genericAnyIs(type: PC.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyIsPAndPCSubType(type: PCSub.self)) // CHECK: [[@LINE]] true
-print(#line, genericAnyIs(type: PCSub.self, to: (P & PCSub).self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PCSub.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PS.self)) // CHECK: [[@LINE]] false
 print(#line, genericAnyAsConditional(type: PS.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PE.self)) // CHECK: [[@LINE]] false
@@ -309,7 +318,7 @@ print(#line, genericAnyAsConditional(type: PE.self, to: (P & PCSub).self, expect
 // print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PC.self)) // CHECK-SR-11565: [[@LINE]] false -- FIXME: reenable this when SR-11565 is fixed
 print(#line, genericAnyAsConditional(type: PC.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PCSub.self)) // CHECK: [[@LINE]] true
-print(#line, genericAnyAsConditional(type: PCSub.self, to: (P & PCSub).self, expected: true)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PCSub.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 
 
 // CHECK-LABEL: type comparisons:
