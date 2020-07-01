@@ -11,7 +11,8 @@ var s: P = S() // This creates existential type because the protocol P is used a
 ```
 
 However, a protocol type does not conform to protocols - not even the protocol itself. 
-Allowing existential types to conform to protocols is unsound because some protocol with static methods, initializers, or associated types requirements cannot be accessed from the protocol type itself - these kinds of requirements require a concrete type.
+Allowing existential types to conform to protocols is unsound. For protocols with static method, initializer, or associated type requirements, the implementation of these requirements cannot be accessed from the protocol type - accessing these kinds of requirements must be done using a concrete type.
+
 Let's walk through the example below:
 
 ```swift
@@ -33,7 +34,7 @@ let pluralWord = Plural(word: "mangoes")
 let wordPairDict: [Word: Word] = [singularWord: pluralWord] // Error
 ```
 
-One workaround to fix this problem is to write a type erasure for the protocol `Word`. Think of type erasure as a way to hide an object's type. Since `Word` is of type `Hashable`, we already have `AnyHashable` type erasure available in the standard library which we can easily use here.
+One workaround to fix this problem is to use type erasure for the protocol `Word`. Think of type erasure as a way to hide an object's type. Since `Word` is of type `Hashable`, we already have `AnyHashable` type erasure available in the standard library which we can easily use here.
 
 ```swift 
 // The fix
@@ -41,5 +42,5 @@ let wordPairDict: [AnyHashable: AnyHashable] = [singularWord: pluralWord]
 ```
 
 # Exceptions
-`@objc` protocol type with no static requirements however do conform to its own protocol. One example is the `Error` protocol.
+`@objc` protocol type with no static requirements however do conform to its own protocol. Another exception is the `Error` Swift protocol.
 

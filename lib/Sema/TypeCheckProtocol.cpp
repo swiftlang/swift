@@ -4256,7 +4256,8 @@ void swift::diagnoseConformanceFailure(Type T,
 
     if (!T->isObjCExistentialType()) {
       diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
-                     T, T->isEqual(Proto->getDeclaredType()), Proto->getDeclaredType());
+                     T, T->isEqual(Proto->getDeclaredType()), 
+                     Proto->getDeclaredType());
       return;
     }
 
