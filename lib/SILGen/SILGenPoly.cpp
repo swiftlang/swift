@@ -4605,6 +4605,17 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   }
   case WitnessDispatchKind::Class: {
     SILValue selfPtr = witnessParams.back().getValue();
+    // If `witness` is a derivative function `SILDeclRef`, replace the
+    // derivative function identifier's generic signature with the witness thunk
+    // substitution map's generic signature.
+    if (auto *derivativeId = witness.derivativeFunctionIdentifier) {
+      auto *newDerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+          derivativeId->getKind(), derivativeId->getParameterIndices(),
+          witnessSubs.getGenericSignature(), SGF.getASTContext());
+      return SGF.emitClassMethodRef(
+          loc, selfPtr, witness.asAutoDiffDerivativeFunction(newDerivativeId),
+          witnessFTy);
+    }
     return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
   }
   }
