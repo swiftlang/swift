@@ -315,15 +315,12 @@ getDifferentiabilityParameters(SILFunctionType *originalFnTy,
 /// Collects the semantic results of the given function type in
 /// `originalResults`. The semantic results are formal results followed by
 /// `inout` parameters, in type order.
-// TODO(TF-983): Generalize to support multiple `inout` parameters. The current
-// singular `inoutParam` and `isWrtInoutParameter` are hacky.
 static void
 getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
-                   Optional<SILParameterInfo> &inoutParam,
-                   bool &isWrtInoutParameter,
+                   IndexSubset *&inoutParameterIndices,
                    SmallVectorImpl<SILResultInfo> &originalResults) {
-  inoutParam = None;
-  isWrtInoutParameter = false;
+  auto &C = functionType->getASTContext();
+  SmallVector<unsigned, 4> inoutParamIndices;
   // Collect original formal results.
   originalResults.append(functionType->getResults().begin(),
                          functionType->getResults().end());
@@ -332,11 +329,12 @@ getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
     auto param = functionType->getParameters()[i];
     if (!param.isIndirectInOut())
       continue;
-    inoutParam = param;
-    isWrtInoutParameter = parameterIndices->contains(i);
+    inoutParamIndices.push_back(i);
     originalResults.push_back(
         SILResultInfo(param.getInterfaceType(), ResultConvention::Indirect));
   }
+  inoutParameterIndices =
+      IndexSubset::get(C, parameterIndices->getCapacity(), inoutParamIndices);
 }
 
 /// Returns the differential type for the given original function type,
@@ -402,11 +400,10 @@ static CanSILFunctionType getAutoDiffDifferentialType(
   SmallVector<Type, 4> substReplacements;
   SmallVector<ProtocolConformanceRef, 4> substConformances;
 
-  Optional<SILParameterInfo> inoutParam = None;
-  bool isWrtInoutParameter = false;
+  IndexSubset *inoutParamIndices;
   SmallVector<SILResultInfo, 2> originalResults;
-  getSemanticResults(originalFnTy, parameterIndices, inoutParam,
-                     isWrtInoutParameter, originalResults);
+  getSemanticResults(originalFnTy, parameterIndices, inoutParamIndices,
+                     originalResults);
 
   SmallVector<SILParameterInfo, 4> diffParams;
   getDifferentiabilityParameters(originalFnTy, parameterIndices, diffParams);
@@ -430,7 +427,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     }
   }
   SmallVector<SILResultInfo, 1> differentialResults;
-  if (!inoutParam || !isWrtInoutParameter) {
+  if (inoutParamIndices->isEmpty()) {
     for (auto resultIndex : resultIndices->getIndices()) {
       auto &result = originalResults[resultIndex];
       auto resultTan =
@@ -480,11 +477,10 @@ static CanSILFunctionType getAutoDiffPullbackType(
   SmallVector<Type, 4> substReplacements;
   SmallVector<ProtocolConformanceRef, 4> substConformances;
 
-  Optional<SILParameterInfo> inoutParam = None;
-  bool isWrtInoutParameter = false;
+  IndexSubset *inoutParamIndices;
   SmallVector<SILResultInfo, 2> originalResults;
-  getSemanticResults(originalFnTy, parameterIndices, inoutParam,
-                     isWrtInoutParameter, originalResults);
+  getSemanticResults(originalFnTy, parameterIndices, inoutParamIndices,
+                     originalResults);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterConventionForOriginalResult =
@@ -551,27 +547,11 @@ static CanSILFunctionType getAutoDiffPullbackType(
     return conv;
   };
 
+  // Collect pullback parameters.
   SmallVector<SILParameterInfo, 1> pullbackParams;
-  if (inoutParam) {
-    auto paramTan = inoutParam->getInterfaceType()->getAutoDiffTangentSpace(
-        lookupConformance);
-    assert(paramTan && "Parameter type does not have a tangent space?");
-    auto paramTanConvention = isWrtInoutParameter
-                                  ? inoutParam->getConvention()
-                                  : ParameterConvention::Indirect_In_Guaranteed;
-    auto paramTanType = paramTan->getCanonicalType();
-    if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
-      pullbackParams.push_back(
-          SILParameterInfo(paramTanType, paramTanConvention));
-    } else {
-      auto gpIndex = substGenericParams.size();
-      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
-      substGenericParams.push_back(gpType);
-      substReplacements.push_back(paramTanType);
-      pullbackParams.push_back({gpType, paramTanConvention});
-    }
-  } else {
-    for (auto resultIndex : resultIndices->getIndices()) {
+  for (auto resultIndex : resultIndices->getIndices()) {
+    // Handle formal original result.
+    if (resultIndex < originalFnTy->getNumResults()) {
       auto &origRes = originalResults[resultIndex];
       auto resultTan = origRes.getInterfaceType()->getAutoDiffTangentSpace(
           lookupConformance);
@@ -590,12 +570,46 @@ static CanSILFunctionType getAutoDiffPullbackType(
         substReplacements.push_back(resultTanType);
         pullbackParams.push_back({gpType, paramTanConvention});
       }
+      continue;
+    }
+    // Handle original `inout` parameter.
+    auto inoutParamIndex = resultIndex - originalFnTy->getNumResults();
+    auto inoutParamIt = std::next(
+        originalFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+    auto paramIndex =
+        std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
+    auto inoutParam = originalFnTy->getParameters()[paramIndex];
+    auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+        lookupConformance);
+    assert(paramTan && "Parameter type does not have a tangent space?");
+    // The pullback parameter convention depends on whether the original `inout`
+    // paramater is a differentiability parameter.
+    // - If yes, the pullback parameter convention is `@inout`.
+    // - If no, the pullback parameter convention is `@in_guaranteed`.
+    bool isWrtInoutParameter = parameterIndices->contains(paramIndex);
+    auto paramTanConvention = isWrtInoutParameter
+                                  ? inoutParam.getConvention()
+                                  : ParameterConvention::Indirect_In_Guaranteed;
+    auto paramTanType = paramTan->getCanonicalType();
+    if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
+      pullbackParams.push_back(
+          SILParameterInfo(paramTanType, paramTanConvention));
+    } else {
+      auto gpIndex = substGenericParams.size();
+      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+      substGenericParams.push_back(gpType);
+      substReplacements.push_back(paramTanType);
+      pullbackParams.push_back({gpType, paramTanConvention});
     }
   }
+
+  // Collect pullback results.
   SmallVector<SILParameterInfo, 4> diffParams;
   getDifferentiabilityParameters(originalFnTy, parameterIndices, diffParams);
   SmallVector<SILResultInfo, 8> pullbackResults;
   for (auto &param : diffParams) {
+    // Skip `inout` parameters, which semantically behave as original results
+    // and always appear as pullback parameters.
     if (param.isIndirectInOut())
       continue;
     auto paramTan =
