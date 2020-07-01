@@ -199,21 +199,6 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
   return flags | ConstraintSystem::TMF_GenerateConstraints;
 }
 
-/// Determine whether the given parameter can accept a trailing closure.
-static bool acceptsTrailingClosure(const AnyFunctionType::Param &param) {
-  Type paramTy = param.getPlainType();
-  if (!paramTy)
-    return true;
-
-  paramTy = paramTy->lookThroughAllOptionalTypes();
-  return paramTy->isTypeParameter() ||
-      paramTy->is<ArchetypeType>() ||
-      paramTy->is<AnyFunctionType>() ||
-      paramTy->isTypeVariableOrMember() ||
-      paramTy->is<UnresolvedType>() ||
-      paramTy->isAny();
-}
-
 // FIXME: This should return ConstraintSystem::TypeMatchResult instead
 //        to give more information to the solver about the failure.
 bool constraints::
@@ -284,6 +269,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   auto skipClaimedArgs = [&](unsigned &nextArgIdx) {
     while (nextArgIdx != numArgs && claimedArgs[nextArgIdx])
       ++nextArgIdx;
+    return nextArgIdx;
   };
 
   // Local function that retrieves the next unclaimed argument with the given
@@ -296,6 +282,13 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
+      return None;
+
+    // If we're claiming variadic arguments, do not claim an unlabeled trailing
+    // closure argument.
+    if (forVariadic &&
+        unlabeledTrailingClosureArgIndex &&
+        nextArgIdx == *unlabeledTrailingClosureArgIndex)
       return None;
 
     // Go hunting for an unclaimed argument whose name does match.
@@ -386,12 +379,45 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   auto bindNextParameter = [&](unsigned paramIdx, unsigned &nextArgIdx,
                                bool ignoreNameMismatch) {
     const auto &param = params[paramIdx];
+    Identifier paramLabel = param.getLabel();
+
+    // If we have the trailing closure argument and are performing a forward
+    // match, look for the matching parameter.
+    if (unlabeledTrailingClosureArgIndex &&
+        skipClaimedArgs(nextArgIdx) == *unlabeledTrailingClosureArgIndex) {
+
+      // If the parameter we are looking at does not support the (unlabeled)
+      // trailing closure argument, this parameter is unfulfilled.
+      if (!paramInfo.acceptsUnlabeledTrailingClosureArgument(paramIdx)) {
+        haveUnfulfilledParams = true;
+        return;
+      }
+
+      // If there is only one trailing closure argument, consider applying
+      // a "fuzzy" match rule that skips this parameter if it is defaulted but
+      // later parameters require an argument.
+      if (nextArgIdx + 1 == numArgs &&
+          paramInfo.hasDefaultArgument(paramIdx) &&
+          param.getPlainType()->getASTContext().LangOpts
+              .EnableFuzzyForwardScanTrailingClosureMatching &&
+          llvm::any_of(range(paramIdx + 1, params.size()), [&](unsigned idx) {
+            return !paramInfo.hasDefaultArgument(idx)
+              && !params[idx].isVariadic();
+          })) {
+        haveUnfulfilledParams = true;
+        return;
+      }
+
+      // The argument is unlabeled, so mark the parameter as unlabeled as
+      // well.
+      paramLabel = Identifier();
+    }
 
     // Handle variadic parameters.
     if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
       auto claimed =
-          claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch);
+          claimNextNamed(nextArgIdx, paramLabel, ignoreNameMismatch);
 
       // If there was no such argument, leave the parameter unfulfilled.
       if (!claimed) {
@@ -424,7 +450,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
     // Try to claim an argument for this parameter.
     if (auto claimed =
-            claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch)) {
+            claimNextNamed(nextArgIdx, paramLabel, ignoreNameMismatch)) {
       parameterBindings[paramIdx].push_back(*claimed);
       return;
     }
@@ -432,125 +458,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // There was no argument to claim. Leave the argument unfulfilled.
     haveUnfulfilledParams = true;
   };
-
-  // If we have an unlabeled trailing closure, we match trailing closure
-  // labels from the end, then match the trailing closure arg.
-  if (unlabeledTrailingClosureArgIndex) {
-    unsigned unlabeledArgIdx = *unlabeledTrailingClosureArgIndex;
-
-    // One past the next parameter index to look at.
-    unsigned prevParamIdx = numParams;
-
-    // Scan backwards to match any labeled trailing closures.
-    for (unsigned argIdx = numArgs - 1; argIdx != unlabeledArgIdx; --argIdx) {
-      bool claimed = false;
-
-      // We do this scan on a copy of prevParamIdx so that, if it fails,
-      // we'll restart at this same point for the next trailing closure.
-      unsigned prevParamIdxForArg = prevParamIdx;
-      while (prevParamIdxForArg > 0) {
-        prevParamIdxForArg -= 1;
-        unsigned paramIdx = prevParamIdxForArg;
-
-        // Check for an exact label match.
-        const auto &param = params[paramIdx];
-        if (param.getLabel() == args[argIdx].getLabel()) {
-          parameterBindings[paramIdx].push_back(argIdx);
-          claim(param.getLabel(), argIdx);
-
-          // Future arguments should search prior to this parameter.
-          prevParamIdx = prevParamIdxForArg;
-          claimed = true;
-          break;
-        }
-      }
-
-      // If we ran out of parameters, there's no match for this argument.
-      // TODO: somehow fall through to report out-of-order arguments?
-      if (!claimed) {
-        if (listener.extraArgument(argIdx))
-          return true;
-      }
-    }
-
-    // Okay, we've matched all the labeled closures; scan backwards from
-    // there to match the unlabeled trailing closure.
-    Optional<unsigned> unlabeledParamIdx;
-    if (prevParamIdx > 0) {
-      unsigned paramIdx = prevParamIdx - 1;
-
-      bool lastAcceptsTrailingClosure =
-          acceptsTrailingClosure(params[paramIdx]);
-
-      // If the last parameter is defaulted, this might be
-      // an attempt to use a trailing closure with previous
-      // parameter that accepts a function type e.g.
-      //
-      // func foo(_: () -> Int, _ x: Int = 0) {}
-      // foo { 42 }
-      //
-      // FIXME: shouldn't this skip multiple arguments and look for
-      // something that acceptsTrailingClosure rather than just something
-      // with a function type?
-      if (!lastAcceptsTrailingClosure && paramIdx > 0 &&
-          paramInfo.hasDefaultArgument(paramIdx)) {
-        auto paramType = params[paramIdx - 1].getPlainType();
-        // If the parameter before defaulted last accepts.
-        if (paramType->is<AnyFunctionType>()) {
-          lastAcceptsTrailingClosure = true;
-          paramIdx -= 1;
-        }
-      }
-
-      if (lastAcceptsTrailingClosure)
-        unlabeledParamIdx = paramIdx;
-    }
-
-    // If there's no suitable last parameter to accept the trailing closure,
-    // notify the listener and bail if we need to.
-    if (!unlabeledParamIdx) {
-      // Try to use a specialized diagnostic for an extra closure.
-      bool isExtraClosure = false;
-      if (prevParamIdx == 0) {
-        isExtraClosure = true;
-      } else if (unlabeledArgIdx > 0) {
-        // Argument before the trailing closure.
-        unsigned prevArg = unlabeledArgIdx - 1;
-        auto &arg = args[prevArg];
-        // If the argument before trailing closure matches
-        // last parameter, this is just a special case of
-        // an extraneous argument.
-        const auto param = params[prevParamIdx - 1];
-        if (param.hasLabel() && param.getLabel() == arg.getLabel()) {
-          isExtraClosure = true;
-        }
-      }
-
-      if (isExtraClosure) {
-        if (listener.extraArgument(unlabeledArgIdx))
-          return true;
-      } else {
-        if (listener.trailingClosureMismatch(prevParamIdx - 1,
-                                             unlabeledArgIdx))
-          return true;
-      }
-
-      if (isExtraClosure) {
-        // Claim the unlabeled trailing closure without an associated
-        // parameter to suppress further complaints about it.
-        claim(Identifier(), unlabeledArgIdx, /*ignoreNameClash=*/true);
-      } else {
-        unlabeledParamIdx = prevParamIdx - 1;
-      }
-    }
-
-    if (unlabeledParamIdx) {
-      // Claim the parameter/argument pair.
-      claim(params[*unlabeledParamIdx].getLabel(), unlabeledArgIdx,
-            /*ignoreNameClash=*/true);
-      parameterBindings[*unlabeledParamIdx].push_back(unlabeledArgIdx);
-    }
-  }
 
   {
     unsigned nextArgIdx = 0;

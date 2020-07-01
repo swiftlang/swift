@@ -1602,8 +1602,6 @@ namespace {
     /// \param callee The callee for the function being applied.
     /// \param apply The ApplyExpr that forms the call.
     /// \param argLabels The argument labels provided for the call.
-    /// \param hasTrailingClosure Whether the last argument is a trailing
-    /// closure.
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
@@ -1611,7 +1609,6 @@ namespace {
     coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
                         ConcreteDeclRef callee, ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
-                        bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
 
     /// Coerce the given object argument (e.g., for the base of a
@@ -1822,7 +1819,7 @@ namespace {
       auto fullSubscriptTy = openedFullFnType->getResult()
                                   ->castTo<FunctionType>();
       index = coerceCallArguments(index, fullSubscriptTy, subscriptRef, nullptr,
-                                  argLabels, hasTrailingClosure,
+                                  argLabels,
                                   locator.withPathElement(
                                     ConstraintLocator::ApplyArgument));
       if (!index)
@@ -2641,6 +2638,7 @@ namespace {
           conformingType->getRValueType(), constrName);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
+
       expr->setInitializer(witness);
       expr->setArg(cs.coerceToRValue(expr->getArg()));
       return expr;
@@ -4981,7 +4979,7 @@ namespace {
       auto *newIndexExpr =
           coerceCallArguments(indexExpr, subscriptType, ref,
                               /*applyExpr*/ nullptr, labels,
-                              /*hasTrailingClosure*/ false, locator);
+                              locator);
 
       // We need to be able to hash the captured index values in order for
       // KeyPath itself to be hashable, so check that all of the subscript
@@ -5523,12 +5521,12 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
-Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
-                                        ConcreteDeclRef callee,
-                                        ApplyExpr *apply,
-                                        ArrayRef<Identifier> argLabels,
-                                        bool hasTrailingClosure,
-                                        ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::coerceCallArguments(
+    Expr *arg, AnyFunctionType *funcType,
+    ConcreteDeclRef callee,
+    ApplyExpr *apply,
+    ArrayRef<Identifier> argLabels,
+    ConstraintLocatorBuilder locator) {
   auto &ctx = getConstraintSystem().getASTContext();
   auto params = funcType->getParams();
 
@@ -5578,9 +5576,11 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
+  auto unlabeledTrailingClosureIndex =
+      arg->getUnlabeledTrailingClosureIndexOfPackedArgument();
   bool failed = constraints::matchCallArguments(args, params,
                                                 paramInfo,
-                       arg->getUnlabeledTrailingClosureIndexOfPackedArgument(),
+                                                unlabeledTrailingClosureIndex,
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);
 
@@ -5810,7 +5810,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       (params[0].getValueOwnership() == ValueOwnership::Default ||
        params[0].getValueOwnership() == ValueOwnership::InOut)) {
     assert(newArgs.size() == 1);
-    assert(!hasTrailingClosure);
+    assert(!unlabeledTrailingClosureIndex);
     return newArgs[0];
   }
 
@@ -5823,8 +5823,9 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       argParen->setSubExpr(newArgs[0]);
     } else {
       bool isImplicit = arg->isImplicit();
-      arg = new (ctx)
-          ParenExpr(lParenLoc, newArgs[0], rParenLoc, hasTrailingClosure);
+      arg = new (ctx) ParenExpr(
+          lParenLoc, newArgs[0], rParenLoc,
+          static_cast<bool>(unlabeledTrailingClosureIndex));
       arg->setImplicit(isImplicit);
     }
   } else {
@@ -5838,8 +5839,8 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       }
     } else {
       // Build a new TupleExpr, re-using source location information.
-      arg = TupleExpr::create(ctx, lParenLoc, newArgs, newLabels, newLabelLocs,
-                              rParenLoc, hasTrailingClosure,
+      arg = TupleExpr::create(ctx, lParenLoc, rParenLoc, newArgs, newLabels,
+                              newLabelLocs, unlabeledTrailingClosureIndex,
                               /*implicit=*/arg->isImplicit());
     }
   }
@@ -7277,9 +7278,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto *arg = apply->getArg();
   auto *fn = apply->getFn();
 
-  bool hasTrailingClosure =
-    isa<CallExpr>(apply) && cast<CallExpr>(apply)->hasTrailingClosure();
-
   auto finishApplyOfDeclWithSpecialTypeCheckingSemantics
     = [&](ApplyExpr *apply,
           ConcreteDeclRef declRef,
@@ -7295,7 +7293,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         arg = coerceCallArguments(arg, fnType, declRef,
                                   apply,
                                   apply->getArgumentLabels(argLabelsScratch),
-                                  hasTrailingClosure,
                                   locator.withPathElement(
                                     ConstraintLocator::ApplyArgument));
         if (!arg) {
@@ -7503,7 +7500,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
     arg = coerceCallArguments(arg, fnType, callee, apply,
                               apply->getArgumentLabels(argLabelsScratch),
-                              hasTrailingClosure,
                               locator.withPathElement(
                                   ConstraintLocator::ApplyArgument));
     if (!arg) {

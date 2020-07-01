@@ -55,6 +55,7 @@ class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
 class PatternBindingInitializer;
+enum class TrailingClosureMatching: uint8_t;
 class TrailingWhereClause;
 
 /// TypeAttributes - These are attributes that may be applied to types.
