@@ -572,6 +572,15 @@ bb0:
   return %6 : $()
 }
 
+// CHECK-LABEL: @base_addr : $@convention(thin) () -> ()
+sil private @base_addr : $() -> () {
+bb0:
+  // CHECK: base_addr_for_offset $*Int
+  %0 = base_addr_for_offset $*Int
+  %1 = tuple ()
+  return %1 : $()
+}
+
 protocol SomeProtocol {
 }
 class SomeClass : SomeProtocol {
