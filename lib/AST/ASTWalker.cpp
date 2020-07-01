@@ -833,7 +833,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     // If the closure was separately type checked and we don't want to
     // visit separately-checked closure bodies, bail out now.
-    if (expr->wasSeparatelyTypeChecked() &&
+    if (expr->isSeparatelyTypeChecked() &&
         !Walker.shouldWalkIntoSeparatelyCheckedClosure(expr))
       return expr;
 
