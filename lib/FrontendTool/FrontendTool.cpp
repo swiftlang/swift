@@ -1348,6 +1348,12 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     }
   }
 
+  // Emit evaluator dependency graph if requested.
+  auto graphPath = ctx.LangOpts.RequestEvaluatorGraphVizPath;
+  if (!graphPath.empty()) {
+    ctx.evaluator.emitRequestEvaluatorGraphViz(graphPath);
+  }
+
   // Emit dependencies and index data.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitIndexData(Instance);
