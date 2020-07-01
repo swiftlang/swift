@@ -3665,7 +3665,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
       } else
         candidate = asd->getOpaqueAccessor(AccessorKind::Get);
     } else if (accessorKind != None) {
-        missingAccessor = true;
+      missingAccessor = true;
     }
     if (!candidate) {
       notFunction = true;
