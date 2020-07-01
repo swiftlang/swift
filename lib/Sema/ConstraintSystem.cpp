@@ -4674,6 +4674,11 @@ SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
   return target;
 }
 
+SolutionApplicationTarget
+SolutionApplicationTarget::forUninitializedWrappedVar(VarDecl *wrappedVar) {
+  return SolutionApplicationTarget(wrappedVar);
+}
+
 ContextualPattern
 SolutionApplicationTarget::getContextualPattern() const {
   assert(kind == Kind::expression);
@@ -4781,6 +4786,18 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     // diagnostic various cases that come up.
     DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
         .highlight(expr->getSourceRange());
+  } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
+    auto *wrapper = wrappedVar->getAttachedPropertyWrappers().back();
+    Type propertyType = wrappedVar->getInterfaceType();
+    Type wrapperType = wrapper->getType();
+
+    // Emit the property wrapper fallback diagnostic
+    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
+                         propertyType, wrapperType);
+    if (auto nominal = wrapperType->getAnyNominal()) {
+      nominal->diagnose(diag::property_wrapper_declared_here,
+                        nominal->getName());
+    }
   } else {
     // Emit a poor fallback message.
     DE.diagnose(target.getAsFunction()->getLoc(),
