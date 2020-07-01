@@ -4,8 +4,8 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import difflib
-from functools import reduce
 import logging
+from functools import reduce
 import os
 import subprocess
 import sys
