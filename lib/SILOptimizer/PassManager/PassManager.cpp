@@ -87,6 +87,9 @@ llvm::cl::list<std::string>
     SILDisablePass("sil-disable-pass", llvm::cl::CommaSeparated,
                      llvm::cl::desc("Disable passes "
                                     "which contain a string from this list"));
+llvm::cl::list<std::string> SILDisablePassOnlyFun(
+    "sil-disable-pass-only-function", llvm::cl::CommaSeparated,
+    llvm::cl::desc("Apply -sil-disable-pass only on this function"));
 
 llvm::cl::list<std::string> SILVerifyBeforePass(
     "sil-verify-before-pass", llvm::cl::CommaSeparated,
@@ -204,7 +207,13 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
   return Default;
 }
 
-static bool isDisabled(SILTransform *T) {
+static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
+  if (!SILDisablePassOnlyFun.empty() && F &&
+      SILDisablePassOnlyFun.end() == std::find(SILDisablePassOnlyFun.begin(),
+                                               SILDisablePassOnlyFun.end(),
+                                               F->getName()))
+    return false;
+
   for (const std::string &NamePattern : SILDisablePass) {
     if (T->getTag().find(NamePattern) != StringRef::npos
         || T->getID().find(NamePattern) != StringRef::npos) {
@@ -395,7 +404,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     return;
   }
 
-  if (isDisabled(SFT)) {
+  if (isDisabled(SFT, F)) {
     if (SILPrintPassName)
       dumpPassInfo("(Disabled)", TransIdx, F);
     return;
