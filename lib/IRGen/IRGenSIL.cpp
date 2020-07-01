@@ -868,6 +868,7 @@ public:
   void visitAllocGlobalInst(AllocGlobalInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);
   void visitGlobalValueInst(GlobalValueInst *i);
+  void visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
@@ -2072,6 +2073,12 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
   Explosion e;
   e.add(InitRef);
   setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *i) {
+  auto storagePtrTy = IGM.getStoragePointerType(i->getType());
+  llvm::Value *addr = llvm::ConstantPointerNull::get(storagePtrTy);
+  setLoweredAddress(i, Address(addr, Alignment()));
 }
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {

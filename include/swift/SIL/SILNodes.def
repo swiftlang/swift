@@ -458,6 +458,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(GlobalAddrInst, global_addr,
                       LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(BaseAddrForOffsetInst, base_addr_for_offset,
+                      LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(GlobalValueInst, global_value,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(IntegerLiteralInst, integer_literal,
