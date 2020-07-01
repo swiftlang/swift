@@ -959,7 +959,7 @@ where Self: BidirectionalCollection, SubSequence == Self {
       _preconditionFailure(
         "Can't remove more items from a collection than it contains")
     }
-    removeSubrange(index(end, offsetBy: -k)..<end)
+    removeSubrange(start..<end)
   }
 }
 
