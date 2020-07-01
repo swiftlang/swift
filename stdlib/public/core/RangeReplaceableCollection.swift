@@ -285,12 +285,17 @@ public protocol RangeReplaceableCollection: Collection
   /// Customization point for `removeLast()`.  Implement this function if you
   /// want to replace the default implementation.
   ///
+  /// The collection must not be empty.
+  ///
   /// - Returns: A non-nil value if the operation was performed.
   mutating func _customRemoveLast() -> Element?
 
   /// Customization point for `removeLast(_:)`.  Implement this function if you
   /// want to replace the default implementation.
   ///
+  /// - Parameter n: The number of elements to remove from the collection.
+  ///   `n` must be greater than or equal to zero and must not exceed the
+  ///   number of elements in the collection.
   /// - Returns: `true` if the operation was performed.
   mutating func _customRemoveLast(_ n: Int) -> Bool
 
@@ -591,9 +596,10 @@ extension RangeReplaceableCollection {
   public mutating func removeFirst(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it has")
-    let end = index(startIndex, offsetBy: k)
+    guard let end = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it has")
+    }
     removeSubrange(startIndex..<end)
   }
 
@@ -699,9 +705,11 @@ extension RangeReplaceableCollection where SubSequence == Self {
   public mutating func removeFirst(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: k)..<endIndex]
+    guard let idx = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    self = self[idx..<endIndex]
   }
 }
 
@@ -800,7 +808,12 @@ extension RangeReplaceableCollection
 
   @inlinable
   public mutating func _customRemoveLast(_ n: Int) -> Bool {
-    self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
+    guard let end = index(endIndex, offsetBy: -n, limitedBy: startIndex)
+    else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    self = self[startIndex..<end]
     return true
   }
 }
@@ -864,13 +877,17 @@ extension RangeReplaceableCollection where Self: BidirectionalCollection {
   public mutating func removeLast(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
     if _customRemoveLast(k) {
       return
     }
     let end = endIndex
-    removeSubrange(index(end, offsetBy: -k)..<end)
+    guard let start = index(end, offsetBy: -k, limitedBy: startIndex)
+    else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+
+    removeSubrange(start..<end)
   }
 }
 
@@ -934,13 +951,16 @@ where Self: BidirectionalCollection, SubSequence == Self {
   public mutating func removeLast(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
     if _customRemoveLast(k) {
       return
     }
     let end = endIndex
-    removeSubrange(index(end, offsetBy: -k)..<end)
+    guard let start = index(end, offsetBy: -k, limitedBy: startIndex)
+    else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    removeSubrange(start..<end)
   }
 }
 
