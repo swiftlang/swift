@@ -52,13 +52,40 @@ SourceLoc swift::extractNearestSourceLoc(const IRGenDescriptor &desc) {
   return SourceLoc();
 }
 
-evaluator::DependencySource IRGenSourceFileRequest::readDependencySource(
+TinyPtrVector<FileUnit *> IRGenDescriptor::getFiles() const {
+  // For a whole module, we emit IR for all files.
+  if (auto *mod = Ctx.dyn_cast<ModuleDecl *>())
+    return TinyPtrVector<FileUnit *>(mod->getFiles());
+
+  // For a primary source file, we emit IR for both it and potentially its
+  // SynthesizedFileUnit.
+  auto *SF = Ctx.get<SourceFile *>();
+  TinyPtrVector<FileUnit *> files;
+  files.push_back(SF);
+
+  if (auto *synthesizedFile = SF->getSynthesizedFile())
+    files.push_back(synthesizedFile);
+
+  return files;
+}
+
+ModuleDecl *IRGenDescriptor::getParentModule() const {
+  if (auto *SF = Ctx.dyn_cast<SourceFile *>())
+    return SF->getParentModule();
+  return Ctx.get<ModuleDecl *>();
+}
+
+evaluator::DependencySource IRGenRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   auto &desc = std::get<0>(getStorage());
-  return {
-    desc.Ctx.dyn_cast<SourceFile *>(),
-    evaluator::DependencyScope::Cascading
-  };
+
+  // We don't track dependencies in whole-module mode.
+  if (auto *mod = desc.Ctx.dyn_cast<ModuleDecl *>()) {
+    return {nullptr, e.getActiveSourceScope()};
+  }
+
+  auto *SF = desc.Ctx.get<SourceFile *>();
+  return {SF, evaluator::DependencyScope::Cascading};
 }
 
 // Define request evaluation functions for each of the IRGen requests.
