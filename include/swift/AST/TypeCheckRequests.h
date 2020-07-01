@@ -2192,7 +2192,7 @@ public:
 /// property in a `Differentiable`-conforming type.
 class TangentStoredPropertyRequest
     : public SimpleRequest<TangentStoredPropertyRequest,
-                           TangentPropertyInfo(VarDecl *),
+                           TangentPropertyInfo(VarDecl *, CanType),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2201,8 +2201,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  TangentPropertyInfo evaluate(Evaluator &evaluator,
-                               VarDecl *originalField) const;
+  TangentPropertyInfo evaluate(Evaluator &evaluator, VarDecl *originalField,
+                               CanType parentType) const;
 
 public:
   // Caching.
