@@ -1280,7 +1280,7 @@ static void performParallelIRGeneration(
 
   // Start all the threads and do the LLVM compilation.
 
-  LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, SILMod->getOptions().NumThreads - 1);
+  LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, Opts.NumThreads - 1);
   codeGenThreads.startThreads();
 
   // Free the memory occupied by the SILModule.
@@ -1301,7 +1301,7 @@ GeneratedModule swift::performIRGeneration(
     const PrimarySpecificPaths &PSPs,
     ArrayRef<std::string> parallelOutputFilenames,
     llvm::GlobalVariable **outModuleHash, llvm::StringSet<> *LinkerDirectives) {
-  if (SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
+  if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty()) {
     ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
                                   parallelOutputFilenames, LinkerDirectives);
