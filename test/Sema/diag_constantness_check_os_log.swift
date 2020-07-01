@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 // Tests the constantness Sema diagnostics for the OSLogTestHelper module,
 // which acts as a stub for the os overlay.

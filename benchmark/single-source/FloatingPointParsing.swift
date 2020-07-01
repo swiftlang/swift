@@ -242,7 +242,7 @@ public func run_ParseDoubleExp(_ N: Int) {
 
 @inline(never)
 public func run_ParseFloat80Exp(_ N: Int) {
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(Linux)
+#if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
@@ -263,7 +263,7 @@ public func run_ParseDoubleUniform(_ N: Int) {
 
 @inline(never)
 public func run_ParseFloat80Uniform(_ N: Int) {
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(Linux)
+#if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)

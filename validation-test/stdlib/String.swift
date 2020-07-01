@@ -1227,7 +1227,7 @@ StringTests.test("Conversions") {
 }
 
 
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#if canImport(Glibc)
   import Glibc
 #endif
 
