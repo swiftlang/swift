@@ -5,10 +5,10 @@
 // XFAIL: OS=linux-android
 // XFAIL: OS=openbsd
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
   typealias JumpBuffer = Int32
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
   typealias JumpBuffer = jmp_buf
 #else

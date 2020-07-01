@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-sil -primary-file %s -o /dev/null -verify
 //
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 // Tests for the diagnostics produced by the OSLogOptimization pass that
 // performs compile-time analysis and optimization of the new os log APIs.
