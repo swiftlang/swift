@@ -2141,18 +2141,17 @@ getInfoForUsedFileNames(const ModuleDecl *module) {
   return result;
 }
 
-static void
-computeMagicFileString(const ModuleDecl *module, StringRef name,
-                       SmallVectorImpl<char> &result) {
+static void computeFileID(const ModuleDecl *module, StringRef name,
+                          SmallVectorImpl<char> &result) {
   result.assign(module->getNameStr().begin(), module->getNameStr().end());
   result.push_back('/');
   result.append(name.begin(), name.end());
 }
 
 static StringRef
-resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
-                          const llvm::StringMap<SourceFilePathInfo> &paths,
-                          bool shouldDiagnose) {
+resolveFileIDConflicts(const ModuleDecl *module, StringRef fileString,
+                       const llvm::StringMap<SourceFilePathInfo> &paths,
+                       bool shouldDiagnose) {
   assert(paths.size() > 1);
   assert(module->getASTContext().LangOpts.EnableConcisePoundFile);
 
@@ -2211,7 +2210,7 @@ resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
 }
 
 llvm::StringMap<std::pair<std::string, bool>>
-ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
+ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
   llvm::StringMap<std::pair<std::string, bool>> result;
   SmallString<64> scratch;
 
@@ -2219,7 +2218,7 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
     return result;
 
   for (auto &namePair : getInfoForUsedFileNames(this)) {
-    computeMagicFileString(this, namePair.first(), scratch);
+    computeFileID(this, namePair.first(), scratch);
     auto &infoForPaths = namePair.second;
 
     assert(!infoForPaths.empty());
@@ -2229,8 +2228,8 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
     // will simply warn about conflicts.
     StringRef winner = infoForPaths.begin()->first();
     if (infoForPaths.size() > 1)
-      winner = resolveMagicNameConflicts(this, scratch, infoForPaths,
-                                         shouldDiagnose);
+      winner = resolveFileIDConflicts(this, scratch, infoForPaths,
+                                      shouldDiagnose);
 
     for (auto &pathPair : infoForPaths) {
       result[pathPair.first()] =
