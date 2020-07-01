@@ -915,3 +915,43 @@ bb1:
   %v = tuple ()
   return %v : $()
 }
+
+// Test an "illegal" reinitialization of a stack location. This
+// happens because lowering .int_fma_FPIEEE32 knows that the type is
+// trivial, so avoids deinitialization. rdar://64671864.
+//
+// Note: we have given up on enforcing known SIL-patterns in
+// CopyForwarding. Instead, we just remove restructions whenever we see
+// unexpected patterns. Eventually, we will replace it with an OSSA
+// pass and enforce all assumptions about SIL patterns in the verifier.
+
+// CHECK-LABEL: sil @testCPF : $@convention(thin) (Float) -> @out Float {
+// CHECK: bb0(%0 : $*Float, %1 : $Float):
+// CHECK:   [[TMP1:%.*]] = alloc_stack $Float
+// CHECK:   store %1 to [[TMP1]] : $*Float
+// CHECK:   [[TMP2:%.*]] = alloc_stack $Float
+// CHECK-NOT: copy_addr
+// CHECK:   [[FMA:%.*]] = builtin "int_fma_FPIEEE32"
+// CHECK:   [[RESULT:%.*]] = struct $Float ([[FMA]] : $Builtin.FPIEEE32)
+// CHECK:   store [[RESULT]] to %0 : $*Float
+// CHECK-NOT: copy_addr
+// CHECK-NOT: destroy_addr
+// CHECK-LABEL: } // end sil function 'testCPF'
+sil @testCPF : $@convention(thin) (Float) -> @out Float {
+bb0(%0 : $*Float, %1 : $Float):
+  %2 = alloc_stack $Float
+  store %1 to %2 : $*Float
+  %4 = alloc_stack $Float
+  copy_addr %2 to [initialization] %4 : $*Float
+  %6 = struct_extract %1 : $Float, #Float._value
+  %7 = builtin "int_fma_FPIEEE32"(%6 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  %8 = struct $Float (%7 : $Builtin.FPIEEE32)
+  store %8 to %4 : $*Float
+  copy_addr %4 to [initialization] %0 : $*Float
+  destroy_addr %4 : $*Float
+  dealloc_stack %4 : $*Float
+  destroy_addr %2 : $*Float
+  dealloc_stack %2 : $*Float
+  %15 = tuple ()
+  return %15 : $()
+}
