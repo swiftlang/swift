@@ -2008,7 +2008,7 @@ public:
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      if (closure->wasSeparatelyTypeChecked()) {
+      if (closure->isSeparatelyTypeChecked()) {
         dcStack.push_back(closure);
         return {true, expr};
       }
@@ -2019,7 +2019,7 @@ public:
 
   Expr *walkToExprPost(Expr *expr) override {
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-      if (closure->wasSeparatelyTypeChecked()) {
+      if (closure->isSeparatelyTypeChecked()) {
         assert(dcStack.back() == closure);
         dcStack.pop_back();
       }

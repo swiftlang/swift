@@ -1975,7 +1975,7 @@ bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
 
 void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable());
-  ExplicitResultTypeAndSeparatelyChecked.getPointer()
+  ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
 }
 

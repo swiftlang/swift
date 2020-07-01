@@ -3759,7 +3759,25 @@ public:
 ///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
+public:
+  enum class BodyState {
+    /// The body was parsed, but not ready for type checking because
+    /// the closure parameters haven't been type checked.
+    Parsed,
 
+    /// The type of the closure itself was type checked. But the body has not
+    /// been type checked yet.
+    ReadyForTypeChecking,
+
+    /// The body was typechecked with the enclosing closure.
+    /// i.e. single expression closure or function builder closure.
+    TypeCheckedAtOnce,
+
+    /// The body was type checked separately from the enclosing closure.
+    SeparatelyTypeChecked,
+  };
+
+private:
   /// The range of the brackets of the capture list, if present.
   SourceRange BracketRange;
     
@@ -3783,8 +3801,7 @@ class ClosureExpr : public AbstractClosureExpr {
   SourceLoc InLoc;
 
   /// The explicitly-specified result type.
-  llvm::PointerIntPair<TypeExpr *, 1, bool>
-    ExplicitResultTypeAndSeparatelyChecked;
+  llvm::PointerIntPair<TypeExpr *, 2, BodyState> ExplicitResultTypeAndBodyState;
 
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
@@ -3799,7 +3816,7 @@ public:
       BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultTypeAndSeparatelyChecked(explicitResultType, false),
+      ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
       Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
@@ -3854,15 +3871,13 @@ public:
 
   Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultTypeAndSeparatelyChecked.getPointer()
-        ->getInstanceType();
+    return ExplicitResultTypeAndBodyState.getPointer()->getInstanceType();
   }
   void setExplicitResultType(Type ty);
 
   TypeRepr *getExplicitResultTypeRepr() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultTypeAndSeparatelyChecked.getPointer()
-        ->getTypeRepr();
+    return ExplicitResultTypeAndBodyState.getPointer()->getTypeRepr();
   }
 
   /// Determine whether the closure has a single expression for its
@@ -3904,14 +3919,20 @@ public:
   /// captured non-weakly).
   bool capturesSelfEnablingImplictSelf() const;
 
-  /// Whether this closure's body was type checked separately from its
-  /// enclosing expression.
-  bool wasSeparatelyTypeChecked() const {
-    return ExplicitResultTypeAndSeparatelyChecked.getInt();
+
+  /// Get the type checking state of this closure's body.
+  BodyState getBodyState() const {
+    return ExplicitResultTypeAndBodyState.getInt();
+  }
+  void setBodyState(BodyState v) {
+    ExplicitResultTypeAndBodyState.setInt(v);
   }
 
-  void setSeparatelyTypeChecked(bool flag = true) {
-    ExplicitResultTypeAndSeparatelyChecked.setInt(flag);
+  /// Whether this closure's body is/was type checked separately from its
+  /// enclosing expression.
+  bool isSeparatelyTypeChecked() const {
+    return getBodyState() == BodyState::SeparatelyTypeChecked ||
+           getBodyState() == BodyState::ReadyForTypeChecking;
   }
 
   static bool classof(const Expr *E) {
