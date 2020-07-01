@@ -172,6 +172,13 @@ public:
                            outModuleHash,
                            LinkerDirectives};
   }
+
+  /// Retrieves the files to perform IR generation for.
+  TinyPtrVector<FileUnit *> getFiles() const;
+
+  /// For a single file, returns its parent module, otherwise returns the module
+  /// itself.
+  ModuleDecl *getParentModule() const;
 };
 
 /// Report that a request of the given kind is being evaluated, so it
@@ -180,10 +187,10 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
-class IRGenSourceFileRequest
-    : public SimpleRequest<IRGenSourceFileRequest,
-                           GeneratedModule(IRGenDescriptor),
-                           RequestFlags::Uncached|RequestFlags::DependencySource> {
+class IRGenRequest
+    : public SimpleRequest<IRGenRequest, GeneratedModule(IRGenDescriptor),
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -193,32 +200,11 @@ private:
   // Evaluation.
   GeneratedModule
   evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
-
-public:
-  bool isCached() const { return true; }
 
 public:
   // Incremental dependencies.
   evaluator::DependencySource
   readDependencySource(const evaluator::DependencyRecorder &) const;
-};
-
-class IRGenWholeModuleRequest
-    : public SimpleRequest<IRGenWholeModuleRequest,
-                           GeneratedModule(IRGenDescriptor),
-                           RequestFlags::Uncached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  GeneratedModule
-  evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
-
-public:
-  bool isCached() const { return true; }
 };
 
 void simple_display(llvm::raw_ostream &out, const IRGenDescriptor &d);
