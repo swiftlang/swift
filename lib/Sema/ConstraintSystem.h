@@ -1074,6 +1074,11 @@ enum class ConstraintSystemFlags {
   /// If set, constraint system always reuses type of pre-typechecked
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x08,
+
+  /// FIME: Temporary hack.
+  /// Force apply a viable solution even if they are ambiguous, so that the
+  /// client get a solution.
+  ForceApplyViableSolution = 0x10,
 };
 
 /// Options that affect the constraint system as a whole.

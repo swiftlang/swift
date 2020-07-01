@@ -1335,6 +1335,12 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return bestIdx;
   }
 
+  // FIXME: Terrible hack for code completion. But applying a solution is better
+  // than just failing.
+  if (Options.contains(ConstraintSystemFlags::ForceApplyViableSolution)) {
+    return bestIdx;
+  }
+
   // If there is not a single "better" than others
   // solution, which probably means that solutions
   // were incomparable, let's just keep the original
