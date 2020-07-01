@@ -746,7 +746,7 @@ ForwardModeTests.test("SimpleWrtSelf") {
     // FIXME(TF-648): Dummy to make `Super.AllDifferentiableVariables` be nontrivial.
     var _nontrivial: [Float] = []
 
-    // FIXME(SR-12175): Fix forward-mode differentiation crash.
+    // FIXME(SR-12175): Fix forward-mode differentiation tangent buffer crash.
     // @differentiable
     required init(base: Float) {
       self.base = base
@@ -792,7 +792,7 @@ ForwardModeTests.test("SimpleWrtSelf") {
     }
   }
 
-  // FIXME(SR-12175): Fix forward-mode differentiation crash.
+    // FIXME(SR-12175): Fix forward-mode differentiation tangent buffer crash.
   // let v = Super.TangentVector(base: 100, _nontrivial: [])
   // expectEqual(100, pullback(at: 1337) { x in Super(base: x) }(v))
   // expectEqual(100, pullback(at: 1337) { x in SubOverride(base: x) }(v))
@@ -1064,12 +1064,80 @@ ForwardModeTests.test("FunctionCall") {
 }
 
 ForwardModeTests.test("ResultSelection") {
-  func foo(_ x: Float, _ y: Float) -> (Float, Float) {
+  func tuple(_ x: Float, _ y: Float) -> (Float, Float) {
     return (x + 1, y + 2)
   }
-  expectEqual(1, derivative(at: 3, 3, in: { x, y in foo(x, y).0 }))
-  expectEqual(1, derivative(at: 3, 3, in: { x, y in foo(x, y).1 }))
+  expectEqual(1, derivative(at: 3, 3, in: { x, y in tuple(x, y).0 }))
+  expectEqual(1, derivative(at: 3, 3, in: { x, y in tuple(x, y).1 }))
+
+  // FIXME(SR-12175): Fix forward-mode differentiation tangent buffer crash.
+  /*
+  func tupleGeneric<T>(_ x: T, _ y: T) -> (T, T) {
+    return (x, y)
+  }
+  func tupleGenericFirst<T>(_ x: T, _ y: T) -> T { tupleGeneric(x, y).0 }
+  func tupleGenericSecond<T>(_ x: T, _ y: T) -> T { tupleGeneric(x, y).1 }
+  expectEqual(1, derivative(at: 3, 3, in: tupleGenericFirst))
+  expectEqual(1, derivative(at: 3, 3, in: tupleGenericSecond))
+  */
 }
+
+// TODO(TF-983): Support forward-mode differentiation of multiple results.
+/*
+ForwardModeTests.test("MultipleResults") {
+  // Test function returning a tuple of active results.
+  func tuple(_ x: Float, _ y: Float) -> (Float, Float) {
+    return (x, y)
+  }
+  func multiply(_ x: Float, _ y: Float) -> Float {
+    let z = tuple(x, y)
+    // Note: both results (tuple elements) are active.
+    return z.0 * z.1
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply))
+  expectEqual((10, 5), gradient(at: 5, 10, in: multiply))
+
+  // Test function with multiple `inout` parameters.
+  func swap(_ x: inout Float, _ y: inout Float) {
+    let tmp = x; x = y; y = tmp
+  }
+  func multiply_swap(_ x: Float, _ y: Float) -> Float {
+    var tuple = (x, y)
+    swap(&tuple.0, &tuple.1)
+    return tuple.0 * tuple.1
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swap))
+  expectEqual((10, 5), gradient(at: 5, 10, in: multiply_swap))
+
+  // Test function with multiple `inout` parameters.
+  func swapGeneric<T>(_ x: inout T, _ y: inout T) {
+    let tmp = x; x = y; y = tmp
+  }
+  func multiply_swapGeneric(_ x: Float, _ y: Float) -> Float {
+    var tuple = (x, y)
+    swapGeneric(&tuple.0, &tuple.1)
+    return tuple.0 * tuple.1
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapGeneric))
+  expectEqual((10, 5), gradient(at: 5, 10, in: multiply_swapGeneric))
+
+  // Test function with multiple `inout` parameters and a formal result.
+  func swapAndReturnProduct(_ x: inout Float, _ y: inout Float) -> Float {
+    let tmp = x
+    x = y
+    y = tmp
+    return x * y
+  }
+  func multiply_swapAndReturnProduct(_ x: Float, _ y: Float) -> Float {
+    var x2 = x
+    var y2 = y
+    let result = swapAndReturnProduct(&x2, &y2)
+    return result
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapAndReturnProduct))
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapAndReturnProduct))
+}
+*/
 
 ForwardModeTests.test("CaptureLocal") {
   let z: Float = 10
