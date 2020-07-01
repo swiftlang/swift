@@ -17,7 +17,6 @@
 #include "swift/Basic/Timer.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
