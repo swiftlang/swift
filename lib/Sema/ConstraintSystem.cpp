@@ -4249,11 +4249,17 @@ Optional<Identifier> constraints::getOperatorName(Expr *expr) {
   return None;
 }
 
-bool constraints::isPatternMatchingOperator(Expr *expr) {
+bool constraints::isPatternMatchingOperator(ASTNode node) {
+  auto *expr = getAsExpr(node);
+  if (!expr) return false;
+
   return isOperator(expr, "~=");
 }
 
-bool constraints::isStandardComparisonOperator(Expr *expr) {
+bool constraints::isStandardComparisonOperator(ASTNode node) {
+  auto *expr = getAsExpr(node);
+  if (!expr) return false;
+
   if (auto opName = getOperatorName(expr)) {
     return opName->is("==") || opName->is("!=") || opName->is("===") ||
            opName->is("!==") || opName->is("<") || opName->is(">") ||

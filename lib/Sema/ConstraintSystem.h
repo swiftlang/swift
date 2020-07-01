@@ -5224,13 +5224,13 @@ bool isArgumentOfPatternMatchingOperator(ConstraintLocator *locator);
 /// associated with `===` and `!==` operators.
 bool isArgumentOfReferenceEqualityOperator(ConstraintLocator *locator);
 
-/// Determine whether given expression is a reference to a
+/// Determine whether the given AST node is a reference to a
 /// pattern-matching operator `~=`
-bool isPatternMatchingOperator(Expr *expr);
+bool isPatternMatchingOperator(ASTNode node);
 
-/// Determine whether given expression is a reference to a
+/// Determine whether the given AST node is a reference to a
 /// "standard" comparison operator such as "==", "!=", ">" etc.
-bool isStandardComparisonOperator(Expr *expr);
+bool isStandardComparisonOperator(ASTNode node);
 
 /// If given expression references operator overlaod(s)
 /// extract and produce name of the operator.

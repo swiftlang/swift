@@ -265,8 +265,9 @@ public:
     assert(getGenericContext() &&
            "Affected decl not within a generic context?");
 
-    if (auto *parentExpr = findParentExpr(getRawAnchor().get<Expr *>()))
-      Apply = dyn_cast<ApplyExpr>(parentExpr);
+    if (auto *expr = getAsExpr(getRawAnchor()))
+      if (auto *parentExpr = findParentExpr(expr))
+        Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
   unsigned getRequirementIndex() const {
