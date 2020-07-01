@@ -34,31 +34,6 @@ struct SectionInfo {
 };
 
 static constexpr const uintptr_t CurrentSectionMetadataVersion = 1;
-
-struct MetadataSections {
-  uintptr_t version;
-  uintptr_t reserved;
-
-  mutable const MetadataSections *next;
-  mutable const MetadataSections *prev;
-
-  struct Range {
-    uintptr_t start;
-    size_t length;
-  };
-
-  Range swift5_protocols;
-  Range swift5_protocol_conformances;
-  Range swift5_type_metadata;
-  Range swift5_typeref;
-  Range swift5_reflstr;
-  Range swift5_fieldmd;
-  Range swift5_assocty;
-  Range swift5_replace;
-  Range swift5_replac2;
-  Range swift5_builtin;
-  Range swift5_capture;
-};
 } // namespace swift
 
 // Called by injected constructors when a dynamic library is loaded.

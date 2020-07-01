@@ -731,7 +731,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   for (const auto *differentiableAttr :
        ASD->getAttrs().getAttributes<DifferentiableAttr>())
     addDerivativeConfiguration(
-        ASD->getAccessor(AccessorKind::Get),
+        ASD->getOpaqueAccessor(AccessorKind::Get),
         AutoDiffConfig(differentiableAttr->getParameterIndices(),
                        IndexSubset::get(ASD->getASTContext(), 1, {0}),
                        differentiableAttr->getDerivativeGenericSignature()));

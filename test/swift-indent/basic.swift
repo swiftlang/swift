@@ -1052,3 +1052,14 @@ struct <#name#> {
     <#fields#>
     func foo() {}
 }
+
+
+// Array literal elements should have their continuation lines indented relative to their first line.
+
+doStuffWithList([
+    baseThing()
+        .map { $0 }
+        .append(\.sdfsdf),
+    secondItem
+        .filter {$0 < 10}
+])

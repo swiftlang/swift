@@ -1170,6 +1170,23 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
           loc, derivativeFn,
           SILType::getPrimitiveObjectType(expectedDerivativeFnTy));
     }
+    // If derivative function value's type is not ABI-compatible with the
+    // expected derivative function type (i.e. parameter and result conventions
+    // do not match), perform reabstraction.
+    auto abiCompatibility = expectedDerivativeFnTy->isABICompatibleWith(
+        derivativeFn->getType().castTo<SILFunctionType>(), *dfi->getFunction());
+    if (!abiCompatibility.isCompatible()) {
+      SILOptFunctionBuilder fb(context.getTransform());
+      auto newDerivativeFn = reabstractFunction(
+          builder, fb, loc, derivativeFn, expectedDerivativeFnTy,
+          [](SubstitutionMap substMap) { return substMap; });
+      derivativeFn = newDerivativeFn;
+      assert(expectedDerivativeFnTy
+                 ->isABICompatibleWith(
+                     derivativeFn->getType().castTo<SILFunctionType>(),
+                     *dfi->getFunction())
+                 .isCompatible());
+    }
 
     derivativeFns.push_back(derivativeFn);
   }

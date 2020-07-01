@@ -218,6 +218,9 @@ private:
 
   Optional<TangentSpace> getTangentSpace(CanType type);
 
+  /// Returns the tangent value category of the given value.
+  SILValueCategory getTangentValueCategory(SILValue v);
+
   /// Assuming the given type conforms to `Differentiable` after remapping,
   /// returns the associated tangent space type.
   SILType getRemappedTangentType(SILType type);
@@ -264,6 +267,8 @@ private:
   SILValue getAdjointProjection(SILBasicBlock *origBB,
                                 SILValue originalProjection);
 
+  SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer);
+
   SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint();
 
   /// Creates and returns a local allocation with the given type.
@@ -272,8 +277,6 @@ private:
   /// deallocated in the pullback exit. All local allocations not in
   /// `destroyedLocalAllocations` are also destroyed in the pullback exit.
   AllocStackInst *createFunctionLocalAllocation(SILType type, SILLocation loc);
-
-  SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer);
 
   /// Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
   /// `originalBuffer`.

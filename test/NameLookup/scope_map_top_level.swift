@@ -21,7 +21,7 @@ extension Int {
 var i: Int = b.my_identity()
 
 
-// RUN: %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
+// RUN: %target-swift-frontend -dump-scope-maps expanded %/s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
 
