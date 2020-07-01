@@ -81,6 +81,11 @@ void ConstraintSystem::inferTransitiveSupertypeBindings(
       bindings.addPotentialBinding(
           binding.withSameSource(type, AllowedBindingKind::Supertypes));
     }
+
+    // Infer transitive protocol requirements.
+    for (auto *protocol : relatedBindings->getSecond().Protocols) {
+      bindings.Protocols.push_back(protocol);
+    }
   }
 }
 
@@ -628,6 +633,10 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       LLVM_FALLTHROUGH;
 
     case ConstraintKind::LiteralConformsTo: {
+      // Record constraint where protocol requirement originated
+      // this is useful to use for the binding later.
+      result.Protocols.push_back(constraint);
+
       // If there is a 'nil' literal constraint, we might need optional
       // supertype bindings.
       if (constraint->getProtocol()->isSpecificProtocol(

@@ -4420,6 +4420,9 @@ private:
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
+    /// The set of protocol requirements placed on this type variable.
+    llvm::TinyPtrVector<Constraint *> Protocols;
+
     /// Whether these bindings should be delayed until the rest of the
     /// constraint system is considered "fully bound".
     bool FullyBound = false;
