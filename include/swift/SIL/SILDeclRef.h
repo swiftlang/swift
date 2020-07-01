@@ -309,7 +309,7 @@ struct SILDeclRef {
   /// function.
   SILDeclRef asAutoDiffDerivativeFunction(
       AutoDiffDerivativeFunctionIdentifier *derivativeId) const {
-    assert(!derivativeFunctionIdentifier);
+    assert(derivativeId);
     SILDeclRef declRef = *this;
     declRef.derivativeFunctionIdentifier = derivativeId;
     return declRef;
