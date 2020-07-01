@@ -929,8 +929,7 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
     } else {
       for (auto *File : M->getFiles()) {
         if (auto *nextSF = dyn_cast<SourceFile>(File)) {
-          if (nextSF->ASTStage >= SourceFile::TypeChecked)
-            IGM.emitSourceFile(*nextSF);
+          IGM.emitSourceFile(*nextSF);
         } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
           IGM.emitSynthesizedFileUnit(*nextSFU);
         } else {
@@ -1138,7 +1137,7 @@ static void performParallelIRGeneration(
   bool DidRunSILCodeGenPreparePasses = false;
   for (auto *File : M->getFiles()) {
     auto nextSF = dyn_cast<SourceFile>(File);
-    if (!nextSF || nextSF->ASTStage < SourceFile::TypeChecked)
+    if (!nextSF)
       continue;
     
     // There must be an output filename for each source file.
