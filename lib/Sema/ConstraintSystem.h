@@ -4557,6 +4557,23 @@ private:
     /// if it has only concrete types or would resolve a closure.
     bool favoredOverDisjunction(Constraint *disjunction) const;
 
+    /// Detect `subtype` relationship between two type variables and
+    /// attempt to infer supertype bindings transitively e.g.
+    ///
+    /// Given A <: T1 <: T2 transitively A <: T2
+    ///
+    /// Which gives us a new (superclass A) binding for T2 as well as T1.
+    ///
+    /// \param cs The constraint system this type variable is associated with.
+    ///
+    /// \param inferredBindings The set of all bindings inferred for type
+    /// variables in the workset.
+    void inferTransitiveBindings(
+        ConstraintSystem &cs,
+        const llvm::SmallDenseMap<TypeVariableType *,
+                                  ConstraintSystem::PotentialBindings>
+            &inferredBindings);
+
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
@@ -4624,22 +4641,6 @@ private:
       bool &hasNonDependentMemberRelationalConstraints,
       bool &addOptionalSupertypeBindings) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
-
-  /// Detect `subtype` relationship between two type variables and
-  /// attempt to infer supertype bindings transitively e.g.
-  ///
-  /// Given A <: T1 <: T2 transitively A <: T2
-  ///
-  /// Which gives us a new (superclass A) binding for T2 as well as T1.
-  ///
-  /// \param inferredBindings The set of all bindings inferred for type
-  /// variables in the workset.
-  /// \param bindings The type variable we aim to infer new supertype
-  /// bindings for.
-  void inferTransitiveSupertypeBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-          &inferredBindings,
-      PotentialBindings &bindings);
 
 private:
   /// Add a constraint to the constraint system.

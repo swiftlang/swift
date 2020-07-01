@@ -21,36 +21,37 @@
 using namespace swift;
 using namespace constraints;
 
-void ConstraintSystem::inferTransitiveSupertypeBindings(
-    const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-        &inferredBindings,
-    PotentialBindings &bindings) {
-  auto *typeVar = bindings.TypeVar;
+void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
+    ConstraintSystem &cs,
+    const llvm::SmallDenseMap<TypeVariableType *,
+                              ConstraintSystem::PotentialBindings>
+        &inferredBindings) {
+  using BindingKind = ConstraintSystem::AllowedBindingKind;
 
   llvm::SmallVector<Constraint *, 4> subtypeOf;
   // First, let's collect all of the `subtype` constraints associated
   // with this type variable.
-  llvm::copy_if(bindings.Sources, std::back_inserter(subtypeOf),
+  llvm::copy_if(Sources, std::back_inserter(subtypeOf),
                 [&](const Constraint *constraint) -> bool {
                   if (constraint->getKind() != ConstraintKind::Subtype)
                     return false;
 
-                  auto rhs = simplifyType(constraint->getSecondType());
-                  return rhs->getAs<TypeVariableType>() == typeVar;
+                  auto rhs = cs.simplifyType(constraint->getSecondType());
+                  return rhs->getAs<TypeVariableType>() == TypeVar;
                 });
 
   if (subtypeOf.empty())
     return;
 
   // We need to make sure that there are no duplicate bindings in the
-  // set, other we'll produce multiple identical solutions.
+  // set, otherwise solver would produce multiple identical solutions.
   llvm::SmallPtrSet<CanType, 4> existingTypes;
-  for (const auto &binding : bindings.Bindings)
+  for (const auto &binding : Bindings)
     existingTypes.insert(binding.BindingType->getCanonicalType());
 
   for (auto *constraint : subtypeOf) {
     auto *tv =
-        simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
+        cs.simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
     if (!tv)
       continue;
 
@@ -63,8 +64,8 @@ void ConstraintSystem::inferTransitiveSupertypeBindings(
       // either be Exact or Supertypes in order for it to make sense
       // to add Supertype bindings based on the relationship between
       // our type variables.
-      if (binding.Kind != AllowedBindingKind::Exact &&
-          binding.Kind != AllowedBindingKind::Supertypes)
+      if (binding.Kind != BindingKind::Exact &&
+          binding.Kind != BindingKind::Supertypes)
         continue;
 
       auto type = binding.BindingType;
@@ -75,16 +76,16 @@ void ConstraintSystem::inferTransitiveSupertypeBindings(
       if (!existingTypes.insert(type->getCanonicalType()).second)
         continue;
 
-      if (ConstraintSystem::typeVarOccursInType(typeVar, type))
+      if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      bindings.addPotentialBinding(
-          binding.withSameSource(type, AllowedBindingKind::Supertypes));
+      addPotentialBinding(
+          binding.withSameSource(type, BindingKind::Supertypes));
     }
 
     // Infer transitive protocol requirements.
     for (auto *protocol : relatedBindings->getSecond().Protocols) {
-      bindings.Protocols.push_back(protocol);
+      Protocols.push_back(protocol);
     }
   }
 }
@@ -113,7 +114,7 @@ ConstraintSystem::determineBestBindings() {
 
     auto &bindings = cachedBindings->getSecond();
 
-    inferTransitiveSupertypeBindings(cache, bindings);
+    bindings.inferTransitiveBindings(*this, cache);
 
     if (isDebugMode()) {
       bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
