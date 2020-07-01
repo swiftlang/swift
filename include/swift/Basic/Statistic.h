@@ -199,6 +199,10 @@ public:
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
   void recordJobMaxRSS(long rss);
   int64_t getChildrenMaxResidentSetSize();
+
+  bool isProfilingEnabled() const {
+    return EventProfilers || EntityProfilers || FrontendStatsEvents;
+  }
 };
 
 // This is a non-nested type just to make it less work to write at call sites.

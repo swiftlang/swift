@@ -1626,10 +1626,12 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
 }
 
 static bool canFreeASTContextBeforeLLVM(CompilerInstance &Instance) {
-  // If the stats reporter is installed, we need the ASTContext to live through
-  // the entire compilation process.
-  if (Instance.getASTContext().Stats) {
-    return false;
+  // If the stats reporter is configured to profile events, it may store
+  // pointers into objects owned by the ASTContext, so we need it to live
+  // through the entire compilation process.
+  if (auto *stats = Instance.getASTContext().Stats) {
+    if (stats->isProfilingEnabled())
+      return false;
   }
 
   const auto &opts = Instance.getInvocation().getFrontendOptions();
