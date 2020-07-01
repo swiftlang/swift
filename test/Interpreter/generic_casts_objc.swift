@@ -50,5 +50,5 @@ print(#line, nongenericAnyIsPObjCProtocol(type: PCSub.self)) // CHECK: [[@LINE]]
 print("casting types to ObjC protocol metatype via generic:")
 print(#line, genericAnyIs(type: PS.self, to: PObjC.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, genericAnyIs(type: PE.self, to: PObjC.self, expected: false)) // CHECK: [[@LINE]] false
-print(#line, genericAnyIs(type: PC.self, to: PObjC.self, expected: true)) // CHECK-ONONE: [[@LINE]] false
-print(#line, genericAnyIs(type: PCSub.self, to: PObjC.self, expected: true)) // CHECK-ONONE: [[@LINE]] false
+print(#line, genericAnyIs(type: PC.self, to: PObjC.self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PCSub.self, to: PObjC.self, expected: false)) // CHECK: [[@LINE]] false
