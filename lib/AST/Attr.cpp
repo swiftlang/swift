@@ -749,8 +749,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
         if (!BD->hasClangNode() &&
-            VD->isEffectiveLinkageMoreVisibleThan(BD))
+            !BD->getFormalAccessScope(VD->getDeclContext(),
+                                      /*treatUsableFromInlineAsPublic*/ true)
+                 .isPublic()) {
           return false;
+        }
       }
     }
     break;
