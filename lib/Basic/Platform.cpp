@@ -387,6 +387,9 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);
     if (Major == 10) {
+      if (Triple.isAArch64() && Minor <= 16)
+        return llvm::VersionTuple(5, 3);
+
       if (Minor <= 14) {
         return llvm::VersionTuple(5, 0);
       } else if (Minor <= 15) {

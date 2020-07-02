@@ -246,6 +246,9 @@ AvailabilityContext ASTContext::getSwift50Availability() {
     return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX()) {
+    if (target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,14,4)));
   } else if (target.isiOS()) {
@@ -274,6 +277,9 @@ AvailabilityContext ASTContext::getSwift51Availability() {
     return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX()) {
+    if (target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,15,0)));
   } else if (target.isiOS()) {
@@ -302,6 +308,9 @@ AvailabilityContext ASTContext::getSwift52Availability() {
     return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX() ) {
+    if (target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
   } else if (target.isiOS()) {
@@ -322,6 +331,9 @@ AvailabilityContext ASTContext::getSwift53Availability() {
     return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX() ) {
+    if (target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
   } else if (target.isiOS()) {
