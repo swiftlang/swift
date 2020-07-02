@@ -535,16 +535,13 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1,
     /// Whether this class inherits its superclass's convenience initializers.
     InheritsSuperclassInits : 1,
     ComputedInheritsSuperclassInits : 1,
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
-
-    /// \see ClassDecl::getEmittedMembers()
-    HasForcedEmittedMembers : 1,
 
     HasMissingDesignatedInitializers : 1,
     ComputedHasMissingDesignatedInitializers : 1,
@@ -3856,14 +3853,6 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
-  bool hasForcedEmittedMembers() const {
-    return Bits.ClassDecl.HasForcedEmittedMembers;
-  }
-
-  void setHasForcedEmittedMembers() {
-    Bits.ClassDecl.HasForcedEmittedMembers = true;
-  }
-
   Optional<bool> getCachedInheritsSuperclassInitializers() const {
     if (Bits.ClassDecl.ComputedInheritsSuperclassInits)
       return Bits.ClassDecl.InheritsSuperclassInits;
@@ -4089,7 +4078,7 @@ public:
 
   /// Get all the members of this class, synthesizing any implicit members
   /// that appear in the vtable if needed.
-  DeclRange getEmittedMembers() const;
+  ArrayRef<Decl *> getEmittedMembers() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5502,35 +5491,10 @@ public:
   }
 
   /// Does this parameter reject temporary pointer conversions?
-  bool isNonEphemeral() const {
-    if (getAttrs().hasAttribute<NonEphemeralAttr>())
-      return true;
-
-    // Only pointer parameters can be non-ephemeral.
-    auto ty = getInterfaceType();
-    if (!ty->lookThroughSingleOptionalType()->getAnyPointerElementType())
-      return false;
-
-    // Enum element pointer parameters are always non-ephemeral.
-    auto *parentDecl = getDeclContext()->getAsDecl();
-    if (parentDecl && isa<EnumElementDecl>(parentDecl))
-      return true;
-
-    return false;
-  }
+  bool isNonEphemeral() const;
 
   /// Attempt to apply an implicit `@_nonEphemeral` attribute to this parameter.
-  void setNonEphemeralIfPossible() {
-    // Don't apply the attribute if this isn't a pointer param.
-    auto type = getInterfaceType();
-    if (!type->lookThroughSingleOptionalType()->getAnyPointerElementType())
-      return;
-
-    if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
-      auto &ctx = getASTContext();
-      getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
-    }
-  }
+  void setNonEphemeralIfPossible();
 
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter

@@ -213,7 +213,7 @@ def help_hidden : Flag<["-", "--"], "help-hidden">,
 
 def v : Flag<["-"], "v">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Show commands to run and use verbose output">;
-def version : Flag<["-", "--"], "version">,
+def version : Flag<["-", "--"], "version">, Flags<[FrontendOption]>,
   HelpText<"Print version information and exit">;
 
 def parseable_output : Flag<["-"], "parseable-output">,
@@ -389,6 +389,14 @@ def diagnostic_style : Separate<["-"], "diagnostic-style">,
 def diagnostic_style_EQ : Joined<["-"], "diagnostic-style=">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   MetaVarName<"<style>">, Alias<diagnostic_style>;
+def locale : Separate<["-"], "locale">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Choose a language for diagnostic messages">,
+  MetaVarName<"<locale-code>">;
+def localization_path : Separate<["-"], "localization-path">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to localized diagnostic messages directory">,
+  MetaVarName<"<path>">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,

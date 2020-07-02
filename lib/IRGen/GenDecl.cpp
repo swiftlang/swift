@@ -443,6 +443,7 @@ public:
 
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF) {
+  assert(SF.ASTStage == SourceFile::TypeChecked);
   PrettySourceFileEmission StackEntry(SF);
 
   // Emit types and other global decls.

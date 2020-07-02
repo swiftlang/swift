@@ -18,3 +18,24 @@
     }
   ]
 }
+{
+  key.typename: "C",
+  key.typeusr: "$s8MyModule1CCD",
+  key.members: [
+    {
+      key.name: "methodForTarget1()",
+      key.sourcetext: "methodForTarget1()",
+      key.description: "methodForTarget1()",
+      key.typename: "ConcreteTarget1",
+      key.typeusr: "$s8MyModule15ConcreteTarget1VD"
+    },
+    {
+      key.name: "methodForTarget2()",
+      key.sourcetext: "methodForTarget2()",
+      key.description: "methodForTarget2()",
+      key.typename: "ConcreteTarget2",
+      key.typeusr: "$s8MyModule15ConcreteTarget2VD"
+    }
+  ],
+  key.reusingastcontext: 1
+}

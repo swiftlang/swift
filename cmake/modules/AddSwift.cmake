@@ -23,7 +23,7 @@ function(_swift_gyb_target_sources target scope)
 
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
-        $<TARGET_FILE:Python2::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
+        $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
       COMMAND
         ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
@@ -88,6 +88,7 @@ function(_add_host_variant_c_compile_link_flags name)
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     target_compile_options(${name} PRIVATE -target;${target})
+    target_link_options(${name} PRIVATE -target;${target})
   endif()
 
   set(_sysroot
@@ -472,6 +473,7 @@ function(add_swift_host_library name)
 
   _add_host_variant_c_compile_flags(${name})
   _add_host_variant_link_flags(${name})
+  _add_host_variant_c_compile_link_flags(${name})
   _set_target_prefix_and_suffix(${name} "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
   # Set compilation and link flags.
@@ -528,11 +530,6 @@ function(add_swift_host_library name)
       target_link_options(${name} PRIVATE
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
-
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    target_link_options(${name} PRIVATE -target;${target})
   endif()
 
   add_dependencies(dev ${name})
@@ -577,6 +574,7 @@ function(add_swift_host_tool executable)
   add_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
   _add_host_variant_c_compile_flags(${executable})
   _add_host_variant_link_flags(${executable})
+  _add_host_variant_c_compile_link_flags(${executable})
   target_link_directories(${executable} PRIVATE
     ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
   add_dependencies(${executable} ${LLVM_COMMON_DEPENDS})

@@ -28,6 +28,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
@@ -2741,7 +2742,7 @@ void ASTMangler::appendConstructorEntity(const ConstructorDecl *ctor,
 }
 
 void ASTMangler::appendDestructorEntity(const DestructorDecl *dtor,
-                                     bool isDeallocating) {
+                                        bool isDeallocating) {
   appendContextOf(dtor);
   appendOperator(isDeallocating ? "fD" : "fd");
 }

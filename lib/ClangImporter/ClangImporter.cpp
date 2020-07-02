@@ -328,12 +328,13 @@ class ClangImporterDependencyCollector : public clang::DependencyCollector
   /// The FileCollector is used by LLDB to generate reproducers. It's not used
   /// by Swift to track dependencies.
   std::shared_ptr<llvm::FileCollector> FileCollector;
-  const bool TrackSystemDeps;
+  const IntermoduleDepTrackingMode Mode;
 
 public:
   ClangImporterDependencyCollector(
-      bool TrackSystemDeps, std::shared_ptr<llvm::FileCollector> FileCollector)
-      : FileCollector(FileCollector), TrackSystemDeps(TrackSystemDeps) {}
+      IntermoduleDepTrackingMode Mode,
+      std::shared_ptr<llvm::FileCollector> FileCollector)
+      : FileCollector(FileCollector), Mode(Mode) {}
 
   void excludePath(StringRef filename) {
     ExcludedPaths.insert(filename);
@@ -345,7 +346,9 @@ public:
             || Filename == ImporterImpl::bridgingHeaderBufferName);
   }
 
-  bool needSystemDependencies() override { return TrackSystemDeps; }
+  bool needSystemDependencies() override {
+    return Mode == IntermoduleDepTrackingMode::IncludeSystem;
+  }
 
   bool sawDependency(StringRef Filename, bool FromClangModule,
                      bool IsSystem, bool IsClangModuleFile,
@@ -375,8 +378,9 @@ public:
 
 std::shared_ptr<clang::DependencyCollector>
 ClangImporter::createDependencyCollector(
-    bool TrackSystemDeps, std::shared_ptr<llvm::FileCollector> FileCollector) {
-  return std::make_shared<ClangImporterDependencyCollector>(TrackSystemDeps,
+    IntermoduleDepTrackingMode Mode,
+    std::shared_ptr<llvm::FileCollector> FileCollector) {
+  return std::make_shared<ClangImporterDependencyCollector>(Mode,
                                                             FileCollector);
 }
 

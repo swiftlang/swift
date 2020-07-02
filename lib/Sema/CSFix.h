@@ -336,10 +336,12 @@ protected:
 /// Unwrap an optional base when we have a member access.
 class UnwrapOptionalBase final : public ConstraintFix {
   DeclNameRef MemberName;
+  Type MemberBaseType;
 
   UnwrapOptionalBase(ConstraintSystem &cs, FixKind kind, DeclNameRef member,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, kind, locator), MemberName(member) {
+                     Type memberBaseType, ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), MemberName(member),
+        MemberBaseType(memberBaseType) {
     assert(kind == FixKind::UnwrapOptionalBase ||
            kind == FixKind::UnwrapOptionalBaseWithOptionalResult);
   }
@@ -352,11 +354,12 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclNameRef member,
+                                    Type memberBaseType,
                                     ConstraintLocator *locator);
 
   static UnwrapOptionalBase *
   createWithOptionalResult(ConstraintSystem &cs, DeclNameRef member,
-                           ConstraintLocator *locator);
+                           Type memberBaseType, ConstraintLocator *locator);
 };
 
 // Treat rvalue as if it was an lvalue

@@ -103,12 +103,12 @@ import NibbleSort
 import NIOChannelPipeline
 import NSDictionaryCastToSwift
 import NSError
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import NSStringConversion
 #endif
 import NopDeinit
 import ObjectAllocation
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
 #if !(SWIFT_PACKAGE || Xcode)
@@ -287,14 +287,14 @@ registerBenchmark(MonteCarloE)
 registerBenchmark(MonteCarloPi)
 registerBenchmark(NSDictionaryCastToSwift)
 registerBenchmark(NSErrorTest)
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 registerBenchmark(NSStringConversion)
 #endif
 registerBenchmark(NibbleSort)
 registerBenchmark(NIOChannelPipeline)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 registerBenchmark(ObjectiveCBridging)
 registerBenchmark(ObjectiveCBridgingStubs)
 #if !(SWIFT_PACKAGE || Xcode)

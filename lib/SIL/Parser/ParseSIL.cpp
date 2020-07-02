@@ -4583,6 +4583,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
       break;
     }
+    case SILInstructionKind::BaseAddrForOffsetInst: {
+      SILType Ty;
+      if (parseSILType(Ty))
+        return true;
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createBaseAddrForOffset(InstLoc, Ty);
+      break;
+    }
     case SILInstructionKind::SelectEnumInst:
     case SILInstructionKind::SelectEnumAddrInst: {
       if (parseTypedValueRef(Val, B))

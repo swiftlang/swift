@@ -12,7 +12,7 @@ func test_UnicodeScalarDoesNotImplementArithmetic(_ us: UnicodeScalar, i: Int) {
   let a3 = "a" * "b" // expected-error {{binary operator '*' cannot be applied to two 'String' operands}}
   let a4 = "a" / "b" // expected-error {{binary operator '/' cannot be applied to two 'String' operands}}
 
-  let b1 = us + us // expected-error {{referencing operator function '+' on 'RangeReplaceableCollection' requires that 'UnicodeScalar' (aka 'Unicode.Scalar') conform to 'RangeReplaceableCollection'}}
+  let b1 = us + us // expected-error {{binary operator '+' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
   let b2 = us - us // expected-error {{binary operator '-' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
   let b3 = us * us // expected-error {{binary operator '*' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
   let b4 = us / us // expected-error {{binary operator '/' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}

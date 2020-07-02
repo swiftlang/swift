@@ -46,7 +46,8 @@ var doubles: [Double] = serialize([Bar.a, .b, .c])
 var foos: [Foo] = deserialize([1, 2, 3])
 var bars: [Bar] = deserialize([1.2, 3.4, 5.6])
 
-// Infer RawValue from witnesses.
+// We reject enums where the raw type stated in the inheritance clause does not
+// match the types of the witnesses.
 enum Color : Int {
   case red
   case blue
@@ -56,11 +57,13 @@ enum Color : Int {
   }
 
   var rawValue: Double {
+  // expected-error@-1 {{invalid redeclaration of synthesized implementation for protocol requirement 'rawValue'}}
     return 1.0
   }
 }
 
 var colorRaw: Color.RawValue = 7.5
+// expected-error@-1 {{cannot convert value of type 'Double' to specified type 'Color.RawValue' (aka 'Int')}}
 
 // Mismatched case types
 

@@ -78,7 +78,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                               ModuleCachePath,
                                               FEOpts.PrebuiltModuleCachePath,
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                              FEOpts.TrackSystemDeps);
+                                              FEOpts.shouldTrackSystemDependencies());
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
@@ -339,8 +339,12 @@ static void writeJSON(llvm::raw_ostream &out,
         }
         out.indent(5 * 2);
         out << "],\n";
+      } else if (!swiftDeps->compiledModulePath.empty()) {
+        writeJSONSingleField(
+            out, "compiledModulePath",
+            swiftDeps->compiledModulePath, 5,
+            /*trailingComma=*/false);
       }
-
       if (!swiftDeps->extraPCMArgs.empty()) {
         out.indent(5 * 2);
         out << "\"extraPcmArgs\": [\n";
@@ -354,7 +358,6 @@ static void writeJSON(llvm::raw_ostream &out,
         out.indent(5 * 2);
         out << (swiftDeps->bridgingHeaderFile.hasValue() ? "],\n" : "]\n");
       }
-
       /// Bridging header and its source file dependencies, if any.
       if (swiftDeps->bridgingHeaderFile) {
         out.indent(5 * 2);
@@ -431,7 +434,7 @@ bool swift::scanDependencies(CompilerInstance &instance) {
       .asAPINotesVersionString()).str();
   // Compute the dependencies of the main module.
   auto mainDependencies =
-    ModuleDependencies::forMainSwiftModule(mainModulePath.str().str(), {
+    ModuleDependencies::forMainSwiftModule({
       // ExtraPCMArgs
       "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str(),
       "-Xcc", apinotesVer

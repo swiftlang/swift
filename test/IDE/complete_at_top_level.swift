@@ -471,7 +471,7 @@ var stringInterp = "\(#^STRING_INTERP_3^#)"
 _ = "" + "\(#^STRING_INTERP_4^#)" + ""
 // STRING_INTERP: Begin completions
 // STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: ['(']{#(value): T#}[')'][#Void#];
-// STRING_INTERP-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#];
+// STRING_INTERP-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: FooStruct[#FooStruct#]; name=FooStruct
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: fooFunc1()[#Void#];
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: optStr()[#String?#];
 // STRING_INTERP-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#];

@@ -39,7 +39,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
 
-    for (const auto arg : ty->getDirectGenericArgs())
+    for (const auto &arg : ty->getDirectGenericArgs())
       if (doIt(arg))
         return true;
     

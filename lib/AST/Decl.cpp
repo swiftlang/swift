@@ -1297,7 +1297,16 @@ bool ExtensionDecl::isConstrainedExtension() const {
 
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
   auto decl = getExtendedNominal();
-  return getParentModule() == decl->getParentModule()
+  bool extendDeclFromSameModule = false;
+  if (!decl->getAlternateModuleName().empty()) {
+    // if the extended type was defined in the same module with the extension,
+    // we should consider them as the same module to preserve ABI stability.
+    extendDeclFromSameModule = decl->getAlternateModuleName() ==
+      getParentModule()->getNameStr();
+  } else {
+    extendDeclFromSameModule = decl->getParentModule() == getParentModule();
+  }
+  return extendDeclFromSameModule
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
 }
@@ -3545,16 +3554,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open: {
-    if (useDC && VD->isSPI()) {
-      auto useModuleScopeContext = useDC->getModuleScopeContext();
-      if (useModuleScopeContext == sourceDC->getModuleScopeContext()) return true;
-
-      auto *useSF = dyn_cast<SourceFile>(useModuleScopeContext);
-      return !useSF || useSF->isImportedAsSPI(VD);
-    }
+  case AccessLevel::Open:
     return true;
-  }
   }
   llvm_unreachable("bad access level");
 }
@@ -4280,11 +4281,11 @@ DestructorDecl *ClassDecl::getDestructor() const {
                            nullptr);
 }
 
-DeclRange ClassDecl::getEmittedMembers() const {
+ArrayRef<Decl *> ClassDecl::getEmittedMembers() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
                            EmittedMembersRequest{const_cast<ClassDecl *>(this)},
-                           getMembers());
+                           ArrayRef<Decl *>());
 }
 
 /// Synthesizer callback for an empty implicit function body.
@@ -4312,6 +4313,10 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
   if (ctx.LangOpts.EnableObjCInterop)
     CD->recordObjCMethod(DD, DD->getObjCSelector());
+
+  // Mark it as synthesized to make its location in getEmittedMembers()
+  // deterministic.
+  DD->setSynthesized(true);
 
   return DD;
 }
@@ -6259,6 +6264,36 @@ SourceRange ParamDecl::getSourceRange() const {
     return SourceRange(startLoc, nameLoc);
 
   return startLoc;
+}
+
+bool ParamDecl::isNonEphemeral() const {
+  if (getAttrs().hasAttribute<NonEphemeralAttr>())
+    return true;
+
+  // Only enum element parameters are non-ephemeral without '@_nonEphemeral'.
+  auto *parentDecl = getDeclContext()->getAsDecl();
+  if (!parentDecl || !isa<EnumElementDecl>(parentDecl))
+    return false;
+
+  // Only pointer parameters can be non-ephemeral.
+  auto ty = getInterfaceType();
+  if (!ty->lookThroughSingleOptionalType()->getAnyPointerElementType())
+    return false;
+
+  return true;
+}
+
+void ParamDecl::setNonEphemeralIfPossible() {
+  assert(hasInterfaceType() && "Must be pre-typechecked.");
+  // Don't apply the attribute if this isn't a pointer param.
+  auto type = getInterfaceType();
+  if (!type->lookThroughSingleOptionalType()->getAnyPointerElementType())
+    return;
+
+  if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
+    auto &ctx = getASTContext();
+    getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
+  }
 }
 
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {

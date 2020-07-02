@@ -36,26 +36,6 @@
 using namespace swift;
 using namespace swift::constraints;
 
-/// Find the declaration directly referenced by this expression.
-static std::pair<ValueDecl *, FunctionRefKind>
-findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
-  do {
-    expr = expr->getSemanticsProvidingExpr();
-
-    if (auto ice = dyn_cast<ImplicitConversionExpr>(expr)) {
-      expr = ice->getSubExpr();
-      continue;
-    }
-
-    if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-      loc = dre->getNameLoc();
-      return { dre->getDecl(), dre->getFunctionRefKind() };
-    }
-
-    return { nullptr, FunctionRefKind::Unapplied };
-  } while (true);
-}
-
 static bool isArithmeticOperatorDecl(ValueDecl *vd) {
   return vd && 
   (vd->getBaseName() == "+" ||
@@ -913,35 +893,6 @@ namespace {
     /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-} // end anonymous namespace
-
-namespace {
-// Check if \p E is a call expression to curried thunk of "KeyPath as function".
-// i.e. '{ `$kp$` in { $0[keyPath: $kp$] } }(keypath)'
-static bool isKeyPathCurriedThunkCallExpr(Expr *E) {
-  auto CE = dyn_cast<CallExpr>(E);
-  if (!CE)
-    return false;
-  auto thunk = dyn_cast<AutoClosureExpr>(CE->getFn());
-  if (!thunk)
-    return false;
-  if (thunk->getParameters()->size() != 1 ||
-      thunk->getParameters()->get(0)->getParameterName().str() != "$kp$")
-    return false;
-
-  auto PE = dyn_cast<ParenExpr>(CE->getArg());
-  if (!PE)
-    return false;
-  return isa<KeyPathExpr>(PE->getSubExpr());
-}
-
-// Extract the keypath expression from the curried thunk expression.
-static Expr *extractKeyPathFromCurryThunkCall(Expr *E) {
-  assert(isKeyPathCurriedThunkCallExpr(E));
-  auto call = cast<CallExpr>(E);
-  auto arg = cast<ParenExpr>(call->getArg());
-  return arg->getSubExpr();
-}
 } // end anonymous namespace
 
 namespace {
@@ -2331,12 +2282,17 @@ namespace {
 
         return setType(ParenType::get(CS.getASTContext(), underlyingType));
       }
-      case PatternKind::Var:
+      case PatternKind::Var: {
+        auto *subPattern = cast<VarPattern>(pattern)->getSubPattern();
+        auto type = getTypeForPattern(subPattern, locator, externalPatternType,
+                                      bindPatternVarsOneWay);
+
+        if (!type)
+          return Type();
+
         // Var doesn't affect the type.
-        return setType(
-            getTypeForPattern(
-              cast<VarPattern>(pattern)->getSubPattern(), locator,
-              externalPatternType, bindPatternVarsOneWay));
+        return setType(type);
+      }
 
       case PatternKind::Any: {
         return setType(
@@ -3776,290 +3732,6 @@ namespace {
     }
   };
 
-  /// AST walker that "sanitizes" an expression for the
-  /// constraint-based type checker.
-  ///
-  /// This is necessary because Sema fills in too much type information before
-  /// the type-checker runs, causing redundant work, and for expression that
-  /// have already been typechecked and may contain unhandled AST nodes.
-  ///
-  /// FIXME: Remove this one we no longer re-type check expressions during
-  /// diagnostics and code completion.
-  class SanitizeExpr : public ASTWalker {
-    ConstraintSystem &CS;
-    llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
-
-  public:
-    SanitizeExpr(ConstraintSystem &cs) : CS(cs){ }
-
-    ASTContext &getASTContext() const { return CS.getASTContext(); }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      while (true) {
-
-        // If we should reuse pre-checked types, don't sanitize the expression
-        // if it's already type-checked.
-        if (CS.shouldReusePrecheckedType() && expr->getType())
-          return { false, expr };
-
-        // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
-        if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
-          auto archetypeVal = OOE->getOpaqueValue();
-          auto base = OOE->getExistentialValue();
-
-          bool inserted = OpenExistentials.insert({archetypeVal, base}).second;
-          assert(inserted && "OpaqueValue appears multiple times?");
-          (void)inserted;
-          SWIFT_DEFER { OpenExistentials.erase(archetypeVal); };
-
-          // Walk to and return the base expression to erase any existentials
-          // within it.
-          return { false, OOE->getSubExpr()->walk(*this) };
-        }
-
-        // Hacky, this behaves just like an OpenedExistential in that it changes
-        // the expr tree.
-        if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
-          if (auto subExpr = ISLE->getAppendingExpr()->getSubExpr()) {
-            if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(subExpr)) {
-              ISLE->getAppendingExpr()->setSubExpr(nullptr);
-            }
-          }
-        }
-
-        // Substitute OpaqueValue with its representing existental.
-        if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
-          auto value = OpenExistentials.find(OVE);
-
-          if (value != OpenExistentials.end()) {
-            expr = value->second;
-            continue;
-          } else {
-            assert(OVE->isPlaceholder() &&
-                   "Didn't see this OVE in a containing OpenExistentialExpr?");
-          }
-        }
-
-        // Skip any implicit conversions applied to this expression.
-        if (auto ICE = dyn_cast<ImplicitConversionExpr>(expr)) {
-          expr = ICE->getSubExpr();
-          continue;
-        }
-
-        // MakeTemporarilyEscapableExpr is typechecked expression.
-        if (auto MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(expr)) {
-          expr = MTEE->getOriginalExpr();
-          continue;
-        }
-
-        // Extract keypath from '{ `$kp$` in { $0[keyPath: $kp$] } }(keypath)'
-        if (isKeyPathCurriedThunkCallExpr(expr)) {
-          expr = extractKeyPathFromCurryThunkCall(expr);
-          continue;
-        }
-
-        // Restore '@autoclosure'd value.
-        if (auto ACE = dyn_cast<AutoClosureExpr>(expr)) {
-          // This is only valid if the closure doesn't have parameters.
-          if (ACE->getParameters()->size() == 0) {
-            expr = ACE->getSingleExpressionBody();
-            continue;
-          }
-          llvm_unreachable("other AutoClosureExpr must be handled specially");
-        }
-
-        // Remove any semantic expression injected by typechecking.
-        if (auto EPE = dyn_cast<EditorPlaceholderExpr>(expr)) {
-          EPE->setSemanticExpr(nullptr);
-        }
-
-        // Strip default arguments and varargs from type-checked call
-        // argument lists.
-        if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
-          if (shouldSanitizeArgumentList(expr))
-            expr = sanitizeArgumentList(expr);
-        }
-
-        // If this expression represents keypath based dynamic member
-        // lookup, let's convert it back to the original form of
-        // member or subscript reference.
-        if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-          if (auto *TE = dyn_cast<TupleExpr>(SE->getIndex())) {
-            auto isImplicitKeyPathExpr = [](Expr *argExpr) -> bool {
-              if (auto *KP = dyn_cast<KeyPathExpr>(argExpr))
-                return KP->isImplicit();
-              return false;
-            };
-
-            if (TE->isImplicit() && TE->getNumElements() == 1 &&
-                TE->getElementName(0) == getASTContext().Id_dynamicMember &&
-                isImplicitKeyPathExpr(TE->getElement(0))) {
-              auto *keyPathExpr = cast<KeyPathExpr>(TE->getElement(0));
-              auto *componentExpr = keyPathExpr->getParsedPath();
-
-              if (auto *UDE = dyn_cast<UnresolvedDotExpr>(componentExpr)) {
-                UDE->setBase(SE->getBase());
-                return {true, UDE};
-              }
-
-              if (auto *subscript = dyn_cast<SubscriptExpr>(componentExpr)) {
-                subscript->setBase(SE->getBase());
-                return {true, subscript};
-              }
-
-              llvm_unreachable("unknown keypath component type");
-            }
-          }
-        }
-
-        // If this is a closure, only walk into its children if they
-        // are type-checked in the context of the enclosing expression.
-        if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-          if (!shouldTypeCheckInEnclosingExpression(closure))
-            return { false, expr };
-        }
-
-        // Now, we're ready to walk into sub expressions.
-        return {true, expr};
-      }
-    }
-
-    bool isSyntheticArgumentExpr(const Expr *expr) {
-      if (isa<DefaultArgumentExpr>(expr))
-        return true;
-
-      if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr))
-        if (isa<ArrayExpr>(varargExpr->getSubExpr()))
-          return true;
-
-      return false;
-    }
-
-    bool shouldSanitizeArgumentList(const Expr *expr) {
-      if (auto *parenExpr = dyn_cast<ParenExpr>(expr)) {
-        return isSyntheticArgumentExpr(parenExpr->getSubExpr());
-      } else if (auto *tupleExpr = dyn_cast<TupleExpr>(expr)) {
-        for (auto *arg : tupleExpr->getElements()) {
-          if (isSyntheticArgumentExpr(arg))
-            return true;
-        }
-
-        return false;
-      } else {
-        return isSyntheticArgumentExpr(expr);
-      }
-    }
-
-    Expr *sanitizeArgumentList(Expr *original) {
-      auto argList = getOriginalArgumentList(original);
-
-      if (argList.args.size() == 1 &&
-          argList.labels[0].empty() &&
-          !isa<VarargExpansionExpr>(argList.args[0])) {
-        auto *result =
-          new (getASTContext()) ParenExpr(argList.lParenLoc,
-                                          argList.args[0],
-                                          argList.rParenLoc,
-                                          argList.hasTrailingClosure);
-        result->setImplicit();
-        return result;
-      }
-
-      return TupleExpr::create(getASTContext(),
-                               argList.lParenLoc,
-                               argList.args,
-                               argList.labels,
-                               argList.labelLocs,
-                               argList.rParenLoc,
-                               argList.hasTrailingClosure,
-                               /*implicit=*/true);
-    }
-
-    Expr *walkToExprPost(Expr *expr) override {
-      if (CS.hasType(expr)) {
-        Type type = CS.getType(expr);
-        if (type->hasOpenedExistential()) {
-          type = type.transform([&](Type type) -> Type {
-            if (auto archetype = type->getAs<OpenedArchetypeType>())
-              return archetype->getOpenedExistentialType();
-            return type;
-          });
-          CS.setType(expr, type);
-          // Set new type to the expression directly.
-          expr->setType(type);
-        }
-      }
-
-      assert(!isa<ImplicitConversionExpr>(expr) &&
-             "ImplicitConversionExpr should be eliminated in walkToExprPre");
-
-      auto buildMemberRef = [&](Type memberType, Expr *base, SourceLoc dotLoc,
-                                ConcreteDeclRef member, DeclNameLoc memberLoc,
-                                bool implicit) -> Expr * {
-        auto *memberRef = new (getASTContext())
-            MemberRefExpr(base, dotLoc, member, memberLoc, implicit);
-
-        if (memberType) {
-          memberRef->setType(memberType);
-          return CS.cacheType(memberRef);
-        }
-
-        return memberRef;
-      };
-
-      // A DotSyntaxCallExpr is a member reference that has already been
-      // type-checked down to a call; turn it back into an overloaded
-      // member reference expression.
-      if (auto dotCall = dyn_cast<DotSyntaxCallExpr>(expr)) {
-        DeclNameLoc memberLoc;
-        auto memberAndFunctionRef = findReferencedDecl(dotCall->getFn(),
-                                                       memberLoc);
-        if (memberAndFunctionRef.first) {
-          assert(!isa<ImplicitConversionExpr>(dotCall->getBase()));
-          return buildMemberRef(dotCall->getType(),
-                                dotCall->getBase(),
-                                dotCall->getDotLoc(),
-                                memberAndFunctionRef.first,
-                                memberLoc, expr->isImplicit());
-        }
-      }
-
-      if (auto *dynamicMember = dyn_cast<DynamicMemberRefExpr>(expr)) {
-        if (auto memberRef = dynamicMember->getMember()) {
-          assert(!isa<ImplicitConversionExpr>(dynamicMember->getBase()));
-          return buildMemberRef(dynamicMember->getType(),
-                                dynamicMember->getBase(),
-                                dynamicMember->getDotLoc(),
-                                memberRef,
-                                dynamicMember->getNameLoc(),
-                                expr->isImplicit());
-        }
-      }
-
-      // A DotSyntaxBaseIgnoredExpr is a static member reference that has
-      // already been type-checked down to a call where the argument doesn't
-      // actually matter; turn it back into an overloaded member reference
-      // expression.
-      if (auto dotIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
-        DeclNameLoc memberLoc;
-        auto memberAndFunctionRef = findReferencedDecl(dotIgnored->getRHS(),
-                                                       memberLoc);
-        if (memberAndFunctionRef.first) {
-          assert(!isa<ImplicitConversionExpr>(dotIgnored->getLHS()));
-          return buildMemberRef(dotIgnored->getType(),
-                                dotIgnored->getLHS(),
-                                dotIgnored->getDotLoc(),
-                                memberAndFunctionRef.first,
-                                memberLoc, expr->isImplicit());
-        }
-      }
-      return expr;
-    }
-
-    /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
-  };
-
   class ConstraintWalker : public ASTWalker {
     ConstraintGenerator &CG;
 
@@ -4187,9 +3859,6 @@ namespace {
 
 static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
                                     DeclContext *DC) {
-  // Remove implicit conversions from the expression.
-  expr = expr->walk(SanitizeExpr(cs));
-
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(cs, DC);
   ConstraintWalker cw(cg);
@@ -4254,7 +3923,9 @@ static bool generateInitPatternConstraints(
       pattern, locator, target.shouldBindPatternVarsOneWay(),
       target.getInitializationPatternBindingDecl(),
       target.getInitializationPatternBindingIndex());
-  assert(patternType && "All patterns have a type");
+
+  if (!patternType)
+    return true;
 
   if (auto wrappedVar = target.getInitializationWrappedVar()) {
     Type propertyType = generateWrappedPropertyTypeConstraints(
