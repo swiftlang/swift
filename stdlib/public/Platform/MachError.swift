@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if canImport(Darwin)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
 @objc
 public enum MachErrorCode : Int32 {
@@ -202,4 +202,4 @@ public enum MachErrorCode : Int32 {
   /// The requested property cannot be changed at this time.
   case policyStatic             = 51
 }
-#endif // canImport(Darwin)
+#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS)

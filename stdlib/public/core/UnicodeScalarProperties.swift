@@ -590,7 +590,7 @@ extension Unicode.Scalar.Properties {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_CHANGES_WHEN_NFKC_CASEFOLDED)
   }
 
-#if canImport(Darwin)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   // FIXME: These properties were introduced in ICU 57, but Ubuntu 16.04 comes
   // with ICU 55 so the values won't be correct there. Exclude them on
   // non-Darwin platforms for now; bundling ICU with the toolchain would resolve
