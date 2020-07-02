@@ -3548,16 +3548,15 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     //
-    // Except when the toType is a generic archetype, because then it may
-    // have protocol conformances we cannot know statically.
-    if (fromExistential && (!toExistential && !toArchetype)) {
-      auto protocolDecl =
-          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
-      // Checking for possible dynamic conformances because we cannot fail
-      // in those cases.
-      if (protocolDecl &&
-          !couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
-        return failed();
+    if (auto *protocolDecl =
+          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())){
+      if (!toExistential) {
+        // Checking for possible dynamic conformances because we cannot fail
+        // in those cases.
+        if (protocolDecl &&
+            !couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
+          return failed();
+        }
       }
     }
 

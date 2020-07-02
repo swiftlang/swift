@@ -4473,21 +4473,27 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 bool
 TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
                                                DeclContext *DC) {
-  // We may have types that can dynamically conform to a protocol, e.g. a non-final
-  // class which might have a subclass that conforms to the protocol, or standard
-  // library collection types such as Array, Set or Dictionary which have custom
-  // casting machinery implemented in situations like:
-  //
-  //  func encodable(_ value: Encodable) {
-  //    _ = value as! [String : Encodable]
-  //  }
-  //
+  // A generic archetype may have protocol conformances we cannot know
+  // statically.
+  if (type->is<ArchetypeType>())
+    return true;
+  
+  // A non-final class might have a subclass that conforms to the protocol.
   if (auto *classDecl = type->getClassOrBoundGenericClass()) {
     if (!classDecl->isFinal())
       return true;
   }
 
   ModuleDecl *M = DC->getParentModule();
+  // For standard library collection types such as Array, Set or Dictionary
+  // which have custom casting machinery implemented in situations like:
+  //
+  //  func encodable(_ value: Encodable) {
+  //    _ = value as! [String : Encodable]
+  //  }
+  // we are skipping checking conditional requirements using lookupConformance,
+  // as an intermediate collection cast can dynamically change if the conditions
+  // are met or not.
   if (type->isKnownStdlibCollectionType())
     return !M->lookupConformance(type, Proto).isInvalid();
   return !conformsToProtocol(type, Proto, DC).isInvalid();
