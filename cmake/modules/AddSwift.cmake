@@ -506,19 +506,21 @@ function(add_swift_host_library name)
   if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION)
-      target_compile_options(${name} PRIVATE
-        -fembed-bitcode)
-      target_link_options(${name} PRIVATE
-        "LINKER:-bitcode_bundle"
-        "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
-
-      # Please note that using a generator expression to fit this in a single
-      # target_link_options does not work (at least in CMake 3.15 and 3.16),
-      # since that seems not to allow the LINKER: prefix to be evaluated (i.e.
-      # it will be added as-is to the linker parameters)
-      if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
+      if(SWIFT_HOST_VARIANT_SDK MATCHES "^(I|TV|WATCH)OS$")
+        target_compile_options(${name} PRIVATE
+          -fembed-bitcode)
         target_link_options(${name} PRIVATE
-          "LINKER:-bitcode_hide_symbols")
+          "LINKER:-bitcode_bundle"
+          "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+  
+        # Please note that using a generator expression to fit this in a single
+        # target_link_options does not work (at least in CMake 3.15 and 3.16),
+        # since that seems not to allow the LINKER: prefix to be evaluated (i.e.
+        # it will be added as-is to the linker parameters)
+        if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
+          target_link_options(${name} PRIVATE
+            "LINKER:-bitcode_hide_symbols")
+        endif()
       endif()
     endif()
 
