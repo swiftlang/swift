@@ -3095,6 +3095,10 @@ ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
 ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "cannot register derivative for 'init' in a non-final class; consider "
       "making %0 final", (Type))
+// TODO(SR-13096): Remove this temporary diagnostic.
+ERROR(derivative_attr_class_setter_unsupported,none,
+      "cannot yet register derivative for class property or subscript setters",
+      ())
 ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
@@ -3133,6 +3137,8 @@ NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
 ERROR(autodiff_attr_original_decl_invalid_kind,none,
       "%0 is not a 'func', 'init', 'subscript', or 'var' computed property "
       "declaration", (DeclNameRef))
+ERROR(autodiff_attr_accessor_not_found,none,
+      "%0 does not have a '%1' accessor", (DeclNameRef, StringRef))
 ERROR(autodiff_attr_original_decl_none_valid_found,none,
       "could not find function %0 with expected type %1", (DeclNameRef, Type))
 ERROR(autodiff_attr_original_decl_not_same_type_context,none,
