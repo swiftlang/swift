@@ -3548,15 +3548,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     //
+    // But we check for conformance and possible dynamic conformances in which
+    // case we cannot fail because it is impossible to know then statically.
     if (auto *protocolDecl =
-          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())){
-      if (!toExistential) {
-        // Checking for possible dynamic conformances because we cannot fail
-        // in those cases.
-        if (protocolDecl &&
-            !couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
-          return failed();
-        }
+          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
+      // Checking for possible dynamic conformances because we cannot fail
+      // in those cases.
+      if (!couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
+        return failed();
       }
     }
 

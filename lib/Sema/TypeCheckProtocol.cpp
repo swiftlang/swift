@@ -4473,6 +4473,11 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 bool
 TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
                                                DeclContext *DC) {
+  // An existential may have an concrete underlying type that protocol conformances
+  // we cannot know statically.
+  if (type->isExistentialType())
+    return true;
+  
   // A generic archetype may have protocol conformances we cannot know
   // statically.
   if (type->is<ArchetypeType>())
