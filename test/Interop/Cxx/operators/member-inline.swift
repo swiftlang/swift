@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
 //
 // REQUIRES: executable_test
+//
+// We can't yet call member functions correctly on Windows.
+// XFAIL: OS=windows-msvc
 
 import MemberInline
 import StdlibUnittest

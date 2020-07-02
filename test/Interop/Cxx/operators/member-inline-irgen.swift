@@ -1,4 +1,7 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
+//
+// We can't yet call member functions correctly on Windows.
+// XFAIL: OS=windows-msvc
 
 import MemberInline
 
