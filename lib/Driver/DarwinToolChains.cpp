@@ -602,6 +602,14 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       switch (getDarwinPlatformKind((triple))) {
       case DarwinPlatformKind::MacOS:
         triple.getMacOSXVersion(major, minor, micro);
+
+        // The first deployment of arm64 for macOS is version 10.16;
+        if (triple.isAArch64() && major <= 10 && minor < 16) {
+          major = 10;
+          minor = 16;
+          micro = 0;
+        }
+
         break;
       case DarwinPlatformKind::IPhoneOS:
       case DarwinPlatformKind::IPhoneOSSimulator:
