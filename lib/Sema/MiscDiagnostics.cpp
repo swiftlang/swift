@@ -1798,7 +1798,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
       newName = newNames[i];
 
     if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size()-1))
+        (argList.hasTrailingClosure && i == argList.args.size()-1 &&
+         (numMissing > 0 || numExtra > 0 || numWrong > 0)))
       continue;
 
     if (oldName.empty()) {
