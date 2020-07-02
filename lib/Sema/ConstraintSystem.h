@@ -4569,10 +4569,17 @@ private:
     /// \param inferredBindings The set of all bindings inferred for type
     /// variables in the workset.
     void inferTransitiveBindings(
-        ConstraintSystem &cs,
+        ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
+
+    /// Finalize binding computation for this type variable by
+    /// inferring bindings from context e.g. transitive bindings.
+    void finalize(ConstraintSystem &cs,
+                  const llvm::SmallDenseMap<TypeVariableType *,
+                                            ConstraintSystem::PotentialBindings>
+                      &inferredBindings);
 
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {

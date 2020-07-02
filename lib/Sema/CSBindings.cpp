@@ -22,7 +22,7 @@ using namespace swift;
 using namespace constraints;
 
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
-    ConstraintSystem &cs,
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
@@ -42,12 +42,6 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
 
   if (subtypeOf.empty())
     return;
-
-  // We need to make sure that there are no duplicate bindings in the
-  // set, otherwise solver would produce multiple identical solutions.
-  llvm::SmallPtrSet<CanType, 4> existingTypes;
-  for (const auto &binding : Bindings)
-    existingTypes.insert(binding.BindingType->getCanonicalType());
 
   for (auto *constraint : subtypeOf) {
     auto *tv =
@@ -90,6 +84,20 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
   }
 }
 
+void ConstraintSystem::PotentialBindings::finalize(
+    ConstraintSystem &cs,
+    const llvm::SmallDenseMap<TypeVariableType *,
+                              ConstraintSystem::PotentialBindings>
+        &inferredBindings) {
+  // We need to make sure that there are no duplicate bindings in the
+  // set, otherwise solver would produce multiple identical solutions.
+  llvm::SmallPtrSet<CanType, 4> existingTypes;
+  for (const auto &binding : Bindings)
+    existingTypes.insert(binding.BindingType->getCanonicalType());
+
+  inferTransitiveBindings(cs, existingTypes, inferredBindings);
+}
+
 Optional<ConstraintSystem::PotentialBindings>
 ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
@@ -114,7 +122,7 @@ ConstraintSystem::determineBestBindings() {
 
     auto &bindings = cachedBindings->getSecond();
 
-    bindings.inferTransitiveBindings(*this, cache);
+    bindings.finalize(*this, cache);
 
     if (isDebugMode()) {
       bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
