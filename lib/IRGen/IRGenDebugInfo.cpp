@@ -1782,7 +1782,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       /* DWOId */ 0, /* SplitDebugInlining */ true,
       /* DebugInfoForProfiling */ false,
       llvm::DICompileUnit::DebugNameTableKind::Default,
-      /* RangesBaseAddress */ false, Sysroot, SDK);
+      /* RangesBaseAddress */ false, DebugPrefixMap.remapPath(Sysroot), SDK);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -1832,12 +1832,11 @@ void IRGenDebugInfoImpl::finalize() {
 
   // Get the list of imported modules (which may actually be different
   // from all ImportDecls).
-  ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
-  IGM.getSwiftModule()->getImportedModules(ModuleWideImports, ImportFilter);
+  IGM.getSwiftModule()->getImportedModules(
+      ModuleWideImports, {ModuleDecl::ImportFilterKind::Public,
+                          ModuleDecl::ImportFilterKind::Private,
+                          ModuleDecl::ImportFilterKind::ImplementationOnly});
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.importedModule))
       DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,

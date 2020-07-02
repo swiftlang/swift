@@ -585,7 +585,7 @@ function(_compile_swift_files
   set(swift_compiler_tool_dep)
   if(SWIFT_INCLUDE_TOOLS)
     # Depend on the binary itself, in addition to the symlink.
-    set(swift_compiler_tool_dep "swift")
+    set(swift_compiler_tool_dep "swift-frontend")
   endif()
 
   # If there are more than one output files, we assume that they are specified

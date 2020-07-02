@@ -1037,11 +1037,24 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
+// Helper function that returns the accessor kind if a token is an accessor
+// label.
+static Optional<AccessorKind> isAccessorLabel(const Token &token) {
+  if (token.is(tok::identifier)) {
+    StringRef tokText = token.getText();
+    for (auto accessor : allAccessorKinds())
+      if (tokText == getAccessorLabel(accessor))
+        return accessor;
+  }
+  return None;
+}
+
 /// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
 /// Returns true on error. Sets `baseType` to the parsed base type if present,
 /// or to `nullptr` if not. A missing base type is not considered an error.
 static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   baseType = nullptr;
+  Parser::BacktrackingScope backtrack(P);
 
   // If base type cannot be parsed, return false (no error).
   if (!P.canParseBaseTypeForQualifiedDeclName())
@@ -1057,6 +1070,28 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   // `parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)` leaves the
   // leading period unparsed to avoid syntax verification errors.
   assert(P.startsWithSymbol(P.Tok, '.') && "false");
+
+  // Check if this is a reference to a property or subscript accessor.
+  //
+  // Note: There is an parsing ambiguity here. An accessor label identifier
+  // (e.g. "set") may refer to the final declaration name component instead of
+  // an accessor kind.
+  //
+  // FIXME: It is wrong to backtrack parsing the entire base type if an accessor
+  // label is found. Instead, only the final component of the base type should
+  // be backtracked. It may be best to implement this in
+  // `Parser::parseTypeIdentifier`.
+  //
+  // Example: consider parsing `A.B.property.set`.
+  // Current behavior: base type is entirely backtracked.
+  // Ideal behavior: base type is parsed as `A.B`.
+  if (P.Tok.is(tok::period)) {
+    const Token &nextToken = P.peekToken();
+    if (isAccessorLabel(nextToken).hasValue())
+      return false;
+  }
+
+  backtrack.cancelBacktrack();
   P.consumeStartingCharacterOfCurrentToken(tok::period);
 
   // Set base type and return false (no error).
@@ -1079,20 +1114,52 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
 static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
                                    TypeRepr *&baseType,
                                    DeclNameRefWithLoc &original) {
-  SyntaxParsingContext DeclNameContext(P.SyntaxContext,
-                                       SyntaxKind::QualifiedDeclName);
-  // Parse base type.
-  if (parseBaseTypeForQualifiedDeclName(P, baseType))
-    return true;
-  // Parse final declaration name.
-  original.Name = P.parseDeclNameRef(
-      original.Loc, nameParseError,
-      Parser::DeclNameFlag::AllowZeroArgCompoundNames |
-      Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
-      Parser::DeclNameFlag::AllowOperators);
-  // The base type is optional, but the final unqualified declaration name is
-  // not. If name could not be parsed, return true for error.
-  return !original.Name;
+  {
+    SyntaxParsingContext DeclNameContext(P.SyntaxContext,
+                                         SyntaxKind::QualifiedDeclName);
+    // Parse base type.
+    if (parseBaseTypeForQualifiedDeclName(P, baseType))
+      return true;
+    // Parse final declaration name.
+    original.Name = P.parseDeclNameRef(
+        original.Loc, nameParseError,
+        Parser::DeclNameFlag::AllowZeroArgCompoundNames |
+            Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
+            Parser::DeclNameFlag::AllowOperators);
+    // The base type is optional, but the final unqualified declaration name is
+    // not. If name could not be parsed, return true for error.
+    if (!original.Name)
+      return true;
+  }
+
+  // Parse an optional accessor kind.
+  //
+  // Note: there is an parsing ambiguity here.
+  //
+  // Example: `A.B.property.set` may be parsed as one of the following:
+  //
+  // 1. No accessor kind.
+  // - Base type: `A.B.property`
+  // - Declaration name: `set`
+  // - Accessor kind: <none>
+  //
+  // 2. Accessor kind exists.
+  // - Base type: `A.B`
+  // - Declaration name: `property`
+  // - Accessor kind: `set`
+  //
+  // Currently, we follow (2) because it's more useful in practice.
+  if (P.Tok.is(tok::period)) {
+    const Token &nextToken = P.peekToken();
+    Optional<AccessorKind> kind = isAccessorLabel(nextToken);
+    if (kind.hasValue()) {
+      original.AccessorKind = kind;
+      P.consumeIf(tok::period);
+      P.consumeIf(tok::identifier);
+    }
+  }
+
+  return false;
 }
 
 /// Parse a `@derivative(of:)` attribute, returning true on error.

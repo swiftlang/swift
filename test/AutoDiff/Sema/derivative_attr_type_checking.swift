@@ -401,6 +401,14 @@ where T: Differentiable & AdditiveArithmetic {
   }
 }
 
+class Class<T> {
+  var x: T
+  init(_ x: T) {
+    self.x = x
+  }
+}
+extension Class: Differentiable where T: Differentiable {}
+
 // Test computed properties.
 
 extension Struct {
@@ -410,6 +418,19 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   @derivative(of: computedProperty)
   func vjpProperty() -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
     return (x, { v in .init(x: v) })
+  }
+  
+  @derivative(of: computedProperty.get)
+  func jvpProperty() -> (value: T, differential: (TangentVector) -> T.TangentVector) {
+    fatalError()
+  }
+  
+  // expected-error @+1 {{'computedProperty' does not have a 'set' accessor}}
+  @derivative(of: computedProperty.set)
+  mutating func vjpPropertySetter(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
   }
 }
 
@@ -442,23 +463,128 @@ extension Struct {
     get { 1 }
     set {}
   }
-  subscript(float float: Float) -> Float { 1 }
+  subscript(float float: Float) -> Float {
+    get { 1 }
+    set {}
+  }
   subscript<T: Differentiable>(x: T) -> T { x }
 }
 extension Struct where T: Differentiable & AdditiveArithmetic {
+  @derivative(of: subscript.get)
+  func vjpSubscriptGetter() -> (value: Float, pullback: (Float) -> TangentVector) {
+    return (1, { _ in .zero })
+  }
+
+  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript)
   func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {
     return (1, { _ in .zero })
   }
 
-  @derivative(of: subscript(float:), wrt: self)
-  func vjpSubscriptLabelled(float: Float) -> (value: Float, pullback: (Float) -> TangentVector) {
+  @derivative(of: subscript().get)
+  func jvpSubscriptGetter() -> (value: Float, differential: (TangentVector) -> Float) {
     return (1, { _ in .zero })
   }
 
-  @derivative(of: subscript(_:), wrt: self)
-  func vjpSubscriptGeneric<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
+  @derivative(of: subscript(float:).get, wrt: self)
+  func vjpSubscriptLabeledGetter(float: Float) -> (value: Float, pullback: (Float) -> TangentVector)  {
+    return (1, { _ in .zero })
+  }
+
+  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-note @-6 {{other attribute declared here}}
+  @derivative(of: subscript(float:), wrt: self)
+  func vjpSubscriptLabeled(float: Float) -> (value: Float, pullback: (Float) -> TangentVector) {
+    return (1, { _ in .zero })
+  }
+
+  @derivative(of: subscript(float:).get)
+  func jvpSubscriptLabeledGetter(float: Float) -> (value: Float, differential: (TangentVector, Float) -> Float)   {
+    return (1, { (_,_) in 1})
+  }
+
+  @derivative(of: subscript(_:).get, wrt: self)
+  func vjpSubscriptGenericGetter<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector)   {
     return (x, { _ in .zero })
+  }
+
+  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-note @-6 {{other attribute declared here}}
+  @derivative(of: subscript(_:), wrt: self)
+  func vjpSubscriptGeneric<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector)   {
+    return (x, { _ in .zero })
+  }
+
+  // expected-error @+1 {{'subscript' does not have a 'set' accessor}}
+  @derivative(of: subscript.set)
+  mutating func vjpSubscriptSetter(_ newValue: Float) -> (
+    value: (), pullback: (inout TangentVector) -> Float
+  ) {
+    fatalError()
+  }
+
+  @derivative(of: subscript().set)
+  mutating func jvpSubscriptSetter(_ newValue: Float) -> (
+    value: (), differential: (inout TangentVector, Float) -> ()
+  ) {
+    fatalError()
+  }
+
+  @derivative(of: subscript(float:).set)
+  mutating func vjpSubscriptLabeledSetter(float: Float, newValue: Float) -> (
+    value: (), pullback: (inout TangentVector) -> (Float, Float)
+  ) {
+    fatalError()
+  }
+
+  @derivative(of: subscript(float:).set)
+  mutating func jvpSubscriptLabeledSetter(float: Float, _ newValue: Float) -> (
+    value: (), differential: (inout TangentVector, Float, Float) -> Void
+  ) {
+    fatalError()
+  }
+
+  // Error: original subscript has no setter.
+  // expected-error @+1 {{'subscript(_:)' does not have a 'set' accessor}}
+  @derivative(of: subscript(_:).set, wrt: self)
+  mutating func vjpSubscriptGeneric_NoSetter<T: Differentiable>(x: T) -> (
+    value: T, pullback: (T.TangentVector) -> TangentVector
+  ) {
+    return (x, { _ in .zero })
+  }
+}
+
+extension Class {
+  subscript() -> Float {
+    get { 1 }
+    // expected-note @+1 {{'subscript()' declared here}}
+    set {}
+  }
+}
+extension Class where T: Differentiable {
+  @derivative(of: subscript.get)
+  func vjpSubscriptGetter() -> (value: Float, pullback: (Float) -> TangentVector) {
+    return (1, { _ in .zero })
+  }
+
+  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-note @-6 {{other attribute declared here}}
+  @derivative(of: subscript)
+  func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {
+    return (1, { _ in .zero })
+  }
+
+  // FIXME(SR-13096): Enable derivative registration for class property/subscript setters.
+  // This requires changing derivative type calculation rules for functions with
+  // class-typed parameters. We need to assume that all functions taking
+  // class-typed operands may mutate those operands.
+  // expected-error @+1 {{cannot yet register derivative for class property or subscript setters}}
+  @derivative(of: subscript.set)
+  func vjpSubscriptSetter(_ newValue: Float) -> (
+    value: (), pullback: (inout TangentVector) -> Float
+  ) {
+    fatalError()
   }
 }
 
@@ -950,4 +1076,51 @@ func internal_original_fileprivate_derivative(_ x: Float) -> Float { x }
 // expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-12=internal}}
 fileprivate func _internal_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
+}
+
+// Test invalid reference to an accessor of a non-storage declaration.
+
+func function(_ x: Float) -> Float {
+  x
+}
+
+// expected-error @+1 {{'function' does not have a 'get' accessor}}
+@derivative(of: function(_:).get)
+func vjpFunction(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// Test ambiguity that exists when Type function name is the same
+// as an accessor label.
+
+extension Float {
+  // Original function name conflicts with an accessor name ("set").
+  func set() -> Float {
+    self
+  }
+
+  // Original function name does not conflict with an accessor name.
+  func method() -> Float {
+    self
+  }
+
+  // Test ambiguous parse.
+  // Expected:
+  // - Base type: `Float`
+  // - Declaration name: `set`
+  // - Accessor kind: <none>
+  // Actual:
+  // - Base type: <none>
+  // - Declaration name: `Float`
+  // - Accessor kind: `set`
+  // expected-error @+1 {{cannot find 'Float' in scope}}
+  @derivative(of: Float.set)
+  func jvpSet() -> (value: Float, differential: (Float) -> Float) {
+    fatalError()
+  }
+
+  @derivative(of: Float.method)
+  func jvpMethod() -> (value: Float, differential: (Float) -> Float) {
+    fatalError()
+  }
 }

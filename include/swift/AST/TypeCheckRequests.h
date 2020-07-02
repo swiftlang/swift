@@ -1064,8 +1064,8 @@ public:
 
 class EmittedMembersRequest :
     public SimpleRequest<EmittedMembersRequest,
-                         DeclRange(ClassDecl *),
-                         RequestFlags::SeparatelyCached> {
+                         ArrayRef<Decl *>(ClassDecl *),
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1073,14 +1073,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  DeclRange
+  ArrayRef<Decl *>
   evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
 
 public:
-  // Separate caching.
   bool isCached() const { return true; }
-  Optional<DeclRange> getCachedResult() const;
-  void cacheResult(DeclRange value) const;
 };
 
 class IsImplicitlyUnwrappedOptionalRequest :

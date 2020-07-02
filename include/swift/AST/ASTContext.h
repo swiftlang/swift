@@ -716,8 +716,11 @@ public:
   ///                compiler.
   /// \param isDWARF \c true if this module loader can load Clang modules
   ///                from DWARF.
+  /// \param IsInterface \c true if this module loader can load Swift textual
+  ///                interface.
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                       bool isClang = false, bool isDWARF = false);
+                       bool isClang = false, bool isDWARF = false,
+                       bool IsInterface = false);
 
   /// Retrieve the module dependencies for the module with the given name.
   ///
@@ -791,6 +794,8 @@ public:
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
 
+  /// Retrieve the module interface loader for this ASTContext.
+  ModuleLoader *getModuleInterfaceLoader() const;
 public:
   namelookup::ImportCache &getImportCache() const;
 

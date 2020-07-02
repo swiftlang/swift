@@ -366,13 +366,14 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   // Load the module file without validation.
   std::unique_ptr<ModuleFile> loadedModuleFile;
   bool isFramework = false;
+  serialization::ExtendedValidationInfo extInfo;
   serialization::ValidationInfo loadInfo =
       ModuleFile::load(modulePath.str(),
                        std::move(moduleBuf.get()),
                        nullptr,
                        nullptr,
                        isFramework, loadedModuleFile,
-                       nullptr);
+                       &extInfo);
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str());
@@ -1087,12 +1088,9 @@ void SerializedASTFile::getImportedModules(
 
 void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
-  ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-
   llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  File.getImportedModules(Imports, ImportFilter);
+  File.getImportedModules(Imports, {ModuleDecl::ImportFilterKind::Public,
+                                    ModuleDecl::ImportFilterKind::Private});
 
   for (auto Import : Imports)
     Import.importedModule->collectLinkLibraries(callback);

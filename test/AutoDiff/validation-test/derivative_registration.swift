@@ -100,14 +100,14 @@ extension Wrapper {
   }
 
   @derivative(of: subscript(_:))
-  func _vjpSubscript(_ x: Tracked<Float>)
+  func _vjpSubscriptGetter(_ x: Tracked<Float>)
     -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Wrapper.TangentVector, Tracked<Float>)) {
     return (self[x], { v in
       (TangentVector(float: v * x), v * self.float)
     })
   }
 }
-DerivativeRegistrationTests.testWithLeakChecking("Subscript") {
+DerivativeRegistrationTests.testWithLeakChecking("SubscriptGetter") {
   let x: Tracked<Float> = 2
   let wrapper = Wrapper(float: 3)
   let (𝛁wrapper, 𝛁x) = gradient(at: wrapper, x) { wrapper, x in wrapper[x] }
@@ -116,24 +116,79 @@ DerivativeRegistrationTests.testWithLeakChecking("Subscript") {
 }
 
 extension Wrapper {
+  subscript() -> Tracked<Float> {
+    get { float }
+    set { float = newValue }
+  }
+
+  @derivative(of: subscript.set)
+  mutating func _vjpSubscriptSetter(_ newValue: Tracked<Float>)
+    -> (value: (), pullback: (inout TangentVector) -> Tracked<Float>) {
+    return ((), { dself in
+      // Note: pullback is hardcoded to set `dself.float = 100` and to return `dnewValue = 200`.
+      dself.float = 100
+      return 200
+    })
+  }
+}
+DerivativeRegistrationTests.testWithLeakChecking("SubscriptSetter") {
+  // A function wrapper around `Wrapper.subscript().set`.
+  func testSubscriptSet(_ wrapper: Wrapper, _ newValue: Tracked<Float>) -> Wrapper {
+    var result = wrapper
+    result[] = newValue
+    return result
+  }
+
+  let x: Tracked<Float> = 2
+  let wrapper = Wrapper(float: 3)
+  let (𝛁wrapper, 𝛁x) = pullback(at: wrapper, x, in: testSubscriptSet)(.init(float: 10))
+  expectEqual(Wrapper.TangentVector(float: 100), 𝛁wrapper)
+  expectEqual(200, 𝛁x)
+}
+
+extension Wrapper {
   var computedProperty: Tracked<Float> {
     @_semantics("autodiff.opaque")
     get { float * float }
-    set {}
+    set { float = newValue }
   }
 
   @derivative(of: computedProperty)
-  func _vjpComputedProperty()
+  func _vjpComputedPropertyGetter()
     -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Wrapper.TangentVector) {
     return (computedProperty, { [f = self.float] v in
       TangentVector(float: v * (f + f))
     })
   }
+
+  @derivative(of: computedProperty.set)
+  mutating func _vjpComputedPropertySetter(_ newValue: Tracked<Float>)
+    -> (value: (), pullback: (inout TangentVector) -> Tracked<Float>) {
+    return ((), { dself in
+      // Note: pullback is hardcoded to set `dself.float = 100` and to return `dnewValue = 200`.
+      dself.float = 100
+      return 200
+    })
+  }
 }
-DerivativeRegistrationTests.testWithLeakChecking("ComputedProperty") {
+DerivativeRegistrationTests.testWithLeakChecking("ComputedPropertyGetter") {
   let wrapper = Wrapper(float: 3)
   let 𝛁wrapper = gradient(at: wrapper) { wrapper in wrapper.computedProperty }
   expectEqual(Wrapper.TangentVector(float: 6), 𝛁wrapper)
+}
+
+DerivativeRegistrationTests.testWithLeakChecking("ComputedPropertySetter") {
+  // A function wrapper around `Wrapper.computedProperty.set`.
+  func testComputedPropertySet(_ wrapper: Wrapper, _ newValue: Tracked<Float>) -> Wrapper {
+    var result = wrapper
+    result.computedProperty = newValue
+    return result
+  }
+  let x: Tracked<Float> = 2
+  let wrapper = Wrapper(float: 3)
+  let (𝛁wrapper, 𝛁x) = pullback(at: wrapper, x, in: testComputedPropertySet)(.init(float: 10))
+  expectEqual(Wrapper.TangentVector(float: 100), 𝛁wrapper)
+  expectEqual(200, 𝛁x)
 }
 
 struct Generic<T> {

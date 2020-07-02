@@ -631,6 +631,10 @@ public:
     return insert(new (getModule()) GlobalValueInst(getSILDebugLocation(Loc), g,
                                                     getTypeExpansionContext()));
   }
+  BaseAddrForOffsetInst *createBaseAddrForOffset(SILLocation Loc, SILType Ty) {
+    return insert(new (F->getModule())
+                  BaseAddrForOffsetInst(getSILDebugLocation(Loc), Ty));
+  }
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E);
 
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,

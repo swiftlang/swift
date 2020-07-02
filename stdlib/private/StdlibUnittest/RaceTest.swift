@@ -41,9 +41,9 @@ import SwiftPrivateLibcExtras
 #if !os(WASI)
 import SwiftPrivateThreadExtras
 #endif
-#if os(macOS) || os(iOS)
+#if canImport(Darwin)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
+#elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
 import MSVCRT

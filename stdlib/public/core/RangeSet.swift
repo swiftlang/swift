@@ -26,7 +26,7 @@
 ///
 ///     numbers.moveSubranges(negativeSubranges, to: 0)
 ///     // numbers == [-5, -3, -9, 10, 12, 14, 15]
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public struct RangeSet<Bound: Comparable> {
   internal var _ranges = _RangeSetStorage<Bound>()
 
@@ -238,15 +238,15 @@ public struct RangeSet<Bound: Comparable> {
   }
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 extension RangeSet: Equatable {}
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 extension RangeSet: Hashable where Bound: Hashable {}
 
 // MARK: - Range Collection
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 extension RangeSet {
   /// A collection of the ranges that make up a range set.
   public struct Ranges: RandomAccessCollection {
@@ -271,7 +271,7 @@ extension RangeSet {
 
 // MARK: - Collection APIs
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 extension RangeSet {
   /// Creates a new range set containing ranges that contain only the
   /// specified indices in the given collection.
@@ -365,7 +365,7 @@ extension RangeSet {
 
 // These methods only depend on the ranges that comprise the range set, so
 // we can provide them even when we can't provide `SetAlgebra` conformance.
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 extension RangeSet {
   /// Adds the contents of the given range set to this range set.
   ///
@@ -549,7 +549,7 @@ extension RangeSet {
   }
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 extension RangeSet: CustomStringConvertible {
   public var description: String {
     let rangesDescription = _ranges

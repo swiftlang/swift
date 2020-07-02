@@ -31,6 +31,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1020,13 +1021,12 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   if (!options.ModuleInterface.empty())
     ModuleInterface.emit(ScratchRecord, options.ModuleInterface);
 
-  ModuleDecl::ImportFilter allImportFilter;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  allImportFilter |= ModuleDecl::ImportFilterKind::Private;
-  allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-  allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  M->getImportedModules(allImports, allImportFilter);
+  M->getImportedModules(allImports,
+                        {ModuleDecl::ImportFilterKind::Public,
+                         ModuleDecl::ImportFilterKind::Private,
+                         ModuleDecl::ImportFilterKind::ImplementationOnly,
+                         ModuleDecl::ImportFilterKind::SPIAccessControl});
   ModuleDecl::removeDuplicateImports(allImports);
 
   // Collect the public and private imports as a subset so that we can

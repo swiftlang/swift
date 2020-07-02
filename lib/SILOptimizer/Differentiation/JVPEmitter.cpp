@@ -312,6 +312,7 @@ AdjointValue JVPEmitter::getTangentValue(SILValue originalValue) {
 
 void JVPEmitter::setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
                                  AdjointValue newTangentValue) {
+#ifndef NDEBUG
   if (auto *defInst = originalValue->getDefiningInstruction()) {
     bool isTupleTypedApplyResult =
         isa<ApplyInst>(defInst) && originalValue->getType().is<TupleType>();
@@ -320,6 +321,7 @@ void JVPEmitter::setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
            "instruction; use `destructure_tuple` on `apply` result and set "
            "tangent value for `destructure_tuple` results instead.");
   }
+#endif
   assert(originalValue->getType().isObject());
   assert(newTangentValue.getType().isObject());
   assert(originalValue->getFunction() == original);
@@ -328,8 +330,8 @@ void JVPEmitter::setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
   assert(newTangentValue.getType() ==
          getRemappedTangentType(originalValue->getType()));
   auto insertion = tangentValueMap.try_emplace(originalValue, newTangentValue);
-  auto inserted = insertion.second;
-  assert(inserted && "The tangent value should not already exist.");
+  (void)insertion;
+  assert(insertion.second && "The tangent value should not already exist.");
 }
 
 //--------------------------------------------------------------------------//
@@ -861,20 +863,19 @@ void JVPEmitter::prepareForDifferentialGeneration() {
   for (auto &origBB : *original) {
     auto *diffBB = differential.createBasicBlock();
     diffBBMap.insert({&origBB, diffBB});
-    {
+    // If the BB is the original entry, then the differential block that we
+    // just created must be the differential function's entry. Create
+    // differential entry arguments and continue.
+    if (&origBB == origEntry) {
+      assert(diffBB->isEntry());
+      createEntryArguments(&differential);
+      auto *lastArg = diffBB->getArguments().back();
+#ifndef NDEBUG
       auto diffStructLoweredType = remapSILTypeInDifferential(
           differentialInfo.getLinearMapStructLoweredType(&origBB));
-
-      // If the BB is the original entry, then the differential block that we
-      // just created must be the differential function's entry. Create
-      // differential entry arguments and continue.
-      if (&origBB == origEntry) {
-        assert(diffBB->isEntry());
-        createEntryArguments(&differential);
-        auto *lastArg = diffBB->getArguments().back();
-        assert(lastArg->getType() == diffStructLoweredType);
-        differentialStructArguments[&origBB] = lastArg;
-      }
+      assert(lastArg->getType() == diffStructLoweredType);
+#endif
+      differentialStructArguments[&origBB] = lastArg;
     }
 
     LLVM_DEBUG({
@@ -942,10 +943,12 @@ void JVPEmitter::prepareForDifferentialGeneration() {
   // Initialize tangent mapping for indirect results.
   auto origIndResults = original->getIndirectResults();
   auto diffIndResults = differential.getIndirectResults();
+#ifndef NDEBUG
   unsigned numInoutParameters = llvm::count_if(
       original->getLoweredFunctionType()->getParameters(),
       [](SILParameterInfo paramInfo) { return paramInfo.isIndirectInOut(); });
   assert(origIndResults.size() + numInoutParameters == diffIndResults.size());
+#endif
   for (auto &origBB : *original)
     for (auto i : indices(origIndResults))
       setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
@@ -1101,12 +1104,12 @@ SILBasicBlock *JVPEmitter::remapBasicBlock(SILBasicBlock *bb) {
 }
 
 void JVPEmitter::visit(SILInstruction *inst) {
-  auto diffBuilder = getDifferentialBuilder();
   if (errorOccurred)
     return;
   if (differentialInfo.shouldDifferentiateInstruction(inst)) {
     LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
+    auto diffBuilder = getDifferentialBuilder();
     auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
 #endif
     TypeSubstCloner::visit(inst);

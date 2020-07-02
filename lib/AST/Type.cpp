@@ -29,6 +29,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"

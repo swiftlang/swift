@@ -7,7 +7,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/usr/bin
-// RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/usr/bin/swift)
+// RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/usr/bin/swift)
 
 // RUN: %t/usr/bin/swift -sdk "" -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
 

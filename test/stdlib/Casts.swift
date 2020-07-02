@@ -84,7 +84,7 @@ CastsTests.test("Optional<T>.none can be casted to Optional<U>.none in generic c
 #if _runtime(_ObjC)
 protocol P2 {}
 CastsTests.test("Cast from ObjC existential to Protocol (SR-3871)") {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     struct S: P2 {}
 
     class ObjCWrapper {

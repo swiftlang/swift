@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -swift-version 5 -O -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 //
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 // This tests the optimality of the IR generated for the new os log APIs. This
 // is not testing the output of a specific optimization pass (which has separate

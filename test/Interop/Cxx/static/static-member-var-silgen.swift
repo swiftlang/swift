@@ -1,15 +1,15 @@
 // RUN: %target-swift-emit-sil -I %S/Inputs -enable-cxx-interop %s | %FileCheck %s
 
 // CHECK: // clang name: WithStaticMember::staticMember
-// CHECK: sil_global @{{_ZN16WithStaticMember12staticMemberE|\?staticMember@WithStaticMember@@2HA}} : $Int32
+// CHECK: sil_global public_external @{{_ZN16WithStaticMember12staticMemberE|\?staticMember@WithStaticMember@@2HA}} : $Int32
 // CHECK: // clang name: WithIncompleteStaticMember::selfMember
-// CHECK: sil_global @{{_ZN26WithIncompleteStaticMember10selfMemberE|\?selfMember@WithIncompleteStaticMember@@2V1@A}} : $WithIncompleteStaticMember
+// CHECK: sil_global public_external @{{_ZN26WithIncompleteStaticMember10selfMemberE|\?selfMember@WithIncompleteStaticMember@@2V1@A}} : $WithIncompleteStaticMember
 // CHECK: // clang name: WithConstStaticMember::defined
-// CHECK: sil_global [let] @{{_ZN21WithConstStaticMember7definedE|\?defined@WithConstStaticMember@@2HB}} : $Int32
+// CHECK: sil_global public_external [let] @{{_ZN21WithConstStaticMember7definedE|\?defined@WithConstStaticMember@@2HB}} : $Int32
 // CHECK: // clang name: WithConstStaticMember::definedOutOfLine
-// CHECK: sil_global [let] @{{_ZN21WithConstStaticMember16definedOutOfLineE|\?definedOutOfLine@WithConstStaticMember@@2HB}} : $Int32
+// CHECK: sil_global public_external [let] @{{_ZN21WithConstStaticMember16definedOutOfLineE|\?definedOutOfLine@WithConstStaticMember@@2HB}} : $Int32
 // CHECK: // clang name: WithConstexprStaticMember::definedInline
-// CHECK: sil_global [let] @{{_ZN25WithConstexprStaticMember13definedInlineE|\?definedInline@WithConstexprStaticMember@@2HB}} : $Int32
+// CHECK: sil_global public_external [let] @{{_ZN25WithConstexprStaticMember13definedInlineE|\?definedInline@WithConstexprStaticMember@@2HB}} : $Int32
 
 import StaticMemberVar
 

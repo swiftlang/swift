@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_MANGLER_H
 
 #include "swift/Demangling/ManglingUtils.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
@@ -24,6 +25,7 @@
 
 namespace swift {
 namespace Mangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 void printManglingStats();
 
@@ -204,6 +206,7 @@ protected:
   }
 };
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Mangle
 } // end namespace swift
 

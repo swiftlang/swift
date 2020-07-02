@@ -6,12 +6,12 @@
 import Foundation
 import StdlibUnittest
 
-#if os(macOS)
+#if canImport(AppKit)
 import AppKit
-#endif
-
-#if os(iOS) || os(tvOS) || os(watchOS)
+#elseif canImport(UIKit)
 import UIKit
+#else
+#error("Unsupported platform")
 #endif
 
 extension CGColorSpace {

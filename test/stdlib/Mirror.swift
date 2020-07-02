@@ -622,7 +622,7 @@ mirrors.test("Weak and Unowned Obj-C refs in class (SR-5289)") {
     }
   }
 
-	if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+	if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
 		let objc = WeakUnownedObjCClass()
 		let classWithReferences = SwiftClassWithWeakAndUnowned(objc)
 		let m = Mirror(reflecting: classWithReferences)
@@ -656,7 +656,7 @@ mirrors.test("Weak and Unowned Obj-C refs in struct") {
     }
   }
 
-	if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+	if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
 		let objc = WeakUnownedObjCClass()
 		let structWithReferences = SwiftStructWithWeakAndUnowned(objc)
 		let m = Mirror(reflecting: structWithReferences)
@@ -692,7 +692,7 @@ mirrors.test("Weak and Unowned Swift refs in class") {
     }
   }
 
-	if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+	if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
 		let swift = WeakUnownedSwiftClass()
 		let classWithReferences = SwiftClassWithWeakAndUnowned(swift)
 		let m = Mirror(reflecting: classWithReferences)
@@ -726,7 +726,7 @@ mirrors.test("Weak and Unowned Swift refs in struct") {
     }
   }
 
-	if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+	if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
 		let swift = WeakUnownedSwiftClass()
 		let structWithReferences = SwiftStructWithWeakAndUnowned(swift)
 		let m = Mirror(reflecting: structWithReferences)

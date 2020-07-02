@@ -1,0 +1,215 @@
+{
+  key.results: [
+    {
+      key.kind: source.lang.swift.decl.function.operator.infix,
+      key.name: "!==",
+      key.sourcetext: " !== <#T##AnyObject?#>",
+      key.description: "!==",
+      key.typename: "Bool",
+      key.context: source.codecompletion.context.othermodule,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.is_system: 1,
+      key.modulename: "Swift"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.operator.infix,
+      key.name: "===",
+      key.sourcetext: " === <#T##AnyObject?#>",
+      key.description: "===",
+      key.typename: "Bool",
+      key.context: source.codecompletion.context.othermodule,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.is_system: 1,
+      key.modulename: "Swift"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "instanceMethod(x:)",
+      key.sourcetext: ".instanceMethod(x: <#T##MyEnum#>)",
+      key.description: "instanceMethod(x: MyEnum)",
+      key.typename: "C",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:8MyModule1CC14instanceMethod1xAcA0A4EnumO_tF",
+      key.modulename: "MyModule"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "methodForTarget1()",
+      key.sourcetext: ".methodForTarget1()",
+      key.description: "methodForTarget1()",
+      key.typename: "ConcreteTarget1",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:8MyModule1CC16methodForTarget1AA08ConcreteE0VyF",
+      key.modulename: "MyModule"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "methodForTarget2()",
+      key.sourcetext: ".methodForTarget2()",
+      key.description: "methodForTarget2()",
+      key.typename: "ConcreteTarget2",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:8MyModule1CC16methodForTarget2AA08ConcreteE0VyF",
+      key.modulename: "MyModule"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "protocolMethod(asc:)",
+      key.sourcetext: ".protocolMethod(asc: <#T##String#>)",
+      key.description: "protocolMethod(asc: String)",
+      key.typename: "C",
+      key.context: source.codecompletion.context.superclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:8MyModule1PPAAE14protocolMethod3ascx5AssocQz_tF",
+      key.modulename: "MyModule"
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "self",
+      key.sourcetext: ".self",
+      key.description: "self",
+      key.typename: "C",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0
+    }
+  ]
+}
+{
+  key.typename: "C",
+  key.typeusr: "$s8MyModule1CCD",
+  key.members: [
+    {
+      key.name: "methodForTarget1()",
+      key.sourcetext: "methodForTarget1()",
+      key.description: "methodForTarget1()",
+      key.typename: "ConcreteTarget1",
+      key.typeusr: "$s8MyModule15ConcreteTarget1VD"
+    },
+    {
+      key.name: "methodForTarget2()",
+      key.sourcetext: "methodForTarget2()",
+      key.description: "methodForTarget2()",
+      key.typename: "ConcreteTarget2",
+      key.typeusr: "$s8MyModule15ConcreteTarget2VD"
+    }
+  ],
+  key.reusingastcontext: 1
+}
+{
+  key.results: [
+    {
+      key.typename: "MyEnum",
+      key.typeusr: "$s8MyModule0A4EnumOD",
+      key.implicitmembers: [
+        {
+          key.name: "foo",
+          key.sourcetext: "foo",
+          key.description: "foo"
+        },
+        {
+          key.name: "bar",
+          key.sourcetext: "bar",
+          key.description: "bar"
+        }
+      ]
+    }
+  ],
+  key.reusingastcontext: 1
+}
+{
+  key.results: [
+    {
+      key.kind: source.lang.swift.decl.function.operator.infix,
+      key.name: "!==",
+      key.sourcetext: " !== <#T##AnyObject?#>",
+      key.description: "!==",
+      key.typename: "Bool",
+      key.context: source.codecompletion.context.othermodule,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.is_system: 1,
+      key.modulename: "Swift"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.operator.infix,
+      key.name: "===",
+      key.sourcetext: " === <#T##AnyObject?#>",
+      key.description: "===",
+      key.typename: "Bool",
+      key.context: source.codecompletion.context.othermodule,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.is_system: 1,
+      key.modulename: "Swift"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "instanceMethod(x:)",
+      key.sourcetext: ".instanceMethod(x: <#T##MyEnum#>)",
+      key.description: "instanceMethod(x: MyEnum)",
+      key.typename: "C",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:8MyModule1CC14instanceMethod1xAcA0A4EnumO_tF",
+      key.modulename: "MyModule"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "methodForTarget1()",
+      key.sourcetext: ".methodForTarget1()",
+      key.description: "methodForTarget1()",
+      key.typename: "ConcreteTarget1",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:8MyModule1CC16methodForTarget1AA08ConcreteE0VyF",
+      key.modulename: "MyModule"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "methodForTarget2()",
+      key.sourcetext: ".methodForTarget2()",
+      key.description: "methodForTarget2()",
+      key.typename: "ConcreteTarget2",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:8MyModule1CC16methodForTarget2AA08ConcreteE0VyF",
+      key.modulename: "MyModule"
+    },
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "protocolMethod(asc:)",
+      key.sourcetext: ".protocolMethod(asc: <#T##String#>)",
+      key.description: "protocolMethod(asc: String)",
+      key.typename: "C",
+      key.context: source.codecompletion.context.superclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "s:8MyModule1PPAAE14protocolMethod3ascx5AssocQz_tF",
+      key.modulename: "MyModule"
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "self",
+      key.sourcetext: ".self",
+      key.description: "self",
+      key.typename: "C",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0
+    }
+  ],
+  key.reusingastcontext: 1
+}

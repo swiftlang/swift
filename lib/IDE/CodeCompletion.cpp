@@ -2085,15 +2085,13 @@ public:
   }
 
   void collectImportedModules(llvm::StringSet<> &ImportedModules) {
-    ModuleDecl::ImportFilter ImportFilter;
-    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-
     SmallVector<ModuleDecl::ImportedModule, 16> Imported;
     SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
-    CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
-                                                               ImportFilter);
+    CurrDeclContext->getParentSourceFile()->getImportedModules(
+        Imported,
+        {ModuleDecl::ImportFilterKind::Public,
+         ModuleDecl::ImportFilterKind::Private,
+         ModuleDecl::ImportFilterKind::ImplementationOnly});
     while (!Imported.empty()) {
       ModuleDecl *MD = Imported.back().importedModule;
       Imported.pop_back();
@@ -6160,15 +6158,29 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (IsAtStartOfLine) {
         //   foo() {}
         //   <HERE>
-        // Global completion.
+
         auto &Sink = CompletionContext.getResultSink();
-        addDeclKeywords(Sink);
-        addStmtKeywords(Sink, MaybeFuncBody);
-        addSuperKeyword(Sink);
-        addLetVarKeywords(Sink);
-        addExprKeywords(Sink);
-        addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
-        DoPostfixExprBeginning();
+        if (isa<Initializer>(CurDeclContext))
+          CurDeclContext = CurDeclContext->getParent();
+
+        if (CurDeclContext->isTypeContext()) {
+          // Override completion (CompletionKind::NominalMemberBeginning).
+          addDeclKeywords(Sink);
+          addLetVarKeywords(Sink);
+          SmallVector<StringRef, 0> ParsedKeywords;
+          CompletionOverrideLookup OverrideLookup(Sink, Context, CurDeclContext,
+                                                  ParsedKeywords, SourceLoc());
+          OverrideLookup.getOverrideCompletions(SourceLoc());
+        } else {
+          // Global completion (CompletionKind::PostfixExprBeginning).
+          addDeclKeywords(Sink);
+          addStmtKeywords(Sink, MaybeFuncBody);
+          addSuperKeyword(Sink);
+          addLetVarKeywords(Sink);
+          addExprKeywords(Sink);
+          addAnyTypeKeyword(Sink, Context.TheAnyType);
+          DoPostfixExprBeginning();
+        }
       } else {
         //   foo() {} <HERE>
         // Member completion.
@@ -6365,13 +6377,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         Lookup.addModuleName(curModule);
 
       // Add results for all imported modules.
-      ModuleDecl::ImportFilter ImportFilter;
-      ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-      ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-      ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
       SmallVector<ModuleDecl::ImportedModule, 4> Imports;
       auto *SF = CurDeclContext->getParentSourceFile();
-      SF->getImportedModules(Imports, ImportFilter);
+      SF->getImportedModules(
+          Imports, {ModuleDecl::ImportFilterKind::Public,
+                    ModuleDecl::ImportFilterKind::Private,
+                    ModuleDecl::ImportFilterKind::ImplementationOnly});
 
       for (auto Imported : Imports) {
         for (auto Import : namelookup::getAllImports(Imported.importedModule))

@@ -331,7 +331,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
   ASTContext &ctx = witness->getASTContext();
   auto *witnessAFD = dyn_cast<AbstractFunctionDecl>(witness);
   if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness))
-    witnessAFD = witnessASD->getAccessor(AccessorKind::Get);
+    witnessAFD = witnessASD->getOpaqueAccessor(AccessorKind::Get);
   // NOTE: Validate `@differentiable` attributes by calling
   // `getParameterIndices`. This is important for type-checking
   // `@differentiable` attributes in non-primary files to skip invalid
@@ -2935,7 +2935,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
       // wondering why a conformance fails.
       if (!AdopterIsClass)
         if (const auto VD = dyn_cast<VarDecl>(Requirement))
-          if (const auto Set = VD->getAccessor(AccessorKind::Set))
+          if (const auto Set = VD->getOpaqueAccessor(AccessorKind::Set))
             if (Set->getAttrs().hasAttribute<NonMutatingAttr>())
               Options.PrintPropertyAccessors = true;
     }
@@ -2963,6 +2963,59 @@ printProtocolStubFixitString(SourceLoc TypeLoc, ProtocolConformance *Conf,
     });
 }
 
+/// Filter the given array of protocol requirements and produce a new vector
+/// containing the non-conflicting requirements to be implemented by the given
+/// \c Adoptee type.
+static llvm::SmallVector<ValueDecl *, 4>
+filterProtocolRequirements(ArrayRef<ValueDecl *> Reqs, Type Adoptee) {
+  llvm::SmallVector<ValueDecl *, 4> Filtered;
+  if (Reqs.empty()) {
+    return Filtered;
+  }
+
+  const auto getProtocolSubstitutionMap = [&](ValueDecl *Req) {
+    auto *const PD = cast<ProtocolDecl>(Req->getDeclContext());
+    return SubstitutionMap::getProtocolSubstitutions(
+        PD, Adoptee, ProtocolConformanceRef(PD));
+  };
+
+  llvm::SmallDenseMap<DeclName, llvm::SmallVector<ValueDecl *, 2>, 4>
+      DeclsByName;
+  for (auto *const Req : Reqs) {
+    if (DeclsByName.find(Req->getName()) == DeclsByName.end()) {
+      DeclsByName[Req->getName()] = {Req};
+      Filtered.push_back(Req);
+      continue;
+    }
+
+    auto OverloadTy = Req->getOverloadSignatureType();
+    if (OverloadTy) {
+      OverloadTy =
+          OverloadTy.subst(getProtocolSubstitutionMap(Req))->getCanonicalType();
+    }
+    if (llvm::any_of(DeclsByName[Req->getName()], [&](ValueDecl *OtherReq) {
+          auto OtherOverloadTy = OtherReq->getOverloadSignatureType();
+          if (OtherOverloadTy) {
+            OtherOverloadTy =
+                OtherOverloadTy.subst(getProtocolSubstitutionMap(OtherReq))
+                    ->getCanonicalType();
+          }
+          return conflicting(Req->getASTContext(), Req->getOverloadSignature(),
+                             OverloadTy, OtherReq->getOverloadSignature(),
+                             OtherOverloadTy,
+                             /*wouldConflictInSwift5*/ nullptr,
+                             /*skipProtocolExtensionCheck*/ true);
+        })) {
+      continue;
+    }
+
+    DeclsByName[Req->getName()].push_back(Req);
+    Filtered.push_back(Req);
+  }
+
+  return Filtered;
+}
+
 void ConformanceChecker::
 diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   auto LocalMissing = getLocalMissingWitness();
@@ -2971,12 +3024,10 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   if (LocalMissing.empty())
     return;
 
-  SourceLoc ComplainLoc = Loc;
-  bool EditorMode = getASTContext().LangOpts.DiagnosticsEditorMode;
-  llvm::SetVector<ValueDecl*> MissingWitnesses(GlobalMissingWitnesses.begin(),
-                                               GlobalMissingWitnesses.end());
-  auto InsertFixitCallback = [ComplainLoc, EditorMode, MissingWitnesses]
-      (NormalProtocolConformance *Conf) {
+  const auto InsertFixit = [](NormalProtocolConformance *Conf,
+                              SourceLoc ComplainLoc, bool EditorMode,
+                              llvm::SmallVector<ValueDecl *, 4>
+                                  MissingWitnesses) {
     DeclContext *DC = Conf->getDeclContext();
     // The location where to insert stubs.
     SourceLoc FixitLocation;
@@ -2996,9 +3047,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     llvm::SetVector<ValueDecl*> NoStubRequirements;
 
     // Print stubs for all known missing witnesses.
-    printProtocolStubFixitString(TypeLoc, Conf,
-                                 MissingWitnesses.getArrayRef(),
-                                 FixIt, NoStubRequirements);
+    printProtocolStubFixitString(TypeLoc, Conf, MissingWitnesses, FixIt,
+                                 NoStubRequirements);
     auto &Diags = DC->getASTContext().Diags;
 
     // If we are in editor mode, squash all notes into a single fixit.
@@ -3072,27 +3122,33 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     }
   };
 
+  const bool IsEditorMode = Context.LangOpts.DiagnosticsEditorMode;
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
+    const auto MissingWitnesses = filterProtocolRequirements(
+        GlobalMissingWitnesses.getArrayRef(), Adoptee);
     if (SuppressDiagnostics) {
       // If the diagnostics are suppressed, we register these missing witnesses
       // for later revisiting.
       Conformance->setInvalid();
-      getASTContext().addDelayedMissingWitnesses(
-          Conformance, MissingWitnesses.getArrayRef());
+      getASTContext().addDelayedMissingWitnesses(Conformance, MissingWitnesses);
     } else {
-      diagnoseOrDefer(LocalMissing[0], true, InsertFixitCallback);
+      diagnoseOrDefer(
+          LocalMissing[0], true, [&](NormalProtocolConformance *Conf) {
+            InsertFixit(Conf, Loc, IsEditorMode, std::move(MissingWitnesses));
+          });
     }
     clearGlobalMissingWitnesses();
     return;
   }
   case MissingWitnessDiagnosisKind::ErrorOnly: {
-    diagnoseOrDefer(LocalMissing[0], true,
-                    [](NormalProtocolConformance *Conf) {});
+    diagnoseOrDefer(LocalMissing[0], true, [](NormalProtocolConformance *) {});
     return;
   }
   case MissingWitnessDiagnosisKind::FixItOnly:
-    InsertFixitCallback(Conformance);
+    InsertFixit(Conformance, Loc, IsEditorMode,
+                filterProtocolRequirements(GlobalMissingWitnesses.getArrayRef(),
+                                           Adoptee));
     clearGlobalMissingWitnesses();
     return;
   }
@@ -5579,15 +5635,16 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   llvm_unreachable("unknown derivable protocol kind");
 }
 
-Type TypeChecker::deriveTypeWitness(DeclContext *DC,
-                                    NominalTypeDecl *TypeDecl,
-                                    AssociatedTypeDecl *AssocType) {
+std::pair<Type, TypeDecl *>
+TypeChecker::deriveTypeWitness(DeclContext *DC,
+                               NominalTypeDecl *TypeDecl,
+                               AssociatedTypeDecl *AssocType) {
   auto *protocol = cast<ProtocolDecl>(AssocType->getDeclContext());
 
   auto knownKind = protocol->getKnownProtocolKind();
   
   if (!knownKind)
-    return nullptr;
+    return std::make_pair(nullptr, nullptr);
 
   auto Decl = DC->getInnermostDeclarationDeclContext();
 
@@ -5595,13 +5652,13 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
                              protocol);
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
-    return derived.deriveRawRepresentable(AssocType);
+    return std::make_pair(derived.deriveRawRepresentable(AssocType), nullptr);
   case KnownProtocolKind::CaseIterable:
-    return derived.deriveCaseIterable(AssocType);
+    return std::make_pair(derived.deriveCaseIterable(AssocType), nullptr);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   default:
-    return nullptr;
+    return std::make_pair(nullptr, nullptr);
   }
 }
 

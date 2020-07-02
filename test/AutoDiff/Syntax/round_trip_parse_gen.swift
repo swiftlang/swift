@@ -38,6 +38,18 @@ func bazDerivative(_ x: Float, y: Float)
   return (x, { v in v })
 }
 
+@derivative(of: baz(label:_:).set, wrt: (x))
+func bazSetDerivative(_ x: Float, y: Float)
+    -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { v in v })
+}
+
+@derivative(of: baz(label:_:).get, wrt: (x))
+func bazGetDerivative(_ x: Float, y: Float)
+    -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { v in v })
+}
+
 @transpose(of: -)
 func negateDerivative(_ x: Float)
     -> (value: Float, pullback: (Float) -> Float) {
@@ -52,6 +64,18 @@ func bazDerivative(_ x: Float, y: Float)
 
 @derivative(of: A<T>.B<U, V>.C.foo(label:_:), wrt: x)
 func qualifiedDerivative(_ x: Float, y: Float)
+    -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { v in v })
+}
+
+@derivative(of: A<T>.B<U, V>.C.foo(label:_:).get, wrt: x)
+func qualifiedGetDerivative(_ x: Float, y: Float)
+    -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { v in v })
+}
+
+@derivative(of: A<T>.B<U, V>.C.foo(label:_:).set, wrt: x)
+func qualifiedSetDerivative(_ x: Float, y: Float)
     -> (value: Float, pullback: (Float) -> Float) {
   return (x, { v in v })
 }
@@ -71,7 +95,28 @@ func subtractTranspose(_ v: Float) -> (Float, Float) {
   return (v, -v)
 }
 
+@transpose(of: Float.-.get, wrt: (0, 1))
+func subtractGetTranspose(_ v: Float) -> (Float, Float) {
+  return (v, -v)
+}
+
+@transpose(of: Float.-.set, wrt: (0, 1))
+func subtractSetTranspose(_ v: Float) -> (Float, Float) {
+  return (v, -v)
+}
+
 @derivative(of: A<T>.B<U, V>.C.foo(label:_:), wrt: 0)
 func qualifiedTranspose(_ v: Float) -> (Float, Float) {
   return (v, -v)
 }
+
+@transpose(of: A<T>.B<U, V>.C.foo(label:_:).get, wrt: 0)
+func qualifiedGetTranspose(_ v: Float) -> (Float, Float) {
+  return (v, -v)
+}
+
+@derivative(of: subscript(_:).set, wrt: (self, newValue))
+func subscriptSetterDerivative() {}
+
+@transpose(of: subscript(_:).set, wrt: (self, 0)
+func subscriptSetterTranspose() {}

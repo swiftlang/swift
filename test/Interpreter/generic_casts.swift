@@ -181,7 +181,7 @@ func nongenericAnyAsConditionalPAndPCSubConforming(type: Any.Type) -> Bool {
 func genericAnyAsConditional<T>(type: Any.Type, to: T.Type, expected: Bool) -> Bool {
   // If we're testing against a runtime that doesn't have the fix this tests,
   // just pretend we got it right.
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     return (type as? T.Type) != nil
   } else {
     return expected
@@ -207,7 +207,7 @@ func nongenericAnyAsUnconditionalPAndPCSubConforming(type: Any.Type) -> Bool {
   return true
 }
 func genericAnyAsUnconditional<T>(type: Any.Type, to: T.Type, expected: Bool) -> Bool {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     blackhole(type as! T.Type)
   }
   return true

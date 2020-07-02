@@ -907,9 +907,9 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
 
   auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
 
-  ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  ModuleDecl::ImportFilter ImportFilter = {
+      ModuleDecl::ImportFilterKind::Public,
+      ModuleDecl::ImportFilterKind::Private};
   if (Visited.empty()) {
     // Only collect implementation-only dependencies from the main module.
     ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;

@@ -63,7 +63,9 @@ jobs:
           path: ../build-cache
           key: ${{ runner.os }}-sccache-v7
       - name: Build macOS installable archive
-        run: ./utils/webassembly/ci.sh
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_12_beta.app/Contents/Developer/
+          ./utils/webassembly/ci.sh
       - name: Upload macOS installable archive
         uses: actions/upload-artifact@v1
         with:

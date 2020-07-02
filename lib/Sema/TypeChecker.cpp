@@ -174,42 +174,6 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ASTContext &Context,
   llvm_unreachable("unknown literal constructor");
 }
 
-/// Return an idealized form of the parameter type of the given
-/// object-literal initializer.  This removes references to the protocol
-/// name from the first argument label, which would be otherwise be
-/// redundant when writing out the object-literal syntax:
-///
-///   #fileLiteral(fileReferenceLiteralResourceName: "hello.jpg")
-///
-/// Doing this allows us to preserve a nicer (and source-compatible)
-/// literal syntax while still giving the initializer a semantically
-/// unambiguous name.
-Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
-                                                ConstructorDecl *ctor) {
-  auto params = ctor->getMethodInterfaceType()
-                    ->castTo<FunctionType>()->getParams();
-  SmallVector<AnyFunctionType::Param, 8> newParams;
-  newParams.append(params.begin(), params.end());
-
-  auto replace = [&](StringRef replacement) -> Type {
-    auto &Context = ctor->getASTContext();
-    newParams[0] = AnyFunctionType::Param(newParams[0].getPlainType(),
-                                          Context.getIdentifier(replacement),
-                                          newParams[0].getParameterFlags());
-    return AnyFunctionType::composeInput(Context, newParams,
-                                         /*canonicalVararg=*/false);
-  };
-
-  switch (expr->getLiteralKind()) {
-  case ObjectLiteralExpr::colorLiteral:
-    return replace("red");
-  case ObjectLiteralExpr::fileLiteral:
-  case ObjectLiteralExpr::imageLiteral:
-    return replace("resourceName");
-  }
-  llvm_unreachable("unknown literal constructor");
-}
-
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   if (auto *stdlib = dc->getASTContext().getStdlibModule()) {
     return stdlib;
@@ -473,81 +437,6 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 
-static Optional<Type> getTypeOfCompletionContextExpr(
-                        DeclContext *DC,
-                        CompletionTypeCheckKind kind,
-                        Expr *&parsedExpr,
-                        ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
-    return None;
-
-  switch (kind) {
-  case CompletionTypeCheckKind::Normal:
-    // Handle below.
-    break;
-
-  case CompletionTypeCheckKind::KeyPath:
-    referencedDecl = nullptr;
-    if (auto keyPath = dyn_cast<KeyPathExpr>(parsedExpr))
-      return TypeChecker::checkObjCKeyPathExpr(DC, keyPath,
-                                               /*requireResultType=*/true);
-
-    return None;
-  }
-
-  Type originalType = parsedExpr->getType();
-  if (auto T = TypeChecker::getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                 referencedDecl, FreeTypeVariableBinding::UnresolvedType))
-    return T;
-
-  // Try to recover if we've made any progress.
-  if (parsedExpr &&
-      !isa<ErrorExpr>(parsedExpr) &&
-      parsedExpr->getType() &&
-      !parsedExpr->getType()->hasError() &&
-      (originalType.isNull() ||
-       !parsedExpr->getType()->isEqual(originalType))) {
-    return parsedExpr->getType();
-  }
-
-  return None;
-}
-
-/// Return the type of an expression parsed during code completion, or
-/// a null \c Type on error.
-Optional<Type> swift::getTypeOfCompletionContextExpr(
-                        ASTContext &Ctx,
-                        DeclContext *DC,
-                        CompletionTypeCheckKind kind,
-                        Expr *&parsedExpr,
-                        ConcreteDeclRef &referencedDecl) {
-  DiagnosticSuppression suppression(Ctx.Diags);
-
-  // Try to solve for the actual type of the expression.
-  return ::getTypeOfCompletionContextExpr(DC, kind, parsedExpr,
-                                          referencedDecl);
-}
-
-/// Return the type of operator function for specified LHS, or a null
-/// \c Type on error.
-FunctionType *
-swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                   Identifier opName, DeclRefKind refKind,
-                                   ConcreteDeclRef &referencedDecl) {
-  auto &ctx = DC->getASTContext();
-  DiagnosticSuppression suppression(ctx.Diags);
-  return TypeChecker::getTypeOfCompletionOperator(DC, LHS, opName, refKind,
-                                                  referencedDecl);
-}
-
-bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
-  auto &ctx = DC->getASTContext();
-  DiagnosticSuppression suppression(ctx.Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, Type(),
-                                                   CTP_Unused);
-  return !resultTy;
-}
-
 bool swift::typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
                                                SourceLoc TargetLoc) {
   auto &Ctx = AFD->getASTContext();
@@ -592,9 +481,4 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
-}
-
-LookupResult
-swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
-  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }

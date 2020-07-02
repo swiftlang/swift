@@ -6,14 +6,14 @@
 struct P<T: K> { }
 
 struct S {
-    init<B>(_ a: P<B>) {
+    init<B>(_ a: P<B>) { // expected-note {{in call to initializer}}
         fatalError()
     }
 }
 
 protocol K { }
 
-func + <Object>(lhs: KeyPath<A, Object>, rhs: String) -> P<Object> { // expected-note {{where 'Object' = 'String'}}
+func + <Object>(lhs: KeyPath<A, Object>, rhs: String) -> P<Object> {
     fatalError()
 }
 
@@ -27,7 +27,9 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{operator function '+' requires that 'String' conform to 'K'}}
+  static let j = S(\A.id + "id") // expected-error {{generic parameter 'B' could not be inferred}}
+  // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'KeyPath<A, String>' and 'String'}}
+  // expected-note@-2 {{overloads for '+' exist with these partially matching parameter lists: (String, String)}}
 }
 
 // SR-5034

@@ -1,0 +1,3 @@
+module CXXTypes {
+  header "cxx-types.h"
+}

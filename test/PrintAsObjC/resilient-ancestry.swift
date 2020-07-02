@@ -11,6 +11,7 @@
 // RUN: %check-in-clang %t/resilient.h -I %t
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=iosmac
 
 // See also resilient-ancestry.swift, for the stable ABI deployment target test.
 

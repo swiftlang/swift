@@ -193,6 +193,7 @@ def _apply_default_arguments(args):
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
+        args.test_swiftformat = False
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
 
@@ -586,6 +587,9 @@ def create_argument_parser():
 
     option(['--skstresstester'], store_true('build_skstresstester'),
            help='build the SourceKit stress tester')
+
+    option(['--swiftformat'], store_true('build_swiftformat'),
+           help='build swift-format')
 
     option(['--swiftevolve'], store_true('build_swiftevolve'),
            help='build the swift-evolve tool')
@@ -1054,6 +1058,8 @@ def create_argument_parser():
            help='skip testing PlaygroundSupport')
     option('--skip-test-skstresstester', toggle_false('test_skstresstester'),
            help='skip testing the SourceKit Stress tester')
+    option('--skip-test-swiftformat', toggle_false('test_swiftformat'),
+           help='skip testing swift-format')
     option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
            help='skip testing SwiftEvolve')
     option('--skip-test-toolchain-benchmarks',

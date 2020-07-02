@@ -1907,6 +1907,11 @@ private:
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }
 
+    // There are no parens at this point, so if there are no parameters either,
+    // this shouldn't be a context (it's an implicit parameter list).
+    if (!PL->size())
+      return None;
+
     ListAligner Aligner(SM, TargetLocation, ContextLoc, Range.Start);
     for (auto *PD: *PL)
       Aligner.updateAlignment(PD->getSourceRange(), PD);
@@ -2337,8 +2342,17 @@ private:
         return None;
 
       ListAligner Aligner(SM, TargetLocation, L, L, R, true);
-      for (auto *Elem: AE->getElements())
-        Aligner.updateAlignment(Elem->getStartLoc(), Elem->getEndLoc(), Elem);
+      for (auto *Elem: AE->getElements()) {
+        SourceRange ElemRange = Elem->getSourceRange();
+        Aligner.updateAlignment(ElemRange, Elem);
+        if (isTargetContext(ElemRange)) {
+          Aligner.setAlignmentIfNeeded(CtxOverride);
+          return IndentContext {
+            ElemRange.Start,
+            !OutdentChecker::hasOutdent(SM, ElemRange, Elem)
+          };
+        }
+      }
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }
 

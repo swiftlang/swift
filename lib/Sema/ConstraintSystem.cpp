@@ -581,6 +581,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   if (isExpr<MemberRefExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::Member);
 
+  if (isExpr<ObjectLiteralExpr>(anchor))
+    return getConstraintLocator(anchor, ConstraintLocator::ConstructorMember);
+
   return getConstraintLocator(anchor);
 }
 
@@ -665,6 +668,8 @@ Type ConstraintSystem::openUnboundGenericType(
   OpenedTypeMap replacements;
   openGeneric(decl->getDeclContext(), decl->getGenericSignature(), locator,
               replacements);
+
+  recordOpenedTypes(locator, replacements);
 
   if (parentTy) {
     auto subs = parentTy->getContextSubstitutions(decl->getDeclContext());
@@ -1664,6 +1669,34 @@ ConstraintSystem::getTypeOfMemberReference(
           return ExistentialMetatypeType::get(baseObjTy);
       return t;
     });
+  }
+
+  // Construct an idealized parameter type of the initializer associated
+  // with object literal, which generally simplifies the first label
+  // (e.g. "colorLiteralRed:") by stripping all the redundant stuff about
+  // literals (leaving e.g. "red:").
+  {
+    auto anchor = locator.getAnchor();
+    if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
+      auto fnType = type->castTo<FunctionType>();
+
+      SmallVector<AnyFunctionType::Param, 4> params(fnType->getParams().begin(),
+                                                    fnType->getParams().end());
+
+      switch (OLE->getLiteralKind()) {
+      case ObjectLiteralExpr::colorLiteral:
+        params[0] = params[0].withLabel(Context.getIdentifier("red"));
+        break;
+
+      case ObjectLiteralExpr::fileLiteral:
+      case ObjectLiteralExpr::imageLiteral:
+        params[0] = params[0].withLabel(Context.getIdentifier("resourceName"));
+        break;
+      }
+
+      type =
+          FunctionType::get(params, fnType->getResult(), fnType->getExtInfo());
+    }
   }
 
   // If we opened up any type variables, record the replacements.
@@ -2775,12 +2808,6 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
   auto *anchor = castToExpr(locator->getAnchor());
   auto *applyExpr = cast<ApplyExpr>(cs.getParentExpr(anchor));
 
-  auto isNameOfStandardComparisonOperator = [](Identifier opName) -> bool {
-    return opName.is("==") || opName.is("!=") || opName.is("===") ||
-           opName.is("!==") || opName.is("<") || opName.is(">") ||
-           opName.is("<=") || opName.is(">=");
-  };
-
   auto isEnumWithAssociatedValues = [](Type type) -> bool {
     if (auto *enumType = type->getAs<EnumType>())
       return !enumType->getDecl()->hasOnlyCasesWithoutAssociatedValues();
@@ -2803,7 +2830,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
           .highlight(lhs->getSourceRange())
           .highlight(rhs->getSourceRange());
 
-      if (isNameOfStandardComparisonOperator(operatorName) &&
+      if (isStandardComparisonOperator(binaryOp->getFn()) &&
           isEnumWithAssociatedValues(lhsType)) {
         DE.diagnose(applyExpr->getLoc(),
                     diag::no_binary_op_overload_for_enum_with_payload,
@@ -4226,6 +4253,15 @@ bool constraints::isPatternMatchingOperator(Expr *expr) {
   return isOperator(expr, "~=");
 }
 
+bool constraints::isStandardComparisonOperator(Expr *expr) {
+  if (auto opName = getOperatorName(expr)) {
+    return opName->is("==") || opName->is("!=") || opName->is("===") ||
+           opName->is("!==") || opName->is("<") || opName->is(">") ||
+           opName->is("<=") || opName->is(">=");
+  }
+  return false;
+}
+
 bool constraints::isOperatorArgument(ConstraintLocator *locator,
                                      StringRef expectedOperator) {
   if (!locator->findLast<LocatorPathElt::ApplyArgToParam>())
@@ -4807,4 +4843,104 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
 
 SourceRange constraints::getSourceRange(ASTNode anchor) {
   return anchor.getSourceRange();
+}
+
+static Optional<Requirement> getRequirement(ConstraintSystem &cs,
+                                            ConstraintLocator *reqLocator) {
+  auto reqLoc = reqLocator->getLastElementAs<LocatorPathElt::AnyRequirement>();
+  if (!reqLoc)
+    return None;
+
+  if (reqLoc->isConditionalRequirement()) {
+    auto path = reqLocator->getPath();
+    auto *typeReqLoc =
+        cs.getConstraintLocator(reqLocator->getAnchor(), path.drop_back());
+
+    auto conformances = cs.getCheckedConformances();
+    auto result = llvm::find_if(
+        conformances,
+        [&typeReqLoc](
+            const std::pair<ConstraintLocator *, ProtocolConformanceRef>
+                &conformance) { return conformance.first == typeReqLoc; });
+    assert(result != conformances.end());
+
+    auto conformance = result->second;
+    assert(conformance.isConcrete());
+
+    return conformance.getConditionalRequirements()[reqLoc->getIndex()];
+  }
+
+  if (auto openedGeneric =
+          reqLocator->findLast<LocatorPathElt::OpenedGeneric>()) {
+    auto signature = openedGeneric->getSignature();
+    return signature->getRequirements()[reqLoc->getIndex()];
+  }
+
+  return None;
+}
+
+static Optional<std::pair<GenericTypeParamType *, RequirementKind>>
+getRequirementInfo(ConstraintSystem &cs, ConstraintLocator *reqLocator) {
+  auto requirement = getRequirement(cs, reqLocator);
+  if (!requirement)
+    return None;
+
+  auto *GP = requirement->getFirstType()->getAs<GenericTypeParamType>();
+  if (!GP)
+    return None;
+
+  auto path = reqLocator->getPath();
+  auto iter = path.rbegin();
+  auto openedGeneric =
+      reqLocator->findLast<LocatorPathElt::OpenedGeneric>(iter);
+  assert(openedGeneric);
+
+  auto newPath = path.drop_back(iter - path.rbegin() + 1);
+  auto *baseLoc = cs.getConstraintLocator(reqLocator->getAnchor(), newPath);
+
+  auto openedTypes = cs.getOpenedTypes();
+  auto substitutions = llvm::find_if(
+      openedTypes,
+      [&baseLoc](
+          const std::pair<ConstraintLocator *, ArrayRef<OpenedType>> &entry) {
+        return entry.first == baseLoc;
+      });
+
+  if (substitutions == openedTypes.end())
+    return None;
+
+  auto replacement =
+      llvm::find_if(substitutions->second, [&GP](const OpenedType &entry) {
+        auto *typeVar = entry.second;
+        return typeVar->getImpl().getGenericParameter() == GP;
+      });
+
+  if (replacement == substitutions->second.end())
+    return None;
+
+  auto *repr = cs.getRepresentative(replacement->second);
+  return std::make_pair(repr->getImpl().getGenericParameter(),
+                        requirement->getKind());
+}
+
+bool ConstraintSystem::isFixedRequirement(ConstraintLocator *reqLocator,
+                                          Type requirementTy) {
+  if (auto reqInfo = getRequirementInfo(*this, reqLocator)) {
+    auto *GP = reqInfo->first;
+    auto reqKind = static_cast<unsigned>(reqInfo->second);
+    return FixedRequirements.count(
+        std::make_tuple(GP, reqKind, requirementTy.getPointer()));
+  }
+
+  return false;
+}
+
+void ConstraintSystem::recordFixedRequirement(ConstraintLocator *reqLocator,
+                                              Type requirementTy) {
+  if (auto reqInfo = getRequirementInfo(*this, reqLocator)) {
+    auto *GP = reqInfo->first;
+    auto reqKind = static_cast<unsigned>(reqInfo->second);
+    FixedRequirements.insert(
+        std::make_tuple(GP, reqKind, requirementTy.getPointer()));
+  }
 }
