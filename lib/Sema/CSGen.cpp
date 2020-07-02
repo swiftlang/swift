@@ -4171,10 +4171,6 @@ bool ConstraintSystem::generateConstraints(
 
   case SolutionApplicationTarget::Kind::uninitializedWrappedVar: {
     auto *wrappedVar = target.getAsUninitializedWrappedVar();
-    Type propertyType = wrappedVar->getType();
-    if (propertyType->hasError())
-      return true;
-
     auto *outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
     auto *typeRepr = outermostWrapper->getTypeRepr();
     auto backingType = openUnboundGenericTypes(outermostWrapper->getType(),
@@ -4183,6 +4179,9 @@ bool ConstraintSystem::generateConstraints(
 
     auto wrappedValueType =
         generateWrappedPropertyTypeConstraints(*this, backingType, wrappedVar);
+    Type propertyType = wrappedVar->getType();
+    if (!wrappedValueType || propertyType->hasError())
+      return true;
 
     addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType,
         getConstraintLocator(wrappedVar, LocatorPathElt::ContextualType()));

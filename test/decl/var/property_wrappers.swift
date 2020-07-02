@@ -958,12 +958,12 @@ struct UsesWrapperRequiringP {
 
 // SR-10899 / rdar://problem/51588022
 @propertyWrapper
-struct SR_10899_Wrapper { // expected-note{{property wrapper type 'SR_10899_Wrapper' declared here}}
+struct SR_10899_Wrapper {
   var wrappedValue: String { "hi" }
 }
 
 struct SR_10899_Usage {
-  @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match that of the 'wrappedValue' property of its wrapper type 'SR_10899_Wrapper'}}
+  @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match 'wrappedValue' type 'String'}}
 }
 
 // SR-11061 / rdar://problem/52593304 assertion with DeclContext mismatches

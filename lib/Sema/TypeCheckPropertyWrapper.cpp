@@ -577,9 +577,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!rawType || rawType->hasError())
     return Type();
 
-  if (!rawType->hasUnboundGenericType())
-    return rawType->mapTypeOutOfContext();
-
   auto binding = var->getParentPatternBinding();
   if (!binding)
     return Type();
