@@ -3534,8 +3534,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         (toType->isAnyObject() || fromType->isAnyObject()))
       return CheckedCastKind::ValueCast;
 
-    // A cast from an existential type to a concrete type does not succeed. For
-    // example:
+    // If we have a cast from an existential type to a concrete type that we
+    // statically know doesn't conform to the protocol, mark the cast as always
+    // failing. For example:
     //
     // struct S {}
     // enum FooError: Error { case bar }
@@ -3548,12 +3549,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     //
-    // But we check for conformance and possible dynamic conformances in which
-    // case we cannot fail because it is impossible to know then statically.
     if (auto *protocolDecl =
           dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
-      // Checking for possible dynamic conformances because we cannot fail
-      // in those cases.
       if (!couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
         return failed();
       }
