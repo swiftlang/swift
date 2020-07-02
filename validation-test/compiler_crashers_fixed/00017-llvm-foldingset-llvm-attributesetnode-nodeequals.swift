@@ -20,4 +20,4 @@ extension Bool : BooleanProtocol {
 func f<T : BooleanProtocol>(_ b: T) {}
 // expected-note@-1 {{required by global function 'f' where 'T' = 'BooleanProtocol'}}
 
-f(true as BooleanProtocol) // expected-error {{value of protocol type 'BooleanProtocol' cannot conform to 'BooleanProtocol'; only struct/enum/class types can conform to protocols}}
+f(true as BooleanProtocol) // expected-error {{protocol 'BooleanProtocol' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
