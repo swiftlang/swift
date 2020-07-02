@@ -419,9 +419,11 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Store direct results to indirect results.
     assert(toRes.isFormalIndirect());
+#ifndef NDEBUG
     SILType resultTy =
         toConv.getSILType(toRes, builder.getTypeExpansionContext());
     assert(resultTy.isAddress());
+#endif
     auto indRes = *toIndResultsIter++;
     builder.createStore(loc, *fromDirResultsIter++, indRes,
                         StoreOwnershipQualifier::Unqualified);
@@ -837,8 +839,10 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                  peerThroughFunctionConversions<ClassMethodInst>(
                      derivativeFn)) {
     auto classOperand = thunk->getArgumentsWithoutIndirectResults().back();
+#ifndef NDEBUG
     auto classOperandType = assocMethodInst->getOperand()->getType();
     assert(classOperand->getType() == classOperandType);
+#endif
     assocRef = builder.createClassMethod(
         loc, classOperand, assocMethodInst->getMember(),
         thunk->mapTypeIntoContext(assocMethodInst->getType()));
