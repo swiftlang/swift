@@ -1,9 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Onone %s -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck --check-prefix CHECK --check-prefix CHECK-ONONE %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
 // RUN: %target-codesign %t/a.out.optimized
-// RUN: %target-run %t/a.out.optimized | %FileCheck %s
+//
+// RUN: %target-run %t/a.out | %FileCheck --check-prefix CHECK %s
+// RUN: %target-run %t/a.out.optimized | %FileCheck --check-prefix CHECK %s
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
@@ -140,42 +141,50 @@ class PC: P {}
 class PCSub: PC {}
 
 // `is` checks
-func nongenericAnyIsPConforming(type: Any.Type) -> Bool {
+func nongenericAnyIsPType(type: Any.Type) -> Bool {
   // `is P.Type` tests whether the argument conforms to `P`
   // Note:  this can only be true for a concrete type, never a protocol
   return type is P.Type
 }
-func nongenericAnyIsPSubtype(type: Any.Type) -> Bool {
+func nongenericAnyIsPProtocol(type: Any.Type) -> Bool {
+  // `P.Protocol` is the metatype for `P` (the type of `P.self`)
   // `is P.Protocol` tests whether the argument is a subtype of `P`
   // In particular, it is true for `P.self`
   return type is P.Protocol
 }
-func nongenericAnyIsPAndAnyObjectConforming(type: Any.Type) -> Bool {
+func nongenericAnyIsPAndAnyObjectType(type: Any.Type) -> Bool {
   return type is (P & AnyObject).Type
 }
-func nongenericAnyIsPAndPCSubConforming(type: Any.Type) -> Bool {
+func nongenericAnyIsPAndAnyObjectProtocol(type: Any.Type) -> Bool {
+  return type is (P & AnyObject).Protocol
+}
+func nongenericAnyIsPAndPCSubType(type: Any.Type) -> Bool {
   return type is (P & PCSub).Type
 }
 func genericAnyIs<T>(type: Any.Type, to: T.Type, expected: Bool) -> Bool {
   // If we're testing against a runtime that doesn't have the fix this tests,
   // just pretend we got it right.
   if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+    // Remember: If `T` is bound to `P`, then `T.Type` is `P.Protocol`
     return type is T.Type
   } else {
     return expected
   }
 }
 // `as?` checks
-func nongenericAnyAsConditionalPConforming(type: Any.Type) -> Bool {
+func nongenericAnyAsConditionalPType(type: Any.Type) -> Bool {
   return (type as? P.Type) != nil
 }
-func nongenericAnyAsConditionalPSubtype(type: Any.Type) -> Bool {
+func nongenericAnyAsConditionalPProtocol(type: Any.Type) -> Bool {
   return (type as? P.Protocol) != nil
 }
-func nongenericAnyAsConditionalPAndAnyObjectConforming(type: Any.Type) -> Bool {
+func nongenericAnyAsConditionalPAndAnyObjectType(type: Any.Type) -> Bool {
   return (type as? (P & AnyObject).Type) != nil
 }
-func nongenericAnyAsConditionalPAndPCSubConforming(type: Any.Type) -> Bool {
+func nongenericAnyAsConditionalPAndAnyObjectProtocol(type: Any.Type) -> Bool {
+  return (type as? (P & AnyObject).Protocol) != nil
+}
+func nongenericAnyAsConditionalPAndPCSubType(type: Any.Type) -> Bool {
   return (type as? (P & PCSub).Type) != nil
 }
 func genericAnyAsConditional<T>(type: Any.Type, to: T.Type, expected: Bool) -> Bool {
@@ -190,19 +199,19 @@ func genericAnyAsConditional<T>(type: Any.Type, to: T.Type, expected: Bool) -> B
 // `as!` checks
 func blackhole<T>(_ : T) { }
 
-func nongenericAnyAsUnconditionalPConforming(type: Any.Type) -> Bool {
+func nongenericAnyAsUnconditionalPType(type: Any.Type) -> Bool {
   blackhole(type as! P.Type)
   return true
 }
-func nongenericAnyAsUnconditionalPSubtype(type: Any.Type) -> Bool {
+func nongenericAnyAsUnconditionalPProtocol(type: Any.Type) -> Bool {
   blackhole(type as! P.Protocol)
   return true
 }
-func nongenericAnyAsUnconditionalPAndAnyObjectConforming(type: Any.Type) -> Bool {
+func nongenericAnyAsUnconditionalPAndAnyObjectType(type: Any.Type) -> Bool {
   blackhole(type as! (P & AnyObject).Type)
   return true
 }
-func nongenericAnyAsUnconditionalPAndPCSubConforming(type: Any.Type) -> Bool {
+func nongenericAnyAsUnconditionalPAndPCSubType(type: Any.Type) -> Bool {
   blackhole(type as! (P & PCSub).Type)
   return true
 }
@@ -215,135 +224,153 @@ func genericAnyAsUnconditional<T>(type: Any.Type, to: T.Type, expected: Bool) ->
 
 // CHECK-LABEL: casting types to protocols with generics:
 print("casting types to protocols with generics:")
-print(nongenericAnyIsPConforming(type: P.self)) // CHECK: false
-print(nongenericAnyIsPSubtype(type: P.self)) // CHECK: true
-print(genericAnyIs(type: P.self, to: P.self, expected: true)) // CHECK: true
-print(nongenericAnyIsPConforming(type: PS.self)) // CHECK: true
-print(genericAnyIs(type: PS.self, to: P.self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyIsPConforming(type: PE.self)) // CHECK: true
-print(genericAnyIs(type: PE.self, to: P.self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyIsPConforming(type: PC.self)) // CHECK: true
-print(genericAnyIs(type: PC.self, to: P.self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyIsPConforming(type: PCSub.self)) // CHECK: true
-print(genericAnyIs(type: PCSub.self, to: P.self, expected: true)) // CHECK-ONONE: true
+print(#line, nongenericAnyIsPType(type: P.self)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPProtocol(type: P.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyIs(type: P.self, to: P.self, expected: true)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyIsPType(type: PS.self)) // CHECK: [[@LINE]] true
+print(#line, PS() is P) // CHECK: [[@LINE]] true
+// One candidate for a Swift type theory holds that
+// `A is a subtype of B iff A.self is metatype<B>`
+// In that theory, `PS() is P` above would imply that
+// `PS.self is P.Protocol` below must also be true.
+// But that theory is not the one that Swift currently
+// implements.
+print(#line, nongenericAnyIsPProtocol(type: PS.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PS.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPType(type: PE.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyIsPProtocol(type: PE.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PE.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPType(type: PC.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyIsPProtocol(type: PC.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PC.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPType(type: PCSub.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyIsPProtocol(type: PCSub.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PCSub.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 
 // CHECK-LABEL: conditionally casting types to protocols with generics:
-print("conditionally casting types to protocols with generics:")
-print(nongenericAnyAsConditionalPConforming(type: P.self)) // CHECK: false
-print(nongenericAnyAsConditionalPSubtype(type: P.self)) // CHECK: true
-print(genericAnyAsConditional(type: P.self, to: P.self, expected: true)) // CHECK: true
-print(nongenericAnyAsConditionalPConforming(type: PS.self)) // CHECK: true
-print(genericAnyAsConditional(type: PS.self, to: P.self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyAsConditionalPConforming(type: PE.self)) // CHECK: true
-print(genericAnyAsConditional(type: PE.self, to: P.self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyAsConditionalPConforming(type: PC.self)) // CHECK: true
-print(genericAnyAsConditional(type: PC.self, to: P.self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyAsConditionalPConforming(type: PCSub.self)) // CHECK: true
-print(genericAnyAsConditional(type: PCSub.self, to: P.self, expected: true)) // CHECK-ONONE: true
+print(#line, "conditionally casting types to protocols with generics:")
+print(#line, nongenericAnyAsConditionalPType(type: P.self)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPProtocol(type: P.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyAsConditional(type: P.self, to: P.self, expected: true)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsConditionalPType(type: PS.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsConditionalPProtocol(type: PS.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PS.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPType(type: PE.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsConditionalPProtocol(type: PE.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PE.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPType(type: PC.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsConditionalPProtocol(type: PC.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PC.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPType(type: PCSub.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsConditionalPProtocol(type: PCSub.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PCSub.self, to: P.self, expected: false)) // CHECK: [[@LINE]] false
 
 // CHECK-LABEL: unconditionally casting types to protocols with generics:
-print("unconditionally casting types to protocols with generics:")
-//print(nongenericAnyAsUnconditionalPConforming(type: P.self)) // expected to trap
-print(nongenericAnyAsUnconditionalPSubtype(type: P.self)) // CHECK: true
-print(genericAnyAsUnconditional(type: P.self, to: P.self, expected: true)) // CHECK: true
-print(nongenericAnyAsUnconditionalPConforming(type: PS.self)) // CHECK: true
-print(genericAnyAsUnconditional(type: PS.self, to: P.self, expected: true)) // CHECK: true
-print(nongenericAnyAsUnconditionalPConforming(type: PE.self)) // CHECK: true
-print(genericAnyAsUnconditional(type: PE.self, to: P.self, expected: true)) // CHECK: true
-print(nongenericAnyAsUnconditionalPConforming(type: PC.self)) // CHECK: true
-print(genericAnyAsUnconditional(type: PC.self, to: P.self, expected: true)) // CHECK: true
-print(nongenericAnyAsUnconditionalPConforming(type: PCSub.self)) // CHECK: true
-print(genericAnyAsUnconditional(type: PCSub.self, to: P.self, expected: true)) // CHECK: true
+print(#line, "unconditionally casting types to protocols with generics:")
+//print(#line, nongenericAnyAsUnconditionalPType(type: P.self)) // expected to trap
+print(#line, nongenericAnyAsUnconditionalPProtocol(type: P.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyAsUnconditional(type: P.self, to: P.self, expected: true)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsUnconditionalPType(type: PS.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyAsUnconditional(type: PS.self, to: P.self, expected: true)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsUnconditionalPType(type: PE.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyAsUnconditional(type: PE.self, to: P.self, expected: true)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsUnconditionalPType(type: PC.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyAsUnconditional(type: PC.self, to: P.self, expected: true)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsUnconditionalPType(type: PCSub.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyAsUnconditional(type: PCSub.self, to: P.self, expected: true)) // CHECK: [[@LINE]] true
 
 // CHECK-LABEL: casting types to protocol & AnyObject existentials:
-print("casting types to protocol & AnyObject existentials:")
-print(nongenericAnyIsPAndAnyObjectConforming(type: PS.self)) // CHECK: false
-print(genericAnyIs(type: PS.self, to: (P & AnyObject).self, expected: false)) // CHECK: false
-print(nongenericAnyIsPAndAnyObjectConforming(type: PE.self)) // CHECK: false
-print(genericAnyIs(type: PE.self, to: (P & AnyObject).self, expected: false)) // CHECK: false
-print(nongenericAnyIsPAndAnyObjectConforming(type: PC.self)) // CHECK: true
-print(genericAnyIs(type: PC.self, to: (P & AnyObject).self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyIsPAndAnyObjectConforming(type: PCSub.self)) // CHECK: true
-print(genericAnyIs(type: PCSub.self, to: (P & AnyObject).self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyAsConditionalPAndAnyObjectConforming(type: PS.self)) // CHECK: false
-print(genericAnyAsConditional(type: PS.self, to: (P & AnyObject).self, expected: false)) // CHECK: false
-print(nongenericAnyAsConditionalPAndAnyObjectConforming(type: PE.self)) // CHECK: false
-print(genericAnyAsConditional(type: PE.self, to: (P & AnyObject).self, expected: false)) // CHECK: false
-print(nongenericAnyAsConditionalPAndAnyObjectConforming(type: PC.self)) // CHECK: true
-print(genericAnyAsConditional(type: PC.self, to: (P & AnyObject).self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyAsConditionalPAndAnyObjectConforming(type: PCSub.self)) // CHECK: true
-print(genericAnyAsConditional(type: PCSub.self, to: (P & AnyObject).self, expected: true)) // CHECK-ONONE: true
+print(#line, "casting types to protocol & AnyObject existentials:")
+print(#line, nongenericAnyIsPAndAnyObjectType(type: PS.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PS.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPAndAnyObjectType(type: PE.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PE.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPAndAnyObjectType(type: PC.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyIsPAndAnyObjectProtocol(type: PC.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PC.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPAndAnyObjectType(type: PCSub.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyIsPAndAnyObjectProtocol(type: PCSub.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PCSub.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPAndAnyObjectType(type: PS.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PS.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPAndAnyObjectType(type: PE.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PE.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPAndAnyObjectType(type: PC.self)) // CHECK: [[@LINE]] true
+print(#line, nongenericAnyAsConditionalPAndAnyObjectProtocol(type: PC.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PC.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPAndAnyObjectType(type: PCSub.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyAsConditional(type: PCSub.self, to: (P & AnyObject).self, expected: false)) // CHECK: [[@LINE]] false
 
 // CHECK-LABEL: casting types to protocol & class existentials:
-print("casting types to protocol & class existentials:")
-print(nongenericAnyIsPAndPCSubConforming(type: PS.self)) // CHECK: false
-print(genericAnyIs(type: PS.self, to: (P & PCSub).self, expected: false)) // CHECK: false
-print(nongenericAnyIsPAndPCSubConforming(type: PE.self)) // CHECK: false
-print(genericAnyIs(type: PE.self, to: (P & PCSub).self, expected: false)) // CHECK: false
-//print(nongenericAnyIsPAndPCSubConforming(type: PC.self)) // CHECK-SR-11565: false -- FIXME: reenable this when SR-11565 is fixed
-print(genericAnyIs(type: PC.self, to: (P & PCSub).self, expected: false)) // CHECK: false
-print(nongenericAnyIsPAndPCSubConforming(type: PCSub.self)) // CHECK: true
-print(genericAnyIs(type: PCSub.self, to: (P & PCSub).self, expected: true)) // CHECK-ONONE: true
-print(nongenericAnyAsConditionalPAndPCSubConforming(type: PS.self)) // CHECK: false
-print(genericAnyAsConditional(type: PS.self, to: (P & PCSub).self, expected: false)) // CHECK: false
-print(nongenericAnyAsConditionalPAndPCSubConforming(type: PE.self)) // CHECK: false
-print(genericAnyAsConditional(type: PE.self, to: (P & PCSub).self, expected: false)) // CHECK: false
-//print(nongenericAnyAsConditionalPAndPCSubConforming(type: PC.self)) // CHECK-SR-11565: false -- FIXME: reenable this when SR-11565 is fixed
-print(genericAnyAsConditional(type: PC.self, to: (P & PCSub).self, expected: false)) // CHECK: false
-print(nongenericAnyAsConditionalPAndPCSubConforming(type: PCSub.self)) // CHECK: true
-print(genericAnyAsConditional(type: PCSub.self, to: (P & PCSub).self, expected: true)) // CHECK-ONONE: true
+print(#line, "casting types to protocol & class existentials:")
+print(#line, nongenericAnyIsPAndPCSubType(type: PS.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PS.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPAndPCSubType(type: PE.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyIs(type: PE.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
+//print(#line, nongenericAnyIsPAndPCSubType(type: PC.self)) // CHECK-SR-11565: [[@LINE]] false -- FIXME: reenable this when SR-11565 is fixed
+print(#line, genericAnyIs(type: PC.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyIsPAndPCSubType(type: PCSub.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyIs(type: PCSub.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PS.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PS.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PE.self)) // CHECK: [[@LINE]] false
+print(#line, genericAnyAsConditional(type: PE.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
+// print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PC.self)) // CHECK-SR-11565: [[@LINE]] false -- FIXME: reenable this when SR-11565 is fixed
+print(#line, genericAnyAsConditional(type: PC.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
+print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PCSub.self)) // CHECK: [[@LINE]] true
+print(#line, genericAnyAsConditional(type: PCSub.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 
 
 // CHECK-LABEL: type comparisons:
-print("type comparisons:\n")
-print(allMetasToAllMetas(Int.self, Int.self)) // CHECK: true
-print(allMetasToAllMetas(Int.self, Float.self)) // CHECK: false
-print(allMetasToAllMetas(C.self, C.self)) // CHECK: true
-print(allMetasToAllMetas(D.self, C.self)) // CHECK: true
-print(allMetasToAllMetas(C.self, D.self)) // CHECK: false
-print(C.self is D.Type) // CHECK: false
-print((D.self as C.Type) is D.Type) // CHECK: true
+print(#line, "type comparisons:\n")
+print(#line, allMetasToAllMetas(Int.self, Int.self)) // CHECK: [[@LINE]] true
+print(#line, allMetasToAllMetas(Int.self, Float.self)) // CHECK: [[@LINE]] false
+print(#line, allMetasToAllMetas(C.self, C.self)) // CHECK: [[@LINE]] true
+print(#line, allMetasToAllMetas(D.self, C.self)) // CHECK: [[@LINE]] true
+print(#line, allMetasToAllMetas(C.self, D.self)) // CHECK: [[@LINE]] false
+print(#line, C.self is D.Type) // CHECK: [[@LINE]] false
+print(#line, (D.self as C.Type) is D.Type) // CHECK: [[@LINE]] true
 
 let t: Any.Type = type(of: 1 as Any)
-print(t is Int.Type) // CHECK: true
-print(t is Float.Type) // CHECK: false
-print(t is C.Type) // CHECK: false
+print(#line, t is Int.Type) // CHECK: [[@LINE]] true
+print(#line, t is Float.Type) // CHECK: [[@LINE]] false
+print(#line, t is C.Type) // CHECK: [[@LINE]] false
 
 let u: Any.Type = type(of: (D() as Any))
-print(u is C.Type) // CHECK: true
-print(u is D.Type) // CHECK: true
-print(u is E.Type) // CHECK: false
-print(u is Int.Type) // CHECK: false
+print(#line, u is C.Type) // CHECK: [[@LINE]] true
+print(#line, u is D.Type) // CHECK: [[@LINE]] true
+print(#line, u is E.Type) // CHECK: [[@LINE]] false
+print(#line, u is Int.Type) // CHECK: [[@LINE]] false
 
 // FIXME: Can't spell AnyObject.Protocol
 // CHECK-LABEL: AnyObject casts:
-print("AnyObject casts:")
-print(allToAll(C(), AnyObject.self)) // CHECK: true
+print(#line, "AnyObject casts:")
+print(#line, allToAll(C(), AnyObject.self)) // CHECK: [[@LINE]] true
 
 // On Darwin, the object will be the ObjC-runtime-class object;
 // out of Darwin, this should not succeed.
-print(allToAll(type(of: C()), AnyObject.self)) 
+print(#line, allToAll(type(of: C()), AnyObject.self))
 // CHECK-objc: true
 // CHECK-native: false
 
 // Bridging
 // NSNumber on Darwin, __SwiftValue on Linux.
-print(allToAll(0, AnyObject.self)) // CHECK: true
+print(#line, allToAll(0, AnyObject.self)) // CHECK: [[@LINE]] true
 
 // This will get bridged using __SwiftValue.
 struct NotBridged { var x: Int }
-print(allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK: true
+print(#line, allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK: [[@LINE]] true
 
 #if canImport(Foundation)
 // This requires Foundation (for NSCopying):
-print(allToAll(NotBridged(x: 0), NSCopying.self)) // CHECK-objc: true
+print(#line, allToAll(NotBridged(x: 0), NSCopying.self)) // CHECK-objc: [[@LINE]] true
 #endif
 
 // On Darwin, these casts fail (intentionally) even though __SwiftValue does
 // technically conform to these protocols through NSObject.
 // Off Darwin, it should not conform at all.
-print(allToAll(NotBridged(x: 0), CustomStringConvertible.self)) // CHECK: false
-print(allToAll(NotBridged(x: 0), (AnyObject & CustomStringConvertible).self)) // CHECK: false
+print(#line, allToAll(NotBridged(x: 0), CustomStringConvertible.self)) // CHECK: [[@LINE]] false
+print(#line, allToAll(NotBridged(x: 0), (AnyObject & CustomStringConvertible).self)) // CHECK: [[@LINE]] false
 
 #if canImport(Foundation)
 // This requires Foundation (for NSArray):
@@ -362,5 +389,5 @@ func swiftOptimizesThisFunctionIncorrectly() -> Bool {
 }
 
 let result = swiftOptimizesThisFunctionIncorrectly()
-print("Bridge cast result: \(result)") // CHECK-NEXT-objc: Bridge cast result: true
+print(#line, "Bridge cast result: \(result)") // CHECK-NEXT-objc: Bridge cast result: true
 #endif
