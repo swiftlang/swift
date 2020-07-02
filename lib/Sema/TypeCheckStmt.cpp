@@ -319,8 +319,6 @@ public:
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
   FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
 
-  SourceLoc TargetTypeCheckLoc;
-
   /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
 
@@ -511,7 +509,7 @@ public:
     
     TypeCheckExprOptions options = {};
     
-    if (TargetTypeCheckLoc.isValid()) {
+    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
       options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
@@ -1558,7 +1556,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
         (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
     if (isDiscarded)
       options |= TypeCheckExprFlags::IsDiscarded;
-    if (TargetTypeCheckLoc.isValid())
+    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode)
       options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
     auto resultTy =
@@ -1618,29 +1616,17 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     }
   }
 
-  const SourceManager &SM = getASTContext().SourceMgr;
-  for (auto &elem : BS->getElements()) {
-    if (TargetTypeCheckLoc.isValid()) {
-      if (SM.isBeforeInBuffer(TargetTypeCheckLoc, elem.getStartLoc()))
-        break;
-
-      // NOTE: We need to check the character loc here because the target loc
-      // can be inside the last token of the node. i.e. string interpolation.
-      SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, elem.getEndLoc());
-      if (endLoc == TargetTypeCheckLoc ||
-          SM.isBeforeInBuffer(endLoc, TargetTypeCheckLoc))
-        continue;
-    }
-
+  for (auto &elem : BS->getElements())
     typeCheckASTNode(elem);
-  }
 
   return BS;
 }
 
 void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC) {
   StmtChecker stmtChecker(DC);
-  stmtChecker.TargetTypeCheckLoc = node.getStartLoc();
+  // FIXME: 'ActiveLabeledStmts', 'SwitchLevel', etc. in StmtChecker are not
+  // populated. Since they don't affect "type checking", it's doesn't cause
+  // any issue for now. But it should be populated nonetheless.
   stmtChecker.typeCheckASTNode(node);
 }
 
@@ -1863,7 +1849,11 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
                                             DeclContext *DC,
                                             SourceLoc Loc) const {
   auto &ctx = DC->getASTContext();
+  assert(DiagnosticSuppression::isEnabled(ctx.Diags) &&
+         "Diagnosing and Single ASTNode type checknig don't mix");
 
+  // Find innermost ASTNode at Loc from DC. Results the reference to the found
+  // ASTNode and the decl context of it.
   class ASTNodeFinder : public ASTWalker {
     SourceManager &SM;
     SourceLoc Loc;
