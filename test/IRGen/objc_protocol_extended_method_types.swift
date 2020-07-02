@@ -99,26 +99,26 @@ print(P.self)
 // CHECK-JIT: [[NEW_PROTOCOL:%.+]] = call %swift.protocol* @objc_allocateProtocol(i8* getelementptr inbounds ([45 x i8], [45 x i8]* @2, i64 0, i64 0))
 // -- requiredInstanceMethod:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredInstanceMethod:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 // -- optionalInstanceMethod:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(optionalInstanceMethod:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), i8 0, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), {{(i8 0|i1 false)}}, {{(i8 1|i1 true)}})
 // -- requiredClassMethod:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredClassMethod:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), i8 1, i8 0)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 0|i1 false)}})
 // -- optionalClassMethod:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(optionalClassMethod:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_VOID_ID]], i64 0, i64 0), i8 0, i8 0)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_VOID_ID]], i64 0, i64 0), {{(i8 0|i1 false)}}, {{(i8 0|i1 false)}})
 // -- requiredInstanceProperty
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredInstanceProperty)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 
 // Make sure we don't emit storage accessors multiple times.
 // CHECK-JIT-NOT: requiredInstanceProperty
 
 // -- setRequiredInstanceProperty:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(setRequiredInstanceProperty:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_VOID_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_VOID_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 
 // Make sure we don't emit storage accessors multiple times.
 // CHECK-JIT-NOT: requiredInstanceProperty
@@ -126,34 +126,34 @@ print(P.self)
 
 // -- requiredROInstanceProperty
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredROInstanceProperty)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 // -- requiredInstanceMethod2:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredInstanceMethod2:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 // -- optionalInstanceMethod2:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(optionalInstanceMethod2:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), i8 0, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), {{(i8 0|i1 false)}}, {{(i8 1|i1 true)}})
 // -- requiredClassMethod2:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredClassMethod2:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), i8 1, i8 0)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 0|i1 false)}})
 // -- optionalClassMethod2:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(optionalClassMethod2:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_VOID_ID]], i64 0, i64 0), i8 0, i8 0)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_VOID_ID]], i64 0, i64 0), {{(i8 0|i1 false)}}, {{(i8 0|i1 false)}})
 // -- requiredInstanceProperty2
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredInstanceProperty2)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 // -- setRequiredInstanceProperty2:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(setRequiredInstanceProperty2:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_VOID_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_VOID_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 // -- requiredROInstanceProperty2
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(requiredROInstanceProperty2)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 // -- objectAtIndexedSubscript:
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(objectAtIndexedSubscript:)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_INT_INT]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_INT_INT]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 // -- init
 // CHECK-JIT: [[SELECTOR:%.+]] = call i8* @sel_registerName(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(init)", i64 0, i64 0))
-// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), i8 1, i8 1)
+// CHECK-JIT: call void @protocol_addMethodDescription(%swift.protocol* [[NEW_PROTOCOL]], i8* [[SELECTOR]], i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[TY_ID]], i64 0, i64 0), {{(i8 1|i1 true)}}, {{(i8 1|i1 true)}})
 // CHECK-JIT: call void @objc_registerProtocol(%swift.protocol* [[NEW_PROTOCOL]])
 // CHECK-JIT: br label %[[FINISH_LABEL]]
 

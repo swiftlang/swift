@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -target x86_64-apple-macosx10.50 | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -target x86_64-apple-macosx10.60 | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.60 | %FileCheck %s
 // REQUIRES: OS=macosx
 
 // CHECK-LABEL: sil [available 10.50] [ossa] @$s22availability_attribute17availableFunctionyyF : $@convention(thin) () -> ()

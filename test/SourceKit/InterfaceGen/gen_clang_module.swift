@@ -69,7 +69,7 @@ var x: FooClassBase
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-IFACE %s
 
 // CHECK-IFACE: DOC: (/<interface-gen>)
-// CHECK-IFACE: ARGS: [-target x86_64-{{.*}} -sdk {{.*}} -F {{.*}}/libIDE-mock-sdk -I {{.*}}.overlays {{.*}} -module-cache-path {{.*}} ]
+// CHECK-IFACE: ARGS: [-target {{.*}}-{{.*}} -sdk {{.*}} -F {{.*}}/libIDE-mock-sdk -I {{.*}}.overlays {{.*}} -module-cache-path {{.*}} ]
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \

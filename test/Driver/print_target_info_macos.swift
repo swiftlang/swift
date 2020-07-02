@@ -7,5 +7,5 @@
 
 // REQUIRES: OS=macosx
 
-// CHECK: "triple": "x86_64-apple-macosx10
-// CHECK: "unversionedTriple": "x86_64-apple-macosx"
+// CHECK: "triple": "{{.*}}-apple-macosx10
+// CHECK: "unversionedTriple": "{{.*}}-apple-macosx"

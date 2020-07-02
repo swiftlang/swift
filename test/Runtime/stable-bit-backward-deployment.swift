@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // -- Deployment target is set to pre-10.14.4 so that we use the "old"
 //    Swift runtime bit in compiler-emitted classes
-// RUN: %target-build-swift -target x86_64-apple-macosx10.9 %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -target %target-cpu-apple-macosx10.9 %s -module-name main -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
