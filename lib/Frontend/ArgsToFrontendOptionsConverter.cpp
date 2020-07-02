@@ -89,8 +89,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
-  Opts.DisableInterfaceFileLock |= Args.hasArg(OPT_disable_interface_lockfile);
-
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();
@@ -141,6 +139,15 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::NoneAction) {
     Opts.RequestedAction = determineRequestedAction(Args);
+  }
+
+  if (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface) {
+    // The situations where we use this action, e.g. explicit module building and
+    // generating prebuilt module cache, don't need synchronization. We should avoid
+    // using lock files for them.
+    Opts.DisableInterfaceFileLock = true;
+  } else {
+    Opts.DisableInterfaceFileLock |= Args.hasArg(OPT_disable_interface_lockfile);
   }
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
