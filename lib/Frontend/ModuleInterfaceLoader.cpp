@@ -508,17 +508,91 @@ class ModuleInterfaceLoaderImpl {
     return true;
   }
 
+  Optional<StringRef>
+  computePrebuiltModulePath(llvm::SmallString<256> &scratch) {
+    namespace path = llvm::sys::path;
+    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
+
+    // Check if the interface file comes from the SDK
+    if (sdkPath.empty() || !hasPrefix(path::begin(interfacePath),
+                                      path::end(interfacePath),
+                                      path::begin(sdkPath),
+                                      path::end(sdkPath)))
+      return None;
+
+    // Assemble the expected path: $PREBUILT_CACHE/Foo.swiftmodule or
+    // $PREBUILT_CACHE/Foo.swiftmodule/arch.swiftmodule. Note that there's no
+    // cache key here.
+    scratch = prebuiltCacheDir;
+
+    // FIXME: Would it be possible to only have architecture-specific names
+    // here? Then we could skip this check.
+    StringRef inParentDirName =
+      path::filename(path::parent_path(interfacePath));
+    if (path::extension(inParentDirName) == ".swiftmodule") {
+      assert(path::stem(inParentDirName) == moduleName);
+      path::append(scratch, inParentDirName);
+    }
+    path::append(scratch, path::filename(modulePath));
+
+    // If there isn't a file at this location, skip returning a path.
+    if (!fs.exists(scratch))
+      return None;
+
+    return scratch.str();
+  }
+
+  /// Hack to deal with build systems (including the Swift standard library, at
+  /// the time of this comment) that aren't yet using target-specific names for
+  /// multi-target swiftmodules, in case the prebuilt cache is.
+  Optional<StringRef>
+  computeFallbackPrebuiltModulePath(llvm::SmallString<256> &scratch) {
+    namespace path = llvm::sys::path;
+    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
+
+    // Check if the interface file comes from the SDK
+    if (sdkPath.empty() || !hasPrefix(path::begin(interfacePath),
+                                      path::end(interfacePath),
+                                      path::begin(sdkPath),
+                                      path::end(sdkPath)))
+      return None;
+
+    // If the module isn't target-specific, there's no fallback path.
+    StringRef inParentDirName =
+        path::filename(path::parent_path(interfacePath));
+    if (path::extension(inParentDirName) != ".swiftmodule")
+      return None;
+
+    // If the interface is already using the target-specific name, there's
+    // nothing else to try.
+    auto normalizedTarget = getTargetSpecificModuleTriple(ctx.LangOpts.Target);
+    if (path::stem(modulePath) == normalizedTarget.str())
+      return None;
+
+    // Assemble the expected path:
+    // $PREBUILT_CACHE/Foo.swiftmodule/target.swiftmodule. Note that there's no
+    // cache key here.
+    scratch = prebuiltCacheDir;
+    path::append(scratch, inParentDirName);
+    path::append(scratch, normalizedTarget.str());
+    scratch += ".swiftmodule";
+
+    // If there isn't a file at this location, skip returning a path.
+    if (!fs.exists(scratch))
+      return None;
+
+    return scratch.str();
+  }
+
   bool isInResourceDir(StringRef path) {
     StringRef resourceDir = ctx.SearchPathOpts.RuntimeResourcePath;
     if (resourceDir.empty()) return false;
     return path.startswith(resourceDir);
   }
 
-  /// Finds the most appropriate .swiftmodule, whose dependencies are up to
-  /// date, that we can load for the provided .swiftinterface file.
-  llvm::ErrorOr<DiscoveredModule> discoverUpToDateModuleForInterface(
-    StringRef modulePath, StringRef cachedOutputPath,
-    SmallVectorImpl<FileDependency> &deps) {
+  llvm::ErrorOr<DiscoveredModule>
+  discoverUpToDateCompiledModuleForInterface(SmallVectorImpl<FileDependency> &deps,
+                                             std::string &UsableModulePath) {
     auto notFoundError =
       std::make_error_code(std::errc::no_such_file_or_directory);
 
@@ -543,7 +617,90 @@ class ModuleInterfaceLoaderImpl {
     case ModuleLoadingMode::OnlySerialized:
       llvm_unreachable("module interface loader should not have been created");
     }
+    // [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]
+    // If there's a module adjacent to the .swiftinterface that we can
+    // _likely_ load (it validates OK and is up to date), bail early with
+    // errc::not_supported, so the next (serialized) loader in the chain will
+    // load it.
+    // Alternately, if there's a .swiftmodule present but we can't even
+    // read it (for whatever reason), we should let the other module loader
+    // diagnose it.
 
+    if (shouldLoadAdjacentModule) {
+      auto adjacentModuleBuffer = fs.getBufferForFile(modulePath);
+      if (adjacentModuleBuffer) {
+        if (serializedASTBufferIsUpToDate(modulePath, *adjacentModuleBuffer.get(),
+                                          deps)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
+                                  << modulePath
+                                  << "; deferring to serialized module loader\n");
+          UsableModulePath = modulePath.str();
+          return std::make_error_code(std::errc::not_supported);
+        } else if (isInResourceDir(modulePath) &&
+                   loadMode == ModuleLoadingMode::PreferSerialized) {
+          // Special-case here: If we're loading a .swiftmodule from the resource
+          // dir adjacent to the compiler, defer to the serialized loader instead
+          // of falling back. This is mainly to support development of Swift,
+          // where one might change the module format version but forget to
+          // recompile the standard library. If that happens, don't fall back
+          // and silently recompile the standard library -- instead, error like
+          // we used to.
+          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module in the "
+                                     "resource-dir at "
+                                  << modulePath
+                                  << "; deferring to serialized module loader "
+                                     "to diagnose\n");
+          return std::make_error_code(std::errc::not_supported);
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "
+                                  << modulePath << "\n");
+          rebuildInfo.setModuleKind(modulePath,
+                                    ModuleRebuildInfo::ModuleKind::Normal);
+        }
+      } else if (adjacentModuleBuffer.getError() != notFoundError) {
+        LLVM_DEBUG(llvm::dbgs() << "Found unreadable module at "
+                                << modulePath
+                                << "; deferring to serialized module loader\n");
+        return std::make_error_code(std::errc::not_supported);
+      }
+    }
+
+    // If we have a prebuilt cache path, check that too if the interface comes
+    // from the SDK.
+    if (!prebuiltCacheDir.empty()) {
+      llvm::SmallString<256> scratch;
+      std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+      Optional<StringRef> path = computePrebuiltModulePath(scratch);
+      if (!path) {
+        // Hack: deal with prebuilds of modules that still use the target-based
+        // names.
+        path = computeFallbackPrebuiltModulePath(scratch);
+      }
+      if (path) {
+        if (swiftModuleIsUpToDate(*path, deps, moduleBuffer)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found up-to-date prebuilt module at "
+                                  << path->str() << "\n");
+          UsableModulePath = path->str();
+          return DiscoveredModule::prebuilt(*path, std::move(moduleBuffer));
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date prebuilt module at "
+                                  << path->str() << "\n");
+          rebuildInfo.setModuleKind(*path,
+                                    ModuleRebuildInfo::ModuleKind::Prebuilt);
+        }
+      }
+    }
+
+    // Couldn't find an up-to-date .swiftmodule, will need to build module from
+    // interface.
+    return notFoundError;
+  }
+
+  /// Finds the most appropriate .swiftmodule, whose dependencies are up to
+  /// date, that we can load for the provided .swiftinterface file.
+  llvm::ErrorOr<DiscoveredModule> discoverUpToDateModuleForInterface(
+    StringRef cachedOutputPath,
+    SmallVectorImpl<FileDependency> &deps) {
 
     // First, check the cached module path. Whatever's in this cache represents
     // the most up-to-date knowledge we have about the module.
@@ -586,82 +743,8 @@ class ModuleInterfaceLoaderImpl {
                                   ModuleRebuildInfo::ModuleKind::Cached);
       }
     }
-
-    // [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]
-    // If there's a module adjacent to the .swiftinterface that we can
-    // _likely_ load (it validates OK and is up to date), bail early with
-    // errc::not_supported, so the next (serialized) loader in the chain will
-    // load it.
-    // Alternately, if there's a .swiftmodule present but we can't even
-    // read it (for whatever reason), we should let the other module loader
-    // diagnose it.
-
-    if (shouldLoadAdjacentModule) {
-      auto adjacentModuleBuffer = fs.getBufferForFile(modulePath);
-      if (adjacentModuleBuffer) {
-        if (serializedASTBufferIsUpToDate(modulePath, *adjacentModuleBuffer.get(),
-                                          deps)) {
-          LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
-                                  << modulePath
-                                  << "; deferring to serialized module loader\n");
-          return std::make_error_code(std::errc::not_supported);
-        } else if (isInResourceDir(modulePath) &&
-                   loadMode == ModuleLoadingMode::PreferSerialized) {
-          // Special-case here: If we're loading a .swiftmodule from the resource
-          // dir adjacent to the compiler, defer to the serialized loader instead
-          // of falling back. This is mainly to support development of Swift,
-          // where one might change the module format version but forget to
-          // recompile the standard library. If that happens, don't fall back
-          // and silently recompile the standard library -- instead, error like
-          // we used to.
-          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module in the "
-                                     "resource-dir at "
-                                  << modulePath
-                                  << "; deferring to serialized module loader "
-                                     "to diagnose\n");
-          return std::make_error_code(std::errc::not_supported);
-        } else {
-          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "
-                                  << modulePath << "\n");
-          rebuildInfo.setModuleKind(modulePath,
-                                    ModuleRebuildInfo::ModuleKind::Normal);
-        }
-      } else if (adjacentModuleBuffer.getError() != notFoundError) {
-        LLVM_DEBUG(llvm::dbgs() << "Found unreadable module at "
-                                << modulePath
-                                << "; deferring to serialized module loader\n");
-        return std::make_error_code(std::errc::not_supported);
-      }
-    }
-
-    // If we have a prebuilt cache path, check that too if the interface comes
-    // from the SDK.
-    if (!prebuiltCacheDir.empty()) {
-      llvm::SmallString<256> scratch;
-      std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-      Optional<StringRef> path = computePrebuiltModulePath(ctx,
-                                                           interfacePath,
-                                                           prebuiltCacheDir,
-                                                           moduleName,
-                                                           scratch);
-
-      if (path) {
-        if (swiftModuleIsUpToDate(*path, deps, moduleBuffer)) {
-          LLVM_DEBUG(llvm::dbgs() << "Found up-to-date prebuilt module at "
-                                  << path->str() << "\n");
-          return DiscoveredModule::prebuilt(*path, std::move(moduleBuffer));
-        } else {
-          LLVM_DEBUG(llvm::dbgs() << "Found out-of-date prebuilt module at "
-                                  << path->str() << "\n");
-          rebuildInfo.setModuleKind(*path,
-                                    ModuleRebuildInfo::ModuleKind::Prebuilt);
-        }
-      }
-    }
-
-    // Couldn't find an up-to-date .swiftmodule, will need to build module from
-    // interface.
-    return notFoundError;
+    std::string usableModulePath;
+    return discoverUpToDateCompiledModuleForInterface(deps, usableModulePath);
   }
 
   /// Writes the "forwarding module" that will forward to a module in the
@@ -771,7 +854,7 @@ class ModuleInterfaceLoaderImpl {
     // in the cache, or in the prebuilt cache.
     SmallVector<FileDependency, 16> allDeps;
     auto moduleOrErr =
-      discoverUpToDateModuleForInterface(modulePath, cachedOutputPath, allDeps);
+      discoverUpToDateModuleForInterface(cachedOutputPath, allDeps);
 
     // If we errored with anything other than 'no such file or directory',
     // fail this load and let the other module loader diagnose it.
@@ -917,6 +1000,25 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
+std::string
+ModuleInterfaceLoader::getUpToDateCompiledModuleForInterface(StringRef moduleName,
+                                                      StringRef interfacePath) {
+  // Derive .swiftmodule path from the .swiftinterface path.
+  auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
+  llvm::SmallString<32> modulePath = interfacePath;
+  llvm::sys::path::replace_extension(modulePath, newExt);
+  ModuleInterfaceLoaderImpl Impl(
+                Ctx, modulePath, interfacePath, moduleName,
+                CacheDir, PrebuiltCacheDir, SourceLoc(),
+                Opts,
+                dependencyTracker,
+                llvm::is_contained(PreferInterfaceForModules, moduleName) ?
+                  ModuleLoadingMode::PreferInterface : LoadMode);
+  SmallVector<FileDependency, 16> allDeps;
+  std::string usableModulePath;
+  Impl.discoverUpToDateCompiledModuleForInterface(allDeps, usableModulePath);
+  return usableModulePath;
+}
 
 bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,

@@ -504,7 +504,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
         LoaderOpts,
         IgnoreSourceInfoFile);
-    Context->addModuleLoader(std::move(PIML));
+    Context->addModuleLoader(std::move(PIML), false, false, true);
   }
 
   std::unique_ptr<SerializedModuleLoader> SML =
