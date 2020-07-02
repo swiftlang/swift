@@ -278,6 +278,9 @@ struct ASTContext::Implementation {
   /// The module loader used to load Clang modules from DWARF.
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
 
+  /// The module loader used to load Swift textual interface.
+  ModuleLoader *TheModuleInterfaceLoader = nullptr;
+
   /// Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
 
@@ -1618,14 +1621,15 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                                 bool IsClang, bool IsDwarf) {
+                                 bool IsClang, bool IsDwarf, bool IsInterface) {
   if (IsClang && !IsDwarf && !getImpl().TheClangModuleLoader)
     getImpl().TheClangModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
   if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
     getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
-
+  if (IsInterface && !getImpl().TheModuleInterfaceLoader)
+    getImpl().TheModuleInterfaceLoader = loader.get();
   getImpl().ModuleLoaders.push_back(std::move(loader));
 }
 
@@ -1698,6 +1702,10 @@ ClangModuleLoader *ASTContext::getClangModuleLoader() const {
 
 ClangModuleLoader *ASTContext::getDWARFModuleLoader() const {
   return getImpl().TheDWARFModuleLoader;
+}
+
+ModuleLoader *ASTContext::getModuleInterfaceLoader() const {
+  return getImpl().TheModuleInterfaceLoader;
 }
 
 ModuleDecl *ASTContext::getLoadedModule(

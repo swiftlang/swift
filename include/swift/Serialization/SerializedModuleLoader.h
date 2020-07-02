@@ -200,6 +200,11 @@ public:
   virtual Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
+
+  virtual std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
+                                                      StringRef interfacePath) {
+    return std::string();
+  }
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -445,12 +450,7 @@ public:
   }
 };
 
-Optional<StringRef>
-computePrebuiltModulePath(ASTContext &ctx,
-                          StringRef interfacePath,
-                          StringRef prebuiltCacheDir,
-                          StringRef moduleName,
-                          llvm::SmallString<256> &scratch);
+
 } // end namespace swift
 
 #endif
