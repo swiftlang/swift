@@ -1043,21 +1043,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       return true;
     }
   }
-  if (Args.hasArg(OPT_sil_existential_specializer)) {
-    Opts.ExistentialSpecializer = true;
-  }
-  if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
-    if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      return true;
-    }
-    if (environmentVariableRequestedMaximumDeterminism()) {
-      Opts.NumThreads = 1;
-      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
-                     "-num-threads");
-    }
-  }
 
   // If we're only emitting a module, stop optimizations once we've serialized
   // the SIL for the module.
@@ -1262,7 +1247,7 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
                             CompilerInvocation &Invocation) {
   using namespace options;
 
-  Opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  Opts.HasMultipleIGMs = Invocation.getIRGenOptions().hasMultipleIGMs();
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
     Opts.ModuleLinkName = A->getValue();
@@ -1594,6 +1579,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
         getRuntimeCompatVersion();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
+    if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+    if (environmentVariableRequestedMaximumDeterminism()) {
+      Opts.NumThreads = 1;
+      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
+                     "-num-threads");
+    }
   }
 
   return false;
