@@ -408,6 +408,8 @@ public:
     S->walk(ContextualizeClosures(DC));
     return HadError;
   }
+
+  void typeCheckASTNode(ASTNode &node);
   
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -1538,6 +1540,57 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     .highlight(valueE->getSourceRange());
 }
 
+void StmtChecker::typeCheckASTNode(ASTNode &node) {
+  // Type check the expression
+  if (auto *E = node.dyn_cast<Expr *>()) {
+    auto &ctx = DC->getASTContext();
+
+    TypeCheckExprOptions options = TypeCheckExprFlags::IsExprStmt;
+    bool isDiscarded =
+        (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
+    if (isDiscarded)
+      options |= TypeCheckExprFlags::IsDiscarded;
+    if (TargetTypeCheckLoc.isValid())
+      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+
+    auto resultTy =
+        TypeChecker::typeCheckExpression(E, DC, Type(), CTP_Unused, options);
+
+    // If a closure expression is unused, the user might have intended to write
+    // "do { ... }".
+    auto *CE = dyn_cast<ClosureExpr>(E);
+    if (CE || isa<CaptureListExpr>(E)) {
+      ctx.Diags.diagnose(E->getLoc(), diag::expression_unused_closure);
+
+      if (CE && CE->hasAnonymousClosureVars() &&
+          CE->getParameters()->size() == 0) {
+        ctx.Diags.diagnose(CE->getStartLoc(), diag::brace_stmt_suggest_do)
+            .fixItInsert(CE->getStartLoc(), "do ");
+      }
+    } else if (isDiscarded && resultTy) {
+      TypeChecker::checkIgnoredExpr(E);
+    }
+
+    node = E;
+    return;
+  }
+
+  // Type check the statement.
+  if (auto *S = node.dyn_cast<Stmt *>()) {
+    typeCheckStmt(S);
+    node = S;
+    return;
+  }
+
+  // Type check the declaration.
+  if (auto *D = node.dyn_cast<Decl *>()) {
+    TypeChecker::typeCheckDecl(D);
+    return;
+  }
+
+  llvm_unreachable("Type checking null ASTNode");
+}
+
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   const SourceManager &SM = getASTContext().SourceMgr;
 
@@ -1569,52 +1622,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         continue;
     }
 
-    if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
-      // Type check the expression.
-      TypeCheckExprOptions options = TypeCheckExprFlags::IsExprStmt;
-      bool isDiscarded = (!getASTContext().LangOpts.Playground &&
-                          !getASTContext().LangOpts.DebuggerSupport);
-      if (isDiscarded)
-        options |= TypeCheckExprFlags::IsDiscarded;
-
-      if (TargetTypeCheckLoc.isValid()) {
-        assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
-               "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
-        options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
-      }
-
-      auto resultTy =
-          TypeChecker::typeCheckExpression(SubExpr, DC, Type(),
-                                           CTP_Unused, options);
-
-      // If a closure expression is unused, the user might have intended
-      // to write "do { ... }".
-      auto *CE = dyn_cast<ClosureExpr>(SubExpr);
-      if (CE || isa<CaptureListExpr>(SubExpr)) {
-        getASTContext().Diags.diagnose(SubExpr->getLoc(),
-                                       diag::expression_unused_closure);
-        
-        if (CE && CE->hasAnonymousClosureVars() &&
-            CE->getParameters()->size() == 0) {
-          getASTContext().Diags.diagnose(CE->getStartLoc(),
-                                         diag::brace_stmt_suggest_do)
-            .fixItInsert(CE->getStartLoc(), "do ");
-        }
-      } else if (isDiscarded && resultTy)
-        TypeChecker::checkIgnoredExpr(SubExpr);
-
-      elem = SubExpr;
-      continue;
-    }
-
-    if (auto *SubStmt = elem.dyn_cast<Stmt*>()) {
-      typeCheckStmt(SubStmt);
-      elem = SubStmt;
-      continue;
-    }
-
-    Decl *SubDecl = elem.get<Decl *>();
-    TypeChecker::typeCheckDecl(SubDecl);
+    typeCheckASTNode(elem);
   }
 
   return BS;
