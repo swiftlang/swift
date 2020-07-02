@@ -180,11 +180,11 @@ public:
   /// Describe the module dependencies for a Swift module that can be
   /// built from a Swift interface file (\c .swiftinterface).
   static ModuleDependencies forSwiftInterface(
-      const std::string &compiledModulePath,
       const std::string &swiftInterfaceFile,
       ArrayRef<StringRef> buildCommands,
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash) {
+    std::string compiledModulePath;
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
           compiledModulePath, swiftInterfaceFile, buildCommands,
@@ -201,9 +201,8 @@ public:
   }
 
   /// Describe the main Swift module.
-  static ModuleDependencies forMainSwiftModule(
-      const std::string &compiledModulePath,
-      ArrayRef<StringRef> extraPCMArgs) {
+  static ModuleDependencies forMainSwiftModule(ArrayRef<StringRef> extraPCMArgs) {
+    std::string compiledModulePath;
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
           compiledModulePath, None, ArrayRef<StringRef>(), extraPCMArgs,
