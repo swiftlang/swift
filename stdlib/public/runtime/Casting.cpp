@@ -1189,13 +1189,6 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
     }
     break;
 
-  case MetadataKind::Existential: {
-    auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
-    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
-      return origSourceType;
-    return nullptr;
-  }
-
   default:
     return nullptr;
   }
