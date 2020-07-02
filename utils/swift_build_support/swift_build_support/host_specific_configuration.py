@@ -10,6 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
+import re
 import sys
 from argparse import ArgumentError
 
@@ -155,11 +156,13 @@ class HostSpecificConfiguration(object):
 
                 # Support for running the macCatalyst tests with
                 # the iOS-like target triple.
-                if name == "macosx-x86_64" and args.maccatalyst \
+                macosx_platform_match = re.search("macosx-(.*)", name)
+                if macosx_platform_match and args.maccatalyst \
                    and args.maccatalyst_ios_tests:
                     (self.swift_test_run_targets
-                     .append("check-swift{}{}-{}".format(
-                         subset_suffix, suffix, "macosx-maccatalyst-x86_64")))
+                     .append("check-swift{}{}-{}-{}".format(
+                         subset_suffix, suffix, "macosx-maccatalyst",
+                         macosx_platform_match.group(1))))
                 else:
                     (self.swift_test_run_targets
                      .append("check-swift{}{}-{}".format(
