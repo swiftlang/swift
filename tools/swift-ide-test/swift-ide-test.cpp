@@ -1318,6 +1318,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
   Invocation.setInputKind(InputFileKind::Swift);
+  Invocation.getTypeCheckerOptions().TypeCheckSingleASTNode = true;
 
   CompilerInstance CI;
 

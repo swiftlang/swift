@@ -520,6 +520,9 @@ bool CompletionInstance::performNewOperation(
 
     Invocation.setCodeCompletionPoint(completionBuffer, Offset);
 
+    // Enable single ASTNode type checking mode.
+    Invocation.getTypeCheckerOptions().TypeCheckSingleASTNode = true;
+
     if (CI.setup(Invocation)) {
       Error = "failed to setup compiler instance";
       return false;

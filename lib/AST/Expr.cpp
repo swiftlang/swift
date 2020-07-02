@@ -2398,6 +2398,15 @@ VarDecl * TapExpr::getVar() const {
   return dyn_cast<VarDecl>(Body->getFirstElement().dyn_cast<Decl *>());
 }
 
+SourceLoc TapExpr::getStartLoc() const {
+  // Include the body in the range, assuming the body follows the SubExpr.
+  if (auto *const se = getSubExpr())
+    return se->getStartLoc();
+  if (auto *const b = getBody())
+    return b->getStartLoc();
+  return SourceLoc();
+}
+
 SourceLoc TapExpr::getEndLoc() const {
   // Include the body in the range, assuming the body follows the SubExpr.
   // Also, be (perhaps overly) defensive about null pointers & invalid

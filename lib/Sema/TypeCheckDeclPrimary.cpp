@@ -2243,7 +2243,9 @@ public:
       }
     }
 
-    if (requiresDefinition(FD) && !FD->hasBody()) {
+    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
+      // DO nothing.
+    } else if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       FD->diagnose(diag::func_decl_without_brace);
     } else if (FD->getDeclContext()->isLocalContext()) {
@@ -2594,7 +2596,9 @@ public:
   void visitDestructorDecl(DestructorDecl *DD) {
     TypeChecker::checkDeclAttributes(DD);
 
-    if (DD->getDeclContext()->isLocalContext()) {
+    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
+      // DO nothing.
+    } else if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TypeChecker::typeCheckAbstractFunctionBody(DD);
     } else if (shouldSkipBodyTypechecking(DD)) {
