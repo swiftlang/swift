@@ -21,15 +21,13 @@ func indirectUse() {
 func forceUnwrap(_ x: ()?) {
 // BOTH-LABEL: sil {{.*}} @$s3Foo11forceUnwrapyyytSgF
   _ = x!
-// ABSOLUTE: string_literal utf8 "SOURCE_DIR/test/SILGen/magic_identifier_file.swift"
-// CONCISE: string_literal utf8 "Foo/magic_identifier_file.swift"
+// BOTH: string_literal utf8 "Foo/magic_identifier_file.swift"
 }
 
 func forceTry(_ fn: () throws -> ()) {
 // BOTH-LABEL: sil {{.*}} @$s3Foo8forceTryyyyyKXEF
   try! fn()
-// ABSOLUTE: string_literal utf8 "SOURCE_DIR/test/SILGen/magic_identifier_file.swift"
-// CONCISE: string_literal utf8 "Foo/magic_identifier_file.swift"
+// BOTH: string_literal utf8 "Foo/magic_identifier_file.swift"
 }
 
 // CONCISE-LABEL: // Mappings from '#fileID' to '#filePath':
