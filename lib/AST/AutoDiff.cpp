@@ -505,9 +505,9 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
         TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable);
   }
   // Get the parent `TangentVector` type.
-  auto memberSubs = baseType->getMemberSubstitutionMap(
-      originalField->getModuleContext(), originalField);
-  auto parentTanType = parentTan->getType().subst(memberSubs);
+  auto parentTanType =
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl))
+          ->getType();
   auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
   // Error if parent `TangentVector` is not a struct.
   if (!parentTanStruct) {
