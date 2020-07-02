@@ -8,6 +8,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
+// REQUIRES: swift_interpreter
 
 print(mavericks()) // CHECK: {{^9$}}
 print(yosemite()) // CHECK-NEXT: {{^10$}}
