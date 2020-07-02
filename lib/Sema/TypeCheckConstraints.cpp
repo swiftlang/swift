@@ -2311,28 +2311,44 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 }
 
 bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
+  auto &Context = dc->getASTContext();
+
+  auto failed = [&]() -> bool {
+    // Invalidate the pattern and the var decl.
+    stmt->getPattern()->setType(ErrorType::get(Context));
+    stmt->getPattern()->forEachVariable([&](VarDecl *var) {
+      if (var->hasInterfaceType() && !var->getType()->hasError())
+        return;
+      var->setInvalid();
+    });
+    return true;
+  };
+
   auto sequenceProto = TypeChecker::getProtocol(
       dc->getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
   if (!sequenceProto)
-    return true;
+    return failed();
 
   // Precheck the sequence.
   Expr *sequence = stmt->getSequence();
   if (ConstraintSystem::preCheckExpression(sequence, dc))
-    return true;
+    return failed();
   stmt->setSequence(sequence);
 
   // Precheck the filtering condition.
   if (Expr *whereExpr = stmt->getWhere()) {
     if (ConstraintSystem::preCheckExpression(whereExpr, dc))
-      return true;
+      return failed();
 
     stmt->setWhere(whereExpr);
   }
 
   auto target = SolutionApplicationTarget::forForEachStmt(
       stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
-  return !typeCheckExpression(target);
+  if (!typeCheckExpression(target))
+    return failed();
+
+  return false;
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
