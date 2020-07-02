@@ -2007,6 +2007,8 @@ NodePointer Demangler::demangleArchetype() {
     if (!demangleBoundGenerics(boundGenericArgs, retroactiveConformances))
       return nullptr;
     auto Name = popNode();
+    if (!Name)
+      return nullptr;
     auto opaque = createWithChildren(Node::Kind::OpaqueType, Name,
                                    createNode(Node::Kind::Index, index));
     auto boundGenerics = createNode(Node::Kind::TypeList);
