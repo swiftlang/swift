@@ -16,14 +16,15 @@
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 // SWIFT_ENABLE_TENSORFLOW
 // This test is currently unsupported because the addition of `+` operators
 // to the stdlib (via `VectorProtocol`) causes type-checking to fail.
 // Re-enable when type-checking no longer fails.
-// UNSUPPORTED: executable_test
+// REQUIRES: no_tensorflow
+// SWIFT_ENABLE_TENSORFLOW END
+
+// rdar://problem/65015626
+// XFAIL: asserts
 
 import StdlibUnittest
 #if canImport(Darwin)

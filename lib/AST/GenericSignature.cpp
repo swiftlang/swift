@@ -236,18 +236,27 @@ CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
              "Left-hand side is not canonical");
       break;
 
-    case RequirementKind::SameType:
-      assert(reqt.getFirstType()->isTypeParameter() &&
-             "Left-hand side must be a type parameter");
+    case RequirementKind::SameType: {
+      auto isCanonicalAnchor = [&](Type type) {
+        if (auto *dmt = type->getAs<DependentMemberType>())
+          return canSig->isCanonicalTypeInContext(dmt->getBase());
+        return type->is<GenericTypeParamType>();
+      };
+
+      auto firstType = reqt.getFirstType();
+      auto secondType = reqt.getSecondType();
+      assert(isCanonicalAnchor(firstType));
+
       if (reqt.getSecondType()->isTypeParameter()) {
-        assert(compareDependentTypes(reqt.getFirstType(), reqt.getSecondType())
-                 < 0 &&
+        assert(isCanonicalAnchor(secondType));
+        assert(compareDependentTypes(firstType, secondType) < 0 &&
                "Out-of-order type parameters in same-type constraint");
       } else {
-        assert(canSig->isCanonicalTypeInContext(reqt.getSecondType()) &&
+        assert(canSig->isCanonicalTypeInContext(secondType) &&
                "Concrete same-type isn't canonical in its own context");
       }
       break;
+    }
 
     case RequirementKind::Conformance:
       assert(reqt.getFirstType()->isTypeParameter() &&
