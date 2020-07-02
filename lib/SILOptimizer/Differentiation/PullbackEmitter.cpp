@@ -1329,6 +1329,7 @@ void PullbackEmitter::visitSILBasicBlock(SILBasicBlock *bb) {
   // 1. Get the pullback struct pullback block argument.
   // 2. Extract the predecessor enum value from the pullback struct value.
   auto *predEnum = getPullbackInfo().getBranchingTraceDecl(bb);
+  (void)predEnum;
   auto *predEnumField = getPullbackInfo().lookUpLinearMapStructEnumField(bb);
   auto predEnumVal = getPullbackStructElement(bb, predEnumField);
 
@@ -1680,14 +1681,16 @@ void PullbackEmitter::visitStructInst(StructInst *si) {
     break;
   case AdjointValueKind::Concrete: {
     auto adjStruct = materializeAdjointDirect(std::move(av), loc);
+    auto *dti = builder.createDestructureStruct(si->getLoc(), adjStruct);
+
     // Find the struct `TangentVector` type.
     auto structTy = remapType(si->getType()).getASTType();
+#ifndef NDEBUG
     auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
     assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
-    auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
-    assert(tangentVectorDecl);
+    assert(tangentVectorTy->getStructOrBoundGenericStruct());
+#endif
 
-    auto *dti = builder.createDestructureStruct(si->getLoc(), adjStruct);
     // Accumulate adjoints for the fields of the `struct` operand.
     unsigned fieldIndex = 0;
     for (auto it = structDecl->getStoredProperties().begin();
