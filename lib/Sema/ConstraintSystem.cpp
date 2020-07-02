@@ -4752,6 +4752,8 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_AssignSource:
   case CTP_SubscriptAssignSource:
   case CTP_Condition:
+  case CTP_WrappedProperty:
+  case CTP_ComposedPropertyWrapper:
   case CTP_CannotFail:
     return false;
   }

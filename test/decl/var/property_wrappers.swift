@@ -347,8 +347,9 @@ struct TestFunction {
   @Function var f: (Int) -> Float?
 
   // FIXME: This diagnostic should be more specific
-  @Function var f2: (Int) -> Float // expected-error{{generic parameter 'U' could not be inferred}}
-  // expected-note@-1 {{explicitly specify}}
+  @Function var f2: (Int) -> Float // expected-error {{property type '(Int) -> Float' does not match 'wrappedValue' type '(Int) -> U?'}}
+  // expected-error@-1 {{generic parameter 'U' could not be inferred}}
+  // expected-note@-2 {{explicitly specify}}
 
   func test() {
     let _: Int = _f // expected-error{{cannot convert value of type 'Function<Int, Float>' to specified type 'Int'}}
@@ -1051,6 +1052,7 @@ struct TestComposition {
   @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
   @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{generic parameter 'Value' could not be inferred}}
   // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  // expected-error@-2 {{composed wrapper type 'WrapperE<Int>' does not match former 'wrappedValue' type 'WrapperC<Value>'}}
 
 	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
 		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{8-8=Int(}} {{9-9=)}}

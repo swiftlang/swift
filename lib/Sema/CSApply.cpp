@@ -8039,6 +8039,8 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     case swift::CTP_AssignSource:
     case swift::CTP_SubscriptAssignSource:
     case swift::CTP_Condition:
+    case swift::CTP_WrappedProperty:
+    case swift::CTP_ComposedPropertyWrapper:
     case swift::CTP_CannotFail:
       result.setExpr(rewrittenExpr);
       break;

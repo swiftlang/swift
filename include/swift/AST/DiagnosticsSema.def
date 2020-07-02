@@ -5010,6 +5010,12 @@ NOTE(property_wrapper_direct_init,none,
 ERROR(property_wrapper_incompatible_property, none,
       "property type %0 does not match that of the 'wrappedValue' property of "
       "its wrapper type %1", (Type, Type))
+ERROR(wrapped_value_mismatch, none,
+      "property type %0 does not match 'wrappedValue' type %1",
+      (Type, Type))
+ERROR(composed_property_wrapper_mismatch, none,
+      "composed wrapper type %0 does not match former 'wrappedValue' type %1",
+      (Type, Type))
 
 ERROR(property_wrapper_type_access,none,
       "%select{%select{variable|constant}0|property}1 "

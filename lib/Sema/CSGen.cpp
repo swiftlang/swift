@@ -3893,8 +3893,10 @@ static Type generateWrappedPropertyTypeConstraints(
       auto *locator =
           cs.getConstraintLocator(typeRepr, LocatorPathElt::ContextualType());
       wrapperType = cs.openUnboundGenericTypes(rawWrapperType, locator);
-      cs.addConstraint(ConstraintKind::Equal, wrappedValueType, wrapperType,
+      cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType,
                        locator);
+      cs.setContextualType(typeRepr, TypeLoc::withoutLoc(wrappedValueType),
+                           CTP_ComposedPropertyWrapper);
     }
 
     wrappedValueType = wrapperType->getTypeOfMember(
@@ -4184,6 +4186,8 @@ bool ConstraintSystem::generateConstraints(
 
     addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType,
         getConstraintLocator(wrappedVar, LocatorPathElt::ContextualType()));
+    setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
+                      CTP_WrappedProperty);
     return false;
   }
   }

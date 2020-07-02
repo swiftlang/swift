@@ -613,6 +613,10 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_subscript_assign;
   case CTP_Condition:
     return diag::cannot_convert_condition_value;
+  case CTP_WrappedProperty:
+    return diag::wrapped_value_mismatch;
+  case CTP_ComposedPropertyWrapper:
+    return diag::composed_property_wrapper_mismatch;
 
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
@@ -2206,6 +2210,8 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
   case CTP_YieldByReference:
+  case CTP_WrappedProperty:
+  case CTP_ComposedPropertyWrapper:
     return None;
 
   case CTP_EnumCaseRawValue:
@@ -2903,6 +2909,11 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
                        : diag::cannot_convert_subscript_assign;
   case CTP_Condition:
     return diag::cannot_convert_condition_value;
+
+  case CTP_WrappedProperty:
+    return diag::wrapped_value_mismatch;
+  case CTP_ComposedPropertyWrapper:
+    return diag::composed_property_wrapper_mismatch;
 
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
