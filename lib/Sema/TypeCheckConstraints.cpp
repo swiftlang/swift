@@ -3554,7 +3554,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       auto protocolDecl =
           dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
       // Checking for possible dynamic conformances because we cannot fail
-      // in thoses cases.
+      // in those cases.
       if (protocolDecl &&
           !couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
         return failed();
@@ -3620,11 +3620,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ValueCast;
   }
 
-  // If it is possible to substitute the generic arguments of source type
-  // with the destination generic archetypes, we are performing what looks
-  // like an upcast except it rebinds generic parameters. Or substitute
-  // destination to source generic archetypes, where we are performing
-  // what looks like an downcast except it also rebinds generic parameters.
+  // We perform an upcast while rebinding generic parameters if it's possible
+  // to substitute the generic arguments of the source type with the generic
+  // archetypes of the destination type. Or, if it's possible to substitute
+  // the generic arguments of the destination type with the generic archetypes
+  // of the source type, we perform a downcast instead.
   if (toType->isBindableTo(fromType) || fromType->isBindableTo(toType))
     return CheckedCastKind::ValueCast;
   
@@ -3642,8 +3642,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  // We can conditionally cast from NSError to an Error-conforming
-  // type.  This is handled in the runtime, so it doesn't need a special cast
+  // We can conditionally cast from NSError to an Error-conforming type.
+  // This is handled in the runtime, so it doesn't need a special cast
   // kind.
   if (Context.LangOpts.EnableObjCInterop) {
     auto nsObject = Context.getNSObjectType();

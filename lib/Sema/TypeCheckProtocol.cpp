@@ -4473,19 +4473,17 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 bool
 TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
                                                DeclContext *DC) {
-  // If the type we're checking is a non-final class because it's
-  // possible that we might have a subclass that conforms to the protocol.
-  //
-  // Or when type is a stdlib collection (Array, Set, Dictionary) that
-  // could have conditional conformances because of custom casting
-  // mechanism implemented for those types e.g.
+  // We may have types that can dynamically conform to a protocol, e.g. a non-final
+  // class which might have a subclass that conforms to the protocol, or standard
+  // library collection types such as Array, Set or Dictionary which have custom
+  // casting machinery implemented in situations like:
   //
   //  func encodable(_ value: Encodable) {
   //    _ = value as! [String : Encodable]
   //  }
   //
   if (auto *classDecl = type->getClassOrBoundGenericClass()) {
-    if (!classDecl->isFinal() || type->is<ArchetypeType>())
+    if (!classDecl->isFinal())
       return true;
   }
 

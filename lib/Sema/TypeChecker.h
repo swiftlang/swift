@@ -885,8 +885,8 @@ ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
                                           SourceLoc ComplainLoc = SourceLoc());
 
 /// This is similar to \c conformsToProtocol, but returns \c true for cases where
-/// the type  \p T could be dynamically cast to \p Proto protocol, such as a non-final
-/// class where a subclass conforms to.
+/// the type \p T could be dynamically cast to \p Proto protocol, such as a non-final
+/// class where a subclass conforms to \p Proto.
 ///
 /// \param DC The context in which to check conformance. This affects, for
 /// example, extension visibility.
