@@ -35,6 +35,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/StorageImpl.h"
 #include "swift/AST/TrailingCallArguments.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -1718,6 +1719,7 @@ public:
 struct DeclNameRefWithLoc {
   DeclNameRef Name;
   DeclNameLoc Loc;
+  Optional<AccessorKind> AccessorKind;
 };
 
 /// Attribute that marks a function as differentiable.
