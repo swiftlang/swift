@@ -12,6 +12,15 @@
 // Test in "Swift 6" mode:
 // RUN: %target-swift-emit-silgen -I %t -enable-experimental-concise-pound-file -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,CONCISE %s
 
+// Remove compiled modules so we test against interfaces:
+// RUN: rm %t/MagicIdentifierFileSwift5.swiftmodule %t/MagicIdentifierFileSwift6.swiftmodule
+
+// Test in Swift 5 mode:
+// RUN: %target-swift-emit-silgen -I %t -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
+
+// Test in "Swift 6" mode:
+// RUN: %target-swift-emit-silgen -I %t -enable-experimental-concise-pound-file -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,CONCISE %s
+
 import MagicIdentifierFileSwift5
 import MagicIdentifierFileSwift6
 
