@@ -104,6 +104,41 @@ void ConstraintSystem::PotentialBindings::finalize(
     existingTypes.insert(binding.BindingType->getCanonicalType());
 
   inferTransitiveBindings(cs, existingTypes, inferredBindings);
+
+  // Adjust optionality of existing bindings based on presence of
+  // `ExpressibleByNilLiteral` requirement.
+  if (llvm::any_of(Protocols, [](Constraint *constraint) {
+        auto *protocol = constraint->getProtocol();
+        return protocol->isSpecificProtocol(
+            KnownProtocolKind::ExpressibleByNilLiteral);
+      })) {
+    for (auto &binding : Bindings) {
+      bool wrapInOptional = false;
+      if (binding.Kind == AllowedBindingKind::Supertypes) {
+        auto type = binding.BindingType->getRValueType();
+        // If the type doesn't conform to ExpressibleByNilLiteral,
+        // produce an optional of that type as a potential binding. We
+        // overwrite the binding in place because the non-optional type
+        // will fail to type-check against the nil-literal conformance.
+        bool conformsToExprByNilLiteral = false;
+        if (auto *nominalBindingDecl = type->getAnyNominal()) {
+          SmallVector<ProtocolConformance *, 2> conformances;
+          conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
+              cs.DC->getParentModule(),
+              cs.getASTContext().getProtocol(
+                  KnownProtocolKind::ExpressibleByNilLiteral),
+              conformances);
+        }
+        wrapInOptional = !conformsToExprByNilLiteral;
+      } else if (binding.isDefaultableBinding() &&
+                 binding.BindingType->isAny()) {
+        wrapInOptional = true;
+      }
+
+      if (wrapInOptional)
+        binding.BindingType = OptionalType::get(binding.BindingType);
+    }
+  }
 }
 
 Optional<ConstraintSystem::PotentialBindings>
@@ -114,11 +149,8 @@ ConstraintSystem::determineBestBindings() {
 
   // First, let's collect all of the possible bindings.
   for (auto *typeVar : getTypeVariables()) {
-    if (typeVar->getImpl().hasRepresentativeOrFixed())
-      continue;
-
-    if (auto bindings = getPotentialBindings(typeVar))
-      cache.insert({typeVar, std::move(bindings)});
+    if (!typeVar->getImpl().hasRepresentativeOrFixed())
+      cache.insert({typeVar, getPotentialBindings(typeVar)});
   }
 
   // Now let's see if we could infer something for related type
@@ -131,6 +163,9 @@ ConstraintSystem::determineBestBindings() {
     auto &bindings = cachedBindings->getSecond();
 
     bindings.finalize(*this, cache);
+
+    if (!bindings)
+      continue;
 
     if (isDebugMode()) {
       bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
@@ -283,31 +318,11 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
   return !InvolvesTypeVariables;
 }
 
-static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
-                                    const ConstraintSystem &CS) {
-  // Look for a literal-conformance constraint on the type variable.
-  auto constraints =
-      CS.getConstraintGraph().gatherConstraints(
-          typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
-          [](Constraint *constraint) -> bool {
-            return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
-                   constraint->getProtocol()->isSpecificProtocol(
-                       KnownProtocolKind::ExpressibleByNilLiteral);
-          });
-
-  for (auto constraint : constraints)
-    if (CS.simplifyType(constraint->getFirstType())->isEqual(typeVar))
-      return true;
-
-  return false;
-}
-
 Optional<ConstraintSystem::PotentialBinding>
 ConstraintSystem::getPotentialBindingForRelationalConstraint(
     PotentialBindings &result, Constraint *constraint,
     bool &hasDependentMemberRelationalConstraints,
-    bool &hasNonDependentMemberRelationalConstraints,
-    bool &addOptionalSupertypeBindings) const {
+    bool &hasNonDependentMemberRelationalConstraints) const {
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
@@ -427,15 +442,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       result.SubtypeOf.insert(bindingTypeVar);
     }
 
-    // If we've already set addOptionalSupertypeBindings, or we aren't
-    // allowing supertype bindings, we're done.
-    if (addOptionalSupertypeBindings || kind != AllowedBindingKind::Supertypes)
-      return None;
-
-    // If the bound is a 'nil' literal type, add optional supertype bindings.
-    if (hasNilLiteralConstraint(bindingTypeVar, *this))
-      addOptionalSupertypeBindings = true;
-
     return None;
   }
 
@@ -498,7 +504,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   SmallVector<Constraint *, 2> defaultableConstraints;
   SmallVector<PotentialBinding, 4> literalBindings;
-  bool addOptionalSupertypeBindings = false;
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
   for (auto constraint : constraints) {
@@ -528,8 +533,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
 
       auto binding = getPotentialBindingForRelationalConstraint(
           result, constraint, hasDependentMemberRelationalConstraints,
-          hasNonDependentMemberRelationalConstraints,
-          addOptionalSupertypeBindings);
+          hasNonDependentMemberRelationalConstraints);
       if (!binding)
         break;
 
@@ -653,13 +657,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       // Record constraint where protocol requirement originated
       // this is useful to use for the binding later.
       result.Protocols.push_back(constraint);
-
-      // If there is a 'nil' literal constraint, we might need optional
-      // supertype bindings.
-      if (constraint->getProtocol()->isSpecificProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral)) {
-        addOptionalSupertypeBindings = true;
-      }
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
@@ -885,40 +882,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
                     return binding.BindingType->isExistentialType() &&
                            binding.Kind == AllowedBindingKind::Subtypes;
                   });
-
-  // If we're supposed to add optional supertype bindings, do so now.
-  if (addOptionalSupertypeBindings) {
-    for (unsigned i : indices(result.Bindings)) {
-      auto &binding = result.Bindings[i];
-      bool wrapInOptional = false;
-
-      if (binding.Kind == AllowedBindingKind::Supertypes) {
-        // If the type doesn't conform to ExpressibleByNilLiteral,
-        // produce an optional of that type as a potential binding. We
-        // overwrite the binding in place because the non-optional type
-        // will fail to type-check against the nil-literal conformance.
-        auto nominalBindingDecl =
-            binding.BindingType->getRValueType()->getAnyNominal();
-        bool conformsToExprByNilLiteral = false;
-        if (nominalBindingDecl) {
-          SmallVector<ProtocolConformance *, 2> conformances;
-          conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
-              DC->getParentModule(),
-              getASTContext().getProtocol(
-                  KnownProtocolKind::ExpressibleByNilLiteral),
-              conformances);
-        }
-        wrapInOptional = !conformsToExprByNilLiteral;
-      } else if (binding.isDefaultableBinding() &&
-                 binding.BindingType->isAny()) {
-        wrapInOptional = true;
-      }
-
-      if (wrapInOptional) {
-        binding.BindingType = OptionalType::get(binding.BindingType);
-      }
-    }
-  }
 
   // If there were both dependent-member and non-dependent-member relational
   // constraints, consider this "fully bound"; we don't want to touch it.

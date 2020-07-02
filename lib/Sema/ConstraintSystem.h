@@ -4645,8 +4645,7 @@ private:
   getPotentialBindingForRelationalConstraint(
       PotentialBindings &result, Constraint *constraint,
       bool &hasDependentMemberRelationalConstraints,
-      bool &hasNonDependentMemberRelationalConstraints,
-      bool &addOptionalSupertypeBindings) const;
+      bool &hasNonDependentMemberRelationalConstraints) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
 private:
