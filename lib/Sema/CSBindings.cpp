@@ -28,22 +28,26 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
         &inferredBindings) {
   using BindingKind = ConstraintSystem::AllowedBindingKind;
 
-  llvm::SmallVector<Constraint *, 4> subtypeOf;
-  // First, let's collect all of the `subtype` constraints associated
+  llvm::SmallVector<Constraint *, 4> conversions;
+  // First, let's collect all of the conversions associated
   // with this type variable.
-  llvm::copy_if(Sources, std::back_inserter(subtypeOf),
-                [&](const Constraint *constraint) -> bool {
-                  if (constraint->getKind() != ConstraintKind::Subtype)
-                    return false;
+  llvm::copy_if(
+      Sources, std::back_inserter(conversions),
+      [&](const Constraint *constraint) -> bool {
+        if (constraint->getKind() != ConstraintKind::Subtype &&
+            constraint->getKind() != ConstraintKind::Conversion &&
+            constraint->getKind() != ConstraintKind::ArgumentConversion &&
+            constraint->getKind() != ConstraintKind::OperatorArgumentConversion)
+          return false;
 
-                  auto rhs = cs.simplifyType(constraint->getSecondType());
-                  return rhs->getAs<TypeVariableType>() == TypeVar;
-                });
+        auto rhs = cs.simplifyType(constraint->getSecondType());
+        return rhs->getAs<TypeVariableType>() == TypeVar;
+      });
 
-  if (subtypeOf.empty())
+  if (conversions.empty())
     return;
 
-  for (auto *constraint : subtypeOf) {
+  for (auto *constraint : conversions) {
     auto *tv =
         cs.simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
     if (!tv)
@@ -51,6 +55,15 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
 
     auto relatedBindings = inferredBindings.find(tv);
     if (relatedBindings == inferredBindings.end())
+      continue;
+
+    // Infer transitive protocol requirements.
+    for (auto *protocol : relatedBindings->getSecond().Protocols) {
+      Protocols.push_back(protocol);
+    }
+
+    // TODO: We shouldn't need this in the future.
+    if (constraint->getKind() != ConstraintKind::Subtype)
       continue;
 
     for (auto &binding : relatedBindings->getSecond().Bindings) {
@@ -75,11 +88,6 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
 
       addPotentialBinding(
           binding.withSameSource(type, BindingKind::Supertypes));
-    }
-
-    // Infer transitive protocol requirements.
-    for (auto *protocol : relatedBindings->getSecond().Protocols) {
-      Protocols.push_back(protocol);
     }
   }
 }
