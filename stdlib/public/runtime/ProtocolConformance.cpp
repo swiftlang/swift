@@ -869,6 +869,15 @@ bool swift::_checkGenericRequirements(
                                    substGenericParam, substWitnessTable).getMetadata();
       if (!baseType) return true;
 
+      // If the type which is constrained to a base class is an existential 
+      // type, and if that existential type includes a superclass constraint,
+      // just require that the superclass by which the existential is
+      // constrained is a subclass of the base class.
+      if (auto *existential = dyn_cast<ExistentialTypeMetadata>(subjectType)) {
+        if (auto *superclassConstraint = existential->getSuperclassConstraint())
+          subjectType = superclassConstraint;
+      }
+
       if (!isSubclass(subjectType, baseType))
         return true;
 
