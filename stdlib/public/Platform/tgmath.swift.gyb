@@ -234,7 +234,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 
 % end
 
-#if canImport(Darwin)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 // Unary intrinsic functions
 // Note these have a corresponding LLVM intrinsic
 % for T, ufunc in TypedUnaryIntrinsicFunctions():
