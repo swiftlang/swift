@@ -5571,25 +5571,7 @@ public:
   /// find a particular nested type by name, directly, or look at the
   /// protocols to which this archetype conforms.
   ArrayRef<std::pair<Identifier, Type>>
-  getKnownNestedTypes(bool resolveTypes = true) const {
-    return getAllNestedTypes(/*resolveTypes=*/false);
-  }
-
-  /// Retrieve the nested types of this archetype.
-  ///
-  /// \param resolveTypes Whether to eagerly resolve the nested types
-  /// (defaults to \c true). Otherwise, the nested types might be
-  /// null.
-  ///
-  /// FIXME: This operation should go away, because it breaks recursive
-  /// protocol constraints.
-  ArrayRef<std::pair<Identifier, Type>>
-  getAllNestedTypes(bool resolveTypes = true) const;
-
-  /// Set the nested types to a copy of the given array of
-  /// archetypes.
-  void setNestedTypes(ASTContext &Ctx,
-                      ArrayRef<std::pair<Identifier, Type>> Nested);
+  getKnownNestedTypes() const;
 
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, Type nested);
