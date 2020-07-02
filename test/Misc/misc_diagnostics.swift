@@ -143,7 +143,7 @@ func test17875634() {
 func test20770032() {
   if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}}
     // expected-error@-1 {{expression pattern of type 'ClosedRange<Int>' cannot match values of type '(Int, Int)'}}
-    // expected-error@-2 {{'(Int, Int)' cannot conform to 'Equatable'; only struct/enum/class types can conform to protocols}}
+    // expected-error@-2 {{type '(Int, Int)' cannot conform to 'Equatable'; only concrete types such as structs, enums and classes can conform to protocols}}
     // expected-note@-3 {{required by operator function '~=' where 'T' = '(Int, Int)'}}
   }
 }

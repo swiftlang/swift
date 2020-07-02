@@ -128,9 +128,9 @@ func combined() {
 
     // Needs self conforming protocols:
     let _: Conforms = [[0: [1 : [works]] as Conforms]]
-    // expected-error@-1 {{value of protocol type 'Conforms' cannot conform to 'Conforms'; only struct/enum/class types can conform to protocols}}
+    // expected-error@-1 {{protocol 'Conforms' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
 
     let _: Conforms = [[0: [1 : [fails]] as Conforms]]
     // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
-    // expected-error@-2 {{value of protocol type 'Conforms' cannot conform to 'Conforms'; only struct/enum/class types can conform to protocols}}
+    // expected-error@-2 {{protocol 'Conforms' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
 }
