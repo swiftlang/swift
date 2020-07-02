@@ -45,6 +45,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -2233,16 +2234,35 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       }
     }
 
-    if (!PD->getTypeRepr())
-      return Type();
+    if (PD->getTypeRepr()) {
+      return validateParameterType(PD);
+    }
 
-    return validateParameterType(PD);
+    // Try type checking the closure if it hasn't.
+    // NOTE: Do this only in 'TypeCheckSingleASTNode' mode. Otherwise, the
+    // parent closure should have been type checked before.
+    if (Context.TypeCheckerOpts.TypeCheckSingleASTNode &&
+        isa<ClosureExpr>(PD->getDeclContext())) {
+      auto *closure = cast<ClosureExpr>(PD->getDeclContext());
+      if (!closure->getType()) {
+        swift::typeCheckASTNodeAtLoc(closure->getParent(), closure->getLoc());
+        if (PD->hasInterfaceType())
+          return PD->getInterfaceType();
+      }
+    }
+
+    // Failed.
+    return Type();
   }
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
     Type interfaceType;
     if (auto *parentE = VD->getParentExpr()) {
+      if (Context.TypeCheckerOpts.TypeCheckSingleASTNode &&
+          !parentE->getType()) {
+        swift::typeCheckASTNodeAtLoc(VD->getDeclContext(), parentE->getLoc());
+      }
       interfaceType = parentE->getType();
     } else if (auto *namingPattern = VD->getNamingPattern()) {
       interfaceType = namingPattern->getType();
@@ -2405,13 +2425,17 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     namingPattern = canVD->NamingPattern;
   }
 
-  if (!namingPattern) {
-    // Try type checking parent conditional statement.
+  if (!namingPattern &&
+      VD->getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
+    // Try type checking parent control statement.
+    // NOTE: Do this only in 'TypeCheckSingleASTNode' mode. Otherwise, the
+    // parent control statement should have been type checked before.
     if (auto parentStmt = VD->getParentPatternStmt()) {
-      if (auto LCS = dyn_cast<LabeledConditionalStmt>(parentStmt)) {
-        TypeChecker::typeCheckConditionForStatement(LCS, VD->getDeclContext());
-        namingPattern = VD->NamingPattern;
-      }
+      if (auto CS = dyn_cast<CaseStmt>(parentStmt))
+        parentStmt = CS->getParentStmt();
+      ASTNode node(parentStmt);
+      TypeChecker::typeCheckASTNode(node, VD->getDeclContext());
+      namingPattern = VD->getCanonicalVarDecl()->NamingPattern;
     }
   }
 

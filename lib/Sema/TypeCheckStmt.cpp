@@ -39,6 +39,7 @@
 #include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -426,6 +427,16 @@ public:
       getASTContext().Diags.diagnose(RS->getReturnLoc(),
                                      diag::jump_out_of_defer, "return");
       return nullptr;
+    }
+
+    // Try type checking the closure if it hasn't.
+    // NOTE: Do this only in 'TypeCheckSingleASTNode' mode. Otherwise, the
+    // parent closure should have been type checked before.
+    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
+      if (auto *closure = TheFunc->getAbstractClosureExpr()) {
+        if (!closure->getType())
+          swift::typeCheckASTNodeAtLoc(closure->getParent(), closure->getLoc());
+      }
     }
 
     Type ResultTy = TheFunc->getBodyResultType();
@@ -1589,7 +1600,8 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 }
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
-  const SourceManager &SM = getASTContext().SourceMgr;
+  if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode)
+    return BS;
 
   // Diagnose defer statement being last one in block (only if
   // BraceStmt does not start a TopLevelDecl).
@@ -1606,6 +1618,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     }
   }
 
+  const SourceManager &SM = getASTContext().SourceMgr;
   for (auto &elem : BS->getElements()) {
     if (TargetTypeCheckLoc.isValid()) {
       if (SM.isBeforeInBuffer(TargetTypeCheckLoc, elem.getStartLoc()))
@@ -1623,6 +1636,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   }
 
   return BS;
+}
+
+void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC) {
+  StmtChecker stmtChecker(DC);
+  stmtChecker.TargetTypeCheckLoc = node.getStartLoc();
+  stmtChecker.typeCheckASTNode(node);
 }
 
 static Type getFunctionBuilderType(FuncDecl *FD) {
@@ -1840,36 +1859,119 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   }
 }
 
-bool TypeCheckFunctionBodyAtLocRequest::evaluate(Evaluator &evaluator,
-                                                 AbstractFunctionDecl *AFD,
-                                                 SourceLoc Loc) const {
-  ASTContext &ctx = AFD->getASTContext();
+bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
+                                            DeclContext *DC,
+                                            SourceLoc Loc) const {
+  auto &ctx = DC->getASTContext();
 
-  BraceStmt *body = AFD->getBody();
-  if (!body || AFD->isBodyTypeChecked())
-    return false;
+  class ASTNodeFinder : public ASTWalker {
+    SourceManager &SM;
+    SourceLoc Loc;
+    ASTNode *FoundNode = nullptr;
+    DeclContext *DC = nullptr;
 
-  // Function builder doesn't support partial type checking.
-  if (auto *func = dyn_cast<FuncDecl>(AFD)) {
+  public:
+    ASTNodeFinder(SourceManager &SM, SourceLoc Loc) : SM(SM), Loc(Loc) {}
+
+    bool isNull() const { return !FoundNode; }
+    ASTNode &getRef() const {
+      assert(FoundNode);
+      return *FoundNode;
+    }
+    DeclContext *getDeclContext() const { return DC; }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      if (auto *brace = dyn_cast<BraceStmt>(S)) {
+        for (ASTNode &node : brace->getElements()) {
+          if (SM.isBeforeInBuffer(Loc, node.getStartLoc()))
+            break;
+
+          // NOTE: We need to check the character loc here because the target
+          // loc can be inside the last token of the node. i.e. interpolated string.
+          SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, node.getEndLoc());
+          if (SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)
+            continue;
+
+          // 'node' may be the target node, except 'CaseStmt' which cannot be
+          // type checked alone.
+          if (!node.isStmt(StmtKind::Case))
+            FoundNode = &node;
+
+          // Walk into the node to narrow down.
+          node.walk(*this);
+        }
+
+        // Already walked into.
+        return {false, nullptr};
+      }
+
+      return {true, S};
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (SM.isBeforeInBuffer(Loc, E->getStartLoc()))
+        return {false, E};
+
+      SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, E->getEndLoc());
+      if (SM.isBeforeInBuffer(endLoc, Loc))
+        return {false, E};
+
+      if (auto closure = dyn_cast<ClosureExpr>(E)) {
+        // NOTE: When a client wants to type check a closure signature, it
+        // requests with closure's 'getLoc()' location.
+        if (Loc == closure->getLoc())
+          return {false, E};
+
+        DC = closure;
+      }
+      return {true, E};
+    }
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *newDC = dyn_cast<DeclContext>(D))
+        DC = newDC;
+      return true;
+    }
+
+  } finder(ctx.SourceMgr, Loc);
+  DC->walkContext(finder);
+
+  // Nothing found at the location, or the decl context does not own the 'Loc'.
+  if (finder.isNull())
+    return true;
+
+  DC = finder.getDeclContext();
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (AFD->isBodyTypeChecked())
+      return false;
+  }
+
+  // Function builder function doesn't support partial type checking.
+  if (auto *func = dyn_cast<FuncDecl>(DC)) {
     if (Type builderType = getFunctionBuilderType(func)) {
       auto optBody =
           TypeChecker::applyFunctionBuilderBodyTransform(func, builderType);
       if (!optBody || !*optBody)
         return true;
       // Wire up the function body now.
-      AFD->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
+      func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
       return false;
     }
   }
 
-  if (ctx.LangOpts.EnableASTScopeLookup)
-    ASTScope::expandFunctionBody(AFD);
+  // The enclosing closure might be a single expression closure or a function
+  // builder closure. In such cases, the body elements are type checked with
+  // the closure itself. So we need to try type checking the enclosing closure
+  // signature first.
+  if (auto CE = dyn_cast<ClosureExpr>(DC)) {
+    swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
+    if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
+      return false;
+  }
 
-  StmtChecker SC(AFD);
-  SC.TargetTypeCheckLoc = Loc;
-  bool hadError = SC.typeCheckBody(body);
-  AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
-  return hadError;
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC);
+  return false;
 }
 
 bool
