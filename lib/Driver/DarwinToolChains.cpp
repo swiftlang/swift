@@ -632,6 +632,16 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       case DarwinPlatformKind::TvOS:
       case DarwinPlatformKind::TvOSSimulator:
         triple.getiOSVersion(major, minor, micro);
+
+        // The first deployment of arm64 simulators is iOS/tvOS 14.0;
+        // the linker doesn't want to see a deployment target before that.
+        if (triple.isSimulatorEnvironment() && triple.isAArch64() &&
+            major < 14) {
+          major = 14;
+          minor = 0;
+          micro = 0;
+        }
+
         break;
       case DarwinPlatformKind::WatchOS:
       case DarwinPlatformKind::WatchOSSimulator:
