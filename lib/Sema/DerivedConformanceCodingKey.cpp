@@ -284,9 +284,9 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
 
     auto labelItem = CaseLabelItem(litPat);
 
-    auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*Implicit=*/true);
     auto *metaTyRef = TypeExpr::createImplicit(enumType, C);
-    auto *valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    auto *valueExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), elt,
+                                            DeclNameLoc(), /*Implicit=*/true);
 
     auto *assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
                                           /*Implicit=*/true);

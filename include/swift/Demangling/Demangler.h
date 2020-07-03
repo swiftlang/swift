@@ -20,6 +20,7 @@
 #define SWIFT_DEMANGLING_DEMANGLER_H
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/NamespaceMacros.h"
 
 //#define NODE_FACTORY_DEBUGGING
 
@@ -28,6 +29,7 @@ using llvm::StringRef;
 
 namespace swift {
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 class CharVector;
   
@@ -622,6 +624,7 @@ public:
 
 NodePointer demangleOldSymbolAsNode(StringRef MangledName,
                                     NodeFactory &Factory);
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift
 

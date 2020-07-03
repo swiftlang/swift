@@ -101,7 +101,8 @@ public:
                            SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleDestructorEntity(const DestructorDecl *decl,
-                                     bool isDeallocating, SymbolKind SKind);
+                                     bool isDeallocating,
+                                     SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleConstructorEntity(const ConstructorDecl *ctor,
                                       bool isAllocating,
@@ -120,11 +121,11 @@ public:
 
   std::string mangleDefaultArgumentEntity(const DeclContext *func,
                                           unsigned index,
-                                          SymbolKind SKind);
+                                          SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
   std::string mangleBackingInitializerEntity(const VarDecl *var,
-                                             SymbolKind SKind);
+                                             SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 

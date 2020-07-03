@@ -2885,6 +2885,10 @@ public:
 
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
 
+    Param withLabel(Identifier newLabel) const {
+      return Param(Ty, newLabel, Flags);
+    }
+
     Param withType(Type newType) const { return Param(newType, Label, Flags); }
 
     Param withFlags(ParameterTypeFlags flags) const {

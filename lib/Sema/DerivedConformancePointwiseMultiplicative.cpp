@@ -67,8 +67,9 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, void *) {
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(DeclNameLoc(), nominal,
-                                                  funcDecl, funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), nominal, funcDecl,
+      funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
   // Get operator protocol requirement.
@@ -98,11 +99,10 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, void *) {
               confRef.getConcrete()->getWitnessDecl(operatorReq))
         memberOpDecl = concreteMemberMethodDecl;
     assert(memberOpDecl && "Member operator declaration must exist");
-    auto memberOpDRE =
-        new (C) DeclRefExpr(memberOpDecl, DeclNameLoc(), /*Implicit*/ true);
     auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
     auto memberOpExpr =
-        new (C) DotSyntaxCallExpr(memberOpDRE, SourceLoc(), memberTypeExpr);
+        new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), memberOpDecl,
+                              DeclNameLoc(), /*Implicit*/ true);
 
     // Create expression `lhs.member <op> rhs.member`.
     // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
@@ -192,8 +192,9 @@ deriveComputedPropertyGetter(AbstractFunctionDecl *funcDecl,
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(DeclNameLoc(), nominal,
-                                                  funcDecl, funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), nominal, funcDecl,
+      funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
   auto createMemberPropertyExpr = [&](VarDecl *member) -> Expr * {

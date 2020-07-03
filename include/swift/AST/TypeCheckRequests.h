@@ -1064,8 +1064,8 @@ public:
 
 class EmittedMembersRequest :
     public SimpleRequest<EmittedMembersRequest,
-                         DeclRange(ClassDecl *),
-                         RequestFlags::SeparatelyCached> {
+                         ArrayRef<Decl *>(ClassDecl *),
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1073,14 +1073,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  DeclRange
+  ArrayRef<Decl *>
   evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
 
 public:
-  // Separate caching.
   bool isCached() const { return true; }
-  Optional<DeclRange> getCachedResult() const;
-  void cacheResult(DeclRange value) const;
 };
 
 class IsImplicitlyUnwrappedOptionalRequest :
@@ -2185,6 +2182,27 @@ private:
   // Evaluation.
   AbstractFunctionDecl *evaluate(Evaluator &evaluator,
                                  DerivativeAttr *attr) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Resolves the "tangent stored property" corresponding to an original stored
+/// property in a `Differentiable`-conforming type.
+class TangentStoredPropertyRequest
+    : public SimpleRequest<TangentStoredPropertyRequest,
+                           TangentPropertyInfo(VarDecl *, CanType),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  TangentPropertyInfo evaluate(Evaluator &evaluator, VarDecl *originalField,
+                               CanType parentType) const;
 
 public:
   // Caching.

@@ -18,9 +18,10 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/LocalizationFormat.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/VersionTuple.h"
@@ -629,7 +630,7 @@ namespace swift {
     DiagnosticState(DiagnosticState &&) = default;
     DiagnosticState &operator=(DiagnosticState &&) = default;
   };
-    
+
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {
@@ -662,6 +663,10 @@ namespace swift {
     /// This is required because diagnostics are not directly emitted
     /// but rather stored until all transactions complete.
     llvm::StringSet<llvm::BumpPtrAllocator &> TransactionStrings;
+
+    /// Diagnostic producer to handle the logic behind retrieving a localized
+    /// diagnostic message.
+    std::unique_ptr<diag::LocalizationProducer> localization;
 
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
@@ -732,6 +737,12 @@ namespace swift {
     }
     StringRef getDiagnosticDocumentationPath() {
       return diagnosticDocumentationPath;
+    }
+
+    void setLocalization(std::string locale, std::string path) {
+      if (!locale.empty() && !path.empty())
+        localization =
+            std::make_unique<diag::YAMLLocalizationProducer>(locale, path);
     }
 
     void ignoreDiagnostic(DiagID id) {
@@ -955,8 +966,7 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    static const char *diagnosticStringFor(const DiagID id,
-                                           bool printDiagnosticName);
+    const char *diagnosticStringFor(const DiagID id, bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.

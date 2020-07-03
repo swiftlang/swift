@@ -50,9 +50,7 @@ print(ps.spiVar)
 otherApiFunc() // expected-error {{cannot find 'otherApiFunc' in scope}}
 
 public func publicUseOfSPI(param: SPIClass) -> SPIClass {} // expected-error 2{{cannot use class 'SPIClass' here; it is an SPI imported from 'SPIHelper'}}
-// expected-error@-1 {{function cannot be declared public because its parameter uses an '@_spi' type}}
 public func publicUseOfSPI2() -> [SPIClass] {} // expected-error {{cannot use class 'SPIClass' here; it is an SPI imported from 'SPIHelper'}}
-// expected-error@-1 {{function cannot be declared public because its result uses an '@_spi' type}}
 
 @inlinable
 func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' is '@_spi' and cannot be referenced from an '@inlinable' function}}

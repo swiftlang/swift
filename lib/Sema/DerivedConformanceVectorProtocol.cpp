@@ -105,8 +105,9 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(DeclNameLoc(), nominal,
-                                                  funcDecl, funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), nominal, funcDecl,
+      funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
   // Get method protocol requirement.
@@ -140,22 +141,20 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
       assert(memberMethodDecl);
     }
     assert(memberMethodDecl && "Member method declaration must exist");
-    auto memberMethodDRE =
-        new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
-    memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `x.scaled(by:)`.
     // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
     // `ConstraintSystem::resolveOverload` error.
     auto *selfDRE =
         new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
-    auto *paramDRE =
-        new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
     auto memberExpr =
         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);
     auto memberMethodExpr =
-        new (C) DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberExpr);
+        new (C) MemberRefExpr(memberExpr, SourceLoc(), memberMethodDecl,
+                              DeclNameLoc(), /*Implicit*/ true);
+    auto *paramDRE =
+        new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
 
     // Create expression: `x.scaled(by: scalar)`.
     return CallExpr::createImplicit(C, memberMethodExpr, {paramDRE},
@@ -252,7 +251,8 @@ ValueDecl *DerivedConformance::deriveVectorProtocol(ValueDecl *requirement) {
   if (requirement->getBaseName() == Context.Id_subtracting)
     return deriveVectorProtocol_unaryMethodOnScalar(
         *this, C.Id_subtracting, Identifier(), C.Id_x);
-  Context.Diags.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_vector_protocol_requirement);
   return nullptr;
 }
 
@@ -263,6 +263,7 @@ Type DerivedConformance::deriveVectorProtocol(AssociatedTypeDecl *requirement) {
   if (requirement->getBaseName() == Context.Id_VectorSpaceScalar)
     return deriveVectorProtocol_VectorSpaceScalar(
         Nominal, getConformanceContext());
-  Context.Diags.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_vector_protocol_requirement);
   return nullptr;
 }

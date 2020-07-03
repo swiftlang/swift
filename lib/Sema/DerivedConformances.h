@@ -122,7 +122,8 @@ public:
   /// Derive a Differentiable type witness for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
-  Type deriveDifferentiable(AssociatedTypeDecl *assocType);
+  std::pair<Type, TypeDecl *>
+  deriveDifferentiable(AssociatedTypeDecl *assocType);
 
   /// Derive a CaseIterable requirement for an enum if it has no associated
   /// values for any of its cases.

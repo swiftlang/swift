@@ -78,7 +78,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                               ModuleCachePath,
                                               FEOpts.PrebuiltModuleCachePath,
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                              FEOpts.TrackSystemDeps);
+                                              FEOpts.shouldTrackSystemDependencies());
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
@@ -457,12 +457,6 @@ bool swift::scanDependencies(CompilerInstance &instance) {
     case ImplicitStdlibKind::Stdlib:
       mainDependencies.addModuleDependency("Swift", alreadyAddedModules);
       break;
-    }
-
-    // Swift -Onone support library.
-    if (invocation.shouldImportSwiftONoneSupport()) {
-      mainDependencies.addModuleDependency(
-          SWIFT_ONONE_SUPPORT, alreadyAddedModules);
     }
 
     // Add any implicit module names.

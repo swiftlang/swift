@@ -14,51 +14,12 @@ if(SWIFT_BUILD_STATIC_SDK_OVERLAY)
 endif()
 
 set(all_overlays
-  Accelerate
-  AppKit
-  ARKit
-  AssetsLibrary
-  AVFoundation
-  CallKit
-  CloudKit
-  Compression
-  Contacts
-  CoreAudio
-  CoreData
   CoreFoundation
   CoreGraphics
-  CoreImage
-  CoreLocation
-  CoreMedia
-  CryptoTokenKit
   Dispatch
   Foundation
-  GameplayKit
-  GLKit
-  HomeKit
-  IOKit
-  Intents
-  MapKit
-  MediaPlayer
-  Metal
-  MetalKit
-  ModelIO
-  NaturalLanguage
-  Network
   ObjectiveC
-  OpenCL
-  os
-  Photos
-  QuartzCore
-  SafariServices
-  SceneKit
-  simd
-  SpriteKit
-  UIKit
-  Vision
-  WatchKit
   XCTest
-  XPC
 )
 
 if(DEFINED SWIFT_OVERLAY_TARGETS)

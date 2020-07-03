@@ -849,7 +849,7 @@ ErrorBridgingTests.test("Swift Error bridged to NSError description") {
     expectEqual("Something", bridgedError.description)
   }
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     checkDescription()
   }
 }
@@ -880,7 +880,7 @@ ErrorBridgingTests.test("Swift Error description memory management") {
     }
   }
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     checkDescription()
   }
 }

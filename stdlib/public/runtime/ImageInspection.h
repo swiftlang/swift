@@ -21,7 +21,6 @@
 #ifndef SWIFT_RUNTIME_IMAGEINSPECTION_H
 #define SWIFT_RUNTIME_IMAGEINSPECTION_H
 
-#include "ImageInspectionELF.h"
 #include <cstdint>
 #include <cstddef>
 #if defined(__cplusplus)

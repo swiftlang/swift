@@ -1,8 +1,0 @@
-// Make sure that we can deserialize AppKit.
-// RUN: %target-sil-opt %platform-sdk-overlay-dir/AppKit.swiftmodule/%target-swiftmodule-name -module-name AppKit > /dev/null
-// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/AppKit.swiftmodule/%target-swiftmodule-name | %FileCheck %s
-
-// REQUIRES: objc_interop
-// REQUIRES: OS=macosx
-
-// CHECK-NOT: Unknown

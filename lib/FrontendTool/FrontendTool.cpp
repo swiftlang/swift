@@ -793,7 +793,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps, LoaderOpts);
+      FEOpts.shouldTrackSystemDependencies(), LoaderOpts);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {
@@ -1224,6 +1224,69 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   return hadAnyError;
 }
 
+static void dumpAPIIfNeeded(const CompilerInstance &Instance) {
+  using namespace llvm::sys;
+  const auto &Invocation = Instance.getInvocation();
+  StringRef OutDir = Invocation.getFrontendOptions().DumpAPIPath;
+  if (OutDir.empty())
+    return;
+
+  auto getOutPath = [&](SourceFile *SF) -> std::string {
+    SmallString<256> Path = OutDir;
+    StringRef Filename = SF->getFilename();
+    path::append(Path, path::filename(Filename));
+    return std::string(Path.str());
+  };
+
+  std::unordered_set<std::string> Filenames;
+
+  auto dumpFile = [&](SourceFile *SF) -> bool {
+    SmallString<512> TempBuf;
+    llvm::raw_svector_ostream TempOS(TempBuf);
+
+    PrintOptions PO = PrintOptions::printInterface();
+    PO.PrintOriginalSourceText = true;
+    PO.Indent = 2;
+    PO.PrintAccess = false;
+    PO.SkipUnderscoredStdlibProtocols = true;
+    SF->print(TempOS, PO);
+    if (TempOS.str().trim().empty())
+      return false; // nothing to show.
+
+    std::string OutPath = getOutPath(SF);
+    bool WasInserted = Filenames.insert(OutPath).second;
+    if (!WasInserted) {
+      llvm::errs() << "multiple source files ended up with the same dump API "
+                      "filename to write to: " << OutPath << '\n';
+      return true;
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(OutPath, EC, fs::FA_Read | fs::FA_Write);
+    if (EC) {
+      llvm::errs() << "error opening file '" << OutPath << "': "
+                   << EC.message() << '\n';
+      return true;
+    }
+
+    OS << TempOS.str();
+    return false;
+  };
+
+  std::error_code EC = fs::create_directories(OutDir);
+  if (EC) {
+    llvm::errs() << "error creating directory '" << OutDir << "': "
+                 << EC.message() << '\n';
+    return;
+  }
+
+  for (auto *FU : Instance.getMainModule()->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(FU))
+      if (dumpFile(SF))
+        return;
+  }
+}
+
 /// Perform any actions that must have access to the ASTContext, and need to be
 /// delayed until the Swift compile pipeline has finished. This may be called
 /// before or after LLVM depending on when the ASTContext gets freed.
@@ -1241,9 +1304,13 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (auto *stats = ctx.Stats)
     countASTStats(*stats, Instance);
 
+  // Report mangling stats if there was no error.
+  if (!ctx.hadError())
+    Mangle::printManglingStats();
+
   // Make sure we didn't load a module during a parse-only invocation, unless
   // it's -emit-imported-modules, which can load modules.
-  auto action = Instance.getInvocation().getFrontendOptions().RequestedAction;
+  auto action = opts.RequestedAction;
   if (FrontendOptions::shouldActionOnlyParse(action) &&
       action != FrontendOptions::ActionType::EmitImportedModules) {
     assert(ctx.getNumLoadedModules() == 1 &&
@@ -1264,6 +1331,21 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
     
     emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
+
+    dumpAPIIfNeeded(Instance);
+  }
+
+  // Verify reference dependencies of the current compilation job. Note this
+  // must be run *before* verifying diagnostics so that the former can be tested
+  // via the latter.
+  if (opts.EnableIncrementalDependencyVerifier) {
+    if (!Instance.getPrimarySourceFiles().empty()) {
+      swift::verifyDependencies(Instance.getSourceMgr(),
+                                Instance.getPrimarySourceFiles());
+    } else {
+      swift::verifyDependencies(Instance.getSourceMgr(),
+                                Instance.getMainModule()->getFiles());
+    }
   }
 
   // Emit dependencies and index data.
@@ -1297,7 +1379,13 @@ static bool performCompile(CompilerInstance &Instance,
     return precompileClangModule(Instance);
   if (Action == FrontendOptions::ActionType::DumpPCM)
     return dumpPrecompiledClangModule(Instance);
-
+  if (Action == FrontendOptions::ActionType::PrintVersion) {
+    llvm::outs() << version::getSwiftFullVersion(
+      version::Version::getCurrentLanguageVersion()) << '\n';
+    llvm::outs() << "Target: "
+      << Invocation.getLangOptions().Target.str() << '\n';
+    return false;
+  }
   if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
     return buildModuleFromInterface(Instance);
 
@@ -1538,18 +1626,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
     return;
   }
 
-  // If we're going to dump the API of the module, we cannot tear down
-  // the ASTContext, as that would cause the module to be freed prematurely.
   const auto &opts = Instance.getInvocation().getFrontendOptions();
-  if (!opts.DumpAPIPath.empty()) {
-    return;
-  }
-
-  // Verifying incremental dependencies relies on access to the Swift Module's
-  // source files.
-  if (opts.EnableIncrementalDependencyVerifier) {
-    return;
-  }
 
   // If there are multiple primary inputs it is too soon to free
   // the ASTContext, etc.. OTOH, if this compilation generates code for > 1
@@ -1777,68 +1854,6 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  isDebugCompilation, Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker());
   }
-}
-
-/// Returns true if an error occurred.
-static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
-  using namespace llvm::sys;
-
-  auto getOutPath = [&](SourceFile *SF) -> std::string {
-    SmallString<256> Path = OutDir;
-    StringRef Filename = SF->getFilename();
-    path::append(Path, path::filename(Filename));
-    return std::string(Path.str());
-  };
-
-  std::unordered_set<std::string> Filenames;
-
-  auto dumpFile = [&](SourceFile *SF) -> bool {
-    SmallString<512> TempBuf;
-    llvm::raw_svector_ostream TempOS(TempBuf);
-
-    PrintOptions PO = PrintOptions::printInterface();
-    PO.PrintOriginalSourceText = true;
-    PO.Indent = 2;
-    PO.PrintAccess = false;
-    PO.SkipUnderscoredStdlibProtocols = true;
-    SF->print(TempOS, PO);
-    if (TempOS.str().trim().empty())
-      return false; // nothing to show.
-
-    std::string OutPath = getOutPath(SF);
-    bool WasInserted = Filenames.insert(OutPath).second;
-    if (!WasInserted) {
-      llvm::errs() << "multiple source files ended up with the same dump API "
-                      "filename to write to: " << OutPath << '\n';
-      return true;
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream OS(OutPath, EC, fs::FA_Read | fs::FA_Write);
-    if (EC) {
-      llvm::errs() << "error opening file '" << OutPath << "': "
-                   << EC.message() << '\n';
-      return true;
-    }
-
-    OS << TempOS.str();
-    return false;
-  };
-
-  std::error_code EC = fs::create_directories(OutDir);
-  if (EC) {
-    llvm::errs() << "error creating directory '" << OutDir << "': "
-                 << EC.message() << '\n';
-    return true;
-  }
-
-  for (auto *FU : Mod->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(FU))
-      if (dumpFile(SF))
-        return true;
-  }
-
-  return false;
 }
 
 /// Creates a diagnostic consumer that handles dispatching diagnostics to
@@ -2196,18 +2211,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
-  if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasDependencyTrackerPath() ||
-      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-      Invocation.getFrontendOptions().TrackSystemDeps) {
-    // Note that we're tracking dependencies even when we don't need to write
-    // them directly; in particular, -track-system-dependencies affects how
-    // module interfaces get loaded, and so we need to be consistently tracking
-    // system dependencies throughout the compiler.
-    Instance->createDependencyTracker(
-        Invocation.getFrontendOptions().TrackSystemDeps);
-  }
-
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
@@ -2225,27 +2228,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   int ReturnValue = 0;
   bool HadError = performCompile(*Instance, Args, ReturnValue, observer);
-  if (!HadError) {
-    Mangle::printManglingStats();
-  }
-
-  if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
-    HadError = dumpAPI(Instance->getMainModule(),
-                       Invocation.getFrontendOptions().DumpAPIPath);
-  }
-
-  // Verify reference dependencies of the current compilation job *before*
-  // verifying diagnostics so that the former can be tested via the latter.
-  if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
-    if (!Instance->getPrimarySourceFiles().empty()) {
-      HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
-                                            Instance->getPrimarySourceFiles());
-    } else {
-      HadError |= swift::verifyDependencies(
-          Instance->getSourceMgr(),
-          Instance->getMainModule()->getFiles());
-    }
-  }
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();

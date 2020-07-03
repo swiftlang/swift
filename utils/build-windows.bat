@@ -97,6 +97,7 @@ git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %
 git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
 mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
 mklink /D "%source_root%\llvm" "%source_root%\llvm-project\llvm"
+mklink /D "%source_root%\lld" "%source_root%\llvm-project\lld"
 mklink /D "%source_root%\lldb" "%source_root%\llvm-project\lldb"
 mklink /D "%source_root%\compiler-rt" "%source_root%\llvm-project\compiler-rt"
 mklink /D "%source_root%\libcxx" "%source_root%\llvm-project\libcxx"
@@ -165,7 +166,7 @@ cmake^
     -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
     -DLLVM_ENABLE_PDB:BOOL=YES^
     -DLLVM_ENABLE_ASSERTIONS:BOOL=YES^
-    -DLLVM_ENABLE_PROJECTS:STRING=clang^
+    -DLLVM_ENABLE_PROJECTS:STRING=lld;clang^
     -DLLVM_TARGETS_TO_BUILD:STRING="AArch64;ARM;X86"^
     -DLLVM_INCLUDE_BENCHMARKS:BOOL=NO^
     -DLLVM_INCLUDE_DOCS:BOOL=NO^

@@ -30,14 +30,15 @@ class FileCollector;
 namespace swift {
 
 DependencyTracker::DependencyTracker(
-    bool TrackSystemDeps, std::shared_ptr<llvm::FileCollector> FileCollector)
+    IntermoduleDepTrackingMode Mode,
+    std::shared_ptr<llvm::FileCollector> FileCollector)
     // NB: The ClangImporter believes it's responsible for the construction of
     // this instance, and it static_cast<>s the instance pointer to its own
     // subclass based on that belief. If you change this to be some other
     // instance, you will need to change ClangImporter's code to handle the
     // difference.
-    : clangCollector(ClangImporter::createDependencyCollector(TrackSystemDeps,
-                                                              FileCollector)) {}
+    : clangCollector(
+          ClangImporter::createDependencyCollector(Mode, FileCollector)) {}
 
 void
 DependencyTracker::addDependency(StringRef File, bool IsSystem) {

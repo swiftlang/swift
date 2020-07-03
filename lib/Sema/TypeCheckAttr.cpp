@@ -900,8 +900,8 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
           // implementation defines `set` if the protocol declares it.
           if (auto protoStorage = dyn_cast<AbstractStorageDecl>(VD))
             if (auto entryStorage = dyn_cast<AbstractStorageDecl>(entryDecl))
-              if (protoStorage->getAccessor(AccessorKind::Set) &&
-                  !entryStorage->getAccessor(AccessorKind::Set))
+              if (protoStorage->supportsMutation() &&
+                  !entryStorage->supportsMutation())
                 return false;
 
           return true;
@@ -1903,17 +1903,13 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   }
 
   auto funcDeclRef = ConcreteDeclRef(mainFunction, substitutionMap);
-  auto *funcDeclRefExpr = new (context) DeclRefExpr(
-      funcDeclRef, DeclNameLoc(location), /*Implicit*/ true);
-  funcDeclRefExpr->setImplicit(true);
-  funcDeclRefExpr->setType(mainFunction->getInterfaceType());
 
-  auto *dotSyntaxCallExpr = new (context) DotSyntaxCallExpr(
-      funcDeclRefExpr, /*DotLoc*/ SourceLoc(), typeExpr, voidToVoidFunctionType);
-  dotSyntaxCallExpr->setImplicit(true);
-  dotSyntaxCallExpr->setThrows(mainFunctionThrows);
+  auto *memberRefExpr = new (context) MemberRefExpr(
+      typeExpr, SourceLoc(), funcDeclRef, DeclNameLoc(location),
+      /*Implicit*/ true);
+  memberRefExpr->setImplicit(true);
 
-  auto *callExpr = CallExpr::createImplicit(context, dotSyntaxCallExpr, {}, {});
+  auto *callExpr = CallExpr::createImplicit(context, memberRefExpr, {}, {});
   callExpr->setImplicit(true);
   callExpr->setThrows(mainFunctionThrows);
   callExpr->setType(context.TheEmptyTupleType);
@@ -3658,7 +3654,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     // If the candidate is an `AbstractStorageDecl`, use its getter as the
     // candidate.
     if (auto *asd = dyn_cast<AbstractStorageDecl>(decl))
-      candidate = asd->getAccessor(AccessorKind::Get);
+      candidate = asd->getOpaqueAccessor(AccessorKind::Get);
     if (!candidate) {
       notFunction = true;
       continue;
@@ -4290,7 +4286,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     D->getAttrs().removeAttribute(attr);
     // Transfer `@differentiable` attribute from storage declaration to
     // getter accessor.
-    auto *getterDecl = asd->getAccessor(AccessorKind::Get);
+    auto *getterDecl = asd->getOpaqueAccessor(AccessorKind::Get);
     auto *newAttr = DifferentiableAttr::create(
         getterDecl, /*implicit*/ true, attr->AtLoc, attr->getRange(),
         attr->isLinear(), resolvedDiffParamIndices,

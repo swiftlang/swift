@@ -590,9 +590,10 @@ extension RangeReplaceableCollection {
   public mutating func removeFirst(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it has")
-    let end = index(startIndex, offsetBy: k)
+    guard let end = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it has")
+    }
     removeSubrange(startIndex..<end)
   }
 
@@ -698,9 +699,11 @@ extension RangeReplaceableCollection where SubSequence == Self {
   public mutating func removeFirst(_ k: Int) {
     if k == 0 { return }
     _precondition(k >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= k,
-      "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: k)..<endIndex]
+    guard let idx = index(startIndex, offsetBy: k, limitedBy: endIndex) else {
+      _preconditionFailure(
+        "Can't remove more items from a collection than it contains")
+    }
+    self = self[idx..<endIndex]
   }
 }
 
@@ -1158,7 +1161,7 @@ extension RangeReplaceableCollection {
   /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
   public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
     guard !subranges.isEmpty else {
       return
@@ -1188,7 +1191,7 @@ extension MutableCollection where Self: RangeReplaceableCollection {
   /// - Parameter subranges: The indices of the elements to remove.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
   public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
     guard let firstRange = subranges.ranges.first else {
       return

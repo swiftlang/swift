@@ -253,11 +253,9 @@ ADContext::emitNondifferentiabilityError(SILValue value,
     getADDebugStream() << "For value:\n" << value;
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
-  auto valueLoc = value.getLoc().getSourceLoc();
   // If instruction does not have a valid location, use the function location
   // as a fallback. Improves diagnostics in some cases.
-  if (valueLoc.isInvalid())
-    valueLoc = value->getFunction()->getLocation().getSourceLoc();
+  auto valueLoc = getValidLocation(value).getSourceLoc();
   return emitNondifferentiabilityError(valueLoc, invoker, diag,
                                        std::forward<U>(args)...);
 }
@@ -272,12 +270,10 @@ ADContext::emitNondifferentiabilityError(SILInstruction *inst,
     getADDebugStream() << "For instruction:\n" << *inst;
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
-  auto instLoc = inst->getLoc().getSourceLoc();
   // If instruction does not have a valid location, use the function location
   // as a fallback. Improves diagnostics for `ref_element_addr` generated in
   // synthesized stored property getters.
-  if (instLoc.isInvalid())
-    instLoc = inst->getFunction()->getLocation().getSourceLoc();
+  auto instLoc = getValidLocation(inst).getSourceLoc();
   return emitNondifferentiabilityError(instLoc, invoker, diag,
                                        std::forward<U>(args)...);
 }
