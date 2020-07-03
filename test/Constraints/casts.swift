@@ -235,8 +235,8 @@ func test_tuple_casts_no_warn() {
   _ = arr as! [(Foo, Foo, Foo)] // expected-warning {{cast from '[(Any, Any)]' to unrelated type '[(Foo, Foo, Foo)]' always fails}}
   _ = tup as! (Foo, Foo, Foo) // expected-warning {{cast from '(Any, Any)' to unrelated type '(Foo, Foo, Foo)' always fails}}
 
-  _ = arr as! [(a: Foo, Foo)] // expected-warning {{cast from '[(Any, Any)]' to unrelated type '[(a: Foo, Foo)]' always fails}}
-  _ = tup as! (a: Foo, Foo) // expected-warning {{cast from '(Any, Any)' to unrelated type '(a: Foo, Foo)' always fails}}
+  _ = arr as! [(a: Foo, Foo)] // Ok
+  _ = tup as! (a: Foo, Foo) // Ok
 }
 
 infix operator ^^^
@@ -334,4 +334,72 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // The array can also be inferred to be [Any].
   _ = ([] ?? []) as Array // expected-warning {{left side of nil coalescing operator '??' has non-optional type '[Any]', so the right side is never used}}
+}
+
+// SR-13088
+protocol JSON { }
+protocol JSONLeaf: JSON {}
+extension Int: JSONLeaf { }
+extension Array: JSON where Element: JSON { }
+
+protocol SR13035Error: Error {}
+class ChildError: SR13035Error {}
+
+protocol AnyC {
+  func foo()
+}
+
+protocol AnyEvent {}
+
+protocol A {
+  associatedtype C: AnyC
+}
+
+protocol EventA: A {
+  associatedtype Event
+}
+
+typealias Container<Namespace>
+  = (event: Namespace.Event, c: Namespace.C) where Namespace: EventA
+
+enum ConcreteA: EventA {
+  struct C: AnyC {
+    func foo() {}
+  }
+
+  enum Event: AnyEvent {
+    case test
+  }
+}
+
+func tests_SR13088_false_positive_always_fail_casts() {
+  // SR-13081
+  let x: JSON = [4] // [4]
+  _ = x as? [Any] // Ok
+
+  // SR-13035
+  func SR13035<SomeError: SR13035Error>(_ child: Result<String, ChildError>, _: Result<String, SomeError>) {
+    let _ = child as? Result<String, SomeError> // Ok
+  }
+
+  func SR13035_1<SomeError: SR13035Error, Child: ChildError>(_ child: Result<String, Child>, parent: Result<String, SomeError>) {
+    _ = child as? Result<String, SomeError> // Ok
+    _ = parent as? Result<String, Child> // OK
+  }
+
+  // SR-11434 and SR-12321
+  func encodable(_ value: Encodable) {
+    _ = value as! [String : Encodable] // Ok
+    _ = value as? [String: Encodable] // Ok
+  }   
+
+  // SR-13025
+  func coordinate(_ event: AnyEvent, from c: AnyC) {
+    switch (event, c) {
+    case let container as Container<ConcreteA>: // OK
+      container.c.foo()
+    default:
+      break
+    }
+  }
 }
