@@ -651,7 +651,7 @@ function set_build_options_for_host() {
 
     # We don't currently support building compiler-rt for cross-compile targets.
     # It's not clear that's useful anyway.
-    if is_cross_tools_host "${host}"; then
+    if [[ $(is_cross_tools_host "${host}") ]] ; then
       llvm_cmake_options+=(
           -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL=FALSE
           -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL=FALSE
