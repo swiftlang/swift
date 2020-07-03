@@ -115,8 +115,6 @@
 
 // Check arm64 simulators first deployment version adjustment.
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-ios13.0-simulator %s 2>&1 | %FileCheck -check-prefix ARM64_IOS_SIMULATOR_LINKER %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-tvos13.0-simulator %s 2>&1 | %FileCheck -check-prefix ARM64_TVOS_SIMULATOR_LINKER %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-watchos5.0-simulator %s 2>&1 | %FileCheck -check-prefix ARM64_WATCHOS_SIMULATOR_LINKER %s
 
 
 // MACOS_10_15: -platform_version macos 10.9.0 10.15.0
@@ -127,8 +125,6 @@
 // X86_MACOS11_LINKER: -platform_version macos 10.16.0
 // X86_64_WATCHOS_SIM_LINKER: -platform_version watchos-simulator 7.0.0
 // ARM64_IOS_SIMULATOR_LINKER: -platform_version ios-simulator 14.0.0
-// ARM64_TVOS_SIMULATOR_LINKER: -platform_version tvos-simulator 14.0.0
-// ARM64_WATCHOS_SIMULATOR_LINKER: -platform_version watchos-simulator 7.0.0
 
 // There are more RUN lines further down in the file.
 
