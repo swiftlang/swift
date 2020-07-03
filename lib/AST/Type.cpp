@@ -760,6 +760,16 @@ bool TypeBase::isStdlibType() {
   return false;
 }
 
+bool TypeBase::isKnownStdlibCollectionType() {
+  if (auto *structType = getAs<BoundGenericStructType>()) {
+    auto &ctx = getASTContext();
+    auto *decl = structType->getDecl();
+    return decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
+           decl == ctx.getSetDecl();
+  }
+  return false;
+}
+
 /// Remove argument labels from the function type.
 Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   // If there is nothing to remove, don't.
