@@ -219,6 +219,10 @@ class StdlibDeploymentTarget(object):
         elif system == 'Darwin':
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.OSX.x86_64
+            elif machine == 'arm64':
+                return StdlibDeploymentTarget.OSX.arm64
+            elif machine == 'arm64e':
+                return StdlibDeploymentTarget.OSX.arm64e
 
         elif system == 'FreeBSD':
             if machine == 'amd64':
