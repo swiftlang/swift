@@ -114,7 +114,7 @@ class Target(object):
 
 
 class StdlibDeploymentTarget(object):
-    OSX = DarwinPlatform("macosx", archs=["x86_64"],
+    OSX = DarwinPlatform("macosx", archs=["x86_64", "arm64", "arm64e"],
                          sdk_name="OSX")
 
     iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
