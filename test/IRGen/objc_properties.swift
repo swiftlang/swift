@@ -118,7 +118,7 @@ class SomeWrapperTests {
 // CHECK-SAME:   i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}},
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
-// CHECK-SAME:   { {{.+}} }* @_CLASS_METHODS__TtC15objc_properties10SomeObject,
+// CHECK-SAME:   { {{.+}} }* @_CLASS_METHODS__TtC15objc_properties10SomeObject{{(\.ptrauth)?}}
 // CHECK-SAME:   i8* null, i8* null, i8* null,
 // CHECK-NEW-SAME:   { {{.+}} }* @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject
 // CHECK-OLD-SAME:   i8* null
@@ -201,7 +201,7 @@ class SomeWrapperTests {
 // CHECK:   i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}},
 // CHECK:   i8* null,
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
-// CHECK:   { {{.+}} }* @_INSTANCE_METHODS__TtC15objc_properties10SomeObject,
+// CHECK:   { {{.+}} }* @_INSTANCE_METHODS__TtC15objc_properties10SomeObject{{(\.ptrauth)?}}
 // CHECK:   i8* null,
 // CHECK:   { {{.+}} }* @_IVARS__TtC15objc_properties10SomeObject,
 // CHECK:   i8* null,
@@ -251,10 +251,10 @@ class SomeWrapperTests {
 // CHECK: @"_CATEGORY__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.+}} } {
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
 // CHECK:   %swift.type* bitcast (i64* getelementptr inbounds (<{ {{.+}} }>* @"$s15objc_properties10SomeObjectCMf", i32 0, i32 2) to %swift.type*),
-// CHECK:   { {{.+}} }* @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties",
-// CHECK:   { {{.+}} }* @"_CATEGORY_CLASS_METHODS__TtC15objc_properties10SomeObject_$_objc_properties",
+// CHECK:   { {{.+}} }* @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
+// CHECK:   { {{.+}} }* @"_CATEGORY_CLASS_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
 // CHECK:   i8* null,
-// CHECK:   { {{.+}} }* @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties", 
+// CHECK:   { {{.+}} }* @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}", 
 // CHECK-NEW:   { {{.+}} }* @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties",
 // CHECK-OLD:   i8* null,
 // CHECK:   i32 60
