@@ -987,6 +987,9 @@ function get_host_install_destdir() {
         if [[ $(should_include_host_in_lipo ${host}) ]]; then
             # If this is one of the hosts we should lipo, install in to a temporary subdirectory.
             local host_install_destdir="${BUILD_DIR}/intermediate-install/${host}"
+        elif [[ "${host}" == "merged-hosts" ]]; then
+            # This assumes that all hosts are merged to the lipo.
+            local host_install_destdir="${INSTALL_DESTDIR}"
         else
             local host_install_destdir="${INSTALL_DESTDIR}/${host}"
         fi
@@ -1048,7 +1051,7 @@ function should_include_host_in_lipo() {
     local host="$1"
     if [[ $(has_cross_compile_hosts) ]] && [[ -z "${SKIP_MERGE_LIPO_CROSS_COMPILE_TOOLS}" ]]; then
         case ${host} in
-            iphone* | appletv* | watch* )
+            macosx* | iphone* | appletv* | watch* )
                 echo 1
                 ;;
         esac
@@ -2849,6 +2852,15 @@ for host in "${ALL_HOSTS[@]}"; do
     if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] && [[ $(host_has_darwin_symbols ${host}) ]]; then
         echo "--- Extracting symbols ---"
 
+        # The usage for this script says that lipo happens before
+        # dsym extraction but that's not really what happens.  At this point,
+        # we're processing an individual host (eg macosx-x86_64) but targeting
+        # the (shared) SYMROOT which can cause mutliple hosts to stomp on each
+        # other.  As a hack, I'm segregating the hosts in the symroot but it
+        # would probably be better to make the script behave as the usage
+        # descibes
+        host_symroot="${INSTALL_SYMROOT}/${host}"
+
         # FIXME: Since it's hard to trace output pipe call,
         #        For now, We don't support dry-run trace for this block
         #        Instead, just echo we do "darwin_intall_extract_symbols".
@@ -2863,7 +2875,7 @@ for host in "${ALL_HOSTS[@]}"; do
             # Copy executables and shared libraries from the `host_install_destdir` to
             # INSTALL_SYMROOT and run dsymutil on them.
             (cd "${CURRENT_INSTALL_DIR}" &&
-             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | cpio --insecure -pdm "${INSTALL_SYMROOT}")
+             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | cpio --insecure -pdm "${host_symroot}")
 
             dsymutil_path=
             if [[ -n "${DARWIN_INSTALL_EXTRACT_SYMBOLS_USE_JUST_BUILT_DSYMUTIL}" ]]; then
@@ -2876,7 +2888,7 @@ for host in "${ALL_HOSTS[@]}"; do
             #
             # Exclude shell scripts and static archives.
             # Exclude swift-api-digester dSYM to reduce debug toolchain size.
-            (cd "${INSTALL_SYMROOT}" &&
+            (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v '.py$' | \
                grep -v '.a$' | \
