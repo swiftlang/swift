@@ -785,6 +785,10 @@ public:
   
   /// Check if this is a nominal type defined at the top level of the Swift module
   bool isStdlibType();
+  
+  /// Check if this is either an Array, Set or Dictionary collection type defined
+  /// at the top level of the Swift module
+  bool isKnownStdlibCollectionType();
 
   /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.

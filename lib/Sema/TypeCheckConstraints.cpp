@@ -3357,7 +3357,14 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         const auto &fromElt = fromTuple->getElement(i);
         const auto &toElt = toTuple->getElement(i);
 
-        if (fromElt.getName() != toElt.getName())
+        // We should only perform name validation if both element have a label,
+        // because unlabeled tuple elements can be converted to labeled ones
+        // e.g.
+        // 
+        // let tup: (Any, Any) = (1, 1)
+        // _ = tup as! (a: Int, Int)
+        if ((!fromElt.getName().empty() && !toElt.getName().empty()) &&
+            fromElt.getName() != toElt.getName())
           return failed();
 
         auto result = checkElementCast(fromElt.getType(), toElt.getType(),
@@ -3527,8 +3534,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         (toType->isAnyObject() || fromType->isAnyObject()))
       return CheckedCastKind::ValueCast;
 
-    // A cast from an existential type to a concrete type does not succeed. For
-    // example:
+    // If we have a cast from an existential type to a concrete type that we
+    // statically know doesn't conform to the protocol, mark the cast as always
+    // failing. For example:
     //
     // struct S {}
     // enum FooError: Error { case bar }
@@ -3541,19 +3549,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     //
-    // Note: we relax the restriction if the type we're casting to is a
-    // non-final class because it's possible that we might have a subclass
-    // that conforms to the protocol.
-    if (fromExistential && !toExistential) {
-      if (auto NTD = toType->getAnyNominal()) {
-        if (!toType->is<ClassType>() || NTD->isFinal()) {
-          auto protocolDecl =
-              dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
-          if (protocolDecl &&
-              !conformsToProtocol(toType, protocolDecl, dc)) {
-            return failed();
-          }
-        }
+    if (auto *protocolDecl =
+          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
+      if (!couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
+        return failed();
       }
     }
 
@@ -3616,10 +3615,12 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ValueCast;
   }
 
-  // If the destination type can be a supertype of the source type, we are
-  // performing what looks like an upcast except it rebinds generic
-  // parameters.
-  if (fromType->isBindableTo(toType))
+  // We perform an upcast while rebinding generic parameters if it's possible
+  // to substitute the generic arguments of the source type with the generic
+  // archetypes of the destination type. Or, if it's possible to substitute
+  // the generic arguments of the destination type with the generic archetypes
+  // of the source type, we perform a downcast instead.
+  if (toType->isBindableTo(fromType) || fromType->isBindableTo(toType))
     return CheckedCastKind::ValueCast;
   
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
@@ -3636,8 +3637,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  // We can conditionally cast from NSError to an Error-conforming
-  // type.  This is handled in the runtime, so it doesn't need a special cast
+  // We can conditionally cast from NSError to an Error-conforming type.
+  // This is handled in the runtime, so it doesn't need a special cast
   // kind.
   if (Context.LangOpts.EnableObjCInterop) {
     auto nsObject = Context.getNSObjectType();
