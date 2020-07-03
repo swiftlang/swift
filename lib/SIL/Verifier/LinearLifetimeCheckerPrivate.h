@@ -209,6 +209,7 @@ private:
 
     llvm::errs() << "Found ownership error?!\n";
     assert(0 && "triggering standard assertion failure routine");
+    return true;
   }
 };
 
