@@ -3807,14 +3807,20 @@ namespace {
             decl->isVariadic(), isInSystemModule(dc), name, bodyParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
-          if (!mdecl->isStatic()) {
+          if (mdecl->isStatic() ||
+              // C++ operators that are implemented as non-static member
+              // functions get imported into Swift as static member functions
+              // that use an additional parameter for the left-hand side operand
+              // instead of the receiver object.
+              mdecl->getDeclName().getNameKind() ==
+                  clang::DeclarationName::CXXOperatorName) {
+            selfIdx = None;
+          } else {
             selfIdx = 0;
             // Workaround until proper const support is handled: Force
             // everything to be mutating. This implicitly makes the parameter
             // indirect.
             selfIsInOut = true;
-          } else {
-            selfIdx = None;
           }
         }
       }

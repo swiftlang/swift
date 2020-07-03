@@ -2783,7 +2783,8 @@ getSILFunctionTypeForClangDecl(TypeConverter &TC, const clang::Decl *clangDecl,
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    AbstractionPattern origPattern =
+    AbstractionPattern origPattern = method->isOverloadedOperator() ?
+        AbstractionPattern::getCXXOperatorMethod(origType, method):
         AbstractionPattern::getCXXMethod(origType, method);
     auto conventions = CXXMethodConventions(method);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
@@ -4039,7 +4040,10 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       assert(numParameterLists == 2);
       if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
-        return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
+        return method->isOverloadedOperator()
+                   ? AbstractionPattern::getCurriedCXXOperatorMethod(fnType,
+                                                                     bridgedFn)
+                   : AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {
         // C function imported as a method.
         return AbstractionPattern::getCurriedCFunctionAsMethod(fnType,
@@ -4123,8 +4127,25 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     }
 
     auto partialFnPattern = bridgingFnPattern.getFunctionResultType();
-    getBridgedParams(rep, partialFnPattern, methodParams, bridgedParams,
-                     bridging);
+    for (unsigned i : indices(methodParams)) {
+      // C++ operators that are implemented as non-static member functions get
+      // imported into Swift as static methods that have an additional
+      // parameter for the left-hand-side operand instead of the receiver
+      // object. These are inout parameters and don't get bridged.
+      // TODO: Undo this if we stop using inout.
+      if (auto method = dyn_cast_or_null<clang::CXXMethodDecl>(
+              constant.getDecl()->getClangDecl())) {
+        if (i==0 && method->isOverloadedOperator()) {
+          bridgedParams.push_back(methodParams[0]);
+          continue;
+        }
+      }
+
+      auto paramPattern = partialFnPattern.getFunctionParamType(i);
+      auto bridgedParam =
+          getBridgedParam(rep, paramPattern, methodParams[i], bridging);
+      bridgedParams.push_back(bridgedParam);
+    }
 
     bridgedResultType =
       getBridgedResultType(rep,
