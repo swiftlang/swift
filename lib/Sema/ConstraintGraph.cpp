@@ -442,24 +442,15 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
   llvm::TinyPtrVector<Constraint *> constraints;
   // Whether we should consider this constraint at all.
-  auto rep = CS.getRepresentative(typeVar);
   auto shouldConsiderConstraint = [&](Constraint *constraint) {
-    // For a one-way constraint, only consider it when the type variable
-    // is on the right-hand side of the the binding, and the left-hand side of
-    // the binding is one of the type variables currently under consideration.
+    // For a one-way constraint, only consider it when the left-hand side of
+    // the binding is one of the type variables currently under consideration,
+    // as only such constraints need solving for this component. Note that we
+    // don't perform any other filtering, as the constraint system should be
+    // responsible for checking any other conditions.
     if (constraint->isOneWayConstraint()) {
-      auto lhsTypeVar =
-          constraint->getFirstType()->castTo<TypeVariableType>();
-      if (!CS.isActiveTypeVariable(lhsTypeVar))
-        return false;
-
-      SmallVector<TypeVariableType *, 2> rhsTypeVars;
-      constraint->getSecondType()->getTypeVariables(rhsTypeVars);
-      for (auto rhsTypeVar : rhsTypeVars) {
-        if (CS.getRepresentative(rhsTypeVar) == rep)
-          return true;
-      }
-      return false;
+      auto lhsTypeVar = constraint->getFirstType()->castTo<TypeVariableType>();
+      return CS.isActiveTypeVariable(lhsTypeVar);
     }
 
     return true;
