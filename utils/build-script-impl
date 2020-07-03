@@ -421,13 +421,16 @@ function verify_host_is_supported() {
       | macosx-arm64e           \
       | iphonesimulator-i386    \
       | iphonesimulator-x86_64  \
+      | iphonesimulator-arm64   \
       | iphoneos-armv7          \
       | iphoneos-armv7s         \
       | iphoneos-arm64          \
       | iphoneos-arm64e         \
       | appletvsimulator-x86_64 \
+      | appletvsimulator-arm64  \
       | appletvos-arm64         \
       | watchsimulator-i386     \
+      | watchsimulator-arm64    \
       | watchos-armv7k          \
       | android-armv7           \
       | android-aarch64)
@@ -528,6 +531,21 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
+                iphonesimulator-arm64)
+                    xcrun_sdk_name="iphonesimulator"
+                    llvm_target_arch="AArch64"
+                    SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
+                    SWIFT_HOST_VARIANT="iphonesimulator"
+                    SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
+                    SWIFT_HOST_VARIANT_ARCH="arm64"
+
+                    cmake_osx_deployment_target=""
+                    cmark_cmake_options=(
+                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
+                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
+                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                    )
+                    ;;
                 iphoneos-armv7)
                     SWIFT_HOST_TRIPLE="armv7-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     llvm_target_arch="ARM"
@@ -563,6 +581,21 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
+                appletvsimulator-arm64)
+                    xcrun_sdk_name="appletvsimulator"
+                    llvm_target_arch="AArch64"
+                    SWIFT_HOST_TRIPLE="arm64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
+                    SWIFT_HOST_VARIANT="appletvsimulator"
+                    SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
+                    SWIFT_HOST_VARIANT_ARCH="arm64"
+
+                    cmake_osx_deployment_target=""
+                    cmark_cmake_options=(
+                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
+                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
+                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                    )
+                    ;;
                 appletvos-arm64)
                     SWIFT_HOST_TRIPLE="arm64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                     llvm_target_arch="AArch64"
@@ -576,6 +609,21 @@ function set_build_options_for_host() {
 
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     cmake_osx_deployment_target=""
+                    ;;
+                watchsimulator-arm64)
+                    xcrun_sdk_name="watchsimulator"
+                    llvm_target_arch="AArch64"
+                    SWIFT_HOST_TRIPLE="arm64-apple-watchos${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
+                    SWIFT_HOST_VARIANT="watchsimulator"
+                    SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
+                    SWIFT_HOST_VARIANT_ARCH="arm64"
+
+                    cmake_osx_deployment_target=""
+                    cmark_cmake_options=(
+                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
+                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
+                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                    )
                     ;;
                 watchos-armv7k)
                     SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
