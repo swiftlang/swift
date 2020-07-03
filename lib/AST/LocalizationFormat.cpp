@@ -101,6 +101,7 @@ readYAML(llvm::yaml::IO &io, T &Seq, bool, Context &Ctx) {
       DiagnosticNode current;
       yamlize(io, current, true, Ctx);
       io.postflightElement(SaveInfo);
+      std::replace(current.msg.begin(), current.msg.end(), '\n', ' ');
       // YAML file isn't guaranteed to have diagnostics in order of their
       // declaration in `.def` files, to accommodate that we need to leave
       // holes in diagnostic array for diagnostics which haven't yet been
