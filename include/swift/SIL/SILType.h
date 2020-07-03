@@ -18,7 +18,6 @@
 #ifndef SWIFT_SIL_SILTYPE_H
 #define SWIFT_SIL_SILTYPE_H
 
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerIntPair.h"
