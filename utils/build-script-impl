@@ -3041,21 +3041,21 @@ done
 
 # Lipo those products which require it, optionally build and test an installable package.
 mergedHost="merged-hosts"
-if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]] && [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
+if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
     # This is from multiple hosts; Which host should we say it is?
     # Let's call it 'merged-hosts' so that we can identify it.
 
-    echo "--- Merging and running lipo ---"
+    if [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
+        # Allow passing lipo with --host-lipo
+        if [[ -z "${HOST_LIPO}" ]] ; then
+            LIPO_PATH=$(xcrun_find_tool lipo)
+        else
+            LIPO_PATH="${HOST_LIPO}"
+        fi
+        call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
-    # Allow passing lipo with --host-lipo
-    if [[ -z "${HOST_LIPO}" ]] ; then
-        LIPO_PATH=$(xcrun_find_tool lipo)
-    else
-        LIPO_PATH="${HOST_LIPO}"
+        # Build and test the lipo-ed package.
+        build_and_test_installable_package ${mergedHost}
     fi
-    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
-
-    # Build and test the lipo-ed package.
-    build_and_test_installable_package ${mergedHost}
 fi
 # END
