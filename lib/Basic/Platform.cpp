@@ -402,6 +402,13 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
+
+    // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
+    // with Swift 5.3
+    if (Triple.isAArch64() && Major <= 14 &&
+        (Triple.isSimulatorEnvironment() || Triple.isMacCatalystEnvironment()))
+      return llvm::VersionTuple(5, 3);
+
     if (Major <= 12) {
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 13) {

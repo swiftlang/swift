@@ -591,6 +591,14 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
     if (tripleIsMacCatalystEnvironment(triple)) {
       triple.getiOSVersion(major, minor, micro);
 
+      // Mac Catalyst on arm was introduced with an iOS deployment target of
+      // 14.0; the linker doesn't want to see a deployment target before that.
+      if (major < 14 && triple.isAArch64()) {
+        major = 14;
+        minor = 0;
+        micro = 0;
+      }
+
       // Mac Catalyst was introduced with an iOS deployment target of 13.0;
       // the linker doesn't want to see a deployment target before that.
       if (major < 13) {
