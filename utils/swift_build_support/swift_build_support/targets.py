@@ -159,7 +159,7 @@ class StdlibDeploymentTarget(object):
 
     iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
                          sdk_name="IOS")
-    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64"],
+    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64", "arm64"],
                                   sdk_name="IOS_SIMULATOR",
                                   is_simulator=True)
 
@@ -168,13 +168,14 @@ class StdlibDeploymentTarget(object):
 
     AppleTV = DarwinPlatform("appletvos", archs=["arm64"],
                              sdk_name="TVOS")
-    AppleTVSimulator = DarwinPlatform("appletvsimulator", archs=["x86_64"],
+    AppleTVSimulator = DarwinPlatform("appletvsimulator", archs=["x86_64", "arm64"],
                                       sdk_name="TVOS_SIMULATOR",
                                       is_simulator=True)
 
     AppleWatch = DarwinPlatform("watchos", archs=["armv7k"],
                                 sdk_name="WATCHOS")
-    AppleWatchSimulator = DarwinPlatform("watchsimulator", archs=["i386"],
+
+    AppleWatchSimulator = DarwinPlatform("watchsimulator", archs=["i386", "arm64"],
                                          sdk_name="WATCHOS_SIMULATOR",
                                          is_simulator=True)
 
