@@ -252,6 +252,10 @@ AvailabilityContext ASTContext::getSwift50Availability() {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,14,4)));
   } else if (target.isiOS()) {
+    if (target.isAArch64() &&
+        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(12,2)));
   } else if (target.isWatchOS()) {
@@ -283,6 +287,10 @@ AvailabilityContext ASTContext::getSwift51Availability() {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,15,0)));
   } else if (target.isiOS()) {
+    if (target.isAArch64() &&
+        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(13,0,0)));
   } else if (target.isWatchOS()) {
@@ -314,6 +322,10 @@ AvailabilityContext ASTContext::getSwift52Availability() {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
   } else if (target.isiOS()) {
+    if (target.isAArch64() &&
+        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
   } else if (target.isWatchOS()) {
@@ -337,6 +349,10 @@ AvailabilityContext ASTContext::getSwift53Availability() {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
   } else if (target.isiOS()) {
+    if (target.isAArch64() &&
+        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
   } else if (target.isWatchOS()) {
