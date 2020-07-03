@@ -11,6 +11,13 @@
 import os
 import platform
 
+from . import shell
+
+try:
+    from build_swift.build_swift.wrappers import xcrun
+except ImportError:
+    from build_swift.wrappers import xcrun
+
 
 class Platform(object):
     """
@@ -85,6 +92,39 @@ class DarwinPlatform(Platform):
         for tests.
         """
         return self.is_embedded and not self.is_simulator
+
+    def sdk_supports_architecture(self, arch, toolchain):
+        """
+        Convenience function for checking whether the SDK supports the
+        target architecture.
+        """
+
+        # The names match up with the xcrun SDK names.
+        xcrun_sdk_name = self.name
+
+        # 32-bit iOS and iOS simulator are supported, but are not covered
+        # by the SDK settings. Handle this special case here.
+        if (xcrun_sdk_name == 'iphoneos' and
+           (arch == 'armv7' or arch == 'armv7s')):
+            return True
+
+        if (xcrun_sdk_name == 'iphonesimulator' and arch == 'i386'):
+            return True
+
+        sdk_path = xcrun.sdk_path(sdk=xcrun_sdk_name, toolchain=toolchain)
+        if not sdk_path:
+            raise RuntimeError('Cannot find SDK path for %s' % xcrun_sdk_name)
+
+        # Find the SDKSettings.plist for this sdK
+        plistCommand = [
+            '/usr/libexec/PlistBuddy',
+            '-c',
+            'Print :SupportedTargets:%s:Archs' % (self.name),
+            '%s/SDKSettings.plist' % (sdk_path)
+        ]
+
+        sdk_archs = shell.capture(plistCommand, dry_run=False, echo=True)
+        return arch in sdk_archs
 
 
 class AndroidPlatform(Platform):
