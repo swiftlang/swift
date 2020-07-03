@@ -53,7 +53,7 @@ func swift6LibraryUse() {
 func stdlibUse() {
 // BOTH-LABEL: sil {{.*}} @$s3Foo9stdlibUseyyF
   fatalError()
-// BOTH: string_literal utf8 "SOURCE_DIR/test/SILGen/magic_identifier_file.swift"
+// BOTH: string_literal utf8 "Foo/magic_identifier_file.swift"
 }
 
 func forceUnwrap(_ x: ()?) {
