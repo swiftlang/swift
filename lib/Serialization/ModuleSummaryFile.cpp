@@ -1,7 +1,9 @@
 #include "swift/Serialization/ModuleSummaryFile.h"
 #include "BCReadingExtras.h"
 #include "memory"
+#include "swift/AST/FileSystem.h"
 #include "llvm/Bitstream/BitstreamReader.h"
+#include "llvm/Bitstream/BitstreamWriter.h"
 
 namespace swift {
 
@@ -12,6 +14,88 @@ getEdgeKind(unsigned edgeKind) {
   if (edgeKind < unsigned(FunctionSummary::EdgeTy::Kind::kindCount))
     return FunctionSummary::EdgeTy::Kind(edgeKind);
   return None;
+}
+
+class Serializer {
+  SmallVector<char, 0> Buffer;
+  llvm::BitstreamWriter Out{Buffer};
+
+  /// A reusable buffer for emitting records.
+  SmallVector<uint64_t, 64> ScratchRecord;
+
+  void emitBlockID(unsigned ID, StringRef name,
+                   SmallVectorImpl<unsigned char> &nameBuffer);
+
+  void emitRecordID(unsigned ID, StringRef name,
+                    SmallVectorImpl<unsigned char> &nameBuffer);
+
+public:
+  void emit(const ModuleSummaryIndex &index);
+  void write(llvm::raw_ostream &os);
+};
+
+void Serializer::emitBlockID(unsigned ID, StringRef name,
+                             llvm::SmallVectorImpl<unsigned char> &nameBuffer) {
+  SmallVector<unsigned, 1> idBuffer;
+  idBuffer.push_back(ID);
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, idBuffer);
+
+  // Emit the block name if present.
+  if (name.empty())
+    return;
+  nameBuffer.resize(name.size());
+  memcpy(nameBuffer.data(), name.data(), name.size());
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_BLOCKNAME, nameBuffer);
+}
+
+void Serializer::emitRecordID(unsigned ID, StringRef name,
+                              SmallVectorImpl<unsigned char> &nameBuffer) {
+  assert(ID < 256 && "can't fit record ID in next to name");
+  nameBuffer.resize(name.size() + 1);
+  nameBuffer[0] = ID;
+  memcpy(nameBuffer.data() + 1, name.data(), name.size());
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
+}
+
+void Serializer::emit(const ModuleSummaryIndex &index) {
+  SmallVector<unsigned char, 64> nameBuffer;
+#define BLOCK(X) emitBlockID(X##_ID, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
+
+  BLOCK(FUNCTION_SUMMARY);
+  BLOCK_RECORD(function_summary, METADATA);
+  BLOCK_RECORD(function_summary, CALL_GRAPH_EDGE);
+
+  llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 8);
+  using namespace function_summary;
+
+  for (const auto &pair : index) {
+    auto &info = pair.second;
+    using namespace function_summary;
+    MetadataLayout MDlayout(Out);
+    MDlayout.emit(ScratchRecord, pair.first, info.Name);
+
+    for (auto call : info.TheSummary->calls()) {
+      CallGraphEdgeLayout edgeLayout(Out);
+      edgeLayout.emit(ScratchRecord, unsigned(call.getKind()),
+                      call.getCallee());
+    }
+  }
+}
+
+void Serializer::write(llvm::raw_ostream &os) {
+  os.write(Buffer.data(), Buffer.size());
+  os.flush();
+}
+
+bool emitModuleSummaryIndex(const ModuleSummaryIndex &index,
+                            DiagnosticEngine &diags, StringRef path) {
+  return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
+    Serializer serializer;
+    serializer.emit(index);
+    serializer.write(out);
+    return false;
+  });
 }
 
 std::unique_ptr<ModuleSummaryIndex>
@@ -32,11 +116,6 @@ loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
       break;
 
     switch (entry.ID) {
-    case CONTROL_BLOCK_ID: {
-      if (cursor.SkipBlock())
-        llvm::report_fatal_error("Can't skip block");
-      break;
-    }
     case FUNCTION_SUMMARY_ID: {
       if (llvm::Error Err = cursor.EnterSubBlock(FUNCTION_SUMMARY_ID)) {
         llvm::report_fatal_error("Can't enter subblock");
@@ -49,6 +128,7 @@ loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
       llvm::BitstreamEntry next = maybeNext.get();
 
       GUID guid;
+      std::string Name;
       std::unique_ptr<FunctionSummary> FS;
       std::vector<FunctionSummary::EdgeTy> CGEdges;
 
@@ -66,6 +146,7 @@ loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
         switch (kind) {
         case function_summary::METADATA: {
           function_summary::MetadataLayout::readRecord(scratch, guid);
+          Name = blobData.str();
           FS = std::make_unique<FunctionSummary>();
           break;
         }
@@ -85,7 +166,7 @@ loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
         }
       }
 
-      moduleSummary->addFunctionSummary(guid, std::move(FS));
+      moduleSummary->addFunctionSummary(Name, std::move(FS));
     }
     }
   }

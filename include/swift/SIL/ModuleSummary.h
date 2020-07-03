@@ -28,6 +28,7 @@ public:
 
   public:
     Kind getKind() const { return kind; }
+    GUID getCallee() const { return CalleeFnOrTable; }
 
     EdgeTy(GUID callee, Kind kind) : CalleeFnOrTable(callee), kind(kind) {}
 
@@ -48,8 +49,10 @@ public:
     }
   };
 
+  using CallGraphEdgeListTy = std::vector<EdgeTy>;
+
 private:
-  std::vector<EdgeTy> CallGraphEdgeList;
+  CallGraphEdgeListTy CallGraphEdgeList;
 
 public:
   FunctionSummary(std::vector<EdgeTy> CGEdges)
@@ -59,16 +62,34 @@ public:
   void addCall(GUID targetGUID, EdgeTy::Kind kind) {
     CallGraphEdgeList.emplace_back(targetGUID, kind);
   }
+
+  ArrayRef<EdgeTy> calls() const { return CallGraphEdgeList; }
+};
+
+struct FunctionSummaryInfo {
+  StringRef Name;
+  std::unique_ptr<FunctionSummary> TheSummary;
 };
 
 class ModuleSummaryIndex {
-  std::map<GUID, std::unique_ptr<FunctionSummary>> FunctionSummaryMap;
+  using FunctionSummaryMapTy = std::map<GUID, FunctionSummaryInfo>;
+  FunctionSummaryMapTy FunctionSummaryMap;
 
 public:
   ModuleSummaryIndex() = default;
 
-  void addFunctionSummary(GUID guid, std::unique_ptr<FunctionSummary> summary) {
-    FunctionSummaryMap.insert(std::make_pair(guid, std::move(summary)));
+  void addFunctionSummary(StringRef name,
+                          std::unique_ptr<FunctionSummary> summary) {
+    auto guid = getGUID(name);
+    FunctionSummaryMap.insert(
+        std::make_pair(guid, FunctionSummaryInfo{name, std::move(summary)}));
+  }
+
+  FunctionSummaryMapTy::const_iterator begin() const {
+    return FunctionSummaryMap.begin();
+  }
+  FunctionSummaryMapTy::const_iterator end() const {
+    return FunctionSummaryMap.end();
   }
 };
 
