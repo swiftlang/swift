@@ -111,6 +111,8 @@ public:
     EmitSILGen, ///< Emit raw SIL
     EmitSIL,    ///< Emit canonical SIL
 
+    EmitModuleSummary, /// < Emit module summary
+
     EmitModuleOnly, ///< Emit module only
     MergeModules,   ///< Merge modules only
 

@@ -24,13 +24,13 @@ enum {
 };
 
 using MetadataLayout = BCRecordLayout<METADATA,
-                                      BCFixed<64>, // Function GUID
+                                      BCVBR<16>, // Function GUID
                                       BCBlob       // Name string
                                       >;
 using CallGraphEdgeLayout =
     BCRecordLayout<CALL_GRAPH_EDGE,
                    BCFixed<32>, // FunctionSummary::Edge::Kind
-                   BCFixed<64>  // Target GUID
+                   BCVBR<16>  // Target GUID
                    >;
 } // namespace function_summary
 
