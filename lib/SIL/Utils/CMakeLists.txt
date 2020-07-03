@@ -6,7 +6,6 @@ target_sources(swiftSIL PRIVATE
   InstructionUtils.cpp
   LoopInfo.cpp
   MemAccessUtils.cpp
-  ModuleSummaryIndex.cpp
   OptimizationRemark.cpp
   OwnershipUtils.cpp
   PrettyStackTrace.cpp

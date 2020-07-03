@@ -1,10 +1,16 @@
+#ifndef SWIFT_SIL_MODULE_SUMMARY_H
+#define SWIFT_SIL_MODULE_SUMMARY_H
+
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILDeclRef.h"
+
+// FIXME: Move this into another module to avoid circular dependencies.
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
 namespace swift {
 
 using GUID = uint64_t;
-GUID getGUID(llvm::StringRef Str) { return llvm::MD5Hash(Str); }
+static GUID getGUID(llvm::StringRef Str) { return llvm::MD5Hash(Str); }
 
 class FunctionSummary {
 public:
@@ -93,4 +99,9 @@ public:
   }
 };
 
+ModuleSummaryIndex buildModuleSummaryIndex(SILModule &M,
+                                           BasicCalleeAnalysis &BCA);
+
 }; // namespace swift
+
+#endif

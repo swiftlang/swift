@@ -55,7 +55,7 @@ buildFunctionSummaryIndex(SILFunction &F, BasicCalleeAnalysis &BCA) {
   return std::make_unique<FunctionSummary>(CallGraphEdgeList);
 }
 
-ModuleSummaryIndex buildModuleSummaryIndex(SILModule &M,
+ModuleSummaryIndex swift::buildModuleSummaryIndex(SILModule &M,
                                            BasicCalleeAnalysis &BCA) {
   ModuleSummaryIndex index;
   for (auto &F : M) {

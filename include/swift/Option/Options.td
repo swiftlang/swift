@@ -918,6 +918,9 @@ def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
 def emit_pcm : Flag<["-"], "emit-pcm">,
   HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_module_summary : Flag<["-"], "emit-module-summary">,
+  HelpText<"Emit module summary">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
