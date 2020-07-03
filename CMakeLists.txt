@@ -462,6 +462,12 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
 endif()
 message(STATUS "")
 
+if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_CROSS_COMPILING FALSE)
+else()
+  set(SWIFT_CROSS_COMPILING TRUE)
+endif()
+
 include(SwiftSharedCMakeConfig)
 
 # NOTE: We include this before SwiftComponents as it relies on some LLVM CMake
