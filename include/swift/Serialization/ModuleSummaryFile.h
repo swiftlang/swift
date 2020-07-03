@@ -10,6 +10,8 @@ namespace swift {
 
 namespace modulesummary {
 
+const unsigned char MODULE_SUMMARY_SIGNATURE[] = {'M', 'O', 'D', 'S'};
+
 enum BlockID {
   MODULE_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 

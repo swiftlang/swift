@@ -23,6 +23,8 @@ class Serializer {
   /// A reusable buffer for emitting records.
   SmallVector<uint64_t, 64> ScratchRecord;
 
+  void writeSignature();
+  void writeBlockInfoBlock();
   void emitBlockID(unsigned ID, StringRef name,
                    SmallVectorImpl<unsigned char> &nameBuffer);
 
@@ -57,7 +59,14 @@ void Serializer::emitRecordID(unsigned ID, StringRef name,
   Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
 }
 
-void Serializer::emit(const ModuleSummaryIndex &index) {
+void Serializer::writeSignature() {
+  for (auto c : MODULE_SUMMARY_SIGNATURE)
+    Out.Emit((unsigned) c, 8);
+}
+
+void Serializer::writeBlockInfoBlock() {
+  llvm::BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
+
   SmallVector<unsigned char, 64> nameBuffer;
 #define BLOCK(X) emitBlockID(X##_ID, #X, nameBuffer)
 #define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
@@ -65,6 +74,12 @@ void Serializer::emit(const ModuleSummaryIndex &index) {
   BLOCK(FUNCTION_SUMMARY);
   BLOCK_RECORD(function_summary, METADATA);
   BLOCK_RECORD(function_summary, CALL_GRAPH_EDGE);
+}
+
+void Serializer::emit(const ModuleSummaryIndex &index) {
+
+  writeSignature();
+  writeBlockInfoBlock();
 
   llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 8);
   using namespace function_summary;
@@ -98,9 +113,26 @@ bool emitModuleSummaryIndex(const ModuleSummaryIndex &index,
   });
 }
 
+static bool readSignature(llvm::BitstreamCursor Cursor) {
+  for (unsigned char byte : MODULE_SUMMARY_SIGNATURE) {
+    if (Cursor.AtEndOfStream())
+      return true;
+    if (auto maybeRead = Cursor.Read(8)) {
+      if (maybeRead.get() != byte)
+        return true;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::unique_ptr<ModuleSummaryIndex>
 loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
   llvm::BitstreamCursor cursor{inputBuffer->getMemBufferRef()};
+
+  if (readSignature(cursor))
+    return nullptr;
 
   auto moduleSummary = std::make_unique<ModuleSummaryIndex>();
 
