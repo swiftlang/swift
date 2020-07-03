@@ -13,6 +13,7 @@
 #include "ToolChains.h"
 
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/AST/PlatformKind.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -613,9 +614,12 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
 
         // The first deployment of arm64 for macOS is version 10.16;
         if (triple.isAArch64() && major <= 10 && minor < 16) {
-          major = 10;
-          minor = 16;
-          micro = 0;
+          llvm::VersionTuple firstMacARM64e(10, 16, 0);
+          firstMacARM64e = canonicalizePlatformVersion(PlatformKind::OSX,
+                                                       firstMacARM64e);
+          major = firstMacARM64e.getMajor();
+          minor = firstMacARM64e.getMinor().getValueOr(0);
+          micro = firstMacARM64e.getSubminor().getValueOr(0);
         }
 
         // Temporary hack: adjust macOS version passed to the linker from

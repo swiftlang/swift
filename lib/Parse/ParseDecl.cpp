@@ -578,6 +578,20 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     return nullptr;
   }
 
+  if (PlatformKind) {
+      if (!Introduced.empty())
+        Introduced.Version =
+            canonicalizePlatformVersion(*PlatformKind, Introduced.Version);
+
+      if (!Deprecated.empty())
+        Deprecated.Version =
+            canonicalizePlatformVersion(*PlatformKind, Deprecated.Version);
+
+      if (!Obsoleted.empty())
+        Obsoleted.Version =
+            canonicalizePlatformVersion(*PlatformKind, Obsoleted.Version);
+  }
+
   auto Attr = new (Context)
   AvailableAttr(AtLoc, SourceRange(AttrLoc, Tok.getLoc()),
                 PlatformKind.getValue(),
@@ -2033,6 +2047,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         } else {
           continue;
         }
+
+        Version = canonicalizePlatformVersion(Platform, Version);
 
         Attributes.add(new (Context)
                        AvailableAttr(AtLoc, AttrRange,

@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
+
 using namespace swift;
 
 StringRef swift::platformString(PlatformKind platform) {
@@ -154,4 +155,18 @@ bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
   // inherit from their non-extension platform.
 
   return false;
+}
+
+llvm::VersionTuple swift::canonicalizePlatformVersion(
+    PlatformKind platform, const llvm::VersionTuple &version) {
+
+  // Canonicalize macOS version for macOS Big Sur to great
+  // 10.16 as 11.0.
+  if (platform == PlatformKind::OSX ||
+      platform == PlatformKind::OSXApplicationExtension) {
+    return llvm::Triple::getCanonicalVersionForOS(llvm::Triple::MacOSX,
+                                                  version);
+  }
+
+  return version;
 }

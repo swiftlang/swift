@@ -399,6 +399,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
           return llvm::VersionTuple(5, 2);
         }
       }
+    } else if (Major == 11) {
+      return llvm::VersionTuple(5, 3);
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
