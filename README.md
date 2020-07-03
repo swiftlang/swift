@@ -241,7 +241,7 @@ various products. These incremental builds are a big timesaver when developing
 and debugging.
 
     cd ${SWIFT_BUILD_DIR}
-    ninja swift
+    ninja compiler
 
 This will build the Swift compiler, but will not rebuild the standard library or
 any other target. Building the `swift-stdlib` target as an additional layer of
@@ -249,6 +249,10 @@ testing from time to time is also a good idea. To build just the standard
 library, run:
 
     ninja swift-stdlib
+
+To build just the compiler frontend, run:
+
+    ninja swift-frontend
 
 It is always a good idea to do a full build after using `update-checkout`.
 
@@ -258,7 +262,7 @@ To open the Swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
 It will auto-create a *lot* of schemes for all of the available targets. A
 common debug flow would involve:
 
- - Select the 'swift' scheme.
+ - Select the 'swift-frontend' scheme.
  - Pull up the scheme editor (⌘⇧<).
  - Select the 'Arguments' tab and click the '+'.
  - Add the command line options.
