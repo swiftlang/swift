@@ -1068,6 +1068,10 @@ function host_has_darwin_symbols() {
 }
 
 function get_stdlib_targets_for_host() {
+    # Don't build the stdlib in the Xcode train for host and cross-compilations host.
+    if [[ "${STDLIB_DEPLOYMENT_TARGETS[@]}" == "" ]]; then
+        return 0
+    fi
 
 # FIXME: STDLIB_DEPLOYMENT_TARGETS argument assumed to apply when Host == Build
 # Cross-compile Hosts are only built with their native standard libraries.
