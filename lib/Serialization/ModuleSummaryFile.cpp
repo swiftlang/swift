@@ -93,10 +93,8 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
   module_summary::MetadataLayout MDLayout(Out);
   MDLayout.emit(ScratchRecord, index.getModuleName());
   {
-    llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 4);
-    using namespace function_summary;
-
     for (const auto &pair : index) {
+      llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 4);
       auto &info = pair.second;
       using namespace function_summary;
       function_summary::MetadataLayout MDlayout(Out);
@@ -141,14 +139,13 @@ static bool readSignature(llvm::BitstreamCursor Cursor) {
   return false;
 }
 
-std::unique_ptr<ModuleSummaryIndex>
-loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
+bool loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
+                            ModuleSummaryIndex &moduleSummary) {
   llvm::BitstreamCursor cursor{inputBuffer->getMemBufferRef()};
 
-  if (readSignature(cursor))
-    return nullptr;
-
-  auto moduleSummary = std::make_unique<ModuleSummaryIndex>();
+  if (readSignature(cursor)) {
+    llvm::report_fatal_error("Invalid signature");
+  }
 
   while (!cursor.AtEndOfStream()) {
     llvm::Expected<llvm::BitstreamEntry> maybeEntry =
@@ -186,7 +183,7 @@ loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
         
         switch (kind) {
         case module_summary::MODULE_METADATA: {
-          moduleSummary->setModuleName(blobData.str());
+          moduleSummary.setModuleName(blobData.str());
           break;
         }
         }
@@ -243,13 +240,12 @@ loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
         }
       }
 
-      moduleSummary->addFunctionSummary(Name, std::move(FS));
+      moduleSummary.addFunctionSummary(Name, std::move(FS));
       break;
     }
     }
   }
-
-  return moduleSummary;
+  return false;
 }
 
 } // namespace modulesummary

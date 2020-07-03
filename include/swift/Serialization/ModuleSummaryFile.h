@@ -56,8 +56,8 @@ using CallGraphEdgeLayout =
 bool emitModuleSummaryIndex(const ModuleSummaryIndex &index,
                             DiagnosticEngine &diags, StringRef path);
 
-std::unique_ptr<ModuleSummaryIndex>
-loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer);
+bool loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
+                            ModuleSummaryIndex &moduleSummary);
 } // namespace modulesummary
 } // namespace swift
 
