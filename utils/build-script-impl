@@ -416,6 +416,8 @@ function verify_host_is_supported() {
       | linux-powerpc64le       \
       | linux-s390x             \
       | macosx-x86_64           \
+      | macosx-arm64            \
+      | macosx-arm64e           \
       | iphonesimulator-i386    \
       | iphonesimulator-x86_64  \
       | iphoneos-armv7          \
@@ -491,6 +493,24 @@ function set_build_options_for_host() {
                     llvm_target_arch=""
 
                     SWIFT_HOST_VARIANT_SDK="OSX"
+                    cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
+                    ;;
+                macosx-arm64)
+                    xcrun_sdk_name="macosx"
+                    llvm_target_arch="AArch64"
+                    SWIFT_HOST_TRIPLE="arm64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
+                    SWIFT_HOST_VARIANT="macosx"
+                    SWIFT_HOST_VARIANT_SDK="OSX"
+                    SWIFT_HOST_VARIANT_ARCH="arm64"
+                    cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
+                    ;;
+                macosx-arm64e)
+                    xcrun_sdk_name="macosx"
+                    llvm_target_arch="AArch64"
+                    SWIFT_HOST_TRIPLE="arm64e-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
+                    SWIFT_HOST_VARIANT="macosx"
+                    SWIFT_HOST_VARIANT_SDK="OSX"
+                    SWIFT_HOST_VARIANT_ARCH="arm64e"
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
                 iphonesimulator-i386)
@@ -920,7 +940,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        iphone* | appletv* | watch* | linux-armv6 | linux-armv7 )
+        macosx-arm64* | iphone* | appletv* | watch* | linux-armv6 | linux-armv7 )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1187,6 +1207,9 @@ function common_cross_c_flags() {
     local arch=${host##*-}
 
     case $host in
+        macosx-*)
+            echo -n " -arch ${arch} "
+            ;;
         iphonesimulator-*)
             echo -n " -arch ${arch}  -mios-simulator-version-min=${DARWIN_DEPLOYMENT_VERSION_IOS}"
             ;;
