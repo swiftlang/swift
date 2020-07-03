@@ -60,7 +60,7 @@ ModuleSummaryIndex buildModuleSummaryIndex(SILModule &M,
   ModuleSummaryIndex index;
   for (auto &F : M) {
     auto FS = buildFunctionSummaryIndex(F, BCA);
-    index.addFunctionSummary(getGUID(F.getName()), std::move(FS));
+    index.addFunctionSummary(F.getName(), std::move(FS));
   }
   return index;
 }

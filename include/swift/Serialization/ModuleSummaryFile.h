@@ -13,8 +13,6 @@ namespace modulesummary {
 enum BlockID {
   MODULE_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 
-  CONTROL_BLOCK_ID,
-
   FUNCTION_SUMMARY_ID,
 };
 
@@ -26,7 +24,8 @@ enum {
 };
 
 using MetadataLayout = BCRecordLayout<METADATA,
-                                      BCFixed<64> // Function GUID
+                                      BCFixed<64>, // Function GUID
+                                      BCBlob       // Name string
                                       >;
 using CallGraphEdgeLayout =
     BCRecordLayout<CALL_GRAPH_EDGE,
@@ -34,6 +33,9 @@ using CallGraphEdgeLayout =
                    BCFixed<64>  // Target GUID
                    >;
 } // namespace function_summary
+
+bool emitModuleSummaryIndex(const ModuleSummaryIndex &index,
+                            DiagnosticEngine &diags, StringRef path);
 
 std::unique_ptr<ModuleSummaryIndex>
 loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer);
