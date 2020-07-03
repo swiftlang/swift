@@ -21,3 +21,7 @@ module MemberVariables {
 module ProtocolConformance {
   header "protocol-conformance.h"
 }
+
+module SynthesizedInitializers {
+  header "synthesized-initializers.h"
+}
