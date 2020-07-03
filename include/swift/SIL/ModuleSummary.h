@@ -78,10 +78,10 @@ struct FunctionSummaryInfo {
 };
 
 class ModuleSummaryIndex {
-  using FunctionSummaryMapTy = std::map<GUID, FunctionSummaryInfo>;
-  FunctionSummaryMapTy FunctionSummaryMap;
-  
-  std::string ModuleName;
+  using FunctionSummaryInfoMapTy = std::map<GUID, FunctionSummaryInfo>;
+  FunctionSummaryInfoMapTy FunctionSummaryInfoMap;
+
+  std::string ModuleName; // Only for debug purpose
 
 public:
   ModuleSummaryIndex() = default;
@@ -94,15 +94,21 @@ public:
   void addFunctionSummary(StringRef name,
                           std::unique_ptr<FunctionSummary> summary) {
     auto guid = getGUID(name);
-    FunctionSummaryMap.insert(
+    FunctionSummaryInfoMap.insert(
         std::make_pair(guid, FunctionSummaryInfo{name, std::move(summary)}));
   }
 
-  FunctionSummaryMapTy::const_iterator begin() const {
-    return FunctionSummaryMap.begin();
+  const std::pair<FunctionSummary *, StringRef>
+  getFunctionInfo(GUID guid) const {
+    auto &entry = FunctionSummaryInfoMap.at(guid);
+    return std::make_pair(entry.TheSummary.get(), entry.Name);
   }
-  FunctionSummaryMapTy::const_iterator end() const {
-    return FunctionSummaryMap.end();
+
+  FunctionSummaryInfoMapTy::const_iterator begin() const {
+    return FunctionSummaryInfoMap.begin();
+  }
+  FunctionSummaryInfoMapTy::const_iterator end() const {
+    return FunctionSummaryInfoMap.end();
   }
 };
 
