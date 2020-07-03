@@ -32,7 +32,9 @@ class Serializer {
                     SmallVectorImpl<unsigned char> &nameBuffer);
 
 public:
-  void emit(const ModuleSummaryIndex &index);
+
+  void emitHeader();
+  void emitModuleSummary(const ModuleSummaryIndex &index);
   void write(llvm::raw_ostream &os);
 };
 
@@ -71,29 +73,40 @@ void Serializer::writeBlockInfoBlock() {
 #define BLOCK(X) emitBlockID(X##_ID, #X, nameBuffer)
 #define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
 
+  BLOCK(MODULE_SUMMARY);
+  BLOCK_RECORD(module_summary, MODULE_METADATA);
+
   BLOCK(FUNCTION_SUMMARY);
   BLOCK_RECORD(function_summary, METADATA);
   BLOCK_RECORD(function_summary, CALL_GRAPH_EDGE);
 }
 
-void Serializer::emit(const ModuleSummaryIndex &index) {
-
+void Serializer::emitHeader() {
   writeSignature();
   writeBlockInfoBlock();
+}
 
-  llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 8);
-  using namespace function_summary;
+void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
+  using namespace module_summary;
 
-  for (const auto &pair : index) {
-    auto &info = pair.second;
+  llvm::BCBlockRAII restoreBlock(Out, MODULE_SUMMARY_ID, 3);
+  module_summary::MetadataLayout MDLayout(Out);
+  MDLayout.emit(ScratchRecord, index.getModuleName());
+  {
+    llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 4);
     using namespace function_summary;
-    MetadataLayout MDlayout(Out);
-    MDlayout.emit(ScratchRecord, pair.first, info.Name);
 
-    for (auto call : info.TheSummary->calls()) {
-      CallGraphEdgeLayout edgeLayout(Out);
-      edgeLayout.emit(ScratchRecord, unsigned(call.getKind()),
-                      call.getCallee());
+    for (const auto &pair : index) {
+      auto &info = pair.second;
+      using namespace function_summary;
+      function_summary::MetadataLayout MDlayout(Out);
+      MDlayout.emit(ScratchRecord, pair.first, info.Name);
+
+      for (auto call : info.TheSummary->calls()) {
+        CallGraphEdgeLayout edgeLayout(Out);
+        edgeLayout.emit(ScratchRecord, unsigned(call.getKind()),
+                        call.getCallee());
+      }
     }
   }
 }
@@ -107,7 +120,8 @@ bool emitModuleSummaryIndex(const ModuleSummaryIndex &index,
                             DiagnosticEngine &diags, StringRef path) {
   return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
     Serializer serializer;
-    serializer.emit(index);
+    serializer.emitHeader();
+    serializer.emitModuleSummary(index);
     serializer.write(out);
     return false;
   });
@@ -148,6 +162,37 @@ loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
       break;
 
     switch (entry.ID) {
+    case MODULE_SUMMARY_ID: {
+      if (llvm::Error Err = cursor.EnterSubBlock(MODULE_SUMMARY_ID)) {
+        llvm::report_fatal_error("Can't enter subblock");
+      }
+
+      llvm::Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
+      if (!maybeNext)
+        llvm::report_fatal_error("Should have next entry");
+      
+      llvm::BitstreamEntry next = maybeNext.get();
+      llvm::SmallVector<uint64_t, 64> scratch;
+      while (next.Kind == llvm::BitstreamEntry::Record) {
+        scratch.clear();
+        llvm::StringRef blobData;
+        llvm::Expected<unsigned> maybeKind =
+            cursor.readRecord(next.ID, scratch, &blobData);
+
+        if (!maybeKind)
+          llvm::report_fatal_error("Should have kind");
+
+        unsigned kind = maybeKind.get();
+        
+        switch (kind) {
+        case module_summary::MODULE_METADATA: {
+          moduleSummary->setModuleName(blobData.str());
+          break;
+        }
+        }
+      }
+      break;
+    }
     case FUNCTION_SUMMARY_ID: {
       if (llvm::Error Err = cursor.EnterSubBlock(FUNCTION_SUMMARY_ID)) {
         llvm::report_fatal_error("Can't enter subblock");
@@ -199,6 +244,7 @@ loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
       }
 
       moduleSummary->addFunctionSummary(Name, std::move(FS));
+      break;
     }
     }
   }

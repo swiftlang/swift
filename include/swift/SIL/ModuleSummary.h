@@ -80,9 +80,16 @@ struct FunctionSummaryInfo {
 class ModuleSummaryIndex {
   using FunctionSummaryMapTy = std::map<GUID, FunctionSummaryInfo>;
   FunctionSummaryMapTy FunctionSummaryMap;
+  
+  std::string ModuleName;
 
 public:
   ModuleSummaryIndex() = default;
+
+  std::string getModuleName() const { return this->ModuleName; }
+  void setModuleName(std::string name) {
+    this->ModuleName = name;
+  }
 
   void addFunctionSummary(StringRef name,
                           std::unique_ptr<FunctionSummary> summary) {

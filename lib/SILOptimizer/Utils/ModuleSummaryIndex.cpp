@@ -58,6 +58,9 @@ buildFunctionSummaryIndex(SILFunction &F, BasicCalleeAnalysis &BCA) {
 ModuleSummaryIndex swift::buildModuleSummaryIndex(SILModule &M,
                                            BasicCalleeAnalysis &BCA) {
   ModuleSummaryIndex index;
+
+  index.setModuleName(M.getSwiftModule()->getName().str());
+
   for (auto &F : M) {
     auto FS = buildFunctionSummaryIndex(F, BCA);
     index.addFunctionSummary(F.getName(), std::move(FS));
