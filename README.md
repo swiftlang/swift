@@ -241,7 +241,7 @@ various products. These incremental builds are a big timesaver when developing
 and debugging.
 
     cd ${SWIFT_BUILD_DIR}
-    ninja compiler
+    ninja swift-frontend
 
 This will build the Swift compiler, but will not rebuild the standard library or
 any other target. Building the `swift-stdlib` target as an additional layer of
@@ -249,10 +249,6 @@ testing from time to time is also a good idea. To build just the standard
 library, run:
 
     ninja swift-stdlib
-
-To build just the compiler frontend, run:
-
-    ninja swift-frontend
 
 It is always a good idea to do a full build after using `update-checkout`.
 
