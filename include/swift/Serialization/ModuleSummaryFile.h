@@ -10,16 +10,33 @@ namespace swift {
 
 namespace modulesummary {
 
+using llvm::BCArray;
+using llvm::BCBlob;
+using llvm::BCFixed;
+using llvm::BCGenericRecordLayout;
+using llvm::BCRecordLayout;
+using llvm::BCVBR;
+
 const unsigned char MODULE_SUMMARY_SIGNATURE[] = {'M', 'O', 'D', 'S'};
 
 enum BlockID {
-  MODULE_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
+  MODULE_SUMMARY_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 
   FUNCTION_SUMMARY_ID,
 };
 
+namespace module_summary {
+enum {
+  MODULE_METADATA,
+};
+
+using MetadataLayout = BCRecordLayout<
+  MODULE_METADATA,
+  BCBlob // Module name
+>;
+};
+
 namespace function_summary {
-using namespace llvm;
 enum {
   METADATA,
   CALL_GRAPH_EDGE,
