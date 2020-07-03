@@ -486,9 +486,7 @@ func test_variadics() {
   // CHECK: [[FN_REF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
   // CHECK: [[MAKE_ARR:%[0-9]+]] = apply [[FN_REF]]<Int>([[ARR_COUNT]])
   // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<Int>, Builtin.RawPointer)
-  // CHECK: [[FIN_REF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
-  // CHECK: [[FIN_ARR:%[0-9]+]] = apply [[FIN_REF]]<Int>([[ARR]])
-  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(thin) (@in_guaranteed SubscriptVariadic1, UnsafeRawPointer) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[FIN_ARR]])
+  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(thin) (@in_guaranteed SubscriptVariadic1, UnsafeRawPointer) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[ARR]])
   _ = \SubscriptVariadic1.[]
   
   _ = \SubscriptVariadic2.["", "1"]
