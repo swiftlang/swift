@@ -1,5 +1,4 @@
 // RUN: %swift -typecheck -verify -parse-stdlib -module-name Swift -target x86_64-apple-macosx11.0 %s
-// RUN: %swift -typecheck -verify -parse-stdlib -module-name Swift -target x86_64-apple-macosx10.16 %s
 
 
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 11.0,
