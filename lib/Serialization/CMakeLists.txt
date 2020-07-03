@@ -4,6 +4,7 @@ add_swift_host_library(swiftSerialization STATIC
   ModuleDependencyScanner.cpp
   ModuleFile.cpp
   ModuleFileSharedCore.cpp
+  ModuleSummaryFile.cpp
   Serialization.cpp
   SerializedModuleLoader.cpp
   SerializedSILLoader.cpp
