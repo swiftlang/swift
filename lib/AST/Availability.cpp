@@ -375,7 +375,7 @@ AvailabilityContext ASTContext::getSwiftFutureAvailability() {
 
   if (target.isMacOSX() ) {
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else if (target.isiOS()) {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));

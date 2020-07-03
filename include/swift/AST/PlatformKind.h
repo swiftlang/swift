@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 
@@ -64,6 +65,9 @@ PlatformKind targetPlatform(LangOptions &LangOpts);
 /// should also apply to the "child" platform for declarations without
 /// an explicit attribute for the child.
 bool inheritsAvailabilityFromPlatform(PlatformKind Child, PlatformKind Parent);
+
+llvm::VersionTuple canonicalizePlatformVersion(
+    PlatformKind platform, const llvm::VersionTuple &version);
 
 } // end namespace swift
 
