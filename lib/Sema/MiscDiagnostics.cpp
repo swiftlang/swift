@@ -3239,6 +3239,76 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   TLCD->walk(checker);
 }
 
+/// Check if this function is an override and if it is, check if it
+/// needs to emit a 'super.foo()' call in the body.
+static void checkIfSuperCallIsRequired(FuncDecl *FD) {
+  class SuperCallFinder : public ASTWalker {
+    const FuncDecl *BaseFunc;
+    bool foundSuperCall = false;
+
+  public:
+    SuperCallFinder(const FuncDecl *baseFunc) : BaseFunc(baseFunc) {}
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E) {
+        return {true, E};
+      }
+      if (auto CE = dyn_cast<CallExpr>(E)) {
+        if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
+          if (isa<SuperRefExpr>(DSCE->getBase()) &&
+              CE->getCalledValue() == BaseFunc) {
+            foundSuperCall = true;
+            return {false, nullptr};
+          }
+        }
+      }
+
+      return {true, E};
+    }
+
+    bool didFindSuperCall() { return foundSuperCall; }
+  };
+
+  auto hasSuperCall = [&](const ValueDecl *BaseVD,
+                          const ValueDecl *OverrideVD) {
+    auto baseFunc = cast<FuncDecl>(BaseVD);
+    auto overriddenFunc = cast<FuncDecl>(OverrideVD);
+    auto walker = SuperCallFinder(baseFunc);
+    overriddenFunc->getBody()->walk(walker);
+    return walker.didFindSuperCall();
+  };
+
+  if (!FD->getAttrs().hasAttribute<OverrideAttr>()) {
+    return;
+  }
+
+  auto &Diags = FD->getASTContext().Diags;
+  SmallString<128> scratch;
+
+  for (auto baseDecl : FD->getOverriddenDecls()) {
+    auto baseHasRequiresSuperAttr =
+        baseDecl->getAttrs().hasAttribute<RequiresSuperAttr>();
+    auto ignoresSuperAttr = FD->getAttrs().getAttribute<IgnoresSuperAttr>();
+    if (ignoresSuperAttr) {
+      if (!baseHasRequiresSuperAttr) {
+        Diags
+            .diagnose(ignoresSuperAttr->getLocation(),
+                      diag::ignores_super_attr_no_effect)
+            .fixItRemove(ignoresSuperAttr->getRangeWithAt());
+      }
+      continue;
+    }
+
+    if (!hasSuperCall(baseDecl, FD)) {
+      scratch.clear();
+      auto baseMethodName = baseDecl->getName().getString(scratch);
+      Diags.diagnose(FD, diag::requires_super_call_override, baseMethodName);
+      Diags.diagnose(FD, diag::silence_super_call_override)
+          .fixItInsert(FD->getAttributeInsertionLoc(false), "@ignoresSuper ");
+    }
+  }
+}
+
 /// Perform diagnostics for func/init/deinit declarations.
 void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   // Don't produce these diagnostics for implicitly generated code.
@@ -3267,6 +3337,10 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
         OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
       }
     }
+  }
+
+  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+    checkIfSuperCallIsRequired(FD);
   }
 }
 
