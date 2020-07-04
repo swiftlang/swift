@@ -2651,6 +2651,18 @@ ERROR(override_method_different_generic_sig,none,
       "base method's generic signature %2; expected generic signature to be %3",
       (DeclBaseName, StringRef, StringRef, StringRef))
 
+ERROR(super_attr_not_valid_final_method, none, 
+      "'@%0' cannot be applied to final method", (StringRef))
+ERROR(super_attr_only_valid_on_class_method, none, 
+      "'@%0' can only be applied on non-final class methods", (StringRef))
+ERROR(ignores_super_attr_no_effect, none, 
+      "'@ignoresSuper' has no effect because base method does not require 'super' call", ())
+WARNING(requires_super_call_override, none, 
+        "method override is missing a 'super.%0' call", 
+        (StringRef))
+NOTE(silence_super_call_override, none, 
+     "annotate method with '@ignoresSuper' if this is intentional", ())
+
 // Inheritance
 ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
