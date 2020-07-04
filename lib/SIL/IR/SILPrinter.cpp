@@ -2888,7 +2888,7 @@ static void printFileIDMap(SILPrintContext &Ctx, const FileIDMap map) {
   if (map.empty())
     return;
 
-  Ctx.OS() << "\n\n// Mappings from '#file' to '#filePath':\n";
+  Ctx.OS() << "\n\n// Mappings from '#fileID' to '#filePath':\n";
 
   if (Ctx.sortSIL()) {
     llvm::SmallVector<llvm::StringRef, 16> keys;

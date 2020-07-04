@@ -460,6 +460,7 @@ enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
   File,
+  FileID,
   FilePath,
   Line,
   Column,

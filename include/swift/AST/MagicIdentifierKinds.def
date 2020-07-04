@@ -57,6 +57,10 @@ MAGIC_STRING_IDENTIFIER(File, "#file", PoundFileExpr)
   MAGIC_IDENTIFIER_TOKEN(File, pound_file)
   MAGIC_IDENTIFIER_DEPRECATED_TOKEN(File, kw___FILE__)
 
+/// The \c #fileID magic identifier literal.
+MAGIC_STRING_IDENTIFIER(FileID, "#fileID", PoundFileIDExpr)
+  MAGIC_IDENTIFIER_TOKEN(FileID, pound_fileID)
+
 /// The \c #filePath magic identifier literal.
 MAGIC_STRING_IDENTIFIER(FilePath, "#filePath", PoundFilePathExpr)
   MAGIC_IDENTIFIER_TOKEN(FilePath, pound_filePath)
