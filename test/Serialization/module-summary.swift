@@ -8,7 +8,11 @@
 
 // MAIN-CHECK: <METADATA {{.+}} op0=1305169934332876051/> blob data = '$s4main10publicFuncyyF'
 
+
+// Ensure that call graph edge has correct function guid
 // MAIN-CHECK:        <METADATA {{.+}} op0=7308225924950623125/> blob data = '$s7module20A4FuncSiyF'
+// MAIN-CHECK:        <METADATA {{.+}} op0=-2624081020897602054/> blob data = 'main'
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=1305169934332876051/>
 // MAIN-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 
@@ -17,7 +21,6 @@
 // MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-432276440123806562/>
 // MAIN-CHECK-NEXT: </FUNCTION_SUMMARY>
 
-
 // RUN: %swift_frontend_plain -cross-module-opt %t/module-summary.swiftmodule.summary %t/module1.swiftmodule.summary %t/module2.swiftmodule.summary -o %t/merged-module.summary
 // RUN: llvm-bcanalyzer -dump %t/merged-module.summary | %FileCheck %s --check-prefix MERGED-CHECK
 
@@ -25,14 +28,14 @@
 // MERGED-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 // MERGED-CHECK:        <METADATA {{.+}} op0=7308225924950623125/> blob data = '$s7module20A4FuncSiyF'
-// MERGED-CHECK-NEXT:   <CALL_GRAPH_EDGE abbrevid=5 op0=0 op1=1426602696/>
+// MERGED-CHECK-NEXT:   <CALL_GRAPH_EDGE abbrevid=5 op0=0 op1=1546188077662747336/>
 // MERGED-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 import module2
 
 func foo() { bar(0) }
 func bar(_ i: Int) {
-    if (i == 0) { return  }
+    if (i == 0) { return }
     foo()
 }
 
@@ -49,8 +52,10 @@ public func publicFunc() {
     foo()
 }
 
-public struct X {
-    func method1() {
-        publicFunc()
-    }
-}
+// public struct X {
+//     func method1() {
+//         publicFunc()
+//     }
+// }
+
+publicFunc()

@@ -227,7 +227,8 @@ bool Deserializer::readFunctionSummary() {
       break;
     }
     case function_summary::CALL_GRAPH_EDGE: {
-      unsigned edgeKindID, targetGUID;
+      unsigned edgeKindID;
+      GUID targetGUID;
       function_summary::CallGraphEdgeLayout::readRecord(Scratch, edgeKindID,
                                                         targetGUID);
       auto edgeKind = getEdgeKind(edgeKindID);

@@ -9,6 +9,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -75,7 +76,52 @@ public:
   }
 };
 
-class ModuleSummaryLinker {};
+static llvm::DenseSet<GUID> computePreservedGUIDs() {
+  llvm::DenseSet<GUID> Set(1);
+  Set.insert(getGUID("main"));
+  return Set;
+}
+
+void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &PreservedGUIDs) {
+  
+  SmallVector<GUID, 8> Worklist;
+  unsigned LiveSymbols = 0;
+
+  for (auto GUID : PreservedGUIDs) {
+    Worklist.push_back(GUID);
+  }
+  
+  while (!Worklist.empty()) {
+    auto GUID = Worklist.pop_back_val();
+    
+    auto maybePair = summary.getFunctionInfo(GUID);
+    if (!maybePair) {
+      llvm_unreachable("Bad GUID");
+    }
+    auto pair = maybePair.getValue();
+    auto FS = pair.first;
+    if (FS->isLive()) continue;
+
+    llvm::dbgs() << "Mark " << pair.second << " as live\n";
+    FS->setLive(true);
+    LiveSymbols++;
+    
+    for (auto Call : FS->calls()) {
+      switch (Call.getKind()) {
+      case FunctionSummary::EdgeTy::Kind::Static: {
+        Worklist.push_back(Call.getCallee());
+        continue;
+      }
+      case FunctionSummary::EdgeTy::Kind::Witness:
+      case FunctionSummary::EdgeTy::Kind::VTable: {
+        llvm_unreachable("Witness and VTable calls are not supported yet.");
+      }
+      case FunctionSummary::EdgeTy::Kind::kindCount:
+        llvm_unreachable("impossible");
+      }
+    }
+  }
+}
 
 int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
                           void *MainAddr) {
@@ -113,6 +159,9 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
   }
 
   TheSummary->setModuleName("combined");
+  
+  auto PreservedGUIDs = computePreservedGUIDs();
+  markDeadSymbols(*TheSummary.get(), PreservedGUIDs);
 
   modulesummary::emitModuleSummaryIndex(*TheSummary, Instance.getDiags(),
                                         Invocation.getOutputFilename());
