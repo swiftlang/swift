@@ -203,7 +203,8 @@ bool Deserializer::readFunctionSummary() {
 
   GUID guid;
   std::string Name;
-  std::unique_ptr<FunctionSummary> FS;
+  FunctionSummary *FS;
+  std::unique_ptr<FunctionSummary> NewFSOwner;
 
   while (next.Kind == llvm::BitstreamEntry::Record) {
     Scratch.clear();
@@ -217,7 +218,12 @@ bool Deserializer::readFunctionSummary() {
     case function_summary::METADATA: {
       function_summary::MetadataLayout::readRecord(Scratch, guid);
       Name = BlobData.str();
-      FS = std::make_unique<FunctionSummary>();
+      if (auto info = moduleSummary.getFunctionInfo(guid)) {
+        FS = info.getValue().first;
+      } else {
+        NewFSOwner = std::make_unique<FunctionSummary>();
+        FS = NewFSOwner.get();
+      }
       break;
     }
     case function_summary::CALL_GRAPH_EDGE: {
@@ -243,7 +249,9 @@ bool Deserializer::readFunctionSummary() {
   }
 
   llvm::dbgs() << "Added " << Name << " in FS list\n";
-  moduleSummary.addFunctionSummary(Name, std::move(FS));
+  if (auto &FS = NewFSOwner) {
+    moduleSummary.addFunctionSummary(Name, std::move(FS));
+  }
   return false;
 }
 

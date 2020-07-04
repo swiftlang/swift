@@ -98,10 +98,14 @@ public:
         std::make_pair(guid, FunctionSummaryInfo{name, std::move(summary)}));
   }
 
-  const std::pair<FunctionSummary *, StringRef>
+  const llvm::Optional<std::pair<FunctionSummary *, StringRef>>
   getFunctionInfo(GUID guid) const {
-    auto &entry = FunctionSummaryInfoMap.at(guid);
-    return std::make_pair(entry.TheSummary.get(), entry.Name);
+    auto found = FunctionSummaryInfoMap.find(guid);
+    if (found == FunctionSummaryInfoMap.end()) {
+      return None;
+    }
+    auto &entry = found->second;
+    return std::make_pair(entry.TheSummary.get(), StringRef(entry.Name));
   }
 
   FunctionSummaryInfoMapTy::const_iterator begin() const {
