@@ -4060,10 +4060,8 @@ public:
                  CodeCompletionLiteralKind::StringLiteral);
     addFromProto("#file", CodeCompletionKeywordKind::pound_file,
                  CodeCompletionLiteralKind::StringLiteral);
-    if (Ctx.LangOpts.EnableConcisePoundFile) {
-      addFromProto("#filePath", CodeCompletionKeywordKind::pound_file,
-                   CodeCompletionLiteralKind::StringLiteral);
-    }
+    addFromProto("#filePath", CodeCompletionKeywordKind::pound_filePath,
+                 CodeCompletionLiteralKind::StringLiteral);
     addFromProto("#line", CodeCompletionKeywordKind::pound_line,
                  CodeCompletionLiteralKind::IntegerLiteral);
     addFromProto("#column", CodeCompletionKeywordKind::pound_column,
