@@ -104,7 +104,7 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
     }
 
     auto HasErr = swift::modulesummary::loadModuleSummaryIndex(
-        std::move(ErrOrBuf.get()), *TheSummary.get());
+        ErrOrBuf.get()->getMemBufferRef(), *TheSummary.get());
 
     if (HasErr)
       llvm::report_fatal_error("Invalid module summary");
