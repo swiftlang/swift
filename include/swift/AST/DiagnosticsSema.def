@@ -1801,11 +1801,11 @@ ERROR(type_cannot_conform_to_nsobject,none,
 
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
-
 ERROR(type_cannot_conform, none,
-      "%select{|value of protocol }0type %1 cannot conform to %2; "
-      "only struct/enum/class types can conform to protocols",
-      (bool, Type, Type))
+      "%select{type %1|protocol %1 as a type}0 cannot conform to "
+      "%select{%3|the protocol itself}2; "
+      "only concrete types such as structs, enums and classes can conform to protocols",
+      (bool, Type, bool, Type))
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
 NOTE(required_by_decl,none,

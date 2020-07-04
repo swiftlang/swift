@@ -18,7 +18,6 @@
 #ifndef SWIFT_SIL_SILTYPE_H
 #define SWIFT_SIL_SILTYPE_H
 
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -622,9 +621,18 @@ template<> Can##ID##Type SILType::getAs<ID##Type>() const = delete;  \
 template<> Can##ID##Type SILType::castTo<ID##Type>() const = delete; \
 template<> bool SILType::is<ID##Type>() const = delete;
 NON_SIL_TYPE(Function)
+NON_SIL_TYPE(GenericFunction)
 NON_SIL_TYPE(AnyFunction)
 NON_SIL_TYPE(LValue)
+NON_SIL_TYPE(InOut)
 #undef NON_SIL_TYPE
+
+#define TYPE(ID, PARENT)
+#define UNCHECKED_TYPE(ID, PARENT)                                   \
+template<> Can##ID##Type SILType::getAs<ID##Type>() const = delete;  \
+template<> Can##ID##Type SILType::castTo<ID##Type>() const = delete; \
+template<> bool SILType::is<ID##Type>() const = delete;
+#include "swift/AST/TypeNodes.def"
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

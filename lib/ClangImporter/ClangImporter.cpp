@@ -3595,6 +3595,18 @@ void ClangImporter::Implementation::lookupValue(
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
 
+  // For operators we have to look up static member functions in addition to the
+  // top-level function lookup below.
+  if (name.isOperator()) {
+    for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
+      if (isVisibleClangEntry(entry)) {
+        if (auto decl = dyn_cast<ValueDecl>(
+                importDeclReal(entry->getMostRecentDecl(), CurrentVersion)))
+          consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+      }
+    }
+  }
+
   for (auto entry : table.lookup(name.getBaseName(), clangTU)) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(entry)) continue;

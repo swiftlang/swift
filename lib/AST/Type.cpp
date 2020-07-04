@@ -760,6 +760,16 @@ bool TypeBase::isStdlibType() {
   return false;
 }
 
+bool TypeBase::isKnownStdlibCollectionType() {
+  if (auto *structType = getAs<BoundGenericStructType>()) {
+    auto &ctx = getASTContext();
+    auto *decl = structType->getDecl();
+    return decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
+           decl == ctx.getSetDecl();
+  }
+  return false;
+}
+
 /// Remove argument labels from the function type.
 Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   // If there is nothing to remove, don't.
@@ -3210,7 +3220,11 @@ void ArchetypeType::populateNestedTypes() const {
 
   // Record the nested types.
   auto mutableThis = const_cast<ArchetypeType *>(this);
-  mutableThis->setNestedTypes(mutableThis->getASTContext(), nestedTypes);
+
+  std::sort(nestedTypes.begin(), nestedTypes.end(), OrderArchetypeByName());
+  auto &Ctx = mutableThis->getASTContext();
+  mutableThis->NestedTypes = Ctx.AllocateCopy(nestedTypes);
+  mutableThis->Bits.ArchetypeType.ExpandedNestedTypes = true;
 }
 
 Type ArchetypeType::getNestedType(Identifier Name) const {
@@ -3250,26 +3264,9 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
 }
 
 ArrayRef<std::pair<Identifier, Type>>
-ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
+ArchetypeType::getKnownNestedTypes() const {
   populateNestedTypes();
-
-  if (resolveTypes) {
-    for (auto &nested : NestedTypes) {
-      if (!nested.second)
-        resolveNestedType(nested);
-    }
-  }
-
   return NestedTypes;
-}
-
-void ArchetypeType::setNestedTypes(
-                                 ASTContext &Ctx,
-                                 ArrayRef<std::pair<Identifier, Type>> Nested) {
-  assert(!Bits.ArchetypeType.ExpandedNestedTypes && "Already expanded");
-  NestedTypes = Ctx.AllocateCopy(Nested);
-  std::sort(NestedTypes.begin(), NestedTypes.end(), OrderArchetypeByName());
-  Bits.ArchetypeType.ExpandedNestedTypes = true;
 }
 
 void ArchetypeType::registerNestedType(Identifier name, Type nested) {
