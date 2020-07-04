@@ -2658,7 +2658,7 @@ ERROR(super_attr_only_valid_on_class_method, none,
 ERROR(ignores_super_attr_no_effect, none, 
       "'@ignoresSuper' has no effect because base method does not require 'super' call", ())
 WARNING(requires_super_call_override, none, 
-        "method override is missing a 'super.%0' call", 
+        "method override is missing 'super.%0' call", 
         (StringRef))
 NOTE(silence_super_call_override, none, 
      "annotate method with '@ignoresSuper' if this is intentional", ())
