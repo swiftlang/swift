@@ -38,10 +38,12 @@
 // LIVE-CHECK-DAG: <METADATA abbrevid=4 op0=-2624081020897602054 op1=1/> blob data = 'main'
 // LIVE-CHECK-DAG: <METADATA abbrevid=4 op0=-432276440123806562 op1=1/> blob data = '$s4main3baryySiF'
 
-// RUN: %target-swift-frontend -emit-sil %s -module-summary-path %t/merged-module.summary -O -I %t | %FileCheck %s --check-prefix DEADFUNC-CHECK
-// DEADFUNC-CHECK: @main
-// DEADFUNC-CHECK: @$s4main3baryySiF
-// DEADFUNC-CHECK: @$s4main10publicFuncyyF
+// RUN: %target-swift-frontend -emit-sil %s -I %t -o %t/main.sil
+// RUN: %target-sil-opt -emit-sorted-sil %t/main.sil -module-summary-path %t/merged-module.summary --sil-cross-deadfuncelim -I %t | %FileCheck %s --check-prefix DEADFUNC-CHECK
+// RUN: %target-swift-frontend -emit-sil %s -module-summary-path %t/merged-module.summary -I %t -O | %FileCheck %s --check-prefix DEADFUNC-CHECK
+// DEADFUNC-CHECK-DAG: @$s4main10publicFuncyyF
+// DEADFUNC-CHECK-DAG: @$s4main3baryySiF
+// DEADFUNC-CHECK-DAG: @main
 
 // DEADFUNC-CHECK-NOT: @$s4main16callExternalFuncyyF
 // DEADFUNC-CHECK-NOT: @$sSi2eeoiySbSi_SitFZ
@@ -70,11 +72,5 @@ func callExternalFunc() {
 public func publicFunc() {
     foo()
 }
-
-// public struct X {
-//     func method1() {
-//         publicFunc()
-//     }
-// }
 
 publicFunc()
