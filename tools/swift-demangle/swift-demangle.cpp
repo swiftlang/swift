@@ -268,12 +268,13 @@ int main(int argc, char **argv) {
   } else {
     swift::Demangle::Context DCtx;
     for (llvm::StringRef name : InputNames) {
-      if (name.startswith("S") || name.startswith("s") ) {
-        std::string correctedName = std::string("$") + name.str();
-        demangle(llvm::outs(), correctedName, DCtx, options);
-      } else {
-        demangle(llvm::outs(), name, DCtx, options);
+      std::string correctedName = name;
+      if (name.startswith("S:") || name.startswith("s:")) {
+        correctedName = std::string("$s" ) + name.drop_front(2).str();
+      } else if (name.startswith("S") || name.startswith("s") ) {
+        correctedName = std::string("$") + name.str();
       }
+      demangle(llvm::outs(), correctedName, DCtx, options);
       llvm::outs() << '\n';
     }
 
