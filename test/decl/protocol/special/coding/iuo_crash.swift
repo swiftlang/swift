@@ -3,6 +3,6 @@
 // Crash due to codable synthesis with implicitly unwrapped optionals of
 // ill-formed types.
 // rdar://problem/60985179
-struct X: Codable {  // expected-error 2{{type 'X' does not conform to protocol}}
+struct X: Codable {
   var c: Undefined! // expected-error{{cannot find type 'Undefined' in scope}}
 }

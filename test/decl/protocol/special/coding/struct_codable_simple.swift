@@ -46,8 +46,7 @@ struct SR_12248_3: Encodable {
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
 }
 
-struct NotConforms: Codable { // expected-error {{type 'NotConforms' does not conform to protocol 'Decodable'}}
-// expected-error@-1 {{type 'NotConforms' does not conform to protocol 'Encodable'}}
+struct NotConforms: Codable {
   enum CodingKeys: CodingKey {
     case x
     case y

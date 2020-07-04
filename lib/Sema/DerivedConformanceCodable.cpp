@@ -99,11 +99,6 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
 /// \param proto The \c ProtocolDecl to check conformance to.
 static CodableConformanceType
 varConformsToCodable(DeclContext *DC, VarDecl *varDecl, ProtocolDecl *proto) {
-  auto declInterfaceType = varDecl->getValueInterfaceType();
-  if (declInterfaceType->hasError()) {
-    return CodableConformanceType::TypeNotValidated;
-  }
-  
   // If the decl doesn't yet have a type, we may be seeing it before the type
   // checker has gotten around to evaluating its type. For example:
   //
@@ -117,7 +112,8 @@ varConformsToCodable(DeclContext *DC, VarDecl *varDecl, ProtocolDecl *proto) {
   //              //    hasn't yet been evaluated
   // }
   bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
-  return typeConformsToCodable(DC, declInterfaceType, isIUO, proto);
+  return typeConformsToCodable(DC, varDecl->getValueInterfaceType(), isIUO,
+                               proto);
 }
 
 /// Retrieve the variable name for the purposes of encoding/decoding.
@@ -180,10 +176,18 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
       propertiesAreValid = false;
       continue;
     }
-
+    
+    auto varDecl = it->second;
+    
+    // If the element declaration type has an error, let's skip conformance
+    // validation because this was caused by another problem that will
+    // produce a diagnostic elsewhere anyway.
+    if (varDecl->getInterfaceType()->hasError())
+      continue;
+    
     // We have a property to map to. Ensure it's {En,De}codable.
     auto conformance =
-        varConformsToCodable(conformanceDC, it->second, derived.Protocol);
+        varConformsToCodable(conformanceDC, varDecl, derived.Protocol);
     switch (conformance) {
       case Conforms:
         // The property was valid. Remove it from the list.
@@ -222,9 +226,12 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
   if (!properties.empty() &&
       derived.Protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
     for (auto it = properties.begin(); it != properties.end(); ++it) {
+      auto *varDecl = it->second;
+      if (varDecl->getInterfaceType()->hasError())
+        continue;
+      
       // If the var is default initializable, then it need not have an explicit
       // initial value.
-      auto *varDecl = it->second;
       if (auto pbd = varDecl->getParentPatternBinding()) {
         if (pbd->isDefaultInitializable())
           continue;
@@ -360,6 +367,12 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   bool allConform = true;
   for (auto *varDecl : target->getStoredProperties()) {
     if (!varDecl->isUserAccessible())
+      continue;
+    
+    // If the synthetized element type has an error, let's skip conformance
+    // validation because this was caused by another problem that will
+    // produce a diagnostic elsewhere anyway.
+    if (varDecl->getInterfaceType()->hasError())
       continue;
 
     // Despite creating the enum in the context of the type, we're
