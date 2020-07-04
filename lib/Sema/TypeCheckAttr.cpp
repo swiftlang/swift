@@ -5848,7 +5848,9 @@ void AttributeChecker::visitRequiresSuperAttr(RequiresSuperAttr *attr) {
     // '@requiresSuper' cannot be applied to 'final' methods as they can't be
     // overridden.
     if (FD->isFinal()) {
-      DE.diagnose(attr->getLocation(), diag::super_attr_not_valid_final_method, attr->getAttrName());
+      DE.diagnose(attr->getLocation(), diag::super_attr_not_valid_final_method,
+                  attr->getAttrName())
+          .fixItRemove(attr->getRangeWithAt());
       FD->getAttrs().removeAttribute(attr);
       attr->setInvalid();
     }
