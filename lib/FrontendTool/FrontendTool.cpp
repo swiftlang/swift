@@ -1826,11 +1826,13 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   return Context.hadError();
 }
 
-static bool emitModuleSummary(SILModule *SM, const PrimarySpecificPaths &PSPs,
+static bool emitModuleSummary(SILModule *SM,
+                              const std::string &ModuleSummaryOutputPath,
                               const ASTContext &Context) {
-    BasicCalleeAnalysis BCA(SM);
-    auto Summary = buildModuleSummaryIndex(*SM, BCA);
-    return modulesummary::emitModuleSummaryIndex(Summary, Context.Diags, PSPs.OutputFilename);
+  BasicCalleeAnalysis BCA(SM);
+  auto Summary = buildModuleSummaryIndex(*SM, BCA);
+  return modulesummary::emitModuleSummaryIndex(Summary, Context.Diags,
+                                               ModuleSummaryOutputPath);
 }
 
 static GeneratedModule
@@ -2059,10 +2061,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Context, MSF);
-  
-  
-  if (Action == FrontendOptions::ActionType::EmitModuleSummary) {
-      return emitModuleSummary(SM.get(), PSPs, Context);
+
+  if (!opts.ModuleSummaryOutputPath.empty()) {
+    if (emitModuleSummary(SM.get(), opts.ModuleSummaryOutputPath, Context)) {
+      return true;
+    }
   }
 
   if (PSPs.haveModuleOrModuleDocOutputPaths()) {

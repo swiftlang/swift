@@ -2,6 +2,7 @@ target_sources(swiftSILOptimizer PRIVATE
   CapturePromotion.cpp
   CapturePropagation.cpp
   ClosureSpecializer.cpp
+  CrossDeadFunctionElimination.cpp
   CrossModuleSerializationSetup.cpp
   DeadFunctionElimination.cpp
   GlobalOpt.cpp

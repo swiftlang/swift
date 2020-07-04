@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/module1.swift -parse-as-library -o %t
-// RUN: %target-swift-frontend -emit-module-summary %S/Inputs/module1.swift -parse-as-library -o %t
+// RUN: %target-swift-frontend -emit-sil %S/Inputs/module1.swift -emit-module-summary-path %t/module1.swiftmodule.summary -parse-as-library > /dev/null
 // RUN: %target-swift-frontend -emit-module %S/Inputs/module2.swift -parse-as-library -I %t -o %t
-// RUN: %target-swift-frontend -emit-module-summary %S/Inputs/module2.swift -parse-as-library -I %t -o %t
-// RUN: %target-swift-frontend -emit-module-summary %s -I %t -o %t
+// RUN: %target-swift-frontend -emit-sil %S/Inputs/module2.swift -emit-module-summary-path %t/module2.swiftmodule.summary -I %t -parse-as-library > /dev/null
+// RUN: %target-swift-frontend -emit-sil %s -emit-module-summary-path %t/module-summary.swiftmodule.summary -I %t > /dev/null
 // RUN: llvm-bcanalyzer -dump %t/module-summary.swiftmodule.summary | %FileCheck %s --check-prefix MAIN-CHECK
 
 // MAIN-CHECK: <METADATA {{.+}} op0=1305169934332876051 op1=0/> blob data = '$s4main10publicFuncyyF'
@@ -37,6 +37,18 @@
 // LIVE-CHECK-DAG: <METADATA abbrevid=4 op0=-8492700279074763592 op1=1/> blob data = '$s4main3fooyyF'
 // LIVE-CHECK-DAG: <METADATA abbrevid=4 op0=-2624081020897602054 op1=1/> blob data = 'main'
 // LIVE-CHECK-DAG: <METADATA abbrevid=4 op0=-432276440123806562 op1=1/> blob data = '$s4main3baryySiF'
+
+// RUN: %target-swift-frontend -emit-sil %s -module-summary-path %t/merged-module.summary -O -I %t | %FileCheck %s --check-prefix DEADFUNC-CHECK
+// DEADFUNC-CHECK: @main
+// DEADFUNC-CHECK: @$s4main3baryySiF
+// DEADFUNC-CHECK: @$s4main10publicFuncyyF
+
+// DEADFUNC-CHECK-NOT: @$s4main16callExternalFuncyyF
+// DEADFUNC-CHECK-NOT: @$sSi2eeoiySbSi_SitFZ
+// DEADFUNC-CHECK-NOT: @$s7module20A4FuncSiyF
+// DEADFUNC-CHECK-NOT: @$sSi22_builtinIntegerLiteralSiBI_tcfC
+// DEADFUNC-CHECK-NOT: @$s4main9callTwiceyyF
+
 
 import module2
 
