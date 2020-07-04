@@ -40,6 +40,9 @@ def emit_module_doc_path
 
 def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
   HelpText<"Output module source info file">;
+  
+def emit_module_summary : Flag<["-"], "emit-module-summary">,
+  HelpText<"Emit module summary">;
 
 def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
   HelpText<"Avoid getting source location from .swiftsourceinfo files">;
