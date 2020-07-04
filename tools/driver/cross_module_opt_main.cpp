@@ -75,6 +75,8 @@ public:
   }
 };
 
+class ModuleSummaryLinker {};
+
 int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
                           void *MainAddr) {
   INITIALIZE_LLVM();
