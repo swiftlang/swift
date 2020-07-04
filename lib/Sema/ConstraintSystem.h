@@ -4423,6 +4423,9 @@ private:
     /// The set of protocol requirements placed on this type variable.
     llvm::TinyPtrVector<Constraint *> Protocols;
 
+    /// The set of constraints which would be used to infer default types.
+    llvm::TinyPtrVector<Constraint *> Defaults;
+
     /// Whether these bindings should be delayed until the rest of the
     /// constraint system is considered "fully bound".
     bool FullyBound = false;
@@ -4573,6 +4576,11 @@ private:
         const llvm::SmallDenseMap<TypeVariableType *,
                                   ConstraintSystem::PotentialBindings>
             &inferredBindings);
+
+    /// Infer bindings based on any protocol conformances that have default
+    /// types.
+    void inferDefaultTypes(ConstraintSystem &cs,
+                           llvm::SmallPtrSetImpl<CanType> &existingTypes);
 
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.

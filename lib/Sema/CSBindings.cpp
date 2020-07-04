@@ -44,9 +44,6 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
         return rhs->getAs<TypeVariableType>() == TypeVar;
       });
 
-  if (conversions.empty())
-    return;
-
   for (auto *constraint : conversions) {
     auto *tv =
         cs.simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
@@ -57,16 +54,19 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
     if (relatedBindings == inferredBindings.end())
       continue;
 
+    auto &bindings = relatedBindings->getSecond();
+
     // Infer transitive protocol requirements.
-    for (auto *protocol : relatedBindings->getSecond().Protocols) {
-      Protocols.push_back(protocol);
-    }
+    llvm::copy(bindings.Protocols, std::back_inserter(Protocols));
+
+    // Infer transitive defaults.
+    llvm::copy(bindings.Defaults, std::back_inserter(Defaults));
 
     // TODO: We shouldn't need this in the future.
     if (constraint->getKind() != ConstraintKind::Subtype)
       continue;
 
-    for (auto &binding : relatedBindings->getSecond().Bindings) {
+    for (auto &binding : bindings.Bindings) {
       // We need the binding kind for the potential binding to
       // either be Exact or Supertypes in order for it to make sense
       // to add Supertype bindings based on the relationship between
@@ -92,6 +92,27 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
   }
 }
 
+void ConstraintSystem::PotentialBindings::inferDefaultTypes(
+    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
+  /// Add defaultable constraints.
+  for (auto *constraint : Defaults) {
+    Type type = constraint->getSecondType();
+    if (!existingTypes.insert(type->getCanonicalType()).second)
+      continue;
+
+    if (constraint->getKind() == ConstraintKind::DefaultClosureType) {
+      // If there are no other possible bindings for this closure
+      // let's default it to the type inferred from its parameters/body,
+      // otherwise we should only attempt contextual types as a
+      // top-level closure type.
+      if (!Bindings.empty())
+        continue;
+    }
+
+    addPotentialBinding({type, AllowedBindingKind::Exact, constraint});
+  }
+}
+
 void ConstraintSystem::PotentialBindings::finalize(
     ConstraintSystem &cs,
     const llvm::SmallDenseMap<TypeVariableType *,
@@ -104,6 +125,8 @@ void ConstraintSystem::PotentialBindings::finalize(
     existingTypes.insert(binding.BindingType->getCanonicalType());
 
   inferTransitiveBindings(cs, existingTypes, inferredBindings);
+
+  inferDefaultTypes(cs, existingTypes);
 
   // Adjust optionality of existing bindings based on presence of
   // `ExpressibleByNilLiteral` requirement.
@@ -152,6 +175,17 @@ void ConstraintSystem::PotentialBindings::finalize(
       PotentiallyIncomplete = true;
 
     addPotentialBinding(PotentialBinding::forHole(cs.getASTContext(), locator));
+  }
+
+  // Determine if the bindings only constrain the type variable from above with
+  // an existential type; such a binding is not very helpful because it's
+  // impossible to enumerate the existential type's subtypes.
+  if (!Bindings.empty()) {
+    SubtypeOfExistentialType =
+        llvm::all_of(Bindings, [](const PotentialBinding &binding) {
+          return binding.BindingType->isExistentialType() &&
+                 binding.Kind == AllowedBindingKind::Subtypes;
+        });
   }
 }
 
@@ -516,7 +550,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
 
   // Consider each of the constraints related to this type variable.
   llvm::SmallPtrSet<CanType, 4> exactTypes;
-  SmallVector<Constraint *, 2> defaultableConstraints;
   SmallVector<PotentialBinding, 4> literalBindings;
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
@@ -636,7 +669,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       // Do these in a separate pass.
       if (getFixedTypeRecursive(constraint->getFirstType(), true)
               ->getAs<TypeVariableType>() == typeVar) {
-        defaultableConstraints.push_back(constraint);
+        result.Defaults.push_back(constraint);
         hasNonDependentMemberRelationalConstraints = true;
       }
       break;
@@ -853,34 +886,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
         result.addPotentialBinding(std::move(literalBinding));
     }
   }
-
-  /// Add defaultable constraints last.
-  for (auto constraint : defaultableConstraints) {
-    Type type = constraint->getSecondType();
-    if (!exactTypes.insert(type->getCanonicalType()).second)
-      continue;
-
-    if (constraint->getKind() == ConstraintKind::DefaultClosureType) {
-      // If there are no other possible bindings for this closure
-      // let's default it to the type inferred from its parameters/body,
-      // otherwise we should only attempt contextual types as a
-      // top-level closure type.
-      if (!result.Bindings.empty())
-        continue;
-    }
-
-    result.addPotentialBinding({type, AllowedBindingKind::Exact, constraint});
-  }
-
-  // Determine if the bindings only constrain the type variable from above with
-  // an existential type; such a binding is not very helpful because it's
-  // impossible to enumerate the existential type's subtypes.
-  result.SubtypeOfExistentialType =
-      std::all_of(result.Bindings.begin(), result.Bindings.end(),
-                  [](const PotentialBinding &binding) {
-                    return binding.BindingType->isExistentialType() &&
-                           binding.Kind == AllowedBindingKind::Subtypes;
-                  });
 
   // If there were both dependent-member and non-dependent-member relational
   // constraints, consider this "fully bound"; we don't want to touch it.
