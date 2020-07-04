@@ -55,9 +55,15 @@ public:
     }
   };
 
+  
+  struct FlagsTy {
+    unsigned Live : 1;
+  };
+  
   using CallGraphEdgeListTy = std::vector<EdgeTy>;
 
 private:
+  FlagsTy Flags;
   CallGraphEdgeListTy CallGraphEdgeList;
 
 public:
@@ -70,6 +76,9 @@ public:
   }
 
   ArrayRef<EdgeTy> calls() const { return CallGraphEdgeList; }
+  
+  bool isLive() const { return Flags.Live; }
+  void setLive(bool Live) { Flags.Live = Live; }
 };
 
 struct FunctionSummaryInfo {
