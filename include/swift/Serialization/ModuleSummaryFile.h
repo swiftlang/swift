@@ -44,6 +44,7 @@ enum {
 
 using MetadataLayout = BCRecordLayout<METADATA,
                                       BCVBR<16>, // Function GUID
+                                      BCFixed<1>, // live
                                       BCBlob       // Name string
                                       >;
 using CallGraphEdgeLayout =
