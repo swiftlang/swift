@@ -72,6 +72,8 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
+  /// The path to combined module summary file
+  std::string ModuleSummaryPath;
   /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;

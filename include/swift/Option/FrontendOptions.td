@@ -44,6 +44,10 @@ def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
 def emit_module_summary : Flag<["-"], "emit-module-summary">,
   HelpText<"Emit module summary">;
 
+def module_summary_path
+  : Separate<["-"], "module-summary-path">, MetaVarName<"<path>">,
+    HelpText<"Combined module summary file <path>">;
+
 def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
   HelpText<"Avoid getting source location from .swiftsourceinfo files">;
 
