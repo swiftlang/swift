@@ -901,6 +901,7 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
 /// Returns true if the "immutable" flag is set on \p object.
 ///
 /// Used for runtime consistency checking of COW buffers.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 bool _swift_isImmutableCOWBuffer(HeapObject *object) {
   return object->refCounts.isImmutableCOWBuffer();
@@ -910,6 +911,7 @@ bool _swift_isImmutableCOWBuffer(HeapObject *object) {
 /// value of the flag.
 ///
 /// Used for runtime consistency checking of COW buffers.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 bool _swift_setImmutableCOWBuffer(HeapObject *object, bool immutable) {
   return object->refCounts.setIsImmutableCOWBuffer(immutable);
