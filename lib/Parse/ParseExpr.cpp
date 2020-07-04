@@ -1018,8 +1018,13 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
 /// Map magic literal tokens such as #file to their
 /// MagicIdentifierLiteralExpr kind.
 static MagicIdentifierLiteralExpr::Kind
-getMagicIdentifierLiteralKind(tok Kind) {
+getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
+  case tok::pound_file:
+    // TODO: Enable by default at the next source break.
+    return Opts.EnableConcisePoundFile
+         ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
+         : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
 #define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
   case tok::TOKEN: \
     return MagicIdentifierLiteralExpr::Kind::NAME;
@@ -1452,7 +1457,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 #define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN) case tok::TOKEN:
 #include "swift/AST/MagicIdentifierKinds.def"
   {
-    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
     auto replacement = MagicIdentifierLiteralExpr::getKindString(Kind);
 
     diagnose(Tok.getLoc(), diag::snake_case_deprecated,
@@ -1462,11 +1467,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
 
   // Cases for non-deprecated magic identifier tokens
+  case tok::pound_file:
 #define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
 #define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) case tok::TOKEN:
 #include "swift/AST/MagicIdentifierKinds.def"
   {
-    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
     SyntaxKind SKind = getMagicIdentifierSyntaxKind(Kind);
 
     ExprContext.setCreateSyntax(SKind);

@@ -52,18 +52,26 @@
 // Magic string literals
 //
 
-/// The \c #file magic identifier literal.
-MAGIC_STRING_IDENTIFIER(File, "#file", PoundFileExpr)
-  MAGIC_IDENTIFIER_TOKEN(File, pound_file)
-  MAGIC_IDENTIFIER_DEPRECATED_TOKEN(File, kw___FILE__)
-
 /// The \c #fileID magic identifier literal.
 MAGIC_STRING_IDENTIFIER(FileID, "#fileID", PoundFileIDExpr)
   MAGIC_IDENTIFIER_TOKEN(FileID, pound_fileID)
 
+/// The \c #file magic identifier literal, written in code where it is
+/// a synonym for \c #fileID (i.e. "Swift 6 mode" code).
+MAGIC_STRING_IDENTIFIER(FileIDSpelledAsFile, "#file", PoundFileExpr)
+  // tok::pound_file is shared with FilePathSpelledAsFile; please write custom
+  // code paths for it.
+
 /// The \c #filePath magic identifier literal.
 MAGIC_STRING_IDENTIFIER(FilePath, "#filePath", PoundFilePathExpr)
   MAGIC_IDENTIFIER_TOKEN(FilePath, pound_filePath)
+
+/// The \c #file magic identifier literal, written in code where it is
+/// a synonym for \c #filePath (i.e. Swift 5 mode code).
+MAGIC_STRING_IDENTIFIER(FilePathSpelledAsFile, "#file", PoundFileExpr)
+  // tok::pound_file is shared with FileIDSpelledAsFile; please write custom
+  // code paths for it.
+  MAGIC_IDENTIFIER_DEPRECATED_TOKEN(FilePathSpelledAsFile, kw___FILE__)
 
 /// The \c #function magic identifier literal.
 MAGIC_STRING_IDENTIFIER(Function, "#function", PoundFunctionExpr)

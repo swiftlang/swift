@@ -4043,6 +4043,12 @@ public:
                             Optional<CodeCompletionLiteralKind> literalKind) {
       CodeCompletionKeywordKind kwKind;
       switch (magicKind) {
+      case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
+        kwKind = CodeCompletionKeywordKind::pound_file;
+        break;
+      case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
+        // Already handled by above case.
+        return;
 #define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
       case MagicIdentifierLiteralExpr::NAME: \
         kwKind = CodeCompletionKeywordKind::TOKEN; \
