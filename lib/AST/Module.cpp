@@ -2153,7 +2153,6 @@ resolveFileIDConflicts(const ModuleDecl *module, StringRef fileString,
                        const llvm::StringMap<SourceFilePathInfo> &paths,
                        bool shouldDiagnose) {
   assert(paths.size() > 1);
-  assert(module->getASTContext().LangOpts.EnableConcisePoundFile);
 
   /// The path we consider to be "correct"; we will emit fix-its changing the
   /// other paths to match this one.
@@ -2203,7 +2202,7 @@ resolveFileIDConflicts(const ModuleDecl *module, StringRef fileString,
 
     for (auto loc : pathPair.second.virtualFileLocs) {
       diags.diagnose(loc,
-                     diag::pound_source_location_creates_pound_file_conflicts,
+                     diag::source_location_creates_file_id_conflicts,
                      fileString);
 
       // Offer a fix-it unless it would be tautological.
@@ -2221,9 +2220,6 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
   llvm::StringMap<std::pair<std::string, bool>> result;
   SmallString<64> scratch;
 
-  if (!getASTContext().LangOpts.EnableConcisePoundFile)
-    return result;
-
   for (auto &namePair : getInfoForUsedFileNames(this)) {
     computeFileID(this, namePair.first(), scratch);
     auto &infoForPaths = namePair.second;
@@ -2231,8 +2227,8 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
     assert(!infoForPaths.empty());
 
     // TODO: In the future, we'd like to handle these conflicts gracefully by
-    // generating a unique `#file` string for each conflicting name. For now, we
-    // will simply warn about conflicts.
+    // generating a unique `#fileID` string for each conflicting name. For now,
+    // we will simply warn about conflicts.
     StringRef winner = infoForPaths.begin()->first();
     if (infoForPaths.size() > 1)
       winner = resolveFileIDConflicts(this, scratch, infoForPaths,

@@ -216,6 +216,7 @@ getActualDefaultArgKind(uint8_t raw) {
   CASE(Inherited)
   CASE(Column)
   CASE(File)
+  CASE(FileID)
   CASE(FilePath)
   CASE(Line)
   CASE(Function)

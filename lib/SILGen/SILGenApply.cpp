@@ -4848,7 +4848,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
 
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {
-    case MagicIdentifierLiteralExpr::File: {
+    case MagicIdentifierLiteralExpr::FileID: {
       std::string value = loc.isValid() ? getMagicFileIDString(loc) : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
@@ -4857,6 +4857,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
       break;
     }
 
+    case MagicIdentifierLiteralExpr::File:
     case MagicIdentifierLiteralExpr::FilePath: {
       StringRef value = loc.isValid() ? getMagicFilePathString(loc) : "";
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,

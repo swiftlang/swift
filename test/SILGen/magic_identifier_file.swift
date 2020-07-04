@@ -32,6 +32,6 @@ func forceTry(_ fn: () throws -> ()) {
 // CONCISE: string_literal utf8 "Foo/magic_identifier_file.swift"
 }
 
-// CONCISE-LABEL: // Mappings from '#file' to '#filePath':
+// CONCISE-LABEL: // Mappings from '#fileID' to '#filePath':
 // CONCISE:       //   'Foo/magic_identifier_file.swift' => 'SOURCE_DIR/test/SILGen/magic_identifier_file.swift'
 

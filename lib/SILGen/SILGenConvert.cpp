@@ -144,7 +144,8 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
   unsigned line = 0;
   unsigned column = 0;
   if (sourceLoc.isValid()) {
-    filename = getMagicFileIDString(sourceLoc);
+    // FIXME: Should be getMagicFileIDString()
+    filename = getMagicFilePathString(sourceLoc);
     std::tie(line, column) =
         ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceLoc);
   }
