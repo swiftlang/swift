@@ -1,8 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/module1.swift -parse-as-library -o %t
-// RUN: %target-swift-frontend -emit-sil %S/Inputs/module1.swift -emit-module-summary-path %t/module1.swiftmodule.summary -parse-as-library > /dev/null
-// RUN: %target-swift-frontend -emit-module %S/Inputs/module2.swift -parse-as-library -I %t -o %t
-// RUN: %target-swift-frontend -emit-sil %S/Inputs/module2.swift -emit-module-summary-path %t/module2.swiftmodule.summary -I %t -parse-as-library > /dev/null
+// RUN: %target-swift-frontend -emit-module %S/Inputs/module1.swift -emit-module-summary-path %t/module1.swiftmodule.summary -parse-as-library -o %t
+// RUN: %target-swift-frontend -emit-module %S/Inputs/module2.swift -emit-module-summary-path %t/module2.swiftmodule.summary -parse-as-library -I %t -o %t
 // RUN: %target-swift-frontend -emit-sil %s -emit-module-summary-path %t/module-summary.swiftmodule.summary -I %t > /dev/null
 // RUN: llvm-bcanalyzer -dump %t/module-summary.swiftmodule.summary | %FileCheck %s --check-prefix MAIN-CHECK
 
