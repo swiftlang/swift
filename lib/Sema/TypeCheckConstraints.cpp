@@ -3357,7 +3357,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         const auto &fromElt = fromTuple->getElement(i);
         const auto &toElt = toTuple->getElement(i);
 
-        // We should only perform name validation if both element have a label,
+        // We should only perform name validation if both elements have a label,
         // because unlabeled tuple elements can be converted to labeled ones
         // e.g.
         // 
