@@ -98,6 +98,9 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
       auto &info = pair.second;
       using namespace function_summary;
       function_summary::MetadataLayout MDlayout(Out);
+
+      llvm::dbgs() << "Emitting " << info.Name << "\n";
+
       MDlayout.emit(ScratchRecord, pair.first, info.Name);
 
       for (auto call : info.TheSummary->calls()) {
@@ -125,7 +128,26 @@ bool emitModuleSummaryIndex(const ModuleSummaryIndex &index,
   });
 }
 
-static bool readSignature(llvm::BitstreamCursor Cursor) {
+class Deserializer {
+  llvm::BitstreamCursor Cursor;
+  SmallVector<uint64_t, 64> Scratch;
+  StringRef BlobData;
+
+  ModuleSummaryIndex &moduleSummary;
+
+  bool readSignature();
+  bool readModuleSummaryMetadata();
+  bool readFunctionSummary();
+  bool readSingleModuleSummary();
+
+public:
+  Deserializer(llvm::MemoryBufferRef inputBuffer,
+               ModuleSummaryIndex &moduleSummary)
+      : Cursor{inputBuffer}, moduleSummary(moduleSummary) {}
+  bool readModuleSummary();
+};
+
+bool Deserializer::readSignature() {
   for (unsigned char byte : MODULE_SUMMARY_SIGNATURE) {
     if (Cursor.AtEndOfStream())
       return true;
@@ -139,17 +161,132 @@ static bool readSignature(llvm::BitstreamCursor Cursor) {
   return false;
 }
 
-bool loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
-                            ModuleSummaryIndex &moduleSummary) {
-  llvm::BitstreamCursor cursor{inputBuffer->getMemBufferRef()};
+bool Deserializer::readModuleSummaryMetadata() {
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry = Cursor.advance();
+  if (!maybeEntry)
+    llvm::report_fatal_error("Should have next entry");
 
-  if (readSignature(cursor)) {
+  llvm::BitstreamEntry entry = maybeEntry.get();
+
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    return true;
+  }
+  Scratch.clear();
+  auto maybeKind = Cursor.readRecord(entry.ID, Scratch, &BlobData);
+
+  if (!maybeKind) {
+    consumeError(maybeKind.takeError());
+    return true;
+  }
+
+  if (maybeKind.get() != module_summary::MODULE_METADATA) {
+    return true;
+  }
+
+  moduleSummary.setModuleName(BlobData.str());
+
+  llvm::dbgs() << "Start loading module " << moduleSummary.getModuleName()
+               << "\n";
+  return false;
+}
+
+bool Deserializer::readFunctionSummary() {
+  if (llvm::Error Err = Cursor.EnterSubBlock(FUNCTION_SUMMARY_ID)) {
+    llvm::report_fatal_error("Can't enter subblock");
+  }
+
+  llvm::Expected<llvm::BitstreamEntry> maybeNext = Cursor.advance();
+  if (!maybeNext)
+    llvm::report_fatal_error("Should have next entry");
+
+  llvm::BitstreamEntry next = maybeNext.get();
+
+  GUID guid;
+  std::string Name;
+  std::unique_ptr<FunctionSummary> FS;
+
+  while (next.Kind == llvm::BitstreamEntry::Record) {
+    Scratch.clear();
+
+    auto maybeKind = Cursor.readRecord(next.ID, Scratch, &BlobData);
+
+    if (!maybeKind)
+      llvm::report_fatal_error("Should have kind");
+
+    switch (maybeKind.get()) {
+    case function_summary::METADATA: {
+      function_summary::MetadataLayout::readRecord(Scratch, guid);
+      Name = BlobData.str();
+      FS = std::make_unique<FunctionSummary>();
+      break;
+    }
+    case function_summary::CALL_GRAPH_EDGE: {
+      unsigned edgeKindID, targetGUID;
+      function_summary::CallGraphEdgeLayout::readRecord(Scratch, edgeKindID,
+                                                        targetGUID);
+      auto edgeKind = getEdgeKind(edgeKindID);
+      if (!edgeKind)
+        llvm::report_fatal_error("Bad edge kind");
+      if (!FS)
+        llvm::report_fatal_error("Invalid state");
+
+      FS->addCall(targetGUID, edgeKind.getValue());
+      break;
+    }
+    }
+
+    maybeNext = Cursor.advance();
+    if (!maybeNext)
+      llvm::report_fatal_error("Should have next entry");
+
+    next = maybeNext.get();
+  }
+
+  llvm::dbgs() << "Added " << Name << " in FS list\n";
+  moduleSummary.addFunctionSummary(Name, std::move(FS));
+  return false;
+}
+
+bool Deserializer::readSingleModuleSummary() {
+  if (llvm::Error Err = Cursor.EnterSubBlock(MODULE_SUMMARY_ID)) {
+    llvm::report_fatal_error("Can't enter subblock");
+  }
+
+  if (readModuleSummaryMetadata()) {
+    return true;
+  }
+
+  llvm::Expected<llvm::BitstreamEntry> maybeNext = Cursor.advance();
+  if (!maybeNext)
+    llvm::report_fatal_error("Should have next entry");
+
+  llvm::BitstreamEntry next = maybeNext.get();
+  while (next.Kind == llvm::BitstreamEntry::SubBlock) {
+    switch (next.ID) {
+    case FUNCTION_SUMMARY_ID: {
+      readFunctionSummary();
+      break;
+    }
+    }
+
+    maybeNext = Cursor.advance();
+    if (!maybeNext) {
+      consumeError(maybeNext.takeError());
+      return true;
+    }
+    next = maybeNext.get();
+  }
+  return false;
+}
+
+bool Deserializer::readModuleSummary() {
+  if (readSignature()) {
     llvm::report_fatal_error("Invalid signature");
   }
 
-  while (!cursor.AtEndOfStream()) {
+  while (!Cursor.AtEndOfStream()) {
     llvm::Expected<llvm::BitstreamEntry> maybeEntry =
-        cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+        Cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       llvm::report_fatal_error("Should have entry");
     }
@@ -159,93 +296,32 @@ bool loadModuleSummaryIndex(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
       break;
 
     switch (entry.ID) {
-    case MODULE_SUMMARY_ID: {
-      if (llvm::Error Err = cursor.EnterSubBlock(MODULE_SUMMARY_ID)) {
-        llvm::report_fatal_error("Can't enter subblock");
+    case llvm::bitc::BLOCKINFO_BLOCK_ID: {
+      if (Cursor.SkipBlock()) {
+        return true;
       }
-
-      llvm::Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
-      if (!maybeNext)
-        llvm::report_fatal_error("Should have next entry");
-      
-      llvm::BitstreamEntry next = maybeNext.get();
-      llvm::SmallVector<uint64_t, 64> scratch;
-      while (next.Kind == llvm::BitstreamEntry::Record) {
-        scratch.clear();
-        llvm::StringRef blobData;
-        llvm::Expected<unsigned> maybeKind =
-            cursor.readRecord(next.ID, scratch, &blobData);
-
-        if (!maybeKind)
-          llvm::report_fatal_error("Should have kind");
-
-        unsigned kind = maybeKind.get();
-        
-        switch (kind) {
-        case module_summary::MODULE_METADATA: {
-          moduleSummary.setModuleName(blobData.str());
-          break;
-        }
-        }
+      break;
+    }
+    case MODULE_SUMMARY_ID: {
+      if (readSingleModuleSummary()) {
+        return true;
       }
       break;
     }
     case FUNCTION_SUMMARY_ID: {
-      if (llvm::Error Err = cursor.EnterSubBlock(FUNCTION_SUMMARY_ID)) {
-        llvm::report_fatal_error("Can't enter subblock");
-      }
-
-      llvm::Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
-      if (!maybeNext)
-        llvm::report_fatal_error("Should have next entry");
-
-      llvm::BitstreamEntry next = maybeNext.get();
-
-      GUID guid;
-      std::string Name;
-      std::unique_ptr<FunctionSummary> FS;
-      std::vector<FunctionSummary::EdgeTy> CGEdges;
-
-      llvm::SmallVector<uint64_t, 64> scratch;
-      while (next.Kind == llvm::BitstreamEntry::Record) {
-        scratch.clear();
-        llvm::StringRef blobData;
-        llvm::Expected<unsigned> maybeKind =
-            cursor.readRecord(next.ID, scratch, &blobData);
-
-        if (!maybeKind)
-          llvm::report_fatal_error("Should have kind");
-
-        unsigned kind = maybeKind.get();
-        switch (kind) {
-        case function_summary::METADATA: {
-          function_summary::MetadataLayout::readRecord(scratch, guid);
-          Name = blobData.str();
-          FS = std::make_unique<FunctionSummary>();
-          break;
-        }
-        case function_summary::CALL_GRAPH_EDGE: {
-          unsigned edgeKindID, targetGUID;
-          function_summary::CallGraphEdgeLayout::readRecord(scratch, edgeKindID,
-                                                            targetGUID);
-          auto edgeKind = getEdgeKind(edgeKindID);
-          if (!edgeKind)
-            llvm::report_fatal_error("Bad edge kind");
-          if (!FS)
-            llvm::report_fatal_error("Invalid state");
-
-          FS->addCall(targetGUID, edgeKind.getValue());
-          break;
-        }
-        }
-      }
-
-      moduleSummary.addFunctionSummary(Name, std::move(FS));
+      llvm_unreachable("FUNCTION_SUMMARY block should be handled in "
+                       "'readSingleModuleSummary'");
       break;
     }
     }
   }
   return false;
+}
+
+bool loadModuleSummaryIndex(llvm::MemoryBufferRef inputBuffer,
+                            ModuleSummaryIndex &moduleSummary) {
+  Deserializer deserializer(inputBuffer, moduleSummary);
+  return deserializer.readModuleSummary();
 }
 
 } // namespace modulesummary

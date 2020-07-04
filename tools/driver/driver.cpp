@@ -144,7 +144,7 @@ static int run_driver(StringRef ExecName,
                              argv[0], (void *)(intptr_t)getExecutablePath);
     }
 
-    if (FirstArg == "-merge-summary") {
+    if (FirstArg == "-cross-module-opt") {
       return cross_module_opt_main(
           llvm::makeArrayRef(argv.data() + 2, argv.data() + argv.size()),
           argv[0], (void *)(intptr_t)getExecutablePath);

@@ -8,6 +8,8 @@
 // CHECK: <FUNCTION_SUMMARY
 // CHECK: <METADATA {{.+}} op0=1305169934332876051/> blob data = '$s4main10publicFuncyyF'
 
+// RUN: %swift_frontend_plain -cross-module-opt %t/module-summary.swiftmodule.summary %t/module1.swiftmodule.summary %t/module2.swiftmodule.summary -o %t/merged-module.summary
+
 import module2
 
 func foo() { bar(0) }

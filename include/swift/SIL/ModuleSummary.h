@@ -73,7 +73,7 @@ public:
 };
 
 struct FunctionSummaryInfo {
-  StringRef Name;
+  std::string Name;
   std::unique_ptr<FunctionSummary> TheSummary;
 };
 
@@ -91,7 +91,7 @@ public:
     this->ModuleName = name;
   }
 
-  void addFunctionSummary(StringRef name,
+  void addFunctionSummary(std::string name,
                           std::unique_ptr<FunctionSummary> summary) {
     auto guid = getGUID(name);
     FunctionSummaryInfoMap.insert(
