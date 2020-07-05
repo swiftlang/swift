@@ -15,8 +15,10 @@ static GUID getGUID(llvm::StringRef Str) { return llvm::MD5Hash(Str); }
 class FunctionSummary {
 public:
   class EdgeTy {
+    GUID CalleeFn;
+    GUID Table;
   public:
-    GUID CalleeFnOrTable;
+
     enum class Kind {
       Static,
       Witness,
@@ -26,17 +28,26 @@ public:
 
     Kind kind;
 
-    EdgeTy(SILDeclRef CalleeFn, Kind kind) : kind(kind) {
-      // FIXME
-      auto name = CalleeFn.getDecl()->getBaseName().getIdentifier().str();
-      this->CalleeFnOrTable = getGUID(name);
+    EdgeTy(FuncDecl &CalleeFn, TypeDecl &Context, Kind kind) : kind(kind) {
+      // FIXME: This is really fragile
+      this->CalleeFn = getGUID(CalleeFn.getBaseIdentifier().str());
+      this->Table = getGUID(Context.getNameStr());
     }
 
   public:
     Kind getKind() const { return kind; }
-    GUID getCallee() const { return CalleeFnOrTable; }
+    GUID getCallee() const { return CalleeFn; }
+    GUID getTable() const {
+      // If kind is static, Table guid should be 0
+      assert(kind != Kind::Static || Table == 0);
+      return Table;
+    }
 
-    EdgeTy(GUID callee, Kind kind) : CalleeFnOrTable(callee), kind(kind) {}
+    EdgeTy(GUID callee, GUID table, Kind kind)
+      : CalleeFn(callee), Table(table), kind(kind) {}
+
+    EdgeTy(GUID callee, Kind kind)
+      : CalleeFn(callee), Table(0), kind(kind) {}
 
     static EdgeTy staticCall(GUID Callee) {
       return EdgeTy(Callee, Kind::Static);
@@ -48,10 +59,14 @@ public:
       return EdgeTy(Callee, Kind::VTable);
     }
     static EdgeTy witnessCall(SILDeclRef Callee) {
-      return EdgeTy(Callee, Kind::Witness);
+      auto &Fn = *Callee.getFuncDecl();
+      auto Context = dyn_cast<ProtocolDecl>(Fn.getDeclContext());
+      return EdgeTy(Fn, *Context, Kind::Witness);
     }
     static EdgeTy vtableCall(SILDeclRef Callee) {
-      return EdgeTy(Callee, Kind::VTable);
+      auto &Fn = *Callee.getFuncDecl();
+      auto Context = dyn_cast<ClassDecl>(Fn.getDeclContext());
+      return EdgeTy(Fn, *Context, Kind::VTable);
     }
   };
 
@@ -71,8 +86,10 @@ public:
       : CallGraphEdgeList(std::move(CGEdges)) {}
   FunctionSummary() = default;
 
-  void addCall(GUID targetGUID, EdgeTy::Kind kind) {
-    CallGraphEdgeList.emplace_back(targetGUID, kind);
+  void addCall(GUID targetGUID, GUID tableGUID, EdgeTy::Kind kind) {
+    // If kind is static, Table guid should be 0
+    assert(kind != EdgeTy::Kind::Static || tableGUID == 0);
+    CallGraphEdgeList.emplace_back(targetGUID, tableGUID, kind);
   }
 
   ArrayRef<EdgeTy> calls() const { return CallGraphEdgeList; }

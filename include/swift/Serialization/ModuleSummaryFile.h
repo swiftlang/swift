@@ -43,14 +43,15 @@ enum {
 };
 
 using MetadataLayout = BCRecordLayout<METADATA,
-                                      BCVBR<16>, // Function GUID
+                                      BCVBR<16>,  // Function GUID
                                       BCFixed<1>, // live
-                                      BCBlob       // Name string
+                                      BCBlob      // Name string
                                       >;
 using CallGraphEdgeLayout =
     BCRecordLayout<CALL_GRAPH_EDGE,
                    BCFixed<32>, // FunctionSummary::Edge::Kind
-                   BCVBR<16>  // Target GUID
+                   BCVBR<16>,   // Target Function GUID
+                   BCVBR<16>    // Table GUID
                    >;
 } // namespace function_summary
 

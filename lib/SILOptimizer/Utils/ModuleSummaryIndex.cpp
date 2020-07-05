@@ -27,12 +27,20 @@ buildFunctionSummaryIndex(SILFunction &F, BasicCalleeAnalysis &BCA) {
         switch (Callee->getKind()) {
         case ValueKind::WitnessMethodInst: {
           auto WMI = cast<WitnessMethodInst>(Callee);
+          auto member = WMI->getMember();
+          auto CalleeFn = member.getFuncDecl();
+          auto Protocol = dyn_cast<ProtocolDecl>(CalleeFn->getDeclContext());
+          Protocol->getModuleContext()->getNameStr();
+          llvm::dbgs() << "Record " << WMI->getMember().getFuncDecl()->getNameStr()
+                       << " of " << Protocol->getNameStr() << " as reference to PWT\n";
+
           auto edge = FunctionSummary::EdgeTy::witnessCall(WMI->getMember());
           CallGraphEdgeList.push_back(edge);
           break;
         }
         case ValueKind::ClassMethodInst: {
           auto CMI = cast<ClassMethodInst>(Callee);
+          llvm::dbgs() << "Record " << CMI->getMember().getDecl()->getBaseName().getIdentifier().str() << " as reference to VTable\n";
           auto edge = FunctionSummary::EdgeTy::vtableCall(CMI->getMember());
           CallGraphEdgeList.push_back(edge);
           break;

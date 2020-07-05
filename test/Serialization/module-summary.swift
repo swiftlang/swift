@@ -10,14 +10,20 @@
 // Ensure that call graph edge has correct function guid
 // MAIN-CHECK:        <METADATA {{.+}} op0=7308225924950623125 op1=0/> blob data = '$s7module20A4FuncSiyF'
 // MAIN-CHECK:        <METADATA {{.+}} op0=-2624081020897602054 op1=0/> blob data = 'main'
-// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=1305169934332876051/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=1305169934332876051 op2=0/>
 // MAIN-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 
 // MAIN-CHECK:        <METADATA {{.+}} op0=-1760476766911317517 op1=0/> blob data = '$s4main9callTwiceyyF'
-// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-8492700279074763592/>
-// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-432276440123806562/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-8492700279074763592 op2=0/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-432276440123806562 op2=0/>
 // MAIN-CHECK-NEXT: </FUNCTION_SUMMARY>
+
+// RUN: llvm-bcanalyzer -dump %t/module2.swiftmodule.summary | %FileCheck %s --check-prefix TABLE-CHECK
+// TABLE-CHECK:        <METADATA {{.+}} op0=-9123464239216498366 op1=0/> blob data = '$s7module24usePyyx7module11PRzlF'
+// TABLE-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=1 op1=1692125368554804631 op2=8225888563470713412/>
+// TABLE-CHECK-NEXT: </FUNCTION_SUMMARY>
+
 
 // RUN: %swift_frontend_plain -cross-module-opt %t/module-summary.swiftmodule.summary %t/module1.swiftmodule.summary %t/module2.swiftmodule.summary -o %t/merged-module.summary
 // RUN: llvm-bcanalyzer -dump %t/merged-module.summary | %FileCheck %s --check-prefix MERGED-CHECK
@@ -26,7 +32,7 @@
 // MERGED-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 // MERGED-CHECK:        <METADATA {{.+}} op0=7308225924950623125 op1=0/> blob data = '$s7module20A4FuncSiyF'
-// MERGED-CHECK-NEXT:   <CALL_GRAPH_EDGE abbrevid=5 op0=0 op1=1546188077662747336/>
+// MERGED-CHECK-NEXT:   <CALL_GRAPH_EDGE abbrevid=5 op0=0 op1=1546188077662747336 op2=0/>
 // MERGED-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 // RUN: llvm-bcanalyzer -dump %t/merged-module.summary | %FileCheck %s --check-prefix LIVE-CHECK

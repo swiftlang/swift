@@ -107,7 +107,7 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
       for (auto call : summary->calls()) {
         CallGraphEdgeLayout edgeLayout(Out);
         edgeLayout.emit(ScratchRecord, unsigned(call.getKind()),
-                        call.getCallee());
+                        call.getCallee(), call.getTable());
       }
     }
   }
@@ -231,16 +231,16 @@ bool Deserializer::readFunctionSummary() {
     }
     case function_summary::CALL_GRAPH_EDGE: {
       unsigned edgeKindID;
-      GUID targetGUID;
+      GUID targetGUID, targetTable;
       function_summary::CallGraphEdgeLayout::readRecord(Scratch, edgeKindID,
-                                                        targetGUID);
+                                                        targetGUID, targetTable);
       auto edgeKind = getEdgeKind(edgeKindID);
       if (!edgeKind)
         llvm::report_fatal_error("Bad edge kind");
       if (!FS)
         llvm::report_fatal_error("Invalid state");
 
-      FS->addCall(targetGUID, edgeKind.getValue());
+      FS->addCall(targetGUID, targetTable, edgeKind.getValue());
       break;
     }
     }
