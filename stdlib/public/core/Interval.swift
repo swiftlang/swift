@@ -361,7 +361,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
     )
   }
   
-  // MARK: Iterating Direction
+  // MARK: - Iterating Direction
   
   /// A Boolean value indicating whether the interval is iterated in the inverse
   /// (descending) direction.
@@ -385,5 +385,55 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
     var newInterval = self
     newInterval.reverse()
     return newInterval
+  }
+}
+
+// MARK: - Comparable Extensions
+
+extension Comparable where Self: Strideable {
+  /// Tests if this value is right next to the given other value.
+  /// - Parameter other: The given other value.
+  /// - Returns: `true` if the 2 values are right next to each other, `false`
+  ///   otherwise.
+  public func borders(on other: Self) -> Bool {
+    self.separates(from: other, byDegrees: 1)
+  }
+  
+  /// Tests if this value shares a common neighbor with the given other value.
+  /// - Parameter other: The given other value.
+  /// - Returns: `true` if the 2 values are both right next to a 3rd value,
+  ///   `false` otherwise.
+  /// - Note: The 2 values could be equal, if the function returns true.
+  public func sharesCommonNeighbor(with other: Self) -> Bool {
+    self.separates(from: other, byDegrees: 2) || self == other
+  }
+  
+  /// Tests the correctness of the Bacon number between this value and the given
+  /// other value.
+  /// - Parameters:
+  ///   - other: The given other value.
+  ///   - degrees: The Bacon number to test for.
+  /// - Returns: `true` if the Bacon number is correct, `false` otherwise.
+  public func separates(
+    from other: Self, byDegrees degrees: Self.Stride
+  ) -> Bool {
+    other == self.advanced(by: degrees) || self == other.advanced(by: degrees)
+  }
+}
+
+extension Comparable {
+  /// Tests if the value is right next to the given other value.
+  /// - Parameter other: The given other value.
+  /// - Returns: `true` if the 2 values are right next to each other, `false`
+  ///   otherwise.
+  public func borders(on other: Self) -> Bool { false }
+  
+  /// Tests if the value shares a common neighbor with the given other value.
+  /// - Parameter other: The given other value.
+  /// - Returns: `true` if the 2 values are both right next to a 3rd value,
+  ///   `false` otherwise.
+  /// - Note: The 2 values could be equal, if the function returns true.
+  public func sharesCommonNeighbor(with other: Self) -> Bool {
+    self == other
   }
 }
