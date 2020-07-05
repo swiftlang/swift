@@ -4153,6 +4153,12 @@ namespace {
         Impl.markUnavailable(result, "Variadic function is unavailable");
       }
 
+      // Set whether this function requires its overrides to call super.
+      if (decl->hasAttr<clang::ObjCRequiresSuperAttr>()) {
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   RequiresSuperAttr(/*IsImplicit=*/true));
+      }
+
       if (decl->hasAttr<clang::ReturnsTwiceAttr>()) {
         // The Clang 'returns_twice' attribute is used for functions like
         // 'vfork' or 'setjmp'. Because these functions may return control flow
