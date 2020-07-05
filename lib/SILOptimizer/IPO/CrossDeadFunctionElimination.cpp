@@ -29,6 +29,53 @@ private:
 
 public:
   SILCrossDeadFuncElimination() {}
+  
+  void eliminateDeadEntriesFromTables(SILModule &M) {
+    
+    for (auto VT : M.getVTables()) {
+      VT->removeEntries_if([&] (SILVTable::Entry &entry) -> bool {
+        auto Impl = entry.getImplementation();
+        auto &maybePair = TheSummary.getFunctionInfo(getGUID(Impl->getName()));
+        if (!maybePair)
+          return false;
+        auto info = maybePair.getValue().first;
+        return !info->isLive();
+      });
+    }
+    
+    
+    for (auto &WT : M.getWitnessTableList()) {
+      WT.clearMethods_if([&] (const SILWitnessTable::MethodWitness &MW) -> bool {
+        auto Impl = MW.Witness;
+        auto &maybePair = TheSummary.getFunctionInfo(getGUID(Impl->getName()));
+        if (!maybePair)
+          return false;
+        auto info = maybePair.getValue().first;
+        return !info->isLive();
+      });
+    }
+  }
+  
+  void eliminateDeadFunctions(SILModule &M) {
+    for (auto &pair : TheSummary) {
+      auto &info = pair.second;
+      if (info.TheSummary->isLive()) {
+        continue;
+      }
+
+      auto F = M.lookUpFunction(info.Name);
+      if (!F) {
+        llvm::dbgs() << "Couldn't eliminate " << info.Name
+                     << " because it's not found\n";
+        continue;
+      }
+      F->dropAllReferences();
+      notifyWillDeleteFunction(F);
+      M.eraseFunction(F);
+
+      llvm::dbgs() << "Eliminate " << info.Name << "\n";
+    }
+  }
 
   void run() override {
     LLVM_DEBUG(llvm::dbgs() << "Running CrossDeadFuncElimination\n");
@@ -47,26 +94,9 @@ public:
       llvm::report_fatal_error("Invalid module summary");
     }
 
-    auto M = getModule();
-
-    for (auto &pair : TheSummary) {
-      auto &info = pair.second;
-      if (info.TheSummary->isLive()) {
-        continue;
-      }
-
-      auto F = M->lookUpFunction(info.Name);
-      if (!F) {
-        llvm::dbgs() << "Couldn't eliminate " << info.Name
-                     << " because it's not found\n";
-        continue;
-      }
-      F->dropAllReferences();
-      notifyWillDeleteFunction(F);
-      M->eraseFunction(F);
-
-      llvm::dbgs() << "Eliminate " << info.Name << "\n";
-    }
+    auto &M = *getModule();
+    this->eliminateDeadEntriesFromTables(M);
+    this->eliminateDeadFunctions(M);
     this->invalidateFunctionTables();
   }
 };

@@ -484,6 +484,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
           continue;
 
         SILFunction *F = entry. getMethodWitness().Witness;
+        if (!F)
+          continue;
         auto *fd = cast<AbstractFunctionDecl>(
                      entry.getMethodWitness().Requirement.getDecl());
         MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ true);

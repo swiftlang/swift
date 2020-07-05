@@ -11,6 +11,8 @@
 // MAIN-CHECK:        <METADATA {{.+}} op0=7308225924950623125 op1=0/> blob data = '$s7module20A4FuncSiyF'
 // MAIN-CHECK:        <METADATA {{.+}} op0=-2624081020897602054 op1=0/> blob data = 'main'
 // MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=1305169934332876051 op2=0/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-731742758654261144 op2=0/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-9123464239216498366 op2=0/>
 // MAIN-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 
@@ -53,19 +55,33 @@
 // LIVE-CHECK-DAG: <METADATA abbrevid=4 op0=-432276440123806562 op1=1/> blob data = '$s4main3baryySiF'
 
 // RUN: %target-swift-frontend -emit-sil %s -I %t -o %t/main.sil
-// RUN: %target-sil-opt -emit-sorted-sil %t/main.sil -module-summary-path %t/merged-module.summary --sil-cross-deadfuncelim -I %t | %FileCheck %s --check-prefix DEADFUNC-CHECK
-// RUN: %target-swift-frontend -emit-sil %s -module-summary-path %t/merged-module.summary -I %t -O | %FileCheck %s --check-prefix DEADFUNC-CHECK
-// DEADFUNC-CHECK-DAG: @$s4main10publicFuncyyF
-// DEADFUNC-CHECK-DAG: @$s4main3baryySiF
-// DEADFUNC-CHECK-DAG: @main
+// RUN: %target-sil-opt -emit-sorted-sil %t/main.sil -module-summary-path %t/merged-module.summary --sil-cross-deadfuncelim -I %t | %FileCheck %s --check-prefix DEADFUNC-MAIN-CHECK
+// RUN: %target-swift-frontend -emit-sil %s -module-summary-path %t/merged-module.summary -I %t -O | %FileCheck %s --check-prefix DEADFUNC-MAIN-CHECK
+// DEADFUNC-MAIN-CHECK-DAG: @$s4main10publicFuncyyF
+// DEADFUNC-MAIN-CHECK-DAG: @$s4main3baryySiF
+// DEADFUNC-MAIN-CHECK-DAG: @main
 
-// DEADFUNC-CHECK-NOT: @$s4main16callExternalFuncyyF
-// DEADFUNC-CHECK-NOT: @$sSi2eeoiySbSi_SitFZ
-// DEADFUNC-CHECK-NOT: @$s7module20A4FuncSiyF
-// DEADFUNC-CHECK-NOT: @$sSi22_builtinIntegerLiteralSiBI_tcfC
-// DEADFUNC-CHECK-NOT: @$s4main9callTwiceyyF
+// DEADFUNC-MAIN-CHECK-NOT: @$s4main16callExternalFuncyyF
+// DEADFUNC-MAIN-CHECK-NOT: @$sSi2eeoiySbSi_SitFZ
+// DEADFUNC-MAIN-CHECK-NOT: @$s7module20A4FuncSiyF
+// DEADFUNC-MAIN-CHECK-NOT: @$sSi22_builtinIntegerLiteralSiBI_tcfC
+// DEADFUNC-MAIN-CHECK-NOT: @$s4main9callTwiceyyF
 
 
+// RUN: %target-swift-frontend -emit-sil %S/Inputs/module2.swift -parse-as-library -module-summary-path %t/merged-module.summary -I %t -O | %FileCheck %s --check-prefix DEADFUNC-MODULE2-CHECK
+
+// DEADFUNC-MODULE2-CHECK-DAG: @$s7module29Concrete1V12memberMethodyyF
+// DEADFUNC-MODULE2-CHECK-DAG: @$s7module29Concrete1V7module11PAadEP12memberMethodyyFTW
+// DEADFUNC-MODULE2-CHECK-DAG: @$s7module29Concrete2V12memberMethodyyF
+// DEADFUNC-MODULE2-CHECK-DAG: @$s7module29Concrete2V7module11PAadEP12memberMethodyyFTW
+// DEADFUNC-MODULE2-CHECK-DAG: @$s7module24usePyyx7module11PRzlF
+
+// DEADFUNC-MODULE2-CHECK-NOT: @$s7module29Concrete2V7module11PAadEP15defaultProvidedyyFTW
+// DEADFUNC-MODULE2-CHECK-NOT: @$s7module20A4FuncSiyF
+// DEADFUNC-MODULE2-CHECK-NOT: @$s7module29Concrete1V7module11PAadEP15defaultProvidedyyFTW
+// DEADFUNC-MODULE2-CHECK-NOT: @$s7module11PPAAE15defaultProvidedyyF
+
+import module1
 import module2
 
 func foo() { bar(0) }
@@ -88,3 +104,4 @@ public func publicFunc() {
 }
 
 publicFunc()
+useP(Concrete2())

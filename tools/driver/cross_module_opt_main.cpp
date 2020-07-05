@@ -114,7 +114,13 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
       }
       case FunctionSummary::EdgeTy::Kind::Witness:
       case FunctionSummary::EdgeTy::Kind::VTable: {
-        llvm_unreachable("Witness and VTable calls are not supported yet.");
+        auto Impls = summary.getImplementations(Call.slot());
+        if (!Impls)
+          llvm_unreachable("Impls not found for the slot");
+        for (auto Impl : Impls.getValue()) {
+          Worklist.push_back(Impl);
+        }
+        break;
       }
       case FunctionSummary::EdgeTy::Kind::kindCount:
         llvm_unreachable("impossible");

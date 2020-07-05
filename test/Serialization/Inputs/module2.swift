@@ -11,6 +11,7 @@ public struct Concrete1 : P {
 
 public struct Concrete2 : P {
     public func memberMethod() {}
+    public init() {}
 }
 
 public func useP<T: P>(_ t: T) {
