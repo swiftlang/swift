@@ -3299,6 +3299,10 @@ static void checkIfSuperCallIsRequired(FuncDecl *FD) {
       continue;
     }
 
+    if (!baseHasRequiresSuperAttr) {
+      continue;
+    }
+
     if (!hasSuperCall(baseDecl, FD)) {
       scratch.clear();
       auto baseMethodName = baseDecl->getName().getString(scratch);
