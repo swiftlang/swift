@@ -668,7 +668,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     tangentProperty->setSetterAccess(member->getFormalAccess());
 
     // Cache the tangent property.
-    C.evaluator.cacheOutput(TangentStoredPropertyRequest{member},
+    C.evaluator.cacheOutput(TangentStoredPropertyRequest{member, CanType()},
                             TangentPropertyInfo(tangentProperty));
 
     // Now that the original property has a corresponding tangent property, it
