@@ -17,7 +17,7 @@ import Foundation
 // arm64e-ios: [[ARM64E_MYRECT:%.*]] = type { float, float, float, float }
 // arm64-tvos: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 // armv7k-watchos: [[ARMV7K_MYRECT:%.*]] = type { float, float, float, float }
-// arm64-macosx: [[ARM64E_MYRECT:%.*]] = type { float, float, float, float }
+// arm64-macosx: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 
 class Foo {
   // x86_64-macosx: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself %0) {{.*}} {
