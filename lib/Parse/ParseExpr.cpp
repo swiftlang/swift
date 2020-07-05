@@ -3814,7 +3814,7 @@ Parser::parsePlatformVersionConstraintSpec() {
 
   // Keep the original version around for run-time checks to support
   // macOS Big Sur betas that report 10.16 at
-  // at run time.
+  // run time.
   llvm::VersionTuple RuntimeVersion = Version;
   Version = canonicalizePlatformVersion(*Platform, Version);
   return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
