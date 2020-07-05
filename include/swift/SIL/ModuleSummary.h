@@ -15,12 +15,14 @@ static GUID getGUID(llvm::StringRef Str) { return llvm::MD5Hash(Str); }
 struct VirtualMethodSlot {
   enum class KindTy {
     Witness, VTable,
+    kindCount,
   };
 
   KindTy Kind;
   GUID VirtualFuncID;
   GUID TableID;
-  
+  VirtualMethodSlot(KindTy kind, GUID virtualFuncID, GUID tableID)
+    : Kind(kind), VirtualFuncID(virtualFuncID), TableID(tableID) { }
   VirtualMethodSlot(FuncDecl &VirtualFunc, TypeDecl &Context, KindTy kind) : Kind(kind) {
     switch (Kind) {
       case KindTy::Witness: {
@@ -30,6 +32,10 @@ struct VirtualMethodSlot {
       case KindTy::VTable: {
         assert(isa<ClassDecl>(Context));
         break;
+        
+      }
+      case KindTy::kindCount: {
+        llvm_unreachable("impossible");
       }
     }
     VirtualFuncID = getGUID(VirtualFunc.getBaseIdentifier().str());
@@ -78,13 +84,34 @@ public:
       this->Table = getGUID(Context.getNameStr());
     }
 
-  public:
-    Kind getKind() const { return kind; }
-    GUID getCallee() const { return CalleeFn; }
     GUID getTable() const {
       // If kind is static, Table guid should be 0
       assert(kind != Kind::Static || Table == 0);
       return Table;
+    }
+  public:
+    Kind getKind() const { return kind; }
+    GUID getCallee() const { return CalleeFn; }
+    
+    VirtualMethodSlot slot() const {
+      VirtualMethodSlot::KindTy slotKind;
+      switch (kind) {
+        case Kind::Witness: {
+        slotKind = VirtualMethodSlot::KindTy::Witness;
+        break;
+        }
+        case Kind::VTable: {
+        slotKind = VirtualMethodSlot::KindTy::VTable;
+        break;
+        }
+        case Kind::Static: {
+          llvm_unreachable("Can't get slot for static call");
+        }
+        case Kind::kindCount: {
+          llvm_unreachable("impossible");
+        }
+      }
+      return VirtualMethodSlot(slotKind, CalleeFn, Table);
     }
 
     EdgeTy(GUID callee, GUID table, Kind kind)

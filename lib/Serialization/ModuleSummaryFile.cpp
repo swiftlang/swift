@@ -16,6 +16,14 @@ getEdgeKind(unsigned edgeKind) {
   return None;
 }
 
+
+static llvm::Optional<VirtualMethodSlot::KindTy>
+getSlotKind(unsigned kind) {
+  if (kind < unsigned(FunctionSummary::EdgeTy::Kind::kindCount))
+    return VirtualMethodSlot::KindTy(kind);
+  return None;
+}
+
 class Serializer {
   SmallVector<char, 0> Buffer;
   llvm::BitstreamWriter Out{Buffer};
@@ -164,6 +172,7 @@ class Deserializer {
 
   bool readSignature();
   bool readModuleSummaryMetadata();
+  bool readVirtualMethodInfo();
   bool readFunctionSummary();
   bool readSingleModuleSummary();
 
@@ -285,6 +294,60 @@ bool Deserializer::readFunctionSummary() {
   return false;
 }
 
+bool Deserializer::readVirtualMethodInfo() {
+  if (llvm::Error Err = Cursor.EnterSubBlock(VIRTUAL_METHOD_INFO_ID)) {
+    llvm::report_fatal_error("Can't enter subblock");
+  }
+
+  llvm::Expected<llvm::BitstreamEntry> maybeNext = Cursor.advance();
+  if (!maybeNext)
+    llvm::report_fatal_error("Should have next entry");
+
+  llvm::BitstreamEntry next = maybeNext.get();
+
+  llvm::Optional<VirtualMethodSlot> slot;
+
+  while (next.Kind == llvm::BitstreamEntry::Record) {
+    Scratch.clear();
+
+    auto maybeKind = Cursor.readRecord(next.ID, Scratch, &BlobData);
+
+    if (!maybeKind)
+      llvm::report_fatal_error("Should have kind");
+
+    switch (maybeKind.get()) {
+    case virtual_method_info::METHOD_METADATA: {
+      unsigned methodKindID;
+      GUID virtualFuncGUID, tableGUID;
+      virtual_method_info::MethodMetadataLayout::readRecord(Scratch, methodKindID, virtualFuncGUID, tableGUID);
+      
+      auto Kind = getSlotKind(methodKindID);
+      if (!Kind)
+        llvm::report_fatal_error("Bad method kind");
+
+      slot = VirtualMethodSlot(Kind.getValue(), virtualFuncGUID, tableGUID);
+      break;
+    }
+    case virtual_method_info::METHOD_IMPL: {
+      GUID implGUID;
+      virtual_method_info::MethodImplLayout::readRecord(Scratch, implGUID);
+      if (!slot)
+        llvm::report_fatal_error("Slot should be set before impl");
+      moduleSummary.addImplementation(slot.getValue(), implGUID);
+      break;
+    }
+    }
+
+    maybeNext = Cursor.advance();
+    if (!maybeNext)
+      llvm::report_fatal_error("Should have next entry");
+
+    next = maybeNext.get();
+  }
+
+  return false;
+}
+
 bool Deserializer::readSingleModuleSummary() {
   if (llvm::Error Err = Cursor.EnterSubBlock(MODULE_SUMMARY_ID)) {
     llvm::report_fatal_error("Can't enter subblock");
@@ -302,9 +365,17 @@ bool Deserializer::readSingleModuleSummary() {
   while (next.Kind == llvm::BitstreamEntry::SubBlock) {
     switch (next.ID) {
     case FUNCTION_SUMMARY_ID: {
-      readFunctionSummary();
+      if (readFunctionSummary()) {
+        llvm::report_fatal_error("Failed to read FS");
+      }
       break;
     }
+      case VIRTUAL_METHOD_INFO_ID: {
+        if (readVirtualMethodInfo()) {
+          llvm::report_fatal_error("Failed to read virtual method info");
+        }
+        break;
+      }
     }
 
     maybeNext = Cursor.advance();
@@ -346,8 +417,9 @@ bool Deserializer::readModuleSummary() {
       }
       break;
     }
-    case FUNCTION_SUMMARY_ID: {
-      llvm_unreachable("FUNCTION_SUMMARY block should be handled in "
+    case FUNCTION_SUMMARY_ID:
+    case VIRTUAL_METHOD_INFO_ID: {
+      llvm_unreachable("FUNCTION_SUMMARY and VIRTUAL_METHOD_INFO_ID blocks should be handled in "
                        "'readSingleModuleSummary'");
       break;
     }
