@@ -160,7 +160,7 @@ bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
 llvm::VersionTuple swift::canonicalizePlatformVersion(
     PlatformKind platform, const llvm::VersionTuple &version) {
 
-  // Canonicalize macOS version for macOS Big Sur to great
+  // Canonicalize macOS version for macOS Big Sur to treat
   // 10.16 as 11.0.
   if (platform == PlatformKind::OSX ||
       platform == PlatformKind::OSXApplicationExtension) {
