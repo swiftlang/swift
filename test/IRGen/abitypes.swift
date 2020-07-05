@@ -17,6 +17,7 @@ import Foundation
 // arm64e-ios: [[ARM64E_MYRECT:%.*]] = type { float, float, float, float }
 // arm64-tvos: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 // armv7k-watchos: [[ARMV7K_MYRECT:%.*]] = type { float, float, float, float }
+// arm64-macosx: [[ARM64E_MYRECT:%.*]] = type { float, float, float, float }
 
 class Foo {
   // x86_64-macosx: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself %0) {{.*}} {
@@ -428,7 +429,12 @@ class Foo {
   // armv7k-watchos: [[TOOBJCBOOL:%[0-9]+]] = call swiftcc i1 @"$s10ObjectiveC22_convertBoolToObjCBool{{[_0-9a-zA-Z]*}}F"(i1 [[NEG]])
   // armv7k-watchos: ret i1 [[TOOBJCBOOL]]
   //
-  @objc dynamic func negate2(_ b: Bool) -> Bool {
+
+  // arm64-macosx: define hidden zeroext i1 @"$s8abitypes3FooC7negate2{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, i1 zeroext %2)
+  // arm64-macosx: [[NEG:%[0-9]+]] = call swiftcc i1 @"$s8abitypes3FooC7negate2{{[_0-9a-zA-Z]*}}F"(i1
+  // arm64-macosx: [[TOOBJCBOOL:%[0-9]+]] = call swiftcc i1 @"$s10ObjectiveC22_convertBoolToObjCBool{{[_0-9a-zA-Z]*}}F"(i1 [[NEG]])
+  // arm64-macosx: ret i1 [[TOOBJCBOOL]]
+@objc dynamic func negate2(_ b: Bool) -> Bool {
     var g = Gadget()
     return g.negate(b)
   }
@@ -532,6 +538,8 @@ class Foo {
   //
   // arm64-tvos: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(%TSo13StructReturnsC* %0, i64 %1, i64 %2, i64 %3, i64 %4, %T8abitypes3FooC* swiftself %5) {{.*}} {
   // arm64-tvos: define hidden void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(%TSo9BigStructV* noalias nocapture sret %0, i8* %1, i8* %2, [[OPAQUE:.*]]* %3, %TSo9BigStructV* %4) {{[#0-9]*}} {
+  // arm64-macosx: define hidden swiftcc { i64, i64, i64, i64 } @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(%TSo13StructReturnsC* %0, i64 %1, i64 %2, i64 %3, i64 %4, %T8abitypes3FooC* swiftself %5) {{.*}} {
+  // arm64-macosx: define hidden void @"$s8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(%TSo9BigStructV* noalias nocapture sret %0, i8* %1, i8* %2, [[OPAQUE:.*]]* %3, %TSo9BigStructV* %4) {{.*}} {
   @objc dynamic func callJustReturn(_ r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
@@ -585,6 +593,15 @@ public func testInlineAgg(_ rect: MyRect) -> Float {
 // arm64e-ios:  store i1 false, i1* [[PTR2]], align 8
 // arm64e-ios:  [[ARG:%.*]] = load i64, i64* [[COERCED]]
 // arm64e-ios:  call void bitcast (void ()* @objc_msgSend to void (i8*, i8*, i64)*)(i8* {{.*}}, i8* {{.*}}, i64 [[ARG]])
+// arm64-macosx: define swiftcc void @"$s8abitypes14testBOOLStructyyF"()
+// arm64-macosx:  [[COERCED:%.*]] = alloca i64
+// arm64-macosx:  [[STRUCTPTR:%.*]] = bitcast i64* [[COERCED]] to %TSo14FiveByteStructV
+// arm64-macosx:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, %TSo14FiveByteStructV* [[STRUCTPTR]], {{i.*}} 0, {{i.*}} 0
+// arm64-macosx:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, %T10ObjectiveC8ObjCBoolV* [[PTR0]], {{i.*}} 0, {{i.*}} 0
+// arm64-macosx:  [[PTR2:%.*]] = getelementptr inbounds %TSb, %TSb* [[PTR1]], {{i.*}} 0, {{i.*}} 0
+// arm64-macosx:  store i1 false, i1* [[PTR2]], align 8
+// arm64-macosx:  [[ARG:%.*]] = load i64, i64* [[COERCED]]
+// arm64-macosx:  call void bitcast (void ()* @objc_msgSend to void (i8*, i8*, i64)*)(i8* {{.*}}, i8* {{.*}}, i64 [[ARG]])
 public func testBOOLStruct() {
   let s = FiveByteStruct()
   MyClass.mymethod(s)
