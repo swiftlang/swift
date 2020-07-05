@@ -97,14 +97,22 @@ public:
 // out the proper includes from libobjc. The values MUST match the ones from
 // libobjc. Debug builds check these values against objc_debug_isa_class_mask
 // from libobjc.
-#  if TARGET_OS_SIMULATOR
-// Simulators don't currently use isa masking, but we still want to emit
+#  if TARGET_OS_SIMULATOR && __x86_64__
+// Simulators don't currently use isa masking on x86, but we still want to emit
 // swift_isaMask and the corresponding code in case that changes. libobjc's
 // mask has the bottom bits clear to include pointer alignment, match that
 // value here.
 #    define SWIFT_ISA_MASK 0xfffffffffffffff8ULL
 #  elif __arm64__
-#    define SWIFT_ISA_MASK 0x0000000ffffffff8ULL
+#    if __has_feature(ptrauth_calls)
+#      define SWIFT_ISA_MASK 0x007ffffffffffff8ULL
+#    else
+#      if TARGET_OS_OSX
+#      define SWIFT_ISA_MASK 0x00007ffffffffff8ULL
+#      else
+#      define SWIFT_ISA_MASK 0x0000000ffffffff8ULL
+#      endif
+#    endif
 #  elif __x86_64__
 #    define SWIFT_ISA_MASK 0x00007ffffffffff8ULL
 #  else

@@ -106,9 +106,25 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4 %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_UNVERSIONED %s
 
+// Check arm64 macOS first deployment version adjustment.
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-macosx10.15.1 %s 2>&1 | %FileCheck -check-prefix ARM64E_MACOS_LINKER %s
+
+// Check x86 macOS 11 deployment version adjustment.
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx11.0 %s 2>&1 | %FileCheck -check-prefix X86_MACOS11_LINKER %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-macosx11.0 %s 2>&1 | %FileCheck -check-prefix ARM64E_MACOS_LINKER %s
+
+// Check arm64 simulators first deployment version adjustment.
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-ios13.0-simulator %s 2>&1 | %FileCheck -check-prefix ARM64_IOS_SIMULATOR_LINKER %s
+
+
 // MACOS_10_15: -platform_version macos 10.9.0 10.15.0
 // MACOS_10_15_4: -platform_version macos 10.9.0 10.15.4
 // MACOS_UNVERSIONED: -platform_version macos 10.9.0 0.0.0
+
+// ARM64E_MACOS_LINKER: -platform_version macos 11.0.0
+// X86_MACOS11_LINKER: -platform_version macos 10.16.0
+// X86_64_WATCHOS_SIM_LINKER: -platform_version watchos-simulator 7.0.0
+// ARM64_IOS_SIMULATOR_LINKER: -platform_version ios-simulator 14.0.0
 
 // There are more RUN lines further down in the file.
 

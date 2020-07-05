@@ -34,6 +34,9 @@
 // IOS12-MACABI-DAG: -rpath [[MACOSX_SDK_STDLIB_PATH]]
 // IOS12-MACABI-DAG: -platform_version mac-catalyst 13.0.0 0.0.0
 
+// RUN: %swiftc_driver -driver-print-jobs -target arm64-apple-ios12.0-macabi -sdk %S/../Inputs/clang-importer-sdk %s | %FileCheck -check-prefix=IOS14-MACABI %s
+// IOS14-MACABI: -platform_version mac-catalyst 14.0.0 0.0.0
+
 // Test using target-variant to build zippered outputs
 
 // RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0-macabi %s | %FileCheck -check-prefix=ZIPPERED-VARIANT-OBJECT %s

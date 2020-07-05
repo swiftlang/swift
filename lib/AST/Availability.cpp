@@ -246,9 +246,16 @@ AvailabilityContext ASTContext::getSwift50Availability() {
     return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX()) {
+    if (target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,14,4)));
   } else if (target.isiOS()) {
+    if (target.isAArch64() &&
+        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(12,2)));
   } else if (target.isWatchOS()) {
@@ -274,9 +281,16 @@ AvailabilityContext ASTContext::getSwift51Availability() {
     return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX()) {
+    if (target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,15,0)));
   } else if (target.isiOS()) {
+    if (target.isAArch64() &&
+        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(13,0,0)));
   } else if (target.isWatchOS()) {
@@ -301,18 +315,27 @@ AvailabilityContext ASTContext::getSwift52Availability() {
   if (target.getArchName() == "arm64e")
     return AvailabilityContext::alwaysAvailable();
 
-  if (target.isMacOSX() ) {
+  if (target.isMacOSX()) {
+    if (target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(10, 15, 4)));
   } else if (target.isiOS()) {
+    if (target.isAArch64() &&
+        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(13, 4, 0)));
   } else if (target.isWatchOS()) {
+    if (target.isArch64Bit())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(9, 99, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
+        VersionRange::allGTE(llvm::VersionTuple(6, 2, 0)));
   }
+  return AvailabilityContext::alwaysAvailable();
 }
 
 AvailabilityContext ASTContext::getSwift53Availability() {
@@ -322,14 +345,26 @@ AvailabilityContext ASTContext::getSwift53Availability() {
     return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX() ) {
+    if (target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+
+    llvm::VersionTuple macOVersion53(10, 16, 0);
+    macOVersion53 = canonicalizePlatformVersion(PlatformKind::OSX, macOVersion53);
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
+        VersionRange::allGTE(macOVersion53));
   } else if (target.isiOS()) {
+    if (target.isAArch64() &&
+        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(14, 0, 0)));
   } else if (target.isWatchOS()) {
+    if (target.isArch64Bit())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(9, 99, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(7, 0, 0)));
   } else {
     return AvailabilityContext::alwaysAvailable();
   }
@@ -340,7 +375,7 @@ AvailabilityContext ASTContext::getSwiftFutureAvailability() {
 
   if (target.isMacOSX() ) {
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else if (target.isiOS()) {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));

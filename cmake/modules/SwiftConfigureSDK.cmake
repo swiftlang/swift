@@ -85,6 +85,38 @@ function(_report_sdk prefix)
   message(STATUS "")
 endfunction()
 
+# Remove architectures not supported by the SDK from the given list.
+function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
+  execute_process(COMMAND
+      /usr/libexec/PlistBuddy -c "Print :SupportedTargets:${os}:Archs" ${sdk_path}/SDKSettings.plist
+    OUTPUT_VARIABLE sdk_supported_archs
+    RESULT_VARIABLE plist_error)
+
+  if (NOT plist_error EQUAL 0)
+    message(STATUS "${os} SDK at ${sdk_path} does not publish its supported architectures")
+    return()
+  endif()
+
+  set(architectures)
+  foreach(arch ${${architectures_var}})
+    if(sdk_supported_archs MATCHES "${arch}\n")
+      list(APPEND architectures ${arch})
+    elseif(arch MATCHES "^armv7(s)?$" AND os STREQUAL "iphoneos")
+      # 32-bit iOS is not listed explicitly in SDK settings.
+      message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
+      list(APPEND architectures ${arch})
+    elseif(arch STREQUAL "i386" AND os STREQUAL "iphonesimulator")
+      # 32-bit iOS simulatoris not listed explicitly in SDK settings.
+      message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
+      list(APPEND architectures ${arch})
+    else()
+      message(STATUS "${name} SDK at ${sdk_path} does not support architecture ${arch}")
+    endif()
+  endforeach()
+
+  set("${architectures_var}" ${architectures} PARENT_SCOPE)
+endfunction()
+
 # Configure an SDK
 #
 # Usage:
@@ -163,6 +195,9 @@ macro(configure_sdk_darwin
       "${SWIFT_DARWIN_SUPPORTED_ARCHS}"   # rhs
       SWIFT_SDK_${prefix}_ARCHITECTURES)  # result
   endif()
+
+  # Remove any architectures not supported by the SDK.
+  remove_sdk_unsupported_archs(${name} ${xcrun_name} ${SWIFT_SDK_${prefix}_PATH} SWIFT_SDK_${prefix}_ARCHITECTURES)
 
   list_intersect(
     "${SWIFT_DARWIN_MODULE_ARCHS}"            # lhs

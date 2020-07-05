@@ -1,7 +1,7 @@
 // This file is also used by objc_properties_ios.swift.
 
-// RUN: %swift -target x86_64-apple-macosx10.11 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NEW %s
-// RUN: %swift -target x86_64-apple-macosx10.10 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-OLD %s
+// RUN: %swift -target %target-cpu-apple-macosx10.11 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NEW %s
+// RUN: %swift -target %target-cpu-apple-macosx10.10 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-OLD %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
@@ -118,7 +118,7 @@ class SomeWrapperTests {
 // CHECK-SAME:   i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}},
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
-// CHECK-SAME:   { {{.+}} }* @_CLASS_METHODS__TtC15objc_properties10SomeObject,
+// CHECK-SAME:   { {{.+}} }* @_CLASS_METHODS__TtC15objc_properties10SomeObject{{(\.ptrauth)?}}
 // CHECK-SAME:   i8* null, i8* null, i8* null,
 // CHECK-NEW-SAME:   { {{.+}} }* @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject
 // CHECK-OLD-SAME:   i8* null
@@ -133,35 +133,35 @@ class SomeWrapperTests {
 // CHECK:   [8 x { i8*, i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([9 x i8], [9 x i8]* @"\01L_selector_data(readonly)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast ([[OPAQUE0:%.*]]* ([[OPAQUE1:%.*]]*, i8*)* @"$s15objc_properties10SomeObjectC8readonlyACvgTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC8readonlyACvgTo{{(.ptrauth)?}}"
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(readwrite)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast ([[OPAQUE0]]* ([[OPAQUE1]]*, i8*)* @"$s15objc_properties10SomeObjectC9readwriteACvgTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC9readwriteACvgTo{{(.ptrauth)?}}"
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(setReadwrite:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void ([[OPAQUE3:%.*]]*, i8*, [[OPAQUE4:%.*]]*)* @"$s15objc_properties10SomeObjectC9readwriteACvsTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC9readwriteACvsTo{{(.ptrauth)?}}"
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([9 x i8], [9 x i8]* @"\01L_selector_data(bareIvar)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast ([[OPAQUE0]]* ([[OPAQUE1]]*, i8*)* @"$s15objc_properties10SomeObjectC8bareIvarACvgTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC8bareIvarACvgTo{{(.ptrauth)?}}"
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([13 x i8], [13 x i8]* @"\01L_selector_data(setBareIvar:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void ([[OPAQUE3]]*, i8*, [[OPAQUE4]]*)* @"$s15objc_properties10SomeObjectC8bareIvarACvsTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC8bareIvarACvsTo{{(.ptrauth)?}}"
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(wobble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (%0* (%0*, i8*)* @"$s15objc_properties10SomeObjectC6wibbleACvgTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC6wibbleACvgTo{{(.ptrauth)?}}"
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(setWobble:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (%0*, i8*, %0*)* @"$s15objc_properties10SomeObjectC6wibbleACvsTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC6wibbleACvsTo{{(.ptrauth)?}}"
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast ([[OPAQUE5:%.*]]* ([[OPAQUE6:%.*]]*, i8*)* @"$s15objc_properties10SomeObjectCACycfcTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectCACycfcTo{{(.ptrauth)?}}"
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -201,7 +201,7 @@ class SomeWrapperTests {
 // CHECK:   i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}},
 // CHECK:   i8* null,
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
-// CHECK:   { {{.+}} }* @_INSTANCE_METHODS__TtC15objc_properties10SomeObject,
+// CHECK:   { {{.+}} }* @_INSTANCE_METHODS__TtC15objc_properties10SomeObject{{(\.ptrauth)?}}
 // CHECK:   i8* null,
 // CHECK:   { {{.+}} }* @_IVARS__TtC15objc_properties10SomeObject,
 // CHECK:   i8* null,
@@ -214,11 +214,11 @@ class SomeWrapperTests {
 // CHECK:   [2 x { i8*, i8*, i8* }] [{
 // CHECK:     { i8* getelementptr inbounds ([18 x i8], [18 x i8]* @"\01L_selector_data(extensionProperty)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast ([[OPAQUE0]]* ([[OPAQUE1]]*, i8*)* @"$s15objc_properties10SomeObjectC17extensionPropertyACvgTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC17extensionPropertyACvgTo{{(.ptrauth)?}}"
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([22 x i8], [22 x i8]* @"\01L_selector_data(setExtensionProperty:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void ([[OPAQUE3]]*, i8*, [[OPAQUE4]]*)* @"$s15objc_properties10SomeObjectC17extensionPropertyACvsTo" to i8*)
+// CHECK:     @"$s15objc_properties10SomeObjectC17extensionPropertyACvsTo{{(.ptrauth)?}}"
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -250,11 +250,11 @@ class SomeWrapperTests {
 
 // CHECK: @"_CATEGORY__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.+}} } {
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
-// CHECK:   %swift.type* bitcast (i64* getelementptr inbounds (<{ {{.+}} }>* @"$s15objc_properties10SomeObjectCMf", i32 0, i32 2) to %swift.type*),
-// CHECK:   { {{.+}} }* @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties",
-// CHECK:   { {{.+}} }* @"_CATEGORY_CLASS_METHODS__TtC15objc_properties10SomeObject_$_objc_properties",
+// CHECK:   @"$s15objc_properties10SomeObjectCMf", i32 0, i32 2
+// CHECK:   { {{.+}} }* @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
+// CHECK:   { {{.+}} }* @"_CATEGORY_CLASS_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
 // CHECK:   i8* null,
-// CHECK:   { {{.+}} }* @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties", 
+// CHECK:   { {{.+}} }* @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}", 
 // CHECK-NEW:   { {{.+}} }* @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties",
 // CHECK-OLD:   i8* null,
 // CHECK:   i32 60
@@ -264,10 +264,10 @@ class SomeWrapperTests {
 // CHECK: @_INSTANCE_METHODS__TtC15objc_properties4Tree =
 // CHECK:    i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(parent)", i64 0, i64 0),
 // CHECK:    i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:    i8* bitcast (%2* (%2*, i8*)* @"$s15objc_properties4TreeC6parentACSgvgTo" to i8*)
+// CHECK:    @"$s15objc_properties4TreeC6parentACSgvgTo{{(.ptrauth)?}}"
 // CHECK:    i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(setParent:)", i64 0, i64 0),
 // CHECK:    i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:    i8* bitcast (void (%2*, i8*, %2*)* @"$s15objc_properties4TreeC6parentACSgvsTo" to i8*)
+// CHECK:    @"$s15objc_properties4TreeC6parentACSgvsTo{{(.ptrauth)?}}"
 
 // CHECK: @_PROTOCOL__TtP15objc_properties5Proto_ = private constant { {{.+}} } {
 // CHECK:   i8* null,

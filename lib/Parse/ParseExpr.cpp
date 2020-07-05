@@ -3815,6 +3815,11 @@ Parser::parsePlatformVersionConstraintSpec() {
   // Register the platform name as a keyword token.
   TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
 
+  // Keep the original version around for run-time checks to support
+  // macOS Big Sur betas that report 10.16 at
+  // at run time.
+  llvm::VersionTuple RuntimeVersion = Version;
+  Version = canonicalizePlatformVersion(*Platform, Version);
   return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
-      Platform.getValue(), PlatformLoc, Version, VersionRange));
+      Platform.getValue(), PlatformLoc, Version, RuntimeVersion, VersionRange));
 }

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target x86_64-apple-macosx10.51 -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target %target-cpu-apple-macosx10.51 -typecheck %s -verify
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop

@@ -198,7 +198,7 @@ struct RuntimeVersionCheck {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
     auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
                             Platform, SourceLoc(),
-                            Version, SourceLoc()
+                            Version, Version, SourceLoc()
                         );
 
     // otherSpec = "*"
