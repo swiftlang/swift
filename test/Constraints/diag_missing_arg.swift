@@ -66,6 +66,19 @@ trailingClosureMulti2(x: 1) { 1 }
 // expected-error@-1 {{missing argument for parameter 'y' in call}} {{27-27=, y: <#() -> Int#>}}
 // expected-error@-2 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
 
+func trailingClosureMulti3(x: () -> Int, y: () -> Int, z: () -> Int, d: Int = 0) {} // expected-note * {{here}}
+trailingClosureMulti3 { 1 }
+// expected-error@-1 {{missing arguments for parameters 'x', 'y' in call}}
+trailingClosureMulti3() { 2 } z: { 3 }
+// expected-error@-1 {{missing argument for parameter 'x' in call}}
+trailingClosureMulti3() { 1 } x: { 2 } z: { 3 }
+// expected-error@-1 {{missing argument for parameter 'y' in call}}
+// expected-error@-2 {{extra argument in call}}
+
+func trailingClosureMulti4(x: () -> Int, c: Int = 0, d: Int = 0, z: () -> Int) {} // expected-note * {{here}}
+trailingClosureMulti4() { 1 } z: { 3 }
+// expected-error@-1 {{trailing closure not allowed in call with more than one defaulted trailing parameter}}
+
 func param2Func(x: Int, y: Int) {} // expected-note * {{here}}
 param2Func(x: 1) // expected-error {{missing argument for parameter 'y' in call}} {{16-16=, y: <#Int#>}}
 param2Func(y: 1) // expected-error {{missing argument for parameter 'x' in call}} {{12-12=x: <#Int#>, }}
