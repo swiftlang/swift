@@ -70,7 +70,8 @@ void indexWitnessTable(ModuleSummaryIndex &index, SILWitnessTable &WT) {
     auto methodWitness = entry.getMethodWitness();
     auto VirtualFunc = methodWitness.Requirement.getFuncDecl();
     auto Witness = methodWitness.Witness;
-    TableFuncSlot slot(*VirtualFunc, Protocol);
+    llvm::dbgs() << "Emit table entry for " << Witness->getName() << "\n";
+    VirtualMethodSlot slot(*VirtualFunc, Protocol);
     index.addImplementation(slot, getGUID(Witness->getName()));
   }
 }
@@ -81,7 +82,7 @@ void indexVTable(ModuleSummaryIndex &index, SILVTable &VT) {
   for (auto entry : VT.getEntries()) {
     auto VirtualFunc = entry.getMethod().getFuncDecl();
     auto Impl = entry.getImplementation();
-    TableFuncSlot slot(*VirtualFunc, Class);
+    VirtualMethodSlot slot(*VirtualFunc, Class);
     index.addImplementation(slot, getGUID(Impl->getName()));
   }
 }

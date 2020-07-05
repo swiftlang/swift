@@ -12,7 +12,7 @@ namespace swift {
 using GUID = uint64_t;
 static GUID getGUID(llvm::StringRef Str) { return llvm::MD5Hash(Str); }
 
-struct TableFuncSlot {
+struct VirtualMethodSlot {
   enum class KindTy {
     Witness, VTable,
   };
@@ -21,7 +21,7 @@ struct TableFuncSlot {
   GUID VirtualFuncID;
   GUID TableID;
   
-  TableFuncSlot(FuncDecl &VirtualFunc, TypeDecl &Context, KindTy kind) : Kind(kind) {
+  VirtualMethodSlot(FuncDecl &VirtualFunc, TypeDecl &Context, KindTy kind) : Kind(kind) {
     switch (Kind) {
       case KindTy::Witness: {
         assert(isa<ProtocolDecl>(Context));
@@ -36,14 +36,23 @@ struct TableFuncSlot {
     TableID = getGUID(Context.getNameStr());
   }
   
-  TableFuncSlot(FuncDecl &VirtualFunc, ProtocolDecl &Context)
-  : TableFuncSlot(VirtualFunc, Context, KindTy::Witness) { }
+  VirtualMethodSlot(FuncDecl &VirtualFunc, ProtocolDecl &Context)
+  : VirtualMethodSlot(VirtualFunc, Context, KindTy::Witness) { }
   
-  TableFuncSlot(FuncDecl &VirtualFunc, ClassDecl &Context)
-  : TableFuncSlot(VirtualFunc, Context, KindTy::VTable) { }
+  VirtualMethodSlot(FuncDecl &VirtualFunc, ClassDecl &Context)
+  : VirtualMethodSlot(VirtualFunc, Context, KindTy::VTable) { }
   
-  bool operator<(const TableFuncSlot &rhs)  const {
-    return Kind < rhs.Kind && TableID < rhs.TableID && VirtualFuncID < rhs.VirtualFuncID;
+  bool operator<(const VirtualMethodSlot &rhs)  const {
+    if (Kind > rhs.Kind)
+      return false;
+    if (Kind < rhs.Kind)
+      return true;
+    if (TableID > rhs.TableID)
+      return false;
+    if (TableID < rhs.TableID)
+      return true;
+
+    return VirtualFuncID < rhs.VirtualFuncID;
   }
 };
 
@@ -140,10 +149,10 @@ struct FunctionSummaryInfo {
 
 class ModuleSummaryIndex {
   using FunctionSummaryInfoMapTy = std::map<GUID, FunctionSummaryInfo>;
-  using FuncTableMapTy = std::map<TableFuncSlot, std::vector<GUID>>;
+  using VirtualMethodInfoMapTy = std::map<VirtualMethodSlot, std::vector<GUID>>;
 
   FunctionSummaryInfoMapTy FunctionSummaryInfoMap;
-  FuncTableMapTy FuncTableMap;
+  VirtualMethodInfoMapTy VirtualMethodInfoMap;
 
   std::string ModuleName; // Only for debug purpose
 
@@ -172,24 +181,27 @@ public:
     return std::make_pair(entry.TheSummary.get(), StringRef(entry.Name));
   }
   
-  void addImplementation(TableFuncSlot slot, GUID funcGUID) {
-    auto found = FuncTableMap.find(slot);
-    if (found == FuncTableMap.end()) {
-      FuncTableMap.insert(std::make_pair(slot, std::vector<GUID>{ funcGUID }));
+  void addImplementation(VirtualMethodSlot slot, GUID funcGUID) {
+    auto found = VirtualMethodInfoMap.find(slot);
+    if (found == VirtualMethodInfoMap.end()) {
+      VirtualMethodInfoMap.insert(std::make_pair(slot, std::vector<GUID>{ funcGUID }));
       return;
     }
     found->second.push_back(funcGUID);
   }
   
   llvm::Optional<ArrayRef<GUID>>
-  getImplementations(TableFuncSlot slot) const {
-    auto found = FuncTableMap.find(slot);
-    if (found == FuncTableMap.end()) {
+  getImplementations(VirtualMethodSlot slot) const {
+    auto found = VirtualMethodInfoMap.find(slot);
+    if (found == VirtualMethodInfoMap.end()) {
       return None;
     }
     return ArrayRef<GUID>(found->second);
   }
 
+  const VirtualMethodInfoMapTy &virtualMethods() const {
+    return VirtualMethodInfoMap;
+  }
 
   FunctionSummaryInfoMapTy::const_iterator begin() const {
     return FunctionSummaryInfoMap.begin();

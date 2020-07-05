@@ -24,6 +24,16 @@
 // TABLE-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=1 op1=1692125368554804631 op2=8225888563470713412/>
 // TABLE-CHECK-NEXT: </FUNCTION_SUMMARY>
 
+// TABLE-CHECK:        <METHOD_METADATA {{.+}} op0=0 op1=1692125368554804631 op2=8225888563470713412/>
+// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=-1159881846596281644/>
+// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=9188130023577763384/>
+// TABLE-CHECK-NEXT: </VIRTUAL_METHOD_INFO>
+
+// TABLE-CHECK:        <METHOD_METADATA {{.+}} op0=0 op1=1757722448577808972 op2=8225888563470713412/>
+// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=-6034489220818382202/>
+// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=5892209788981434976/>
+// TABLE-CHECK-NEXT: </VIRTUAL_METHOD_INFO>
+
 
 // RUN: %swift_frontend_plain -cross-module-opt %t/module-summary.swiftmodule.summary %t/module1.swiftmodule.summary %t/module2.swiftmodule.summary -o %t/merged-module.summary
 // RUN: llvm-bcanalyzer -dump %t/merged-module.summary | %FileCheck %s --check-prefix MERGED-CHECK

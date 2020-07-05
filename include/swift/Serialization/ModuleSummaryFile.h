@@ -23,6 +23,8 @@ enum BlockID {
   MODULE_SUMMARY_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 
   FUNCTION_SUMMARY_ID,
+
+  VIRTUAL_METHOD_INFO_ID,
 };
 
 namespace module_summary {
@@ -33,6 +35,25 @@ enum {
 using MetadataLayout = BCRecordLayout<
   MODULE_METADATA,
   BCBlob // Module name
+>;
+};
+
+namespace virtual_method_info {
+enum {
+  METHOD_METADATA,
+  METHOD_IMPL,
+};
+
+using MethodMetadataLayout = BCRecordLayout<
+  METHOD_METADATA,
+  BCFixed<1>, // KindTy (WitnessTable or VTable)
+  BCVBR<16>,  // VirtualFunc GUID
+  BCVBR<16>   // Table GUID
+>;
+
+using MethodImplLayout = BCRecordLayout<
+  METHOD_IMPL,
+  BCVBR<16> // Impl func GUID
 >;
 };
 

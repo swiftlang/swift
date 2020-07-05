@@ -79,6 +79,11 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(FUNCTION_SUMMARY);
   BLOCK_RECORD(function_summary, METADATA);
   BLOCK_RECORD(function_summary, CALL_GRAPH_EDGE);
+
+  BLOCK(VIRTUAL_METHOD_INFO);
+  BLOCK_RECORD(virtual_method_info, METHOD_METADATA);
+  BLOCK_RECORD(virtual_method_info, METHOD_IMPL);
+
 }
 
 void Serializer::emitHeader() {
@@ -108,6 +113,27 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
         CallGraphEdgeLayout edgeLayout(Out);
         edgeLayout.emit(ScratchRecord, unsigned(call.getKind()),
                         call.getCallee(), call.getTable());
+      }
+    }
+  }
+  
+  {
+    for (auto &method : index.virtualMethods()) {
+      llvm::BCBlockRAII restoreBlock(Out, VIRTUAL_METHOD_INFO_ID, 5);
+      auto &slot = method.first;
+      auto impls = method.second;
+      using namespace virtual_method_info;
+
+      MethodMetadataLayout MDLayout(Out);
+
+      MDLayout.emit(ScratchRecord,
+                    unsigned(slot.Kind),
+                    slot.VirtualFuncID,
+                    slot.TableID);
+      
+      for (auto impl : impls) {
+        MethodImplLayout ImplLayout(Out);
+        ImplLayout.emit(ScratchRecord, impl);
       }
     }
   }
