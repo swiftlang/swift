@@ -3554,6 +3554,20 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       if (!couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
         return failed();
       }
+    } else if (auto protocolComposition =
+                   fromType->getAs<ProtocolCompositionType>()) {
+      if (!protocolComposition->getMembers().empty() &&
+          llvm::any_of(protocolComposition->getMembers(),
+                       [&](Type protocolType) {
+                         if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
+                                 protocolType->getAnyNominal())) {
+                           return !couldDynamicallyConformToProtocol(
+                               toType, protocolDecl, dc);
+                         }
+                         return false;
+                       })) {
+        return failed();
+      }
     }
 
     // If neither type is class-constrained, anything goes.
