@@ -12,6 +12,41 @@ namespace swift {
 using GUID = uint64_t;
 static GUID getGUID(llvm::StringRef Str) { return llvm::MD5Hash(Str); }
 
+struct TableFuncSlot {
+  enum class KindTy {
+    Witness, VTable,
+  };
+
+  KindTy Kind;
+  GUID VirtualFuncID;
+  GUID TableID;
+  
+  TableFuncSlot(FuncDecl &VirtualFunc, TypeDecl &Context, KindTy kind) : Kind(kind) {
+    switch (Kind) {
+      case KindTy::Witness: {
+        assert(isa<ProtocolDecl>(Context));
+        break;
+      }
+      case KindTy::VTable: {
+        assert(isa<ClassDecl>(Context));
+        break;
+      }
+    }
+    VirtualFuncID = getGUID(VirtualFunc.getBaseIdentifier().str());
+    TableID = getGUID(Context.getNameStr());
+  }
+  
+  TableFuncSlot(FuncDecl &VirtualFunc, ProtocolDecl &Context)
+  : TableFuncSlot(VirtualFunc, Context, KindTy::Witness) { }
+  
+  TableFuncSlot(FuncDecl &VirtualFunc, ClassDecl &Context)
+  : TableFuncSlot(VirtualFunc, Context, KindTy::VTable) { }
+  
+  bool operator<(const TableFuncSlot &rhs)  const {
+    return Kind < rhs.Kind && TableID < rhs.TableID && VirtualFuncID < rhs.VirtualFuncID;
+  }
+};
+
 class FunctionSummary {
 public:
   class EdgeTy {
@@ -105,7 +140,10 @@ struct FunctionSummaryInfo {
 
 class ModuleSummaryIndex {
   using FunctionSummaryInfoMapTy = std::map<GUID, FunctionSummaryInfo>;
+  using FuncTableMapTy = std::map<TableFuncSlot, std::vector<GUID>>;
+
   FunctionSummaryInfoMapTy FunctionSummaryInfoMap;
+  FuncTableMapTy FuncTableMap;
 
   std::string ModuleName; // Only for debug purpose
 
@@ -133,6 +171,25 @@ public:
     auto &entry = found->second;
     return std::make_pair(entry.TheSummary.get(), StringRef(entry.Name));
   }
+  
+  void addImplementation(TableFuncSlot slot, GUID funcGUID) {
+    auto found = FuncTableMap.find(slot);
+    if (found == FuncTableMap.end()) {
+      FuncTableMap.insert(std::make_pair(slot, std::vector<GUID>{ funcGUID }));
+      return;
+    }
+    found->second.push_back(funcGUID);
+  }
+  
+  llvm::Optional<ArrayRef<GUID>>
+  getImplementations(TableFuncSlot slot) const {
+    auto found = FuncTableMap.find(slot);
+    if (found == FuncTableMap.end()) {
+      return None;
+    }
+    return ArrayRef<GUID>(found->second);
+  }
+
 
   FunctionSummaryInfoMapTy::const_iterator begin() const {
     return FunctionSummaryInfoMap.begin();

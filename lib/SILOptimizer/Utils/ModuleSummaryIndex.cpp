@@ -30,8 +30,7 @@ buildFunctionSummaryIndex(SILFunction &F, BasicCalleeAnalysis &BCA) {
           auto member = WMI->getMember();
           auto CalleeFn = member.getFuncDecl();
           auto Protocol = dyn_cast<ProtocolDecl>(CalleeFn->getDeclContext());
-          Protocol->getModuleContext()->getNameStr();
-          llvm::dbgs() << "Record " << WMI->getMember().getFuncDecl()->getNameStr()
+          llvm::dbgs() << "Record " << CalleeFn->getNameStr()
                        << " of " << Protocol->getNameStr() << " as reference to PWT\n";
 
           auto edge = FunctionSummary::EdgeTy::witnessCall(WMI->getMember());
@@ -63,6 +62,30 @@ buildFunctionSummaryIndex(SILFunction &F, BasicCalleeAnalysis &BCA) {
   return std::make_unique<FunctionSummary>(CallGraphEdgeList);
 }
 
+void indexWitnessTable(ModuleSummaryIndex &index, SILWitnessTable &WT) {
+  auto &Protocol = *WT.getProtocol();
+  for (auto entry : WT.getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method) break;
+
+    auto methodWitness = entry.getMethodWitness();
+    auto VirtualFunc = methodWitness.Requirement.getFuncDecl();
+    auto Witness = methodWitness.Witness;
+    TableFuncSlot slot(*VirtualFunc, Protocol);
+    index.addImplementation(slot, getGUID(Witness->getName()));
+  }
+}
+
+
+void indexVTable(ModuleSummaryIndex &index, SILVTable &VT) {
+  auto &Class = *VT.getClass();
+  for (auto entry : VT.getEntries()) {
+    auto VirtualFunc = entry.getMethod().getFuncDecl();
+    auto Impl = entry.getImplementation();
+    TableFuncSlot slot(*VirtualFunc, Class);
+    index.addImplementation(slot, getGUID(Impl->getName()));
+  }
+}
+
 ModuleSummaryIndex swift::buildModuleSummaryIndex(SILModule &M,
                                            BasicCalleeAnalysis &BCA) {
   ModuleSummaryIndex index;
@@ -72,6 +95,14 @@ ModuleSummaryIndex swift::buildModuleSummaryIndex(SILModule &M,
   for (auto &F : M) {
     auto FS = buildFunctionSummaryIndex(F, BCA);
     index.addFunctionSummary(F.getName(), std::move(FS));
+  }
+  
+  for (auto &WT : M.getWitnessTableList()) {
+    indexWitnessTable(index, WT);
+  }
+  
+  for (auto &VT : M.getVTables()) {
+    indexVTable(index, *VT);
   }
   return index;
 }
