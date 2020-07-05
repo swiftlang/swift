@@ -69,7 +69,7 @@ class PlatformVersionConstraintAvailabilitySpec : public AvailabilitySpec {
 
   llvm::VersionTuple Version;
 
-  // For macOS Big Sur, we we canonicalize 10.16 to 11.0 for compile-time
+  // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
   // checking since clang canonicalizes availability markup. However, to
   // support Beta versions of macOS Big Sur where the OS
   // reports 10.16 at run time, we need to compare against 10.16,
