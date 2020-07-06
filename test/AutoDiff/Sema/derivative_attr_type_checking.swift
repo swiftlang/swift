@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend-typecheck -verify %s
+// RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s
 
 import _Differentiation
 
@@ -1133,4 +1133,14 @@ extension Float {
   func jvpMethod() -> (value: Float, differential: (Float) -> Float) {
     fatalError()
   }
+}
+
+// Test original function with opaque result type.
+
+func opaqueResult(_ x: Float) -> some Differentiable { x }
+
+// expected-error @+1 {{could not find function 'opaqueResult' with expected type '(Float) -> Float'}}
+@derivative(of: opaqueResult)
+func vjpOpaqueResult(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
 }

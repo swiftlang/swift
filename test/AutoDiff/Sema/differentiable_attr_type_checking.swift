@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend-typecheck -verify %s
+// RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s
 
 import _Differentiation
 
@@ -695,3 +695,7 @@ struct Accessors: Differentiable {
     _modify { yield &stored }
   }
 }
+
+// expected-error @+1 {{cannot differentiate functions returning opaque result types}}
+@differentiable
+func opaqueResult(_ x: Float) -> some Differentiable { x }
