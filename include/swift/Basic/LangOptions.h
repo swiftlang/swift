@@ -508,9 +508,6 @@ namespace swift {
     /// function bodies.
     bool SkipNonInlinableFunctionBodies = false;
 
-    /// Single statement (ASTNode) type checking mode for IDE tooling.
-    bool TypeCheckSingleASTNode = false;
-
     ///
     /// Flags for developers
     ///

@@ -4133,6 +4133,10 @@ namespace {
       // If we end up here, we should have diagnosed somewhere else
       // already.
       Expr *simplified = simplifyExprType(expr);
+      // Invalidate 'VarDecl's inside the pattern.
+      expr->getSubPattern()->forEachVariable([](VarDecl *VD) {
+        VD->setInvalid();
+      });
       if (!SuppressDiagnostics
           && !cs.getType(simplified)->is<UnresolvedType>()) {
         auto &de = cs.getASTContext().Diags;
@@ -8271,7 +8275,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   if (!resultTarget)
     return None;
 
-  if (!getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
+  if (!Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked)) {
     bool hadError = false;
 
     // Visit closures that have non-single expression bodies.

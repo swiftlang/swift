@@ -1279,6 +1279,7 @@ class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   ASTContext &Ctx;
   SourceFile *SF;
+  bool LeaveFunctionBodyUnchecked;
 
   explicit DeclChecker(ASTContext &ctx, SourceFile *SF) : Ctx(ctx), SF(SF) {}
 
@@ -2243,7 +2244,7 @@ public:
       }
     }
 
-    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
+    if (LeaveFunctionBodyUnchecked) {
       // DO nothing.
     } else if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
@@ -2578,7 +2579,9 @@ public:
 
     checkAccessControl(CD);
 
-    if (requiresDefinition(CD) && !CD->hasBody()) {
+    if (LeaveFunctionBodyUnchecked) {
+      // Do nothing.
+    } else if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       CD->diagnose(diag::missing_initializer_def);
     } else if (CD->getDeclContext()->isLocalContext()) {
@@ -2596,8 +2599,8 @@ public:
   void visitDestructorDecl(DestructorDecl *DD) {
     TypeChecker::checkDeclAttributes(DD);
 
-    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
-      // DO nothing.
+    if (LeaveFunctionBodyUnchecked) {
+      // Do nothing.
     } else if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TypeChecker::typeCheckAbstractFunctionBody(DD);
@@ -2610,7 +2613,9 @@ public:
 };
 } // end anonymous namespace
 
-void TypeChecker::typeCheckDecl(Decl *D) {
+void TypeChecker::typeCheckDecl(Decl *D, bool LeaveBodyUnchecked) {
   auto *SF = D->getDeclContext()->getParentSourceFile();
-  DeclChecker(D->getASTContext(), SF).visit(D);
+  DeclChecker declChecker(D->getASTContext(), SF);
+  declChecker.LeaveFunctionBodyUnchecked = LeaveBodyUnchecked;
+  declChecker.visit(D);
 }
