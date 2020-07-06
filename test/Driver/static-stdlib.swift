@@ -1,5 +1,5 @@
 // Statically link a "hello world" program
-// REQUIRES: OS=linux-gnu
+// REQUIRES: OS=linux-gnu || OS=openbsd
 // REQUIRES: static_stdlib
 print("hello world!")
 // RUN: %empty-directory(%t)

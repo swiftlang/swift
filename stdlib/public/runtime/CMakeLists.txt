@@ -96,9 +96,15 @@ else()
   endif()
 endif()
 
+# TODO: Put the logic for finding libdl in a module, similar to ICU.
+set(libdl)
+if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
+  set(libdl -ldl)
+endif()
+
 
 set(sdk "${SWIFT_HOST_VARIANT_SDK}")
-if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
+if(SWIFT_BUILD_STATIC_STDLIB AND ${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
   list(REMOVE_ITEM swift_runtime_sources ImageInspectionELF.cpp)
   set(static_binary_lnk_file_list)
   string(TOLOWER "${sdk}" lowercase_sdk)
@@ -157,7 +163,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
 ${libicu_i18n_a}
 ${libicu_uc_a}
 ${libicu_data_a}
--ldl
+${libdl}
 -lstdc++
 -lm")
 
@@ -166,7 +172,7 @@ ${libicu_data_a}
                              DESTINATION "lib/swift_static/${lowercase_sdk}"
                              COMPONENT stdlib)
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
-  foreach(arch IN LISTS SWIFT_SDK_LINUX_ARCHITECTURES)
+  foreach(arch IN LISTS SWIFT_SDK_${sdk}_ARCHITECTURES)
     add_dependencies(static_binary_magic ${swift_image_inspection_${arch}_static})
   endforeach()
   add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
@@ -286,7 +292,7 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       string(TOLOWER "${sdk}" lowercase_sdk)
       set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
       file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
--ldl
+${libdl}
 -lpthread
 -lswiftCore
 -lswiftImageInspectionShared

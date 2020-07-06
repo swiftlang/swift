@@ -1,6 +1,7 @@
 // Create a self contained binary
 // REQUIRES: OS=linux-gnu
 // REQUIRES: static_stdlib
+// XFAIL: OS=openbsd
 print("hello world!")
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -static-executable -o %t/static-executable %s
