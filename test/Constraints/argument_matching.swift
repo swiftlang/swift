@@ -1607,3 +1607,19 @@ struct DiagnoseAllLabels {
     f(aax: 0, bbx: 1, dd: 3, ff: 5) // expected-error {{incorrect argument labels in call (have 'aax:bbx:dd:ff:', expected 'aa:bb:dd:ff:')}} {{7-10=aa}} {{15-18=bb}} {{none}}
   }
 }
+
+// SR-13135: Type inference regression in Swift 5.3 - can't infer a type of @autoclosure result.
+func sr13135() {
+  struct Foo {
+    var bar: [Int] = []
+  }
+
+  let baz: Int? = nil
+
+  func foo<T: Equatable>(
+    _ a: @autoclosure () throws -> T,
+    _ b: @autoclosure () throws -> T
+  ) {}
+
+  foo(Foo().bar, [baz])
+}
