@@ -47,7 +47,7 @@ using namespace swift;
 /// This is ABI and cannot be removed. Even though _stdlib_isOSVersionAtLeast()
 /// is no longer inlinable, is previously was and so calls to this method
 /// have been inlined into shipped apps.
-_SwiftNSOperatingSystemVersion swift::_swift_stdlib_operatingSystemVersion() {
+_SwiftNSOperatingSystemVersion _swift_stdlib_operatingSystemVersion() {
   os_system_version_s version = SWIFT_LAZY_CONSTANT(getOSVersion());
 
   return { (int)version.major, (int)version.minor, (int)version.patch };
