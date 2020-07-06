@@ -143,15 +143,23 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
-  add_custom_command_target(swift_static_binary_${sdk}_args
-    COMMAND
-      "${CMAKE_COMMAND}" -E copy
-      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk"
-      "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    OUTPUT
-      "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    DEPENDS
-      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
+  file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
+-static
+-lswiftCore
+-lswiftImageInspectionShared
+-Xlinker
+--defsym=__import_pthread_self=pthread_self
+-Xlinker
+--defsym=__import_pthread_once=pthread_once
+-Xlinker
+--defsym=__import_pthread_key_create=pthread_key_create
+-lpthread
+${libicu_i18n_a}
+${libicu_uc_a}
+${libicu_data_a}
+-ldl
+-lstdc++
+-lm")
 
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
