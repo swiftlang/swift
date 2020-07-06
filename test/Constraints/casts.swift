@@ -232,7 +232,7 @@ func test_tuple_casts_no_warn() {
   _ = arr as! [(Foo, Foo)] // Ok
   _ = tup as! (Foo, Foo) // Ok
 
-  _ = arr as! [(Foo, Foo, Foo)] // expected-warning {{cast from '[(Any, Any)]' to unrelated type '[(Foo, Foo, Foo)]' always fails}}
+  _ = arr as! [(Foo, Foo, Foo)] // Ok
   _ = tup as! (Foo, Foo, Foo) // expected-warning {{cast from '(Any, Any)' to unrelated type '(Foo, Foo, Foo)' always fails}}
 
   _ = arr as! [(a: Foo, Foo)] // Ok
@@ -422,6 +422,33 @@ func tests_SR13088_false_positive_always_fail_casts() {
       break
     }
   }
+
+  // SR-7187
+  let a: [Any] = [String?.some("hello") as Any, String?.none as Any]
+  let b: [AnyObject] = [String?.some("hello") as AnyObject, String?.none as AnyObject]
+
+  _ = a is [String?] // Ok
+  _ = a as? [String?] as Any // OK
+  _ = b is [String?] // Ok
+  _ = b as? [String?] as AnyObject // OK
+
+  // SR-6192
+  let items = [String]()
+  let dict = [String: Any]()
+  let set = Set<String>()
+
+  _ = items is [Int] // Ok
+  _ = items as? [Int] as Any // Ok
+  _ = items as! [Int] // Ok
+
+  _ = dict is [Int: Any] // Ok
+  _ = dict as? [Int: Any] as Any // Ok
+  _ = dict as! [Int: Any] as Any // Ok
+
+  _ = set is Set<Int> // Ok
+  _ = set as? Set<Int> as Any // Ok
+  _ = set as! Set<Int> // Ok
+
 }
 
 // Protocol composition
