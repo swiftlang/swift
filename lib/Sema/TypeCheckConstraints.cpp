@@ -2124,6 +2124,9 @@ TypeChecker::typeCheckExpression(
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
+  if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))
+    csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
+
   ConstraintSystem cs(dc, csOptions);
 
   // Tell the constraint system what the contextual type is.  This informs

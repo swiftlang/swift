@@ -322,6 +322,10 @@ public:
   /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
 
+  /// Skip type checking any elements inside 'BraceStmt', also this is
+  /// propagated to DeclChecker and ConstraintSystem.
+  bool LeaveBraceStmtBodyUnchecked = false;
+
   ASTContext &getASTContext() const { return Ctx; };
   
   struct AddLabeledStmt {
@@ -428,13 +432,9 @@ public:
     }
 
     // Try type checking the closure if it hasn't.
-    // NOTE: Do this only in 'TypeCheckSingleASTNode' mode. Otherwise, the
-    // parent closure should have been type checked before.
-    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
-      if (auto *closure = TheFunc->getAbstractClosureExpr()) {
-        if (!closure->getType())
-          swift::typeCheckASTNodeAtLoc(closure->getParent(), closure->getLoc());
-      }
+    if (auto *closure = TheFunc->getAbstractClosureExpr()) {
+      if (!closure->getType() && !closure->hasSingleExpressionBody())
+        swift::typeCheckASTNodeAtLoc(closure->getParent(), closure->getLoc());
     }
 
     Type ResultTy = TheFunc->getBodyResultType();
@@ -509,9 +509,10 @@ public:
     
     TypeCheckExprOptions options = {};
     
-    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
+    if (LeaveBraceStmtBodyUnchecked) {
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
       options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
     }
 
@@ -623,7 +624,8 @@ public:
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
-    TypeChecker::typeCheckDecl(DS->getTempDecl());
+    TypeChecker::typeCheckDecl(
+        DS->getTempDecl(), /*LeaveBodyUnchecked=*/LeaveBraceStmtBodyUnchecked);
 
     Expr *theCall = DS->getCallExpr();
     TypeChecker::typeCheckExpression(theCall, DC);
@@ -1556,8 +1558,10 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
         (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
     if (isDiscarded)
       options |= TypeCheckExprFlags::IsDiscarded;
-    if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode)
+    if (LeaveBraceStmtBodyUnchecked) {
+      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
       options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+    }
 
     auto resultTy =
         TypeChecker::typeCheckExpression(E, DC, Type(), CTP_Unused, options);
@@ -1590,7 +1594,8 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 
   // Type check the declaration.
   if (auto *D = node.dyn_cast<Decl *>()) {
-    TypeChecker::typeCheckDecl(D);
+    TypeChecker::typeCheckDecl(
+        D, /*LeaveBodyUnchecked=*/LeaveBraceStmtBodyUnchecked);
     return;
   }
 
@@ -1598,7 +1603,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 }
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
-  if (getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode)
+  if (LeaveBraceStmtBodyUnchecked)
     return BS;
 
   // Diagnose defer statement being last one in block (only if
@@ -1622,11 +1627,13 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   return BS;
 }
 
-void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC) {
+void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
+                                   bool LeaveBodyUnchecked) {
   StmtChecker stmtChecker(DC);
   // FIXME: 'ActiveLabeledStmts', 'SwitchLevel', etc. in StmtChecker are not
   // populated. Since they don't affect "type checking", it's doesn't cause
   // any issue for now. But it should be populated nonetheless.
+  stmtChecker.LeaveBraceStmtBodyUnchecked = LeaveBodyUnchecked;
   stmtChecker.typeCheckASTNode(node);
 }
 
@@ -1960,7 +1967,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
       return false;
   }
 
-  TypeChecker::typeCheckASTNode(finder.getRef(), DC);
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC,
+                                /*LeaveBodyUnchecked=*/true);
   return false;
 }
 

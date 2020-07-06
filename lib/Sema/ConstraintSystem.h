@@ -1250,6 +1250,10 @@ enum class ConstraintSystemFlags {
   /// for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x10,
+
+  /// Don't try to type check closure bodies, and leave them unchecked. This is
+  /// used for source tooling functionalities.
+  LeaveClosureBodyUnchecked = 0x20,
 };
 
 /// Options that affect the constraint system as a whole.

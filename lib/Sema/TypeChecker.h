@@ -164,12 +164,17 @@ enum class TypeCheckExprFlags {
   /// not all type variables have been determined.  In this case, the constraint
   /// system is not applied to the expression AST, but the ConstraintSystem is
   /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x08,
+  AllowUnresolvedTypeVariables = 0x02,
 
   /// If set, this expression isn't embedded in a larger expression or
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
-  IsExprStmt = 0x20,
+  IsExprStmt = 0x04,
+
+  /// Don't try to type check closure expression bodies, and leave them
+  /// unchecked. This is used by source tooling functionalities such as code
+  /// completion.
+  LeaveClosureBodyUnchecked = 0x08,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -533,7 +538,8 @@ bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
 /// of the function, set the result type of the expression to that sugar type.
 Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
-void typeCheckASTNode(ASTNode &node, DeclContext *DC);
+void typeCheckASTNode(ASTNode &node, DeclContext *DC,
+                      bool LeaveBodyUnchecked = false);
 
 bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
@@ -559,7 +565,7 @@ Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
 
 void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-void typeCheckDecl(Decl *D);
+void typeCheckDecl(Decl *D, bool LeaveBodyUnchecked = false);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);

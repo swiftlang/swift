@@ -2239,12 +2239,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     }
 
     // Try type checking the closure if it hasn't.
-    // NOTE: Do this only in 'TypeCheckSingleASTNode' mode. Otherwise, the
-    // parent closure should have been type checked before.
-    if (Context.TypeCheckerOpts.TypeCheckSingleASTNode &&
-        isa<ClosureExpr>(PD->getDeclContext())) {
-      auto *closure = cast<ClosureExpr>(PD->getDeclContext());
-      if (!closure->getType()) {
+    if (auto *closure = dyn_cast<ClosureExpr>(PD->getDeclContext())) {
+      if (!closure->getType() && !closure->hasSingleExpressionBody()) {
         swift::typeCheckASTNodeAtLoc(closure->getParent(), closure->getLoc());
         if (PD->hasInterfaceType())
           return PD->getInterfaceType();
@@ -2259,10 +2255,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     auto *VD = cast<VarDecl>(D);
     Type interfaceType;
     if (auto *parentE = VD->getParentExpr()) {
-      if (Context.TypeCheckerOpts.TypeCheckSingleASTNode &&
-          !parentE->getType()) {
+      // Type check the ASTNode that contains the parent 'TapExpr' if it
+      // hasn't.
+      if (!parentE->getType())
         swift::typeCheckASTNodeAtLoc(VD->getDeclContext(), parentE->getLoc());
-      }
       interfaceType = parentE->getType();
     } else if (auto *namingPattern = VD->getNamingPattern()) {
       interfaceType = namingPattern->getType();
@@ -2425,16 +2421,14 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     namingPattern = canVD->NamingPattern;
   }
 
-  if (!namingPattern &&
-      VD->getASTContext().TypeCheckerOpts.TypeCheckSingleASTNode) {
+  if (!namingPattern) {
     // Try type checking parent control statement.
-    // NOTE: Do this only in 'TypeCheckSingleASTNode' mode. Otherwise, the
-    // parent control statement should have been type checked before.
     if (auto parentStmt = VD->getParentPatternStmt()) {
       if (auto CS = dyn_cast<CaseStmt>(parentStmt))
         parentStmt = CS->getParentStmt();
       ASTNode node(parentStmt);
-      TypeChecker::typeCheckASTNode(node, VD->getDeclContext());
+      TypeChecker::typeCheckASTNode(node, VD->getDeclContext(),
+                                    /*LeaveBodyUnchecked=*/true);
       namingPattern = VD->getCanonicalVarDecl()->NamingPattern;
     }
   }

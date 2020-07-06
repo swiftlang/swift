@@ -444,8 +444,6 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
 bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
   auto &Ctx = DC->getASTContext();
-  assert(Ctx.TypeCheckerOpts.TypeCheckSingleASTNode &&
-         "typeCheckASTNodeAtLoc is only supported in TypeCheckSingleASTNode");
   DiagnosticSuppression suppression(Ctx.Diags);
   return !evaluateOrDefault(Ctx.evaluator,
                             TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
