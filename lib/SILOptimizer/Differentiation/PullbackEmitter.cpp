@@ -371,7 +371,9 @@ SILValue PullbackEmitter::getAdjointProjection(SILBasicBlock *origBB,
     assert(!seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`@noDerivative` struct projections should never be active");
     auto adjSource = getAdjointBuffer(origBB, seai->getOperand());
-    auto *tanField = getTangentStoredProperty(getContext(), seai, getInvoker());
+    auto structType = remapType(seai->getOperand()->getType()).getASTType();
+    auto *tanField =
+        getTangentStoredProperty(getContext(), seai, structType, getInvoker());
     assert(tanField && "Invalid projections should have been diagnosed");
     return builder.createStructElementAddr(seai->getLoc(), adjSource, tanField);
   }
@@ -400,7 +402,10 @@ SILValue PullbackEmitter::getAdjointProjection(SILBasicBlock *origBB,
     auto loc = reai->getLoc();
     // Get the class operand, stripping `begin_borrow`.
     auto classOperand = stripBorrow(reai->getOperand());
-    auto *tanField = getTangentStoredProperty(getContext(), reai, getInvoker());
+    auto classType = remapType(reai->getOperand()->getType()).getASTType();
+    auto *tanField =
+        getTangentStoredProperty(getContext(), reai->getField(), classType,
+                                 reai->getLoc(), getInvoker());
     assert(tanField && "Invalid projections should have been diagnosed");
     // Create a local allocation for the element adjoint buffer.
     auto eltTanType = tanField->getValueInterfaceType()->getCanonicalType();
@@ -666,8 +671,9 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
 
   // Look up the corresponding field in the tangent space.
   auto *origField = cast<VarDecl>(accessor->getStorage());
-  auto *tanField =
-      getTangentStoredProperty(getContext(), origField, pbLoc, getInvoker());
+  auto baseType = remapType(origSelf->getType()).getASTType();
+  auto *tanField = getTangentStoredProperty(getContext(), origField, baseType,
+                                            pbLoc, getInvoker());
   if (!tanField) {
     errorOccurred = true;
     return true;
@@ -772,8 +778,9 @@ bool PullbackEmitter::runForSemanticMemberSetter() {
 
   // Look up the corresponding field in the tangent space.
   auto *origField = cast<VarDecl>(accessor->getStorage());
-  auto *tanField =
-      getTangentStoredProperty(getContext(), origField, pbLoc, getInvoker());
+  auto baseType = remapType(origSelf->getType()).getASTType();
+  auto *tanField = getTangentStoredProperty(getContext(), origField, baseType,
+                                            pbLoc, getInvoker());
   if (!tanField) {
     errorOccurred = true;
     return true;
@@ -882,7 +889,10 @@ bool PullbackEmitter::run() {
       }
       // Diagnose unsupported stored property projections.
       if (auto *inst = dyn_cast<FieldIndexCacheBase>(v)) {
-        if (!getTangentStoredProperty(getContext(), inst, getInvoker())) {
+        assert(inst->getNumOperands() == 1);
+        auto baseType = remapType(inst->getOperand(0)->getType()).getASTType();
+        if (!getTangentStoredProperty(getContext(), inst, baseType,
+                                      getInvoker())) {
           errorOccurred = true;
           return true;
         }
@@ -1699,8 +1709,8 @@ void PullbackEmitter::visitStructInst(StructInst *si) {
       if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
         continue;
       // Find the corresponding field in the tangent space.
-      auto *tanField =
-          getTangentStoredProperty(getContext(), field, loc, getInvoker());
+      auto *tanField = getTangentStoredProperty(getContext(), field, structTy,
+                                                loc, getInvoker());
       if (!tanField) {
         errorOccurred = true;
         return;
@@ -1732,6 +1742,7 @@ void PullbackEmitter::visitBeginApplyInst(BeginApplyInst *bai) {
 
 void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {
   auto *bb = sei->getParent();
+  auto loc = getValidLocation(sei);
   auto structTy = remapType(sei->getOperand()->getType()).getASTType();
   auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
   assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
@@ -1739,14 +1750,15 @@ void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {
   auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
   assert(tangentVectorDecl);
   // Find the corresponding field in the tangent space.
-  auto *tanField = getTangentStoredProperty(getContext(), sei, getInvoker());
+  auto *tanField =
+      getTangentStoredProperty(getContext(), sei, structTy, getInvoker());
   assert(tanField && "Invalid projections should have been diagnosed");
   // Accumulate adjoint for the `struct_extract` operand.
   auto av = getAdjointValue(bb, sei);
   switch (av.getKind()) {
   case AdjointValueKind::Zero:
     addAdjointValue(bb, sei->getOperand(),
-                    makeZeroAdjointValue(tangentVectorSILTy), sei->getLoc());
+                    makeZeroAdjointValue(tangentVectorSILTy), loc);
     break;
   case AdjointValueKind::Concrete:
   case AdjointValueKind::Aggregate: {
@@ -1765,7 +1777,7 @@ void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {
     }
     addAdjointValue(bb, sei->getOperand(),
                     makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
-                    sei->getLoc());
+                    loc);
   }
   }
 }
@@ -1775,7 +1787,9 @@ void PullbackEmitter::visitRefElementAddrInst(RefElementAddrInst *reai) {
   auto loc = reai->getLoc();
   auto adjBuf = getAdjointBuffer(bb, reai);
   auto classOperand = reai->getOperand();
-  auto *tanField = getTangentStoredProperty(getContext(), reai, getInvoker());
+  auto classType = remapType(reai->getOperand()->getType()).getASTType();
+  auto *tanField =
+      getTangentStoredProperty(getContext(), reai, classType, getInvoker());
   assert(tanField && "Invalid projections should have been diagnosed");
   switch (getTangentValueCategory(classOperand)) {
   case SILValueCategory::Object: {

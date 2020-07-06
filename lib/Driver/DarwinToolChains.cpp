@@ -13,6 +13,7 @@
 #include "ToolChains.h"
 
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/AST/PlatformKind.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -591,6 +592,14 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
     if (tripleIsMacCatalystEnvironment(triple)) {
       triple.getiOSVersion(major, minor, micro);
 
+      // Mac Catalyst on arm was introduced with an iOS deployment target of
+      // 14.0; the linker doesn't want to see a deployment target before that.
+      if (major < 14 && triple.isAArch64()) {
+        major = 14;
+        minor = 0;
+        micro = 0;
+      }
+
       // Mac Catalyst was introduced with an iOS deployment target of 13.0;
       // the linker doesn't want to see a deployment target before that.
       if (major < 13) {
@@ -602,12 +611,41 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
       switch (getDarwinPlatformKind((triple))) {
       case DarwinPlatformKind::MacOS:
         triple.getMacOSXVersion(major, minor, micro);
+
+        // The first deployment of arm64 for macOS is version 10.16;
+        if (triple.isAArch64() && major <= 10 && minor < 16) {
+          llvm::VersionTuple firstMacARM64e(10, 16, 0);
+          firstMacARM64e = canonicalizePlatformVersion(PlatformKind::OSX,
+                                                       firstMacARM64e);
+          major = firstMacARM64e.getMajor();
+          minor = firstMacARM64e.getMinor().getValueOr(0);
+          micro = firstMacARM64e.getSubminor().getValueOr(0);
+        }
+
+        // Temporary hack: adjust macOS version passed to the linker from
+        // 11 down to 10.16, but only for x86.
+        if (triple.isX86() && major == 11) {
+          major = 10;
+          minor = 16;
+          micro = 0;
+        }
+
         break;
       case DarwinPlatformKind::IPhoneOS:
       case DarwinPlatformKind::IPhoneOSSimulator:
       case DarwinPlatformKind::TvOS:
       case DarwinPlatformKind::TvOSSimulator:
         triple.getiOSVersion(major, minor, micro);
+
+        // The first deployment of arm64 simulators is iOS/tvOS 14.0;
+        // the linker doesn't want to see a deployment target before that.
+        if (triple.isSimulatorEnvironment() && triple.isAArch64() &&
+            major < 14) {
+          major = 14;
+          minor = 0;
+          micro = 0;
+        }
+
         break;
       case DarwinPlatformKind::WatchOS:
       case DarwinPlatformKind::WatchOSSimulator:

@@ -70,7 +70,12 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
     (void)isNewValue;
-    assert(isNewValue && "symbol appears twice");
+#ifndef NDEBUG
+    if (!isNewValue) {
+      llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
+      assert(false && "TBDGen symbol appears twice");
+    }
+#endif
   }
 }
 

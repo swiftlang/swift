@@ -726,7 +726,8 @@ public:
   }
 
   LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
-    assert(isLoadableOrOpaque(LV->getType()));
+    assert(isLoadableOrOpaque(LV->getType()) &&
+           !LV->getType().isTrivial(getFunction()));
     return insert(new (getModule())
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
@@ -737,11 +738,19 @@ public:
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  /// Convenience function for creating a load_borrow on non-trivial values and
+  /// load [trivial] on trivial values. Becomes load unqualified in non-ossa
+  /// functions.
   SILValue emitLoadBorrowOperation(SILLocation loc, SILValue v) {
     if (!hasOwnership()) {
       return emitLoadValueOperation(loc, v,
                                     LoadOwnershipQualifier::Unqualified);
     }
+
+    if (v->getType().isTrivial(getFunction())) {
+      return emitLoadValueOperation(loc, v, LoadOwnershipQualifier::Trivial);
+    }
+
     return createLoadBorrow(loc, v);
   }
 
@@ -875,6 +884,33 @@ public:
                                      SILValue DestAddr) {
     return insert(new (getModule())
                       StoreBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
+  }
+
+  /// A helper function for emitting store_borrow in operations where one must
+  /// handle both ossa and non-ossa code.
+  ///
+  /// In words:
+  ///
+  /// * If the function does not have ownership, this just emits an unqualified
+  ///   store.
+  ///
+  /// * If the function has ownership, but the type is trivial, use store
+  ///   [trivial].
+  ///
+  /// * Otherwise, emit an actual store_borrow.
+  void emitStoreBorrowOperation(SILLocation loc, SILValue src,
+                                SILValue destAddr) {
+    if (!hasOwnership()) {
+      return emitStoreValueOperation(loc, src, destAddr,
+                                     StoreOwnershipQualifier::Unqualified);
+    }
+
+    if (src->getType().isTrivial(getFunction())) {
+      return emitStoreValueOperation(loc, src, destAddr,
+                                     StoreOwnershipQualifier::Trivial);
+    }
+
+    createStoreBorrow(loc, src, destAddr);
   }
 
   MarkUninitializedInst *
