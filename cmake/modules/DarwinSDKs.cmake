@@ -16,23 +16,6 @@ set(SUPPORTED_WATCHOS_ARCHS "armv7k")
 set(SUPPORTED_WATCHOS_SIMULATOR_ARCHS "i386;arm64")
 set(SUPPORTED_OSX_ARCHS "x86_64;arm64;arm64e")
 
-# Get the SDK version from SDKSettings.
-execute_process(
-  COMMAND "defaults" "read" "${CMAKE_OSX_SYSROOT}/SDKSettings.plist" "Version"
-    OUTPUT_VARIABLE SWIFT_OSX_SDK_VERSION
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-# Remove the last component, if any. e.g. 10.15.26 -> 10.15
-string(REGEX REPLACE "\([0-9]*[.][0-9]*\)[.][0-9]*" "\\1"
-       SWIFT_OSX_SDK_VERSION "${SWIFT_OSX_SDK_VERSION}")
-
-if (${SWIFT_OSX_SDK_VERSION} STREQUAL "10.14" OR
-    ${SWIFT_OSX_SDK_VERSION} STREQUAL "10.15")
-  set(SUPPORTED_OSX_ARCHS "x86_64")
-else()
-  set(SUPPORTED_OSX_ARCHS "x86_64;arm64e")
-endif()
-
 is_sdk_requested(OSX swift_build_osx)
 if(swift_build_osx)
   configure_sdk_darwin(
