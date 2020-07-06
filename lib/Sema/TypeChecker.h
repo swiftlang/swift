@@ -341,6 +341,9 @@ enum class CheckedCastContextKind {
   IsPattern,
   /// An enum-element pattern.
   EnumElementPattern,
+  /// Coerce to checked cast. Used when we verify if it is possible to
+  /// suggest to convert a coercion to a checked cast.
+  Coercion,
 };
 
 namespace TypeChecker {
