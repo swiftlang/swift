@@ -4240,6 +4240,15 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
 
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
 
+  // Diagnose if original function has opaque result types.
+  if (auto *opaqueResultTypeDecl = original->getOpaqueResultTypeDecl()) {
+    diags.diagnose(
+        attr->getLocation(),
+        diag::autodiff_attr_opaque_result_type_unsupported);
+    attr->setInvalid();
+    return nullptr;
+  }
+
   // Diagnose if original function is an invalid class member.
   bool isOriginalClassMember = original->getDeclContext() &&
                                original->getDeclContext()->getSelfClassDecl();
@@ -4532,6 +4541,16 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       return true;
     }
   }
+
+  // Diagnose if original function has opaque result types.
+  if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
+    diags.diagnose(
+        attr->getLocation(),
+        diag::autodiff_attr_opaque_result_type_unsupported);
+    attr->setInvalid();
+    return true;
+  }
+
   // Diagnose if original function is an invalid class member.
   bool isOriginalClassMember =
       originalAFD->getDeclContext() &&
@@ -5083,8 +5102,14 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     attr->setInvalid();
     return;
   }
-
   attr->setOriginalFunction(originalAFD);
+
+  // Diagnose if original function has opaque result types.
+  if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
+    diagnose(attr->getLocation(), diag::autodiff_attr_opaque_result_type_unsupported);
+    attr->setInvalid();
+    return;
+  }
 
   // Get the linearity parameter types.
   SmallVector<AnyFunctionType::Param, 4> linearParams;
