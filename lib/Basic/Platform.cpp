@@ -403,6 +403,9 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);
     if (Major == 10) {
+      if (Triple.isAArch64() && Minor <= 16)
+        return llvm::VersionTuple(5, 3);
+
       if (Minor <= 14) {
         return llvm::VersionTuple(5, 0);
       } else if (Minor <= 15) {
@@ -412,9 +415,18 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
           return llvm::VersionTuple(5, 2);
         }
       }
+    } else if (Major == 11) {
+      return llvm::VersionTuple(5, 3);
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
+
+    // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
+    // with Swift 5.3
+    if (Triple.isAArch64() && Major <= 14 &&
+        (Triple.isSimulatorEnvironment() || Triple.isMacCatalystEnvironment()))
+      return llvm::VersionTuple(5, 3);
+
     if (Major <= 12) {
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 13) {
