@@ -183,7 +183,13 @@ void ArraySemanticsCall::initialize(ApplyInst *AI, StringRef semanticName,
 
   // Need a 'self' argument otherwise this is not a semantic call that
   // we recognize.
-  if (getKind() < ArrayCallKind::kArrayInit && !hasSelf())
+  ArrayCallKind kind = getKind();
+  if (kind == ArrayCallKind::kNone) {
+    SemanticsCall = nullptr;
+    return;
+  }
+
+  if (kind < ArrayCallKind::kArrayInit && !hasSelf())
     SemanticsCall = nullptr;
 
   // A arguments must be passed reference count neutral except for self.
