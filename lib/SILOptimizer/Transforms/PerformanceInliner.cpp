@@ -109,7 +109,7 @@ class SILPerformanceInliner {
     FastPathBuiltinBenefit = RemovedCallBenefit + 40,
 
     /// The benefit of inlining a function with a semantic call site.
-    SemanticCallBenefit = RemovedCallBenefit + 50,
+    SemanticCallBenefit = RemovedCallBenefit + 10,
 
     /// The benefit of being able to devirtualize a call.
     DevirtualizedCallBenefit = RemovedCallBenefit + 300,
@@ -362,10 +362,14 @@ bool SILPerformanceInliner::isProfitableToInline(
         // Functions with semantic calls need to be inlined into their callers
         // for optimization based on those semantics to kick in within the
         // caller scope. This may mean the call can be hoisted out of a loop for
-        // example. Do this only after the caller is fully specialized,
+        // example.
+        // Do this only after the caller is fully specialized,
         // otherwise it could actually prevent inlining of callers.
+        // Don't apply the SemanticCallInlining in LateInliner after which we
+        // don't expect any optimizations on @semantics.
         SILFunction *Callee = FAI.getReferencedFunctionOrNull();
-        if (!IsGeneric && Callee && isOptimizableSemanticFunction(Callee)) {
+        if (WhatToInline != InlineSelection::Everything && !IsGeneric &&
+            Callee && isOptimizableSemanticFunction(Callee)) {
           BlockW.updateBenefit(Benefit, SemanticCallBenefit);
         }
 
