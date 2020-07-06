@@ -75,6 +75,28 @@ set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
+if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
+  set(libicu_i18n_a -licui18nswift)
+  set(libicu_uc_a -licuucswift)
+  set(libicu_data_a -licudataswift)
+else()
+  find_package(ICU REQUIRED COMPONENTS uc i18n)
+  get_filename_component(ICU_UC_LIBDIR "${ICU_UC_LIBRARIES}" DIRECTORY)
+  get_filename_component(ICU_I18N_LIBDIR "${ICU_I18N_LIBRARIES}" DIRECTORY)
+
+  set(libicu_i18n_a -licui18n)
+  set(libicu_uc_a -licuuc)
+  set(libicu_data_a)
+  if(EXISTS ${ICU_I18N_LIBDIR}/libicui18n.a AND
+      EXISTS ${ICU_UC_LIBDIR}/libicuuc.a AND
+      EXISTS ${ICU_UC_LIBDIR}/libicudata.a)
+    set(libicu_i18n_a ${ICU_I18N_LIBDIR}/libicui18n.a)
+    set(libicu_uc_a ${ICU_UC_LIBDIR}/libicuuc.a)
+    set(libicu_data_a ${ICU_UC_LIBDIR}/libicudata.a)
+  endif()
+endif()
+
+
 set(sdk "${SWIFT_HOST_VARIANT_SDK}")
 if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   list(REMOVE_ITEM swift_runtime_sources ImageInspectionELF.cpp)
@@ -254,27 +276,6 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
     # 'GenericUnix' (eg linux)
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
       string(TOLOWER "${sdk}" lowercase_sdk)
-      if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
-        set(libicu_i18n_a -licui18nswift)
-        set(libicu_uc_a -licuucswift)
-        set(libicu_data_a -licudataswift)
-      else()
-        find_package(ICU REQUIRED COMPONENTS uc i18n)
-        get_filename_component(ICU_UC_LIBDIR "${ICU_UC_LIBRARIES}" DIRECTORY)
-        get_filename_component(ICU_I18N_LIBDIR "${ICU_I18N_LIBRARIES}" DIRECTORY)
-
-        set(libicu_i18n_a -licui18n)
-        set(libicu_uc_a -licuuc)
-        set(libicu_data_a)
-        if(EXISTS ${ICU_I18N_LIBDIR}/libicui18n.a AND
-            EXISTS ${ICU_UC_LIBDIR}/libicuuc.a AND
-            EXISTS ${ICU_UC_LIBDIR}/libicudata.a)
-          set(libicu_i18n_a ${ICU_I18N_LIBDIR}/libicui18n.a)
-          set(libicu_uc_a ${ICU_UC_LIBDIR}/libicuuc.a)
-          set(libicu_data_a ${ICU_UC_LIBDIR}/libicudata.a)
-        endif()
-      endif()
-
       set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
       file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
 -ldl
