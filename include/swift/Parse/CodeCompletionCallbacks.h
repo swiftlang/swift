@@ -198,6 +198,10 @@ public:
 
   virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
 
+  virtual bool canPerformCompleteLabeledTrailingClosure() const {
+    return false;
+  }
+
   virtual void completeLabeledTrailingClosure(CodeCompletionExpr *E,
                                               bool isAtStartOfLine) {};
 

@@ -27,7 +27,6 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceManager.h"
@@ -79,7 +78,7 @@ void LookupResult::filter(
   Results.erase(std::remove_if(Results.begin(), Results.end(),
                                [&](LookupResultEntry result) -> bool {
                                  auto isInner = index < originalFirstOuter;
-                                 index++;
+                                 ++index;
                                  if (pred(result, !isInner))
                                    return false;
 
@@ -87,7 +86,7 @@ void LookupResult::filter(
                                  // an inner result, the outer results need to
                                  // shift down.
                                  if (isInner)
-                                   IndexOfFirstOuterResult--;
+                                   --IndexOfFirstOuterResult;
                                  return true;
                                }),
                 Results.end());
@@ -245,12 +244,13 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
   return ConstructorComparison::Same;
 }
 
-/// Given a set of declarations whose names and signatures have matched,
+/// Given a set of declarations whose names and interface types have matched,
 /// figure out which of these declarations have been shadowed by others.
-static void recordShadowedDeclsAfterSignatureMatch(
-                              ArrayRef<ValueDecl *> decls,
+template <typename T>
+static void recordShadowedDeclsAfterTypeMatch(
+                              ArrayRef<T> decls,
                               const DeclContext *dc,
-                              llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
+                              llvm::SmallPtrSetImpl<T> &shadowed) {
   assert(decls.size() > 1 && "Nothing collided");
 
   // Compare each declaration to every other declaration. This is
@@ -354,9 +354,9 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // This is due to the fact that in Swift 4, we only gave custom overload
       // types to properties in extensions of generic types, otherwise we
       // used the null type.
-      if (!ctx.isSwiftVersionAtLeast(5)) {
-        auto secondSig = secondDecl->getOverloadSignature();
-        auto firstSig = firstDecl->getOverloadSignature();
+      if (!ctx.isSwiftVersionAtLeast(5) && isa<ValueDecl>(firstDecl)) {
+        auto secondSig = cast<ValueDecl>(secondDecl)->getOverloadSignature();
+        auto firstSig = cast<ValueDecl>(firstDecl)->getOverloadSignature();
         if (firstSig.IsVariable && secondSig.IsVariable)
           if (firstSig.InExtensionOfGenericType !=
               secondSig.InExtensionOfGenericType)
@@ -492,6 +492,48 @@ static void recordShadowedDeclsAfterSignatureMatch(
   }
 }
 
+/// Given a set of declarations whose names and generic signatures have matched,
+/// figure out which of these declarations have been shadowed by others.
+static void recordShadowedDeclsAfterSignatureMatch(
+                              ArrayRef<ValueDecl *> decls,
+                              const DeclContext *dc,
+                              llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
+  assert(decls.size() > 1 && "Nothing collided");
+
+  // Categorize all of the declarations based on their overload types.
+  llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
+  llvm::SmallVector<CanType, 2> collisionTypes;
+
+  for (auto decl : decls) {
+    assert(!isa<TypeDecl>(decl));
+
+    CanType type;
+
+    // FIXME: The type of a variable or subscript doesn't include
+    // enough context to distinguish entities from different
+    // constrained extensions, so use the overload signature's
+    // type. This is layering a partial fix upon a total hack.
+    if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+      type = asd->getOverloadSignatureType();
+    else
+      type = decl->getInterfaceType()->getCanonicalType();
+
+    // Record this declaration based on its signature.
+    auto &known = collisions[type];
+    if (known.size() == 1) {
+      collisionTypes.push_back(type);
+    }
+    known.push_back(decl);
+  }
+
+  // Check whether we have shadowing for signature collisions.
+  for (auto type : collisionTypes) {
+    ArrayRef<ValueDecl *> collidingDecls = collisions[type];
+    recordShadowedDeclsAfterTypeMatch(collidingDecls, dc,
+                                      shadowed);
+  }
+}
+
 /// Look through the given set of declarations (that all have the same name),
 /// recording those that are shadowed by another declaration in the
 /// \c shadowed set.
@@ -527,14 +569,23 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   if (decls.size() < 2)
     return;
 
+  llvm::TinyPtrVector<ValueDecl *> typeDecls;
+
   // Categorize all of the declarations based on their overload signatures.
-  llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
-  llvm::SmallVector<CanType, 2> collisionTypes;
-  llvm::SmallDenseMap<NominalTypeDecl *, llvm::TinyPtrVector<ConstructorDecl *>>
+  llvm::SmallDenseMap<const GenericSignatureImpl *,
+                      llvm::TinyPtrVector<ValueDecl *>> collisions;
+  llvm::SmallVector<const GenericSignatureImpl *, 2> collisionSignatures;
+  llvm::SmallDenseMap<NominalTypeDecl *,
+                      llvm::TinyPtrVector<ConstructorDecl *>>
     importedInitializerCollisions;
-  llvm::TinyPtrVector<NominalTypeDecl *> importedInitializerCollectionTypes;
+  llvm::TinyPtrVector<NominalTypeDecl *> importedInitializerCollisionTypes;
 
   for (auto decl : decls) {
+    if (auto *typeDecl = dyn_cast<TypeDecl>(decl)) {
+      typeDecls.push_back(typeDecl);
+      continue;
+    }
+
     // Specifically keep track of imported initializers, which can come from
     // Objective-C init methods, Objective-C factory methods, renamed C
     // functions, or be synthesized by the importer.
@@ -545,60 +596,71 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
         auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl();
         auto &knownInits = importedInitializerCollisions[nominal];
         if (knownInits.size() == 1) {
-          importedInitializerCollectionTypes.push_back(nominal);
+          importedInitializerCollisionTypes.push_back(nominal);
         }
         knownInits.push_back(ctor);
       }
     }
 
-    CanType signature;
+    // If the decl is currently being validated, this is likely a recursive
+    // reference and we'll want to skip ahead so as to avoid having its type
+    // attempt to desugar itself.
+    if (decl->isRecursiveValidation())
+      continue;
 
-    if (!isa<TypeDecl>(decl)) {
-      // If the decl is currently being validated, this is likely a recursive
-      // reference and we'll want to skip ahead so as to avoid having its type
-      // attempt to desugar itself.
-      if (decl->isRecursiveValidation())
-        continue;
-      auto ifaceType = decl->getInterfaceType();
+    CanGenericSignature signature;
 
-      // FIXME: the canonical type makes a poor signature, because we don't
-      // canonicalize away default arguments.
-      signature = ifaceType->getCanonicalType();
-
-      // FIXME: The type of a variable or subscript doesn't include
-      // enough context to distinguish entities from different
-      // constrained extensions, so use the overload signature's
-      // type. This is layering a partial fix upon a total hack.
-      if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
-        signature = asd->getOverloadSignatureType();
-    }
+    auto *dc = decl->getInnermostDeclContext();
+    if (auto genericSig = dc->getGenericSignatureOfContext())
+      signature = genericSig->getCanonicalSignature();
 
     // Record this declaration based on its signature.
-    auto &known = collisions[signature];
+    auto &known = collisions[signature.getPointer()];
     if (known.size() == 1) {
-      collisionTypes.push_back(signature);
+      collisionSignatures.push_back(signature.getPointer());
     }
+
     known.push_back(decl);
   }
 
+  // Check whether we have shadowing for type declarations.
+  if (typeDecls.size() > 1) {
+    ArrayRef<ValueDecl *> collidingDecls = typeDecls;
+    recordShadowedDeclsAfterTypeMatch(collidingDecls, dc, shadowed);
+  }
+
   // Check whether we have shadowing for signature collisions.
-  for (auto signature : collisionTypes) {
-    recordShadowedDeclsAfterSignatureMatch(collisions[signature], dc,
-                                           shadowed);
+  for (auto signature : collisionSignatures) {
+    ArrayRef<ValueDecl *> collidingDecls = collisions[signature];
+    recordShadowedDeclsAfterSignatureMatch(collidingDecls, dc, shadowed);
   }
 
   // Check whether we have shadowing for imported initializer collisions.
-  for (auto nominal : importedInitializerCollectionTypes) {
+  for (auto nominal : importedInitializerCollisionTypes) {
     recordShadowedDeclsForImportedInits(importedInitializerCollisions[nominal],
                                         shadowed);
   }
 }
 
-bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const DeclContext *dc) {
+static void
+recordShadowedDecls(ArrayRef<OperatorDecl *> decls, const DeclContext *dc,
+                    llvm::SmallPtrSetImpl<OperatorDecl *> &shadowed) {
+  // Always considered to have the same signature.
+  recordShadowedDeclsAfterTypeMatch(decls, dc, shadowed);
+}
+
+static void
+recordShadowedDecls(ArrayRef<PrecedenceGroupDecl *> decls,
+                    const DeclContext *dc,
+                    llvm::SmallPtrSetImpl<PrecedenceGroupDecl *> &shadowed) {
+  // Always considered to have the same type.
+  recordShadowedDeclsAfterTypeMatch(decls, dc, shadowed);
+}
+
+template <typename T, typename Container>
+static bool removeShadowedDeclsImpl(Container &decls, const DeclContext *dc) {
   // Collect declarations with the same (full) name.
-  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
-    collidingDeclGroups;
+  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<T>> collidingDeclGroups;
   bool anyCollisions = false;
   for (auto decl : decls) {
     // Record this declaration based on its full name.
@@ -614,7 +676,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     return false;
 
   // Walk through the declarations again, marking any declarations that shadow.
-  llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
+  llvm::SmallPtrSet<T, 4> shadowed;
   for (auto decl : decls) {
     auto known = collidingDeclGroups.find(decl->getName());
     if (known == collidingDeclGroups.end()) {
@@ -633,8 +695,8 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
   // Remove shadowed declarations from the list of declarations.
   bool anyRemoved = false;
   decls.erase(std::remove_if(decls.begin(), decls.end(),
-                             [&](ValueDecl *vd) {
-                               if (shadowed.count(vd) > 0) {
+                             [&](T decl) {
+                               if (shadowed.count(decl) > 0) {
                                  anyRemoved = true;
                                  return true;
                                }
@@ -644,6 +706,28 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
               decls.end());
 
   return anyRemoved;
+}
+
+bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl *> &decls,
+                                const DeclContext *dc) {
+  return removeShadowedDeclsImpl<ValueDecl *>(decls, dc);
+}
+
+bool swift::removeShadowedDecls(TinyPtrVector<OperatorDecl *> &decls,
+                                const DeclContext *dc) {
+#ifndef NDEBUG
+  // Make sure all the operators have the same fixity.
+  if (decls.size() > 1) {
+    for (auto *op : decls)
+      assert(op->getFixity() == decls[0]->getFixity());
+  }
+#endif
+  return removeShadowedDeclsImpl<OperatorDecl *>(decls, dc);
+}
+
+bool swift::removeShadowedDecls(TinyPtrVector<PrecedenceGroupDecl *> &decls,
+                                const DeclContext *dc) {
+  return removeShadowedDeclsImpl<PrecedenceGroupDecl *>(decls, dc);
 }
 
 namespace {
@@ -773,8 +857,6 @@ SelfBoundsFromWhereClauseRequest::evaluate(
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
         isSelfLHS = (identTypeRepr->getNameRef().getBaseIdentifier() ==
                      ctx.Id_Self);
-    } else if (Type type = req.getSubject()) {
-      isSelfLHS = type->isEqual(dc->getSelfInterfaceType());
     }
     if (!isSelfLHS)
       continue;
@@ -783,8 +865,6 @@ SelfBoundsFromWhereClauseRequest::evaluate(
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
       rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, lookupDC);
-    } else if (Type type = req.getConstraint()) {
-      rhsDecls = directReferencesForType(type);
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
@@ -815,30 +895,24 @@ TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = ext->getASTContext();
 
   TinyPtrVector<TypeDecl *> result;
+  auto resolve = [&](TypeRepr *typeRepr) {
+    auto decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+    result.insert(result.end(), decls.begin(), decls.end());
+  };
   for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
-    auto resolve = [&](TypeLoc loc) {
-      DirectlyReferencedTypeDecls decls;
-      if (auto *typeRepr = loc.getTypeRepr())
-        decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-      else if (Type type = loc.getType())
-        decls = directReferencesForType(type);
-
-      result.insert(result.end(), decls.begin(), decls.end());
-    };
-
     switch (req.getKind()) {
     case RequirementReprKind::TypeConstraint:
-      resolve(req.getSubjectLoc());
-      resolve(req.getConstraintLoc());
+      resolve(req.getSubjectRepr());
+      resolve(req.getConstraintRepr());
       break;
 
     case RequirementReprKind::SameType:
-      resolve(req.getFirstTypeLoc());
-      resolve(req.getSecondTypeLoc());
+      resolve(req.getFirstTypeRepr());
+      resolve(req.getSecondTypeRepr());
       break;
 
     case RequirementReprKind::LayoutConstraint:
-      resolve(req.getSubjectLoc());
+      resolve(req.getSubjectRepr());
       break;
     }
   }
@@ -1256,6 +1330,12 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
                           << "\n");
 
   decl->prepareLookupTable();
+
+  // If we're allowed to load extensions, call prepareExtensions to ensure we
+  // properly invalidate the lazily-complete cache for any extensions brought in
+  // by modules loaded after-the-fact. This can happen with the LLDB REPL.
+  if (!disableAdditionalExtensionLoading)
+    decl->prepareExtensions();
 
   auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {
@@ -2212,12 +2292,11 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
-  TypeLoc &typeLoc = attr->getTypeLoc();
   DirectlyReferencedTypeDecls decls;
-  if (auto typeRepr = typeLoc.getTypeRepr()) {
+  if (auto *typeRepr = attr->getTypeRepr()) {
     decls = directReferencesForTypeRepr(
         evaluator, ctx, typeRepr, dc);
-  } else if (Type type = typeLoc.getType()) {
+  } else if (Type type = attr->getType()) {
     decls = directReferencesForType(type);
   }
 
@@ -2232,7 +2311,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // If we found declarations that are associated types, look outside of
   // the current context to see if we can recover.
   if (declsAreAssociatedTypes(decls)) {
-    if (auto typeRepr = typeLoc.getTypeRepr()) {
+    if (auto typeRepr = attr->getTypeRepr()) {
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
         auto assocType = cast<AssociatedTypeDecl>(decls.front());
 
@@ -2264,7 +2343,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
               identTypeRepr
             };
 
-            typeLoc = TypeLoc(IdentTypeRepr::create(ctx, components));
+            auto *newTE = new (ctx) TypeExpr(IdentTypeRepr::create(ctx, components));
+            attr->resetTypeInformation(newTE);
             return nominal;
           }
         }

@@ -98,8 +98,8 @@ namespace swift {
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SILBasicBlock *Prev,
                                      SmallVectorImpl<uint64_t> &scratch);
-    /// Read a SIL instruction within a given SIL basic block.
-    bool readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
+    /// Read a SIL instruction.
+    bool readSILInstruction(SILFunction *Fn,
                             SILBuilder &Builder,
                             unsigned RecordKind,
                             SmallVectorImpl<uint64_t> &scratch);

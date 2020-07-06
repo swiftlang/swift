@@ -28,7 +28,6 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
-#include <string>
 
 namespace swift {
 

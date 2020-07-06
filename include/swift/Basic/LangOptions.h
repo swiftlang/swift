@@ -267,6 +267,10 @@ namespace swift {
     /// Build the ASTScope tree lazily
     bool LazyASTScopes = true;
 
+    /// Whether to enable the new operator decl and precedencegroup lookup
+    /// behavior. This is a staging flag, and will be removed in the future.
+    bool EnableNewOperatorLookup = false;
+
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
@@ -331,6 +335,10 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
+    /// Whether to disable the evaluation of '#if' decls, such that the bodies
+    /// of active clauses aren't hoisted into the enclosing scope.
+    bool DisablePoundIfEvaluation = false;
+
     /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
     /// the interface hash, hash them into per-iterable-decl-context
     /// fingerprints. Fine-grained dependency types won't dirty every provides
@@ -359,7 +367,7 @@ namespace swift {
 
     /// Whether to enable a more aggressive mode of incremental dependency
     /// gathering that never captures cascading edges.
-    bool EnableExperientalPrivateIntransitiveDependencies = false;
+    bool DirectIntramoduleDependencies = true;
 
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
@@ -545,7 +553,10 @@ namespace swift {
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
-    
+
+    /// Enable experimental support for one-way constraints for the
+    /// parameters of closures.
+    bool EnableOneWayClosureParameters = false;
   };
 } // end namespace swift
 

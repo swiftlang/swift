@@ -179,7 +179,7 @@ struct Label<L> : P where L : P { // expected-note 2 {{'L' declared as parameter
 }
 
 func test_51167632() -> some P {
-  AnyP(G { // expected-error {{type 'Label<_>.Type' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
+  AnyP(G { // expected-error {{type 'Label<_>.Type' cannot conform to 'P'; only concrete types such as structs, enums and classes can conform to protocols}}
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
@@ -418,11 +418,14 @@ func testNonExhaustiveSwitch(e: E) {
 // rdar://problem/59856491
 struct TestConstraintGenerationErrors {
   @TupleBuilder var buildTupleFnBody: String {
+    let a = nil // expected-error {{'nil' requires a contextual type}}
     String(nothing) // expected-error {{cannot find 'nothing' in scope}}
   }
 
   func buildTupleClosure() {
-    tuplify(true) { _ in
+    // FIXME: suppress the ambiguity error
+    tuplify(true) { _ in // expected-error {{type of expression is ambiguous without more context}}
+      let a = nothing // expected-error {{cannot find 'nothing' in scope}}
       String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
   }
@@ -558,3 +561,14 @@ func rdar61347993() {
   func test_closure(_: () -> Result) {}
   test_closure {} // expected-error {{cannot convert value of type '()' to closure result type 'Result'}}
 }
+
+// One-way constraints through parameters.
+func wrapperifyInfer<T, U>(_ cond: Bool, @WrapperBuilder body: (U) -> T) -> T {
+  fatalError("boom")
+}
+
+let intValue = 17
+wrapperifyInfer(true) { x in // expected-error{{unable to infer type of a closure parameter 'x' in the current context}}
+  intValue + x
+}
+

@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -42,6 +43,7 @@
 #if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
 #endif
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
@@ -1478,22 +1480,9 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   //      if possible.
   //   3: Complain about uses of implicit @objc entrypoints, then abort().
   //
-  // The actual reportLevel is stored as the above values +1, so that
-  // 0 indicates we have not yet checked. It's fine to race through here.
-  //
   // The default, if SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT is not set, is 2.
-  static int storedReportLevel = 0;
-  if (storedReportLevel == 0) {
-    auto reportLevelStr = getenv("SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT");
-    if (reportLevelStr &&
-        reportLevelStr[0] >= '0' && reportLevelStr[0] <= '3' &&
-        reportLevelStr[1] == 0)
-      storedReportLevel = (reportLevelStr[0] - '0') + 1;
-    else
-      storedReportLevel = 3;
-  }
-
-  int reportLevel = storedReportLevel - 1;
+  uint8_t reportLevel =
+    runtime::environment::SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT();
   if (reportLevel < 1) return;
 
   // Report the error.

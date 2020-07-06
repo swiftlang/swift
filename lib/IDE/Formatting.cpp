@@ -316,7 +316,7 @@ public:
 
   std::pair<unsigned, unsigned> indentLineAndColumn() {
     if (InnermostCtx)
-      return SM.getLineAndColumn(InnermostCtx->ContextLoc);
+      return SM.getPresumedLineAndColumnForLoc(InnermostCtx->ContextLoc);
     return std::make_pair(0, 0);
   }
 
@@ -446,7 +446,7 @@ private:
       }
     }
     for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-      if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }
@@ -1260,7 +1260,7 @@ private:
       }
     }
     for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-      if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }
@@ -1475,7 +1475,7 @@ private:
       return;
     for (auto Invalid = Loc.isInvalid(); CurrentTokIt != TokenList.end() &&
          (Invalid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
-         CurrentTokIt++) {
+         ++CurrentTokIt) {
       if (CurrentTokIt->getKind() == tok::comment) {
         CharSourceRange CommentRange = CurrentTokIt->getRange();
         SourceLoc StartLineLoc = Lexer::getLocForStartOfLine(
@@ -1907,6 +1907,11 @@ private:
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }
 
+    // There are no parens at this point, so if there are no parameters either,
+    // this shouldn't be a context (it's an implicit parameter list).
+    if (!PL->size())
+      return None;
+
     ListAligner Aligner(SM, TargetLocation, ContextLoc, Range.Start);
     for (auto *PD: *PL)
       Aligner.updateAlignment(PD->getSourceRange(), PD);
@@ -2337,8 +2342,17 @@ private:
         return None;
 
       ListAligner Aligner(SM, TargetLocation, L, L, R, true);
-      for (auto *Elem: AE->getElements())
-        Aligner.updateAlignment(Elem->getStartLoc(), Elem->getEndLoc(), Elem);
+      for (auto *Elem: AE->getElements()) {
+        SourceRange ElemRange = Elem->getSourceRange();
+        Aligner.updateAlignment(ElemRange, Elem);
+        if (isTargetContext(ElemRange)) {
+          Aligner.setAlignmentIfNeeded(CtxOverride);
+          return IndentContext {
+            ElemRange.Start,
+            !OutdentChecker::hasOutdent(SM, ElemRange, Elem)
+          };
+        }
+      }
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }
 

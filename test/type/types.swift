@@ -20,14 +20,7 @@ var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 
 
 if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
   var e0 : [Int]
-  e0[] // expected-error {{no exact matches in call to subscript}}
-  // expected-note@-1 {{candidate has partially matching parameter list (Int)}}
-  // expected-note@-2 {{candidate has partially matching parameter list (Range<Int>)}}
-  // expected-note@-3 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
-  // expected-note@-4 {{candidate has partially matching parameter list (RangeSet<Array<Int>.Index>)}}
-  // expected-note@-5 {{candidate has partially matching parameter list (Range<Array<Int>.Index>)}}
-  // expected-note@-6 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
-  // expected-note@-7 {{candidate has partially matching parameter list (RangeSet<Array<Int>.Index>)}}
+  e0[] // expected-error {{missing argument for parameter #1 in call}} {{6-6=<#Int#>}}
 }
 
 var f0 : [Float]

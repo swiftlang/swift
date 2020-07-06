@@ -13,6 +13,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_2 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_1 | %FileCheck %s -check-prefix=INIT_FALLBACK
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_2 | %FileCheck %s -check-prefix=INIT_FALLBACK
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBERDECL_SAMELINE | %FileCheck %s -check-prefix=MEMBERDECL_SAMELINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBERDECL_NEWLINE | %FileCheck %s -check-prefix=MEMBERDECL_NEWLINE
 
 func globalFunc1(fn1: () -> Int, fn2: () -> String) {}
 func testGlobalFunc() {
@@ -183,4 +187,50 @@ func testOptionalInit() {
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn2
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn3
 // INIT_REQUIRED_NEWLINE_3: End completions
+}
+
+struct MyStruct4<T> {
+  init(arg1: Int = 0, arg2: () -> T) {}
+  init(name: String, arg2: () -> String, arg3: () -> T) {}
+
+  func testStructMethod() {}
+}
+func testFallbackPostfix() {
+  let _ = MyStruct4 {
+    1
+  } #^INIT_FALLBACK_1^#
+// INIT_FALLBACK: Begin completions, 2 items
+// INIT_FALLBACK-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INIT_FALLBACK-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#];
+// INIT_FALLBACK: End completions
+  let _ = MyStruct4(name: "test") {
+    ""
+  } arg3: {
+    1
+  } #^INIT_FALLBACK_2^#
+}
+
+protocol P {
+  func foo()
+}
+struct TestNominalMember: P {
+  var value = MyStruct().method1 { 1 } #^MEMBERDECL_SAMELINE^#
+  #^MEMBERDECL_NEWLINE^#
+
+// MEMBERDECL_SAMELINE: Begin completions, 4 items
+// MEMBERDECL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {() -> String in|}#}[#(() -> String)?#]; name=fn2: (() -> String)?
+// MEMBERDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .enumFunc()[#Void#]; name=enumFunc()
+// MEMBERDECL_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#]; name=+ SimpleEnum
+// MEMBERDECL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#]; name=self
+// MEMBERDECL_SAMELINE: End completions
+
+// MEMBERDECL_NEWLINE: Begin completions
+// MEMBERDECL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {() -> String in|}#}[#(() -> String)?#]; name=fn2: (() -> String)?
+// MEMBERDECL_NEWLINE-DAG: Keyword[enum]/None:                 enum; name=enum
+// MEMBERDECL_NEWLINE-DAG: Keyword[func]/None:                 func; name=func
+// MEMBERDECL_NEWLINE-DAG: Keyword[private]/None:              private; name=private
+// MEMBERDECL_NEWLINE-DAG: Keyword/None:                       lazy; name=lazy
+// MEMBERDECL_NEWLINE-DAG: Keyword[var]/None:                  var; name=var
+// MEMBERDECL_NEWLINE-DAG: Decl[InstanceMethod]/Super:         func foo() {|}; name=foo()
+// MEMBERDECL_NEWLINE: End completions
 }

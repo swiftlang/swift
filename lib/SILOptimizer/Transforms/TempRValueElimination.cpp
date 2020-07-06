@@ -352,7 +352,7 @@ bool TempRValueOptPass::checkNoSourceModification(
     SILInstruction *inst = &*iter;
 
     if (useInsts.count(inst))
-      numLoadsFound++;
+      ++numLoadsFound;
 
     // If this is the last use of the temp we are ok. After this point,
     // modifications to the source don't matter anymore.

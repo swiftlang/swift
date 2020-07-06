@@ -1062,7 +1062,7 @@ void ImportResolver::findCrossImports(
                           << "'\n");
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumCrossImportsChecked++;
+    ++ctx.Stats->getFrontendCounters().NumCrossImportsChecked;
 
   // Find modules we need to import.
   SmallVector<Identifier, 4> names;
@@ -1078,7 +1078,7 @@ void ImportResolver::findCrossImports(
         I.importLoc);
 
   if (ctx.Stats && !names.empty())
-    ctx.Stats->getFrontendCounters().NumCrossImportsFound++;
+    ++ctx.Stats->getFrontendCounters().NumCrossImportsFound;
 
   // Add import statements.
   for (auto &name : names) {

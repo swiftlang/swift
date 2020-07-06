@@ -38,7 +38,8 @@
               key.is_dynamic: 1,
               key.is_implicit: 1
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.struct,
@@ -58,7 +59,8 @@
             {
               key.attribute: source.decl.attribute.objc
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
@@ -70,14 +72,16 @@
             {
               key.attribute: source.decl.attribute.objc
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
       ],
       key.attributes: [
         {
           key.attribute: source.decl.attribute.objcMembers
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     }
   ]
 }

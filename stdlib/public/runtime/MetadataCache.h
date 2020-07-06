@@ -27,7 +27,13 @@
 namespace swift {
 
 class MetadataAllocator : public llvm::AllocatorBase<MetadataAllocator> {
+private:
+  uint16_t Tag;
+
 public:
+  constexpr MetadataAllocator(uint16_t tag) : Tag(tag) {}
+  MetadataAllocator() = delete;
+
   void Reset() {}
 
   LLVM_ATTRIBUTE_RETURNS_NONNULL void *Allocate(size_t size, size_t alignment);
@@ -37,12 +43,24 @@ public:
   using AllocatorBase<MetadataAllocator>::Deallocate;
 
   void PrintStats() const {}
+  
+  MetadataAllocator withTag(uint16_t Tag) {
+    MetadataAllocator Allocator = *this;
+    Allocator.Tag = Tag;
+    return Allocator;
+  }
+};
+
+template<uint16_t StaticTag>
+class TaggedMetadataAllocator: public MetadataAllocator {
+public:
+  constexpr TaggedMetadataAllocator() : MetadataAllocator(StaticTag) {}
 };
 
 /// A typedef for simple global caches.
-template <class EntryTy>
+template <class EntryTy, uint16_t Tag>
 using SimpleGlobalCache =
-  ConcurrentMap<EntryTy, /*destructor*/ false, MetadataAllocator>;
+  ConcurrentMap<EntryTy, /*destructor*/ false, TaggedMetadataAllocator<Tag>>;
 
 template <class T, bool ProvideDestructor = true>
 class StaticOwningPointer {
@@ -87,9 +105,10 @@ struct ConcurrencyControl {
   ConcurrencyControl() = default;
 };
 
-template <class EntryType, bool ProvideDestructor = true>
+template <class EntryType, uint16_t Tag, bool ProvideDestructor = true>
 class LockingConcurrentMapStorage {
-  ConcurrentMap<EntryType, ProvideDestructor, MetadataAllocator> Map;
+  ConcurrentMap<EntryType, ProvideDestructor,
+                TaggedMetadataAllocator<Tag>> Map;
   StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
 
 public:
@@ -367,6 +386,14 @@ class MetadataCacheKey {
 
     auto *aDescription = awt->getDescription();
     auto *bDescription = bwt->getDescription();
+    return compareProtocolConformanceDescriptors(aDescription, bDescription);
+  }
+
+public:
+  /// Compare two conformance descriptors, checking their contents if necessary.
+  static int compareProtocolConformanceDescriptors(
+      const ProtocolConformanceDescriptor *aDescription,
+      const ProtocolConformanceDescriptor *bDescription) {
     if (aDescription == bDescription)
       return 0;
 
@@ -386,6 +413,7 @@ class MetadataCacheKey {
                            bDescription->getProtocol());
   }
 
+private:
   /// Compare the content from two keys.
   static int compareContent(const void * const *adata,
                             const void * const *bdata,
@@ -1388,10 +1416,10 @@ public:
   }
 };
 
-template <class EntryType, bool ProvideDestructor = true>
+template <class EntryType, uint16_t Tag, bool ProvideDestructor = true>
 class MetadataCache :
     public LockingConcurrentMap<EntryType,
-             LockingConcurrentMapStorage<EntryType, ProvideDestructor>> {
+             LockingConcurrentMapStorage<EntryType, Tag, ProvideDestructor>> {
 };
 
 } // namespace swift

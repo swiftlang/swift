@@ -1012,9 +1012,12 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
 
   constexpr TargetAnyClassMetadata(TargetClassMetadata<Runtime> *superclass)
     : TargetHeapMetadata<Runtime>(MetadataKind::Class),
-      Superclass(superclass),
-      CacheData{nullptr, nullptr},
-      Data(SWIFT_CLASS_IS_SWIFT_MASK) {}
+      Superclass(superclass)
+#if SWIFT_OBJC_INTEROP
+      , CacheData{nullptr, nullptr},
+      Data(SWIFT_CLASS_IS_SWIFT_MASK)
+#endif
+      {}
 
 #if SWIFT_OBJC_INTEROP
   // Allow setting the metadata kind to a class ISA on class metadata.
@@ -1022,13 +1025,12 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   using TargetMetadata<Runtime>::setClassISA;
 #endif
 
-  // Note that ObjC classes does not have a metadata header.
+  // Note that ObjC classes do not have a metadata header.
 
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> Superclass;
 
-  // TODO: remove the CacheData and Data fields in non-ObjC-interop builds.
-
+#if SWIFT_OBJC_INTEROP
   /// The cache data is used for certain dynamic lookups; it is owned
   /// by the runtime and generally needs to interoperate with
   /// Objective-C's use.
@@ -1043,11 +1045,16 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   static constexpr StoredPointer offsetToData() {
     return offsetof(TargetAnyClassMetadata, Data);
   }
+#endif
 
   /// Is this object a valid swift type metadata?  That is, can it be
   /// safely downcast to ClassMetadata?
   bool isTypeMetadata() const {
+#if SWIFT_OBJC_INTEROP
     return (Data & SWIFT_CLASS_IS_SWIFT_MASK);
+#else
+    return true;
+#endif
   }
   /// A different perspective on the same bit
   bool isPureObjC() const {
@@ -1270,6 +1277,7 @@ public:
     return bounds;
   }
 
+#if SWIFT_OBJC_INTEROP
   /// Given a statically-emitted metadata template, this sets the correct
   /// "is Swift" bit for the current runtime. Depending on the deployment
   /// target a binary was compiled for, statically emitted metadata templates
@@ -1294,6 +1302,7 @@ public:
     
     assert(isTypeMetadata());
   }
+#endif
 
   bool isCanonicalStaticallySpecializedGenericMetadata() const {
     auto *description = getDescription();
@@ -2651,7 +2660,7 @@ private:
 
 using ContextDescriptor = TargetContextDescriptor<InProcess>;
 
-inline bool isCImportedModuleName(StringRef name) {
+inline bool isCImportedModuleName(llvm::StringRef name) {
   // This does not include MANGLING_MODULE_CLANG_IMPORTER because that's
   // used only for synthesized declarations and not actual imported
   // declarations.
@@ -2748,7 +2757,7 @@ public:
 
   /// Retrieve the generic parameter that is the subject of this requirement,
   /// as a mangled type name.
-  StringRef getParam() const {
+  llvm::StringRef getParam() const {
     return swift::Demangle::makeSymbolicMangledNameStringRef(Param.get());
   }
 
@@ -2759,7 +2768,7 @@ public:
   }
 
   /// Retrieve the right-hand type for a SameType or BaseClass requirement.
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     assert(getKind() == GenericRequirementKind::SameType ||
            getKind() == GenericRequirementKind::BaseClass);
     return swift::Demangle::makeSymbolicMangledNameStringRef(Type.get());
@@ -2990,7 +2999,7 @@ public:
 
   using TrailingGenericContextObjects::getGenericContext;
 
-  StringRef getMangledExtendedContext() const {
+  llvm::StringRef getMangledExtendedContext() const {
     return Demangle::makeSymbolicMangledNameStringRef(ExtendedContext.get());
   }
   
@@ -3214,13 +3223,13 @@ public:
     return (this
          ->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
   }
-  
-  StringRef getUnderlyingTypeArgument(unsigned i) const {
+
+  llvm::StringRef getUnderlyingTypeArgument(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
     const char *ptr = getUnderlyingTypeArgumentMangledName(i);    
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
   }
-  
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::OpaqueType;
   }

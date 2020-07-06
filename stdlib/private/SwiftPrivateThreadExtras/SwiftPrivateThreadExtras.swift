@@ -15,9 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -117,17 +117,18 @@ public func _stdlib_thread_join<Result>(
 ) -> (CInt, Result?) {
 #if os(Windows)
   let result = WaitForSingleObject(thread, INFINITE)
-  if result == WAIT_OBJECT_0 {
-    var threadResult: DWORD = 0
-    GetExitCodeThread(thread, &threadResult)
-    CloseHandle(thread)
+  guard result == WAIT_OBJECT_0 else { return (CInt(result), nil) }
 
-    return (CInt(result),
-            UnsafeMutablePointer<DWORD>(&threadResult)
-                .withMemoryRebound(to: Result.self, capacity: 1){ $0.pointee })
-  } else {
-    return (CInt(result), nil)
+  var dwResult: DWORD = 0
+  GetExitCodeThread(thread, &dwResult)
+  CloseHandle(thread)
+
+  let value: Result = withUnsafePointer(to: &dwResult) {
+    $0.withMemoryRebound(to: Result.self, capacity: 1) {
+      $0.pointee
+    }
   }
+  return (CInt(result), value)
 #else
   var threadResultRawPtr: UnsafeMutableRawPointer?
   let result = pthread_join(thread, &threadResultRawPtr)

@@ -43,10 +43,23 @@ function(get_test_dependencies SDK result_var_name)
 
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
-      swift swift-ide-test swift-syntax-test sil-opt swift-llvm-opt swift-demangle
-      sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
-      lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
-      swift-api-digester swift-refactor swift-demangle-yamldump)
+      lldb-moduleimport-test
+      sil-func-extractor
+      sil-llvm-gen
+      sil-nm
+      sil-opt
+      sil-passpipeline-dumper
+      swift-frontend
+      swift-api-digester
+      swift-demangle
+      swift-demangle-yamldump
+      swift-dependency-tool
+      swift-ide-test
+      swift-llvm-opt
+      swift-refactor
+      swift-reflection-dump
+      swift-remoteast-test
+      swift-syntax-test)
 
     if(SWIFT_BUILD_SYNTAXPARSERLIB)
       list(APPEND deps_binaries swift-syntax-parser-test)
@@ -218,7 +231,7 @@ foreach(SDK ${SWIFT_SDKS})
     set(validation_test_bin_dir
         "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
-    if(LibXml2_FOUND)
+    if(LLVM_ENABLE_LIBXML2)
       set(SWIFT_HAVE_LIBXML2 TRUE)
     else()
       set(SWIFT_HAVE_LIBXML2 FALSE)

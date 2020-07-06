@@ -51,6 +51,7 @@ SEMANTICS_ATTR(ARRAY_GET_ELEMENT_ADDRESS, "array.get_element_address")
 SEMANTICS_ATTR(ARRAY_INIT, "array.init")
 SEMANTICS_ATTR(ARRAY_INIT_EMPTY, "array.init.empty")
 SEMANTICS_ATTR(ARRAY_MAKE_MUTABLE, "array.make_mutable")
+SEMANTICS_ATTR(ARRAY_END_MUTATION, "array.end_mutation")
 SEMANTICS_ATTR(ARRAY_MUTATE_UNKNOWN, "array.mutate_unknown")
 SEMANTICS_ATTR(ARRAY_PROPS_IS_NATIVE_TYPE_CHECKED, "array.props.isNativeTypeChecked")
 SEMANTICS_ATTR(ARRAY_RESERVE_CAPACITY_FOR_APPEND, "array.reserve_capacity_for_append")
@@ -59,6 +60,7 @@ SEMANTICS_ATTR(ARRAY_WITH_UNSAFE_MUTABLE_BUFFER_POINTER, "array.withUnsafeMutabl
 SEMANTICS_ATTR(ARRAY_COUNT, "array.count")
 SEMANTICS_ATTR(ARRAY_DEALLOC_UNINITIALIZED, "array.dealloc_uninitialized")
 SEMANTICS_ATTR(ARRAY_UNINITIALIZED_INTRINSIC, "array.uninitialized_intrinsic")
+SEMANTICS_ATTR(ARRAY_FINALIZE_INTRINSIC, "array.finalize_intrinsic")
 
 SEMANTICS_ATTR(SEQUENCE_FOR_EACH, "sequence.forEach")
 
@@ -67,6 +69,8 @@ SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER,
           "optimize.sil.specialize.generic.partial.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER,
           "optimize.sil.specialize.generic.size.never")
+SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER,
+          "optimize.sil.specialize.owned2guarantee.never")
 
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_INTERPOLATION, "oslog.message.init_interpolation")
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_STRING_LITERAL, "oslog.message.init_stringliteral")

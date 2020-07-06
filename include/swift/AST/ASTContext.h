@@ -254,11 +254,6 @@ public:
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
 
-  /// The set of top-level modules we have loaded.
-  /// This map is used for iteration, therefore it's a MapVector and not a
-  /// DenseMap.
-  llvm::MapVector<Identifier, ModuleDecl*> LoadedModules;
-
   /// The builtin module.
   ModuleDecl * const TheBuiltinModule;
 
@@ -407,6 +402,12 @@ public:
                               array.size());
   }
 
+  template <typename T>
+  MutableArrayRef<T>
+  AllocateCopy(const std::vector<T> &vec,
+               AllocationArena arena = AllocationArena::Permanent) const {
+    return AllocateCopy(ArrayRef<T>(vec), arena);
+  }
 
   template<typename T>
   ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &vec,
@@ -648,6 +649,15 @@ public:
   /// metadata.
   AvailabilityContext getPrespecializedGenericMetadataAvailability();
 
+  /// Get the runtime availability of the swift_compareTypeContextDescriptors
+  /// for the target platform.
+  AvailabilityContext getCompareTypeContextDescriptorsAvailability();
+
+  /// Get the runtime availability of the
+  /// swift_compareProtocolConformanceDescriptors entry point for the target
+  /// platform.
+  AvailabilityContext getCompareProtocolConformanceDescriptorsAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -706,8 +716,11 @@ public:
   ///                compiler.
   /// \param isDWARF \c true if this module loader can load Clang modules
   ///                from DWARF.
+  /// \param IsInterface \c true if this module loader can load Swift textual
+  ///                interface.
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                       bool isClang = false, bool isDWARF = false);
+                       bool isClang = false, bool isDWARF = false,
+                       bool IsInterface = false);
 
   /// Retrieve the module dependencies for the module with the given name.
   ///
@@ -781,7 +794,25 @@ public:
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
 
+  /// Retrieve the module interface loader for this ASTContext.
+  ModuleLoader *getModuleInterfaceLoader() const;
+public:
   namelookup::ImportCache &getImportCache() const;
+
+  /// Returns an iterator over the modules that are known by this context
+  /// to be loaded.
+  ///
+  /// Iteration order is guaranteed to match the order in which
+  /// \c addLoadedModule was called to register the loaded module
+  /// with this context.
+  iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
+  getLoadedModules() const;
+
+  /// Returns the number of loaded modules known by this context to be loaded.
+  unsigned getNumLoadedModules() const {
+    auto eltRange = getLoadedModules();
+    return std::distance(eltRange.begin(), eltRange.end());
+  }
 
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
@@ -822,6 +853,11 @@ public:
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
 
+  /// Insert an externally-sourced module into the set of known loaded modules
+  /// in this context.
+  void addLoadedModule(ModuleDecl *M);
+
+public:
   /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.

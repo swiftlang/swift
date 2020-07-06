@@ -839,7 +839,7 @@ private:
     if (demangleNatural(natural)) {
       if (!Mangled.nextIf('_'))
         return false;
-      natural++;
+      ++natural;
       return true;
     }
     return false;

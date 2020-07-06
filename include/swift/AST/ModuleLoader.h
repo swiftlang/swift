@@ -22,8 +22,6 @@
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "swift/AST/ModuleDependencies.h"
 
@@ -62,13 +60,22 @@ enum class Bridgeability : unsigned {
   Full
 };
 
+/// Specifies which dependencies the intermodule dependency tracker records.
+enum class IntermoduleDepTrackingMode {
+  /// Records both system and non-system dependencies.
+  IncludeSystem,
+
+  /// Records only non-system dependencies.
+  ExcludeSystem,
+};
+
 /// Records dependencies on files outside of the current module;
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
   explicit DependencyTracker(
-      bool TrackSystemDeps,
+      IntermoduleDepTrackingMode Mode,
       std::shared_ptr<llvm::FileCollector> FileCollector = {});
 
   /// Adds a file as a dependency.
@@ -91,6 +98,7 @@ struct SubCompilerInstanceInfo {
   CompilerInstance* Instance;
   StringRef Hash;
   ArrayRef<StringRef> BuildArguments;
+  ArrayRef<StringRef> ExtraPCMArgs;
 };
 
 /// Abstract interface to run an action in a sub ASTContext.
@@ -99,7 +107,8 @@ struct InterfaceSubContextDelegate {
                                StringRef interfacePath,
                                StringRef outputPath,
                                SourceLoc diagLoc,
-  llvm::function_ref<bool(ASTContext&,ArrayRef<StringRef>, StringRef)> action) = 0;
+  llvm::function_ref<bool(ASTContext&,ArrayRef<StringRef>,
+                          ArrayRef<StringRef>, StringRef)> action) = 0;
   virtual bool runInSubCompilerInstance(StringRef moduleName,
                                         StringRef interfacePath,
                                         StringRef outputPath,

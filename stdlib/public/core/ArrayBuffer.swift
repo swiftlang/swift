@@ -100,21 +100,55 @@ extension _ArrayBuffer {
   }
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  ///
+  /// This function should only be used for internal sanity checks.
+  /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferencedUnflaggedNative()
     }
-
-    // This is a performance optimization. This code used to be:
-    //
-    //   return _storage.isUniquelyReferencedNative() && _isNative.
-    //
-    // SR-6437
-    if !_storage.isUniquelyReferencedNative() {
+    return _storage.isUniquelyReferencedNative() && _isNative
+   }
+  
+  /// Returns `true` and puts the buffer in a mutable state iff the buffer's
+  /// storage is uniquely-referenced.
+  ///
+  /// - Precondition: The buffer must be immutable.
+  ///
+  /// - Warning: It's a requirement to call `beginCOWMutation` before the buffer
+  ///   is mutated.
+  @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutation() -> Bool {
+    let isUnique: Bool
+    if !_isClassOrObjCExistential(Element.self) {
+      isUnique = _storage.beginCOWMutationUnflaggedNative()
+    } else if !_storage.beginCOWMutationNative() {
       return false
+    } else {
+      isUnique = _isNative
     }
-    return _isNative
+#if INTERNAL_CHECKS_ENABLED
+    if isUnique {
+      _native.isImmutable = false
+    }
+#endif
+    return isUnique
+  }
+  
+  /// Puts the buffer in an immutable state.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  ///
+  /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
+  ///   until the next call of `beginCOWMutation`.
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func endCOWMutation() {
+#if INTERNAL_CHECKS_ENABLED
+    _native.isImmutable = true
+#endif
+    _storage.endCOWMutation()
   }
 
   /// Convert to an NSArray.
@@ -123,6 +157,60 @@ extension _ArrayBuffer {
   @inlinable
   internal func _asCocoaArray() -> AnyObject {
     return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative.buffer
+  }
+
+  /// Creates and returns a new uniquely referenced buffer which is a copy of
+  /// this buffer.
+  ///
+  /// This buffer is consumed, i.e. it's released.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew() -> _ArrayBuffer {
+    return _consumeAndCreateNew(bufferIsUnique: false,
+                                minimumCapacity: count,
+                                growForAppend: false)
+  }
+
+  /// Creates and returns a new uniquely referenced buffer which is a copy of
+  /// this buffer.
+  ///
+  /// If `bufferIsUnique` is true, the buffer is assumed to be uniquely
+  /// referenced and the elements are moved - instead of copied - to the new
+  /// buffer.
+  /// The `minimumCapacity` is the lower bound for the new capacity.
+  /// If `growForAppend` is true, the new capacity is calculated using
+  /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
+  ///
+  /// This buffer is consumed, i.e. it's released.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) -> _ArrayBuffer {
+    let newCapacity = _growArrayCapacity(oldCapacity: capacity,
+                                         minimumCapacity: minimumCapacity,
+                                         growForAppend: growForAppend)
+    let c = count
+    _internalInvariant(newCapacity >= c)
+    
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: c, minimumCapacity: newCapacity)
+
+    if bufferIsUnique {
+      // As an optimization, if the original buffer is unique, we can just move
+      // the elements instead of copying.
+      let dest = newBuffer.firstElementAddress
+      dest.moveInitialize(from: mutableFirstElementAddress,
+                          count: c)
+      _native.mutableCount = 0
+    } else {
+      _copyContents(
+        subRange: 0..<c,
+        initializing: newBuffer.mutableFirstElementAddress)
+    }
+    return _ArrayBuffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
   /// If this buffer is backed by a uniquely-referenced mutable
@@ -134,7 +222,7 @@ extension _ArrayBuffer {
   -> NativeBuffer? {
     if _fastPath(isUniquelyReferenced()) {
       let b = _native
-      if _fastPath(b.capacity >= minimumCapacity) {
+      if _fastPath(b.mutableCapacity >= minimumCapacity) {
         return b
       }
     }
@@ -256,12 +344,25 @@ extension _ArrayBuffer {
     return _native.firstElementAddress
   }
 
+  /// A mutable pointer to the first element.
+  ///
+  /// - Precondition: the buffer must be mutable.
+  @_alwaysEmitIntoClient
+  internal var mutableFirstElementAddress: UnsafeMutablePointer<Element> {
+    _internalInvariant(_isNative, "must be a native buffer")
+    return _native.mutableFirstElementAddress
+  }
+
   @inlinable
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return _fastPath(_isNative) ? firstElementAddress : nil
   }
 
   /// The number of elements the buffer stores.
+  ///
+  /// This property is obsolete. It's only used for the ArrayBufferProtocol and
+  /// to keep backward compatibility.
+  /// Use `immutableCount` or `mutableCount` instead.
   @inlinable
   internal var count: Int {
     @inline(__always)
@@ -271,6 +372,33 @@ extension _ArrayBuffer {
     set {
       _internalInvariant(_isNative, "attempting to update count of Cocoa array")
       _native.count = newValue
+    }
+  }
+  
+  /// The number of elements of the buffer.
+  ///
+  /// - Precondition: The buffer must be immutable.
+  @_alwaysEmitIntoClient
+  internal var immutableCount: Int {
+    return _fastPath(_isNative) ? _native.immutableCount : _nonNative.endIndex
+  }
+
+  /// The number of elements of the buffer.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  internal var mutableCount: Int {
+    @inline(__always)
+    get {
+      _internalInvariant(
+        _isNative,
+        "attempting to get mutating-count of non-native buffer")
+      return _native.mutableCount
+    }
+    @inline(__always)
+    set {
+      _internalInvariant(_isNative, "attempting to update count of Cocoa array")
+      _native.mutableCount = newValue
     }
   }
 
@@ -291,8 +419,6 @@ extension _ArrayBuffer {
     }
   }
 
-  // TODO: gyb this
-  
   /// Traps if an inout violation is detected or if the buffer is
   /// native and typechecked and the subscript is out of range.
   ///
@@ -312,10 +438,40 @@ extension _ArrayBuffer {
     }
   }
 
+  /// Traps unless the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  internal func _checkValidSubscriptMutating(_ index: Int) {
+    _native._checkValidSubscriptMutating(index)
+  }
+
   /// The number of elements the buffer can store without reallocation.
+  ///
+  /// This property is obsolete. It's only used for the ArrayBufferProtocol and
+  /// to keep backward compatibility.
+  /// Use `immutableCapacity` or `mutableCapacity` instead.
   @inlinable
   internal var capacity: Int {
     return _fastPath(_isNative) ? _native.capacity : _nonNative.endIndex
+  }
+
+  /// The number of elements the buffer can store without reallocation.
+  ///
+  /// - Precondition: The buffer must be immutable.
+  @_alwaysEmitIntoClient
+  internal var immutableCapacity: Int {
+    return _fastPath(_isNative) ? _native.immutableCapacity : _nonNative.count
+  }
+  
+  /// The number of elements the buffer can store without reallocation.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  internal var mutableCapacity: Int {
+    _internalInvariant(_isNative, "attempting to get mutating-capacity of non-native buffer")
+    return _native.mutableCapacity
   }
 
   @inlinable

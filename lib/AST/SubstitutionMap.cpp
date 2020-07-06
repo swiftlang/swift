@@ -97,6 +97,13 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   return getReplacementTypesBuffer();
 }
 
+ArrayRef<Type> SubstitutionMap::getInnermostReplacementTypes() const {
+  if (empty()) return { };
+
+  return getReplacementTypes().take_back(
+      getGenericSignature()->getInnermostGenericParams().size());
+}
+
 GenericSignature SubstitutionMap::getGenericSignature() const {
   return storage ? storage->getGenericSignature() : nullptr;
 }
@@ -333,7 +340,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
           reqt.getSecondType()->isEqual(proto->getDeclaredType()))
         return getConformances()[index];
 
-      index++;
+      ++index;
     }
   }
 

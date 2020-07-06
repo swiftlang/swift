@@ -27,11 +27,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Lex/Preprocessor.h"
@@ -1708,6 +1710,30 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   unsigned index = 0;
   SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
+  // C++ operators that are implemented as non-static member functions get
+  // imported into Swift as static methods that have an additional
+  // parameter for the left-hand side operand instead of the receiver object.
+  if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+    if (clangDecl->isOverloadedOperator()) {
+      auto param = new (SwiftContext)
+          ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                    SwiftContext.getIdentifier("lhs"), dc);
+
+      auto parent = CMD->getParent();
+      auto parentType = importType(
+          parent->getASTContext().getRecordType(parent),
+          ImportTypeKind::Parameter, allowNSUIntegerAsInt, Bridgeability::None);
+
+      param->setInterfaceType(parentType.getType());
+
+      // Workaround until proper const support is handled: Force everything to
+      // be mutating. This implicitly makes the parameter indirect.
+      param->setSpecifier(ParamSpecifier::InOut);
+
+      parameters.push_back(param);
+    }
+  }
+
   for (auto param : params) {
     auto paramTy = param->getType();
     if (paramTy->isVoidType()) {
@@ -2082,7 +2108,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
   auto argNames = importedName.getDeclName().getArgumentNames();
   unsigned nameIndex = 0;
-  for (size_t paramIndex = 0; paramIndex != params.size(); paramIndex++) {
+  for (size_t paramIndex = 0, e = params.size(); paramIndex != e;
+       ++paramIndex) {
     auto param = params[paramIndex];
     auto paramTy = param->getType();
     auto paramIsError = errorInfo && paramIndex == errorInfo->ErrorParameterIndex;

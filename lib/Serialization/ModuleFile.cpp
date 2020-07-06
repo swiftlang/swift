@@ -152,6 +152,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::ARE_PRIVATE_IMPORTS_ENABLED:
       extendedInfo.setPrivateImportsEnabled(true);
       break;
+    case options_block::IS_IMPLICIT_DYNAMIC_ENABLED:
+      extendedInfo.setImplicitDynamicEnabled(true);
+      break;
     case options_block::RESILIENCE_STRATEGY:
       unsigned Strategy;
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
@@ -1977,9 +1980,7 @@ ModuleFile::ModuleFile(
   }
 }
 
-Status ModuleFile::associateWithFileContext(FileUnit *file,
-                                            SourceLoc diagLoc,
-                                            bool treatAsPartialModule) {
+Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   assert(!hasError() && "error already detected; should not call this");
@@ -2033,8 +2034,12 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
+    // If this module file is being installed into the main module, it's treated
+    // as a partial module.
+    auto isPartialModule = M->isMainModule();
+
     if (dependency.isImplementationOnly() &&
-        !(treatAsPartialModule || ctx.LangOpts.DebuggerSupport)) {
+        !(isPartialModule || ctx.LangOpts.DebuggerSupport)) {
       // When building normally (and not merging partial modules), we don't
       // want to bring in the implementation-only module, because that might
       // change the set of visible declarations. However, when debugging we
@@ -2188,6 +2193,30 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   return cast<TypeDecl>(getDecl(*iter));
 }
 
+std::unique_ptr<llvm::MemoryBuffer>
+ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
+                          std::string &Name) {
+  // Open the module file
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto moduleBuf = fs.getBufferForFile(modulePath);
+  if (!moduleBuf)
+    return nullptr;
+
+  // Load the module file without validation.
+  std::unique_ptr<ModuleFile> loadedModuleFile;
+  ExtendedValidationInfo ExtInfo;
+  bool isFramework = false;
+  serialization::ValidationInfo loadInfo =
+     ModuleFile::load(modulePath.str(),
+                      std::move(moduleBuf.get()),
+                      nullptr,
+                      nullptr,
+                      /*isFramework*/isFramework, loadedModuleFile,
+                      &ExtInfo);
+  Name = loadedModuleFile->Name;
+  return std::move(loadedModuleFile->ModuleInputBuffer);
+}
+
 OpaqueTypeDecl *ModuleFile::lookupOpaqueResultType(StringRef MangledName) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
@@ -2247,9 +2276,6 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name,
     if (getStableFixity(fixity) == item.first)
       return cast<OperatorDecl>(getDecl(item.second));
   }
-
-  // FIXME: operators re-exported from other modules?
-
   return nullptr;
 }
 
@@ -2664,13 +2690,14 @@ void ModuleFile::lookupObjCMethods(
   }
 }
 
-void ModuleFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void ModuleFile::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &dep : Dependencies) {
     auto depSpis = dep.spiGroups;
     if (dep.Import.hasValue() && dep.Import->importedModule == importedModule &&
         !depSpis.empty()) {
-      spiGroups.append(depSpis.begin(), depSpis.end());
+      spiGroups.insert(depSpis.begin(), depSpis.end());
     }
   }
 }

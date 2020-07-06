@@ -642,7 +642,7 @@ namespace {
     /// doesn't already exist.
     AnnotatedLine &lineForLoc(SourceLoc Loc) {
       // FIXME: This call to `getLineNumber` is expensive.
-      unsigned lineNo = SM.getLineNumber(Loc);
+      unsigned lineNo = SM.getLineAndColumnInBuffer(Loc).first;
       AnnotatedLine newLine(lineNo, 0, "");
       auto iter =
           std::lower_bound(AnnotatedLines.begin(), AnnotatedLines.end(),
@@ -651,7 +651,8 @@ namespace {
                            });
       if (iter == AnnotatedLines.end() || iter->getLineNumber() != lineNo) {
         newLine.LineText = SM.getLineString(BufferID, lineNo);
-        newLine.DisplayLineNumber = SM.getLineAndColumn(Loc).first;
+        newLine.DisplayLineNumber =
+            SM.getPresumedLineAndColumnForLoc(Loc).first;
         return *AnnotatedLines.insert(iter, newLine);
       } else {
         return *iter;
@@ -667,8 +668,9 @@ namespace {
 
     void lineRangesForRange(CharSourceRange Range,
                             SmallVectorImpl<CharSourceRange> &LineRanges) {
-      unsigned startLineNo = SM.getLineNumber(Range.getStart());
-      unsigned endLineNo = SM.getLineNumber(Range.getEnd());
+      unsigned startLineNo =
+          SM.getLineAndColumnInBuffer(Range.getStart()).first;
+      unsigned endLineNo = SM.getLineAndColumnInBuffer(Range.getEnd()).first;
 
       if (startLineNo == endLineNo) {
         LineRanges.push_back(Range);
@@ -747,7 +749,7 @@ namespace {
           std::max(getPreferredLineNumberIndent(), MinimumLineNumberIndent);
 
       // Print the file name at the top of each excerpt.
-      auto primaryLineAndColumn = SM.getLineAndColumn(PrimaryLoc);
+      auto primaryLineAndColumn = SM.getPresumedLineAndColumnForLoc(PrimaryLoc);
       Out.changeColor(ColoredStream::Colors::CYAN);
       Out << std::string(lineNumberIndent + 1, '=') << " "
           << SM.getDisplayNameForLoc(PrimaryLoc) << ":"
@@ -932,7 +934,8 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   if (Info.IsChildNote)
     return;
 
-  if (ExperimentalFormattingEnabled) {
+  switch (FormattingStyle) {
+  case DiagnosticOptions::FormattingStyle::Swift:
     if (Info.Kind == DiagnosticKind::Note && currentSnippet) {
       // If this is a note and we have an in-flight message, add it to that
       // instead of emitting it separately.
@@ -950,7 +953,9 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
           BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
       }
     }
-  } else {
+    break;
+
+  case DiagnosticOptions::FormattingStyle::LLVM:
     printDiagnostic(SM, Info);
 
     if (PrintEducationalNotes) {
@@ -965,6 +970,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     for (auto ChildInfo : Info.ChildDiagnosticInfo) {
       printDiagnostic(SM, *ChildInfo);
     }
+    break;
   }
 }
 
@@ -1101,7 +1107,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                          R.End.getPointer()-LineStart));
     }
 
-    LineAndCol = getLineAndColumn(Loc);
+    LineAndCol = getPresumedLineAndColumnForLoc(Loc);
   }
 
   return llvm::SMDiagnostic(LLVMSourceMgr, Loc.Value, BufferID,

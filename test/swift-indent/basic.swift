@@ -1036,3 +1036,30 @@ private var secondThing = item
     .filter {},
     firstThing = 20,
     thirdThing = 56
+
+
+// Function decls missing their parameter list and body shouldn't pick up the next token as a continuation.
+
+struct BarType {
+    func bar
+}
+
+struct <#name#> {
+    <#fields#>
+}
+
+struct <#name#> {
+    <#fields#>
+    func foo() {}
+}
+
+
+// Array literal elements should have their continuation lines indented relative to their first line.
+
+doStuffWithList([
+    baseThing()
+        .map { $0 }
+        .append(\.sdfsdf),
+    secondItem
+        .filter {$0 < 10}
+])

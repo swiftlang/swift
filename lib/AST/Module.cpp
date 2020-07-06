@@ -36,7 +36,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -499,6 +498,10 @@ bool ModuleDecl::isClangModule() const {
 }
 
 void ModuleDecl::addFile(FileUnit &newFile) {
+  // If this is a LoadedFile, make sure it loaded without error.
+  assert(!(isa<LoadedFile>(newFile) &&
+           cast<LoadedFile>(newFile).hadLoadError()));
+
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
          !isa<SourceFile>(newFile) ||
@@ -508,17 +511,39 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
-void ModuleDecl::removeFile(FileUnit &existingFile) {
-  // Do a reverse search; usually the file to be deleted will be at the end.
-  std::reverse_iterator<decltype(Files)::iterator> I(Files.end()),
-  E(Files.begin());
-  I = std::find(I, E, &existingFile);
-  assert(I != E);
+ArrayRef<SourceFile *>
+PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
+                                    ModuleDecl *mod) const {
+  assert(mod->isMainModule() && "Only the main module can have primaries");
 
-  // Adjust for the std::reverse_iterator offset.
-  ++I;
-  Files.erase(I.base());
-  clearLookupCache();
+  SmallVector<SourceFile *, 8> primaries;
+  for (auto *file : mod->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file)) {
+      if (SF->isPrimary())
+        primaries.push_back(SF);
+    }
+  }
+  return mod->getASTContext().AllocateCopy(primaries);
+}
+
+ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<ModuleDecl *>(this);
+  return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
+}
+
+SourceFile *CodeCompletionFileRequest::evaluate(Evaluator &evaluator,
+                                                ModuleDecl *mod) const {
+  const auto &SM = mod->getASTContext().SourceMgr;
+  assert(mod->isMainModule() && "Can only do completion in the main module");
+  assert(SM.hasCodeCompletionBuffer() && "Not performing code completion?");
+
+  for (auto *file : mod->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (SF && SF->getBufferID() == SM.getCodeCompletionBufferID())
+      return SF;
+  }
+  llvm_unreachable("Couldn't find the completion file?");
 }
 
 #define FORWARD(name, args) \
@@ -564,7 +589,7 @@ void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupValue++;
+    ++stats->getFrontendCounters().NumModuleLookupValue;
 
   if (isParsedModule(this)) {
     getSourceLookupCache().lookupValue(Name, LookupKind, Result);
@@ -658,8 +683,9 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
-void ModuleDecl::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void ModuleDecl::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
 }
 
@@ -719,7 +745,7 @@ void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   auto *stats = getASTContext().Stats;
   if (stats)
-    stats->getFrontendCounters().NumModuleLookupClassMember++;
+    ++stats->getFrontendCounters().NumModuleLookupClassMember;
 
   if (isParsedModule(this)) {
     FrontendStatsTracer tracer(getASTContext().Stats,
@@ -850,7 +876,7 @@ SourceFile::getBasicLocsForDecl(const Decl *D) const {
 
   auto setLineColumn = [&SM](LineColumn &Home, SourceLoc Loc) {
     if (Loc.isValid()) {
-      std::tie(Home.Line, Home.Column) = SM.getLineAndColumn(Loc);
+      std::tie(Home.Line, Home.Column) = SM.getPresumedLineAndColumnForLoc(Loc);
     }
   };
 #define SET(X) setLineColumn(Result.X, D->get##X());
@@ -1051,265 +1077,24 @@ LookupConformanceInModuleRequest::evaluate(
   return ProtocolConformanceRef(conformance);
 }
 
-namespace {
-  template <typename T>
-  struct OperatorLookup {
-    // Don't fold this into the static_assert: this would trigger an MSVC bug
-    // that causes the assertion to fail.
-    static constexpr T* ptr = static_cast<T*>(nullptr);
-    static_assert(ptr, "Only usable with operators");
-  };
-
-  template <>
-  struct OperatorLookup<PrefixOperatorDecl> {
-    static PrefixOperatorDecl *lookup(Evaluator &eval,
-                                      const OperatorLookupDescriptor &desc) {
-      // We can return the first prefix operator. All prefix operators of the
-      // same name are equivalent.
-      DirectOperatorLookupRequest req{desc, OperatorFixity::Prefix};
-      auto results = evaluateOrDefault(eval, req, {});
-      return results.empty() ? nullptr : cast<PrefixOperatorDecl>(results[0]);
-    }
-  };
-
-  template <>
-  struct OperatorLookup<InfixOperatorDecl> {
-    static InfixOperatorDecl *lookup(Evaluator &eval,
-                                     const OperatorLookupDescriptor &desc) {
-      // Return the first result if it exists.
-      DirectOperatorLookupRequest req{desc, OperatorFixity::Infix};
-      auto results = evaluateOrDefault(eval, req, {});
-      return results.empty() ? nullptr : cast<InfixOperatorDecl>(results[0]);
-    }
-  };
-
-  template <>
-  struct OperatorLookup<PostfixOperatorDecl> {
-    static PostfixOperatorDecl *lookup(Evaluator &eval,
-                                       const OperatorLookupDescriptor &desc) {
-      // We can return the first postfix operator. All postfix operators of the
-      // same name are equivalent.
-      DirectOperatorLookupRequest req{desc, OperatorFixity::Postfix};
-      auto results = evaluateOrDefault(eval, req, {});
-      return results.empty() ? nullptr : cast<PostfixOperatorDecl>(results[0]);
-    }
-  };
-
-  template <>
-  struct OperatorLookup<PrecedenceGroupDecl> {
-    static PrecedenceGroupDecl *lookup(Evaluator &eval,
-                                       const OperatorLookupDescriptor &desc) {
-      // Return the first result if it exists.
-      auto results =
-          evaluateOrDefault(eval, DirectPrecedenceGroupLookupRequest{desc}, {});
-      return results.empty() ? nullptr : results[0];
-    }
-  };
-} // end anonymous namespace
-
-/// A helper class to sneak around C++ access control rules.
-class SourceFile::Impl {
-public:
-  /// Only intended for use by lookupOperatorDeclForName.
-  static ArrayRef<SourceFile::ImportedModuleDesc>
-  getImportsForSourceFile(const SourceFile &SF) {
-    return *SF.Imports;
-  }
-};
-
-struct SourceFile::SourceFileSyntaxInfo {
-  const bool Enable;
-  /// The root of the syntax tree representing the source file.
-  Optional<syntax::SourceFileSyntax> SyntaxRoot;
-  SourceFileSyntaxInfo(bool Enable): Enable(Enable) {}
-};
-
-bool SourceFile::hasSyntaxRoot() const {
-  return SyntaxInfo->SyntaxRoot.hasValue();
+void SourceFile::getInterfaceHash(llvm::SmallString<32> &str) const {
+  assert(hasInterfaceHash() && "Interface hash not enabled");
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  auto md5 = *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+                  .InterfaceHash;
+  llvm::MD5::MD5Result result;
+  md5.final(result);
+  llvm::MD5::stringifyResult(result, str);
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
-  assert(hasSyntaxRoot() && "no syntax root is set.");
-  return *SyntaxInfo->SyntaxRoot;
+  assert(shouldBuildSyntaxTree() && "Syntax tree disabled");
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+              .SyntaxRoot;
 }
-
-void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
-  SyntaxInfo->SyntaxRoot.emplace(Root);
-}
-
-template<typename OP_DECL>
-static Optional<OP_DECL *>
-lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
-                          bool isCascading);
-
-template<typename OP_DECL>
-using ImportedOperatorsMap = llvm::SmallDenseMap<OP_DECL*, bool, 16>;
-
-template<typename OP_DECL>
-static typename ImportedOperatorsMap<OP_DECL>::iterator
-checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
-                       ImportedOperatorsMap<OP_DECL> &importedOperators) {
-  // Check for conflicts.
-  auto i = importedOperators.begin(), end = importedOperators.end();
-  auto start = i;
-  for (++i; i != end; ++i) {
-    if (i->first->conflictsWith(start->first)) {
-      if (loc.isValid()) {
-        ASTContext &C = SF.getASTContext();
-        C.Diags.diagnose(loc, diag::ambiguous_operator_decls);
-        start->first->diagnose(diag::found_this_operator_decl);
-        i->first->diagnose(diag::found_this_operator_decl);
-      }
-      return end;
-    }
-  }
-  return start;
-}
-
-template<>
-typename ImportedOperatorsMap<PrecedenceGroupDecl>::iterator
-checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
-               ImportedOperatorsMap<PrecedenceGroupDecl> &importedGroups) {
-  if (importedGroups.size() == 1)
-    return importedGroups.begin();
-
-  // Any sort of ambiguity is an error.
-  if (loc.isValid()) {
-    ASTContext &C = SF.getASTContext();
-    C.Diags.diagnose(loc, diag::ambiguous_precedence_groups);
-    for (auto &entry : importedGroups) {
-      entry.first->diagnose(diag::found_this_precedence_group);
-    }
-  }
-  return importedGroups.end();
-}
-
-// Returns None on error, Optional(nullptr) if no operator decl found, or
-// Optional(decl) if decl was found.
-template <typename OP_DECL>
-static Optional<OP_DECL *>
-lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
-                          Identifier Name, bool includePrivate,
-                          bool isCascading) {
-  auto &eval = File.getASTContext().evaluator;
-  auto desc = OperatorLookupDescriptor::forFile(const_cast<FileUnit *>(&File),
-                                                Name, isCascading,
-                                                /*diagLoc*/ SourceLoc());
-  switch (File.getKind()) {
-  case FileUnitKind::Builtin:
-    // The Builtin module declares no operators.
-    return nullptr;
-  case FileUnitKind::Synthesized:
-    // Synthesized files currently declare no operators.
-    return nullptr;
-  case FileUnitKind::Source:
-    break;
-  case FileUnitKind::SerializedAST:
-  case FileUnitKind::ClangModule:
-  case FileUnitKind::DWARFModule:
-    return OperatorLookup<OP_DECL>::lookup(eval, desc);
-  }
-
-  auto &SF = cast<SourceFile>(File);
-  assert(SF.ASTStage >= SourceFile::ImportsResolved);
-
-  // Check if the decl exists on the file.
-  if (auto *op = OperatorLookup<OP_DECL>::lookup(eval, desc))
-    return op;
-
-  // Look for imported operator decls.
-  // Record whether they come from re-exported modules.
-  // FIXME: We ought to prefer operators elsewhere in this module before we
-  // check imports.
-  auto ownModule = SF.getParentModule();
-  ImportedOperatorsMap<OP_DECL> importedOperators;
-  for (auto &imported : SourceFile::Impl::getImportsForSourceFile(SF)) {
-    // Protect against source files that contrive to import their own modules.
-    if (imported.module.importedModule == ownModule)
-      continue;
-
-    bool isExported =
-        imported.importOptions.contains(SourceFile::ImportFlags::Exported);
-    if (!includePrivate && !isExported)
-      continue;
-
-    Optional<OP_DECL *> maybeOp = lookupOperatorDeclForName<OP_DECL>(
-        imported.module.importedModule, Loc, Name, isCascading);
-    if (!maybeOp)
-      return None;
-    
-    if (OP_DECL *op = *maybeOp)
-      importedOperators[op] |= isExported;
-  }
-
-  llvm::PointerIntPair<OP_DECL *, 1, /*isPrivate*/ bool> result = {nullptr,
-                                                                   true};
-
-  if (!importedOperators.empty()) {
-    auto start = checkOperatorConflicts(SF, Loc, importedOperators);
-    if (start == importedOperators.end())
-      return None;
-    result = { start->first, start->second };
-  }
-
-  if (includePrivate || result.getInt())
-    return result.getPointer();
-  return nullptr;
-}
-
-template<typename OP_DECL>
-static Optional<OP_DECL *>
-lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
-                          bool isCascading) {
-  OP_DECL *result = nullptr;
-  for (const FileUnit *File : M->getFiles()) {
-    auto next = lookupOperatorDeclForName<OP_DECL>(*File, Loc, Name, false,
-                                                   isCascading);
-    if (!next.hasValue())
-      return next;
-
-    // FIXME: Diagnose ambiguity.
-    if (*next && result)
-      return None;
-    if (*next)
-      result = *next;
-  }
-  return result;
-}
-
-template <typename OperatorType>
-OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
-    Evaluator &evaluator, OperatorLookupDescriptor desc) const {
-  auto *file = desc.fileOrModule.get<FileUnit *>();
-  auto result =
-      lookupOperatorDeclForName<OperatorType>(*file, desc.diagLoc, desc.name,
-                                              /*includePrivate*/ true,
-                                              desc.isCascading);
-  if (!result.hasValue())
-    return nullptr;
-
-  if (!result.getValue()) {
-    result = lookupOperatorDeclForName<OperatorType>(file->getParentModule(),
-                                                     desc.diagLoc, desc.name,
-                                                     desc.isCascading);
-  }
-  return result.hasValue() ? result.getValue() : nullptr;
-}
-
-#define LOOKUP_OPERATOR(Kind)                                                  \
-  Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
-    auto result = lookupOperatorDeclForName<Kind##Decl>(                       \
-        this, loc, name, /*isCascading*/ false);                               \
-    return result ? *result : nullptr;                                         \
-  }                                                                            \
-  template Kind##Decl *LookupOperatorRequest<Kind##Decl>::evaluate(            \
-      Evaluator &e, OperatorLookupDescriptor) const;
-
-LOOKUP_OPERATOR(PrefixOperator)
-LOOKUP_OPERATOR(InfixOperator)
-LOOKUP_OPERATOR(PostfixOperator)
-LOOKUP_OPERATOR(PrecedenceGroup)
-#undef LOOKUP_OPERATOR
 
 void DirectOperatorLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
@@ -1734,6 +1519,7 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
 namespace swift {
 /// Represents a file containing information about cross-module overlays.
 class OverlayFile {
+  friend class ModuleDecl;
   /// The file that data should be loaded from.
   StringRef filePath;
 
@@ -1750,7 +1536,10 @@ class OverlayFile {
   ///          before returning.
   bool loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
                               Identifier bystandingModule);
-
+  bool loadOverlayModuleNames(ASTContext &ctx,
+                              StringRef module,
+                              StringRef bystandingModule,
+                              SourceLoc diagLoc);
 public:
   // Only allocate in ASTContexts.
   void *operator new(size_t bytes) = delete;
@@ -1789,6 +1578,21 @@ void ModuleDecl::addCrossImportOverlayFile(StringRef file) {
   Identifier secondaryModule = ctx.getIdentifier(llvm::sys::path::stem(file));
   declaredCrossImports[secondaryModule]
       .push_back(new (ctx) OverlayFile(ctx.AllocateCopy(file)));
+}
+
+llvm::SmallSetVector<Identifier, 4>
+ModuleDecl::collectCrossImportOverlay(ASTContext &ctx,
+                                      StringRef file,
+                                      StringRef moduleName,
+                                      StringRef &bystandingModule) {
+  OverlayFile ovFile(file);
+  bystandingModule = llvm::sys::path::stem(file);
+  ovFile.loadOverlayModuleNames(ctx, moduleName, bystandingModule, SourceLoc());
+  llvm::SmallSetVector<Identifier, 4> result;
+  for (auto Id: ovFile.overlayModuleNames) {
+    result.insert(Id);
+  }
+  return result;
 }
 
 bool ModuleDecl::mightDeclareCrossImportOverlays() const {
@@ -2017,15 +1821,15 @@ OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
 }
 
 bool
-OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
-                                    Identifier bystanderName) {
-  auto &ctx = M->getASTContext();
+OverlayFile::loadOverlayModuleNames(ASTContext &ctx, StringRef module,
+                                    StringRef bystanderName,
+                                    SourceLoc diagLoc) {
   llvm::vfs::FileSystem &fs = *ctx.SourceMgr.getFileSystem();
 
   auto bufOrError = fs.getBufferForFile(filePath);
   if (!bufOrError) {
     ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
-                       M->getName(), bystanderName,
+                       module, bystanderName,
                        bufOrError.getError().message(), filePath);
     return false;
   }
@@ -2039,7 +1843,7 @@ OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
 
     for (auto message : errorMessages)
       ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
-                         M->getName(), bystanderName, message, filePath);
+                         module, bystanderName, message, filePath);
     return false;
   }
 
@@ -2051,6 +1855,15 @@ OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
   }
 
   return true;
+}
+
+bool
+OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
+                                    Identifier bystanderName) {
+  return loadOverlayModuleNames(M->getASTContext(),
+                                M->getName().str(),
+                                bystanderName.str(),
+                                diagLoc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2183,31 +1996,29 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   return !imports.isImportedBy(module, getParentModule());
 }
 
-void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void SourceFile::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &import : *Imports) {
     if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
         importedModule == import.module.importedModule) {
       auto importedSpis = import.spiGroups;
-      spiGroups.append(importedSpis.begin(), importedSpis.end());
+      spiGroups.insert(importedSpis.begin(), importedSpis.end());
     }
   }
 }
 
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
-  SmallVector<Identifier, 4> importedSPIGroups;
+  llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
   if (importedSPIGroups.empty()) return false;
 
   auto declSPIGroups = targetDecl->getSPIGroups();
 
-  // Note: If we reach a point where there are many SPI imports or SPI groups
-  // on decls we could optimize this further by using a set.
-  for (auto importedSPI : importedSPIGroups)
-    for (auto declSPI : declSPIGroups)
-      if (importedSPI == declSPI)
-        return true;
+  for (auto declSPI : declSPIGroups)
+    if (importedSPIGroups.count(declSPI))
+      return true;
 
   return false;
 }
@@ -2432,59 +2243,49 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       bool KeepParsedTokens, bool BuildSyntaxTree,
-                       ParsingOptions parsingOpts)
+                       ParsingOptions parsingOpts, bool isPrimary)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), Kind(K),
-      SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
+
+  assert(!IsPrimary || M.isMainModule() &&
+         "A primary cannot appear outside the main module");
 
   if (isScriptMode()) {
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);
     assert(!problem && "multiple main files?");
     (void)problem;
   }
-  if (KeepParsedTokens) {
-    AllCorrectedTokens = std::vector<Token>();
-  }
 }
 
-std::vector<Token> &SourceFile::getTokenVector() {
-  assert(shouldCollectToken() && "Disabled");
-  return *AllCorrectedTokens;
+SourceFile::ParsingOptions
+SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
+  ParsingOptions opts;
+  if (langOpts.DisablePoundIfEvaluation)
+    opts |= ParsingFlags::DisablePoundIfEvaluation;
+  if (langOpts.BuildSyntaxTree)
+    opts |= ParsingFlags::BuildSyntaxTree;
+  if (langOpts.CollectParsedToken)
+    opts |= ParsingFlags::CollectParsedTokens;
+  return opts;
 }
 
 ArrayRef<Token> SourceFile::getAllTokens() const {
-  assert(shouldCollectToken() && "Disabled");
-  return *AllCorrectedTokens;
+  assert(shouldCollectTokens() && "Disabled");
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+              .CollectedTokens;
 }
 
-bool SourceFile::shouldCollectToken() const {
-  switch (Kind) {
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-    return (bool)AllCorrectedTokens;
-  case SourceFileKind::SIL:
-    return false;
-  }
-  llvm_unreachable("unhandled kind");
+bool SourceFile::shouldCollectTokens() const {
+  return Kind != SourceFileKind::SIL &&
+         ParsingOpts.contains(ParsingFlags::CollectParsedTokens);
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
-  return canBeParsedInFull() && SyntaxInfo->Enable;
-}
-
-bool SourceFile::canBeParsedInFull() const {
-  switch (Kind) {
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-    return true;
-  case SourceFileKind::SIL:
-    return false;
-  }
-  llvm_unreachable("unhandled kind");
+  return Kind != SourceFileKind::SIL &&
+         ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
 }
 
 bool SourceFile::hasDelayedBodyParsing() const {
@@ -2496,7 +2297,7 @@ bool SourceFile::hasDelayedBodyParsing() const {
     return false;
   if (hasInterfaceHash())
     return false;
-  if (shouldCollectToken())
+  if (shouldCollectTokens())
     return false;
   if (shouldBuildSyntaxTree())
     return false;
@@ -2508,7 +2309,7 @@ ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
-                           {});
+                           {}).TopLevelDecls;
 }
 
 bool FileUnit::walk(ASTWalker &walker) {
@@ -2636,16 +2437,6 @@ TypeRefinementContext *SourceFile::getTypeRefinementContext() {
 
 void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
   TRC = Root;
-}
-
-void SourceFile::createReferencedNameTracker() {
-  assert(!RequestReferencedNames && "This file already has a name tracker.");
-  RequestReferencedNames.emplace(ReferencedNameTracker());
-}
-
-const ReferencedNameTracker *
-SourceFile::getConfiguredReferencedNameTracker() const {
-  return getRequestBasedReferencedNameTracker();
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {

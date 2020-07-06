@@ -524,6 +524,7 @@ class SDKNodeDeclType: public SDKNodeDecl {
   // Check whether the type declaration is pulled from an external module so we
   // can incorporate extensions in the interested module.
   bool IsExternal;
+  bool IsEnumExhaustive;
   bool HasMissingDesignatedInitializers;
   bool InheritsConvenienceInitializers;
 public:
@@ -548,6 +549,11 @@ public:
   StringRef getEnumRawTypeName() const {
     assert(isEnum());
     return EnumRawTypeName;
+  }
+
+  bool isEnumExhaustive() const {
+    assert(isEnum());
+    return IsEnumExhaustive;
   }
 
   bool hasMissingDesignatedInitializers() const {

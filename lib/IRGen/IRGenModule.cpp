@@ -102,9 +102,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
-  CGO.setFramePointer(Opts.DisableFPElim
-                          ? clang::CodeGenOptions::FramePointerKind::All
-                          : clang::CodeGenOptions::FramePointerKind::None);
+
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -652,6 +650,26 @@ namespace RuntimeConstants {
     }
     return RuntimeAvailability::AlwaysAvailable;
   }
+
+  RuntimeAvailability
+  CompareTypeContextDescriptorsAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCompareTypeContextDescriptorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  CompareProtocolConformanceDescriptorsAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCompareProtocolConformanceDescriptorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -986,15 +1004,13 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
-void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
-                                     bool HasFramePointer) {
-  Attrs.addAttribute("frame-pointer", HasFramePointer ? "all" : "none");
+void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
+  Attrs.addAttribute("frame-pointer", "none");
 }
 
-void IRGenModule::setHasFramePointer(llvm::Function *F,
-                                     bool HasFramePointer) {
+void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b;
-  setHasFramePointer(b, HasFramePointer);
+  setHasNoFramePointer(b);
   F->addAttributes(llvm::AttributeList::FunctionIndex, b);
 }
 
@@ -1004,10 +1020,6 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
   // Add the default attributes for the Clang configuration.
   clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
 
-  // Add frame pointer attributes.
-  // FIXME: why are we doing this?
-  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
-  
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;

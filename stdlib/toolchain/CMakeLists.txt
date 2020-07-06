@@ -15,11 +15,7 @@ set(compile_flags
   # C++ code in the runtime and standard library should generally avoid
   # introducing static constructors or destructors.
   "-Wglobal-constructors"
-  "-Wexit-time-destructors"
-
-  # We don't want runtime C++ code to export symbols we didn't explicitly
-  # choose to.
-  "-fvisibility=hidden")
+  "-Wexit-time-destructors")
 
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables

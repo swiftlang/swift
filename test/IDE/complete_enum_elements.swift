@@ -29,7 +29,7 @@
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_QUAL_1 > %t.enum.txt
-// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_CONTEXT < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_EXPR_ERROR_1 > %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
@@ -115,6 +115,17 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: End completions
+
+// FOO_ENUM_DOT_CONTEXT: Begin completions
+// FOO_ENUM_DOT_CONTEXT-NEXT: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
+// FOO_ENUM_DOT_CONTEXT-NEXT: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: Foo1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: alias1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
+// FOO_ENUM_DOT_CONTEXT-NEXT: End completions
 
 // FOO_ENUM_DOT_INVALID: Begin completions
 // FOO_ENUM_DOT_INVALID-NEXT: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self

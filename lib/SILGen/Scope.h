@@ -47,8 +47,23 @@ public:
   Scope(const Scope &other) = delete;
   Scope &operator=(const Scope &other) = delete;
 
-  Scope(Scope &&other) = delete;
-  Scope &operator=(Scope &&other) = delete; // implementable if needed
+  Scope(Scope &&other)
+      : cleanups(other.cleanups), depth(other.depth),
+        savedInnermostScope(other.savedInnermostScope), loc(other.loc) {
+    // Invalidate other.
+    other.depth = CleanupsDepth::invalid();
+  }
+
+  Scope &operator=(Scope &&other) {
+    depth = other.depth;
+    savedInnermostScope = other.savedInnermostScope;
+    loc = other.loc;
+
+    // Invalidate other.
+    other.depth = CleanupsDepth::invalid();
+
+    return *this;
+  }
 
   explicit Scope(SILGenFunction &SGF, SILLocation loc)
       : Scope(SGF.Cleanups, CleanupLocation::get(loc)) {}
@@ -81,6 +96,30 @@ private:
   /// Internal private implementation of popImpl so we can use it in Scope::pop
   /// and in Scope's destructor.
   void popImpl();
+};
+
+/// A scope that must be manually popped by the using code. If not
+/// popped, the destructor asserts.
+class LLVM_LIBRARY_VISIBILITY AssertingManualScope {
+  Scope scope;
+
+public:
+  explicit AssertingManualScope(CleanupManager &cleanups, CleanupLocation loc)
+      : scope(cleanups, loc) {}
+
+  AssertingManualScope(AssertingManualScope &&other)
+      : scope(std::move(other.scope)) {}
+
+  AssertingManualScope &operator=(AssertingManualScope &&other) {
+    scope = std::move(other.scope);
+    return *this;
+  }
+
+  ~AssertingManualScope() {
+    assert(!scope.isValid() && "Unpopped manual scope?!");
+  }
+
+  void pop() && { scope.pop(); }
 };
 
 /// A FullExpr is a RAII object recording that a full-expression has

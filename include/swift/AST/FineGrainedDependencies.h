@@ -1,4 +1,4 @@
-//===----- FineGrainedependencies.h -----------------------------*- C++ -*-===//
+//===----- FineGrainedDependencies.h ----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,6 +19,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLParser.h"
@@ -632,6 +633,11 @@ public:
 
   const DependencyKey &getKey() const { return key; }
 
+  /// Only used when the driver is reading a SourceFileDepGraphNode.
+  void setKey(const DependencyKey &key) {
+    this->key = key;
+  }
+
   const Optional<StringRef> getFingerprint() const {
     if (fingerprint) {
       return StringRef(fingerprint.getValue());
@@ -679,12 +685,12 @@ class SourceFileDepGraphNode : public DepGraphNode {
   size_t sequenceNumber = ~0;
 
   /// Holds the sequence numbers of definitions I depend upon.
-  std::unordered_set<size_t> defsIDependUpon;
+  llvm::SetVector<size_t> defsIDependUpon;
 
   /// True iff a Decl exists for this node.
   /// If a provides and a depends in the existing system both have the same key,
   /// only one SourceFileDepGraphNode is emitted.
-  bool isProvides;
+  bool isProvides = false;
 
   friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode,
                                             SourceFileDepGraph>;
@@ -692,7 +698,7 @@ class SourceFileDepGraphNode : public DepGraphNode {
 public:
   /// When the driver imports a node create an uninitialized instance for
   /// deserializing.
-  SourceFileDepGraphNode() : DepGraphNode(), sequenceNumber(~0) {}
+  SourceFileDepGraphNode() : DepGraphNode() {}
 
   /// Used by the frontend to build nodes.
   SourceFileDepGraphNode(DependencyKey key, Optional<StringRef> fingerprint,
@@ -735,6 +741,9 @@ public:
     return DepGraphNode::humanReadableName(getIsProvides() ? "here"
                                                            : "somewhere else");
   }
+
+  SWIFT_DEBUG_DUMP;
+  void dump(llvm::raw_ostream &os) const;
 
   bool verify() const {
     DepGraphNode::verify();
@@ -794,15 +803,6 @@ public:
   /// Nodes are owned by the graph.
   ~SourceFileDepGraph() {
     forEachNode([&](SourceFileDepGraphNode *n) { delete n; });
-  }
-
-  /// Goes at the start of an emitted YAML file to help tools recognize it.
-  /// May vary in the future according to version, etc.
-  std::string yamlProlog(const bool hadCompilationError) const {
-    return std::string("# Fine-grained v0\n") +
-           (!hadCompilationError ? ""
-                                 : "# Dependencies are unknown because a "
-                                   "compilation error occurred.\n");
   }
 
   SourceFileDepGraphNode *getNode(size_t sequenceNumber) const;
@@ -872,7 +872,6 @@ public:
 
   void emitDotFile(StringRef outputPath, DiagnosticEngine &diags);
 
-private:
   void addNode(SourceFileDepGraphNode *n) {
     n->setSequenceNumber(allNodes.size());
     allNodes.push_back(n);
@@ -1008,51 +1007,5 @@ private:
 
 } // end namespace fine_grained_dependencies
 } // end namespace swift
-
-//==============================================================================
-// MARK: Declarations for YAMLTraits for reading/writing of SourceFileDepGraph
-//==============================================================================
-
-// This introduces a redefinition where ever std::is_same_t<size_t, uint64_t>
-// holds
-#if !(defined(__linux__) || defined(_WIN64))
-LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
-#endif
-LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_grained_dependencies::NodeKind)
-LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_grained_dependencies::DeclAspect)
-LLVM_YAML_DECLARE_MAPPING_TRAITS(
-    swift::fine_grained_dependencies::DependencyKey)
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::fine_grained_dependencies::DepGraphNode)
-
-namespace llvm {
-namespace yaml {
-template <>
-struct MappingContextTraits<
-    swift::fine_grained_dependencies::SourceFileDepGraphNode,
-    swift::fine_grained_dependencies::SourceFileDepGraph> {
-  using SourceFileDepGraphNode =
-      swift::fine_grained_dependencies::SourceFileDepGraphNode;
-  using SourceFileDepGraph =
-      swift::fine_grained_dependencies::SourceFileDepGraph;
-
-  static void mapping(IO &io, SourceFileDepGraphNode &node,
-                      SourceFileDepGraph &g);
-};
-
-template <>
-struct SequenceTraits<
-    std::vector<swift::fine_grained_dependencies::SourceFileDepGraphNode *>> {
-  using SourceFileDepGraphNode =
-      swift::fine_grained_dependencies::SourceFileDepGraphNode;
-  using NodeVec = std::vector<SourceFileDepGraphNode *>;
-  static size_t size(IO &, NodeVec &vec);
-  static SourceFileDepGraphNode &element(IO &, NodeVec &vec, size_t index);
-};
-
-} // namespace yaml
-} // namespace llvm
-
-LLVM_YAML_DECLARE_MAPPING_TRAITS(
-    swift::fine_grained_dependencies::SourceFileDepGraph)
 
 #endif // SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H

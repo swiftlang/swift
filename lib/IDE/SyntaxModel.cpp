@@ -538,8 +538,8 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
   // Avoid passing the individual syntax tokens corresponding to single-line
   // object literal expressions, as they will be reported as a single token.
   return Node.Kind == SyntaxStructureKind::ObjectLiteralExpression &&
-    SM.getLineNumber(Node.Range.getStart()) ==
-    SM.getLineNumber(Node.Range.getEnd());
+         SM.getLineAndColumnInBuffer(Node.Range.getStart()).first ==
+             SM.getLineAndColumnInBuffer(Node.Range.getEnd()).first;
 }
 
 std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
@@ -1199,7 +1199,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                              ExcludeNodeAtLocation).shouldContinue)
       return false;
     if (auto *CA = dyn_cast<CustomAttr>(D)) {
-      if (auto *Repr = CA->getTypeLoc().getTypeRepr()) {
+      if (auto *Repr = CA->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
       }
@@ -1416,7 +1416,7 @@ bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,
                                        const ASTNodeType& ASTNode) {
   SubStructureStack.emplace_back(Node, ASTNode);
   if (shouldTreatAsSingleToken(Node, SM))
-    AvoidPassingSyntaxToken ++;
+    ++AvoidPassingSyntaxToken;
 
   if (!passTokenNodesUntil(Node.Range.getStart(),
                            ExcludeNodeAtLocation).shouldContinue)
@@ -1552,12 +1552,12 @@ static CharSourceRange sanitizeUnpairedParenthesis(CharSourceRange Range) {
   unsigned TrimLen = 0;
   for (char C : Text) {
     if (C == '(') {
-      Pairs ++;
+      ++Pairs;
     } else if (C == ')') {
       if (Pairs == 0)
-        TrimLen ++;
+        ++TrimLen;
       else
-        Pairs --;
+        --Pairs;
     } else {
       TrimLen = 0;
     }

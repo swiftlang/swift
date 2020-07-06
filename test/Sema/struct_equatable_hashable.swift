@@ -114,7 +114,8 @@ struct StructWithoutExplicitConformance {
 }
 
 func structWithoutExplicitConformance() {
-  if StructWithoutExplicitConformance(a: 1, b: "b") == StructWithoutExplicitConformance(a: 2, b: "a") { } // expected-error{{binary operator '==' cannot be applied to two 'StructWithoutExplicitConformance' operands}}
+  // This diagnostic is about `Equatable` because it's considered the best possible solution among other ones for operator `==`.
+  if StructWithoutExplicitConformance(a: 1, b: "b") == StructWithoutExplicitConformance(a: 2, b: "a") { } // expected-error{{referencing operator function '==' on 'Equatable' requires that 'StructWithoutExplicitConformance' conform to 'Equatable'}}
 }
 
 // Structs with non-hashable/equatable stored properties don't derive conformance.

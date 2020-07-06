@@ -109,12 +109,12 @@ ImportCache::getImportSet(ASTContext &ctx,
 
   if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos)) {
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().ImportSetFoldHit++;
+      ++ctx.Stats->getFrontendCounters().ImportSetFoldHit;
     return *result;
   }
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().ImportSetFoldMiss++;
+    ++ctx.Stats->getFrontendCounters().ImportSetFoldMiss;
 
   SmallVector<ModuleDecl::ImportedModule, 4> stack;
   for (auto next : topLevelImports) {
@@ -166,12 +166,12 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
   auto found = ImportSetForDC.find(dc);
   if (found != ImportSetForDC.end()) {
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().ImportSetCacheHit++;
+      ++ctx.Stats->getFrontendCounters().ImportSetCacheHit;
     return *found->second;
   }
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().ImportSetCacheMiss++;
+    ++ctx.Stats->getFrontendCounters().ImportSetCacheMiss;
 
   SmallVector<ModuleDecl::ImportedModule, 4> imports;
 
@@ -179,11 +179,10 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
       ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), mod});
 
   if (file) {
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    importFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
-    file->getImportedModules(imports, importFilter);
+    file->getImportedModules(imports,
+                             {ModuleDecl::ImportFilterKind::Private,
+                              ModuleDecl::ImportFilterKind::ImplementationOnly,
+                              ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
 
   auto &result = getImportSet(ctx, imports);
@@ -213,12 +212,12 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   auto found = VisibilityCache.find(key);
   if (found != VisibilityCache.end()) {
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().ModuleVisibilityCacheHit++;
+      ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheHit;
     return found->second;
   }
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().ModuleVisibilityCacheMiss++;
+    ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheMiss;
 
   SmallVector<ModuleDecl::AccessPathTy, 1> accessPaths;
   for (auto next : getImportSet(dc).getAllImports()) {
@@ -251,12 +250,12 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   auto found = ShadowCache.find(key);
   if (found != ShadowCache.end()) {
     if (ctx.Stats)
-      ctx.Stats->getFrontendCounters().ModuleShadowCacheHit++;
+      ++ctx.Stats->getFrontendCounters().ModuleShadowCacheHit;
     return found->second;
   }
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().ModuleShadowCacheMiss++;
+    ++ctx.Stats->getFrontendCounters().ModuleShadowCacheMiss;
 
   SmallVector<ModuleDecl::ImportedModule, 4> stack;
   llvm::SmallDenseSet<ModuleDecl::ImportedModule, 32> visited;
@@ -265,11 +264,10 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
       ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), currentMod});
 
   if (auto *file = dyn_cast<FileUnit>(dc)) {
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    importFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
-    file->getImportedModules(stack, importFilter);
+    file->getImportedModules(stack,
+                             {ModuleDecl::ImportFilterKind::Private,
+                              ModuleDecl::ImportFilterKind::ImplementationOnly,
+                              ModuleDecl::ImportFilterKind::SPIAccessControl});
   }
 
   SmallVector<ModuleDecl::AccessPathTy, 4> accessPaths;

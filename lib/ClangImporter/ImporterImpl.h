@@ -390,6 +390,11 @@ private:
   /// Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::MangleContext> Mangler;
 
+  /// Clang arguments used to create the Clang invocation.
+  std::vector<std::string> ClangArgs;
+
+  /// Extra clang args specified via "-Xcc"
+  std::vector<std::string> ExtraClangArgs;
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
@@ -920,12 +925,12 @@ public:
 
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
-  ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
+  ClangModuleUnit *getWrapperForModule(const clang::Module *underlying,
+                                       SourceLoc importLoc = SourceLoc());
 
   /// Constructs a Swift module for the given Clang module.
-  ModuleDecl *finishLoadingClangModule(SourceLoc importLoc,
-                                       const clang::Module *clangModule,
-                                       bool preferOverlay);
+  ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
+                                       SourceLoc importLoc);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.

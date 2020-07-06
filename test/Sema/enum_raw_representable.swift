@@ -46,7 +46,8 @@ var doubles: [Double] = serialize([Bar.a, .b, .c])
 var foos: [Foo] = deserialize([1, 2, 3])
 var bars: [Bar] = deserialize([1.2, 3.4, 5.6])
 
-// Infer RawValue from witnesses.
+// We reject enums where the raw type stated in the inheritance clause does not
+// match the types of the witnesses.
 enum Color : Int {
   case red
   case blue
@@ -56,11 +57,13 @@ enum Color : Int {
   }
 
   var rawValue: Double {
+  // expected-error@-1 {{invalid redeclaration of synthesized implementation for protocol requirement 'rawValue'}}
     return 1.0
   }
 }
 
 var colorRaw: Color.RawValue = 7.5
+// expected-error@-1 {{cannot convert value of type 'Double' to specified type 'Color.RawValue' (aka 'Int')}}
 
 // Mismatched case types
 
@@ -97,11 +100,11 @@ func rdar32431736() {
 
   let myE1: E = items1.first
   // expected-error@-1 {{cannot convert value of type 'String?' to specified type 'E'}}
-  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: }} {{29-29=!)}}
+  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: }} {{29-29=!) ?? <#default value#>}}
 
   let myE2: E = items2?.first
   // expected-error@-1 {{cannot convert value of type 'String?' to specified type 'E'}}
-  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: (}} {{30-30=)!)}}
+  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: (}} {{30-30=)!) ?? <#default value#>}}
 }
 
 // rdar://problem/32431165 - improve diagnostic for raw representable argument mismatch
@@ -122,29 +125,43 @@ rdar32431165_1(.baz)
 // expected-error@-1 {{reference to member 'baz' cannot be resolved without a contextual type}}
 
 rdar32431165_1("")
-// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{16-16=E_32431165(rawValue: }} {{18-18=)}}
+// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}}
 rdar32431165_1(42, "")
-// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{20-20=E_32431165(rawValue: }} {{22-22=)}}
+// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{20-20=E_32431165(rawValue: }} {{22-22=) ?? <#default value#>}}
 
 func rdar32431165_2(_: String) {}
 func rdar32431165_2(_: Int) {}
 func rdar32431165_2(_: Int, _: String) {}
 
 rdar32431165_2(E_32431165.bar)
-// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{16-16=}} {{30-30=.rawValue}}
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{30-30=.rawValue}}
 rdar32431165_2(42, E_32431165.bar)
-// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{20-20=}} {{34-34=.rawValue}}
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{34-34=.rawValue}}
 
-E_32431165.bar == "bar"
-// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String}} {{1-1=}} {{15-15=.rawValue}}
+// TODO: In following two examples it's possible to fix a problem by either using `.rawValue` on first argument
+// or constructing raw representable type from second, both ways are valid.
+do {
+  E_32431165.bar == "bar"
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'E_32431165' and 'String'}} expected-note@-1 {{partially matching parameter lists: (String, String)}}
 
-"bar" == E_32431165.bar
-// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String}} {{10-10=}} {{24-24=.rawValue}}
+  "bar" == E_32431165.bar
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'String' and 'E_32431165'}} expected-note@-1 {{partially matching parameter lists: (String, String)}}
+}
+
+func rdar32431165_overloaded() -> Int { 42 }     // expected-note {{'rdar32431165_overloaded()' produces 'Int', not the expected contextual result type 'E_32431165'}}
+func rdar32431165_overloaded() -> String { "A" } // expected-note {{'rdar32431165_overloaded()' produces 'String', not the expected contextual result type 'E_32431165'}}
+
+func test_candidate_diagnostic() {
+  func test_argument(_: E_32431165) {}
+
+  let _: E_32431165 = rdar32431165_overloaded() // expected-error {{no 'rdar32431165_overloaded' candidates produce the expected contextual result type 'E_32431165'}}
+  test_argument(rdar32431165_overloaded()) // expected-error {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{17-17=E_32431165(rawValue: }} {{42-42=) ?? <#default value#>}}
+}
 
 func rdar32432253(_ condition: Bool = false) {
   let choice: E_32431165 = condition ? .foo : .bar
   let _ = choice == "bar"
-  // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{11-11=}} {{17-17=.rawValue}}
+  // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{17-17=.rawValue}}
 }
 
 func sr8150_helper1(_: Int) {}
@@ -161,13 +178,13 @@ func sr8150_helper4(_: Foo) {}
 
 func sr8150(bar: Bar) {
   sr8150_helper1(bar)
-  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{21-21=.rawValue}}
   sr8150_helper2(bar)
-  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{21-21=.rawValue}}
   sr8150_helper3(0.0)
-  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=) ?? <#default value#>}}
   sr8150_helper4(0.0)
-  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=) ?? <#default value#>}}
 }
 
 class SR8150Box {
@@ -177,11 +194,21 @@ class SR8150Box {
 // Bonus problem with mutable values being passed.
 func sr8150_mutable(obj: SR8150Box) {
   sr8150_helper1(obj.bar)
-  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{25-25=.rawValue}}
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{25-25=.rawValue}}
 
   var bar = obj.bar
   sr8150_helper1(bar)
-  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{21-21=.rawValue}}
+
+  func test(_ opt: Bar?) {
+    sr8150_helper1(opt)
+    // expected-error@-1 {{cannot convert value of type 'Bar?' to expected argument type 'Double'}} {{23-23=?.rawValue ?? <#default value#>}}
+    sr8150_helper1(opt ?? Bar.a)
+    // expected-error@-1 {{no exact matches in call to global function 'sr8150_helper1'}}
+    // expected-note@-2  {{candidate expects value of type 'Bar' for parameter #0}} {{20-20=(}} {{32-32=).rawValue}}
+    let _: Double? = opt
+    // expected-error@-1 {{cannot convert value of type 'Bar?' to specified type 'Double?'}} {{25-25=?.rawValue}}
+  }
 }
 
 struct NotEquatable { }

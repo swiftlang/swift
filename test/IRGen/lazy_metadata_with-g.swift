@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -parse-as-library -module-name=test -target x86_64-apple-macosx10.15 -wmo -O -g -emit-ir %s  | %FileCheck %s
+// RUN: %target-swiftc_driver -parse-as-library -module-name=test -target %target-cpu-apple-macosx10.15 -wmo -O -g -emit-ir %s  | %FileCheck %s
 // REQUIRES: OS=macosx
 
 // Check that the compiler does not emit any metadata for unused internal

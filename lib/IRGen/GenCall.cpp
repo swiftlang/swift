@@ -447,7 +447,7 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
 
     // Remove the last component and add it as an overflow type.
     overflowTypes.push_back(components.pop_back_val());
-    numDirectComponents--;
+    --numDirectComponents;
 
     // Add a pointer to the end of components.
     components.push_back(IGM.Int8PtrTy);
@@ -1851,7 +1851,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
       auto fnType = getCallee().getFunctionPointer().getFunctionType();
       assert(fnType->getNumParams() > 0);
       auto resultTy = fnType->getParamType(0)->getPointerElementType();
-      auto temp = IGF.createAlloca(resultTy, Alignment(0), "indirect.result");
+      auto temp = IGF.createAlloca(resultTy, Alignment(), "indirect.result");
       emitToMemory(temp, substResultTI, isOutlined);
       return;
     }

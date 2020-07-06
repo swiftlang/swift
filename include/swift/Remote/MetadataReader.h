@@ -33,6 +33,8 @@
 #include <vector>
 #include <unordered_map>
 
+#include <inttypes.h>
+
 namespace swift {
 namespace remote {
 
@@ -2192,6 +2194,8 @@ private:
         readMangledName(RemoteAddress(extendedContextAddress),
                         MangledNameKind::Type,
                         dem);
+      if (!demangledExtendedContext)
+        return nullptr;
 
       auto demangling = dem.createNode(Node::Kind::Extension);
       demangling->addChild(parentDemangling, dem);
@@ -2623,6 +2627,7 @@ private:
     // WARNING: the following algorithm works on current modern Apple
     // runtimes but is not actually ABI.  But it is pretty reliable.
 
+#if SWIFT_OBJC_INTEROP
     StoredPointer dataPtr;
     if (!Reader->readInteger(RemoteAddress(classAddress +
                                TargetClassMetadata<Runtime>::offsetToData()),
@@ -2665,6 +2670,9 @@ private:
     }
 
     return dataPtr;
+#else
+    return StoredPointer();
+#endif
   }
 
   IsaEncodingKind getIsaEncoding() {

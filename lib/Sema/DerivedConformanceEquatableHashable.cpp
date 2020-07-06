@@ -253,26 +253,26 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // the same case, binding variables for the left- and right-hand associated
   // values.
   for (auto elt : enumDecl->getAllElements()) {
-    elementCount++;
+    ++elementCount;
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
-    auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), DeclNameLoc(),
-                                                 DeclNameRef(), elt,
-                                                 lhsSubpattern);
+    auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
+    auto lhsElemPat =
+        new (C) EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(),
+                                   DeclNameRef(), elt, lhsSubpattern);
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 3> rhsPayloadVars;
     auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
-    auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), DeclNameLoc(),
-                                                 DeclNameRef(), elt,
-                                                 rhsSubpattern);
+    auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
+    auto rhsElemPat =
+        new (C) EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(),
+                                   DeclNameRef(), elt, rhsSubpattern);
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
@@ -305,7 +305,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     // constructing long lists of autoclosure-wrapped conditions connected by
     // &&, which the type checker has more difficulty processing.)
     SmallVector<ASTNode, 6> statementsInCase;
-    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); varIdx++) {
+    for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
                                          /*implicit*/true);
@@ -386,19 +386,17 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    auto aPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
     auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
                                          /*implicit*/ true);
-    auto aPropertyExpr = new (C) DotSyntaxCallExpr(aPropertyRef, SourceLoc(),
-                                                   aParamRef);
+    auto aPropertyExpr = new (C) MemberRefExpr(aParamRef, SourceLoc(),
+                                               propertyDecl, DeclNameLoc(),
+                                               /*implicit*/ true);
 
-    auto bPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
     auto bParamRef = new (C) DeclRefExpr(bParam, DeclNameLoc(),
                                          /*implicit*/ true);
-    auto bPropertyExpr = new (C) DotSyntaxCallExpr(bPropertyRef, SourceLoc(),
-                                                   bParamRef);
+    auto bPropertyExpr = new (C) MemberRefExpr(bParamRef, SourceLoc(),
+                                               propertyDecl, DeclNameLoc(),
+                                               /*implicit*/ true);
 
     auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C,
       aPropertyExpr, bPropertyExpr);
@@ -506,13 +504,13 @@ deriveEquatable_eq(
   if (generatedIdentifier != C.Id_EqualsOperator) {
     auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
     auto equatableTy = equatableProto->getDeclaredType();
-    auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
+    auto equatableTyExpr = TypeExpr::createImplicit(equatableTy, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
     eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
                                                   SourceRange(),
-                                                  equatableTypeLoc,
+                                                  equatableTyExpr,
                                                   equalsDeclName,
                                                   DeclNameLoc()));
   }
@@ -748,12 +746,12 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   //   case A, B(Int), C(String, Int)
   //   @derived func hash(into hasher: inout Hasher) {
   //     switch self {
-  //     case A:
+  //     case .A:
   //       hasher.combine(0)
-  //     case B(let a0):
+  //     case .B(let a0):
   //       hasher.combine(1)
   //       hasher.combine(a0)
-  //     case C(let a0, let a1):
+  //     case .C(let a0, let a1):
   //       hasher.combine(2)
   //       hasher.combine(a0)
   //       hasher.combine(a1)
@@ -783,10 +781,9 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
     auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), DeclNameLoc(),
-                                          DeclNameRef(elt->getBaseIdentifier()),
-                                          elt, payloadPattern);
+    auto pat = new (C) EnumElementPattern(
+        TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
+        DeclNameRef(elt->getBaseIdentifier()), elt, payloadPattern);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -874,12 +871,12 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    auto propertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                           /*implicit*/ true);
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/ true);
-    auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
-                                                      selfRef);
+    auto selfPropertyExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
+                                                  propertyDecl, DeclNameLoc(),
+                                                  /*implicit*/ true);
+
     // Generate: hasher.combine(self.<property>)
     auto combineExpr = createHasherCombineCall(C, hasherParam, selfPropertyExpr);
     statements.emplace_back(ASTNode(combineExpr));

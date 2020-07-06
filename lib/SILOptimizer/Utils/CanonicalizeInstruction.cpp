@@ -315,6 +315,11 @@ splitAggregateLoad(LoadInst *loadInst, CanonicalizeInstruction &pass) {
 // (store (struct_element_addr %base) object)
 //   ->
 // (store %base (struct object))
+//
+// TODO: supporting enums here would be very easy. The main thing is adding
+// support in `createAggFromFirstLevelProjections`.
+// Note: we will not be able to support tuples because we cannot have a
+// single-element tuple.
 static SILBasicBlock::iterator
 broadenSingleElementStores(StoreInst *storeInst,
                            CanonicalizeInstruction &pass) {
@@ -322,29 +327,14 @@ broadenSingleElementStores(StoreInst *storeInst,
   // instructions. This must be valid regardless of whether the pass immediately
   // deletes the instructions or simply records them for later deletion.
   auto nextII = std::next(storeInst->getIterator());
-
-  // Bail if the store's destination is not a struct_element_addr.
-  auto *sea = dyn_cast<StructElementAddrInst>(storeInst->getDest());
-  if (!sea)
-    return nextII;
-
   auto *f = storeInst->getFunction();
 
-  // Continue up the struct_element_addr chain, as long as each struct only has
-  // a single property, creating StoreInsts along the way.
-  SILBuilderWithScope builder(storeInst);
-
-  SILValue result = storeInst->getSrc();
-  SILValue baseAddr = sea->getOperand();
-  SILValue storeAddr;
-  while (true) {
+  ProjectionPath projections(storeInst->getDest()->getType());
+  SILValue op = storeInst->getDest();
+  while (isa<StructElementAddrInst>(op)) {
+    auto *inst = cast<SingleValueInstruction>(op);
+    SILValue baseAddr = inst->getOperand(0);
     SILType baseAddrType = baseAddr->getType();
-
-    // If our aggregate has unreferenced storage then we can never prove if it
-    // actually has a single field.
-    if (baseAddrType.aggregateHasUnreferenceableStorage())
-      break;
-
     auto *decl = baseAddrType.getStructOrBoundGenericStruct();
     assert(
       !decl->isResilient(f->getModule().getSwiftModule(),
@@ -352,31 +342,38 @@ broadenSingleElementStores(StoreInst *storeInst,
         "This code assumes resilient structs can not have fragile fields. If "
         "this assert is hit, this has been changed. Please update this code.");
 
-    // NOTE: If this is ever changed to support enums, we must check for address
-    // only types here. For structs we do not have to check since a single
-    // element struct with a loadable element can never be address only. We
-    // additionally do not have to worry about our input value being address
-    // only since we are storing into it.
-    if (decl->getStoredProperties().size() != 1)
+    // Bail if the store's destination is not a struct_element_addr or if the
+    // store's destination (%base) is not a loadable type. If %base is not a
+    // loadable type, we can't create it as a struct later on.
+    // If our aggregate has unreferenced storage then we can never prove if it
+    // actually has a single field.
+    if (!baseAddrType.isLoadable(*f) ||
+        baseAddrType.aggregateHasUnreferenceableStorage() ||
+        decl->getStoredProperties().size() != 1)
       break;
 
-    // Update the store location now that we know it is safe.
-    storeAddr = baseAddr;
-
-    // Otherwise, create the struct.
-    result = builder.createStruct(storeInst->getLoc(),
-                                  baseAddrType.getObjectType(), result);
-
-    // See if we have another struct_element_addr we can strip off. If we don't
-    // then this as much as we can promote.
-    sea = dyn_cast<StructElementAddrInst>(sea->getOperand());
-    if (!sea)
-      break;
-    baseAddr = sea->getOperand();
+    projections.push_back(Projection(inst));
+    op = baseAddr;
   }
-  // If we failed to create any structs, bail.
-  if (result == storeInst->getSrc())
+
+  // If we couldn't create a projection, bail.
+  if (projections.empty())
     return nextII;
+
+  // Now work our way back up. At this point we know all operations we are going
+  // to do succeed (cast<SingleValueInst>, createAggFromFirstLevelProjections,
+  // etc.) so we can omit null checks. We should not bail at this point (we
+  // could create a double consume, or worse).
+  SILBuilderWithScope builder(storeInst);
+  SILValue result = storeInst->getSrc();
+  SILValue storeAddr = storeInst->getDest();
+  for (Projection proj : llvm::reverse(projections)) {
+    storeAddr = cast<SingleValueInstruction>(storeAddr)->getOperand(0);
+    result = proj.createAggFromFirstLevelProjections(
+                     builder, storeInst->getLoc(),
+                     storeAddr->getType().getObjectType(), {result})
+                 .get();
+  }
 
   // Store the new struct-wrapped value into the final base address.
   builder.createStore(storeInst->getLoc(), result, storeAddr,

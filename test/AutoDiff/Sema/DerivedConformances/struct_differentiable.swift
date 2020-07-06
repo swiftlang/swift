@@ -341,7 +341,6 @@ struct SR_12793: Differentiable {
 }
 
 // Test property wrappers.
-// TF-1190: Test `@noDerivative` warning for property wrapper backing storage properties.
 
 @propertyWrapper
 struct ImmutableWrapper<Value> {
@@ -354,18 +353,32 @@ struct Wrapper<Value> {
   var wrappedValue: Value
 }
 
+@propertyWrapper
+class ClassWrapper<Value> {
+  var wrappedValue: Value
+  init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
+}
+
 struct Generic<T> {}
 extension Generic: Differentiable where T: Differentiable {}
 
 struct WrappedProperties: Differentiable {
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires all stored properties not marked with `@noDerivative` to be mutable; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires 'wrappedValue' in property wrapper 'ImmutableWrapper' to be mutable; add an explicit '@noDerivative' attribute}}
   @ImmutableWrapper var immutableInt: Generic<Int>
 
   // expected-warning @+1 {{stored property 'mutableInt' has no derivative because 'Generic<Int>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
   @Wrapper var mutableInt: Generic<Int>
 
   @Wrapper var float: Generic<Float>
+  @ClassWrapper var float2: Generic<Float>
+  // SR-13071: Test `@differentiable` wrapped property.
+  @differentiable @Wrapper var float3: Generic<Float>
+
   @noDerivative @ImmutableWrapper var nondiff: Generic<Int>
+
+  static func testTangentMemberwiseInitializer() {
+    _ = TangentVector(float: .init(), float2: .init(), float3: .init())
+  }
 }
 
 // Verify that cross-file derived conformances are disallowed.

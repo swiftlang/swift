@@ -105,7 +105,7 @@ def run_command(args, dry_run):
     try:
         out, err = proc.communicate()
         exitcode = proc.returncode
-        return (exitcode, out, err)
+        return (exitcode, out.decode('utf-8'), err.decode('utf-8'))
     except KeyboardInterrupt:
         proc.terminate()
         raise
@@ -416,6 +416,10 @@ def main():
     non_stdlib_module_files = (
         x for x in module_files if x.name != STDLIB_NAME)
     status = process_module_files(pool, non_stdlib_module_files)
+    if os.name == 'nt':
+        import ctypes
+        Kernel32 = ctypes.cdll.LoadLibrary("Kernel32.dll")
+        Kernel32.ExitProcess(ctypes.c_ulong(status))
     sys.exit(status)
 
 

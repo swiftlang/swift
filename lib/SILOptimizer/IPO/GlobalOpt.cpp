@@ -270,7 +270,7 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
     // an addressor, we set count to 2 to disable optimizing the initializer.
     InitializerCount[Callee] = 2;
   else
-    InitializerCount[Callee]++;
+    ++InitializerCount[Callee];
 }
 
 static bool isPotentialStore(SILInstruction *inst) {

@@ -215,7 +215,7 @@ void InlineTree::buildTree(Function *F) {
 
       LLVM_DEBUG(dbgs() << I << '\n');
 
-      totalNumberOfInstructions++;
+      ++totalNumberOfInstructions;
       SmallVector<DILocation *, 8> InlineChain;
 
       // Scan the chain of inlined scopes.
@@ -239,15 +239,15 @@ void InlineTree::buildTree(Function *F) {
           Nd = rootNode;
           LLVM_DEBUG(dbgs() << ", root\n");
         }
-        Nd->numTotalInsts++;
+        ++Nd->numTotalInsts;
         PrevDL = DL;
       }
 
       if (!Nd) {
         Nd = rootNode;
-        Nd->numTotalInsts++;
+        ++Nd->numTotalInsts;
       }
-      Nd->numSelfInsts++;
+      ++Nd->numSelfInsts;
     }
   }
 }
@@ -319,7 +319,7 @@ void InlineTree::print(raw_ostream &os) {
                               S.instanceOverhead;
         S.selfInstOverhead = Nd->numSelfInsts - Nd->numSelfInsts /
                              S.instanceOverhead;
-        S.instanceOverhead--;
+        --S.instanceOverhead;
       }
     } else {
       S.totalInstOverhead += Nd->numTotalInsts;

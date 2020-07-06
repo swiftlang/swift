@@ -70,7 +70,12 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
     (void)isNewValue;
-    assert(isNewValue && "symbol appears twice");
+#ifndef NDEBUG
+    if (!isNewValue) {
+      llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
+      assert(false && "TBDGen symbol appears twice");
+    }
+#endif
   }
 }
 
@@ -623,7 +628,7 @@ void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
   for (auto *param : *PL) {
     if (param->isDefaultArgument())
       addSymbol(SILDeclRef::getDefaultArgGenerator(VD, index));
-    index++;
+    ++index;
   }
 }
 
@@ -637,7 +642,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
 
   // Add the global function pointer for a dynamically replaceable function.
-  if (AFD->isNativeDynamic()) {
+  if (AFD->shouldUseNativeMethodReplacement()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
@@ -682,7 +687,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
   if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
     assert(opaqueResult->getNamingDecl() == FD);
-    if (FD->isNativeDynamic()) {
+    if (FD->shouldUseNativeDynamicDispatch()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
@@ -731,7 +736,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   for (const auto *differentiableAttr :
        ASD->getAttrs().getAttributes<DifferentiableAttr>())
     addDerivativeConfiguration(
-        ASD->getAccessor(AccessorKind::Get),
+        ASD->getOpaqueAccessor(AccessorKind::Get),
         AutoDiffConfig(differentiableAttr->getParameterIndices(),
                        IndexSubset::get(ASD->getASTContext(), 1, {0}),
                        differentiableAttr->getDerivativeGenericSignature()));

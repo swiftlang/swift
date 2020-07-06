@@ -724,13 +724,6 @@ struct AppliedBuilderTransform {
 
   /// The return expression, capturing the last value to be emitted.
   Expr *returnExpr = nullptr;
-
-  using PatternEntry = std::pair<const PatternBindingDecl *, unsigned>;
-
-  /// Mapping from specific pattern binding entries to the solution application
-  /// targets capturing their initialization.
-  llvm::DenseMap<PatternEntry, SolutionApplicationTarget>
-      patternBindingEntries;
 };
 
 /// Describes the fixed score of a solution to the constraint system.
@@ -855,8 +848,113 @@ struct ForEachStmtInfo {
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
 /// solution application targets.
-using SolutionApplicationTargetsKey =
-    PointerUnion<const StmtConditionElement *, const Stmt *>;
+class SolutionApplicationTargetsKey {
+public:
+  enum class Kind {
+    empty,
+    tombstone,
+    stmtCondElement,
+    stmt,
+    patternBindingEntry,
+  };
+
+private:
+  Kind kind;
+
+  union {
+    const StmtConditionElement *stmtCondElement;
+
+    const Stmt *stmt;
+
+    struct PatternBindingEntry {
+      const PatternBindingDecl *patternBinding;
+      unsigned index;
+    } patternBindingEntry;
+  } storage;
+
+public:
+  SolutionApplicationTargetsKey(Kind kind) {
+    assert(kind == Kind::empty || kind == Kind::tombstone);
+    this->kind = kind;
+  }
+
+  SolutionApplicationTargetsKey(const StmtConditionElement *stmtCondElement) {
+    kind = Kind::stmtCondElement;
+    storage.stmtCondElement = stmtCondElement;
+  }
+
+  SolutionApplicationTargetsKey(const Stmt *stmt) {
+    kind = Kind::stmt;
+    storage.stmt = stmt;
+  }
+
+  SolutionApplicationTargetsKey(
+      const PatternBindingDecl *patternBinding, unsigned index) {
+    kind = Kind::stmt;
+    storage.patternBindingEntry.patternBinding = patternBinding;
+    storage.patternBindingEntry.index = index;
+  }
+
+  friend bool operator==(
+      SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
+    if (lhs.kind != rhs.kind)
+      return false;
+
+    switch (lhs.kind) {
+    case Kind::empty:
+    case Kind::tombstone:
+      return true;
+
+    case Kind::stmtCondElement:
+      return lhs.storage.stmtCondElement == rhs.storage.stmtCondElement;
+
+    case Kind::stmt:
+      return lhs.storage.stmt == rhs.storage.stmt;
+
+    case Kind::patternBindingEntry:
+      return (lhs.storage.patternBindingEntry.patternBinding
+                == rhs.storage.patternBindingEntry.patternBinding) &&
+          (lhs.storage.patternBindingEntry.index
+             == rhs.storage.patternBindingEntry.index);
+    }
+    llvm_unreachable("invalid SolutionApplicationTargetsKey kind");
+  }
+
+  friend bool operator!=(
+      SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
+    return !(lhs == rhs);
+  }
+
+  unsigned getHashValue() const {
+    using llvm::hash_combine;
+    using llvm::DenseMapInfo;
+
+    switch (kind) {
+    case Kind::empty:
+    case Kind::tombstone:
+      return llvm::DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind));
+
+    case Kind::stmtCondElement:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.stmtCondElement));
+
+    case Kind::stmt:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.stmt));
+
+    case Kind::patternBindingEntry:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(
+              storage.patternBindingEntry.patternBinding),
+          DenseMapInfo<unsigned>::getHashValue(
+              storage.patternBindingEntry.index));
+    }
+    llvm_unreachable("invalid statement kind");
+  }
+};
 
 /// A complete solution to a constraint system.
 ///
@@ -920,7 +1018,7 @@ public:
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
   /// The node -> type mappings introduced by this solution.
-  llvm::MapVector<ASTNode, Type> nodeTypes;
+  llvm::DenseMap<ASTNode, Type> nodeTypes;
 
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
@@ -1042,6 +1140,15 @@ public:
   /// for an argument conversion, returns \c None.
   Optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *) const;
+
+  /// Retrieve the builder transform that was applied to this function, if any.
+  const AppliedBuilderTransform *getAppliedBuilderTransform(
+     AnyFunctionRef fn) const {
+    auto known = functionBuilderTransformed.find(fn);
+    return known != functionBuilderTransformed.end()
+        ? &known->second
+        : nullptr;
+  }
 
   SWIFT_DEBUG_DUMP;
 
@@ -1229,13 +1336,16 @@ struct DynamicCallableMethods {
 /// Describes the target to which a constraint system's solution can be
 /// applied.
 class SolutionApplicationTarget {
+public:
   enum class Kind {
     expression,
     function,
     stmtCondition,
     caseLabelItem,
+    patternBinding,
   } kind;
 
+private:
   union {
     struct {
       /// The expression being type-checked.
@@ -1297,6 +1407,8 @@ class SolutionApplicationTarget {
       CaseLabelItem *caseLabelItem;
       DeclContext *dc;
     } caseLabelItem;
+
+    PatternBindingDecl *patternBinding;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1337,6 +1449,11 @@ public:
     this->caseLabelItem.dc = dc;
   }
 
+  SolutionApplicationTarget(PatternBindingDecl *patternBinding) {
+    kind = Kind::patternBinding;
+    this->patternBinding = patternBinding;
+  }
+
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
@@ -1362,6 +1479,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -1380,6 +1498,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.dc;
+
+    case Kind::patternBinding:
+      return patternBinding->getDeclContext();
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -1531,6 +1652,7 @@ public:
     case Kind::expression:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return None;
 
     case Kind::function:
@@ -1544,6 +1666,7 @@ public:
     case Kind::expression:
     case Kind::function:
     case Kind::caseLabelItem:
+    case Kind::patternBinding:
       return None;
 
     case Kind::stmtCondition:
@@ -1557,12 +1680,26 @@ public:
     case Kind::expression:
     case Kind::function:
     case Kind::stmtCondition:
+    case Kind::patternBinding:
       return None;
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem;
     }
     llvm_unreachable("invalid case label type");
+  }
+
+  PatternBindingDecl *getAsPatternBinding() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+      return nullptr;
+
+    case Kind::patternBinding:
+      return patternBinding;
+    }
   }
 
   BraceStmt *getFunctionBody() const {
@@ -1590,6 +1727,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem->getSourceRange();
+
+    case Kind::patternBinding:
+      return patternBinding->getSourceRange();
     }
     llvm_unreachable("invalid target type");
   }
@@ -1608,6 +1748,9 @@ public:
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem->getStartLoc();
+
+    case Kind::patternBinding:
+      return patternBinding->getLoc();
     }
     llvm_unreachable("invalid target type");
   }
@@ -1616,11 +1759,28 @@ public:
   SolutionApplicationTarget walk(ASTWalker &walker);
 };
 
+/// A function that rewrites a solution application target in the context
+/// of solution application.
+using RewriteTargetFn = std::function<
+    Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>;
+
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,
   Diagnostics,
   Finalization
+};
+
+/// Describes the result of applying a solution to a given function.
+enum class SolutionApplicationToFunctionResult {
+  /// Application of the solution succeeded.
+  Success,
+  /// Application of the solution failed.
+  /// TODO: This should probably go away entirely.
+  Failure,
+  /// The solution could not be applied immediately, and type checking for
+  /// this function should be delayed until later.
+  Delay,
 };
 
 /// Describes a system of constraints on type variables, the
@@ -1789,20 +1949,13 @@ private:
 
   /// The list of all generic requirements fixed along the current
   /// solver path.
-  using FixedRequirement = std::tuple<TypeBase *, RequirementKind, TypeBase *>;
-  SmallVector<FixedRequirement, 4> FixedRequirements;
+  using FixedRequirement =
+      std::tuple<GenericTypeParamType *, unsigned, TypeBase *>;
+  llvm::SmallSetVector<FixedRequirement, 4> FixedRequirements;
 
-  bool hasFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
-    auto reqInfo = std::make_tuple(lhs.getPointer(), kind, rhs.getPointer());
-    return llvm::any_of(
-        FixedRequirements,
-        [&reqInfo](const FixedRequirement &entry) { return entry == reqInfo; });
-  }
-
-  void recordFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
-    FixedRequirements.push_back(
-        std::make_tuple(lhs.getPointer(), kind, rhs.getPointer()));
-  }
+  bool isFixedRequirement(ConstraintLocator *reqLocator, Type requirementTy);
+  void recordFixedRequirement(ConstraintLocator *reqLocator,
+                              Type requirementTy);
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
@@ -2480,15 +2633,11 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(TypeLoc &L, Type T) { setType(ASTNode(&L), T); }
-
   void setType(KeyPathExpr *KP, unsigned I, Type T) {
     assert(KP && "Expected non-null key path parameter!");
     assert(T && "Expected non-null type!");
     KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
   }
-
-  bool hasType(TypeLoc &L) const { return hasType(ASTNode(&L)); }
 
   /// Check to see if we have a type for a node.
   bool hasType(ASTNode node) const {
@@ -2511,8 +2660,6 @@ public:
     //           "Mismatched types!");
     return NodeTypes.find(node)->second;
   }
-
-  Type getType(TypeLoc &L) const { return getType(ASTNode(&L)); }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
     assert(hasType(KP, I) && "Expected type to have been set!");
@@ -2584,7 +2731,6 @@ public:
 
   void setSolutionApplicationTarget(
       SolutionApplicationTargetsKey key, SolutionApplicationTarget target) {
-    assert(key && "Expected non-null solution application target key!");
     assert(solutionApplicationTargets.count(key) == 0 &&
            "Already set this solution application target");
     solutionApplicationTargets.insert({key, target});
@@ -3080,62 +3226,18 @@ public:
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// storage wrapper if the decl has an associated storage wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getStorageWrapperInformation(SelectedOverload resolvedOverload) {
-    if (resolvedOverload.choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-        if (decl->hasAttachedPropertyWrapper()) {
-          if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
-            Type type = storageWrapper->getInterfaceType();
-            if (Type baseType = resolvedOverload.choice.getBaseType()) {
-              type = baseType->getTypeOfMember(DC->getParentModule(),
-                                               storageWrapper, type);
-            }
-            return std::make_pair(decl, type);
-          }
-        }
-      }
-    }
-    return None;
-  }
+  getStorageWrapperInformation(SelectedOverload resolvedOverload);
 
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getPropertyWrapperInformation(SelectedOverload resolvedOverload) {
-    if (resolvedOverload.choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-        if (decl->hasAttachedPropertyWrapper()) {
-          auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
-          if (Type baseType = resolvedOverload.choice.getBaseType()) {
-            wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
-                                                  decl, wrapperTy);
-          }
-          return std::make_pair(decl, wrapperTy);
-        }
-      }
-    }
-    return None;
-  }
+  getPropertyWrapperInformation(SelectedOverload resolvedOverload);
 
   /// Gets the VarDecl, and the type of the type property that it wraps if
   /// resolved overload has a decl which is the backing storage for a
   /// property wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getWrappedPropertyInformation(SelectedOverload resolvedOverload) {
-    if (resolvedOverload.choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
-        if (auto wrapped = decl->getOriginalWrappedProperty()) {
-          Type type = wrapped->getInterfaceType();
-          if (Type baseType = resolvedOverload.choice.getBaseType()) {
-            type = baseType->getTypeOfMember(DC->getParentModule(),
-                                             wrapped, type);
-          }
-          return std::make_pair(decl, type);
-        }
-      }
-    }
-    return None;
-  }
+  getWrappedPropertyInformation(SelectedOverload resolvedOverload);
 
   /// Merge the equivalence sets of the two type variables.
   ///
@@ -3246,9 +3348,6 @@ public:
   /// element type of the set.
   static Optional<Type> isSetType(Type t);
 
-  /// Determine if the type in question is one of the known collection types.
-  static bool isCollectionType(Type t);
-
   /// Determine if the type in question is AnyHashable.
   static bool isAnyHashableType(Type t);
 
@@ -3296,16 +3395,13 @@ public:
   /// Add implicit "load" expressions to the given expression.
   Expr *addImplicitLoadExpr(Expr *expr);
 
-  /// "Open" the given unbound type by introducing fresh type
-  /// variables for generic parameters and constructing a bound generic
-  /// type from these type variables.
-  ///
-  /// \param unbound The type to open.
+  /// "Open" the unbound generic type represented by the given declaration and
+  /// parent type by introducing fresh type variables for generic parameters
+  /// and constructing a bound generic type from these type variables.
   ///
   /// \returns The opened type.
-  Type openUnboundGenericType(UnboundGenericType *unbound,
-                              ConstraintLocatorBuilder locator,
-                              OpenedTypeMap &replacements);
+  Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
+                              ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of unbound
   /// generic types with bound generic types with fresh type variables as
@@ -3314,7 +3410,7 @@ public:
   /// \param type The type to open.
   ///
   /// \returns The opened type.
-  Type openUnboundGenericType(Type type, ConstraintLocatorBuilder locator);
+  Type openUnboundGenericTypes(Type type, ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -3441,6 +3537,19 @@ public:
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
                           OpenedTypeMap *replacements = nullptr);
+
+  /// Retrieve a list of conformances established along the current solver path.
+  ArrayRef<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
+  getCheckedConformances() const {
+    return CheckedConformances;
+  }
+
+  /// Retrieve a list of generic parameter types solver has "opened" (replaced
+  /// with a type variable) along the current path.
+  ArrayRef<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>>
+  getOpenedTypes() const {
+    return OpenedTypes;
+  }
 
 private:
   /// Adjust the constraint system to accomodate the given selected overload, and
@@ -3576,15 +3685,19 @@ public:
   bool generateConstraints(SolutionApplicationTarget &target,
                            FreeTypeVariableBinding allowFreeTypeVariables);
 
-  /// Generate constraints for the body of the given single-statement closure.
+  /// Generate constraints for the body of the given closure.
   ///
-  /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(ClosureExpr *closure);
+  /// \param closure the closure expression
+  /// \param resultType the closure's result type
+  ///
+  /// \returns \c true if constraint generation failed, \c false otherwise
+  bool generateConstraints(ClosureExpr *closure, Type resultType);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E, DeclContext *dc);
+  Expr *generateConstraints(Expr *E, DeclContext *dc,
+                            bool isInputExpression = true);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.
@@ -4620,6 +4733,30 @@ public:
                                  = FreeTypeVariableBinding::Disallow,
                                  bool allowFixes = false);
 
+  /// Construct and solve a system of constraints based on the given expression
+  /// and its contextual information.
+  ///
+  /// This method is designed to be used for code completion which means that
+  /// it doesn't mutate given expression, even if there is a single valid
+  /// solution, and constraint solver is allowed to produce partially correct
+  /// solutions. Such solutions can have any number of holes in them.
+  ///
+  /// \param expr The expression involved in code completion.
+  ///
+  /// \param DC The declaration context this expression is found in.
+  ///
+  /// \param contextualType The type \p expr is being converted to.
+  ///
+  /// \param CTP When contextualType is specified, this indicates what
+  /// the conversion is doing.
+  ///
+  /// \param callback The callback to be used to provide results to
+  /// code completion.
+  static void
+  solveForCodeCompletion(Expr *expr, DeclContext *DC, Type contextualType,
+                         ContextualTypePurpose CTP,
+                         llvm::function_ref<void(const Solution &)> callback);
+
 private:
   /// Solve the system of constraints.
   ///
@@ -4676,6 +4813,23 @@ public:
   /// Apply the given solution to the given statement-condition.
   Optional<StmtCondition> applySolution(
       Solution &solution, StmtCondition condition, DeclContext *dc);
+
+  /// Apply the given solution to the given function's body and, for
+  /// closure expressions, the expression itself.
+  ///
+  /// \param solution The solution to apply.
+  /// \param fn The function to which the solution is being applied.
+  /// \param currentDC The declaration context in which transformations
+  /// will be applied.
+  /// \param rewriteTarget Function that performs a rewrite of any
+  /// solution application target within the context.
+  ///
+  SolutionApplicationToFunctionResult applySolution(
+      Solution &solution, AnyFunctionRef fn,
+      DeclContext *&currentDC,
+      std::function<
+        Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+          rewriteTarget);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
@@ -5013,6 +5167,10 @@ bool isArgumentOfReferenceEqualityOperator(ConstraintLocator *locator);
 /// Determine whether given expression is a reference to a
 /// pattern-matching operator `~=`
 bool isPatternMatchingOperator(Expr *expr);
+
+/// Determine whether given expression is a reference to a
+/// "standard" comparison operator such as "==", "!=", ">" etc.
+bool isStandardComparisonOperator(Expr *expr);
 
 /// If given expression references operator overlaod(s)
 /// extract and produce name of the operator.
@@ -5440,6 +5598,39 @@ BraceStmt *applyFunctionBuilderTransform(
           constraints::SolutionApplicationTarget)>
             rewriteTarget);
 
+/// Determine whether the given closure expression should be type-checked
+/// within the context of its enclosing expression. Otherwise, it will be
+/// separately type-checked once its enclosing expression has determined all
+/// of the parameter and result types without looking at the body.
+bool shouldTypeCheckInEnclosingExpression(ClosureExpr *expr);
+
+/// Visit each subexpression that will be part of the constraint system
+/// of the given expression, including those in closure bodies that will be
+/// part of the constraint system.
+void forEachExprInConstraintSystem(
+    Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
+
 } // end namespace swift
+
+namespace llvm {
+template<>
+struct DenseMapInfo<swift::constraints::SolutionApplicationTargetsKey> {
+  using Key = swift::constraints::SolutionApplicationTargetsKey;
+
+  static inline Key getEmptyKey() {
+    return Key(Key::Kind::empty);
+  }
+  static inline Key getTombstoneKey() {
+    return Key(Key::Kind::tombstone);
+  }
+  static inline unsigned getHashValue(Key key) {
+    return key.getHashValue();
+  }
+  static bool isEqual(Key a, Key b) {
+    return a == b;
+  }
+};
+
+}
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H

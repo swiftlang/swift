@@ -68,7 +68,7 @@ static unsigned getElementCountRec(TypeExpansionContext context,
   if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
     unsigned NumElements = 0;
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++)
+    for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i)
       NumElements +=
           getElementCountRec(context, Module, T.getTupleElementType(i), false);
     return NumElements;
@@ -162,7 +162,7 @@ static SILType getElementTypeRec(TypeExpansionContext context,
   // If this is a tuple type, walk into it.
   if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+    for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
       auto FieldType = T.getTupleElementType(i);
       unsigned NumFieldElements =
           getElementCountRec(context, Module, FieldType, false);
@@ -230,7 +230,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
 
       // Figure out which field we're walking into.
       unsigned FieldNo = 0;
-      for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+      for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
         auto EltTy = PointeeType.getTupleElementType(i);
         unsigned NumSubElt = getElementCountRec(
             TypeExpansionContext(B.getFunction()), Module, EltTy, false);
@@ -320,7 +320,7 @@ static void getPathStringToElementRec(TypeExpansionContext context,
   }
 
   unsigned FieldNo = 0;
-  for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+  for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
     auto Field = TT->getElement(i);
     SILType FieldTy = T.getTupleElementType(i);
     unsigned NumFieldElements = getElementCountRec(context, Module, FieldTy, false);
@@ -1128,7 +1128,7 @@ void ElementUseCollector::collectClassSelfUses() {
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
           if (Arg->getParent() == TheMemory.getParentBlock()) {
-            StoresOfArgumentToSelf++;
+            ++StoresOfArgumentToSelf;
             continue;
           }
         }
@@ -1633,7 +1633,7 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
           if (Arg->getParent() == uninitMemory->getParent()) {
-            StoresOfArgumentToSelf++;
+            ++StoresOfArgumentToSelf;
             continue;
           }
         }

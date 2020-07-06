@@ -108,9 +108,9 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), DeclNameLoc(),
-                                          DeclNameRef(), elt, nullptr);
+    auto pat = new (C)
+        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
+                           DeclNameLoc(), DeclNameRef(), elt, nullptr);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -198,7 +198,7 @@ struct RuntimeVersionCheck {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
     auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
                             Platform, SourceLoc(),
-                            Version, SourceLoc()
+                            Version, Version, SourceLoc()
                         );
 
     // otherSpec = "*"
@@ -332,9 +332,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // Create a statement which assigns the case to self.
 
     // valueExpr = "\(enumType).\(elt)"
-    auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
-    auto valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    auto valueExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(),
+                                           elt, DeclNameLoc(), /*implicit*/true);
     
     // assignment = "self = \(valueExpr)"
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -354,7 +354,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                      CaseLabelItem(litPat), SourceLoc(),
                                      SourceLoc(), body,
                                      /*case body var decls*/ None));
-    Idx++;
+    ++Idx;
   }
 
   auto anyPat = AnyPattern::createImplicit(C);

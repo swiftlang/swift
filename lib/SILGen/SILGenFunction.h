@@ -324,7 +324,7 @@ public:
   std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
-  std::vector<SILDebugScope*> DebugScopeStack;
+  std::vector<const SILDebugScope *> DebugScopeStack;
 
   /// The cleanup depth and BB for when the operand of a
   /// BindOptionalExpr is a missing value.
@@ -571,12 +571,15 @@ public:
   StringRef getMagicFilePathString(SourceLoc loc);
   StringRef getMagicFunctionString();
 
-  /// Push a new debug scope and set its parent pointer.
+  /// Enter the debug scope for \p Loc, creating it if necessary.
   void enterDebugScope(SILLocation Loc) {
     auto *Parent =
         DebugScopeStack.size() ? DebugScopeStack.back() : F.getDebugScope();
-    auto *DS = new (SGM.M)
-        SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
+    auto *DS = Parent;
+    // Don't nest a scope for Loc under Parent unless it's actually different.
+    if (Parent->getLoc().getAsRegularLocation() != Loc.getAsRegularLocation())
+      DS = DS = new (SGM.M)
+          SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
     DebugScopeStack.push_back(DS);
     B.setCurrentDebugScope(DS);
   }
@@ -1187,6 +1190,8 @@ public:
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
+  ManagedValue emitUninitializedArrayFinalization(SILLocation loc,
+                                                  ManagedValue array);
 
   /// Emit a cleanup for an owned value that should be written back at end of
   /// scope if the value is not forwarded.

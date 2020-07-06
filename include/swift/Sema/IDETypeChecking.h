@@ -19,7 +19,6 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
-#include "llvm/ADT/MapVector.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
@@ -133,9 +132,9 @@ namespace swift {
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
-  /// Partially typecheck the specified function body.
-  bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                          SourceLoc EndTypeCheckLoc);
+  /// Type check a function body element which is at \p TagetLoc .
+  bool typeCheckAbstractFunctionBodyAtLoc(AbstractFunctionDecl *AFD,
+                                          SourceLoc TargetLoc);
 
   /// Typecheck top-level code parsed during code completion.
   ///

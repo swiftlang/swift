@@ -336,6 +336,7 @@ func f1(x: String, y: Whichever) {
     case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
         break
     case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+    // expected-note@-1 {{overloads for '~=' exist with these partially matching parameter lists: (Substring, String)}}
         break
     default:
       break

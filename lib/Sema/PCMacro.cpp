@@ -497,7 +497,7 @@ public:
   buildPatternAndVariable(Expr *InitExpr) {
     SmallString<16> NameBuf;
     (Twine("pctmp") + Twine(TmpNameIndex)).toVector(NameBuf);
-    TmpNameIndex++;
+    ++TmpNameIndex;
 
     Expr *MaybeLoadInitExpr = nullptr;
 
@@ -547,10 +547,11 @@ public:
     }
 
     std::pair<unsigned, unsigned> StartLC =
-        Context.SourceMgr.getLineAndColumn(SR.Start);
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(SR.Start);
 
-    std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
-        Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
+    std::pair<unsigned, unsigned> EndLC =
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(
+            Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
     Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
     Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
@@ -617,10 +618,11 @@ public:
     }
 
     std::pair<unsigned, unsigned> StartLC =
-        Context.SourceMgr.getLineAndColumn(SR.Start);
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(SR.Start);
 
-    std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
-        Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
+    std::pair<unsigned, unsigned> EndLC =
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(
+            Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
     Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
     Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);

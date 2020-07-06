@@ -27,7 +27,6 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Casting.h"
@@ -811,7 +810,7 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
                           *applySite.getInstruction())
              << "Devirtualized call to class method " << NV("Method", f);
     });
-  NumClassDevirt++;
+  ++NumClassDevirt;
 
   return {newAI, changedCFG};
 }
@@ -1046,7 +1045,7 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
                           *applySite.getInstruction())
              << "Devirtualized call to " << NV("Method", f);
     });
-  NumWitnessDevirt++;
+  ++NumWitnessDevirt;
   return {newApplySite, changedCFG};
 }
 

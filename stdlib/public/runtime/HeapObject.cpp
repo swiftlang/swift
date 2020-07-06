@@ -243,7 +243,7 @@ public:
 
 } // end anonymous namespace
 
-static SimpleGlobalCache<BoxCacheEntry> Boxes;
+static SimpleGlobalCache<BoxCacheEntry, BoxesTag> Boxes;
 
 BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
                                     size_t alignMask) {
@@ -886,6 +886,23 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
 }
 
 #ifndef NDEBUG
+
+/// Returns true if the "immutable" flag is set on \p object.
+///
+/// Used for runtime consistency checking of COW buffers.
+SWIFT_RUNTIME_EXPORT
+bool _swift_isImmutableCOWBuffer(HeapObject *object) {
+  return object->refCounts.isImmutableCOWBuffer();
+}
+
+/// Sets the "immutable" flag on \p object to \p immutable and returns the old
+/// value of the flag.
+///
+/// Used for runtime consistency checking of COW buffers.
+SWIFT_RUNTIME_EXPORT
+bool _swift_setImmutableCOWBuffer(HeapObject *object, bool immutable) {
+  return object->refCounts.setIsImmutableCOWBuffer(immutable);
+}
 
 void HeapObject::dump() const {
   auto *Self = const_cast<HeapObject *>(this);

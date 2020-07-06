@@ -131,7 +131,7 @@ static bool hasOpaqueArchetypeOperand(TypeExpansionContext context,
 static bool hasOpaqueArchetypeResult(TypeExpansionContext context,
                                      SILInstruction &inst) {
   // Check the results for opaque types.
-  for (const auto &res : inst.getResults())
+  for (SILValue res : inst.getResults())
     if (opaqueArchetypeWouldChange(context, res->getType().getASTType()))
       return true;
   return false;
@@ -161,6 +161,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::GlobalValueInst:
+  case SILInstructionKind::BaseAddrForOffsetInst:
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::StringLiteralInst:
@@ -427,7 +428,7 @@ class SerializeSILPass : public SILModuleTransform {
     }
 
     for (auto &VT : M.getVTables()) {
-      VT.setSerialized(IsNotSerialized);
+      VT->setSerialized(IsNotSerialized);
     }
   }
 

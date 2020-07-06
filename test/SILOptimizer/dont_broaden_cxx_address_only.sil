@@ -1,0 +1,44 @@
+// RUN: %target-sil-opt -silgen-cleanup %s -I %S/Inputs -enable-sil-verify-all -enable-cxx-interop | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+import CXXTypesWithUserProvidedDestructor
+
+// Make sure we don't try to create a struct here. HasUserProvidedDestructor is not loadable, even
+// though it's only property is.
+// CHECK-LABEL: @test_foo
+// CHECK: bb0
+// CHECK-NEXT: [[E:%.*]] = struct_element_addr
+// CHECK-NEXT: store %1 to [trivial] [[E]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end sil function 'test_foo'
+sil shared [transparent] [serializable] [ossa] @test_foo : $@convention(method) (Int32, @thin HasUserProvidedDestructor.Type) -> @out HasUserProvidedDestructor {
+bb0(%0 : $*HasUserProvidedDestructor, %1 : $Int32, %2 : $@thin HasUserProvidedDestructor.Type):
+  %3 = struct_element_addr %0 : $*HasUserProvidedDestructor, #HasUserProvidedDestructor.x
+  store %1 to [trivial] %3 : $*Int32
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we create a struct for the first (loadable) type but not the second
+// type (HasMemberWithUserProvidedDestructor).
+// CHECK-LABEL: @test_bar
+// CHECK: bb0
+// CHECK-NEXT: [[E:%.*]] = struct_element_addr
+// CHECK-NEXT: [[AGG:%.*]] = struct $Loadable (%1 : $Int32)
+// CHECK-NEXT: store [[AGG]] to [trivial] [[E]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end sil function 'test_bar'
+sil shared [transparent] [serializable] [ossa] @test_bar : $@convention(method) (Int32, @thin HasMemberWithUserProvidedDestructor.Type) -> @out HasMemberWithUserProvidedDestructor {
+bb0(%0 : $*HasMemberWithUserProvidedDestructor, %1 : $Int32, %2 : $@thin HasMemberWithUserProvidedDestructor.Type):
+  %3 = struct_element_addr %0 : $*HasMemberWithUserProvidedDestructor, #HasMemberWithUserProvidedDestructor.y
+  %3a = struct_element_addr %3 : $*Loadable, #Loadable.x
+  store %1 to [trivial] %3a : $*Int32
+  %5 = tuple ()
+  return %5 : $()
+}

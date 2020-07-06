@@ -23,7 +23,7 @@ function(_swift_gyb_target_sources target scope)
 
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
-        $<TARGET_FILE:Python2::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
+        $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
       COMMAND
         ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
@@ -75,25 +75,10 @@ function(_set_target_prefix_and_suffix target kind sdk)
   endif()
 endfunction()
 
-function(is_darwin_based_sdk sdk_name out_var)
-  if ("${sdk_name}" STREQUAL "OSX" OR
-      "${sdk_name}" STREQUAL "IOS" OR
-      "${sdk_name}" STREQUAL "IOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "TVOS" OR
-      "${sdk_name}" STREQUAL "TVOS_SIMULATOR" OR
-      "${sdk_name}" STREQUAL "WATCHOS" OR
-      "${sdk_name}" STREQUAL "WATCHOS_SIMULATOR")
-    set(${out_var} TRUE PARENT_SCOPE)
-  else()
-    set(${out_var} FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
 # Usage:
 # _add_host_variant_c_compile_link_flags(name)
 function(_add_host_variant_c_compile_link_flags name)
-  is_darwin_based_sdk("${SWIFT_HOST_VARIANT_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
   endif()
 
@@ -103,11 +88,12 @@ function(_add_host_variant_c_compile_link_flags name)
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     target_compile_options(${name} PRIVATE -target;${target})
+    target_link_options(${name} PRIVATE -target;${target})
   endif()
 
   set(_sysroot
     "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
-  if(IS_DARWIN)
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     target_compile_options(${name} PRIVATE -isysroot;${_sysroot})
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
     target_compile_options(${name} PRIVATE --sysroot=${_sysroot})
@@ -116,13 +102,13 @@ function(_add_host_variant_c_compile_link_flags name)
   if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
     # lld can handle targeting the android build.  However, if lld is not
     # enabled, then fallback to the linker included in the android NDK.
-    if(NOT SWIFT_ENABLE_LLD_LINKER)
+    if(NOT SWIFT_USE_LINKER STREQUAL "lld")
       swift_android_tools_path(${SWIFT_HOST_VARIANT_ARCH} tools_path)
       target_compile_options(${name} PRIVATE -B${tools_path})
     endif()
   endif()
 
-  if(IS_DARWIN)
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
@@ -135,6 +121,7 @@ function(_add_host_variant_c_compile_link_flags name)
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
   if (_lto_flag_out)
     target_compile_options(${name} PRIVATE ${_lto_flag_out})
+    target_link_options(${name} PRIVATE ${_lto_flag_out})
   endif()
 endfunction()
 
@@ -368,18 +355,9 @@ function(_add_host_variant_link_flags target)
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
-    find_program(LDLLD_PATH "ld.lld")
-    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
-       (SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS AND NOT CMAKE_SYSTEM_NAME STREQUAL WINDOWS))
-      target_link_options(${target} PRIVATE -fuse-ld=lld)
-    elseif(SWIFT_ENABLE_GOLD_LINKER AND
-           "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-      if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-        target_link_options(${target} PRIVATE -fuse-ld=gold.exe)
-      else()
-        target_link_options(${target} PRIVATE -fuse-ld=gold)
-      endif()
+    if(SWIFT_USE_LINKER)
+      target_link_options(${target} PRIVATE
+        -fuse-ld=${SWIFT_USE_LINKER}$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>)
     endif()
   endif()
 
@@ -475,20 +453,16 @@ function(add_swift_host_library name)
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    set_target_properties(${name}
-      PROPERTIES
+    set_target_properties(${name} PROPERTIES
       INSTALL_NAME_DIR "@rpath")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
-    set_target_properties(${name}
-      PROPERTIES
+    set_target_properties(${name} PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL CYGWIN)
-    set_target_properties(${name}
-      PROPERTIES
+    set_target_properties(${name} PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
-    set_target_properties(${name}
-      PROPERTIES
+    set_target_properties(${name} PROPERTIES
       INSTALL_RPATH "$ORIGIN")
   endif()
 
@@ -498,6 +472,7 @@ function(add_swift_host_library name)
 
   _add_host_variant_c_compile_flags(${name})
   _add_host_variant_link_flags(${name})
+  _add_host_variant_c_compile_link_flags(${name})
   _set_target_prefix_and_suffix(${name} "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
   # Set compilation and link flags.
@@ -526,7 +501,6 @@ function(add_swift_host_library name)
     endif()
 
     set_target_properties(${name} PROPERTIES
-      CXX_STANDARD 14
       NO_SONAME YES)
   endif()
 
@@ -554,15 +528,6 @@ function(add_swift_host_library name)
     if(SWIFT_COMPILER_VERSION)
       target_link_options(${name} PRIVATE
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
-    endif()
-
-    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    # MSVC, clang-cl, gcc don't understand -target.
-    if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-      get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-        MACCATALYST_BUILD_FLAVOR ""
-        DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-      target_link_options(${name} PRIVATE -target;${target})
     endif()
   endif()
 
@@ -608,6 +573,7 @@ function(add_swift_host_tool executable)
   add_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
   _add_host_variant_c_compile_flags(${executable})
   _add_host_variant_link_flags(${executable})
+  _add_host_variant_c_compile_link_flags(${executable})
   target_link_directories(${executable} PRIVATE
     ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
   add_dependencies(${executable} ${LLVM_COMMON_DEPENDS})

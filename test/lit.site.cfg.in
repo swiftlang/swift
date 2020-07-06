@@ -14,6 +14,7 @@ import os
 import platform
 import sys
 
+config.cmake = "@CMAKE_COMMAND@"
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
@@ -116,10 +117,10 @@ if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
 if "@SWIFT_HAVE_LIBXML2@" == "TRUE":
     config.available_features.add('libxml2')
 
-if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
+if "@SWIFT_USE_LINKER@" == "lld":
     config.android_linker_name = "lld"
 else:
-    # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
+    # even if SWIFT_USE_LINKER isn't set, we cannot use BFD for Android
     config.android_linker_name = "gold"
 
 if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':

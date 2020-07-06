@@ -375,6 +375,12 @@ public:
     /// The instruction may read memory.
     MayRead,
     /// The instruction may write to memory.
+    /// This includes destroying or taking from memory (e.g. destroy_addr,
+    /// copy_addr [take], load [take]).
+    /// Although, physically, destroying or taking does not modify the memory,
+    /// it is important to model it is a write. Optimizations must not assume
+    /// that the value stored in memory is still available for loading after
+    /// the memory is destroyed or taken.
     MayWrite,
     /// The instruction may read or write memory.
     MayReadWrite,
@@ -3207,6 +3213,20 @@ public:
       : InstructionBase(DebugLoc, Ty, nullptr) {}
 };
 
+/// Creates a base address for offset calculations.
+class BaseAddrForOffsetInst
+    : public InstructionBase<SILInstructionKind::BaseAddrForOffsetInst,
+                             LiteralInst> {
+  friend SILBuilder;
+
+  BaseAddrForOffsetInst(SILDebugLocation DebugLoc, SILType Ty)
+      : InstructionBase(DebugLoc, Ty) {}
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+};
+
 /// Gives the value of a global variable.
 ///
 /// The referenced global variable must be a statically initialized object.
@@ -5752,6 +5772,13 @@ public:
     return s;
   }
 
+  static bool classof(const SILNode *node) {
+    SILNodeKind kind = node->getKind();
+    return kind == SILNodeKind::StructExtractInst ||
+           kind == SILNodeKind::StructElementAddrInst ||
+           kind == SILNodeKind::RefElementAddrInst;
+  }
+
 private:
   unsigned cacheFieldIndex();
 };
@@ -8165,17 +8192,21 @@ private:
   friend SILBuilder;
   /// Differentiability parameter indices.
   IndexSubset *ParameterIndices;
+  /// Differentiability result indices.
+  IndexSubset *ResultIndices;
   /// Indicates whether derivative function operands (JVP/VJP) exist.
   bool HasDerivativeFunctions;
 
   DifferentiableFunctionInst(SILDebugLocation DebugLoc,
                              IndexSubset *ParameterIndices,
+                             IndexSubset *ResultIndices,
                              SILValue OriginalFunction,
                              ArrayRef<SILValue> DerivativeFunctions,
                              bool HasOwnership);
 
   static SILType getDifferentiableFunctionType(SILValue OriginalFunction,
-                                               IndexSubset *ParameterIndices);
+                                               IndexSubset *ParameterIndices,
+                                               IndexSubset *ResultIndices);
 
   static ValueOwnershipKind
   getMergedOwnershipKind(SILValue OriginalFunction,
@@ -8184,7 +8215,7 @@ private:
 public:
   static DifferentiableFunctionInst *
   create(SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
-         SILValue OriginalFunction,
+         IndexSubset *ResultIndices, SILValue OriginalFunction,
          Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
          bool HasOwnership);
 
@@ -8193,6 +8224,9 @@ public:
 
   /// Returns differentiability parameter indices.
   IndexSubset *getParameterIndices() const { return ParameterIndices; }
+
+  /// Returns differentiability result indices.
+  IndexSubset *getResultIndices() const { return ResultIndices; }
 
   /// Returns true if derivative functions (JVP/VJP) exist.
   bool hasDerivativeFunctions() const { return HasDerivativeFunctions; }

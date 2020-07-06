@@ -20,6 +20,7 @@
 
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
 #include "swift/Strings.h"
@@ -28,6 +29,7 @@
 
 namespace swift {
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 enum class ImplMetatypeRepresentation {
   Thin,
@@ -94,22 +96,13 @@ enum class ImplParameterDifferentiability {
   NotDifferentiable
 };
 
-static inline llvm::Optional<ImplParameterDifferentiability>
-getDifferentiabilityFromString(StringRef string) {
-  if (string.empty())
-    return ImplParameterDifferentiability::DifferentiableOrNotApplicable;
-  if (string == "@noDerivative")
-    return ImplParameterDifferentiability::NotDifferentiable;
-  return None;
-}
-
 /// Describe a lowered function parameter, parameterized on the type
 /// representation.
 template <typename BuiltType>
 class ImplFunctionParam {
+  BuiltType Type;
   ImplParameterConvention Convention;
   ImplParameterDifferentiability Differentiability;
-  BuiltType Type;
 
 public:
   using ConventionType = ImplParameterConvention;
@@ -137,9 +130,18 @@ public:
     return None;
   }
 
-  ImplFunctionParam(ImplParameterConvention convention,
-                    ImplParameterDifferentiability diffKind, BuiltType type)
-      : Convention(convention), Differentiability(diffKind), Type(type) {}
+  static llvm::Optional<DifferentiabilityType>
+  getDifferentiabilityFromString(StringRef string) {
+    if (string.empty())
+      return DifferentiabilityType::DifferentiableOrNotApplicable;
+    if (string == "@noDerivative")
+      return DifferentiabilityType::NotDifferentiable;
+    return None;
+  }
+
+  ImplFunctionParam(BuiltType type, ImplParameterConvention convention,
+                    ImplParameterDifferentiability diffKind)
+      : Type(type), Convention(convention), Differentiability(diffKind) {}
 
   ImplParameterConvention getConvention() const { return Convention; }
 
@@ -158,15 +160,22 @@ enum class ImplResultConvention {
   Autoreleased,
 };
 
+enum class ImplResultDifferentiability {
+  DifferentiableOrNotApplicable,
+  NotDifferentiable
+};
+
 /// Describe a lowered function result, parameterized on the type
 /// representation.
 template <typename BuiltType>
 class ImplFunctionResult {
-  ImplResultConvention Convention;
   BuiltType Type;
+  ImplResultConvention Convention;
+  ImplResultDifferentiability Differentiability;
 
 public:
   using ConventionType = ImplResultConvention;
+  using DifferentiabilityType = ImplResultDifferentiability;
 
   static llvm::Optional<ConventionType>
   getConventionFromString(StringRef conventionString) {
@@ -184,10 +193,26 @@ public:
     return None;
   }
 
-  ImplFunctionResult(ImplResultConvention convention, BuiltType type)
-      : Convention(convention), Type(type) {}
+  static llvm::Optional<DifferentiabilityType>
+  getDifferentiabilityFromString(StringRef string) {
+    if (string.empty())
+      return DifferentiabilityType::DifferentiableOrNotApplicable;
+    if (string == "@noDerivative")
+      return DifferentiabilityType::NotDifferentiable;
+    return None;
+  }
+
+  ImplFunctionResult(
+      BuiltType type, ImplResultConvention convention,
+      ImplResultDifferentiability diffKind =
+          ImplResultDifferentiability::DifferentiableOrNotApplicable)
+      : Type(type), Convention(convention), Differentiability(diffKind) {}
 
   ImplResultConvention getConvention() const { return Convention; }
+
+  ImplResultDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
 
   BuiltType getType() const { return Type; }
 };
@@ -361,7 +386,7 @@ class TypeDecoder {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      SmallVector<BuiltType, 8> args;
+      llvm::SmallVector<BuiltType, 8> args;
 
       const auto &genericArgs = Node->getChild(1);
       if (genericArgs->getKind() != NodeKind::TypeList)
@@ -474,7 +499,7 @@ class TypeDecoder {
         return BuiltType();
 
       // Find the protocol list.
-      SmallVector<BuiltProtocolDecl, 8> Protocols;
+      llvm::SmallVector<BuiltProtocolDecl, 8> Protocols;
       auto TypeList = Node->getChild(0);
       if (TypeList->getKind() == NodeKind::ProtocolList &&
           TypeList->getNumChildren() >= 1) {
@@ -576,7 +601,7 @@ class TypeDecoder {
         return BuiltType();
 
       bool hasParamFlags = false;
-      SmallVector<FunctionParam<BuiltType>, 8> parameters;
+      llvm::SmallVector<FunctionParam<BuiltType>, 8> parameters;
       if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
                                           parameters, hasParamFlags))
         return BuiltType();
@@ -598,9 +623,9 @@ class TypeDecoder {
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;
-      SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
-      SmallVector<ImplFunctionResult<BuiltType>, 8> results;
-      SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
+      llvm::SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
+      llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> results;
+      llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
       ImplFunctionTypeFlags flags;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {
@@ -640,7 +665,7 @@ class TypeDecoder {
           if (decodeImplFunctionParam(child, parameters))
             return BuiltType();
         } else if (child->getKind() == NodeKind::ImplResult) {
-          if (decodeImplFunctionPart(child, results))
+          if (decodeImplFunctionParam(child, results))
             return BuiltType();
         } else if (child->getKind() == NodeKind::ImplErrorResult) {
           if (decodeImplFunctionPart(child, errorResults))
@@ -684,7 +709,7 @@ class TypeDecoder {
       return decodeMangledType(Node->getChild(0));
 
     case NodeKind::Tuple: {
-      SmallVector<BuiltType, 8> elements;
+      llvm::SmallVector<BuiltType, 8> elements;
       std::string labels;
       bool variadic = false;
       for (auto &element : *Node) {
@@ -693,19 +718,16 @@ class TypeDecoder {
 
         // If the tuple element is labeled, add its label to 'labels'.
         unsigned typeChildIndex = 0;
-        unsigned nameIdx = 0;
-        if (element->getChild(nameIdx)->getKind() == NodeKind::VariadicMarker) {
-          variadic = true;
-          nameIdx = 1;
-          typeChildIndex = 1;
+        if (element->getChild(typeChildIndex)->getKind() == NodeKind::VariadicMarker) {
+          return BuiltType();
         }
-        if (element->getChild(nameIdx)->getKind() == NodeKind::TupleElementName) {
+        if (element->getChild(typeChildIndex)->getKind() == NodeKind::TupleElementName) {
           // Add spaces to terminate all the previous labels if this
           // is the first we've seen.
           if (labels.empty()) labels.append(elements.size(), ' ');
 
           // Add the label and its terminator.
-          labels += element->getChild(0)->getText();
+          labels += element->getChild(typeChildIndex)->getText();
           labels += ' ';
           typeChildIndex++;
 
@@ -913,13 +935,13 @@ private:
     if (!type)
       return true;
 
-    results.emplace_back(*convention, type);
+    results.emplace_back(type, *convention);
     return false;
   }
 
-  bool decodeImplFunctionParam(
-      Demangle::NodePointer node,
-      llvm::SmallVectorImpl<ImplFunctionParam<BuiltType>> &results) {
+  template <typename T>
+  bool decodeImplFunctionParam(Demangle::NodePointer node,
+                               llvm::SmallVectorImpl<T> &results) {
     // Children: `convention, differentiability?, type`
     if (node->getNumChildren() != 2 && node->getNumChildren() != 3)
       return true;
@@ -931,28 +953,26 @@ private:
       return true;
 
     StringRef conventionString = conventionNode->getText();
-    auto convention =
-        ImplFunctionParam<BuiltType>::getConventionFromString(conventionString);
+    auto convention = T::getConventionFromString(conventionString);
     if (!convention)
       return true;
     BuiltType type = decodeMangledType(typeNode);
     if (!type)
       return true;
 
-    auto diffKind =
-        ImplParameterDifferentiability::DifferentiableOrNotApplicable;
+    auto diffKind = T::DifferentiabilityType::DifferentiableOrNotApplicable;
     if (node->getNumChildren() == 3) {
       auto diffKindNode = node->getChild(1);
       if (diffKindNode->getKind() != Node::Kind::ImplDifferentiability)
         return true;
       auto optDiffKind =
-          getDifferentiabilityFromString(diffKindNode->getText());
+          T::getDifferentiabilityFromString(diffKindNode->getText());
       if (!optDiffKind)
         return true;
       diffKind = *optDiffKind;
     }
 
-    results.emplace_back(*convention, diffKind, type);
+    results.emplace_back(type, *convention, diffKind);
     return false;
   }
 
@@ -1134,6 +1154,7 @@ decodeMangledType(BuilderType &Builder,
 }
 
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift
 

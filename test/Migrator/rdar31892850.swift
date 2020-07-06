@@ -21,6 +21,6 @@ func foo() {
 // CHECK:  {
 // CHECK:    "file": "{{.*}}rdar31892850.swift",
 // CHECK:    "offset": 329,
-// CHECK:    "text": ")"
+// CHECK:    "text": ") ?? <#default value#>"
 // CHECK:  }
 // CHECK:]

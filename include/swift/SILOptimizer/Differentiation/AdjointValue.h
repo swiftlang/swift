@@ -136,13 +136,12 @@ public:
   void print(llvm::raw_ostream &s) const {
     switch (getKind()) {
     case AdjointValueKind::Zero:
-      s << "Zero";
+      s << "Zero[" << getType() << ']';
       break;
     case AdjointValueKind::Aggregate:
-      s << "Aggregate<";
+      s << "Aggregate[" << getType() << "](";
       if (auto *decl =
               getType().getASTType()->getStructOrBoundGenericStruct()) {
-        s << "Struct>(";
         interleave(
             llvm::zip(decl->getStoredProperties(), base->value.aggregate),
             [&s](std::tuple<VarDecl *, const AdjointValue &> elt) {
@@ -151,7 +150,6 @@ public:
             },
             [&s] { s << ", "; });
       } else if (getType().is<TupleType>()) {
-        s << "Tuple>(";
         interleave(
             base->value.aggregate,
             [&s](const AdjointValue &elt) { elt.print(s); },
@@ -162,10 +160,11 @@ public:
       s << ')';
       break;
     case AdjointValueKind::Concrete:
-      s << "Concrete(" << base->value.concrete << ')';
+      s << "Concrete[" << getType() << "](" << base->value.concrete << ')';
       break;
     }
   }
+
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); };
 };
 

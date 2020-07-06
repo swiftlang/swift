@@ -1,0 +1,5 @@
+// RUN: %llvm-nm --defined-only -C %target-static-stdlib-path/libswiftCore.a | %FileCheck --allow-empty %s
+// CHECK-NOT: [^:]llvm::
+
+// REQUIRES: OS=linux-gnu
+// REQUIRES: static_stdlib

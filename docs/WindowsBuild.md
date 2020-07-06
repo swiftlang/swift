@@ -1,27 +1,38 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build swift on Windows.
+Visual Studio 2017 or newer is needed to build Swift on Windows. The free Community edition is sufficient to build Swift.
 
-The following must take place in the **developer command prompt** (provided by Visual Studio). This shows up as "x64 Native Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu.
+The commands below (with the exception of installing Visual Studio) must be entered in the "**x64 Native** Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu. This sets environment variables to select the correct target platform.
 
 ## Install dependencies
 
-- Install the latest version of [Visual Studio](https://www.visualstudio.com/downloads/)
-- Make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The following components are required:
+### Visual Studio
 
-1. Microsoft.VisualStudio.Component.Windows10SDK
-2. Microsoft.VisualStudio.Component.Windows10SDK.17763
-3. Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+An easy way to get most of the tools to build Swift is using the [Visual Studio installer](https://www.visualstudio.com/downloads/). This command installs all needed Visual Studio components as well as Python and Git:
+
+```
+vs_community ^
+  --add Component.CPython2.x86 ^
+  --add Component.CPython3.x64 ^
+  --add Microsoft.VisualStudio.Component.Git ^
+  --add Microsoft.VisualStudio.Component.VC.ATL ^
+  --add Microsoft.VisualStudio.Component.VC.CMake.Project ^
+  --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
+  --add Microsoft.VisualStudio.Component.Windows10SDK ^
+  --add Microsoft.VisualStudio.Component.Windows10SDK.17763
+```
+
+If you prefer you can install everything by hand, but make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The components listed above are required.
 
 The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.
 
 ### Python
 
-In the Visual Studio installation program, under *Individual Components*
+The command above already installs Python 2 and 3. Alternatively, in the Visual Studio installation program, under *Individual Components*
 
 1. Install *Python 2*, either the 32-bit version (C:\Python27\\) or the 64-bit version (C:\Python27amd64\\)
 
-> If you install the 64-bit version only, you will need to adjust `PYTHON_EXECUTABLE` below to `C:\Python27amd64\python.exe`
+   **Note:** If you install the 64-bit version only, you will need to adjust `PYTHON_EXECUTABLE` below to `C:\Python27amd64\python.exe`
 
 2. Install *Python 3 64 bits (3.7.x)*
 
@@ -53,9 +64,9 @@ subst S: <path to sources>
 
 ```cmd
 S:
-git clone https://github.com/apple/llvm-project --branch swift/master toolchain
-git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift toolchain/swift
-git clone https://github.com/apple/swift-cmark toolchain/cmark
+git clone https://github.com/apple/llvm-project --branch swift/master llvm-project
+git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift swift
+git clone https://github.com/apple/swift-cmark cmark
 git clone https://github.com/apple/swift-corelibs-libdispatch swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
@@ -67,19 +78,20 @@ git clone https://github.com/compnerd/swift-build swift-build
 
 ## Acquire ICU, SQLite3, curl, libxml2 and zlib
 
-Go to [compnerd's swift-build azure page](https://dev.azure.com/compnerd/swift-build/_build) and open [Pipelines](https://dev.azure.com/compnerd/swift-build/_build) where you'll see bots (hopefully green) for:
+```
+C:\Python27\python.exe -m pip install --user msrest azure-devops tabulate
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id ICU --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id XML2 --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id CURL --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id zlib --latest-artifacts --filter windows-x64 --download
+C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id SQLite --latest-artifacts --filter windows-x64 --download
+```
 
-- [ICU](https://dev.azure.com/compnerd/swift-build/_build?definitionId=9)
-- [SQLite](https://dev.azure.com/compnerd/swift-build/_build?definitionId=12&_a=summary)
-- [curl](https://dev.azure.com/compnerd/swift-build/_build?definitionId=11&_a=summary)
-- [libxml2](https://dev.azure.com/compnerd/swift-build/_build?definitionId=10&_a=summary)
-- [zlib](https://dev.azure.com/compnerd/swift-build/_build?definitionId=16&_a=summary)
-
-Download each of the zip files and copy their contents into S:/Library. The directory structure should resemble:
+Extract the zip files, ignoring the top level directory, into `S:/Library`. The directory structure should resemble:
 
 ```
 /Library
-  ┝ icu-64
+  ┝ icu-67
   │   ┕ usr/...
   ├ libcurl-development
   │   ┕ usr/...
@@ -102,10 +114,10 @@ Set up the `ucrt`, `visualc`, and `WinSDK` modules by:
 - and setup the `visualc.apinotes` located at `swift/stdlib/public/Platform/visualc.apinotes` into `${VCToolsInstallDir}/include` as `visualc.apinotes`
 
 ```cmd
-mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\toolchain\swift\stdlib\public\Platform\ucrt.modulemap
-mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\toolchain\swift\stdlib\public\Platform\winsdk.modulemap
-mklink "%VCToolsInstallDir%\include\module.modulemap" S:\toolchain\swift\stdlib\public\Platform\visualc.modulemap
-mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\toolchain\swift\stdlib\public\Platform\visualc.apinotes
+mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\swift\stdlib\public\Platform\ucrt.modulemap
+mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\swift\stdlib\public\Platform\winsdk.modulemap
+mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Platform\visualc.modulemap
+mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Platform\visualc.apinotes
 ```
 
 Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
@@ -113,36 +125,40 @@ Warning: Creating the above links usually requires administrator privileges. The
 ## Build the toolchain
 
 ```cmd
-md "S:\b\toolchain"
 cmake -B "S:\b\toolchain" ^
   -C S:\swift-build\cmake\caches\windows-x86_64.cmake ^
   -C S:\swift-build\cmake\caches\org.compnerd.dt.cmake ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D LLVM_ENABLE_ASSERTIONS=YES ^
-  -D LLVM_ENABLE_PROJECTS="clang;clang-tools-extra;cmark;swift;lldb;lld" ^
+  -D LLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lldb;lld" ^
   -D LLVM_EXTERNAL_PROJECTS="cmark;swift" ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
   -D LLVM_ENABLE_PDB=YES ^
   -D LLVM_ENABLE_LIBEDIT=NO ^
   -D LLDB_ENABLE_PYTHON=YES ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib" ^
+  -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR="S:/swift" ^
+  -D LLVM_EXTERNAL_CMARK_SOURCE_DIR="S:/cmark" ^
+  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-67/usr/include" ^
+  -D SWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-67/usr/lib/icuuc67.lib" ^
+  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-67/usr/include" ^
+  -D SWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-67/usr/lib/icuin67.lib" ^
   -D CMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" ^
   -D PYTHON_EXECUTABLE=C:\Python27\python.exe ^
   -D SWIFT_BUILD_DYNAMIC_STDLIB=YES ^
   -D SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES ^
   -G Ninja ^
-  -S S:\toolchain\llvm
+  -S S:\llvm-project\llvm
 
 ninja -C S:\b\toolchain
 ```
 
+**Note:** If you installed only the 64-bit version of Python, you will need to adjust `PYTHON_EXECUTABLE` argument to `C:\Python27amd64\python.exe`
+
+
 ## Running Swift tests on Windows
 
 ```cmd
-path S:\Library\icu-64\usr\bin;S:\b\toolchain\bin;S:\b\toolchain\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\Library\icu-67\usr\bin;S:\b\toolchain\bin;S:\b\toolchain\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\toolchain check-swift
 ```
 
@@ -162,7 +178,7 @@ ninja -C S:\b\libdispatch check
 ## Build swift-corelibs-foundation
 
 ```cmd
-cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-64" -D ICU_INCLUDE_DIR=S:/Library/icu-64/usr/include -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2s.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include/libxml2" -D ENABLE_TESTING=NO -D dispatch_DIR=S:/b/libdispatch/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
+cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-67" -D ICU_INCLUDE_DIR=S:/Library/icu-67/usr/include -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2s.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include/libxml2" -D ENABLE_TESTING=NO -D dispatch_DIR=S:/b/libdispatch/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
 ninja -C S:\b\foundation
 ```
 
@@ -194,7 +210,7 @@ ninja -C S:\b\xctest check-xctest
 ## Rebuild Foundation
 
 ```cmd
-cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-64" -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -D ENABLE_TESTING=YES -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D XCTest_DIR=S:/b/xctest/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
+cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-67" -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -D ENABLE_TESTING=YES -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D XCTest_DIR=S:/b/xctest/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
 ninja -C S:\b\foundation
 ```
 

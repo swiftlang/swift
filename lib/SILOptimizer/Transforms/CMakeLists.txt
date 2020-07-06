@@ -8,6 +8,7 @@ target_sources(swiftSILOptimizer PRIVATE
   ArrayCountPropagation.cpp
   ArrayElementValuePropagation.cpp
   AssumeSingleThreaded.cpp
+  COWOpts.cpp
   CSE.cpp
   ConditionForwarding.cpp
   CopyForwarding.cpp
@@ -23,9 +24,10 @@ target_sources(swiftSILOptimizer PRIVATE
   Outliner.cpp
   ObjectOutliner.cpp
   PerformanceInliner.cpp
+  PhiArgumentOptimizations.cpp
+  PruneVTables.cpp
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
-  RedundantPhiElimination.cpp
   ReleaseDevirtualizer.cpp
   SemanticARCOpts.cpp
   SILCodeMotion.cpp
@@ -36,5 +38,6 @@ target_sources(swiftSILOptimizer PRIVATE
   Sink.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
+  TempLValueOpt.cpp
   TempRValueElimination.cpp
   UnsafeGuaranteedPeephole.cpp)

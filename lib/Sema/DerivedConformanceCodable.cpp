@@ -82,11 +82,8 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
                                                     ProtocolDecl *proto) {
   target = context->mapTypeIntoContext(target);
 
-  if (isIUO) {
-    return typeConformsToCodable(context,
-                                 target->lookThroughSingleOptionalType(),
-                                 false, proto);
-  }
+  if (isIUO)
+    target = target->lookThroughSingleOptionalType();
 
   auto conf = TypeChecker::conformsToProtocol(target, proto, context);
   return conf.isInvalid() ? DoesNotConform : Conforms;
@@ -619,9 +616,9 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
                                           DeclNameLoc(), /*Implicit=*/true);
 
     // CodingKeys.x
-    auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit=*/true);
     auto *metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
-    auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), elt,
+                                          DeclNameLoc(), /*Implicit=*/true);
 
     // encode(_:forKey:)/encodeIfPresent(_:forKey:)
     auto methodName = useIfPresentVariant ? C.Id_encodeIfPresent : C.Id_encode;
@@ -901,9 +898,9 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
                                              SourceLoc(), varType);
 
       // CodingKeys.x
-      auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit=*/true);
       metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
-      auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+      auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(),
+                                            elt, DeclNameLoc(), /*Implicit=*/true);
 
       // decode(_:forKey:)/decodeIfPresent(_:forKey:)
       SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};

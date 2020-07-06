@@ -281,6 +281,17 @@ SourceLoc swift::extractNearestSourceLoc(const DirectLookupDescriptor &desc) {
 // LookupOperatorRequest computation.
 //----------------------------------------------------------------------------//
 
+OperatorLookupDescriptor OperatorLookupDescriptor::forDC(const DeclContext *DC,
+                                                         Identifier name) {
+  auto *moduleDC = DC->getModuleScopeContext();
+  if (auto *file = dyn_cast<FileUnit>(moduleDC)) {
+    return OperatorLookupDescriptor::forFile(file, name);
+  } else {
+    auto *mod = cast<ModuleDecl>(moduleDC->getAsDecl());
+    return OperatorLookupDescriptor::forModule(mod, name);
+  }
+}
+
 ArrayRef<FileUnit *> OperatorLookupDescriptor::getFiles() const {
   if (auto *module = getModule())
     return module->getFiles();
@@ -298,7 +309,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 SourceLoc swift::extractNearestSourceLoc(const OperatorLookupDescriptor &desc) {
-  return desc.diagLoc;
+  return extractNearestSourceLoc(desc.fileOrModule);
 }
 
 void DirectLookupRequest::writeDependencySink(
@@ -306,6 +317,24 @@ void DirectLookupRequest::writeDependencySink(
     TinyPtrVector<ValueDecl *> result) const {
   auto &desc = std::get<0>(getStorage());
   tracker.addUsedMember(desc.DC, desc.Name.getBaseName());
+}
+
+//----------------------------------------------------------------------------//
+// LookupInModuleRequest computation.
+//----------------------------------------------------------------------------//
+
+void LookupInModuleRequest::writeDependencySink(
+    evaluator::DependencyCollector &reqTracker, QualifiedLookupResult l) const {
+  auto *module = std::get<0>(getStorage());
+  auto member = std::get<1>(getStorage());
+  auto *DC = std::get<4>(getStorage());
+
+  // Decline to record lookups outside our module.
+  if (!DC->getParentSourceFile() ||
+      module->getParentModule() != DC->getParentModule()) {
+    return;
+  }
+  reqTracker.addTopLevelName(member.getBaseName());
 }
 
 //----------------------------------------------------------------------------//

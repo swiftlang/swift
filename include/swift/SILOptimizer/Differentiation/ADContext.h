@@ -86,9 +86,6 @@ private:
                        32>
       invokers;
 
-  /// Mapping from `differentiable_function` instructions to result indices.
-  llvm::DenseMap<DifferentiableFunctionInst *, unsigned> resultIndices;
-
   /// Mapping from original `apply` instructions to their corresponding
   /// `NestedApplyInfo`s.
   llvm::DenseMap<ApplyInst *, NestedApplyInfo> nestedApplyInfo;
@@ -174,17 +171,6 @@ public:
     invokers.insert({witness, DifferentiationInvoker(witness)});
   }
 
-  /// Returns the result index for `dfi` if found in this context. Otherwise,
-  /// sets the result index to zero and returns it.
-  unsigned getResultIndex(DifferentiableFunctionInst *dfi) {
-    return resultIndices[dfi];
-  }
-
-  /// Sets the result index for `dfi`.
-  void setResultIndex(DifferentiableFunctionInst *dfi, unsigned index) {
-    resultIndices[dfi] = index;
-  }
-
   llvm::DenseMap<ApplyInst *, NestedApplyInfo> &getNestedApplyInfo() {
     return nestedApplyInfo;
   }
@@ -215,7 +201,7 @@ public:
   /// `CanonicalizeInstruction` may get rid of the need for this workaround.
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
-      SILValue original,
+      IndexSubset *resultIndices, SILValue original,
       Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None);
 
   // Given an `differentiable_function` instruction, finds the corresponding
@@ -267,11 +253,9 @@ ADContext::emitNondifferentiabilityError(SILValue value,
     getADDebugStream() << "For value:\n" << value;
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
-  auto valueLoc = value.getLoc().getSourceLoc();
   // If instruction does not have a valid location, use the function location
   // as a fallback. Improves diagnostics in some cases.
-  if (valueLoc.isInvalid())
-    valueLoc = value->getFunction()->getLocation().getSourceLoc();
+  auto valueLoc = getValidLocation(value).getSourceLoc();
   return emitNondifferentiabilityError(valueLoc, invoker, diag,
                                        std::forward<U>(args)...);
 }
@@ -286,12 +270,10 @@ ADContext::emitNondifferentiabilityError(SILInstruction *inst,
     getADDebugStream() << "For instruction:\n" << *inst;
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
-  auto instLoc = inst->getLoc().getSourceLoc();
   // If instruction does not have a valid location, use the function location
   // as a fallback. Improves diagnostics for `ref_element_addr` generated in
   // synthesized stored property getters.
-  if (instLoc.isInvalid())
-    instLoc = inst->getFunction()->getLocation().getSourceLoc();
+  auto instLoc = getValidLocation(inst).getSourceLoc();
   return emitNondifferentiabilityError(instLoc, invoker, diag,
                                        std::forward<U>(args)...);
 }

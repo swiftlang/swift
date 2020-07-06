@@ -20,12 +20,13 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/TypeLoc.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/Error.h"
@@ -105,6 +106,10 @@ class ModuleFile
   StringRef MiscVersion;
 
 public:
+  static std::unique_ptr<llvm::MemoryBuffer> getModuleName(ASTContext &Ctx,
+                                                           StringRef modulePath,
+                                                           std::string &Name);
+
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:
@@ -705,14 +710,10 @@ public:
   /// This does not include diagnostics about \e this file failing to load,
   /// but rather other things that might be imported as part of bringing the
   /// file into the AST.
-  /// \param treatAsPartialModule If true, processes implementation-only
-  /// information instead of assuming the client won't need it and shouldn't
-  /// see it.
   ///
   /// \returns any error that occurred during association, such as being
   /// compiled for a different OS.
-  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
-                                  bool treatAsPartialModule);
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
 
   /// Transfers ownership of a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to keep them
@@ -816,8 +817,9 @@ public:
 
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
-  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                              SmallVectorImpl<Identifier> &spiGroups) const;
+  void lookupImportedSPIGroups(
+                         const ModuleDecl *importedModule,
+                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
   /// Reports all link-time dependencies.
   void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;

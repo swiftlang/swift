@@ -20,7 +20,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSet.h"
 #include <string>
@@ -30,6 +29,8 @@ namespace swift {
 
 class ClangModuleDependenciesCacheImpl;
 class SourceFile;
+class ASTContext;
+class Identifier;
 
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependenciesKind : int8_t {
@@ -72,6 +73,11 @@ public:
   /// interface.
   const std::vector<std::string> buildCommandLine;
 
+  /// To build a PCM to be used by this Swift module, we need to append these
+  /// arguments to the generic PCM build arguments reported from the dependency
+  /// graph.
+  const std::vector<std::string> extraPCMArgs;
+
   /// The hash value that will be used for the generated module
   const std::string contextHash;
 
@@ -91,10 +97,12 @@ public:
       const std::string &compiledModulePath,
       const Optional<std::string> &swiftInterfaceFile,
       ArrayRef<StringRef> buildCommandLine,
+      ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash
   ) : ModuleDependenciesStorageBase(/*isSwiftModule=*/true, compiledModulePath),
       swiftInterfaceFile(swiftInterfaceFile),
       buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
+      extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()),
       contextHash(contextHash) { }
 
   ModuleDependenciesStorageBase *clone() const override {
@@ -172,13 +180,15 @@ public:
   /// Describe the module dependencies for a Swift module that can be
   /// built from a Swift interface file (\c .swiftinterface).
   static ModuleDependencies forSwiftInterface(
-      const std::string &compiledModulePath,
       const std::string &swiftInterfaceFile,
       ArrayRef<StringRef> buildCommands,
+      ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash) {
+    std::string compiledModulePath;
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, swiftInterfaceFile, buildCommands, contextHash));
+          compiledModulePath, swiftInterfaceFile, buildCommands,
+          extraPCMArgs, contextHash));
   }
 
   /// Describe the module dependencies for a serialized or parsed Swift module.
@@ -186,7 +196,17 @@ public:
       const std::string &compiledModulePath) {
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, None, ArrayRef<StringRef>(), StringRef()));
+          compiledModulePath, None, ArrayRef<StringRef>(),
+          ArrayRef<StringRef>(), StringRef()));
+  }
+
+  /// Describe the main Swift module.
+  static ModuleDependencies forMainSwiftModule(ArrayRef<StringRef> extraPCMArgs) {
+    std::string compiledModulePath;
+    return ModuleDependencies(
+        std::make_unique<SwiftModuleDependenciesStorage>(
+          compiledModulePath, None, ArrayRef<StringRef>(), extraPCMArgs,
+          StringRef()));
   }
 
   /// Describe the module dependencies for a Clang module that can be
@@ -247,6 +267,11 @@ public:
   /// Add (Clang) module on which the bridging header depends.
   void addBridgingModuleDependency(StringRef module,
                                    llvm::StringSet<> &alreadyAddedModules);
+
+  /// Collect a map from a secondary module name to a list of cross-import
+  /// overlays, when this current module serves as the primary module.
+  llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
+  collectCrossImportOverlayNames(ASTContext &ctx, StringRef moduleName);
 };
 
 using ModuleDependencyID = std::pair<std::string, ModuleDependenciesKind>;

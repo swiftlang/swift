@@ -12,6 +12,7 @@
 
 #include "ExprContextAnalysis.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
@@ -32,12 +33,13 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "llvm/ADT/SmallSet.h"
 
 using namespace swift;
 using namespace ide;
 
 //===----------------------------------------------------------------------===//
-// typeCheckContextUntil(DeclContext, SourceLoc)
+// typeCheckContextAt(DeclContext, SourceLoc)
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -79,7 +81,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     auto &SM = DC->getASTContext().SourceMgr;
     auto bodyRange = AFD->getBodySourceRange();
     if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
-      swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+      swift::typeCheckAbstractFunctionBodyAtLoc(AFD, Loc);
     } else {
       assert(bodyRange.isInvalid() && "The body should not be parsed if the "
                                       "completion happens in the signature");
@@ -99,27 +101,12 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 }
 } // anonymous namespace
 
-void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
+void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
 
   if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
-    // Typecheck all 'TopLevelCodeDecl's up to the target one.
-    // In theory, this is not needed, but it fails to resolve the type of
-    // 'guard'ed variable. e.g.
-    //
-    //   guard value = something() else { fatalError() }
-    //   <complete>
-    // Here, 'value' is '<error type>' unless we explicitly typecheck the
-    // 'guard' statement.
-    SourceFile *SF = DC->getParentSourceFile();
-    for (auto *D : SF->getTopLevelDecls()) {
-      if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
-        typeCheckTopLevelCodeDecl(Code);
-        if (Code == TLCD)
-          break;
-      }
-    }
+    typeCheckTopLevelCodeDecl(TLCD);
   } else {
     typeCheckContextImpl(DC, Loc);
   }
@@ -193,6 +180,81 @@ Expr *swift::ide::findParsedExpr(const DeclContext *DC,
   ExprFinder finder(DC->getASTContext().SourceMgr, TargetRange);
   const_cast<DeclContext *>(DC)->walkContext(finder);
   return finder.get();
+}
+
+//===----------------------------------------------------------------------===//
+// removeCodeCompletionExpr(ASTContext, Expr)
+//===----------------------------------------------------------------------===//
+
+namespace {
+// TODO: Implement other expressions?
+class CCExprRemover: public ASTWalker, public ExprVisitor<CCExprRemover, Expr *> {
+  ASTContext &Ctx;
+
+public:
+  bool Removed = false;
+
+  CCExprRemover(ASTContext &Ctx) : Ctx(Ctx) {}
+
+  Expr *visitCallExpr(CallExpr *E) {
+    SourceLoc lParenLoc, rParenLoc;
+    SmallVector<Identifier, 2> argLabels;
+    SmallVector<SourceLoc, 2> argLabelLocs;
+    SmallVector<Expr *, 2> args;
+    SmallVector<TrailingClosure, 2> trailingClosures;
+    bool removing = false;
+
+    if (auto paren = dyn_cast<ParenExpr>(E->getArg())) {
+      if (isa<CodeCompletionExpr>(paren->getSubExpr())) {
+        lParenLoc = paren->getLParenLoc();
+        rParenLoc = paren->getRParenLoc();
+        removing = true;
+      }
+    } else if (auto tuple = dyn_cast<TupleExpr>(E->getArg())) {
+      lParenLoc = tuple->getLParenLoc();
+      rParenLoc = tuple->getRParenLoc();
+      for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i) {
+        if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
+          removing = true;
+          continue;
+        }
+
+        if (i < E->getUnlabeledTrailingClosureIndex()) {
+          // Normal arguments.
+          argLabels.push_back(E->getArgumentLabels()[i]);
+          argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
+          args.push_back(tuple->getElement(i));
+        } else {
+          // Trailing closure arguments.
+          trailingClosures.emplace_back(E->getArgumentLabels()[i],
+                                        E->getArgumentLabelLocs()[i],
+                                        tuple->getElement(i));
+        }
+      }
+    }
+    if (removing) {
+      Removed = true;
+      return CallExpr::create(Ctx, E->getFn(), lParenLoc, args, argLabels,
+                              argLabelLocs, rParenLoc, trailingClosures,
+                              E->isImplicit());
+    }
+    return E;
+  }
+
+  Expr *visitExpr(Expr *E) {
+    return E;
+  }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    return {true, visit(E)};
+  }
+};
+}
+
+bool swift::ide::removeCodeCompletionExpr(ASTContext &Ctx, Expr *&expr) {
+  CCExprRemover remover(Ctx);
+  expr = expr->walk(remover);
+  return remover.Removed;
 }
 
 //===----------------------------------------------------------------------===//
@@ -313,8 +375,11 @@ public:
 static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
-  bool isOnMetaType = baseTy->is<AnyMetatypeType>();
   auto baseInstanceTy = baseTy->getMetatypeInstanceType();
+  if (!baseInstanceTy->mayHaveMembers())
+    return;
+
+  bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
   if (!DC.lookupQualified(baseInstanceTy,
@@ -403,8 +468,6 @@ static void collectPossibleCalleesByQualifiedLookup(
     baseTy = *baseTyOpt;
   }
   baseTy = baseTy->getWithoutSpecifierType();
-  if (!baseTy->getMetatypeInstanceType()->mayHaveMembers())
-    return;
 
   // Use metatype for lookup 'super.init' if it's inside constructors.
   if (isa<SuperRefExpr>(baseExpr) && isa<ConstructorDecl>(DC) &&
@@ -412,6 +475,22 @@ static void collectPossibleCalleesByQualifiedLookup(
     baseTy = MetatypeType::get(baseTy);
 
   collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
+
+  // Add virtual 'subscript<Value>(keyPath: KeyPath<Root, Value>) -> Value'.
+  if (name.getBaseName() == DeclBaseName::createSubscript() &&
+      (baseTy->getAnyNominal() || baseTy->is<ArchetypeType>() ||
+       baseTy->is<TupleType>())) {
+    auto &Ctx = DC.getASTContext();
+
+    auto *kpDecl = Ctx.getKeyPathDecl();
+    Type kpTy = kpDecl->mapTypeIntoContext(kpDecl->getDeclaredInterfaceType());
+    Type kpValueTy = kpTy->castTo<BoundGenericType>()->getGenericArgs()[1];
+    kpTy = BoundGenericType::get(kpDecl, Type(), {baseTy, kpValueTy});
+
+    Type fnTy = FunctionType::get(
+        {AnyFunctionType::Param(kpTy, Ctx.Id_keyPath)}, kpValueTy);
+    candidates.emplace_back(fnTy->castTo<AnyFunctionType>(), nullptr);
+  }
 }
 
 /// For the given \c callExpr, collect possible callee types and declarations.
@@ -881,10 +960,10 @@ class ExprContextAnalyzer {
       break;
     }
     default:
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-        assert(isSingleExpressionBodyForCodeCompletion(AFD->getBody()));
+      if (auto *FD = dyn_cast<FuncDecl>(D)) {
+        assert(isSingleExpressionBodyForCodeCompletion(FD->getBody()));
         singleExpressionBody = true;
-        recordPossibleType(getReturnTypeFromContext(AFD));
+        recordPossibleType(getReturnTypeFromContext(FD));
         break;
       }
       llvm_unreachable("Unhandled decl kind.");
@@ -1018,8 +1097,8 @@ public:
         case DeclKind::PatternBinding:
           return true;
         default:
-          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-            if (auto *body = AFD->getBody())
+          if (auto *FD = dyn_cast<FuncDecl>(D))
+            if (auto *body = FD->getBody())
               return isSingleExpressionBodyForCodeCompletion(body);
           return false;
         }
