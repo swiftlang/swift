@@ -874,3 +874,19 @@ func generic_and_missing_label<T>(x: T) {}
 
 generic_and_missing_label(42)
 // expected-error@-1 {{missing argument label 'x:' in call}} {{27-27=x: }}
+
+// SR-13135: Type inference regression in Swift 5.3 - can't infer a type of @autoclosure result.
+func sr13135() {
+  struct Foo {
+    var bar: [Int] = []
+  }
+
+  let baz: Int? = nil
+
+  func foo<T: Equatable>(
+    _ a: @autoclosure () throws -> T,
+    _ b: @autoclosure () throws -> T
+  ) {}
+
+  foo(Foo().bar, [baz])
+}
