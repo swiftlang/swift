@@ -55,8 +55,7 @@ public typealias Mission = (origin: Planet, destination: Planet)
 let _ = CoreFuel.hydrogenEnergyDensityInMJPerKg
 let _ = CoreFuel.totalEnergyInMJ
 
-// FIXME: rdar://64993153
-// LAUNCHKIT: {"name":"CoreFuel","path":"{{[^"]*}}CoreFuel.swiftmodule","isImportedDirectly":false,
+// LAUNCHKIT: {"name":"CoreFuel","path":"{{[^"]*}}CoreFuel.swiftmodule","isImportedDirectly":true,
 #endif
 
 
@@ -99,10 +98,8 @@ let _cassini: FlightKit.Mission = (origin: "Earth", destination: "Saturn")
 // SHIPUI: "swiftmodulesDetailedInfo":[
 // SHIPUI-DAG: {"name":"FlightKit","path":"{{[^"]*}}FlightKit.swiftmodule","isImportedDirectly":true,
 // SHIPUI-DAG: {"name":"LaunchKit","path":"{{[^"]*}}LaunchKit.swiftmodule","isImportedDirectly":true,
-// FIXME: rdar://64993153 - this should be direct
-// SHIPUI-DAG: {"name":"CoreFuel","path":"{{[^"]*}}CoreFuel.swiftmodule","isImportedDirectly":false,
+// SHIPUI-DAG: {"name":"CoreFuel","path":"{{[^"]*}}CoreFuel.swiftmodule","isImportedDirectly":true,
 // SHIPUI-DAG: {"name":"CoreShip","path":"{{[^"]*}}CoreShip.swiftmodule","isImportedDirectly":false,
-// FIXME: rdar://64993153 - this should be direct
-// SHIPUI-DAG: {"name":"CoreMission","path":"{{[^"]*}}CoreMission.swiftmodule","isImportedDirectly":false,
+// SHIPUI-DAG: {"name":"CoreMission","path":"{{[^"]*}}CoreMission.swiftmodule","isImportedDirectly":true,
 // SHIPUI: ]
 #endif
