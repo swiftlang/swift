@@ -3,7 +3,7 @@
 
 struct IntBox {
   int value;
-  IntBox operator+(IntBox rhs);
+  IntBox operator+(IntBox rhs) const;
 };
 
 #endif
