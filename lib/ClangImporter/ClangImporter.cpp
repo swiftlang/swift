@@ -40,6 +40,7 @@
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
@@ -1196,7 +1197,8 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
   // Set up the imported header module.
-  auto *importedHeaderModule = ModuleDecl::create(ctx.getIdentifier("__ObjC"), ctx);
+  auto *importedHeaderModule =
+      ModuleDecl::create(ctx.getIdentifier(CLANG_HEADER_MODULE_NAME), ctx);
   importer->Impl.ImportedHeaderUnit =
     new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
