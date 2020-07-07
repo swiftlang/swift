@@ -98,6 +98,61 @@ CheckTypeWitnessResult checkTypeWitness(Type type,
                                         AssociatedTypeDecl *assocType,
                                         NormalProtocolConformance *Conf);
 
+/// Describes the means of inferring an abstract type witness.
+enum class AbstractTypeWitnessKind : uint8_t {
+  /// The type witness was inferred via a same-type-to-concrete constraint
+  /// in a protocol requirement signature.
+  Fixed,
+
+  /// The type witness was inferred via a defaulted associated type.
+  Default,
+
+  /// The type witness was inferred to a generic parameter of the
+  /// conforming type.
+  GenericParam,
+};
+
+/// A type witness inferred without the aid of a specific potential
+/// value witness.
+class AbstractTypeWitness {
+  AbstractTypeWitnessKind Kind;
+  AssociatedTypeDecl *AssocType;
+  Type TheType;
+
+  /// When this is a default type witness, the declaration responsible for it.
+  /// May not necessarilly match \c AssocType.
+  AssociatedTypeDecl *DefaultedAssocType;
+
+  AbstractTypeWitness(AbstractTypeWitnessKind Kind,
+                      AssociatedTypeDecl *AssocType, Type TheType,
+                      AssociatedTypeDecl *DefaultedAssocType)
+      : Kind(Kind), AssocType(AssocType), TheType(TheType),
+        DefaultedAssocType(DefaultedAssocType) {
+    assert(AssocType && TheType);
+  }
+
+public:
+  static AbstractTypeWitness forFixed(AssociatedTypeDecl *assocType, Type type);
+
+  static AbstractTypeWitness forDefault(AssociatedTypeDecl *assocType,
+                                        Type type,
+                                        AssociatedTypeDecl *defaultedAssocType);
+
+  static AbstractTypeWitness forGenericParam(AssociatedTypeDecl *assocType,
+                                             Type type);
+
+public:
+  AbstractTypeWitnessKind getKind() const { return Kind; }
+
+  AssociatedTypeDecl *getAssocType() const { return AssocType; }
+
+  Type getType() const { return TheType; }
+
+  AssociatedTypeDecl *getDefaultedAssocType() const {
+    return DefaultedAssocType;
+  }
+};
+
 /// The set of associated types that have been inferred by matching
 /// the given value witness to its corresponding requirement.
 struct InferredAssociatedTypesByWitness {
@@ -818,17 +873,17 @@ private:
 
   /// Compute the default type witness from an associated type default,
   /// if there is one.
-  Type computeDefaultTypeWitness(AssociatedTypeDecl *assocType);
+  Optional<AbstractTypeWitness>
+  computeDefaultTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
   std::pair<Type, TypeDecl *>
   computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
 
-  /// Compute a type witness without using a specific potential witness,
-  /// e.g., using a fixed type (from a refined protocol), default type
-  /// on an associated type, or deriving the type.
-  Type computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
+  /// Compute a type witness without using a specific potential witness.
+  Optional<AbstractTypeWitness>
+  computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Substitute the current type witnesses into the given interface type.
   Type substCurrentTypeWitnesses(Type type);
@@ -846,6 +901,15 @@ private:
   /// Check the current type witnesses against the
   /// requirements of the given constrained extension.
   bool checkConstrainedExtension(ExtensionDecl *ext);
+
+  /// Validate the current tentative solution represented by \p typeWitnesses
+  /// and attempt to resolve abstract type witnesses for associated types that
+  /// could not be inferred otherwise.
+  ///
+  /// \returns \c nullptr, or the associated type that failed.
+  AssociatedTypeDecl *
+  completeSolution(ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
+                   unsigned reqDepth);
 
   /// Top-level operation to find solutions for the given unresolved
   /// associated types.
