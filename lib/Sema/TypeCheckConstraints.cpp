@@ -3267,6 +3267,12 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       return castKind;
 
     case CheckedCastKind::Unresolved:
+      // Even though we know the elements cannot be downcast, we cannot return
+      // failed() here as it's possible for an empty Array, Set or Dictionary to
+      // be cast to any element type at runtime (SR-6192). The one exception to
+      // this is when we're checking whether we can treat a coercion as a checked
+      // cast because we don't want to tell the user to use as!, as it's probably
+      // the wrong suggestion.
       if (contextKind == CheckedCastContextKind::Coercion)
         return failed();
       return castKind;
@@ -3301,6 +3307,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         break;
 
       case CheckedCastKind::Unresolved:
+        // Handled the same as in checkElementCast; see comment there for
+        // rationale.
         if (contextKind == CheckedCastContextKind::Coercion)
           return failed();
         LLVM_FALLTHROUGH;
@@ -3326,6 +3334,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         break;
 
       case CheckedCastKind::Unresolved:
+        // Handled the same as in checkElementCast; see comment there for
+        // rationale.
         if (contextKind == CheckedCastContextKind::Coercion)
           return failed();
         LLVM_FALLTHROUGH;
@@ -3566,8 +3576,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       }
     } else if (auto protocolComposition =
                    fromType->getAs<ProtocolCompositionType>()) {
-      if (!protocolComposition->getMembers().empty() &&
-          llvm::any_of(protocolComposition->getMembers(),
+      if (llvm::any_of(protocolComposition->getMembers(),
                        [&](Type protocolType) {
                          if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
                                  protocolType->getAnyNominal())) {
