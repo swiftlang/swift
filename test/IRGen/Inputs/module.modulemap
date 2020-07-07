@@ -7,3 +7,17 @@ module AutolinkCoffCPragmaTransitive {
   header "autolink-coff-c-pragma-transitive.h"
   export *
 }
+
+module AutolinkElfCPragma {
+  header "autolink-elf-c-pragma.h"
+  export *
+}
+
+module AutolinkElfCPragmaTransitive {
+  header "autolink-elf-c-pragma-transitive.h"
+  export *
+}
+
+module AutolinkModuleMapLink {
+  link "autolink-module-map-link"
+}
