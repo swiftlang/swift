@@ -79,7 +79,7 @@ jobs:
           name: macos-test-results
           path: ./swift-test-results.tar.gz
   macos_smoke_test:
-    name: Compile hello.swift on macOS
+    name: Run smoke tests on macOS
     runs-on: macos-latest
     needs: macos_build
     steps:
@@ -92,21 +92,29 @@ jobs:
         run: |
           set -x
           tar xf $(find . -name "swift-wasm-*.tar.gz" -type f)
-          TOOLCHAIN_PATH=$(find . -name "swift-wasm-*" -type d)
+          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
           echo 'print("Hello, world!")' > hello.swift
           $TOOLCHAIN_PATH/usr/bin/swiftc \
                 -target wasm32-unknown-wasi \
                 -sdk $TOOLCHAIN_PATH/usr/share/wasi-sysroot \
                 hello.swift -o hello.wasm && \
                 echo "Successfully linked hello.wasm"
-
+      - name: Test SwiftPM
+        shell: bash
+        run: |
+          set -x
+          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
+          mkdir test
+          cd test
+          $TOOLCHAIN_PATH/usr/bin/swift package init
+          $TOOLCHAIN_PATH/usr/bin/swift build --triple wasm32-unknown-wasi
       - name: Upload hello.wasm compiled with macOS package
         uses: actions/upload-artifact@v1
         with:
           name: macos-hello.wasm
           path: hello.wasm
   linux_smoke_test:
-    name: Compile hello.swift on Linux
+    name: Run smoke tests on Linux
     runs-on: ubuntu-18.04
     needs: linux_build
     steps:
@@ -119,14 +127,22 @@ jobs:
         run: |
           set -x
           tar xf $(find . -name "swift-wasm-*.tar.gz" -type f)
-          TOOLCHAIN_PATH=$(find . -name "swift-wasm-*" -type d)
+          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
           echo 'print("Hello, world!")' > hello.swift
           $TOOLCHAIN_PATH/usr/bin/swiftc \
                 -target wasm32-unknown-wasi \
                 -sdk $TOOLCHAIN_PATH/usr/share/wasi-sysroot \
                 hello.swift -o hello.wasm && \
                 echo "Successfully linked hello.wasm"
-
+      - name: Test SwiftPM
+        shell: bash
+        run: |
+          set -x
+          TOOLCHAIN_PATH=$(find "$PWD" -name "swift-wasm-*" -type d)
+          mkdir test
+          cd test
+          $TOOLCHAIN_PATH/usr/bin/swift package init
+          $TOOLCHAIN_PATH/usr/bin/swift build --triple wasm32-unknown-wasi
       - name: Upload hello.wasm compiled with Linux package
         uses: actions/upload-artifact@v1
         with:
