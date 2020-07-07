@@ -809,6 +809,44 @@ bb0(%0 : $C3):
   return %2 : $C1
 }
 
+// CHECK-LABEL: sil @dead_upcast
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_upcast : $@convention(thin) (C2) -> C2 {
+bb0(%0 : $C2):
+  %1 = upcast %0 : $C2 to $C1
+  strong_retain %1 : $C1
+  strong_release %0 : $C2
+  return %0 : $C2
+}
+
+// CHECK-LABEL: sil @dead_unchecked_ref_cast
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_unchecked_ref_cast : $@convention(thin) (C1) -> C1 {
+bb0(%0 : $C1):
+  %1 = unchecked_ref_cast %0 : $C1 to $C2
+  strong_retain %1 : $C2
+  strong_release %0 : $C1
+  return %0 : $C1
+}
+
+// CHECK-LABEL: sil @dead_end_cow_mutation
+// CHECK: bb0
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: return
+sil @dead_end_cow_mutation : $@convention(thin) (C1) -> C1 {
+bb0(%0 : $C1):
+  %1 = end_cow_mutation %0 : $C1
+  strong_retain %1 : $C1
+  strong_release %0 : $C1
+  return %0 : $C1
+}
 
 struct XS {
   var m: Int
@@ -2294,14 +2332,13 @@ bb0(%0 : $B, %1 : $@sil_unowned B, %2 : $AnyObject, %3: $@sil_unmanaged AnyObjec
 // CHECK-NOT:     open_existential_ref
 // CHECK:         unchecked_ref_cast [[Ref]]
 
-sil @collapse_existential_pack_unpack_unchecked_ref_cast : $@convention(thin) (MyClass) -> () {
+sil @collapse_existential_pack_unpack_unchecked_ref_cast : $@convention(thin) (MyClass) -> Builtin.NativeObject {
 bb0(%0: $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
   %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
   %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
   strong_retain %3: $Builtin.NativeObject
-  %5 = tuple ()
-  return %5 : $()
+  return %3 : $Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil @collapse_existential_pack_unpack_ref_to_raw_pointer
@@ -2531,15 +2568,12 @@ sil @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () {
 // CHECK-NOT: alloc_ref_dynamic
 // CHECK-NEXT: [[R:%[0-9]+]] = alloc_ref $E
 // CHECK-NEXT: [[C:%[0-9]+]] = upcast [[R]] : $E to $B
-// CHECK-NEXT: strong_release [[C]]
-// CHECK: return
-sil @alloc_ref_dynamic_with_upcast_metatype : $() -> () {
+// CHECK-NEXT: return [[C]]
+sil @alloc_ref_dynamic_with_upcast_metatype : $() -> B {
   %1 = metatype $@thick E.Type
   %2 = upcast %1 : $@thick E.Type to $@thick B.Type
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
-  strong_release %3 : $B
-  %4 = tuple()
-  return %4 : $()
+  return %3 : $B
 }
 
 // CHECK-LABEL: @alloc_ref_dynamic_after_successful_checked_cast_br
@@ -2570,8 +2604,7 @@ bb3 (%10: $Builtin.Int32):
 // CHECK: bb1
 // CHECK-NOT: alloc_ref_dynamic
 // CHECK:      [[R:%[0-9]+]] = alloc_ref $E
-// CHECK-NEXT: [[C:%[0-9]+]] = upcast [[R]] : $E to $B
-// CHECK-NEXT: strong_release [[C]]
+// CHECK-NEXT: strong_release [[R]]
 sil @alloc_ref_dynamic_upcast_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
   checked_cast_br [exact] %1 : $@thick B.Type to E.Type, bb1, bb2
@@ -3705,4 +3738,81 @@ bb0(%0 : $@thick SpecialEnum.Type):
   %3 = builtin "is_same_metatype"(%1 : $@thick Any.Type, %1 : $@thick Any.Type) : $Builtin.Int1
   %4 = struct $Bool (%3 : $Builtin.Int1)
   return %4 : $Bool
+}
+
+struct IntTuple {
+  @_hasStorage var t: (Int64, Int64)
+}
+
+sil_global [let] @initialized_let_global : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+sil_global @initialized_var_global : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+sil_global [let] @initialized_tuple_global : $IntTuple = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %1 = integer_literal $Builtin.Int64, 28
+  %2 = struct $Int64 (%0 : $Builtin.Int64)
+  %3 = struct $Int64 (%1 : $Builtin.Int64)
+  %4 = tuple (%2 : $Int64, %3 : $Int64)
+  %initval = struct $IntTuple (%4 : $(Int64, Int64))
+}
+
+// CHECK-LABEL: sil @load_from_global_let
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 27
+// CHECK:         [[R:%.*]] = struct $Int64 ([[I]] : $Builtin.Int64)
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'load_from_global_let'
+sil @load_from_global_let : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @initialized_let_global : $*Int64
+  %1 = load %0 : $*Int64
+  return %1 : $Int64
+}
+
+// CHECK-LABEL: sil @load_from_global_with_projections
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 28
+// CHECK:         return [[I]]
+// CHECK:       } // end sil function 'load_from_global_with_projections'
+sil @load_from_global_with_projections : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = global_addr @initialized_tuple_global : $*IntTuple
+  %1 = struct_element_addr %0 : $*IntTuple, #IntTuple.t
+  %2 = tuple_element_addr %1 : $*(Int64, Int64), 1
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  %4 = load %3 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @load_from_global_without_projections
+// CHECK-DAG:     [[I1:%.*]] = integer_literal $Builtin.Int64, 27
+// CHECK-DAG:     [[I2:%.*]] = integer_literal $Builtin.Int64, 28
+// CHECK-DAG:     [[S1:%.*]] = struct $Int64 ([[I1]] : $Builtin.Int64)
+// CHECK-DAG:     [[S2:%.*]] = struct $Int64 ([[I2]] : $Builtin.Int64)
+// CHECK-DAG:     [[T:%.*]] = tuple ([[S1]] : $Int64, [[S2]] : $Int64)
+// CHECK-DAG:     [[IT:%.*]] = struct $IntTuple ([[T]] : $(Int64, Int64))
+// CHECK:         return [[IT]]
+// CHECK:       } // end sil function 'load_from_global_without_projections'
+sil @load_from_global_without_projections : $@convention(thin) () -> IntTuple {
+bb0:
+  %0 = global_addr @initialized_tuple_global : $*IntTuple
+  %1 = load %0 : $*IntTuple
+  return %1 : $IntTuple
+}
+
+// CHECK-LABEL: sil @load_from_global_var
+// CHECK:         global_addr
+// CHECK-NEXT:    load
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'load_from_global_var'
+sil @load_from_global_var : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @initialized_var_global : $*Int64
+  %1 = load %0 : $*Int64
+  return %1 : $Int64
 }

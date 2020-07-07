@@ -25,7 +25,6 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -40,6 +39,8 @@ class Pattern;
 class PatternBindingDecl;
 class VarDecl;
 class CaseStmt;
+class DoCatchStmt;
+class SwitchStmt;
 
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
@@ -539,11 +540,11 @@ public:
 /// DoStmt - do statement, without any trailing clauses.
 class DoStmt : public LabeledStmt {
   SourceLoc DoLoc;
-  Stmt *Body;
+  BraceStmt *Body;
   
 public:
   DoStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
-         Stmt *body, Optional<bool> implicit = None)
+         BraceStmt *body, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::Do, getDefaultImplicitFlag(implicit, doLoc),
                   labelInfo),
       DoLoc(doLoc), Body(body) {}
@@ -553,8 +554,8 @@ public:
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
   
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *s) { Body = s; }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *s) { Body = s; }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Do; }
 };
@@ -928,6 +929,7 @@ class CaseStmt final
                                     CaseLabelItem> {
   friend TrailingObjects;
 
+  Stmt *ParentStmt = nullptr;
   SourceLoc UnknownAttrLoc;
   SourceLoc ItemIntroducerLoc;
   SourceLoc ItemTerminatorLoc;
@@ -954,6 +956,14 @@ public:
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
 
   CaseParentKind getParentKind() const { return ParentKind; }
+
+  Stmt *getParentStmt() const { return ParentStmt; }
+  void setParentStmt(Stmt *S) {
+    assert(S && "Parent statement must be SwitchStmt or DoCatchStmt");
+    assert((ParentKind == CaseParentKind::Switch && isa<SwitchStmt>(S)) ||
+           (ParentKind == CaseParentKind::DoCatch && isa<DoCatchStmt>(S)));
+    ParentStmt = S;
+  }
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
@@ -1162,6 +1172,8 @@ class DoCatchStmt final
     Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
                             getTrailingObjects<CaseStmt *>());
+    for (auto *catchStmt : getCatches())
+      catchStmt->setParentStmt(this);
   }
 
 public:

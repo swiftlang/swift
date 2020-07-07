@@ -1,7 +1,11 @@
 // RUN: %target-run-simple-swift
+
 // NOTE(TF-813): verify that enabling forward-mode does not affect reverse-mode.
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
+// Temporarily disabled because forward-mode is not at feature parity with reverse-mode.
+// UN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
+
 // RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
+
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -48,11 +52,73 @@ SimpleMathTests.test("FunctionCall") {
 }
 
 SimpleMathTests.test("ResultSelection") {
-  func foo(_ x: Float, _ y: Float) -> (Float, Float) {
+  func tuple(_ x: Float, _ y: Float) -> (Float, Float) {
     return (x + 1, y + 2)
   }
-  expectEqual((1, 0), gradient(at: 3, 3, in: { x, y in foo(x, y).0 }))
-  expectEqual((0, 1), gradient(at: 3, 3, in: { x, y in foo(x, y).1 }))
+  expectEqual((1, 0), gradient(at: 3, 3, in: { x, y in tuple(x, y).0 }))
+  expectEqual((0, 1), gradient(at: 3, 3, in: { x, y in tuple(x, y).1 }))
+
+  func tupleGeneric<T>(_ x: T, _ y: T) -> (T, T) {
+    return (x, y)
+  }
+  func tupleGenericFirst<T>(_ x: T, _ y: T) -> T { tupleGeneric(x, y).0 }
+  func tupleGenericSecond<T>(_ x: T, _ y: T) -> T { tupleGeneric(x, y).1 }
+  expectEqual((1, 0), gradient(at: 3, 3, in: tupleGenericFirst))
+  expectEqual((0, 1), gradient(at: 3, 3, in: tupleGenericSecond))
+}
+
+SimpleMathTests.test("MultipleResults") {
+  // Test function returning a tuple of active results.
+  func tuple(_ x: Float, _ y: Float) -> (Float, Float) {
+    return (x, y)
+  }
+  func multiply(_ x: Float, _ y: Float) -> Float {
+    let z = tuple(x, y)
+    // Note: both results (tuple elements) are active.
+    return z.0 * z.1
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply))
+  expectEqual((10, 5), gradient(at: 5, 10, in: multiply))
+
+  // Test function with multiple `inout` parameters.
+  func swap(_ x: inout Float, _ y: inout Float) {
+    let tmp = x; x = y; y = tmp
+  }
+  func multiply_swap(_ x: Float, _ y: Float) -> Float {
+    var tuple = (x, y)
+    swap(&tuple.0, &tuple.1)
+    return tuple.0 * tuple.1
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swap))
+  expectEqual((10, 5), gradient(at: 5, 10, in: multiply_swap))
+
+  // Test function with multiple `inout` parameters.
+  func swapGeneric<T>(_ x: inout T, _ y: inout T) {
+    let tmp = x; x = y; y = tmp
+  }
+  func multiply_swapGeneric(_ x: Float, _ y: Float) -> Float {
+    var tuple = (x, y)
+    swapGeneric(&tuple.0, &tuple.1)
+    return tuple.0 * tuple.1
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapGeneric))
+  expectEqual((10, 5), gradient(at: 5, 10, in: multiply_swapGeneric))
+
+  // Test function with multiple `inout` parameters and a formal result.
+  func swapAndReturnProduct(_ x: inout Float, _ y: inout Float) -> Float {
+    let tmp = x
+    x = y
+    y = tmp
+    return x * y
+  }
+  func multiply_swapAndReturnProduct(_ x: Float, _ y: Float) -> Float {
+    var x2 = x
+    var y2 = y
+    let result = swapAndReturnProduct(&x2, &y2)
+    return result
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapAndReturnProduct))
+  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapAndReturnProduct))
 }
 
 SimpleMathTests.test("CaptureLocal") {
@@ -230,7 +296,6 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     // Custom initializer with `@differentiable`.
     @differentiable
     init(x: Float) {
-      print(x)
       self.x = x
     }
   }
@@ -369,7 +434,21 @@ SimpleMathTests.test("ForceUnwrapping") {
   expectEqual((1, 2), forceUnwrap(Float(2)))
 }
 
-// CHECK-LABEL: sil private [ossa] @AD__${{.*}}jumpTimesTwo{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__$s4nullyycfU18_12jumpTimesTwoL_5modelSfAAyycfU18_14SmallTestModelL_V_tF_bb0__PB__src_0_wrt_0) -> SmallTestModel.TangentVector {
+SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete rhs") {
+  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.
+  struct SmallTestModel : Differentiable {
+    public var stored: Float = 3.0
+    @differentiable public func callAsFunction() -> Float { return stored }
+  }
+
+  func doubled(_ model: SmallTestModel) -> Float{
+    return model() + model.stored
+  }
+  let grads = gradient(at: SmallTestModel(), in: doubled)
+  expectEqual(2.0, grads.stored)
+}
+
+// CHECK-LABEL: sil private [ossa] @AD__${{.*}}doubled{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
 // CHECK: bb0([[DX:%.*]] : $Float, [[PB_STRUCT:%.*]] : {{.*}}):
 // CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
 // CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
@@ -387,19 +466,5 @@ SimpleMathTests.test("ForceUnwrapping") {
 // CHECK:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
 // CHECK:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
 // CHECK: }
-
-SimpleMathTests.test("Struct") {
-  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.
-  struct SmallTestModel : Differentiable {
-    public var jump: Float = 3.0
-    @differentiable public func callAsFunction() -> Float { return jump }
-  }
-
-  func jumpTimesTwo(model: SmallTestModel) -> Float{
-    return model() + model.jump
-  }
-  let grads = gradient(at: SmallTestModel(), in: jumpTimesTwo)
-  expectEqual(2.0, grads.jump)
-}
 
 runAllTests()

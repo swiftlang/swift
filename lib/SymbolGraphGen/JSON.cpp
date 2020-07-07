@@ -66,21 +66,18 @@ void swift::symbolgraphgen::serialize(const ExtensionDecl *Extension,
         OS.attribute("extendedModule", ExtendedModule->getNameStr());
       }
     }
-    if (const auto Generics = Extension->getAsGenericContext()) {
-      SmallVector<Requirement, 4> FilteredRequirements;
 
-      filterGenericRequirements(Generics->getGenericRequirements(),
-          Extension->getExtendedNominal()
-              ->getDeclContext()->getSelfNominalTypeDecl(),
-                                FilteredRequirements);
+    SmallVector<Requirement, 4> FilteredRequirements;
 
-      if (!FilteredRequirements.empty()) {
-        OS.attributeArray("constraints", [&](){
-          for (const auto &Requirement : FilteredRequirements) {
-            serialize(Requirement, OS);
-          }
-        }); // end constraints:
-      }
+    filterGenericRequirements(Extension,
+                              FilteredRequirements);
+
+    if (!FilteredRequirements.empty()) {
+      OS.attributeArray("constraints", [&](){
+        for (const auto &Requirement : FilteredRequirements) {
+          serialize(Requirement, OS);
+        }
+      }); // end constraints:
     }
   }); // end swiftExtension:
 }
@@ -123,24 +120,36 @@ void swift::symbolgraphgen::filterGenericRequirements(
     const NominalTypeDecl *Self,
     SmallVectorImpl<Requirement> &FilteredRequirements) {
   for (const auto &Req : Requirements) {
-      if (Req.getKind() == RequirementKind::Layout) {
-        continue;
-      }
-    /*
-     Don't serialize constraints that aren't applicable for display.
+    if (Req.getKind() == RequirementKind::Layout) {
+      continue;
+    }
+    // extension /* protocol */ Q {
+    // func foo() {}
+    // }
+    // ignore Self : Q, obvious
+    if (Req.getSecondType()->getAnyNominal() == Self) {
+      continue;
+    }
+    FilteredRequirements.push_back(Req);
+  }
+}
 
-     For example:
+void
+swift::symbolgraphgen::filterGenericRequirements(const ExtensionDecl *Extension,
+    SmallVectorImpl<Requirement> &FilteredRequirements) {
+  for (const auto &Req : Extension->getGenericRequirements()) {
+    if (Req.getKind() == RequirementKind::Layout) {
+      continue;
+    }
 
-     extension Equatable {
-       func foo(_ thing: Self) {}
-     }
+    if (!isa<ProtocolDecl>(Extension->getExtendedNominal()) &&
+        Req.getFirstType()->isEqual(Extension->getExtendedType())) {
+      continue;
+    }
 
-     `foo` includes a constraint `Self: Equatable` for the compiler's purposes,
-     but that's redundant for the purposes of documentation.
-     This is extending Equatable, after all!
-    */
-    if (Req.getFirstType()->getString() == "Self" &&
-        Req.getSecondType()->getAnyNominal() == Self) {
+    // extension /* protocol */ Q
+    // ignore Self : Q, obvious
+    if (Req.getSecondType()->isEqual(Extension->getExtendedType())) {
       continue;
     }
     FilteredRequirements.push_back(Req);

@@ -505,9 +505,27 @@ bool isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM, CanType type)
 /// Should requests for the given type's metadata be cached?
 bool shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type);
 
-bool isNominalGenericContextTypeMetadataAccessTrivial(IRGenModule &IGM,
-                                                      NominalTypeDecl &nominal,
+bool isInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
                                                       CanType type);
+
+enum CanonicalSpecializedMetadataUsageIsOnlyFromAccessor : bool {
+  ForUseOnlyFromAccessor = true,
+  NotForUseOnlyFromAccessor = false
+};
+
+/// Is the address of the canonical specialization of a generic metadata
+/// statically known?
+///
+/// In other words, can a canonical specialization be formed for the specified
+/// type. If onlyFromAccess is ForUseOnlyFromAccessor, then metadata's address
+/// is known, but access to the metadata must go through the canonical
+/// specialized accessor so that initialization of the metadata can occur.
+bool isCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    CanonicalSpecializedMetadataUsageIsOnlyFromAccessor onlyFromAccessor);
+
+bool isCompleteCanonicalSpecializedNominalTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type);
 
 /// Determine how the given type metadata should be accessed.
 MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
@@ -593,6 +611,9 @@ MetadataResponse
 emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF, Explosion &params,
                                       NominalTypeDecl *nominal,
                                       GenericArguments &genericArgs);
+
+MetadataResponse emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    IRGenFunction &IGF, Explosion &params, CanType theType);
 
 /// Emit a declaration reference to a metatype object.
 void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,

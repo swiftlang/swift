@@ -141,6 +141,27 @@ typedef struct swift_childinfo {
   swift_typeref_t TR;
 } swift_childinfo_t;
 
+// Values here match the values from MetadataAllocatorTags in Metadata.h.
+enum swift_metadata_allocation_tag {
+  SWIFT_GENERIC_METADATA_CACHE_ALLOCATION = 14,
+};
+
+typedef int swift_metadata_allocation_tag_t;
+
+/// A metadata allocation made by the Swift runtime.
+typedef struct swift_metadata_allocation {
+  /// The allocation's tag, which describes what kind of allocation it is. This
+  /// may be one of the values in swift_metadata_allocation_tag, or something
+  /// else, in which case the tag should be considered unknown.
+  swift_metadata_allocation_tag_t Tag;
+
+  /// A pointer to the start of the allocation in the remote process.
+  swift_reflection_ptr_t Ptr;
+
+  /// The size of the allocation in bytes.
+  unsigned Size;
+} swift_metadata_allocation_t;
+
 /// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;

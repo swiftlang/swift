@@ -69,6 +69,8 @@ func guardFn(_ l: D, _ r: D) -> Bool { return true }
 // CHECK:         cond_br {{%.*}}, [[GUARD_YES:bb[0-9]+]], [[GUARD_NO:bb[0-9]+]]
 //
 // CHECK:       [[GUARD_YES]]:
+// CHECK-NEXT:    debug_value [[R2]]
+// CHECK-NEXT:    debug_value [[L2]]
 // CHECK-NEXT:    destroy_value [[L2]]
 // CHECK-NEXT:    destroy_value [[R2]]
 // CHECK-NEXT:    end_borrow [[BORROWED_TUP]]

@@ -33,15 +33,26 @@ class ModuleDependencyScanner : public SerializedModuleLoaderBase {
   ErrorOr<ModuleDependencies> scanInterfaceFile(
       Twine moduleInterfacePath);
 
-  SubASTContextDelegate &astDelegate;
+  InterfaceSubContextDelegate &astDelegate;
 public:
   Optional<ModuleDependencies> dependencies;
 
   ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                          Identifier moduleName, SubASTContextDelegate &astDelegate)
+                          Identifier moduleName,
+                          InterfaceSubContextDelegate &astDelegate)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
         moduleName(moduleName), astDelegate(astDelegate) { }
+
+  std::string getCompiledModulePath(const SerializedModuleBaseName &BaseName) {
+    if (LoadMode == ModuleLoadingMode::OnlySerialized) {
+      return BaseName.getName(file_types::TY_SwiftModuleFile);
+    }
+    return static_cast<SerializedModuleLoaderBase*>(Ctx
+      .getModuleInterfaceLoader())->getUpToDateCompiledModuleForInterface(
+         moduleName.str(),
+         BaseName.getName(file_types::TY_SwiftModuleInterfaceFile));
+  }
 
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID,
@@ -55,12 +66,9 @@ public:
     auto &fs = *Ctx.SourceMgr.getFileSystem();
 
     // Compute the full path of the module we're looking for.
-    auto ModPath = BaseName.getName(file_types::TY_SwiftModuleFile);
-    if (LoadMode == ModuleLoadingMode::OnlySerialized) {
-      // If there is no module file, there's nothing we can do.
-      if (!fs.exists(ModPath))
-        return std::make_error_code(std::errc::no_such_file_or_directory);
+    auto ModPath = getCompiledModulePath(BaseName);
 
+    if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
       auto dependencies = scanModuleFile(ModPath);
       if (dependencies) {
@@ -101,12 +109,18 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> modulePath = moduleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
-  ModuleDependencies Result = ModuleDependencies::forSwiftInterface(
-      modulePath.str().str(), moduleInterfacePath.str());
+  Optional<ModuleDependencies> Result;
   std::error_code code;
-  auto hasError = astDelegate.runInSubContext(Ctx,
-                                                 moduleInterfacePath.str(),
-                                                 [&](ASTContext &Ctx) {
+  auto hasError = astDelegate.runInSubContext(moduleName.str(),
+                                              moduleInterfacePath.str(),
+                                              StringRef(),
+                                              SourceLoc(),
+                [&](ASTContext &Ctx, ArrayRef<StringRef> Args,
+                    ArrayRef<StringRef> PCMArgs, StringRef Hash) {
+    Result = ModuleDependencies::forSwiftInterface(moduleInterfacePath.str(),
+                                                   Args,
+                                                   PCMArgs,
+                                                   Hash);
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();
     auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
@@ -123,19 +137,19 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
 
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;
-    Result.addModuleDependencies(*sourceFile, alreadyAddedModules);
+    Result->addModuleDependencies(*sourceFile, alreadyAddedModules);
     return false;
   });
 
   if (hasError) {
     return code;
   }
-  return Result;
+  return *Result;
 }
 
 Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
-    SubASTContextDelegate &delegate) {
+    InterfaceSubContextDelegate &delegate) {
   // Check whether we've cached this result.
   if (auto found = cache.findDependencies(
           moduleName, ModuleDependenciesKind::Swift))

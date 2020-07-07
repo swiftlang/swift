@@ -80,21 +80,6 @@ public extension Differentiable where TangentVector == Self {
 }
 
 public extension Differentiable {
-  // This is a temporary solution enabling the addition of
-  // `zeroTangentVectorInitializer` without implementing derived conformances.
-  // This property will produce incorrect results when tangent vectors depend
-  // on instance-specific information from `self`.
-  // TODO: Implement derived conformances and remove this default
-  // implementation.
-  @available(*, deprecated, message: """
-      `zeroTangentVectorInitializer` derivation has not been implemented; this \
-      default implementation is not correct when tangent vectors depend on \
-      instance-specific information from `self` and should not be used
-      """)
-  var zeroTangentVectorInitializer: () -> TangentVector {
-    { TangentVector.zero }
-  }
-
   /// A tangent vector initialized using `zeroTangentVectorInitializer`.
   /// `move(along: zeroTangentVector)` should not modify `self`.
   var zeroTangentVector: TangentVector { zeroTangentVectorInitializer() }

@@ -56,7 +56,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
   Action visitTypeAliasType(TypeAliasType *aliasTy) override {
     if (aliasTy->getDecl()->hasClangNode() &&
         !aliasTy->getDecl()->isCompatibilityAlias()) {
-      assert(!aliasTy->getGenericSignature());
+      assert(!aliasTy->getDecl()->isGeneric());
       Callback(*this, aliasTy->getDecl());
     } else {
       Type(aliasTy->getSinglyDesugaredType()).walk(*this);
@@ -71,8 +71,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
     if (sig->getSuperclassBound(paramTy))
       return true;
 
-    auto conformsTo = sig->getConformsTo(paramTy);
-    return !conformsTo.empty();
+    return !sig->getRequiredProtocols(paramTy).empty();
   }
 
   Action visitBoundGenericType(BoundGenericType *boundGeneric) override {

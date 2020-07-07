@@ -30,7 +30,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -519,11 +518,7 @@ public:
 
     ProtocolConformanceRef operator()(CanType dependentType,
                                       Type conformingReplacementType,
-                                      ProtocolDecl *conformedProtocol) const {
-      return builder->lookupConformance(dependentType,
-                                        conformingReplacementType,
-                                        conformedProtocol);
-    }
+                                      ProtocolDecl *conformedProtocol) const;
   };
 
   /// Retrieve a function that can perform conformance lookup for this

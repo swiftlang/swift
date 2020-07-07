@@ -123,6 +123,21 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
+  void setBody(BraceStmt *stmt, bool isSingleExpression) {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      AFD->setBody(stmt);
+      AFD->setHasSingleExpressionBody(isSingleExpression);
+      return;
+    }
+
+    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
+    if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+      return CE->setBody(stmt, isSingleExpression);
+    }
+
+    llvm_unreachable("autoclosures don't have statement bodies");
+  }
+
   DeclContext *getAsDeclContext() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD;

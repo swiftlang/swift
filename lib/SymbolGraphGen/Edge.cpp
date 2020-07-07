@@ -42,20 +42,19 @@ void Edge::serialize(llvm::json::OStream &OS) const {
     }
 
     if (ConformanceExtension) {
-      if (const auto *Generics = ConformanceExtension->getAsGenericContext()) {
-        SmallVector<Requirement, 4> FilteredRequirements;
-        filterGenericRequirements(Generics->getGenericRequirements(),
-            ConformanceExtension->getExtendedNominal()
-                ->getDeclContext()->getSelfNominalTypeDecl(),
-                                  FilteredRequirements);
-        if (!FilteredRequirements.empty()) {
-          OS.attributeArray("swiftConstraints", [&](){
-            for (const auto &Req :
-                 ConformanceExtension->getGenericRequirements()) {
-              ::serialize(Req, OS);
-            }
-          });
-        }
+      SmallVector<Requirement, 4> FilteredRequirements;
+      filterGenericRequirements(
+          ConformanceExtension->getGenericRequirements(),
+          ConformanceExtension->getExtendedNominal()
+              ->getDeclContext()->getSelfNominalTypeDecl(),
+                                FilteredRequirements);
+      if (!FilteredRequirements.empty()) {
+        OS.attributeArray("swiftConstraints", [&](){
+          for (const auto &Req :
+               ConformanceExtension->getGenericRequirements()) {
+            ::serialize(Req, OS);
+          }
+        });
       }
     }
   });

@@ -4,9 +4,6 @@
 
 // REQUIRES: objc_interop
 
-// This test currently fails iphonesimulator-i386.
-// REQUIRES: CPU=x86_64
-
 import Foundation
 
 class Foo: NSObject {
@@ -21,8 +18,6 @@ func hasKVCString() -> String? {
     // CHECK:      string_literal utf8 "doesIndeedHaveAKVCString"
     // CHECK-NOT:  = keypath
     // CHECK:      [[RESULT:%.*]] = enum $Optional<String>, #Optional.some
-    // CHECK-NEXT: return [[RESULT:%.*]]
-    // CHECK-NEXT: }
     return (\Foo.hasKVCString)._kvcKeyPathString
 }
 
@@ -30,7 +25,5 @@ func hasKVCString() -> String? {
 func noKVCString() -> String? {
     // CHECK-NOT:  = keypath
     // CHECK:      [[RESULT:%.*]] = enum $Optional<String>, #Optional.none
-    // CHECK-NEXT: return [[RESULT:%.*]]
-    // CHECK-NEXT: }
     return (\Foo.noKVCString)._kvcKeyPathString
 }

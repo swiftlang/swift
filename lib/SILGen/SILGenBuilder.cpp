@@ -774,6 +774,13 @@ ReturnInst *SILGenBuilder::createReturn(SILLocation loc,
   return createReturn(loc, returnValue.forward(SGF));
 }
 
+ReturnInst *
+SILGenBuilder::createReturn(SILLocation loc, SILValue returnValue,
+                            AssertingManualScope &&functionLevelScope) {
+  std::move(functionLevelScope).pop();
+  return createReturn(loc, returnValue);
+}
+
 ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
                                         ArrayRef<ManagedValue> elements) {
   // Handle the empty tuple case.

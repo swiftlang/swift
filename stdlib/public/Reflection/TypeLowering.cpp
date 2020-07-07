@@ -1031,7 +1031,7 @@ class ExistentialTypeInfoBuilder {
           continue;
         case FieldDescriptorKind::ClassProtocol:
           Representation = ExistentialTypeRepresentation::Class;
-          WitnessTableCount++;
+          ++WitnessTableCount;
 
           if (auto *Superclass = TC.getBuilder().lookupSuperclass(P)) {
             auto *SuperclassTI = TC.getTypeInfo(Superclass);
@@ -1057,7 +1057,7 @@ class ExistentialTypeInfoBuilder {
 
           continue;
         case FieldDescriptorKind::Protocol:
-          WitnessTableCount++;
+          ++WitnessTableCount;
           continue;
         case FieldDescriptorKind::ObjCClass:
         case FieldDescriptorKind::Struct:
@@ -1203,7 +1203,7 @@ public:
       break;
     }
 
-    for (unsigned i = 0; i < WitnessTableCount; i++)
+    for (unsigned i = 0; i < WitnessTableCount; ++i)
       builder.addField("wtable", TC.getRawPointerTypeRef());
 
     return builder.build();
@@ -1227,7 +1227,7 @@ public:
     RecordTypeInfoBuilder builder(TC, RecordKind::ExistentialMetatype);
 
     builder.addField("metadata", TC.getAnyMetatypeTypeRef());
-    for (unsigned i = 0; i < WitnessTableCount; i++)
+    for (unsigned i = 0; i < WitnessTableCount; ++i)
       builder.addField("wtable", TC.getRawPointerTypeRef());
 
     return builder.build();
@@ -1772,7 +1772,7 @@ public:
 
     for (auto Case : Fields) {
       if (Case.TR == nullptr) {
-        NoPayloadCases++;
+        ++NoPayloadCases;
         addCase(Case.Name);
       } else {
         PayloadCases.push_back(Case);

@@ -78,7 +78,7 @@ ParserResult<Expr> Parser::parseExprIs() {
   if (type.isNull())
     return nullptr;
 
-  return makeParserResult(new (Context) IsExpr(isLoc, type.get()));
+  return makeParserResult(IsExpr::create(Context, isLoc, type.get()));
 }
 
 /// parseExprAs
@@ -108,12 +108,13 @@ ParserResult<Expr> Parser::parseExprAs() {
 
   Expr *parsed;
   if (questionLoc.isValid()) {
-    parsed = new (Context) ConditionalCheckedCastExpr(asLoc, questionLoc,
-                                                      type.get());
+    parsed = ConditionalCheckedCastExpr::create(Context, asLoc, questionLoc,
+                                                type.get());
   } else if (exclaimLoc.isValid()) {
-    parsed = new (Context) ForcedCheckedCastExpr(asLoc, exclaimLoc, type.get());
+    parsed = ForcedCheckedCastExpr::create(Context, asLoc, exclaimLoc,
+                                           type.get());
   } else {
-    parsed = new (Context) CoerceExpr(asLoc, type.get());
+    parsed = CoerceExpr::create(Context, asLoc, type.get());
   }
   return makeParserResult(parsed);
 }
@@ -1132,10 +1133,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         if (CodeCompletion) {
           CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
         }
-        // Eat the code completion token because we handled it.
-        consumeToken(tok::code_complete);
-        Result.setHasCodeCompletion();
-        return Result;
+        auto CCExpr = new (Context) CodeCompletionExpr(Result.get(),
+                                                       consumeToken(tok::code_complete));
+        return makeParserCodeCompletionResult(CCExpr);
       }
 
       DeclNameLoc NameLoc;
@@ -3178,8 +3178,8 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
   // Record the line numbers for the diagnostics below.
   // Note that *do not* move this to after 'parseExprClosure()' it slows down
   // 'getLineNumber()' call because of cache in SourceMgr.
-  auto origLine = SourceMgr.getLineNumber(calleeRange.End);
-  auto braceLine = SourceMgr.getLineNumber(braceLoc);
+  auto origLine = SourceMgr.getLineAndColumnInBuffer(calleeRange.End).first;
+  auto braceLine = SourceMgr.getLineAndColumnInBuffer(braceLoc).first;
 
   ParserStatus result;
 
@@ -3213,12 +3213,19 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
       if (!Tok.is(tok::code_complete))
         break;
 
+      // If the current completion mode doesn't support trailing closure
+      // completion, leave the token here and let "postfix completion" to
+      // handle it.
+      if (CodeCompletion &&
+          !CodeCompletion->canPerformCompleteLabeledTrailingClosure())
+        break;
+
       // foo() {} <token>
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
       if (CodeCompletion)
         CodeCompletion->completeLabeledTrailingClosure(CCExpr, Tok.isAtStartOfLine());
       consumeToken(tok::code_complete);
-      result.hasCodeCompletion();
+      result.setHasCodeCompletion();
       closures.push_back({Identifier(), SourceLoc(), CCExpr});
       continue;
     }
@@ -3805,6 +3812,11 @@ Parser::parsePlatformVersionConstraintSpec() {
   // Register the platform name as a keyword token.
   TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
 
+  // Keep the original version around for run-time checks to support
+  // macOS Big Sur betas that report 10.16 at
+  // run time.
+  llvm::VersionTuple RuntimeVersion = Version;
+  Version = canonicalizePlatformVersion(*Platform, Version);
   return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
-      Platform.getValue(), PlatformLoc, Version, VersionRange));
+      Platform.getValue(), PlatformLoc, Version, RuntimeVersion, VersionRange));
 }

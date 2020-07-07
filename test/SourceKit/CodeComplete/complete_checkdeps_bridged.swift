@@ -35,8 +35,8 @@ func foo() {
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
 // RUN:   -shell -- echo '### Modify bridging header library file' == \
-// RUN:   -shell -- cp -R $INPUT_DIR/MyProject_mod/LocalCFunc.h %t/MyProject/ == \
 // RUN:   -shell -- sleep $SLEEP_TIME == \
+// RUN:   -shell -- cp -R $INPUT_DIR/MyProject_mod/LocalCFunc.h %t/MyProject/ == \
 // RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
 
 // RUN:   -shell -- echo '### Fast completion' == \

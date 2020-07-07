@@ -32,8 +32,10 @@
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Parser.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/OperatorKinds.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Sema/Lookup.h"
@@ -1410,11 +1412,53 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::CXXConversionFunctionName:
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
-  case clang::DeclarationName::CXXOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
   case clang::DeclarationName::CXXDeductionGuideName:
     // TODO: Handling these is part of C++ interoperability.
     return ImportedName();
+
+  case clang::DeclarationName::CXXOperatorName: {
+    auto op = D->getDeclName().getCXXOverloadedOperator();
+    switch (op) {
+    case clang::OverloadedOperatorKind::OO_Plus:
+    case clang::OverloadedOperatorKind::OO_Minus:
+    case clang::OverloadedOperatorKind::OO_Star:
+    case clang::OverloadedOperatorKind::OO_Slash:
+    case clang::OverloadedOperatorKind::OO_Percent:
+    case clang::OverloadedOperatorKind::OO_Amp:
+    case clang::OverloadedOperatorKind::OO_Pipe:
+    case clang::OverloadedOperatorKind::OO_Less:
+    case clang::OverloadedOperatorKind::OO_Greater:
+    case clang::OverloadedOperatorKind::OO_LessLess:
+    case clang::OverloadedOperatorKind::OO_GreaterGreater:
+    case clang::OverloadedOperatorKind::OO_EqualEqual:
+    case clang::OverloadedOperatorKind::OO_ExclaimEqual:
+    case clang::OverloadedOperatorKind::OO_LessEqual:
+    case clang::OverloadedOperatorKind::OO_GreaterEqual:
+    case clang::OverloadedOperatorKind::OO_AmpAmp:
+    case clang::OverloadedOperatorKind::OO_PipePipe:
+      if (auto FD = dyn_cast<clang::FunctionDecl>(D)) {
+        baseName = clang::getOperatorSpelling(op);
+        isFunction = true;
+        argumentNames.resize(
+            FD->param_size() +
+            // C++ operators that are implemented as non-static member functions
+            // get imported into Swift as static member functions that use an
+            // additional parameter for the left-hand side operand instead of
+            // the receiver object.
+            (isa<clang::CXXMethodDecl>(D) ? 1 : 0));
+      } else {
+        // This can happen for example for templated operators functions.
+        // We don't support those, yet.
+        return ImportedName();
+      }
+      break;
+    default:
+      // We don't import these yet.
+      return ImportedName();
+    }
+    break;
+  }
 
   case clang::DeclarationName::Identifier:
     // Map the identifier.

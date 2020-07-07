@@ -55,6 +55,7 @@
 #include "ConformanceDescription.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
+#include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
@@ -101,9 +102,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
-  CGO.setFramePointer(Opts.DisableFPElim
-                          ? clang::CodeGenOptions::FramePointerKind::All
-                          : clang::CodeGenOptions::FramePointerKind::None);
+
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -338,6 +337,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
+  static_assert(MetadataAdjustmentIndex::ValueType == 1,
+                "Adjustment index must be synchronized with this layout");
   FullTypeMetadataStructTy = createStructType(*this, "swift.full_type", {
     WitnessTablePtrTy,
     TypeMetadataStructTy
@@ -350,6 +351,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
+  static_assert(MetadataAdjustmentIndex::Class == 2,
+                "Adjustment index must be synchronized with this layout");
   FullHeapMetadataStructTy =
                   createStructType(*this, "swift.full_heapmetadata", {
     dtorPtrTy,
@@ -644,6 +647,26 @@ namespace RuntimeConstants {
     auto featureAvailability = Context.getSwift51Availability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::AvailableByCompatibilityLibrary;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  CompareTypeContextDescriptorsAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCompareTypeContextDescriptorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  CompareProtocolConformanceDescriptorsAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCompareProtocolConformanceDescriptorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
   }
@@ -981,57 +1004,31 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
-void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
-                                     bool HasFramePointer) {
-  Attrs.addAttribute("frame-pointer", HasFramePointer ? "all" : "none");
+void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
+  Attrs.addAttribute("frame-pointer", "none");
 }
 
-void IRGenModule::setHasFramePointer(llvm::Function *F,
-                                     bool HasFramePointer) {
+void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b;
-  setHasFramePointer(b, HasFramePointer);
+  setHasNoFramePointer(b);
   F->addAttributes(llvm::AttributeList::FunctionIndex, b);
 }
 
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                                OptimizationMode FuncOptMode) {
-  // Add frame pointer attributes.
-  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
-  
-  // Add target-cpu and target-features if they are non-null.
-  auto *Clang = static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
+  // Add the default attributes for the Clang configuration.
+  clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
 
-  std::string &CPU = ClangOpts.CPU;
-  if (CPU != "")
-    Attrs.addAttribute("target-cpu", CPU);
-
-  std::vector<std::string> Features;
-  for (auto &F : ClangOpts.Features)
-    if (!shouldRemoveTargetFeature(F))
-        Features.push_back(F);
-
-  if (!Features.empty()) {
-    SmallString<64> allFeatures;
-    // Sort so that the target features string is canonical.
-    std::sort(Features.begin(), Features.end());
-    llvm::interleave(Features, [&](const std::string &s) {
-      allFeatures.append(s);
-    }, [&]{
-      allFeatures.push_back(',');
-    });
-    Attrs.addAttribute("target-features", allFeatures);
-  }
+  // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
-  if (FuncOptMode == OptimizationMode::ForSize)
+  if (FuncOptMode == OptimizationMode::ForSize) {
+    Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
     Attrs.addAttribute(llvm::Attribute::MinSize);
-
-  auto triple = llvm::Triple(ClangOpts.Triple);
-  if (triple.getArchName() == "arm64e") {
-    Attrs.addAttribute("ptrauth-returns");
-    Attrs.addAttribute("ptrauth-calls");
+  } else {
+    Attrs.removeAttribute(llvm::Attribute::MinSize);
+    Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
   }
 }
 
@@ -1203,14 +1200,9 @@ static bool isFirstObjectFileInModule(IRGenModule &IGM) {
   if (IGM.getSILModule().isWholeModule())
     return IGM.IRGen.getPrimaryIGM() == &IGM;
 
-  const DeclContext *DC = IGM.getSILModule().getAssociatedContext();
-  if (!DC)
-    return false;
-
-  assert(!isa<ModuleDecl>(DC) && "that would be a whole module build");
-  assert(isa<FileUnit>(DC) && "compiling something smaller than a file?");
-  ModuleDecl *containingModule = cast<FileUnit>(DC)->getParentModule();
-  return containingModule->getFiles().front() == DC;
+  auto *file = cast<FileUnit>(IGM.getSILModule().getAssociatedContext());
+  auto *containingModule = file->getParentModule();
+  return containingModule->getFiles().front() == file;
 }
 
 void IRGenModule::emitAutolinkInfo() {

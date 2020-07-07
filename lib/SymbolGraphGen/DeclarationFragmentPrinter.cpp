@@ -137,8 +137,11 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
     PrintNameContext NameContext) {
   openFragment(FragmentKind::TypeIdentifier);
   printText(Name.str());
-  llvm::raw_svector_ostream OS(USR);
-  ide::printDeclUSR(RefTo, OS);
+  USR.clear();
+  if (Name.str() != "Self") {
+    llvm::raw_svector_ostream OS(USR);
+    ide::printDeclUSR(RefTo, OS);
+  }
   closeFragment();
 }
 

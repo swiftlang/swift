@@ -221,6 +221,10 @@ module BlocksReturningBool {
   header "BlocksReturningBool.h"
 }
 
+module MacOSVersionCanonicalization {
+  header "MacOSVersionCanonicalization.h"
+}
+
 module Warnings1 { header "Warnings1.h" }
 module Warnings2 { header "Warnings2.h" }
 module Warnings3 { header "Warnings3.h" }

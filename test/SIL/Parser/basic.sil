@@ -572,6 +572,15 @@ bb0:
   return %6 : $()
 }
 
+// CHECK-LABEL: @base_addr : $@convention(thin) () -> ()
+sil private @base_addr : $() -> () {
+bb0:
+  // CHECK: base_addr_for_offset $*Int
+  %0 = base_addr_for_offset $*Int
+  %1 = tuple ()
+  return %1 : $()
+}
+
 protocol SomeProtocol {
 }
 class SomeClass : SomeProtocol {
@@ -774,6 +783,25 @@ bb0(%0 : $Class1, %1 : $Builtin.Word):
   %3 = tail_addr %2 : $*Val, %1 : $Builtin.Word, $Aleph
   return %0 : $Class1
 }
+
+// CHECK-LABEL: sil @test_cow_mutation
+sil @test_cow_mutation : $@convention(thin) (@owned Class1) -> @owned Class1 {
+bb0(%0 : $Class1):
+  // CHECK: (%1, %2) = begin_cow_mutation %0 : $Class1
+  (%1, %2) = begin_cow_mutation %0 : $Class1
+  // CHECK: %3 = end_cow_mutation [keep_unique] %2 : $Class1
+  %3 = end_cow_mutation [keep_unique] %2 : $Class1
+  // CHECK: (%4, %5) = begin_cow_mutation [native] %0 : $Class1
+  (%4, %5) = begin_cow_mutation [native] %0 : $Class1
+  // CHECK: %6 = end_cow_mutation %5 : $Class1
+  %6 = end_cow_mutation %5 : $Class1
+  // CHECK: [[T:%[0-9]+]] = ref_tail_addr [immutable] %3 : $Class1, $Val
+  %7 = ref_tail_addr [immutable] %3 : $Class1, $Val
+  // CHECK: ref_element_addr [immutable] %3 : $Class1, #Class1.a
+  %8 = ref_element_addr [immutable] %3 : $Class1, #Class1.a
+  return %0 : $Class1
+}
+
 
 
 // CHECK-LABEL: closure_test
@@ -1669,11 +1697,22 @@ bb0:
   return %1 : $()
 }
 
+class Foo2: Foo {}
+
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter
-// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter [override]
+// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter [nonoverridden]
+// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter
 // CHECK: }
 sil_vtable Foo {
-  #Foo.subscript!getter: @Foo_subscript_getter
+  #Foo.subscript!getter: @Foo_subscript_getter [nonoverridden]
+  #Foo.subscript!setter: @Foo_subscript_setter 
+}
+
+// CHECK-LABEL: sil_vtable Foo2 {
+// CHECK: #Foo.subscript!getter: {{.*}} : @Foo_subscript_getter [inherited] [nonoverridden]
+// CHECK: #Foo.subscript!setter: {{.*}} : @Foo_subscript_setter [override]
+// CHECK: }
+sil_vtable Foo2 {
+  #Foo.subscript!getter: @Foo_subscript_getter [inherited] [nonoverridden]
   #Foo.subscript!setter: @Foo_subscript_setter [override]
 }

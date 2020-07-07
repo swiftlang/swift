@@ -215,8 +215,8 @@ struct SymbolGraph {
   /// and checking every named parent context as well.
   ///
   /// \param IgnoreContext If `true`, don't consider
-  /// the context of the symbol to determine whether it is implicitly private.
-  bool isImplicitlyPrivate(const ValueDecl *VD,
+  /// the context of the declaration to determine whether it is implicitly private.
+  bool isImplicitlyPrivate(const Decl *D,
                            bool IgnoreContext = false) const;
 
   /// Returns `true` if the declaration should be included as a node
@@ -226,6 +226,11 @@ struct SymbolGraph {
   /// Returns `true` if the declaration is a requirement of a protocol
   /// or is a default implementation of a protocol
   bool isRequirementOrDefaultImplementation(const ValueDecl *VD) const;
+
+  /// Returns `true` if there are no nodes or edges in this graph.
+  bool empty() const {
+    return Nodes.empty() && Edges.empty();
+  }
 };
 
 } // end namespace symbolgraphgen

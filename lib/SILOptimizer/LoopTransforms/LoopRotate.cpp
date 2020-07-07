@@ -198,7 +198,7 @@ static void rewriteNewLoopEntryCheckBlock(
     auto &inst = *instIter;
     updateSSAForUseOfInst(updater, insertedPhis, valueMap, header,
                           entryCheckBlock, &inst);
-    instIter++;
+    ++instIter;
   }
 }
 

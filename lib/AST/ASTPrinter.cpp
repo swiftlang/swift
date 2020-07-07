@@ -30,6 +30,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
@@ -43,6 +44,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
@@ -474,7 +476,7 @@ void StreamPrinter::printText(StringRef Text) {
 /// Whether we will be printing a TypeLoc by using the TypeRepr printer
 static bool willUseTypeReprPrinting(TypeLoc tyLoc,
                                     Type currentType,
-                                    PrintOptions options) {
+                                    const PrintOptions &options) {
   // Special case for when transforming archetypes
   if (currentType && tyLoc.getType())
     return false;
@@ -685,7 +687,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printTypeWithOptions(Type T, PrintOptions options) {
+  void printTypeWithOptions(Type T, const PrintOptions &options) {
     if (options.TransformContext) {
       // FIXME: it's not clear exactly what we want to keep from the existing
       // options, and what we want to discard.
@@ -735,7 +737,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printTransformedTypeWithOptions(T, Options);
   }
 
-  void printTypeLocWithOptions(const TypeLoc &TL, PrintOptions options) {
+  void printTypeLocWithOptions(const TypeLoc &TL, const PrintOptions &options) {
     if (CurrentType && TL.getType()) {
       printTransformedTypeWithOptions(TL.getType(), options);
       return;
@@ -812,6 +814,10 @@ public:
       TypeArrayView<GenericTypeParamType> genericParams,
       ArrayRef<Requirement> requirements, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
+  void printSingleDepthOfGenericSignature(
+      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
+      llvm::function_ref<bool(const Requirement &)> filter);
   void printRequirement(const Requirement &req);
 
 private:
@@ -871,7 +877,12 @@ public:
       return false; // not needed for the parser library.
     #endif
 
-    if (!shouldPrint(D, true))
+    bool Synthesize =
+        Options.TransformContext &&
+        Options.TransformContext->isPrintingSynthesizedExtension() &&
+        isa<ExtensionDecl>(D);
+
+    if (!shouldPrint(D, true) && !Synthesize)
       return false;
 
     Decl *Old = Current;
@@ -889,10 +900,6 @@ public:
 
     SWIFT_DEFER { CurrentType = OldType; };
 
-    bool Synthesize =
-        Options.TransformContext &&
-        Options.TransformContext->isPrintingSynthesizedExtension() &&
-        isa<ExtensionDecl>(D);
     if (Synthesize) {
       Printer.setSynthesizedTarget(Options.TransformContext->getDecl());
     }
@@ -1075,7 +1082,7 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
 
 /// Determines if we are required to print the name of a property declaration,
 /// or if we can elide it by printing a '_' instead.
-static bool mustPrintPropertyName(VarDecl *decl, PrintOptions opts) {
+static bool mustPrintPropertyName(VarDecl *decl, const PrintOptions &opts) {
   // If we're not allowed to omit the name, we must print it.
   if (!opts.OmitNameOfInaccessibleProperties) return true;
 
@@ -1157,7 +1164,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(pattern);
     Printer << tok::kw_is << " ";
-    isa->getCastTypeLoc().getType().print(Printer, Options);
+    isa->getCastType().print(Printer, Options);
     break;
   }
 
@@ -1435,7 +1442,7 @@ void PrintAST::printGenericSignature(
     // Move index to genericParams.
     unsigned lastParamIdx = paramIdx;
     do {
-      lastParamIdx++;
+      ++lastParamIdx;
     } while (lastParamIdx < numParam &&
              genericParams[lastParamIdx]->getDepth() == depth);
 
@@ -1454,6 +1461,15 @@ void PrintAST::printGenericSignature(
 void PrintAST::printSingleDepthOfGenericSignature(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, unsigned flags,
+    llvm::function_ref<bool(const Requirement &)> filter) {
+  bool isFirstReq = true;
+  printSingleDepthOfGenericSignature(genericParams, requirements, isFirstReq,
+                                     flags, filter);
+}
+
+void PrintAST::printSingleDepthOfGenericSignature(
+    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
@@ -1501,7 +1517,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
   }
 
   if (printRequirements || printInherited) {
-    bool isFirstReq = true;
     for (const auto &req : requirements) {
       if (!filter(req))
         continue;
@@ -1563,9 +1578,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
         }
       } else {
         Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-
-        // We don't substitute type for the printed requirement so that the
-        // printed requirement agrees with separately reported generic parameters.
         printRequirement(req);
         Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       }
@@ -1577,7 +1589,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
 }
 
 void PrintAST::printRequirement(const Requirement &req) {
-  printType(req.getFirstType());
+  printTransformedType(req.getFirstType());
   switch (req.getKind()) {
   case RequirementKind::Layout:
     Printer << " : ";
@@ -1591,7 +1603,7 @@ void PrintAST::printRequirement(const Requirement &req) {
     Printer << " == ";
     break;
   }
-  printType(req.getSecondType());
+  printTransformedType(req.getSecondType());
 }
 
 bool PrintAST::shouldPrintPattern(const Pattern *P) {
@@ -1668,6 +1680,14 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     if (Options.AccessFilter > AccessLevel::Private &&
         VD->getFormalAccess() < Options.AccessFilter)
       return false;
+  }
+
+  // Skip clang decls marked with the swift_private attribute.
+  if (Options.SkipSwiftPrivateClangDecls) {
+    if (auto ClangD = D->getClangDecl()) {
+      if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+        return false;
+    }
   }
 
   if (Options.SkipPrivateStdlibDecls &&
@@ -2064,6 +2084,9 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
 }
 
 void PrintAST::printInherited(const Decl *decl) {
+  if (!Options.PrintInherited) {
+    return;
+  }
   SmallVector<TypeLoc, 6> TypesToPrint;
   getInheritedForPrinting(decl, Options, TypesToPrint);
   if (TypesToPrint.empty())
@@ -2171,8 +2194,52 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
   Ty->print(Printer, Options);
 }
 
+
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
+
+  auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
+    auto Sig = ED->getGenericSignature();
+    printSingleDepthOfGenericSignature(Sig->getGenericParams(),
+                                       Sig->getRequirements(),
+                                       IsFirst, PrintRequirements,
+                                       [](const Requirement &Req){
+      return true;
+    });
+  };
+
+  auto printCombinedRequirementsIfNeeded = [&]() -> bool {
+    if (!Options.TransformContext ||
+        !Options.TransformContext->isPrintingSynthesizedExtension())
+      return false;
+
+    // Combined requirements only needed if the transform context is an enabling
+    // extension of the protocol rather than a nominal (which can't have
+    // constraints of its own).
+    ExtensionDecl *Target = dyn_cast<ExtensionDecl>(
+      Options.TransformContext->getDecl().getAsDecl());
+    if (!Target || Target == ExtDecl)
+      return false;
+
+    bool IsFirst = true;
+    if (ExtDecl->isConstrainedExtension()) {
+      printRequirementsFrom(ExtDecl, IsFirst);
+    }
+    if (Target->isConstrainedExtension()) {
+      if (auto *NTD = Target->getExtendedNominal()) {
+        // Update the current decl and type transform for Target rather than
+        // ExtDecl.
+        PrintOptions Adjusted = Options;
+        Adjusted.initForSynthesizedExtension(NTD);
+        llvm::SaveAndRestore<Decl*> TempCurrent(Current, NTD);
+        llvm::SaveAndRestore<PrintOptions> TempOptions(Options, Adjusted);
+        printRequirementsFrom(Target, IsFirst);
+      }
+    }
+    return true;
+  };
+
+
   if (Options.BracketOptions.shouldOpenExtension(ExtDecl)) {
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
@@ -2180,7 +2247,25 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 
     printExtendedTypeName(ExtendedType, Printer, Options);
     printInherited(ExtDecl);
-    printDeclGenericRequirements(ExtDecl);
+
+    // We may need to combine requirements from ExtDecl (which has the members
+    // to print) and the TransformContexts' decl if it is an enabling extension
+    // of the base NominalDecl (which can have its own requirements) rather than
+    // base NominalDecl itself (which can't). E.g:
+    //
+    //   protocol Foo {}
+    //   extension Foo where <requirments from ExtDecl> { ... }
+    //   struct Bar {}
+    //   extension Bar: Foo where <requirments from TransformContext> { ... }
+    //
+    // should produce a synthesized extension of Bar with both sets of
+    // requirments:
+    //
+    //   extension Bar where <requirments from ExtDecl+TransformContext { ... }
+    //
+    if (!printCombinedRequirementsIfNeeded())
+      printDeclGenericRequirements(ExtDecl);
+
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(ExtDecl, false,
@@ -2552,8 +2637,10 @@ static bool isEscaping(Type type) {
   return false;
 }
 
-static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
-                                ParameterTypeFlags flags, bool escaping) {
+static void printParameterFlags(ASTPrinter &printer,
+                                const PrintOptions &options,
+                                ParameterTypeFlags flags,
+                                bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer.printAttrName("@autoclosure ");
   if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
@@ -2575,7 +2662,7 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
   }
 
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
-    printer << "@escaping ";
+    printer.printKeyword("@escaping", options, " ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -2612,11 +2699,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   auto type = decl->getInterfaceType();
   Printer << ": ";
   TypeLoc tyLoc;
-  if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr())
+  if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr()) {
     tyLoc = TypeLoc(repr, type);
-  else
+  } else {
     tyLoc = TypeLoc::withoutLoc(type);
-
+  }
   Printer.printDeclResultTypePre(decl, tyLoc);
 
   // HACK: When printing result types for vars with opaque result types,
@@ -3641,11 +3728,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return false;
 
     // Don't print qualifiers for imported types.
-    for (auto File : M->getFiles()) {
-      if (File->getKind() == FileUnitKind::ClangModule ||
-          File->getKind() == FileUnitKind::DWARFModule)
-        return false;
-    }
+    if (!Options.QualifyImportedTypes)
+      for (auto File : M->getFiles()) {
+        if (File->getKind() == FileUnitKind::ClangModule ||
+            File->getKind() == FileUnitKind::DWARFModule)
+          return false;
+      }
 
     return true;
   }
@@ -3727,7 +3815,7 @@ public:
     }
 
     printQualifiedType(T);
-    printGenericArgs(T->getInnermostGenericArgs());
+    printGenericArgs(T->getDirectGenericArgs());
   }
 
   void visitParenType(ParenType *T) {
@@ -4595,12 +4683,13 @@ void GenericSignatureImpl::print(ASTPrinter &Printer, PrintOptions PO) const {
   GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(Printer, PO);
 }
 
-void GenericSignature::print(raw_ostream &OS, PrintOptions Opts) const {
+void GenericSignature::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
 }
 
-void GenericSignature::print(ASTPrinter &Printer, PrintOptions Opts) const {
+void GenericSignature::print(ASTPrinter &Printer,
+                             const PrintOptions &Opts) const {
   if (isNull()) {
     Printer << "<null>";
     return;
@@ -4740,6 +4829,13 @@ void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   print(Printer, Opts);
 }
 void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
+  switch (getDifferentiability()) {
+  case SILResultDifferentiability::NotDifferentiable:
+    Printer << "@noDerivative ";
+    break;
+  default:
+    break;
+  }
   Printer << getStringForResultConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }

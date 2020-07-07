@@ -12,6 +12,7 @@
 
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "ModuleFile.h"
+#include "ModuleFileSharedCore.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
@@ -196,18 +197,20 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       bool requireTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
       forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
         auto pathExt = llvm::sys::path::extension(path);
-        if (requireTargetSpecificModule) {
-          if (pathExt != moduleSuffix)
+
+        if (pathExt != moduleSuffix)
+          if (requireTargetSpecificModule || pathExt != suffix)
             return;
-          if (!checkTargetFiles(path))
+
+        if (!checkTargetFiles(path)) {
+          if (requireTargetSpecificModule)
             return;
-        } else {
-          if (suffix != pathExt)
-            return;
+
           auto stat = fs.status(path);
           if (!stat || stat->isDirectory())
             return;
         }
+
         // Extract module name.
         auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
         names.push_back(Ctx.getIdentifier(name));
@@ -271,6 +274,12 @@ std::error_code SerializedModuleLoaderBase::openModuleDocFileIfPresent(
   }
 
   return std::error_code();
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+SerializedModuleLoaderBase::getModuleName(ASTContext &Ctx, StringRef modulePath,
+                                          std::string &Name) {
+  return ModuleFile::getModuleName(Ctx, modulePath, Name);
 }
 
 std::error_code
@@ -356,15 +365,16 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
     return moduleBuf.getError();
 
   // Load the module file without validation.
-  std::unique_ptr<ModuleFile> loadedModuleFile;
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
+  serialization::ExtendedValidationInfo extInfo;
   serialization::ValidationInfo loadInfo =
-      ModuleFile::load(modulePath.str(),
+      ModuleFileSharedCore::load(modulePath.str(),
                        std::move(moduleBuf.get()),
                        nullptr,
                        nullptr,
                        isFramework, loadedModuleFile,
-                       nullptr);
+                       &extInfo);
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str());
@@ -649,7 +659,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-    bool isFramework, bool treatAsPartialModule) {
+    bool isFramework) {
   assert(moduleInputBuffer);
 
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -666,28 +676,31 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
   serialization::ExtendedValidationInfo extendedInfo;
   std::unique_ptr<ModuleFile> loadedModuleFile;
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFileCore;
   serialization::ValidationInfo loadInfo =
-      ModuleFile::load(moduleInterfacePath,
+      ModuleFileSharedCore::load(moduleInterfacePath,
                        std::move(moduleInputBuffer),
                        std::move(moduleDocInputBuffer),
                        std::move(moduleSourceInfoInputBuffer),
-                       isFramework, loadedModuleFile,
+                       isFramework, loadedModuleFileCore,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
+    loadedModuleFile =
+        std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
     M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
-    M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
     if (extendedInfo.arePrivateImportsEnabled())
       M.setPrivateImportsEnabled();
+    if (extendedInfo.isImplicitDynamicEnabled())
+      M.setImplicitDynamicEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
-        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid,
-                                                   treatAsPartialModule);
+        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
 
     // FIXME: This seems wrong. Overlay for system Clang module doesn't
     // necessarily mean it's "system" module. User can make their own overlay
@@ -704,22 +717,23 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
       findOverlayFiles(diagLoc.getValueOr(SourceLoc()), &M, fileUnit);
       return fileUnit;
     }
-
-    M.removeFile(*fileUnit);
   }
 
   // From here on is the failure path.
-
-  // Even though the module failed to load, it's possible its contents include
-  // a source buffer that need to survive because it's already been used for
-  // diagnostics.
-  if (auto orphanedBuffer = loadedModuleFile->takeBufferForDiagnostics())
-    OrphanedMemoryBuffers.push_back(std::move(orphanedBuffer));
 
   if (diagLoc)
     serialization::diagnoseSerializedASTLoadFailure(
         Ctx, *diagLoc, loadInfo, extendedInfo, moduleBufferID,
         moduleDocBufferID, loadedModuleFile.get(), M.getName());
+
+  // Even though the module failed to load, it's possible its contents include
+  // a source buffer that need to survive because it's already been used for
+  // diagnostics.
+  // Note this is only necessary in case a bridging header failed to load
+  // during the `associateWithFileContext()` call.
+  if (loadedModuleFile && loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
+    OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
+
   return nullptr;
 }
 
@@ -787,20 +801,20 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                Ctx.LangOpts.DebuggerSupport)) {
             return false;
           }
-          return duplicates.insert(dependency.RawPath).second;
+          return duplicates.insert(dependency.Core.RawPath).second;
         });
 
     // FIXME: only show module part of RawAccessPath
     assert(!missing.empty() && "unknown missing dependency?");
     if (missing.size() == 1) {
       Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_single_dependency,
-                         missing.front().getPrettyPrintedPath());
+                         missing.front().Core.getPrettyPrintedPath());
     } else {
       llvm::SmallString<64> missingNames;
       missingNames += '\'';
       interleave(missing,
                  [&](const ModuleFile::Dependency &next) {
-                   missingNames += next.getPrettyPrintedPath();
+                   missingNames += next.Core.getPrettyPrintedPath();
                  },
                  [&] { missingNames += "', '"; });
       missingNames += '\'';
@@ -834,7 +848,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     // hard because we're discovering this /while/ resolving imports, which
     // means the problematic modules haven't been recorded yet.
     Ctx.Diags.diagnose(diagLoc, diag::serialization_circular_dependency,
-                       circularDependencyIter->getPrettyPrintedPath(),
+                       circularDependencyIter->Core.getPrettyPrintedPath(),
                        ModuleName);
     break;
   }
@@ -953,19 +967,21 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   auto M = ModuleDecl::create(moduleID.Item, Ctx);
   M->setIsSystemModule(isSystemModule);
-  Ctx.LoadedModules[moduleID.Item] = M;
+  Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   StringRef moduleInterfacePathStr =
     Ctx.AllocateCopy(moduleInterfacePath.str());
 
-  if (!loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
-               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
-               std::move(moduleSourceInfoInputBuffer),
-               isFramework, /*treatAsPartialModule*/false)) {
+  auto *file =
+      loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
+              std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
+              std::move(moduleSourceInfoInputBuffer), isFramework);
+  if (file) {
+    M->addFile(*file);
+  } else {
     M->setFailedToLoad();
   }
-
   return M;
 }
 
@@ -988,7 +1004,6 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
     return nullptr;
 
   bool isFramework = false;
-  bool treatAsPartialModule = false;
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
   moduleInputBuffer = std::move(bufIter->second);
   MemoryBuffers.erase(bufIter);
@@ -997,13 +1012,13 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto *M = ModuleDecl::create(moduleID.Item, Ctx);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
-  if (!loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
-               std::move(moduleInputBuffer), {}, {},
-               isFramework, treatAsPartialModule)) {
+  auto *file = loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
+                       std::move(moduleInputBuffer), {}, {}, isFramework);
+  if (!file)
     return nullptr;
-  }
 
-  Ctx.LoadedModules[moduleID.Item] = M;
+  M->addFile(*file);
+  Ctx.addLoadedModule(M);
   return M;
 }
 
@@ -1080,12 +1095,9 @@ void SerializedASTFile::getImportedModules(
 
 void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
-  ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-
   llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  File.getImportedModules(Imports, ImportFilter);
+  File.getImportedModules(Imports, {ModuleDecl::ImportFilterKind::Public,
+                                    ModuleDecl::ImportFilterKind::Private});
 
   for (auto Import : Imports)
     Import.importedModule->collectLinkLibraries(callback);
@@ -1101,7 +1113,11 @@ void SerializedASTFile::collectLinkLibraries(
 }
 
 bool SerializedASTFile::isSIB() const {
-  return File.IsSIB;
+  return File.isSIB();
+}
+
+bool SerializedASTFile::hadLoadError() const {
+  return File.hasError();
 }
 
 bool SerializedASTFile::isSystemModule() const {
@@ -1173,8 +1189,9 @@ void SerializedASTFile::lookupObjCMethods(
   File.lookupObjCMethods(selector, results);
 }
 
-void SerializedASTFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                           SmallVectorImpl<Identifier> &spiGroups) const {
+void SerializedASTFile::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   File.lookupImportedSPIGroups(importedModule, spiGroups);
 }
 

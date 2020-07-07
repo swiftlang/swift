@@ -268,8 +268,8 @@ class Remangler : public RemanglerBase {
   }
 
   void mangleChildNode(Node *node, unsigned index) {
-    assert(index < node->getNumChildren());
-    mangle(node->begin()[index]);
+    if (index < node->getNumChildren())
+      mangle(node->begin()[index]);
   }
 
   void manglePureProtocol(Node *Proto) {
@@ -895,7 +895,7 @@ void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
 
 void Remangler::mangleDependentGenericSignature(Node *node) {
   size_t ParamCountEnd = 0;
-  for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; Idx++) {
+  for (size_t Idx = 0, Num = node->getNumChildren(); Idx < Num; ++Idx) {
     Node *Child = node->getChild(Idx);
     if (Child->getKind() == Node::Kind::DependentGenericParamCount) {
       ParamCountEnd = Idx + 1;
@@ -1573,6 +1573,9 @@ void Remangler::mangleImplFunctionType(Node *node) {
                         .Default(0);
         assert(ConvCh && "invalid impl parameter convention");
         Buffer << ConvCh;
+        // Mangle result differentiability, if it exists.
+        if (Child->getNumChildren() == 3)
+          mangleImplDifferentiability(Child->getChild(1));
         break;
       }
       default:
@@ -2531,6 +2534,17 @@ void Remangler::mangleOpaqueType(Node *node) {
 }
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
+}
+
+void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "MM";
+}
+
+void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mb";
 }
 
 } // anonymous namespace

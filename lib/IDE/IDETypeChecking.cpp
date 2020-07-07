@@ -282,7 +282,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
     auto handleRequirements = [&](SubstitutionMap subMap,
                                   GenericSignature GenericSig,
+                                  ExtensionDecl *OwningExt,
                                   ArrayRef<Requirement> Reqs) {
+      ProtocolDecl *BaseProto = OwningExt->getInnermostDeclContext()
+        ->getSelfProtocolDecl();
       for (auto Req : Reqs) {
         auto Kind = Req.getKind();
 
@@ -290,8 +293,16 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         if (Kind == RequirementKind::Layout)
           continue;
 
-        auto First = Req.getFirstType();
-        auto Second = Req.getSecondType();
+        Type First = Req.getFirstType();
+        Type Second = Req.getSecondType();
+
+        // Skip protocol's Self : <Protocol> requirement.
+        if (BaseProto &&
+            Req.getKind() == RequirementKind::Conformance &&
+            First->isEqual(BaseProto->getSelfInterfaceType()) &&
+            Second->getAnyNominal() == BaseProto)
+          continue;
+
         if (!BaseType->isExistentialType()) {
           First = First.subst(subMap);
           Second = Second.subst(subMap);
@@ -346,19 +357,29 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       // the extension to the interface types of the base type's
       // declaration.
       SubstitutionMap subMap;
-      if (!BaseType->isExistentialType())
-        subMap = BaseType->getContextSubstitutionMap(M, Ext);
+      if (!BaseType->isExistentialType()) {
+        if (auto *NTD = Ext->getExtendedNominal())
+          subMap = BaseType->getContextSubstitutionMap(M, NTD);
+      }
 
       assert(Ext->getGenericSignature() && "No generic signature.");
       auto GenericSig = Ext->getGenericSignature();
-      if (handleRequirements(subMap, GenericSig, GenericSig->getRequirements()))
+      if (handleRequirements(subMap, GenericSig, Ext, GenericSig->getRequirements()))
         return {Result, MergeInfo};
     }
 
-    if (Conf && handleRequirements(Conf->getSubstitutions(M),
-                                   Conf->getGenericSignature(),
-                                   Conf->getConditionalRequirements()))
-      return {Result, MergeInfo};
+    if (Conf) {
+      SubstitutionMap subMap;
+      if (!BaseType->isExistentialType()) {
+        if (auto *NTD = EnablingExt->getExtendedNominal())
+          subMap = BaseType->getContextSubstitutionMap(M, NTD);
+      }
+      if (handleRequirements(subMap,
+                             Conf->getGenericSignature(),
+                             EnablingExt,
+                             Conf->getConditionalRequirements()))
+        return {Result, MergeInfo};
+    }
 
     Result.Ext = Ext;
     return {Result, MergeInfo};
@@ -431,7 +452,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     auto handleExtension = [&](ExtensionDecl *E, bool Synthesized,
                                ExtensionDecl *EnablingE,
                                NormalProtocolConformance *Conf) {
-      if (Options.shouldPrint(E)) {
+      PrintOptions AdjustedOpts = Options;
+      if (Synthesized) {
+        // Members from underscored system protocols should still appear as
+        // members of the target type, even if the protocols themselves are not
+        // printed.
+        AdjustedOpts.SkipUnderscoredStdlibProtocols = false;
+      }
+      if (AdjustedOpts.shouldPrint(E)) {
         auto Pair = isApplicable(E, Synthesized, EnablingE, Conf);
         if (Pair.first) {
           InfoMap->insert({E, Pair.first});

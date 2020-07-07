@@ -24,14 +24,13 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              SILType loweredType,
                                              Optional<SILLocation> loc,
                                              VarDecl *Decl) {
-  // Get a StringMapEntry for the variable.  As a sop to error cases,
-  // allow the name to have an empty string.
+  // Get a StringMapEntry for the variable.
   llvm::StringMapEntry<SILGlobalVariable*> *entry = nullptr;
-  if (!name.empty()) {
-    entry = &*M.GlobalVariableMap.insert(std::make_pair(name, nullptr)).first;
-    assert(!entry->getValue() && "global variable already exists");
-    name = entry->getKey();
-  }
+  assert(!name.empty() && "Name required");
+
+  entry = &*M.GlobalVariableMap.insert(std::make_pair(name, nullptr)).first;
+  assert(!entry->getValue() && "global variable already exists");
+  name = entry->getKey();
 
   auto var = new (M) SILGlobalVariable(M, linkage, isSerialized, name,
                                        loweredType, loc, Decl);
@@ -48,8 +47,9 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
   : Module(Module),
     Name(Name),
     LoweredType(LoweredType),
-    Location(Loc),
+    Location(Loc.getValueOr(SILLocation::invalid())),
     Linkage(unsigned(Linkage)),
+    HasLocation(Loc.hasValue()),
     VDecl(Decl) {
   setSerialized(isSerialized);
   IsDeclaration = isAvailableExternally(Linkage);
@@ -109,6 +109,12 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
     case SILInstructionKind::BuiltinInst: {
       auto *bi = cast<BuiltinInst>(I);
       switch (M.getBuiltinInfo(bi->getName()).ID) {
+        case BuiltinValueKind::ZeroInitializer: {
+          auto type = bi->getType().getASTType();
+          if (auto vector = dyn_cast<BuiltinVectorType>(type))
+            type = vector.getElementType();
+          return isa<BuiltinIntegerType>(type) || isa<BuiltinFloatType>(type);
+        }
         case BuiltinValueKind::PtrToInt:
           if (isa<LiteralInst>(bi->getArguments()[0]))
             return true;
@@ -130,6 +136,8 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           auto *TE = bi->getSingleUserOfType<TupleExtractInst>();
           return TE && getOffsetSubtract(TE, M);
         }
+        case BuiltinValueKind::OnFastPath:
+          return true;
         default:
           break;
       }

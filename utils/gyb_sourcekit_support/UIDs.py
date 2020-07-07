@@ -99,6 +99,8 @@ UID_KEYS = [
     KEY('EducationalNotePaths', 'key.educational_note_paths'),
     KEY('FormatOptions', 'key.editor.format.options'),
     KEY('CodeCompleteOptions', 'key.codecomplete.options'),
+    KEY('TypeContextInfoOptions', 'key.typecontextinfo.options'),
+    KEY('ConformingMethodListOptions', 'key.conformingmethods.options'),
     KEY('FilterRules', 'key.codecomplete.filterrules'),
     KEY('NextRequestStart', 'key.nextrequeststart'),
     KEY('Popular', 'key.popular'),
@@ -181,6 +183,9 @@ UID_KEYS = [
     KEY('ReusingASTContext', 'key.reusingastcontext'),
     KEY('CompletionCheckDependencyInterval',
         'key.completion_check_dependency_interval'),
+    KEY('AnnotatedTypename', 'key.annotated.typename'),
+    KEY('CompileOperation', 'key.compile_operation'),
+    KEY('EffectiveAccess', 'key.effective_access'),
 ]
 
 

@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 
@@ -54,16 +55,19 @@ StringRef prettyPlatformString(PlatformKind platform);
 /// If ForTargetVariant is true then for zippered builds the target-variant
 /// triple will be used rather than the target to determine whether the
 /// platform is active.
-bool isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
+bool isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                       bool ForTargetVariant = false);
 
 /// Returns the target platform for the given language options.
-PlatformKind targetPlatform(LangOptions &LangOpts);
+PlatformKind targetPlatform(const LangOptions &LangOpts);
 
 /// Returns true when availability attributes from the "parent" platform
 /// should also apply to the "child" platform for declarations without
 /// an explicit attribute for the child.
 bool inheritsAvailabilityFromPlatform(PlatformKind Child, PlatformKind Parent);
+
+llvm::VersionTuple canonicalizePlatformVersion(
+    PlatformKind platform, const llvm::VersionTuple &version);
 
 } // end namespace swift
 

@@ -25,7 +25,7 @@ static unsigned getAnyMetatypeDepth(CanType type) {
   unsigned depth = 0;
   while (auto metatype = dyn_cast<AnyMetatypeType>(type)) {
     type = metatype.getInstanceType();
-    depth++;
+    ++depth;
   }
   return depth;
 }
@@ -719,7 +719,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
 static unsigned getOptionalDepth(CanType type) {
   unsigned depth = 0;
   while (CanType objectType = type.getOptionalObjectType()) {
-    depth++;
+    ++depth;
     type = objectType;
   }
   return depth;

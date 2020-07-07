@@ -17,7 +17,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
-#include <string>
 
 namespace clang {
   class Module;

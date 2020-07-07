@@ -264,6 +264,26 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
   return nullptr;
 }
 
+SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
+
+  // Remove a cast if it's only used by an end_cow_mutation.
+  //
+  // (end_cow_mutation (upcast X)) -> (end_cow_mutation X)
+  // (end_cow_mutation (unchecked_ref_cast X)) -> (end_cow_mutation X)
+  SILValue op = ECM->getOperand();
+  if (!isa<UncheckedRefCastInst>(op) && !isa<UpcastInst>(op))
+    return nullptr;
+  if (!op->hasOneUse())
+    return nullptr;
+
+  SingleValueInstruction *refCast = cast<SingleValueInstruction>(op);
+  auto *newECM = Builder.createEndCOWMutation(ECM->getLoc(),
+                                              refCast->getOperand(0));
+  ECM->replaceAllUsesWith(refCast);
+  refCast->setOperand(0, newECM);
+  refCast->moveAfter(newECM);
+  return eraseInstFromFunction(*ECM);
+}
 
 SILInstruction *
 SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
@@ -440,6 +460,11 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   if (TTOCMI->getFunction()->hasOwnership())
     return nullptr;
 
+  if (auto *OCTTMI = dyn_cast<ObjCToThickMetatypeInst>(TTOCMI->getOperand())) {
+    TTOCMI->replaceAllUsesWith(OCTTMI->getOperand());
+    return eraseInstFromFunction(*TTOCMI);
+  }
+
   // Perform the following transformations:
   // (thick_to_objc_metatype (metatype @thick)) ->
   // (metatype @objc_metatype)
@@ -459,6 +484,11 @@ SILInstruction *
 SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   if (OCTTMI->getFunction()->hasOwnership())
     return nullptr;
+
+  if (auto *TTOCMI = dyn_cast<ThickToObjCMetatypeInst>(OCTTMI->getOperand())) {
+    OCTTMI->replaceAllUsesWith(TTOCMI->getOperand());
+    return eraseInstFromFunction(*OCTTMI);
+  }
 
   // Perform the following transformations:
   // (objc_to_thick_metatype (metatype @objc_metatype)) ->

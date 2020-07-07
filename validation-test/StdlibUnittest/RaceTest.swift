@@ -1,3 +1,4 @@
+// REQUIRES: rdar64809498
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
 // RUN: %target-run %t.out | %FileCheck %s
 // REQUIRES: stress_test
@@ -5,16 +6,15 @@
 
 import SwiftPrivate
 import StdlibUnittest
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
 #else
 #error("Unsupported platform")
 #endif
-
 
 _setTestSuiteFailedCallback() { print("abort()") }
 

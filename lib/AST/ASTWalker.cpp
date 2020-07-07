@@ -476,7 +476,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   } while (false)
 
   Expr *visitErrorExpr(ErrorExpr *E) { return E; }
-  Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) { return E; }
+  Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) {
+    if (Expr *baseExpr = E->getBase()) {
+      Expr *newBaseExpr = doIt(baseExpr);
+      if (!newBaseExpr)
+        return nullptr;
+      E->setBase(newBaseExpr);
+    }
+    return E;
+  }
   Expr *visitLiteralExpr(LiteralExpr *E) { return E; }
   Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) { return E; }
   Expr *visitTypeExpr(TypeExpr *E) {
@@ -815,21 +823,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
     }
 
-    // Handle single-expression closures.
-    if (expr->hasSingleExpressionBody()) {
-      if (Expr *body = doIt(expr->getSingleExpressionBody())) {
-        expr->setSingleExpressionBody(body);
-        return expr;
-      }
-      return nullptr;
-    }
-
-    if (!Walker.shouldWalkIntoNonSingleExpressionClosure(expr))
+    // If the closure was separately type checked and we don't want to
+    // visit separately-checked closure bodies, bail out now.
+    if (expr->wasSeparatelyTypeChecked() &&
+        !Walker.shouldWalkIntoSeparatelyCheckedClosure(expr))
       return expr;
 
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
-      expr->setBody(body, false);
+      expr->setBody(body, expr->hasSingleExpressionBody());
       return expr;
     }
     return nullptr;
@@ -898,8 +900,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->setSubExpr(Sub);
     }
 
-    if (doIt(E->getCastTypeLoc()))
-      return nullptr;
+    if (auto *const tyRepr = E->getCastTypeRepr())
+      if (doIt(tyRepr))
+        return nullptr;
 
     return E;
   }
@@ -1342,15 +1345,15 @@ public:
   bool doIt(RequirementRepr &Req) {
     switch (Req.getKind()) {
     case RequirementReprKind::SameType:
-      if (doIt(Req.getFirstTypeLoc()) || doIt(Req.getSecondTypeLoc()))
+      if (doIt(Req.getFirstTypeRepr()) || doIt(Req.getSecondTypeRepr()))
         return true;
       break;
     case RequirementReprKind::TypeConstraint:
-      if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
+      if (doIt(Req.getSubjectRepr()) || doIt(Req.getConstraintRepr()))
         return true;
       break;
     case RequirementReprKind::LayoutConstraint:
-      if (doIt(Req.getFirstTypeLoc()))
+      if (doIt(Req.getFirstTypeRepr()))
         return true;
       break;
     }
@@ -1493,7 +1496,7 @@ Stmt *Traversal::visitGuardStmt(GuardStmt *US) {
 }
 
 Stmt *Traversal::visitDoStmt(DoStmt *DS) {
-  if (Stmt *S2 = doIt(DS->getBody()))
+  if (BraceStmt *S2 = cast_or_null<BraceStmt>(doIt(DS->getBody())))
     DS->setBody(S2);
   else
     return nullptr;
@@ -1696,14 +1699,15 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
     }
   }
   if (!P->isImplicit())
-    if (doIt(P->getCastTypeLoc()))
-      return nullptr;
+    if (auto *TR = P->getCastTypeRepr())
+      if (doIt(TR))
+        return nullptr;
   return P;
 }
 
 Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
-  if (!P->isParentTypeImplicit())
-    if (doIt(P->getParentType()))
+  if (auto *TR = P->getParentTypeRepr())
+    if (doIt(TR))
       return nullptr;
 
   if (!P->hasSubPattern())

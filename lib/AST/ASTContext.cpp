@@ -44,7 +44,6 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -157,6 +156,11 @@ struct ASTContext::Implementation {
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
+  /// The set of top-level modules we have loaded.
+  /// This map is used for iteration, therefore it's a MapVector and not a
+  /// DenseMap.
+  llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
+
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
@@ -258,6 +262,9 @@ struct ASTContext::Implementation {
 
   /// The module loader used to load Clang modules from DWARF.
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
+
+  /// The module loader used to load Swift textual interface.
+  ModuleLoader *TheModuleInterfaceLoader = nullptr;
 
   /// Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
@@ -550,14 +557,10 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
   : LangOpts(langOpts),
     TypeCheckerOpts(typeckOpts),
     SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
-    evaluator(Diags,
-              langOpts.DebugDumpCycles,
-              langOpts.BuildRequestDependencyGraph,
-              langOpts.EnableExperientalPrivateIntransitiveDependencies),
+    evaluator(Diags, langOpts),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
-    TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(
       new (*this, AllocationArena::Permanent)
         ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
@@ -1450,20 +1453,21 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                                 bool IsClang, bool IsDwarf) {
+                                 bool IsClang, bool IsDwarf, bool IsInterface) {
   if (IsClang && !IsDwarf && !getImpl().TheClangModuleLoader)
     getImpl().TheClangModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
   if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
     getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
-
+  if (IsInterface && !getImpl().TheModuleInterfaceLoader)
+    getImpl().TheModuleInterfaceLoader = loader.get();
   getImpl().ModuleLoaders.push_back(std::move(loader));
 }
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
-    ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) {
+    ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate) {
   for (auto &loader : getImpl().ModuleLoaders) {
     if (isUnderlyingClangModule &&
         loader.get() != getImpl().TheClangModuleLoader)
@@ -1486,14 +1490,16 @@ void ASTContext::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void ASTContext::loadObjCMethods(
-       ClassDecl *classDecl,
-       ObjCSelector selector,
-       bool isInstanceMethod,
-       unsigned previousGeneration,
-       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+    ClassDecl *classDecl, ObjCSelector selector, bool isInstanceMethod,
+    unsigned previousGeneration,
+    llvm::TinyPtrVector<AbstractFunctionDecl *> &methods, bool swiftOnly) {
   PrettyStackTraceSelector stackTraceSelector("looking for", selector);
   PrettyStackTraceDecl stackTraceDecl("...in", classDecl);
   for (auto &loader : getImpl().ModuleLoaders) {
+    // Ignore the Clang importer if we've been asked for Swift-only results.
+    if (swiftOnly && loader.get() == getClangModuleLoader())
+      continue;
+
     loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
                             previousGeneration, methods);
   }
@@ -1515,11 +1521,6 @@ void ASTContext::verifyAllLoadedModules() const {
   FrontendStatsTracer tracer(Stats, "verify-all-loaded-modules");
   for (auto &loader : getImpl().ModuleLoaders)
     loader->verifyAllModules();
-
-  for (auto &topLevelModulePair : LoadedModules) {
-    ModuleDecl *M = topLevelModulePair.second;
-    assert(!M->getFiles().empty() || M->failedToLoad());
-  }
 #endif
 }
 
@@ -1535,6 +1536,10 @@ ClangModuleLoader *ASTContext::getDWARFModuleLoader() const {
   return getImpl().TheDWARFModuleLoader;
 }
 
+ModuleLoader *ASTContext::getModuleInterfaceLoader() const {
+  return getImpl().TheModuleInterfaceLoader;
+}
+
 ModuleDecl *ASTContext::getLoadedModule(
     ArrayRef<Located<Identifier>> ModulePath) const {
   assert(!ModulePath.empty());
@@ -1546,8 +1551,18 @@ ModuleDecl *ASTContext::getLoadedModule(
   return nullptr;
 }
 
+iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
+ASTContext::getLoadedModules() const {
+  return {getImpl().LoadedModules.begin(), getImpl().LoadedModules.end()};
+}
+
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
-  return LoadedModules.lookup(ModuleName);
+  return getImpl().LoadedModules.lookup(ModuleName);
+}
+
+void ASTContext::addLoadedModule(ModuleDecl *M) {
+  assert(M);
+  getImpl().LoadedModules[M->getName()] = M;
 }
 
 static AllocationArena getArena(GenericSignature genericSig) {
@@ -3372,14 +3387,22 @@ SILFunctionType::SILFunctionType(
     }
   }
 
-  // Check that `@noDerivative` parameters only exist on `@differentiable`
-  // functions.
-  if (!ext.isDifferentiable())
-    for (auto param : getParameters())
+  // Check that `@noDerivative` parameters and results only exist in
+  // `@differentiable` function types.
+  if (!ext.isDifferentiable()) {
+    for (auto param : getParameters()) {
       assert(param.getDifferentiability() ==
                  SILParameterDifferentiability::DifferentiableOrNotApplicable &&
-             "non-`@differentiable` function should not have NotDifferentiable "
-             "parameter");
+             "non-`@differentiable` function type should not have "
+             "`@noDerivative` parameter");
+    }
+    for (auto result : getResults()) {
+      assert(result.getDifferentiability() ==
+                 SILResultDifferentiability::DifferentiableOrNotApplicable &&
+             "non-`@differentiable` function type should not have "
+             "`@noDerivative` result");
+    }
+  }
 #endif
 }
 
@@ -3723,11 +3746,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
       superclass = superclass.subst(Substitutions);
     }
   #endif
-  SmallVector<ProtocolDecl*, 4> protos;
-  for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
-    protos.push_back(proto);
-  }
-  
+  const auto protos = signature->getRequiredProtocols(opaqueInterfaceTy);
+
   auto mem = ctx.Allocate(
     OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
       protos.size(), superclass ? 1 : 0, layout ? 1 : 0),
@@ -3836,45 +3856,6 @@ void TypeLoc::setInvalidType(ASTContext &C) {
   Ty = ErrorType::get(C);
 }
 
-namespace {
-class raw_capturing_ostream : public raw_ostream {
-  std::string Message;
-  uint64_t Pos;
-  CapturingTypeCheckerDebugConsumer &Listener;
-
-public:
-  raw_capturing_ostream(CapturingTypeCheckerDebugConsumer &Listener)
-      : Listener(Listener) {}
-
-  ~raw_capturing_ostream() override {
-    flush();
-  }
-
-  void write_impl(const char *Ptr, size_t Size) override {
-    Message.append(Ptr, Size);
-    Pos += Size;
-
-    // Check if we have at least one complete line.
-    size_t LastNewline = StringRef(Message).rfind('\n');
-    if (LastNewline == StringRef::npos)
-      return;
-    Listener.handleMessage(StringRef(Message.data(), LastNewline + 1));
-    Message.erase(0, LastNewline + 1);
-  }
-
-  uint64_t current_pos() const override {
-    return Pos;
-  }
-};
-} // unnamed namespace
-
-TypeCheckerDebugConsumer::~TypeCheckerDebugConsumer() { }
-
-CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
-    : Log(new raw_capturing_ostream(*this)) {
-  Log->SetUnbuffered();
-}
-
 void SubstitutionMap::Storage::Profile(
                                llvm::FoldingSetNodeID &id,
                                GenericSignature genericSig,
@@ -3893,7 +3874,7 @@ void SubstitutionMap::Storage::Profile(
       id.AddPointer(replacementTypes[i].getPointer());
     else
       id.AddPointer(nullptr);
-    i++;
+    ++i;
   });
 
   // Conformances.

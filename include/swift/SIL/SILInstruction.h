@@ -375,6 +375,12 @@ public:
     /// The instruction may read memory.
     MayRead,
     /// The instruction may write to memory.
+    /// This includes destroying or taking from memory (e.g. destroy_addr,
+    /// copy_addr [take], load [take]).
+    /// Although, physically, destroying or taking does not modify the memory,
+    /// it is important to model it is a write. Optimizations must not assume
+    /// that the value stored in memory is still available for loading after
+    /// the memory is destroyed or taken.
     MayWrite,
     /// The instruction may read or write memory.
     MayReadWrite,
@@ -1162,8 +1168,7 @@ public:
   }
 };
 
-/// A template base class for instructions that take a single SILValue operand
-/// and has no result or a single value result.
+/// A template base class for instructions that take a single SILValue operand.
 template<SILInstructionKind Kind, typename Base>
 class UnaryInstructionBase : public InstructionBase<Kind, Base> {
   // Space for 1 operand.
@@ -3206,6 +3211,20 @@ public:
   /// Create a placeholder instruction with an unset global reference.
   GlobalAddrInst(SILDebugLocation DebugLoc, SILType Ty)
       : InstructionBase(DebugLoc, Ty, nullptr) {}
+};
+
+/// Creates a base address for offset calculations.
+class BaseAddrForOffsetInst
+    : public InstructionBase<SILInstructionKind::BaseAddrForOffsetInst,
+                             LiteralInst> {
+  friend SILBuilder;
+
+  BaseAddrForOffsetInst(SILDebugLocation DebugLoc, SILType Ty)
+      : InstructionBase(DebugLoc, Ty) {}
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
 /// Gives the value of a global variable.
@@ -5753,6 +5772,13 @@ public:
     return s;
   }
 
+  static bool classof(const SILNode *node) {
+    SILNodeKind kind = node->getKind();
+    return kind == SILNodeKind::StructExtractInst ||
+           kind == SILNodeKind::StructElementAddrInst ||
+           kind == SILNodeKind::RefElementAddrInst;
+  }
+
 private:
   unsigned cacheFieldIndex();
 };
@@ -5806,11 +5832,24 @@ class RefElementAddrInst
   friend SILBuilder;
 
   RefElementAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
-                     VarDecl *Field, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy, Field) {}
+                     VarDecl *Field, SILType ResultTy, bool IsImmutable)
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy, Field) {
+    setImmutable(IsImmutable);
+  }
 
 public:
   ClassDecl *getClassDecl() const { return cast<ClassDecl>(getParentDecl()); }
+
+  /// Returns true if all loads of the same instance variable from the same
+  /// class reference operand are guaranteed to yield the same value.
+  bool isImmutable() const {
+    return SILInstruction::Bits.RefElementAddrInst.Immutable;
+  }
+
+  /// Sets the immutable flag.
+  void setImmutable(bool immutable = true) {
+    SILInstruction::Bits.RefElementAddrInst.Immutable = immutable;
+  }
 };
 
 /// RefTailAddrInst - Derive the address of the first element of the first
@@ -5821,8 +5860,11 @@ class RefTailAddrInst
 {
   friend SILBuilder;
 
-  RefTailAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {}
+  RefTailAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType ResultTy,
+                  bool IsImmutable)
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {
+    setImmutable(IsImmutable);
+  }
 
 public:
   ClassDecl *getClassDecl() const {
@@ -5832,6 +5874,17 @@ public:
   }
 
   SILType getTailType() const { return getType().getObjectType(); }
+
+  /// Returns true if all loads of the same instance variable from the same
+  /// class reference operand are guaranteed to yield the same value.
+  bool isImmutable() const {
+    return SILInstruction::Bits.RefTailAddrInst.Immutable;
+  }
+
+  /// Sets the immutable flag.
+  void setImmutable(bool immutable = true) {
+    SILInstruction::Bits.RefTailAddrInst.Immutable = immutable;
+  }
 };
 
 /// MethodInst - Abstract base for instructions that implement dynamic
@@ -6560,6 +6613,102 @@ class IsUniqueInst
 
   IsUniqueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType BoolTy)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
+};
+
+class BeginCOWMutationInst;
+
+/// A result for the begin_cow_mutation instruction. See documentation for
+/// begin_cow_mutation for more information.
+class BeginCOWMutationResult final : public MultipleValueInstructionResult {
+public:
+  BeginCOWMutationResult(unsigned index, SILType type,
+                         ValueOwnershipKind ownershipKind)
+      : MultipleValueInstructionResult(ValueKind::BeginCOWMutationResult,
+                                       index, type, ownershipKind) {}
+
+  BeginCOWMutationInst *getParent(); // inline below
+  const BeginCOWMutationInst *getParent() const {
+    return const_cast<BeginCOWMutationResult *>(this)->getParent();
+  }
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::BeginCOWMutationResult;
+  }
+};
+
+/// Performs a uniqueness check of the operand for the purpose of modifying
+/// a copy-on-write object.
+///
+/// Returns two results: the first result is an Int1 which is the result of the
+/// uniqueness check. The second result is the class reference operand, which
+/// can be used for mutation.
+class BeginCOWMutationInst final
+    : public UnaryInstructionBase<SILInstructionKind::BeginCOWMutationInst,
+                                  MultipleValueInstruction>,
+      public MultipleValueInstructionTrailingObjects<
+          BeginCOWMutationInst, BeginCOWMutationResult>
+{
+  friend SILBuilder;
+  friend TrailingObjects;
+
+  BeginCOWMutationInst(SILDebugLocation loc, SILValue operand,
+                       ArrayRef<SILType> resultTypes,
+                       ArrayRef<ValueOwnershipKind> resultOwnerships,
+                       bool isNative);
+
+  static BeginCOWMutationInst *
+  create(SILDebugLocation loc, SILValue operand, SILType BoolTy, SILFunction &F,
+         bool isNative);
+
+public:
+  using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
+
+  /// Returns the result of the uniqueness check.
+  SILValue getUniquenessResult() const {
+    return &getAllResultsBuffer()[0];
+  }
+
+  /// Returns the class reference which can be used for mutation.
+  SILValue getBufferResult() const {
+    return &getAllResultsBuffer()[1];
+  }
+
+  bool isNative() const {
+    return SILInstruction::Bits.BeginCOWMutationInst.Native;
+  }
+  
+  void setNative(bool native = true) {
+    SILInstruction::Bits.BeginCOWMutationInst.Native = native;
+  }
+};
+
+// Out of line to work around forward declaration issues.
+inline BeginCOWMutationInst *BeginCOWMutationResult::getParent() {
+  auto *Parent = MultipleValueInstructionResult::getParent();
+  return cast<BeginCOWMutationInst>(Parent);
+}
+
+/// Marks the end of the mutation of a reference counted object.
+class EndCOWMutationInst
+    : public UnaryInstructionBase<SILInstructionKind::EndCOWMutationInst,
+                                  SingleValueInstruction>
+{
+  friend SILBuilder;
+
+  EndCOWMutationInst(SILDebugLocation DebugLoc, SILValue Operand,
+                     bool keepUnique)
+      : UnaryInstructionBase(DebugLoc, Operand, Operand->getType()) {
+    setKeepUnique(keepUnique);
+  }
+
+public:
+  bool doKeepUnique() const {
+    return SILInstruction::Bits.EndCOWMutationInst.KeepUnique;
+  }
+
+  void setKeepUnique(bool keepUnique = true) {
+    SILInstruction::Bits.EndCOWMutationInst.KeepUnique = keepUnique;
+  }
 };
 
 /// Given an escaping closure return true iff it has a non-nil context and the
@@ -8043,17 +8192,21 @@ private:
   friend SILBuilder;
   /// Differentiability parameter indices.
   IndexSubset *ParameterIndices;
+  /// Differentiability result indices.
+  IndexSubset *ResultIndices;
   /// Indicates whether derivative function operands (JVP/VJP) exist.
   bool HasDerivativeFunctions;
 
   DifferentiableFunctionInst(SILDebugLocation DebugLoc,
                              IndexSubset *ParameterIndices,
+                             IndexSubset *ResultIndices,
                              SILValue OriginalFunction,
                              ArrayRef<SILValue> DerivativeFunctions,
                              bool HasOwnership);
 
   static SILType getDifferentiableFunctionType(SILValue OriginalFunction,
-                                               IndexSubset *ParameterIndices);
+                                               IndexSubset *ParameterIndices,
+                                               IndexSubset *ResultIndices);
 
   static ValueOwnershipKind
   getMergedOwnershipKind(SILValue OriginalFunction,
@@ -8062,7 +8215,7 @@ private:
 public:
   static DifferentiableFunctionInst *
   create(SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
-         SILValue OriginalFunction,
+         IndexSubset *ResultIndices, SILValue OriginalFunction,
          Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
          bool HasOwnership);
 
@@ -8071,6 +8224,9 @@ public:
 
   /// Returns differentiability parameter indices.
   IndexSubset *getParameterIndices() const { return ParameterIndices; }
+
+  /// Returns differentiability result indices.
+  IndexSubset *getResultIndices() const { return ResultIndices; }
 
   /// Returns true if derivative functions (JVP/VJP) exist.
   bool hasDerivativeFunctions() const { return HasDerivativeFunctions; }

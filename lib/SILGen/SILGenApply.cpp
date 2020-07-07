@@ -1005,7 +1005,7 @@ public:
       // @objc dynamic initializers are statically dispatched (we're
       // calling the allocating entry point, which is a thunk that
       // does the dynamic dispatch for us).
-      if (ctor->isObjCDynamic())
+      if (ctor->shouldUseObjCDispatch())
         return false;
 
       // Required constructors are statically dispatched when the 'self'
@@ -1243,7 +1243,7 @@ public:
       if (superMV.getValue() != SGF.InitDelegationSelf.getValue()) {
         SILValue underlyingSelf = SGF.InitDelegationSelf.getValue();
         SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
-        CleanupHandle newWriteback = SGF.enterDelegateInitSelfWritebackCleanup(
+        CleanupHandle newWriteback = SGF.enterOwnedValueWritebackCleanup(
             SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
             superMV.forward(SGF));
         SGF.SuperInitDelegationSelf =
@@ -3361,7 +3361,7 @@ struct ParamLowering {
     }
 
     if (foreignError)
-      count++;
+      ++count;
 
     if (foreignSelf.isImportAsMember()) {
       // Claim only the self parameter.
@@ -3818,7 +3818,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
                                                   resultFnType.getParams(),
                                                   /*canonicalVararg*/ true);
     auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
-    payload = ArgumentSource(element, std::move(arg));
+    payload = ArgumentSource(uncurriedLoc, std::move(arg));
     formalResultType = cast<FunctionType>(formalResultType).getResult();
     origFormalType = origFormalType.getFunctionResultType();
   } else {
@@ -4881,8 +4881,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
       unsigned Value = 0;
       if (Loc.isValid()) {
         Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
-                    ? ctx.SourceMgr.getLineAndColumn(Loc).first
-                    : ctx.SourceMgr.getLineAndColumn(Loc).second;
+                    ? ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first
+                    : ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).second;
       }
 
       auto silTy = SILType::getBuiltinIntegerLiteralType(ctx);
@@ -4960,6 +4960,31 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanaged(array),
                               SGFContext());
+}
+
+ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
+                                                      ManagedValue array) {
+  auto &Ctx = getASTContext();
+  FuncDecl *finalize = Ctx.getFinalizeUninitializedArray();
+  
+  // The _finalizeUninitializedArray function only needs to be called if the
+  // library contains it.
+  // The Array implementation in the stdlib <= 5.3 does not use SIL COW
+  // support yet and therefore does not provide the _finalizeUninitializedArray
+  // intrinsic function.
+  if (!finalize)
+    return array;
+
+  SILValue arrayVal = array.forward(*this);
+  CanType arrayTy = arrayVal->getType().getASTType();
+
+  // Invoke the intrinsic.
+  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                   Ctx.getArrayDecl());
+  RValue result = emitApplyOfLibraryIntrinsic(loc, finalize, subMap,
+                              ManagedValue::forUnmanaged(arrayVal),
+                              SGFContext());
+  return std::move(result).getScalarValue();
 }
 
 namespace {

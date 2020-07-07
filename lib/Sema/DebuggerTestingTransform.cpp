@@ -15,6 +15,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "CodeSynthesis.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTWalker.h"
@@ -36,7 +37,7 @@ namespace {
 /// Find available closure discriminators.
 ///
 /// The parser typically takes care of assigning unique discriminators to
-/// closures, but the parser is unavailable to this transform.
+/// closures, but the parser is unavailable during semantic analysis.
 class DiscriminatorFinder : public ASTWalker {
   unsigned NextDiscriminator = 0;
 

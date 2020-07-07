@@ -16,8 +16,6 @@
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/Syntax.h"
 
-#include <vector>
-
 namespace swift {
 namespace syntax {
 

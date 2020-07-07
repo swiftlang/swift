@@ -12,6 +12,7 @@
 
 #include "swift/Demangling/Punycode.h"
 #include "swift/Demangling/ManglingUtils.h"
+#include <limits>
 #include <vector>
 #include <cstdint>
 
@@ -49,7 +50,7 @@ static int digit_index(char value) {
 static bool isValidUnicodeScalar(uint32_t S) {
   // Also accept the range of 0xD800 - 0xD880, which is used for non-symbol
   // ASCII characters.
-  return (S < 0xD880) || (S >= 0xE000 && S <= 0x1FFFFF);
+  return (S < 0xD880) || (S >= 0xE000 && S <= 0x10FFFF);
 }
 
 // Section 6.1: Bias adaptation function
@@ -88,7 +89,7 @@ bool Punycode::decodePunycode(StringRef InputPunycode,
     for (char c : InputPunycode.slice(0, lastDelimiter)) {
       // fail on any non-basic code point
       if (static_cast<unsigned char>(c) > 0x7f)
-        return true;
+        return false;
       OutCodePoints.push_back(c);
     }
     // if more than zero code points were consumed then consume one more
@@ -103,31 +104,40 @@ bool Punycode::decodePunycode(StringRef InputPunycode,
     for (int k = base; ; k += base) {
       // consume a code point, or fail if there was none to consume
       if (InputPunycode.empty())
-        return true;
+        return false;
       char codePoint = InputPunycode.front();
       InputPunycode = InputPunycode.slice(1, InputPunycode.size());
       // let digit = the code point's digit-value, fail if it has none
       int digit = digit_index(codePoint);
       if (digit < 0)
-        return true;
+        return false;
       
+      // Fail if i + (digit * w) would overflow
+      if (digit > (std::numeric_limits<int>::max() - i) / w)
+        return false;
       i = i + digit * w;
       int t = k <= bias ? tmin
             : k >= bias + tmax ? tmax
             : k - bias;
       if (digit < t)
         break;
+      // Fail if w * (base - t) would overflow
+      if (w > std::numeric_limits<int>::max() / (base - t))
+        return false;
       w = w * (base - t);
     }
     bias = adapt(i - oldi, OutCodePoints.size() + 1, oldi == 0);
+    // Fail if n + i / (OutCodePoints.size() + 1) would overflow
+    if (i / (OutCodePoints.size() + 1) > std::numeric_limits<int>::max() - n)
+      return false;
     n = n + i / (OutCodePoints.size() + 1);
     i = i % (OutCodePoints.size() + 1);
     // if n is a basic code point then fail
     if (n < 0x80)
-      return true;
+      return false;
     // insert n into output at position i
     OutCodePoints.insert(OutCodePoints.begin() + i, n);
-    i++;
+    ++i;
   }
   
   return true;
@@ -168,11 +178,17 @@ bool Punycode::encodePunycode(const std::vector<uint32_t> &InputCodePoints,
       if (codePoint >= n && codePoint < m)
         m = codePoint;
     }
-    
+
+    if ((m - n) > (std::numeric_limits<int>::max() - delta) / (h + 1))
+      return false;
     delta = delta + (m - n) * (h + 1);
     n = m;
     for (auto c : InputCodePoints) {
-      if (c < n) ++delta;
+      if (c < n) {
+        if (delta == std::numeric_limits<int>::max())
+          return false;
+        ++delta;
+      }
       if (c == n) {
         int q = delta;
         for (int k = base; ; k += base) {
@@ -285,11 +301,12 @@ static bool convertUTF8toUTF32(llvm::StringRef InputUTF8,
   auto end = InputUTF8.end();
   while (ptr < end) {
     uint8_t first = *ptr++;
+    uint32_t code_point = 0;
     if (first < 0x80) {
       if (Mangle::isValidSymbolChar(first) || !mapNonSymbolChars) {
-        OutUTF32.push_back(first);
+        code_point = first;
       } else {
-        OutUTF32.push_back((uint32_t)first + 0xD800);
+        code_point = (uint32_t)first + 0xD800;
       }
     } else if (first < 0xC0) {
       // Invalid continuation byte.
@@ -301,7 +318,7 @@ static bool convertUTF8toUTF32(llvm::StringRef InputUTF8,
       uint8_t second = *ptr++;
       if (!isContinuationByte(second))
         return false;
-      OutUTF32.push_back(((first & 0x1F) << 6) | (second & 0x3F));
+      code_point = ((first & 0x1F) << 6) | (second & 0x3F);
     } else if (first < 0xF0) {
       // Three-byte sequence.
       if (end - ptr < 2)
@@ -310,8 +327,9 @@ static bool convertUTF8toUTF32(llvm::StringRef InputUTF8,
       uint8_t third = *ptr++;
       if (!isContinuationByte(second) || !isContinuationByte(third))
         return false;
-      OutUTF32.push_back(((first & 0xF) << 12) | ((second & 0x3F) << 6)
-                         | ( third  & 0x3F      ));
+      code_point = ((first & 0xF) << 12)
+                 | ((second & 0x3F) << 6)
+                 | ( third  & 0x3F      );
     } else if (first < 0xF8) {
       // Four-byte sequence.
       if (end - ptr < 3)
@@ -322,13 +340,17 @@ static bool convertUTF8toUTF32(llvm::StringRef InputUTF8,
       if (!isContinuationByte(second) || !isContinuationByte(third)
           || !isContinuationByte(fourth))
         return false;
-      OutUTF32.push_back(((first & 0x7) << 18) | ((second & 0x3F) << 12)
-                         | ((third  & 0x3F) <<  6)
-                         | ( fourth & 0x3F       ));
+      code_point = ((first & 0x7) << 18)
+                  | ((second & 0x3F) << 12)
+                  | ((third  & 0x3F) <<  6)
+                  | ( fourth & 0x3F       );
     } else {
       // Unused sequence length.
       return false;
     }
+    if (!isValidUnicodeScalar(code_point))
+      return false;
+    OutUTF32.push_back(code_point);
   }
   return true;
 }

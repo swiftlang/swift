@@ -190,11 +190,15 @@ public:
 
   /// Returns true if the given value is varied for any of the given parameter
   /// (independent variable) indices.
-  bool isVaried(SILValue value, IndexSubset *parameterIndices) const;
+  bool isVaried(SILValue value, IndexSubset *independentVariableIndices) const;
 
   /// Returns true if the given value is useful for the given dependent variable
   /// index.
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
+
+  /// Returns true if the given value is varied for any of the given result
+  /// (dependent variable) indices.
+  bool isUseful(SILValue value, IndexSubset *dependentVariableIndices) const;
 
   /// Returns true if the given value is active for the given
   /// `SILAutoDiffIndices` (parameter indices and result index).

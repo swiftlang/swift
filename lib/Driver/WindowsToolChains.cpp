@@ -86,7 +86,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   // Rely on `-libc` to correctly identify the MSVC Runtime Library.  We use
   // `-nostartfiles` as that limits the difference to just the
-  // `-defaultlib:libcmt` which is passed unconditionally with the `clang++`
+  // `-defaultlib:libcmt` which is passed unconditionally with the `clang`
   // driver rather than the `clang-cl` driver.
   Arguments.push_back("-nostartfiles");
 
@@ -167,7 +167,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
-  // Run clang++ in verbose mode if "-v" is set
+  // Run clang in verbose mode if "-v" is set
   if (context.Args.hasArg(options::OPT_v)) {
     Arguments.push_back("-v");
   }

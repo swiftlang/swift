@@ -22,7 +22,6 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
-#include "llvm/ADT/DenseMap.h"
 #include <functional>
 
 namespace swift {

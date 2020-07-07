@@ -2,6 +2,10 @@ module AccessSpecifiers {
   header "access-specifiers.h"
 }
 
+module LoadableTypes {
+  header "loadable-types.h"
+}
+
 module MemberwiseInitializer {
   header "memberwise-initializer.h"
 }
@@ -16,4 +20,8 @@ module MemberVariables {
 
 module ProtocolConformance {
   header "protocol-conformance.h"
+}
+
+module SynthesizedInitializers {
+  header "synthesized-initializers.h"
 }

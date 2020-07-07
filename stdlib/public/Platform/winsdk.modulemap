@@ -189,6 +189,11 @@ module WinSDK [system] {
     link "OleAut32.Lib"
   }
 
+  module RichEdit {
+    header "Richedit.h"
+    export *
+  }
+
   module User {
     header "WinUser.h"
     export *

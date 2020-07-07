@@ -442,24 +442,15 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
   llvm::TinyPtrVector<Constraint *> constraints;
   // Whether we should consider this constraint at all.
-  auto rep = CS.getRepresentative(typeVar);
   auto shouldConsiderConstraint = [&](Constraint *constraint) {
-    // For a one-way constraint, only consider it when the type variable
-    // is on the right-hand side of the the binding, and the left-hand side of
-    // the binding is one of the type variables currently under consideration.
+    // For a one-way constraint, only consider it when the left-hand side of
+    // the binding is one of the type variables currently under consideration,
+    // as only such constraints need solving for this component. Note that we
+    // don't perform any other filtering, as the constraint system should be
+    // responsible for checking any other conditions.
     if (constraint->isOneWayConstraint()) {
-      auto lhsTypeVar =
-          constraint->getFirstType()->castTo<TypeVariableType>();
-      if (!CS.isActiveTypeVariable(lhsTypeVar))
-        return false;
-
-      SmallVector<TypeVariableType *, 2> rhsTypeVars;
-      constraint->getSecondType()->getTypeVariables(rhsTypeVars);
-      for (auto rhsTypeVar : rhsTypeVars) {
-        if (CS.getRepresentative(rhsTypeVar) == rep)
-          return true;
-      }
-      return false;
+      auto lhsTypeVar = constraint->getFirstType()->castTo<TypeVariableType>();
+      return CS.isActiveTypeVariable(lhsTypeVar);
     }
 
     return true;
@@ -872,8 +863,8 @@ namespace {
         contractedCycle = false;
         for (const auto &edge : cycleEdges) {
           if (unionSets(edge.first, edge.second)) {
-            if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
-              auto &log = ctx.TypeCheckerDebug->getStream();
+            if (cs.isDebugMode()) {
+              auto &log = llvm::errs();
               if (cs.solverState)
                 log.indent(cs.solverState->depth * 2);
 
@@ -883,8 +874,8 @@ namespace {
             }
 
             if (ctx.Stats) {
-              ctx.Stats->getFrontendCounters()
-                  .NumCyclicOneWayComponentsCollapsed++;
+              ++ctx.Stats->getFrontendCounters()
+                  .NumCyclicOneWayComponentsCollapsed;
             }
 
             contractedCycle = true;
@@ -1126,6 +1117,10 @@ bool ConstraintGraph::contractEdges() {
     if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
       if (auto bindings = CS.getPotentialBindings(tyvar1)) {
+        // Holes can't be contracted.
+        if (bindings.IsHole)
+          continue;
+
         for (auto &binding : bindings.Bindings) {
           auto type = binding.BindingType;
           isNotContractable = type.findIf([&](Type nestedType) -> bool {
@@ -1155,8 +1150,8 @@ bool ConstraintGraph::contractEdges() {
           rep2->getImpl().canBindToLValue()) ||
          // Allow l-value contractions when binding parameter types.
          isParamBindingConstraint)) {
-      if (CS.getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-        auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+      if (CS.isDebugMode()) {
+        auto &log = llvm::errs();
         if (CS.solverState)
           log.indent(CS.solverState->depth * 2);
 
@@ -1184,8 +1179,8 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
   SWIFT_FUNC_STAT;
   auto &context = CS.getASTContext();
   if (auto *Stats = context.Stats) {
-    Stats->getFrontendCounters()
-        .NumConstraintsConsideredForEdgeContraction++;
+    ++Stats->getFrontendCounters()
+        .NumConstraintsConsideredForEdgeContraction;
   }
 }
 

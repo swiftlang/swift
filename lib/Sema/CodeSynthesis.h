@@ -18,6 +18,7 @@
 #ifndef SWIFT_TYPECHECKING_CODESYNTHESIS_H
 #define SWIFT_TYPECHECKING_CODESYNTHESIS_H
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/LLVM.h"

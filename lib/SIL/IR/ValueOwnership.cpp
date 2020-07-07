@@ -74,6 +74,7 @@ CONSTANT_OWNERSHIP_INST(None, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(Owned, CopyBlock)
 CONSTANT_OWNERSHIP_INST(Owned, CopyBlockWithoutEscaping)
 CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
+CONSTANT_OWNERSHIP_INST(Owned, EndCOWMutation)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
@@ -102,6 +103,7 @@ CONSTANT_OWNERSHIP_INST(None, FunctionRef)
 CONSTANT_OWNERSHIP_INST(None, DynamicFunctionRef)
 CONSTANT_OWNERSHIP_INST(None, PreviousDynamicFunctionRef)
 CONSTANT_OWNERSHIP_INST(None, GlobalAddr)
+CONSTANT_OWNERSHIP_INST(None, BaseAddrForOffset)
 CONSTANT_OWNERSHIP_INST(None, IndexAddr)
 CONSTANT_OWNERSHIP_INST(None, IndexRawPointer)
 CONSTANT_OWNERSHIP_INST(None, InitEnumDataAddr)
@@ -299,6 +301,11 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginApplyResult(
   return Result->getOwnershipKind();
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginCOWMutationResult(
+    BeginCOWMutationResult *Result) {
+  return Result->getOwnershipKind();
+}
+
 ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
     SILFunctionArgument *Arg) {
   return Arg->getOwnershipKind();
@@ -386,6 +393,7 @@ struct ValueOwnershipKindBuiltinVisitor
   }
 // This returns a value at +1 that is destroyed strictly /after/ the
 // UnsafeGuaranteedEnd. This provides the guarantee that we want.
+CONSTANT_OWNERSHIP_BUILTIN(Owned, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(None, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericAShr)

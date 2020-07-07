@@ -23,7 +23,6 @@
 
 // rdar://problem/56959761
 // UNSUPPORTED: OS=watchos
-// UNSUPPORTED: OS=tvos
 
 import Foundation
 

@@ -156,6 +156,28 @@ void _swift_stdlib_immortalize(void *obj) {
   heapObj->refCounts.setIsImmortal(true);
 }
 
+#ifndef NDEBUG
+// SideTableRefCountBits specialization intentionally does not exist.
+template <>
+bool RefCounts<InlineRefCountBits>::isImmutableCOWBuffer() {
+  if (!hasSideTable())
+    return false;
+  HeapObjectSideTableEntry *sideTable = allocateSideTable(false);
+  assert(sideTable);
+  return sideTable->isImmutableCOWBuffer();
+}
+
+template <>
+bool RefCounts<InlineRefCountBits>::setIsImmutableCOWBuffer(bool immutable) {
+  HeapObjectSideTableEntry *sideTable = allocateSideTable(false);
+  assert(sideTable);
+  bool oldValue = sideTable->isImmutableCOWBuffer();
+  sideTable->setIsImmutableCOWBuffer(immutable);
+  return oldValue;
+}
+
+#endif
+
 // namespace swift
 } // namespace swift
 

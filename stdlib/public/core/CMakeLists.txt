@@ -60,6 +60,7 @@ set(SWIFTLIB_ESSENTIAL
   DictionaryVariant.swift
   DropWhile.swift
   Dump.swift
+  EitherSequence.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -107,6 +108,7 @@ set(SWIFTLIB_ESSENTIAL
   Pointer.swift
   Policy.swift
   PrefixWhile.swift
+  Prespecialize.swift
   Print.swift
   PtrAuth.swift
   Random.swift
@@ -319,7 +321,7 @@ add_swift_target_library(swiftCore
                   PRIVATE_LINK_LIBRARIES
                     ${swift_core_private_link_libraries}
                   INCORPORATE_OBJECT_LIBRARIES
-                    swiftRuntime swiftStdlibStubs
+                    swiftRuntime swiftLLVMSupport swiftDemangling swiftStdlibStubs
                   FRAMEWORK_DEPENDS
                     ${swift_core_framework_depends}
                   INSTALL_IN_COMPONENT

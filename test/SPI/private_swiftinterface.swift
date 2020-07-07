@@ -21,7 +21,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/merged.swiftinterface
 // RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/merged.private.swiftinterface
 
-@_spi(HelperSPI) @_spi(OtherSPI) import SPIHelper
+@_spi(HelperSPI) @_spi(OtherSPI) @_spi(OtherSPI) import SPIHelper
 // CHECK-PUBLIC: import SPIHelper
 // CHECK-PRIVATE: @_spi(OtherSPI) @_spi(HelperSPI) import SPIHelper
 
@@ -87,3 +87,25 @@ private class PrivateClassLocal {}
   // CHECK-PRIVATE: @_spi(LocalSPI) public func extensionSPIMethod()
   // CHECK-PUBLIC-NOT: extensionSPIMethod
 }
+
+// Test the dummy conformance printed to replace private types used in
+// conditional conformances. rdar://problem/63352700
+
+// Conditional conformances using SPI types should appear in full in the
+// private swiftinterface.
+public struct PublicType<T> {}
+@_spi(LocalSPI) public protocol SPIProto {}
+private protocol PrivateConstraint {}
+@_spi(LocalSPI) public protocol SPIProto2 {}
+
+@_spi(LocalSPI)
+extension PublicType: SPIProto2 where T: SPIProto2 {}
+// CHECK-PRIVATE: extension PublicType : {{.*}}.SPIProto2 where T : {{.*}}.SPIProto2
+// CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
+
+// The dummy conformance should be only in the private swiftinterface for
+// SPI extensions.
+@_spi(LocalSPI)
+extension PublicType: SPIProto where T: PrivateConstraint {}
+// CHECK-PRIVATE: extension {{.*}}.PublicType : {{.*}}.SPIProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
+// CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary

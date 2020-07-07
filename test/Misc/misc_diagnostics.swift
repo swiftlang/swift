@@ -54,8 +54,9 @@ struct MyArray<Element> {} // expected-note {{'Element' declared as parameter to
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}}
-        // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+        a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<_>.Type' and 'Int.Type'}}
+       // expected-error@-2 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
     }
 }
 
@@ -114,11 +115,11 @@ func test17875634() {
   var col = 2
   var coord = (row, col)
 
-  match += (1, 2) // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match += (row, col) // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match += coord // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
   match.append(row, col) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 
@@ -142,7 +143,7 @@ func test17875634() {
 func test20770032() {
   if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}}
     // expected-error@-1 {{expression pattern of type 'ClosedRange<Int>' cannot match values of type '(Int, Int)'}}
-    // expected-error@-2 {{'(Int, Int)' cannot conform to 'Equatable'; only struct/enum/class types can conform to protocols}}
+    // expected-error@-2 {{type '(Int, Int)' cannot conform to 'Equatable'; only concrete types such as structs, enums and classes can conform to protocols}}
     // expected-note@-3 {{required by operator function '~=' where 'T' = '(Int, Int)'}}
   }
 }

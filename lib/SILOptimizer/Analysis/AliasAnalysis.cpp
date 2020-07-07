@@ -569,6 +569,15 @@ AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   return Result;
 }
 
+/// Get the underlying object, looking through init_enum_data_addr and
+/// init_existential_addr.
+static SILValue stripInitEnumAndExistentialAddr(SILValue v) {
+  while (isa<InitEnumDataAddrInst>(v) || isa<InitExistentialAddrInst>(v)) {
+    v = getUnderlyingObject(cast<SingleValueInstruction>(v)->getOperand(0));
+  }
+  return v;
+}
+
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
 AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
@@ -614,9 +623,12 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   LLVM_DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1);
   LLVM_DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2);
 
-  // If O1 and O2 do not equal, see if we can prove that they cannot be the
-  // same object. If we can, return No Alias.
-  if (O1 != O2 && aliasUnequalObjects(O1, O2))
+  // If the underlying objects are not equal, see if we can prove that they
+  // cannot be the same object. If we can, return No Alias.
+  // For this we even look through init_enum_data_addr and init_existential_addr.
+  SILValue StrippedO1 = stripInitEnumAndExistentialAddr(O1);
+  SILValue StrippedO2 = stripInitEnumAndExistentialAddr(O2);
+  if (StrippedO1 != StrippedO2 && aliasUnequalObjects(StrippedO1, StrippedO2))
     return AliasResult::NoAlias;
 
   // Ok, either O1, O2 are the same or we could not prove anything based off of

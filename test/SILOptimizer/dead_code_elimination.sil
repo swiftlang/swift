@@ -259,3 +259,21 @@ bb2:
 bb3:
   br bb1
 }
+
+// Check that DCE eliminates dead access instructions.
+// CHECK-LABEL: sil @dead_access
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: end sil function 'dead_access'
+sil @dead_access : $@convention(thin) (@in Container) -> () {
+bb0(%0 : $*Container):
+  %1 = begin_access [modify] [dynamic] %0 : $*Container
+  end_access %1 : $*Container
+  
+  %3 = begin_access [read] [static] %0 : $*Container
+  end_access %3 : $*Container
+
+  %999 = tuple ()
+  return %999 : $()
+}

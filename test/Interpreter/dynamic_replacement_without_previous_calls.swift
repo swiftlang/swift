@@ -11,9 +11,9 @@ import Module1
 
 import StdlibUnittest
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -23,7 +23,7 @@ import StdlibUnittest
 #endif
 
 private func target_library_name(_ name: String) -> String {
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   return "lib\(name).dylib"
 #elseif os(Windows)
   return "\(name).dll"

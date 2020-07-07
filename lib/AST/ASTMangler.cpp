@@ -28,6 +28,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
@@ -677,8 +678,10 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
-  // We have a custom prefix, so finalize() won't verify for us. Do it manually.
-  verify(Storage.str().drop_front(USRPrefix.size()));
+  // We have a custom prefix, so finalize() won't verify for us. If we're not
+  // in invalid code (coming from an IDE caller) verify manually.
+  if (!decl->isInvalid())
+    verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
 }
 
@@ -1584,7 +1587,7 @@ getParamDifferentiability(SILParameterDifferentiability diffKind) {
   case swift::SILParameterDifferentiability::NotDifferentiable:
     return 'w';
   }
-  llvm_unreachable("bad parameter convention");
+  llvm_unreachable("bad parameter differentiability");
 };
 
 static char getResultConvention(ResultConvention conv) {
@@ -1596,6 +1599,17 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::Autoreleased: return 'a';
   }
   llvm_unreachable("bad result convention");
+};
+
+static Optional<char>
+getResultDifferentiability(SILResultDifferentiability diffKind) {
+  switch (diffKind) {
+  case swift::SILResultDifferentiability::DifferentiableOrNotApplicable:
+    return None;
+  case swift::SILResultDifferentiability::NotDifferentiable:
+    return 'w';
+  }
+  llvm_unreachable("bad result differentiability");
 };
 
 void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
@@ -1684,6 +1698,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   // Mangle the results.
   for (auto result : fn->getResults()) {
     OpArgs.push_back(getResultConvention(result.getConvention()));
+    if (auto diffKind =
+            getResultDifferentiability(result.getDifferentiability()))
+      OpArgs.push_back(*diffKind);
     appendType(result.getInterfaceType());
   }
 
@@ -2539,8 +2556,9 @@ void ASTMangler::appendGenericSignatureParts(
 DependentMemberType *
 ASTMangler::dropProtocolFromAssociatedType(DependentMemberType *dmt) {
   auto baseTy = dmt->getBase();
-  bool unambiguous = (!dmt->getAssocType() ||
-                      CurGenericSignature->getConformsTo(baseTy).size() <= 1);
+  bool unambiguous =
+      (!dmt->getAssocType() ||
+       CurGenericSignature->getRequiredProtocols(baseTy).size() <= 1);
 
   if (auto *baseDMT = baseTy->getAs<DependentMemberType>())
     baseTy = dropProtocolFromAssociatedType(baseDMT);
@@ -2573,8 +2591,8 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
     // If the base type is known to have a single protocol conformance
     // in the current generic context, then we don't need to disambiguate the
     // associated type name by protocol.
-    if (!OptimizeProtocolNames || !CurGenericSignature
-        || CurGenericSignature->getConformsTo(dmt->getBase()).size() > 1) {
+    if (!OptimizeProtocolNames || !CurGenericSignature ||
+        CurGenericSignature->getRequiredProtocols(dmt->getBase()).size() > 1) {
       appendAnyGenericType(assocTy->getProtocol());
     }
     return;
@@ -2724,7 +2742,7 @@ void ASTMangler::appendConstructorEntity(const ConstructorDecl *ctor,
 }
 
 void ASTMangler::appendDestructorEntity(const DestructorDecl *dtor,
-                                     bool isDeallocating) {
+                                        bool isDeallocating) {
   appendContextOf(dtor);
   appendOperator(isDeallocating ? "fD" : "fd");
 }

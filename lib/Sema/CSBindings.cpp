@@ -69,6 +69,9 @@ void ConstraintSystem::inferTransitiveSupertypeBindings(
 
       auto type = binding.BindingType;
 
+      if (type->isHole())
+        continue;
+
       if (!existingTypes.insert(type->getCanonicalType()).second)
         continue;
 
@@ -107,9 +110,8 @@ ConstraintSystem::determineBestBindings() {
 
     inferTransitiveSupertypeBindings(cache, bindings);
 
-    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      bindings.dump(typeVar, log, solverState->depth * 2);
+    if (isDebugMode()) {
+      bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
     }
 
     // If these are the first bindings, or they are better than what
@@ -711,7 +713,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       }
       break;
 
-    case ConstraintKind::OneWayEqual: {
+    case ConstraintKind::OneWayEqual:
+    case ConstraintKind::OneWayBindParam: {
       // Don't produce any bindings if this type variable is on the left-hand
       // side of a one-way binding.
       auto firstType = constraint->getFirstType();
@@ -1031,19 +1034,18 @@ bool TypeVarBindingProducer::computeNext() {
 
     auto srcLocator = binding.getLocator();
     if (srcLocator &&
-        srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
-        !type->hasTypeVariable() && CS.isCollectionType(type)) {
+        (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+         srcLocator->isLastElement<LocatorPathElt::AutoclosureResult>()) &&
+        !type->hasTypeVariable() && type->isKnownStdlibCollectionType()) {
       // If the type binding comes from the argument conversion, let's
       // instead of binding collection types directly, try to bind
       // using temporary type variables substituted for element
       // types, that's going to ensure that subtype relationship is
       // always preserved.
       auto *BGT = type->castTo<BoundGenericType>();
-      auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
-                                         BGT->getASTContext());
-
       auto dstLocator = TypeVar->getImpl().getLocator();
-      auto newType = CS.openUnboundGenericType(UGT, dstLocator)
+      auto newType = CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
+                                               dstLocator)
                          ->reconstituteSugar(/*recursive=*/false);
       addNewBinding(binding.withType(newType));
     }
@@ -1072,7 +1074,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
 
   if (Binding.hasDefaultedLiteralProtocol()) {
-    type = cs.openUnboundGenericType(type, dstLocator);
+    type = cs.openUnboundGenericTypes(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
@@ -1087,27 +1089,36 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       // resolved and had to be bound to a placeholder "hole" type.
       cs.increaseScore(SK_Hole);
 
+      ConstraintFix *fix = nullptr;
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-        auto path = dstLocator->getPath();
-        // Drop `generic parameter` locator element so that all missing
-        // generic parameters related to the same path can be coalesced later.
-        auto *fix = DefaultGenericArgument::create(
-            cs, GP,
-            cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
-        if (cs.recordFix(fix))
-          return true;
+        // If it is represetative for a key path root, let's emit a more
+        // specific diagnostic.
+        auto *keyPathRoot =
+            cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
+        if (keyPathRoot) {
+          fix = SpecifyKeyPathRootType::create(
+              cs, keyPathRoot->getImpl().getLocator());
+        } else {
+          auto path = dstLocator->getPath();
+          // Drop `generic parameter` locator element so that all missing
+          // generic parameters related to the same path can be coalesced later.
+          fix = DefaultGenericArgument::create(
+              cs, GP,
+              cs.getConstraintLocator(dstLocator->getAnchor(),
+                                      path.drop_back()));
+        }
+      } else if (TypeVar->getImpl().isClosureParameterType()) {
+        fix = SpecifyClosureParameterType::create(cs, dstLocator);
       } else if (TypeVar->getImpl().isClosureResultType()) {
-        auto *fix = SpecifyClosureReturnType::create(
-            cs, TypeVar->getImpl().getLocator());
-        if (cs.recordFix(fix))
-          return true;
-      } else if (srcLocator->getAnchor() &&
-                 isExpr<ObjectLiteralExpr>(srcLocator->getAnchor())) {
-        auto *fix = SpecifyObjectLiteralTypeImport::create(
-            cs, TypeVar->getImpl().getLocator());
-        if (cs.recordFix(fix))
-          return true;
+        fix = SpecifyClosureReturnType::create(cs, dstLocator);
+      } else if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
+        fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
+      } else if (srcLocator->isKeyPathRoot()) {
+        fix = SpecifyKeyPathRootType::create(cs, dstLocator);
       }
+
+      if (fix && cs.recordFix(fix))
+        return true;
     }
   }
 

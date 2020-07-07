@@ -9,25 +9,25 @@ func initStaticVars() -> CInt {
 }
 
 // CHECK: // clang name: staticVar
-// CHECK: sil_global @staticVar : $Int32
+// CHECK: sil_global public_external @staticVar : $Int32
 // CHECK: // clang name: staticVarInit
-// CHECK: sil_global @staticVarInit : $Int32
+// CHECK: sil_global public_external @staticVarInit : $Int32
 // CHECK: // clang name: staticVarInlineInit
-// CHECK: sil_global @staticVarInlineInit : $Int32
+// CHECK: sil_global public_external @staticVarInlineInit : $Int32
 // CHECK: // clang name: staticConst
-// CHECK: sil_global [let] @staticConst : $Int32
+// CHECK: sil_global public_external [let] @staticConst : $Int32
 // CHECK: // clang name: staticConstInit
-// CHECK: sil_global [let] @staticConstInit : $Int32
+// CHECK: sil_global public_external [let] @staticConstInit : $Int32
 // CHECK: // clang name: staticConstInlineInit
-// CHECK: sil_global [let] @staticConstInlineInit : $Int32
+// CHECK: sil_global public_external [let] @staticConstInlineInit : $Int32
 // CHECK: // clang name: staticConstexpr
-// CHECK: sil_global [let] @staticConstexpr : $Int32
+// CHECK: sil_global public_external [let] @staticConstexpr : $Int32
 // CHECK: // clang name: staticNonTrivial
-// CHECK: sil_global @staticNonTrivial : $NonTrivial
+// CHECK: sil_global public_external @staticNonTrivial : $NonTrivial
 // CHECK: // clang name: staticConstNonTrivial
-// CHECK: sil_global [let] @staticConstNonTrivial : $NonTrivial
+// CHECK: sil_global public_external [let] @staticConstNonTrivial : $NonTrivial
 // CHECK: // clang name: staticConstexprNonTrivial
-// CHECK: sil_global [let] @staticConstexprNonTrivial : $NonTrivial
+// CHECK: sil_global public_external [let] @staticConstexprNonTrivial : $NonTrivial
 
 func readStaticVar() -> CInt {
   return staticVar

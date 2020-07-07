@@ -213,9 +213,10 @@ enum class FixKind : uint8_t {
   /// via forming `Foo(rawValue:)` instead of using its `RawValue` directly.
   ExplicitlyConstructRawRepresentable,
 
-  /// Use raw value type associated with raw representative accessible
+  /// Use raw value type associated with raw representable, accessible
   /// using `.rawValue` member.
-  UseValueTypeOfRawRepresentative,
+  UseRawValue,
+
   /// If an array was passed to a variadic argument, give a specific diagnostic
   /// and offer to drop the brackets if it's a literal.
   ExpandArrayIntoVarargs,
@@ -233,6 +234,10 @@ enum class FixKind : uint8_t {
   /// Base type in reference to the contextual member e.g. `.foo` couldn't be
   /// inferred and has to be specified explicitly.
   SpecifyBaseTypeForContextualMember,
+
+  /// Type of the closure parameter used in the body couldn't be inferred
+  /// and has to be specified explicitly.
+  SpecifyClosureParameterType,
 
   /// Closure return type has to be explicitly specified because it can't be
   /// inferred in current context e.g. because it's a multi-statement closure.
@@ -253,13 +258,17 @@ enum class FixKind : uint8_t {
 
   /// A warning fix that allows a coercion to perform a force-cast.
   AllowCoercionToForceCast,
-  
+
   /// Allow key path root type mismatch when applying a key path that has a
   /// root type not convertible to the type of the base instance.
   AllowKeyPathRootTypeMismatch,
 
   /// Allow key path to be bound to a function type with more than 1 argument
-  AllowMultiArgFuncKeyPathMismatch
+  AllowMultiArgFuncKeyPathMismatch,
+
+  /// Specify key path root type when it cannot be infered from context.
+  SpecifyKeyPathRootType,
+
 };
 
 class ConstraintFix {
@@ -327,10 +336,12 @@ protected:
 /// Unwrap an optional base when we have a member access.
 class UnwrapOptionalBase final : public ConstraintFix {
   DeclNameRef MemberName;
+  Type MemberBaseType;
 
   UnwrapOptionalBase(ConstraintSystem &cs, FixKind kind, DeclNameRef member,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, kind, locator), MemberName(member) {
+                     Type memberBaseType, ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), MemberName(member),
+        MemberBaseType(memberBaseType) {
     assert(kind == FixKind::UnwrapOptionalBase ||
            kind == FixKind::UnwrapOptionalBaseWithOptionalResult);
   }
@@ -343,11 +354,12 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclNameRef member,
+                                    Type memberBaseType,
                                     ConstraintLocator *locator);
 
   static UnwrapOptionalBase *
   createWithOptionalResult(ConstraintSystem &cs, DeclNameRef member,
-                           ConstraintLocator *locator);
+                           Type memberBaseType, ConstraintLocator *locator);
 };
 
 // Treat rvalue as if it was an lvalue
@@ -359,6 +371,10 @@ public:
   std::string getName() const override { return "treat rvalue as lvalue"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
@@ -512,6 +528,8 @@ public:
   Type getToType() const { return RHS; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
@@ -789,6 +807,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
                                     bool usingStorageWrapper, Type base,
                                     Type wrapper, ConstraintLocator *locator);
@@ -815,6 +837,10 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
@@ -873,6 +899,33 @@ public:
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::DefineMemberBasedOnUse;
   }
+};
+
+class DefineMemberBasedOnUnintendedGenericParam final : public ConstraintFix {
+  Type BaseType;
+  DeclNameRef Name;
+  Identifier ParamName;
+
+  DefineMemberBasedOnUnintendedGenericParam(ConstraintSystem &cs, Type baseType,
+                                            DeclNameRef member,
+                                            Identifier paramName,
+                                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
+        BaseType(baseType), Name(member), ParamName(paramName) {}
+
+public:
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = Name.getString(scratch);
+    return "allow access to invalid member '" + memberName.str() +
+           "' on archetype presumed intended to conform to protocol";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static DefineMemberBasedOnUnintendedGenericParam *
+  create(ConstraintSystem &cs, Type baseType, DeclNameRef member,
+         Identifier paramName, ConstraintLocator *locator);
 };
 
 class AllowInvalidMemberRef : public ConstraintFix {
@@ -1067,6 +1120,8 @@ public:
                            bool asNote = false) const override;
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 };
 
 
@@ -1322,6 +1377,8 @@ class AllowInvalidRefInKeyPath final : public ConstraintFix {
     // Allow a reference to a initializer instance as a key path
     // component.
     Initializer,
+    // Allow a reference to an enum case as a key path component.
+    EnumCase,
   } Kind;
 
   ValueDecl *Member;
@@ -1343,6 +1400,8 @@ public:
       return "allow reference to a method as a key path component";
     case RefKind::Initializer:
       return "allow reference to an init method as a key path component";
+    case RefKind::EnumCase:
+      return "allow reference to an enum case as a key path component";
     }
     llvm_unreachable("covered switch");
   }
@@ -1359,16 +1418,16 @@ private:
                                           ConstraintLocator *locator);
 };
 
-class RemoveReturn final : public ConstraintFix {
-  RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
+class RemoveReturn final : public ContextualMismatch {
+  RemoveReturn(ConstraintSystem &cs, Type resultTy, ConstraintLocator *locator);
 
 public:
   std::string getName() const override { return "remove or omit return type"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
+  static RemoveReturn *create(ConstraintSystem &cs, Type resultTy,
+                              ConstraintLocator *locator);
 };
 
 class CollectionElementContextualMismatch final : public ContextualMismatch {
@@ -1487,10 +1546,6 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
-
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
@@ -1507,6 +1562,8 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static IgnoreAssignmentDestinationType *create(ConstraintSystem &cs,
                                                  Type sourceTy, Type destTy,
@@ -1582,37 +1639,47 @@ public:
                                          ConstraintLocatorBuilder locator);
 };
 
-class ExplicitlyConstructRawRepresentable final : public AllowArgumentMismatch {
-  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type argType,
-                                      Type paramType,
+class ExplicitlyConstructRawRepresentable final : public ConstraintFix {
+  Type RawReprType;
+  Type ExpectedType;
+
+  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type rawReprType,
+                                      Type expectedType,
                                       ConstraintLocator *locator)
-      : AllowArgumentMismatch(cs, FixKind::ExplicitlyConstructRawRepresentable,
-                              argType, paramType, locator) {}
+      : ConstraintFix(cs, FixKind::ExplicitlyConstructRawRepresentable,
+                      locator),
+        RawReprType(rawReprType), ExpectedType(expectedType) {}
 
 public:
   std::string getName() const override {
     return "explicitly construct a raw representable type";
   }
 
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
   static ExplicitlyConstructRawRepresentable *
-  attempt(ConstraintSystem &cs, Type argType, Type paramType,
-          ConstraintLocatorBuilder locator);
+  create(ConstraintSystem &cs, Type rawTypeRepr, Type expectedType,
+         ConstraintLocator *locator);
 };
 
-class UseValueTypeOfRawRepresentative final : public AllowArgumentMismatch {
-  UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type argType,
-                                  Type paramType, ConstraintLocator *locator)
-      : AllowArgumentMismatch(cs, FixKind::UseValueTypeOfRawRepresentative,
-                              argType, paramType, locator) {}
+class UseRawValue final : public ConstraintFix {
+  Type RawReprType;
+  Type ExpectedType;
+
+  UseRawValue(ConstraintSystem &cs, Type rawReprType, Type expectedType,
+              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseRawValue, locator),
+        RawReprType(rawReprType), ExpectedType(expectedType) {}
 
 public:
   std::string getName() const override {
     return "use `.rawValue` of a raw representable type";
   }
 
-  static UseValueTypeOfRawRepresentative *
-  attempt(ConstraintSystem &cs, Type argType, Type paramType,
-          ConstraintLocatorBuilder locator);
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static UseRawValue *create(ConstraintSystem &cs, Type rawReprType,
+                             Type expectedType, ConstraintLocator *locator);
 };
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').
@@ -1706,6 +1773,19 @@ public:
 
   static SpecifyBaseTypeForContextualMember *
   create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
+};
+
+class SpecifyClosureParameterType final : public ConstraintFix {
+  SpecifyClosureParameterType(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyClosureParameterType, locator) {}
+
+public:
+  std::string getName() const;
+
+  bool diagnose(const Solution &solution, bool asNote = false) const;
+
+  static SpecifyClosureParameterType *create(ConstraintSystem &cs,
+                                             ConstraintLocator *locator);
 };
 
 class SpecifyClosureReturnType final : public ConstraintFix {
@@ -1805,7 +1885,7 @@ public:
 ///   bar[keyPath: keyPath]
 /// }
 /// \endcode
-class AllowKeyPathRootTypeMismatch : public ContextualMismatch {
+class AllowKeyPathRootTypeMismatch final : public ContextualMismatch {
 protected:
   AllowKeyPathRootTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                                ConstraintLocator *locator)
@@ -1821,6 +1901,21 @@ public:
 
   static AllowKeyPathRootTypeMismatch *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
+class SpecifyKeyPathRootType final : public ConstraintFix {
+    SpecifyKeyPathRootType(ConstraintSystem &cs, ConstraintLocator *locator)
+        : ConstraintFix(cs, FixKind::SpecifyKeyPathRootType, locator) {}
+
+  public:
+    std::string getName() const {
+      return "specify key path root type";
+    }
+
+    bool diagnose(const Solution &solution, bool asNote = false) const;
+
+    static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

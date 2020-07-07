@@ -169,6 +169,28 @@ bool SILPhiArgument::getIncomingPhiOperands(
   return true;
 }
 
+bool SILPhiArgument::visitIncomingPhiOperands(
+    function_ref<bool(Operand *)> visitor) const {
+  if (!isPhiArgument())
+    return false;
+
+  const auto *parentBlock = getParent();
+  assert(!parentBlock->pred_empty());
+
+  unsigned argIndex = getIndex();
+  for (auto *predBlock : getParent()->getPredecessorBlocks()) {
+    Operand *incomingOperand =
+        getIncomingPhiOperandForPred(parentBlock, predBlock, argIndex);
+    assert(incomingOperand);
+
+    // Call the visitor, bailing if the callee signals error.
+    if (!visitor(incomingOperand)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool SILPhiArgument::getIncomingPhiValues(
     SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
         &returnedPredBBAndPhiValuePairs) const {

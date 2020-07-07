@@ -78,8 +78,15 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
   P.addRawSILInstLowering();
 }
 
-static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("Guaranteed Passes");
+// This pipeline defines a set of mandatory diagnostic passes and a set of
+// supporting optimization passes that enable those diagnostics. These are run
+// before any performance optimizations and in contrast to those optimizations
+// _IS_ run when SourceKit emits diagnostics.
+//
+// Any passes not needed for diagnostic emission that need to run at -Onone
+// should be in the -Onone pass pipeline and the prepare optimizations pipeline.
+static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
   P.addSILGenCleanup();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
@@ -117,8 +124,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   if (Options.shouldOptimize()) {
     P.addDestroyHoisting();
   }
-  if (!Options.StripOwnershipAfterSerialization)
-    P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
@@ -142,7 +147,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
 
-  P.addGuaranteedARCOpts();
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
@@ -169,7 +173,7 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   }
 
   // Otherwise run the rest of diagnostics.
-  addMandatoryOptPipeline(P);
+  addMandatoryDiagnosticOptPipeline(P);
 
   if (SILViewGuaranteedCFG) {
     addCFGPrinterPipeline(P, "SIL View Guaranteed CFG");
@@ -279,6 +283,9 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // splits up copy_addr.
   P.addCopyForwarding();
 
+  // Optimize copies from a temporary (an "l-value") to a destination.
+  P.addTempLValueOpt();
+
   // Split up opaque operations (copy_addr, retain_value, etc.).
   P.addLowerAggregateInstrs();
 
@@ -351,6 +358,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Jump threading can expose opportunity for SILCombine (enum -> is_enum_tag->
   // cond_br).
   P.addJumpThreadSimplifyCFG();
+  P.addPhiExpansion();
   P.addSILCombine();
   // SILCombine can expose further opportunities for SimplifyCFG.
   P.addSimplifyCFG();
@@ -365,6 +373,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addRedundantLoadElimination();
   }
 
+  P.addCOWOpts();
   P.addPerformanceConstantPropagation();
   // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
   // can cleanup redundant and dead instructions.
@@ -427,9 +436,14 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // not blocked by any other passes' optimizations, so do it early.
   P.addDifferentiabilityWitnessDevirtualizer();
 
-  // Strip ownership from non-transparent functions.
-  if (P.getOptions().StripOwnershipAfterSerialization)
-    P.addNonTransparentFunctionOwnershipModelEliminator();
+  // Strip ownership from non-transparent functions when we are not compiling
+  // the stdlib module. When compiling the stdlib, we eliminate ownership on
+  // these functions later with a nromal call to
+  // P.addNonTransparentFunctionOwnershipModelEliminator().
+  //
+  // This is done so we can push ownership through the pass pipeline first for
+  // the stdlib and then everything else.
+  P.addNonStdlibNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
@@ -438,6 +452,14 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // temp-rvalue opt is here so that we can hit copies from non-ossa code that
   // is linked in from the stdlib.
   P.addTempRValueOpt();
+
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
+
+  // Needed to serialize static initializers of globals for cross-module
+  // optimization.
+  P.addGlobalOpt();
 
   // Add the outliner pass (Osize).
   P.addOutliner();
@@ -496,8 +518,7 @@ static void addSerializePipeline(SILPassPipelinePlan &P) {
   P.addSerializeSILPass();
 
   // Strip any transparent functions that still have ownership.
-  if (P.getOptions().StripOwnershipAfterSerialization)
-    P.addOwnershipModelEliminator();
+  P.addOwnershipModelEliminator();
 }
 
 static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
@@ -513,6 +534,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.addLICM();
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
+  P.addLICM();
   P.addLoopUnroll();
 }
 
@@ -594,6 +616,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addLICM();
+  P.addCOWOpts();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
   // LICM might have added new merging potential by hoisting
@@ -601,6 +624,10 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   // potential of merging out of two loops
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
+
+  // Sometimes stack promotion can catch cases only at this late stage of the
+  // pipeline, after FunctionSignatureOpts.
+  P.addStackPromotion();
 
   // Optimize overflow checks.
   P.addRedundantOverflowCheckRemoval();
@@ -730,17 +757,21 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
-  P.startPipeline("Mandatory Combines");
+  // These are optimizations that we do not need to enable diagnostics (or
+  // depend on other passes needed for diagnostics). Thus we can run them later
+  // and avoid having SourceKit run these passes when just emitting diagnostics
+  // in the editor.
+  P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
+  P.addGuaranteedARCOpts();
 
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
 
   // Now strip any transparent functions that still have ownership.
-  if (Options.StripOwnershipAfterSerialization)
-    P.addOwnershipModelEliminator();
+  P.addOwnershipModelEliminator();
 
   // Finally perform some small transforms.
   P.startPipeline("Rest of Onone");

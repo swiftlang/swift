@@ -91,12 +91,12 @@ public:
 };
 
 /// Check whether the given type witness can be used for the given
-/// associated type.
+/// associated type in the given conformance.
 ///
 /// \returns an empty result on success, or a description of the error.
-CheckTypeWitnessResult checkTypeWitness(DeclContext *dc, ProtocolDecl *proto,
+CheckTypeWitnessResult checkTypeWitness(Type type,
                                         AssociatedTypeDecl *assocType,
-                                        Type type);
+                                        NormalProtocolConformance *Conf);
 
 /// The set of associated types that have been inferred by matching
 /// the given value witness to its corresponding requirement.
@@ -822,15 +822,13 @@ private:
 
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
-  Type computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
+  std::pair<Type, TypeDecl *>
+  computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Compute a type witness without using a specific potential witness,
   /// e.g., using a fixed type (from a refined protocol), default type
   /// on an associated type, or deriving the type.
-  ///
-  /// \param allowDerived Whether to allow "derived" type witnesses.
-  Type computeAbstractTypeWitness(AssociatedTypeDecl *assocType,
-                                  bool allowDerived);
+  Type computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Substitute the current type witnesses into the given interface type.
   Type substCurrentTypeWitnesses(Type type);

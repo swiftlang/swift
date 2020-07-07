@@ -27,7 +27,6 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Casting.h"
@@ -89,13 +88,6 @@ static bool isEffectivelyFinalMethod(FullApplySite applySite, CanType classType,
   if (cd && cd->isFinal())
     return true;
 
-  const DeclContext *dc = applySite.getModule().getAssociatedContext();
-
-  // Without an associated context we cannot perform any
-  // access-based optimizations.
-  if (!dc)
-    return false;
-
   auto *cmi = cast<MethodInst>(applySite.getCallee());
 
   if (!calleesAreStaticallyKnowable(applySite.getModule(), cmi->getMember()))
@@ -149,18 +141,11 @@ static bool isEffectivelyFinalMethod(FullApplySite applySite, CanType classType,
 ///   it is a whole-module compilation.
 static bool isKnownFinalClass(ClassDecl *cd, SILModule &module,
                               ClassHierarchyAnalysis *cha) {
-  const DeclContext *dc = module.getAssociatedContext();
-
   if (cd->isFinal())
     return true;
 
-  // Without an associated context we cannot perform any
-  // access-based optimizations.
-  if (!dc)
-    return false;
-
   // Only handle classes defined within the SILModule's associated context.
-  if (!cd->isChildContextOf(dc))
+  if (!cd->isChildContextOf(module.getAssociatedContext()))
     return false;
 
   if (!cd->hasAccess())
@@ -825,7 +810,7 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
                           *applySite.getInstruction())
              << "Devirtualized call to class method " << NV("Method", f);
     });
-  NumClassDevirt++;
+  ++NumClassDevirt;
 
   return {newAI, changedCFG};
 }
@@ -1060,7 +1045,7 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
                           *applySite.getInstruction())
              << "Devirtualized call to " << NV("Method", f);
     });
-  NumWitnessDevirt++;
+  ++NumWitnessDevirt;
   return {newApplySite, changedCFG};
 }
 

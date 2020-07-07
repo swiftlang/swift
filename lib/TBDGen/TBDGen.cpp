@@ -70,7 +70,12 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
     (void)isNewValue;
-    assert(isNewValue && "symbol appears twice");
+#ifndef NDEBUG
+    if (!isNewValue) {
+      llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
+      assert(false && "TBDGen symbol appears twice");
+    }
+#endif
   }
 }
 
@@ -444,8 +449,8 @@ void TBDGenVisitor::addBaseConformanceDescriptor(
   addSymbol(entity);
 }
 
-void TBDGenVisitor::addConformances(DeclContext *DC) {
-  for (auto conformance : DC->getLocalConformances(
+void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
+  for (auto conformance : IDC->getLocalConformances(
                             ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
     auto needsWTable =
@@ -462,8 +467,9 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     // We cannot emit the witness table symbol if the protocol is imported from
     // another module and it's resilient, because initialization of that protocol
     // is necessary in this case
-    if (!rootConformance->getProtocol()->isResilient(DC->getParentModule(),
-                                                     ResilienceExpansion::Maximal))
+    if (!rootConformance->getProtocol()->isResilient(
+            IDC->getAsGenericContext()->getParentModule(),
+            ResilienceExpansion::Maximal))
       addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
     addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
@@ -497,7 +503,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             addSymbolIfNecessary(reqtAccessor, witnessAccessor);
           });
         } else if (isa<EnumElementDecl>(witnessDecl)) {
-          addSymbolIfNecessary(valueReq, witnessDecl);
+          auto getter = storage->getSynthesizedAccessor(AccessorKind::Get);
+          addSymbolIfNecessary(getter, witnessDecl);
         }
       }
     });
@@ -621,7 +628,7 @@ void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
   for (auto *param : *PL) {
     if (param->isDefaultArgument())
       addSymbol(SILDeclRef::getDefaultArgGenerator(VD, index));
-    index++;
+    ++index;
   }
 }
 
@@ -635,7 +642,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
 
   // Add the global function pointer for a dynamically replaceable function.
-  if (AFD->isNativeDynamic()) {
+  if (AFD->shouldUseNativeMethodReplacement()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
@@ -680,7 +687,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
   if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
     assert(opaqueResult->getNamingDecl() == FD);
-    if (FD->isNativeDynamic()) {
+    if (FD->shouldUseNativeDynamicDispatch()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
@@ -729,7 +736,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   for (const auto *differentiableAttr :
        ASD->getAttrs().getAttributes<DifferentiableAttr>())
     addDerivativeConfiguration(
-        ASD->getAccessor(AccessorKind::Get),
+        ASD->getOpaqueAccessor(AccessorKind::Get),
         AutoDiffConfig(differentiableAttr->getParameterIndices(),
                        IndexSubset::get(ASD->getASTContext(), 1, {0}),
                        differentiableAttr->getDerivativeGenericSignature()));
@@ -1017,13 +1024,12 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
 void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
   visitNominalTypeDecl(ED);
-
-  if (!ED->isResilient())
-    return;
 }
 
 void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
-  addSymbol(LinkEntity::forEnumCase(EED));
+  if (EED->getParentEnum()->isResilient())
+    addSymbol(LinkEntity::forEnumCase(EED));
+
   if (auto *PL = EED->getParameterList())
     visitDefaultArguments(EED, PL);
 }

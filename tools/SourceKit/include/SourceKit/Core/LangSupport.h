@@ -51,6 +51,7 @@ struct EntityInfo {
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;
+  Optional<UIdent> EffectiveAccess;
 
   EntityInfo() = default;
 };
@@ -148,6 +149,7 @@ public:
 
   virtual void setCompletionKind(UIdent kind) {};
   virtual void setReusingASTContext(bool) = 0;
+  virtual void setAnnotatedTypename(bool) = 0;
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
@@ -617,6 +619,7 @@ public:
 
   virtual void handleResult(const TypeContextInfoItem &Result) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
 };
 
 struct ConformingMethodListResult {
@@ -641,6 +644,7 @@ public:
   virtual ~ConformingMethodListConsumer() {}
 
   virtual void handleResult(const ConformingMethodListResult &Result) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
 };
 
@@ -809,12 +813,14 @@ public:
 
   virtual void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf,
                                         unsigned Offset,
+                                        OptionsDictionary *options,
                                         ArrayRef<const char *> Args,
                                         TypeContextInfoConsumer &Consumer,
                                         Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getConformingMethodList(llvm::MemoryBuffer *inputBuf,
                                        unsigned Offset,
+                                       OptionsDictionary *options,
                                        ArrayRef<const char *> Args,
                                        ArrayRef<const char *> ExpectedTypes,
                                        ConformingMethodListConsumer &Consumer,

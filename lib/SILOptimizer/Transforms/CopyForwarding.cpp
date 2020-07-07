@@ -322,6 +322,9 @@ namespace {
 /// This returns false and sets Oper to a valid operand if the instruction is a
 /// projection of the value at the given address. The assumption is that we
 /// cannot deinitialize memory via projections.
+///
+/// This returns true with Oper == nullptr for trivial stores (without a proper
+/// deinit).
 class AnalyzeForwardUse
     : public SILInstructionVisitor<AnalyzeForwardUse, bool> {
 public:
@@ -352,7 +355,10 @@ public:
     return true;
   }
   bool visitStoreInst(StoreInst *Store) {
-    llvm_unreachable("illegal reinitialization or store of an address");
+    // Trivial values may be stored prior to the next deinit. A store is an
+    // implicit "deinit" with no operand to replace.
+    assert(Store->getOperand(0)->getType().isTrivial(*Store->getFunction()));
+    return true;
   }
   bool visitDestroyAddrInst(DestroyAddrInst *UserInst) {
     Oper = &UserInst->getOperandRef();
@@ -1011,15 +1017,17 @@ bool CopyForwarding::forwardPropagateCopy() {
       continue;
 
     AnalyzeForwardUse AnalyzeUse(CopyDest);
-    bool seenDeinit = AnalyzeUse.visit(UserInst);
-    // If this use cannot be analyzed, then abort.
+    bool seenDeinitOrStore = AnalyzeUse.visit(UserInst);
+    if (AnalyzeUse.Oper)
+      ValueUses.push_back(AnalyzeUse.Oper);
+
+    // If this is a deinit or store, we're done searching.
+    if (seenDeinitOrStore)
+      break;
+
+    // If this non-deinit instruction wasn't fully analyzed, bail-out.
     if (!AnalyzeUse.Oper)
       return false;
-    // Otherwise record the operand.
-    ValueUses.push_back(AnalyzeUse.Oper);
-    // If this is a deinit, we're done searching.
-    if (seenDeinit)
-      break;
   }
   if (SI == SE)
     return false;

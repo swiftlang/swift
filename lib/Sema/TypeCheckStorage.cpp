@@ -1043,29 +1043,20 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   Call->setType(copyMethodType->getResult());
   Call->setThrows(false);
 
-  TypeLoc ResultTy;
-  ResultTy.setType(VD->getType());
-
   // If we're working with non-optional types, we're forcing the cast.
   if (!isOptional) {
-    auto *Cast =
-      new (Ctx) ForcedCheckedCastExpr(Call, SourceLoc(), SourceLoc(),
-                                      TypeLoc::withoutLoc(underlyingType));
+    auto *const Cast =
+        ForcedCheckedCastExpr::createImplicit(Ctx, Call, underlyingType);
     Cast->setCastKind(CheckedCastKind::ValueCast);
-    Cast->setType(underlyingType);
-    Cast->setImplicit();
 
     return Cast;
   }
 
   // We're working with optional types, so perform a conditional checked
   // downcast.
-  auto *Cast =
-    new (Ctx) ConditionalCheckedCastExpr(Call, SourceLoc(), SourceLoc(),
-                                         TypeLoc::withoutLoc(underlyingType));
+  auto *const Cast =
+      ConditionalCheckedCastExpr::createImplicit(Ctx, Call, underlyingType);
   Cast->setCastKind(CheckedCastKind::ValueCast);
-  Cast->setType(OptionalType::get(underlyingType));
-  Cast->setImplicit();
 
   // Use OptionalEvaluationExpr to evaluate the "?".
   auto *Result = new (Ctx) OptionalEvaluationExpr(Cast);
@@ -1821,7 +1812,7 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto &ctx = accessor->getASTContext();
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumAccessorBodiesSynthesized++;
+    ++ctx.Stats->getFrontendCounters().NumAccessorBodiesSynthesized;
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
@@ -1850,7 +1841,7 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
   accessor->setImplicit();
 
   if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
+    ++ctx.Stats->getFrontendCounters().NumAccessorsSynthesized;
 
   if (doesAccessorHaveBody(accessor))
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
@@ -2082,7 +2073,7 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
 
   } else if (dc->isModuleScopeContext()) {
     // Fixed-layout global variables don't require opaque accessors.
-    if (!var->isResilient() && !var->isNativeDynamic())
+    if (!var->isResilient() && !var->shouldUseNativeDynamicDispatch())
       return false;
 
   // Stored properties imported from Clang don't require opaque accessors.
@@ -2127,7 +2118,7 @@ RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
 
   // Dynamic storage does not have an opaque modify coroutine.
   if (dc->getSelfClassDecl())
-    if (storage->isObjCDynamic())
+    if (storage->shouldUseObjCDispatch())
       return false;
 
   // Requirements of ObjC protocols don't have an opaque modify coroutine.
@@ -2488,7 +2479,11 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   result.Getter = getGetterMutatingness(firstWrapper.*varMember);
   result.Setter = getSetterMutatingness(firstWrapper.*varMember,
                                         var->getInnermostDeclContext());
-  
+
+  auto getCustomAttrTypeLoc = [](const CustomAttr *CA) -> TypeLoc {
+    return { CA->getTypeRepr(), CA->getType() };
+  };
+
   // Compose the traits of the following wrappers.
   for (unsigned i = 1; i < numWrappers && !isProjectedValue; ++i) {
     assert(var == originalVar);
@@ -2505,8 +2500,8 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
       auto &ctx = var->getASTContext();
       ctx.Diags.diagnose(var->getAttachedPropertyWrappers()[i]->getLocation(),
                diag::property_wrapper_mutating_get_composed_to_get_only,
-               var->getAttachedPropertyWrappers()[i]->getTypeLoc(),
-               var->getAttachedPropertyWrappers()[i-1]->getTypeLoc());
+               getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i]),
+               getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i-1]));
 
       return None;
     }
@@ -2683,16 +2678,21 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     pbd->setInit(0, initializer);
     pbd->setInitializerChecked(0);
     wrappedValue = findWrappedValuePlaceholder(initializer);
-  } else if (!parentPBD->isInitialized(patternNumber) &&
-             wrapperInfo.defaultInit) {
-    // FIXME: Record this expression somewhere so that DI can perform the
-    // initialization itself.
-    auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
-    Expr *initializer = CallExpr::createImplicit(ctx, typeExpr, {}, { });
-    typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
-                                           initializer);
-    pbd->setInit(0, initializer);
-    pbd->setInitializerChecked(0);
+  } else {
+    if (!parentPBD->isInitialized(patternNumber) && wrapperInfo.defaultInit) {
+      // FIXME: Record this expression somewhere so that DI can perform the
+      // initialization itself.
+      auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
+      Expr *initializer = CallExpr::createImplicit(ctx, typeExpr, {}, { });
+      typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
+                                             initializer);
+      pbd->setInit(0, initializer);
+      pbd->setInitializerChecked(0);
+    }
+
+    if (var->getOpaqueResultTypeDecl()) {
+      var->diagnose(diag::opaque_type_var_no_underlying_type);
+    }
   }
 
   // If there is a projection property (projectedValue) in the wrapper,

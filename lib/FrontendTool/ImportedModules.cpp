@@ -78,15 +78,12 @@ bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
   StringRef implicitHeaderPath = opts.ImplicitObjCHeaderPath;
   if (!implicitHeaderPath.empty()) {
     if (!clangImporter->importBridgingHeader(implicitHeaderPath, mainModule)) {
-      ModuleDecl::ImportFilter importFilter;
-      importFilter |= ModuleDecl::ImportFilterKind::Public;
-      importFilter |= ModuleDecl::ImportFilterKind::Private;
-      importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-      importFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
-
       SmallVector<ModuleDecl::ImportedModule, 16> imported;
       clangImporter->getImportedHeaderModule()->getImportedModules(
-          imported, importFilter);
+          imported, {ModuleDecl::ImportFilterKind::Public,
+                     ModuleDecl::ImportFilterKind::Private,
+                     ModuleDecl::ImportFilterKind::ImplementationOnly,
+                     ModuleDecl::ImportFilterKind::SPIAccessControl});
 
       for (auto IM : imported) {
         if (auto clangModule = IM.importedModule->findUnderlyingClangModule())

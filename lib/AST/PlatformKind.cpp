@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
+
 using namespace swift;
 
 StringRef swift::platformString(PlatformKind platform) {
@@ -92,7 +93,7 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
   llvm_unreachable("bad PlatformKind");
 }
 
-bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
+bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                              bool ForTargetVariant) {
   llvm::Triple TT = LangOpts.Target;
 
@@ -105,7 +106,7 @@ bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
                                    LangOpts.EnableAppExtensionRestrictions);
 }
 
-PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
+PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
   if (LangOpts.Target.isMacOSX()) {
     return (LangOpts.EnableAppExtensionRestrictions
                 ? PlatformKind::OSXApplicationExtension
@@ -154,4 +155,18 @@ bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
   // inherit from their non-extension platform.
 
   return false;
+}
+
+llvm::VersionTuple swift::canonicalizePlatformVersion(
+    PlatformKind platform, const llvm::VersionTuple &version) {
+
+  // Canonicalize macOS version for macOS Big Sur to treat
+  // 10.16 as 11.0.
+  if (platform == PlatformKind::OSX ||
+      platform == PlatformKind::OSXApplicationExtension) {
+    return llvm::Triple::getCanonicalVersionForOS(llvm::Triple::MacOSX,
+                                                  version);
+  }
+
+  return version;
 }

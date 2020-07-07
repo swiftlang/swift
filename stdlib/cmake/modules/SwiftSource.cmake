@@ -385,7 +385,6 @@ function(_compile_swift_files
   # The standard library and overlays are always built resiliently.
   if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-enable-library-evolution")
-    list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)
@@ -584,7 +583,7 @@ function(_compile_swift_files
   set(swift_compiler_tool_dep)
   if(SWIFT_INCLUDE_TOOLS)
     # Depend on the binary itself, in addition to the symlink.
-    set(swift_compiler_tool_dep "swift")
+    set(swift_compiler_tool_dep "swift-frontend")
   endif()
 
   # If there are more than one output files, we assume that they are specified

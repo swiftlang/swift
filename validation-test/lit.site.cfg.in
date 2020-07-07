@@ -13,6 +13,7 @@
 import sys
 import platform
 
+config.cmake = "@CMAKE_COMMAND@"
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
@@ -98,10 +99,10 @@ if "@CMAKE_GENERATOR@" == "Xcode":
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
-if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
+if "@SWIFT_USE_LINKER@" == "lld":
     config.android_linker_name = "lld"
 else:
-    # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
+    # even if SWIFT_USE_LINKER isn't set, we cannot use BFD for Android
     config.android_linker_name = "gold"
 
 # Let the main config do the real work.

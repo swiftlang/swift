@@ -1154,7 +1154,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
                                        ToAI->isNonThrowing());
   FromAI->replaceAllUsesWith(NAI);
   FromAI->eraseFromParent();
-  NumOpenExtRemoved++;
+  ++NumOpenExtRemoved;
   return true;
 }
 
@@ -1195,10 +1195,10 @@ static bool CSExistentialInstructions(SILFunctionArgument *Arg,
   // Try to CSE the users of the current open_existential_addr instruction with
   // one of the other open_existential_addr that dominate it.
   int NumOpenInstr = Opens.size();
-  for (int i = 0; i < NumOpenInstr; i++) {
+  for (int i = 0; i < NumOpenInstr; ++i) {
     // Try to find a better dominating 'open' for the i-th instruction.
     OpenExistentialAddrInst *SomeOpen = TopDominator[i];
-    for (int j = 0; j < NumOpenInstr; j++) {
+    for (int j = 0; j < NumOpenInstr; ++j) {
 
       if (i == j || TopDominator[i] == TopDominator[j])
         continue;
@@ -1221,13 +1221,13 @@ static bool CSExistentialInstructions(SILFunctionArgument *Arg,
   // because we'll be adding new users and we need to make sure that we can
   // find the original users.
   llvm::SmallVector<ApplyWitnessPair, 8> OriginalAW;
-  for (int i=0; i < NumOpenInstr; i++) {
+  for (int i=0; i < NumOpenInstr; ++i) {
     OriginalAW.push_back(getOpenExistentialUsers(TopDominator[i]));
   }
 
   // Perform the CSE for the open_existential_addr instruction and their
   // dominating instruction.
-  for (int i=0; i < NumOpenInstr; i++) {
+  for (int i=0; i < NumOpenInstr; ++i) {
     if (Opens[i] != TopDominator[i])
       Changed |= tryToCSEOpenExtCall(Opens[i], TopDominator[i],
                                      OriginalAW[i], DA);

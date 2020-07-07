@@ -18,6 +18,7 @@
 #define SWIFT_DEMANGLING_BASEREMANGLER_H
 
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/NamespaceMacros.h"
 #include <unordered_map>
 
 using namespace swift::Demangle;
@@ -25,6 +26,7 @@ using llvm::StringRef;
 
 namespace swift {
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 // An entry in the remangler's substitution map.
 class SubstitutionEntry {
@@ -163,6 +165,7 @@ public:
   }
 };
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift
 

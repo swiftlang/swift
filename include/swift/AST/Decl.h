@@ -41,7 +41,6 @@
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Located.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <type_traits>
@@ -536,16 +535,13 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1,
     /// Whether this class inherits its superclass's convenience initializers.
     InheritsSuperclassInits : 1,
     ComputedInheritsSuperclassInits : 1,
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
-
-    /// \see ClassDecl::getEmittedMembers()
-    HasForcedEmittedMembers : 1,
 
     HasMissingDesignatedInitializers : 1,
     ComputedHasMissingDesignatedInitializers : 1,
@@ -558,10 +554,12 @@ protected:
     IsIncompatibleWithWeakReferences : 1
   );
 
-  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1+1,
     /// True if this struct has storage for fields that aren't accessible in
     /// Swift.
-    HasUnreferenceableStorage : 1
+    HasUnreferenceableStorage : 1,
+    /// True if this struct is imported from C++ and not trivially copyable.
+    IsCxxNotTriviallyCopyable : 1
   );
   
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
@@ -573,7 +571,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -599,7 +597,10 @@ protected:
 
     /// Whether the module was imported from Clang (or, someday, maybe another
     /// language).
-    IsNonSwiftModule : 1
+    IsNonSwiftModule : 1,
+
+    /// Whether this module is the main module.
+    IsMainModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1026,12 +1027,12 @@ class RequirementRepr {
   SourceLoc SeparatorLoc;
   RequirementReprKind Kind : 2;
   bool Invalid : 1;
-  TypeLoc FirstType;
+  TypeRepr *FirstType;
 
   /// The second element represents the right-hand side of the constraint.
   /// It can be e.g. a type or a layout constraint.
   union {
-    TypeLoc SecondType;
+    TypeRepr *SecondType;
     LayoutConstraintLoc SecondLayout;
   };
 
@@ -1040,16 +1041,16 @@ class RequirementRepr {
   StringRef AsWrittenString;
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeLoc FirstType, TypeLoc SecondType)
+                  TypeRepr *FirstType, TypeRepr *SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondType(SecondType) { }
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeLoc FirstType, LayoutConstraintLoc SecondLayout)
+                  TypeRepr *FirstType, LayoutConstraintLoc SecondLayout)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
-  void printImpl(ASTPrinter &OS, bool AsWritten) const;
+  void printImpl(ASTPrinter &OS) const;
 
 public:
   /// Construct a new type-constraint requirement.
@@ -1060,9 +1061,9 @@ public:
   /// this requirement was implied.
   /// \param Constraint The protocol or protocol composition to which the
   /// subject must conform, or superclass from which the subject must inherit.
-  static RequirementRepr getTypeConstraint(TypeLoc Subject,
+  static RequirementRepr getTypeConstraint(TypeRepr *Subject,
                                            SourceLoc ColonLoc,
-                                           TypeLoc Constraint) {
+                                           TypeRepr *Constraint) {
     return { ColonLoc, RequirementReprKind::TypeConstraint, Subject, Constraint };
   }
 
@@ -1072,9 +1073,9 @@ public:
   /// \param EqualLoc The location of the '==' in the same-type constraint, or
   /// an invalid location if this requirement was implied.
   /// \param SecondType The second type.
-  static RequirementRepr getSameType(TypeLoc FirstType,
+  static RequirementRepr getSameType(TypeRepr *FirstType,
                                      SourceLoc EqualLoc,
-                                     TypeLoc SecondType) {
+                                     TypeRepr *SecondType) {
     return { EqualLoc, RequirementReprKind::SameType, FirstType, SecondType };
   }
 
@@ -1086,7 +1087,7 @@ public:
   /// this requirement was implied.
   /// \param Layout The layout requirement to which the
   /// subject must conform.
-  static RequirementRepr getLayoutConstraint(TypeLoc Subject,
+  static RequirementRepr getLayoutConstraint(TypeRepr *Subject,
                                              SourceLoc ColonLoc,
                                              LayoutConstraintLoc Layout) {
     return {ColonLoc, RequirementReprKind::LayoutConstraint, Subject,
@@ -1104,25 +1105,7 @@ public:
 
   /// For a type-bound requirement, return the subject of the
   /// conformance relationship.
-  Type getSubject() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint ||
-           getKind() == RequirementReprKind::LayoutConstraint);
-    return FirstType.getType();
-  }
-
   TypeRepr *getSubjectRepr() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint ||
-           getKind() == RequirementReprKind::LayoutConstraint);
-    return FirstType.getTypeRepr();
-  }
-
-  TypeLoc &getSubjectLoc() {
-    assert(getKind() == RequirementReprKind::TypeConstraint ||
-           getKind() == RequirementReprKind::LayoutConstraint);
-    return FirstType;
-  }
-
-  const TypeLoc &getSubjectLoc() const {
     assert(getKind() == RequirementReprKind::TypeConstraint ||
            getKind() == RequirementReprKind::LayoutConstraint);
     return FirstType;
@@ -1130,22 +1113,7 @@ public:
 
   /// For a type-bound requirement, return the protocol or to which
   /// the subject conforms or superclass it inherits.
-  Type getConstraint() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return SecondType.getType();
-  }
-
   TypeRepr *getConstraintRepr() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return SecondType.getTypeRepr();
-  }
-
-  TypeLoc &getConstraintLoc() {
-    assert(getKind() == RequirementReprKind::TypeConstraint);
-    return SecondType;
-  }
-
-  const TypeLoc &getConstraintLoc() const {
     assert(getKind() == RequirementReprKind::TypeConstraint);
     return SecondType;
   }
@@ -1166,43 +1134,13 @@ public:
   }
 
   /// Retrieve the first type of a same-type requirement.
-  Type getFirstType() const {
-    assert(getKind() == RequirementReprKind::SameType);
-    return FirstType.getType();
-  }
-
   TypeRepr *getFirstTypeRepr() const {
-    assert(getKind() == RequirementReprKind::SameType);
-    return FirstType.getTypeRepr();
-  }
-
-  TypeLoc &getFirstTypeLoc() {
-    assert(getKind() == RequirementReprKind::SameType);
-    return FirstType;
-  }
-
-  const TypeLoc &getFirstTypeLoc() const {
     assert(getKind() == RequirementReprKind::SameType);
     return FirstType;
   }
 
   /// Retrieve the second type of a same-type requirement.
-  Type getSecondType() const {
-    assert(getKind() == RequirementReprKind::SameType);
-    return SecondType.getType();
-  }
-
   TypeRepr *getSecondTypeRepr() const {
-    assert(getKind() == RequirementReprKind::SameType);
-    return SecondType.getTypeRepr();
-  }
-
-  TypeLoc &getSecondTypeLoc() {
-    assert(getKind() == RequirementReprKind::SameType);
-    return SecondType;
-  }
-
-  const TypeLoc &getSecondTypeLoc() const {
     assert(getKind() == RequirementReprKind::SameType);
     return SecondType;
   }
@@ -1213,19 +1151,13 @@ public:
     return SeparatorLoc;
   }
 
-  SourceRange getSourceRange() const {
-    if (getKind() == RequirementReprKind::LayoutConstraint)
-      return SourceRange(FirstType.getSourceRange().Start,
-                         SecondLayout.getSourceRange().End);
-    return SourceRange(FirstType.getSourceRange().Start,
-                       SecondType.getSourceRange().End);
-  }
+  SourceRange getSourceRange() const;
 
   /// Retrieve the first or subject type representation from the \c repr,
   /// or \c nullptr if \c repr is null.
   static TypeRepr *getFirstTypeRepr(const RequirementRepr *repr) {
     if (!repr) return nullptr;
-    return repr->FirstType.getTypeRepr();
+    return repr->FirstType;
   }
 
   /// Retrieve the second or constraint type representation from the \c repr,
@@ -1234,7 +1166,7 @@ public:
     if (!repr) return nullptr;
     assert(repr->getKind() == RequirementReprKind::TypeConstraint ||
            repr->getKind() == RequirementReprKind::SameType);
-    return repr->SecondType.getTypeRepr();
+    return repr->SecondType;
   }
 
   SWIFT_DEBUG_DUMP;
@@ -2711,6 +2643,7 @@ public:
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
+private:
   bool isObjCDynamic() const {
     return isObjC() && isDynamic();
   }
@@ -2718,6 +2651,37 @@ public:
   bool isNativeDynamic() const {
     return !isObjC() && isDynamic();
   }
+
+  bool isObjCDynamicInGenericClass() const;
+
+public:
+  /// Should we use Objective-C method dispatch for this decl.
+  bool shouldUseObjCDispatch() const {
+    return isObjCDynamic();
+  }
+
+  /// Should we use native dynamic function replacement dispatch for this decl.
+  bool shouldUseNativeDynamicDispatch() const {
+    return isNativeDynamic();
+  }
+
+  /// Should we use Objective-C category based function replacement for this
+  /// decl.
+  /// This is all `@objc dynamic` methods except for such methods in native
+  /// generic classes. We can't use a category for generic classes so we use
+  /// native replacement instead (this behavior is only enabled with
+  /// -enable-implicit-dynamic).
+  bool shouldUseObjCMethodReplacement() const;
+
+  /// Should we use native dynamic function replacement mechanism for this decl.
+  /// This is all native dynamic methods except for `@objc dynamic` methods in
+  /// generic classes (see above).
+  bool shouldUseNativeMethodReplacement() const;
+
+  /// Is this a native dynamic function replacement based replacement.
+  /// This is all @_dynamicReplacement(for:) of native functions and @objc
+  /// dynamic methods on generic classes (see above).
+  bool isNativeMethodReplacement() const;
 
   bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
     return (std::min(getEffectiveAccess(), AccessLevel::Public) >
@@ -3564,6 +3528,8 @@ public:
   /// initializer.
   bool hasDefaultInitializer() const;
 
+  bool isTypeErasedGenericClass() const;
+
   /// Retrieves the synthesized zero parameter default initializer for this
   /// declaration, or \c nullptr if it doesn't have one.
   ConstructorDecl *getDefaultInitializer() const;
@@ -3822,6 +3788,14 @@ public:
   void setHasUnreferenceableStorage(bool v) {
     Bits.StructDecl.HasUnreferenceableStorage = v;
   }
+
+  bool isCxxNotTriviallyCopyable() const {
+    return Bits.StructDecl.IsCxxNotTriviallyCopyable;
+  }
+
+  void setIsCxxNotTriviallyCopyable(bool v) {
+    Bits.StructDecl.IsCxxNotTriviallyCopyable = v;
+  }
 };
 
 /// This is the base type for AncestryOptions. Each flag describes possible
@@ -3878,14 +3852,6 @@ class ClassDecl final : public NominalTypeDecl {
     /// superclass was computed yet or not.
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
-
-  bool hasForcedEmittedMembers() const {
-    return Bits.ClassDecl.HasForcedEmittedMembers;
-  }
-
-  void setHasForcedEmittedMembers() {
-    Bits.ClassDecl.HasForcedEmittedMembers = true;
-  }
 
   Optional<bool> getCachedInheritsSuperclassInitializers() const {
     if (Bits.ClassDecl.ComputedInheritsSuperclassInits)
@@ -4104,15 +4070,15 @@ public:
   ///
   /// \param isInstance Whether we are looking for an instance method
   /// (vs. a class method).
-  MutableArrayRef<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
-                                                       bool isInstance);
+  TinyPtrVector<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
+                                                     bool isInstance);
 
   /// Record the presence of an @objc method with the given selector.
   void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
 
   /// Get all the members of this class, synthesizing any implicit members
   /// that appear in the vtable if needed.
-  DeclRange getEmittedMembers() const;
+  ArrayRef<Decl *> getEmittedMembers() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5219,6 +5185,12 @@ public:
   Optional<PropertyWrapperMutability>
       getPropertyWrapperMutability() const;
 
+  /// Returns whether this property is the backing storage property or a storage
+  /// wrapper for wrapper instance's projectedValue. If this property is
+  /// neither, then it returns `None`.
+  Optional<PropertyWrapperSynthesizedPropertyKind>
+  getPropertyWrapperSynthesizedPropertyKind() const;
+
   /// Retrieve the backing storage property for a property that has an
   /// attached property wrapper.
   ///
@@ -5519,35 +5491,10 @@ public:
   }
 
   /// Does this parameter reject temporary pointer conversions?
-  bool isNonEphemeral() const {
-    if (getAttrs().hasAttribute<NonEphemeralAttr>())
-      return true;
-
-    // Only pointer parameters can be non-ephemeral.
-    auto ty = getInterfaceType();
-    if (!ty->lookThroughSingleOptionalType()->getAnyPointerElementType())
-      return false;
-
-    // Enum element pointer parameters are always non-ephemeral.
-    auto *parentDecl = getDeclContext()->getAsDecl();
-    if (parentDecl && isa<EnumElementDecl>(parentDecl))
-      return true;
-
-    return false;
-  }
+  bool isNonEphemeral() const;
 
   /// Attempt to apply an implicit `@_nonEphemeral` attribute to this parameter.
-  void setNonEphemeralIfPossible() {
-    // Don't apply the attribute if this isn't a pointer param.
-    auto type = getInterfaceType();
-    if (!type->lookThroughSingleOptionalType()->getAnyPointerElementType())
-      return;
-
-    if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
-      auto &ctx = getASTContext();
-      getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
-    }
-  }
+  void setNonEphemeralIfPossible();
 
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
@@ -7035,6 +6982,10 @@ public:
     return Name;
   }
 
+  // This is needed to allow templated code to work with both ValueDecls and
+  // PrecedenceGroupDecls.
+  DeclBaseName getBaseName() const { return Name; }
+
   SourceLoc getLBraceLoc() const { return LBraceLoc; }
   SourceLoc getRBraceLoc() const { return RBraceLoc; }
 
@@ -7192,6 +7143,10 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
 
+  // This is needed to allow templated code to work with both ValueDecls and
+  // OperatorDecls.
+  DeclBaseName getBaseName() const { return name; }
+
   /// Get the list of identifiers after the colon in the operator declaration.
   ///
   /// This list includes the names of designated types. For infix operators, the
@@ -7252,12 +7207,6 @@ public:
 
   PrecedenceGroupDecl *getPrecedenceGroup() const;
 
-  /// True if this decl's attributes conflict with those declared by another
-  /// operator.
-  bool conflictsWith(InfixOperatorDecl *other) {
-    return getPrecedenceGroup() != other->getPrecedenceGroup();
-  }
-  
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::InfixOperator;
   }
@@ -7286,12 +7235,6 @@ public:
     return { getOperatorLoc(), getNameLoc() };
   }
 
-  /// True if this decl's attributes conflict with those declared by another
-  /// PrefixOperatorDecl.
-  bool conflictsWith(PrefixOperatorDecl *other) {
-    return false;
-  }
-  
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PrefixOperator;
   }
@@ -7318,12 +7261,6 @@ public:
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
-  }
-
-  /// True if this decl's attributes conflict with those declared by another
-  /// PostfixOperatorDecl.
-  bool conflictsWith(PostfixOperatorDecl *other) {
-    return false;
   }
   
   static bool classof(const Decl *D) {

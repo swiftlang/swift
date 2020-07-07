@@ -122,6 +122,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             Identifier FnId, SILType resultType,
                             Explosion &args, Explosion &out,
                             SubstitutionMap substitutions) {
+  if (Builtin.ID == BuiltinValueKind::COWBufferForReading) {
+    // Just forward the incoming argument.
+    assert(args.size() == 1 && "Expecting one incoming argument");
+    out = std::move(args);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
     // Just consume the incoming argument.
     assert(args.size() == 1 && "Expecting one incoming argument");
@@ -538,15 +545,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     bool isWeak = false, isVolatile = false, isSingleThread = false;
     if (NextPart != Parts.end() && *NextPart == "weak") {
       isWeak = true;
-      NextPart++;
+      ++NextPart;
     }
     if (NextPart != Parts.end() && *NextPart == "volatile") {
       isVolatile = true;
-      NextPart++;
+      ++NextPart;
     }
     if (NextPart != Parts.end() && *NextPart == "singlethread") {
       isSingleThread = true;
-      NextPart++;
+      ++NextPart;
     }
     assert(NextPart == Parts.end() && "Mismatch with sema");
 

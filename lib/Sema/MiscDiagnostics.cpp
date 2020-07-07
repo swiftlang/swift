@@ -86,14 +86,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return closure->hasAppliedFunctionBuilder();
+        return !closure->wasSeparatelyTypeChecked();
       return false;
     }
 
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -136,6 +136,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       if (auto *SE = dyn_cast<SubscriptExpr>(E))
         CallArgs.insert(SE->getIndex());
+
+      if (auto *DSE = dyn_cast<DynamicSubscriptExpr>(E))
+        CallArgs.insert(DSE->getIndex());
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (auto Comp : KPE->getComponents()) {
@@ -186,14 +189,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         // Otherwise, try to drill down through member calls for the purposes
         // of argument-matching code below.
         } else if (auto selfApply = dyn_cast<SelfApplyExpr>(base)) {
-          uncurryLevel++;
+          ++uncurryLevel;
           base = selfApply->getSemanticFn();
           if (auto calleeDRE = dyn_cast<DeclRefExpr>(base))
             callee = calleeDRE->getDeclRef();
 
         // Otherwise, check for a dynamic member.
         } else if (auto dynamicMRE = dyn_cast<DynamicMemberRefExpr>(base)) {
-          uncurryLevel++;
+          ++uncurryLevel;
           callee = dynamicMRE->getMember();
         }
 
@@ -1287,8 +1290,8 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -1456,12 +1459,12 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return closure->hasAppliedFunctionBuilder();
+        return !closure->wasSeparatelyTypeChecked();
       return false;
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -3160,8 +3163,8 @@ static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
         continue;
       
       auto &SM = ctx.SourceMgr;
-      auto prevLineCol = SM.getLineAndColumn(prevLoc);
-      if (SM.getLineNumber(thisLoc) != prevLineCol.first)
+      auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
+      if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
         continue;
 
       ctx.Diags.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
@@ -3262,8 +3265,8 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -3412,8 +3415,8 @@ public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
 
-  bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-    return expr->hasAppliedFunctionBuilder();
+  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+    return false;
   }
 
   bool shouldWalkIntoTapExpression() override { return false; }
@@ -3749,18 +3752,18 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
     // checking for a type, which forced it to be promoted to a double optional
     // type.
     if (auto ooType = subExpr->getType()->getOptionalObjectType()) {
-      if (auto TP = dyn_cast<TypedPattern>(p))
+      if (auto OSP = dyn_cast<OptionalSomePattern>(p)) {
         // Check for 'if let' to produce a tuned diagnostic.
-        if (isa<OptionalSomePattern>(TP->getSubPattern()) &&
-            TP->getSubPattern()->isImplicit()) {
+        if (auto *TP = dyn_cast<TypedPattern>(OSP->getSubPattern())) {
           ctx.Diags.diagnose(cond.getIntroducerLoc(),
                              diag::optional_check_promotion,
                              subExpr->getType())
             .highlight(subExpr->getSourceRange())
-            .fixItReplace(TP->getTypeLoc().getSourceRange(),
+            .fixItReplace(TP->getTypeRepr()->getSourceRange(),
                           ooType->getString());
           return;
         }
+      }
       ctx.Diags.diagnose(cond.getIntroducerLoc(),
                          diag::optional_pattern_match_promotion,
                          subExpr->getType(), cond.getInitializer()->getType())
@@ -3975,7 +3978,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
 
       SmallString<4> forceUnwrapString;
-      for (size_t i = 0; i < optionalityDifference; i++)
+      for (size_t i = 0; i < optionalityDifference; ++i)
         forceUnwrapString += "!";
 
       Ctx.Diags.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
@@ -4152,8 +4155,8 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -4228,8 +4231,8 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -4283,7 +4286,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       if (!property)
         return;
       auto propertyVar = cast<VarDecl>(property);
-      if (propertyVar->isObjCDynamic() ||
+      if (propertyVar->shouldUseObjCDispatch() ||
           (propertyVar->isObjC() &&
            propertyVar->getParsedAccessor(AccessorKind::Set)))
         return;

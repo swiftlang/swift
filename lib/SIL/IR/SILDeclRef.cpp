@@ -41,7 +41,7 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   auto dc = method->getDeclContext();
 
   if (dc->getSelfClassDecl()) {
-    if (method->isObjCDynamic()) {
+    if (method->shouldUseObjCDispatch()) {
       return MethodDispatch::Class;
     }
 
@@ -88,7 +88,7 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
 bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   assert(!isa<AbstractStorageDecl>(vd));
 
-  if (vd->isObjCDynamic()) {
+  if (vd->shouldUseObjCDispatch()) {
     return true;
   }
 
@@ -233,7 +233,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
 
   // Native function-local declarations have shared linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
-  // of marking them "used" other than making them external. 
+  // of marking them "used" other than making them external.
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
@@ -333,6 +333,10 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (fn->hasForcedStaticDispatch()) {
       limit = Limit::OnDemand;
     }
+  }
+
+  if (isEnumElement()) {
+    limit = Limit::OnDemand;
   }
 
   auto effectiveAccess = d->getEffectiveAccess();
@@ -810,7 +814,12 @@ bool SILDeclRef::requiresNewVTableEntry() const {
   if (derivativeFunctionIdentifier)
     if (derivativeFunctionRequiresNewVTableEntry(*this))
       return true;
-  if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
+  if (!hasDecl())
+    return false;
+  auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
+  if (!fnDecl)
+    return false;
+  if (fnDecl->needsNewVTableEntry())
     return true;
   return false;
 }
@@ -863,15 +872,15 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     }
 
     // Overrides of @objc dynamic declarations are not in the vtable.
-    if (overridden.getDecl()->isObjCDynamic()) {
+    if (overridden.getDecl()->shouldUseObjCDispatch()) {
       return SILDeclRef();
     }
-    
+
     if (auto *accessor = dyn_cast<AccessorDecl>(overridden.getDecl())) {
       auto *asd = accessor->getStorage();
       if (asd->hasClangNode())
         return SILDeclRef();
-      if (asd->isObjCDynamic()) {
+      if (asd->shouldUseObjCDispatch()) {
         return SILDeclRef();
       }
     }
@@ -1102,6 +1111,10 @@ static bool isDesignatedConstructorForClass(ValueDecl *decl) {
 }
 
 bool SILDeclRef::canBeDynamicReplacement() const {
+  // The foreign entry of a @dynamicReplacement(for:) of @objc method in a
+  // generic class can't be a dynamic replacement.
+  if (isForeign && hasDecl() && getDecl()->isNativeMethodReplacement())
+    return false;
   if (kind == SILDeclRef::Kind::Destroyer ||
       kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
@@ -1113,6 +1126,11 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 }
 
 bool SILDeclRef::isDynamicallyReplaceable() const {
+  // The non-foreign entry of a @dynamicReplacement(for:) of @objc method in a
+  // generic class can't be a dynamically replaced.
+  if (!isForeign && hasDecl() && getDecl()->isNativeMethodReplacement())
+    return false;
+
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
   if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer())
@@ -1134,5 +1152,15 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
     return false;
 
   auto decl = getDecl();
-  return decl->isNativeDynamic();
+
+  if (isForeign)
+    return false;
+
+  // We can't generate categories for generic classes. So the standard mechanism
+  // for replacing @objc dynamic methods in generic classes does not work.
+  // Instead we mark the non @objc entry dynamically replaceable and replace
+  // that.
+  // For now, we only support this behavior if -enable-implicit-dynamic is
+  // enabled.
+  return decl->shouldUseNativeMethodReplacement();
 }

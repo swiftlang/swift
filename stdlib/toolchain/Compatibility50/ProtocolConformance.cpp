@@ -66,7 +66,7 @@ static void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   auto recordsEnd
     = reinterpret_cast<const ProtocolConformanceRecord*>
                                           (section + size);
-  for (auto record = recordsBegin; record != recordsEnd; record++) {
+  for (auto record = recordsBegin; record != recordsEnd; ++record) {
     auto descriptor = record->get();
     if (auto typePtr = descriptor->_getTypeDescriptorLocation()) {
       if (*typePtr == nullptr)

@@ -9,7 +9,7 @@
 | **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
 | **Ubuntu 18.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04)|
 | **Ubuntu 20.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04)|
-| **CentOS 8** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-centos-8/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|
+| **CentOS 8** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-centos-8/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|[![Build Status](https://ci.swift.org/job/oss-swift-package-centos-8/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|
 | **Amazon Linux 2** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|
 
 **Swift Community-Hosted CI Platforms**
@@ -85,6 +85,9 @@ Once you are able to build things successfully and have a compile-test-debug
 loop going, check out the [development tips](docs/DevelopmentTips.md) for
 better productivity while working on the compiler.
 
+You can also skim [docs/README.md](/docs/README.md) to understand what
+high-level documentation is available.
+
 ### System Requirements
 
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are currently
@@ -94,7 +97,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/resources/).
+To build for macOS, you need [Xcode 12 beta](https://developer.apple.com/xcode/resources/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -150,8 +153,6 @@ sudo apt-get install    \
 with version 2 shipped with Ubuntu.
 
 **Note:** For Ubuntu 20.04, use `libpython2-dev` in place of the libpython-dev package above.
-
-Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md).
 
 ### Getting Sources for Swift and Related Projects
 
@@ -240,7 +241,7 @@ various products. These incremental builds are a big timesaver when developing
 and debugging.
 
     cd ${SWIFT_BUILD_DIR}
-    ninja swift
+    ninja swift-frontend
 
 This will build the Swift compiler, but will not rebuild the standard library or
 any other target. Building the `swift-stdlib` target as an additional layer of
@@ -257,7 +258,7 @@ To open the Swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
 It will auto-create a *lot* of schemes for all of the available targets. A
 common debug flow would involve:
 
- - Select the 'swift' scheme.
+ - Select the 'swift-frontend' scheme.
  - Pull up the scheme editor (⌘⇧<).
  - Select the 'Arguments' tab and click the '+'.
  - Add the command line options.
