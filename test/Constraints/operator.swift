@@ -293,3 +293,9 @@ func rdar_62054241() {
     // expected-note@-1 {{found candidate with type '(Foo, Foo) -> Bool'}}
   }
 }
+
+// SR-11399 - Operator returning IUO doesn't implicitly unwrap
+postfix operator ^^^
+postfix func ^^^ (lhs: Int) -> Int! { 0 }
+
+let x: Int = 1^^^
