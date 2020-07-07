@@ -18,20 +18,20 @@ import Swift
 import Foundation
 import simd
 
-#if os(macOS)
+#if canImport(AppKit)
 import AppKit
 
 typealias OSImage = NSImage
 typealias OSColor = NSColor
 typealias OSBezierPath = NSBezierPath
-#endif
-
-#if os(iOS) || os(tvOS) || os(watchOS)
+#elseif canImport(UIKit)
 import UIKit
 
 typealias OSImage = UIImage
 typealias OSColor = UIColor
 typealias OSBezierPath = UIBezierPath
+#else
+#error("Platform does not support UIKit or AppKit!")
 #endif
 
 // Check ObjC mirror implementation.

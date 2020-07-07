@@ -320,6 +320,24 @@ void DirectLookupRequest::writeDependencySink(
 }
 
 //----------------------------------------------------------------------------//
+// LookupInModuleRequest computation.
+//----------------------------------------------------------------------------//
+
+void LookupInModuleRequest::writeDependencySink(
+    evaluator::DependencyCollector &reqTracker, QualifiedLookupResult l) const {
+  auto *module = std::get<0>(getStorage());
+  auto member = std::get<1>(getStorage());
+  auto *DC = std::get<4>(getStorage());
+
+  // Decline to record lookups outside our module.
+  if (!DC->getParentSourceFile() ||
+      module->getParentModule() != DC->getParentModule()) {
+    return;
+  }
+  reqTracker.addTopLevelName(member.getBaseName());
+}
+
+//----------------------------------------------------------------------------//
 // LookupConformanceInModuleRequest computation.
 //----------------------------------------------------------------------------//
 

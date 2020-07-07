@@ -884,6 +884,13 @@ function(_add_swift_target_library_single target name)
   endif()
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
+  # Target libraries that include libDemangling must define the name to use for
+  # the inline namespace to distinguish symbols from those built for the
+  # compiler, in order to avoid possible ODR violations if both are statically
+  # linked into the same binary.
+  target_compile_definitions("${target}" PRIVATE
+                             SWIFT_INLINE_NAMESPACE=__runtime)
+
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
     target_include_directories("${target}" SYSTEM PRIVATE
@@ -1119,6 +1126,8 @@ function(_add_swift_target_library_single target name)
   if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
       list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
   endif()
+
+  list(APPEND library_search_directories "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift")
 
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)

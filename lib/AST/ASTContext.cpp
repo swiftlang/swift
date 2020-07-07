@@ -156,6 +156,11 @@ struct ASTContext::Implementation {
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
+  /// The set of top-level modules we have loaded.
+  /// This map is used for iteration, therefore it's a MapVector and not a
+  /// DenseMap.
+  llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
+
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
@@ -257,6 +262,9 @@ struct ASTContext::Implementation {
 
   /// The module loader used to load Clang modules from DWARF.
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
+
+  /// The module loader used to load Swift textual interface.
+  ModuleLoader *TheModuleInterfaceLoader = nullptr;
 
   /// Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
@@ -1445,14 +1453,15 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                                 bool IsClang, bool IsDwarf) {
+                                 bool IsClang, bool IsDwarf, bool IsInterface) {
   if (IsClang && !IsDwarf && !getImpl().TheClangModuleLoader)
     getImpl().TheClangModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
   if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
     getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
-
+  if (IsInterface && !getImpl().TheModuleInterfaceLoader)
+    getImpl().TheModuleInterfaceLoader = loader.get();
   getImpl().ModuleLoaders.push_back(std::move(loader));
 }
 
@@ -1527,6 +1536,10 @@ ClangModuleLoader *ASTContext::getDWARFModuleLoader() const {
   return getImpl().TheDWARFModuleLoader;
 }
 
+ModuleLoader *ASTContext::getModuleInterfaceLoader() const {
+  return getImpl().TheModuleInterfaceLoader;
+}
+
 ModuleDecl *ASTContext::getLoadedModule(
     ArrayRef<Located<Identifier>> ModulePath) const {
   assert(!ModulePath.empty());
@@ -1538,8 +1551,18 @@ ModuleDecl *ASTContext::getLoadedModule(
   return nullptr;
 }
 
+iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
+ASTContext::getLoadedModules() const {
+  return {getImpl().LoadedModules.begin(), getImpl().LoadedModules.end()};
+}
+
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
-  return LoadedModules.lookup(ModuleName);
+  return getImpl().LoadedModules.lookup(ModuleName);
+}
+
+void ASTContext::addLoadedModule(ModuleDecl *M) {
+  assert(M);
+  getImpl().LoadedModules[M->getName()] = M;
 }
 
 static AllocationArena getArena(GenericSignature genericSig) {
@@ -3364,14 +3387,22 @@ SILFunctionType::SILFunctionType(
     }
   }
 
-  // Check that `@noDerivative` parameters only exist on `@differentiable`
-  // functions.
-  if (!ext.isDifferentiable())
-    for (auto param : getParameters())
+  // Check that `@noDerivative` parameters and results only exist in
+  // `@differentiable` function types.
+  if (!ext.isDifferentiable()) {
+    for (auto param : getParameters()) {
       assert(param.getDifferentiability() ==
                  SILParameterDifferentiability::DifferentiableOrNotApplicable &&
-             "non-`@differentiable` function should not have NotDifferentiable "
-             "parameter");
+             "non-`@differentiable` function type should not have "
+             "`@noDerivative` parameter");
+    }
+    for (auto result : getResults()) {
+      assert(result.getDifferentiability() ==
+                 SILResultDifferentiability::DifferentiableOrNotApplicable &&
+             "non-`@differentiable` function type should not have "
+             "`@noDerivative` result");
+    }
+  }
 #endif
 }
 

@@ -659,7 +659,7 @@ public:
   }
 
 private:
-  std::vector<SwiftSemanticToken> takeSemanticTokens(
+  std::vector<SwiftSemanticToken> getSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
 
   Optional<std::vector<DiagnosticEntryInfo>> getSemanticDiagnostics(
@@ -719,9 +719,7 @@ public:
   }
 
   void parse() {
-    auto root = Parser->parse();
-    if (SynTreeCreator)
-      SynTreeCreator->acceptSyntaxRoot(root, Parser->getSourceFile());
+    Parser->parse();
   }
 
   SourceFile &getSourceFile() {
@@ -762,12 +760,12 @@ void SwiftDocumentSemanticInfo::readSemanticInfo(
 
   llvm::sys::ScopedLock L(Mtx);
 
-  Tokens = takeSemanticTokens(NewSnapshot);
+  Tokens = getSemanticTokens(NewSnapshot);
   Diags = getSemanticDiagnostics(NewSnapshot, ParserDiags);
 }
 
 std::vector<SwiftSemanticToken>
-SwiftDocumentSemanticInfo::takeSemanticTokens(
+SwiftDocumentSemanticInfo::getSemanticTokens(
     ImmutableTextSnapshotRef NewSnapshot) {
 
   llvm::sys::ScopedLock L(Mtx);
@@ -775,13 +773,15 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
   if (SemaToks.empty())
     return {};
 
+  auto result = SemaToks;
+
   // Adjust the position of the tokens.
   TokSnapshot->foreachReplaceUntil(NewSnapshot,
     [&](ReplaceImmutableTextUpdateRef Upd) -> bool {
-      if (SemaToks.empty())
+      if (result.empty())
         return false;
 
-      auto ReplaceBegin = std::lower_bound(SemaToks.begin(), SemaToks.end(),
+      auto ReplaceBegin = std::lower_bound(result.begin(), result.end(),
           Upd->getByteOffset(),
           [&](const SwiftSemanticToken &Tok, unsigned StartOffset) -> bool {
             return Tok.ByteOffset+Tok.Length < StartOffset;
@@ -791,7 +791,7 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
       if (Upd->getLength() == 0) {
         ReplaceEnd = ReplaceBegin;
       } else {
-        ReplaceEnd = std::upper_bound(ReplaceBegin, SemaToks.end(),
+        ReplaceEnd = std::upper_bound(ReplaceBegin, result.end(),
             Upd->getByteOffset() + Upd->getLength(),
             [&](unsigned EndOffset, const SwiftSemanticToken &Tok) -> bool {
               return EndOffset < Tok.ByteOffset;
@@ -802,14 +802,14 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
       int Delta = InsertLen - Upd->getLength();
       if (Delta != 0) {
         for (std::vector<SwiftSemanticToken>::iterator
-               I = ReplaceEnd, E = SemaToks.end(); I != E; ++I)
+               I = ReplaceEnd, E = result.end(); I != E; ++I)
           I->ByteOffset += Delta;
       }
-      SemaToks.erase(ReplaceBegin, ReplaceEnd);
+      result.erase(ReplaceBegin, ReplaceEnd);
       return true;
     });
 
-  return std::move(SemaToks);
+  return result;
 }
 
 Optional<std::vector<DiagnosticEntryInfo>>
@@ -1615,27 +1615,9 @@ private:
 
       bool walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
-        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (auto closure = dyn_cast<ClosureExpr>(E)) {
-            if (closure->hasSingleExpressionBody()) {
-              // Treat a single-expression body like a brace statement and reset
-              // the enclosing context. Note: when the placeholder is the whole
-              // body it is handled specially as wrapped in braces by
-              // shouldUseTrailingClosureInTuple().
-              auto SR = closure->getSingleExpressionBody()->getSourceRange();
-              if (SR.isValid() && SR.Start != TargetLoc &&
-                  SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-                OuterStmt = nullptr;
-                OuterExpr = nullptr;
-                EnclosingCallAndArg = {nullptr, nullptr};
-                return true;
-              }
-            }
-          }
-
-          if (!checkCallExpr(E) && !EnclosingCallAndArg.first) {
-            OuterExpr = E;
-          }
+        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
+            !checkCallExpr(E) && !EnclosingCallAndArg.first) {
+          OuterExpr = E;
         }
         return true;
       }
@@ -1646,11 +1628,30 @@ private:
         return true;
       }
 
+      /// Whether this statement body consists of only an implicit "return",
+      /// possibly within braces.
+      bool isImplicitReturnBody(Stmt *S) {
+        if (auto RS = dyn_cast<ReturnStmt>(S))
+          return RS->isImplicit() && RS->getSourceRange().Start == TargetLoc;
+
+        if (auto BS = dyn_cast<BraceStmt>(S)) {
+          if (BS->getNumElements() == 1) {
+            if (auto innerS = BS->getFirstElement().dyn_cast<Stmt *>())
+              return isImplicitReturnBody(innerS);
+          }
+        }
+
+        return false;
+      }
+
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
-        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
+        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
+            !isImplicitReturnBody(S)) {
           // A statement inside an expression - e.g. `foo({ if ... })` - resets
           // the enclosing context.
+          //
+          // ... unless it's an implicit return.
           OuterExpr = nullptr;
           EnclosingCallAndArg = {nullptr, nullptr};
 
@@ -1766,7 +1767,6 @@ public:
                                ArrayRef<ClosureInfo> trailingClosures)>
                 MultiClosureCallback,
             std::function<bool(EditorPlaceholderExpr *)> NonClosureCallback) {
-
     SourceLoc PlaceholderStartLoc = SM.getLocForOffset(BufID, Offset);
 
     // See if the placeholder is encapsulated with an EditorPlaceholderExpr

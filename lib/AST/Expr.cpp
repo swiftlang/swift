@@ -1770,6 +1770,82 @@ Expr *CallExpr::getDirectCallee() const {
   }
 }
 
+void ExplicitCastExpr::setCastType(Type type) {
+  CastTy->setType(MetatypeType::get(type));
+}
+
+ForcedCheckedCastExpr *ForcedCheckedCastExpr::create(ASTContext &ctx,
+                                                     SourceLoc asLoc,
+                                                     SourceLoc exclaimLoc,
+                                                     TypeRepr *tyRepr) {
+  return new (ctx) ForcedCheckedCastExpr(nullptr, asLoc, exclaimLoc,
+                                         new (ctx) TypeExpr(tyRepr));
+}
+
+ForcedCheckedCastExpr *
+ForcedCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub, Type castTy) {
+  auto *const expr = new (ctx) ForcedCheckedCastExpr(
+      sub, SourceLoc(), SourceLoc(), TypeExpr::createImplicit(castTy, ctx));
+  expr->setType(castTy);
+  expr->setImplicit();
+  return expr;
+}
+
+ConditionalCheckedCastExpr *
+ConditionalCheckedCastExpr::create(ASTContext &ctx, SourceLoc asLoc,
+                                   SourceLoc questionLoc, TypeRepr *tyRepr) {
+  return new (ctx) ConditionalCheckedCastExpr(nullptr, asLoc, questionLoc,
+                                              new (ctx) TypeExpr(tyRepr));
+}
+
+ConditionalCheckedCastExpr *
+ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
+                                           Type castTy) {
+  auto *const expr = new (ctx) ConditionalCheckedCastExpr(
+      sub, SourceLoc(), SourceLoc(), TypeExpr::createImplicit(castTy, ctx));
+  expr->setType(OptionalType::get(castTy));
+  expr->setImplicit();
+  return expr;
+}
+
+ConditionalCheckedCastExpr *
+ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
+                                           TypeRepr *tyRepr, Type castTy) {
+  auto *const expr = new (ctx) ConditionalCheckedCastExpr(
+      sub, SourceLoc(), SourceLoc(), new (ctx) TypeExpr(tyRepr));
+  expr->setType(OptionalType::get(castTy));
+  expr->setImplicit();
+  expr->setCastType(castTy);
+  return expr;
+}
+
+IsExpr *IsExpr::create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr) {
+  return new (ctx) IsExpr(nullptr, isLoc, new (ctx) TypeExpr(tyRepr));
+}
+
+CoerceExpr *CoerceExpr::create(ASTContext &ctx, SourceLoc asLoc,
+                               TypeRepr *tyRepr) {
+  return new (ctx) CoerceExpr(nullptr, asLoc, new (ctx) TypeExpr(tyRepr));
+}
+
+CoerceExpr *CoerceExpr::createImplicit(ASTContext &ctx, Expr *sub,
+                                       Type castTy) {
+  auto *const expr = new (ctx)
+      CoerceExpr(sub, SourceLoc(), TypeExpr::createImplicit(castTy, ctx));
+  expr->setType(castTy);
+  expr->setImplicit();
+  return expr;
+}
+
+CoerceExpr *CoerceExpr::forLiteralInit(ASTContext &ctx, Expr *literal,
+                                       SourceRange range,
+                                       TypeRepr *literalTyRepr) {
+  auto *const expr =
+      new (ctx) CoerceExpr(range, literal, new (ctx) TypeExpr(literalTyRepr));
+  expr->setImplicit();
+  return expr;
+}
+
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          VarDecl *Self)
   : Expr(ExprKind::RebindSelfInConstructor, /*Implicit=*/true,
@@ -1898,19 +1974,6 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
   return body.get<Expr *>();
 }
 
-void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
-  assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getFirstElement();
-  if (auto stmt = body.dyn_cast<Stmt *>()) {
-    if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
-      braceStmt->getFirstElement() = NewBody;
-    else
-      cast<ReturnStmt>(stmt)->setResult(NewBody);
-    return;
-  }
-  getBody()->setFirstElement(NewBody);
-}
-
 bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
 }
@@ -1923,7 +1986,7 @@ bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
 
 void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable());
-  ExplicitResultTypeAndEnclosingChecked.getPointer()
+  ExplicitResultTypeAndSeparatelyChecked.getPointer()
       ->setType(MetatypeType::get(ty));
 }
 
@@ -1949,7 +2012,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
     body = body->getSemanticsProvidingExpr();
 
     if (auto *openExistential = dyn_cast<OpenExistentialExpr>(body)) {
-      body = openExistential->getSubExpr();
+      body = openExistential->getSubExpr()->getSemanticsProvidingExpr();
     }
 
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
@@ -1969,7 +2032,7 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
       innerBody = innerBody->getSemanticsProvidingExpr();
 
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(innerBody)) {
-        innerBody = openExistential->getSubExpr();
+        innerBody = openExistential->getSubExpr()->getSemanticsProvidingExpr();
         if (auto *ICE = dyn_cast<ImplicitConversionExpr>(innerBody))
           innerBody = ICE->getSyntacticSubExpr();
       }

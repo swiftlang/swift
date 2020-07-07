@@ -14,9 +14,6 @@ public protocol DangerousEscaper {
 // CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> (), [[SELF:%.*]] : $DangerousEscaper):
 // CHECK:   [[OE:%.*]] = open_existential_ref [[SELF]]
 
-// Copy (1).
-// CHECK:   strong_retain [[ARG]] : $@callee_guaranteed () -> ()
-
 // Extend the lifetime to the end of this function (2).
 // CHECK:   strong_retain [[ARG]] : $@callee_guaranteed () -> ()
 
@@ -42,8 +39,6 @@ public protocol DangerousEscaper {
 // CHECK:   destroy_addr [[CLOSURE_ADDR]] : $*@callee_guaranteed () -> ()
 // CHECK:   dealloc_stack [[BLOCK_STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
 
-// Release of closure copy (1).
-// CHECK:   strong_release %0 : $@callee_guaranteed () -> ()
 // CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}") DangerousEscaper, #DangerousEscaper.malicious!foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 // CHECK:   apply [[METH]]<@opened("{{.*}}") DangerousEscaper>([[BLOCK_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 

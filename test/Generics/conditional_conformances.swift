@@ -413,9 +413,9 @@ extension Foo: P where Bar: P {
 extension BinaryInteger {
   var foo: Self {
     return self <= 1
-            ? 1
+            ? 1 // expected-error {{cannot convert return expression of type 'Int' to return type 'Self'}}
             : (2...self).reduce(1, *)
-            // expected-error@-1 {{referencing instance method 'reduce' on 'ClosedRange' requires that 'Self.Stride' conform to 'SignedInteger'}}
+            // expected-error@-1 {{cannot convert value of type 'Self' to expected argument type 'Int'}} {{20-20=Int(}} {{24-24=)}}
   }
 }
 

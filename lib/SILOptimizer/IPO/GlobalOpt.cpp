@@ -713,11 +713,6 @@ void SILGlobalOpt::reset() {
 
 void SILGlobalOpt::collect() {
   for (auto &F : *Module) {
-    // TODO: Add support for ownership.
-    if (F.hasOwnership()) {
-      continue;
-    }
-
     // Make sure to create an entry. This is important in case a global variable
     // (e.g. a public one) is not used inside the same module.
     if (F.isGlobalInit())

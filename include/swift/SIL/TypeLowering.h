@@ -1095,6 +1095,15 @@ private:
 };
 
 } // namespace Lowering
+
+CanSILFunctionType getNativeSILFunctionType(
+    Lowering::TypeConverter &TC, TypeExpansionContext context,
+    Lowering::AbstractionPattern origType, CanAnyFunctionType substType,
+    Optional<SILDeclRef> origConstant = None,
+    Optional<SILDeclRef> constant = None,
+    Optional<SubstitutionMap> reqtSubs = None,
+    ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
+
 } // namespace swift
 
 namespace llvm {

@@ -3,12 +3,12 @@
 
 // RUN: rm -rf %t.dir
 // RUN: mkdir -p %t.dir/usr/bin
-// RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t.dir/usr/bin/swift)
+// RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t.dir/usr/bin/swift)
 
 // RUN: %t.dir/usr/bin/swift -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 // RUN: %t.dir/usr/bin/swift repl -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 
-// CHECK-SWIFT-INVOKES-REPL: {{.*}}/swift -frontend -repl
+// CHECK-SWIFT-INVOKES-REPL: {{.*}}/swift{{.*}} -repl
 
 
 // RUN: %empty-directory(%t.dir)
@@ -20,7 +20,7 @@
 // RUN: cd %t.dir && %swift_driver_plain -### t.swift 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-INTERPRETER %s
 // RUN: cd %t.dir && %swift_driver_plain -### subpath/build 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-INTERPRETER %s
 
-// CHECK-SWIFT-INVOKES-INTERPRETER: {{.*}}/swift -frontend -interpret
+// CHECK-SWIFT-INVOKES-INTERPRETER: {{.*}}/swift-frontend -frontend -interpret
 
 
 // Check that 'swift foo' invokes 'swift-foo'.

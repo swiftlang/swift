@@ -1,0 +1,71 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -module-name inherit -sil-generic-specializer-enable-ownership %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+class MMFont {
+}
+
+class Klass {}
+
+struct MMStorage<Key : Hashable, Value> {
+  var k: Klass = Klass()
+}
+
+func ==(lhs: MMObject, rhs: MMObject) -> Bool
+
+class MMObject : Hashable {
+  func hash(into hasher: inout Hasher)
+}
+
+class MMString : MMObject {
+}
+
+// CHECK-LABEL: @caller : $@convention(thin) (Int, Int, @owned MMString) -> @owned MMStorage<MMString, Optional<MMFont>> {
+sil [ossa] @caller : $@convention(thin) (Int, Int, @owned MMString) -> @owned MMStorage<MMString, Optional<MMFont>> {
+bb0(%0 : $Int, %1 : $Int, %2 : @owned $MMString):
+  %3 = metatype $@thin MMStorage<MMString, Optional<MMFont>>.Type
+  %13 = function_ref @ext_fn1 : $@convention(thin) (Int, @thin MMStorage<MMString, Optional<MMFont>>.Type) -> @owned MMStorage<MMString, Optional<MMFont>>
+  %14 = apply %13(%0, %3) : $@convention(thin) (Int, @thin MMStorage<MMString, Optional<MMFont>>.Type) -> @owned MMStorage<MMString, Optional<MMFont>>
+  %15 = copy_value %14 : $MMStorage<MMString, Optional<MMFont>>
+
+  // CHECK: [[STACK:%[0-9]+]] = alloc_stack $MMString
+  %37 = alloc_stack $MMString
+  store %2 to [init] %37 : $*MMString
+  // CHECK: [[ID:%[0-9]+]] = function_ref @$s6callee7inherit8MMStringC_AB6MMFontCSgTg5 : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, Optional<MMFont>>) -> Bool
+  %34 = function_ref @callee : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
+  // CHECK: [[LOAD:%[0-9]+]] = load [take] [[STACK]]
+  // CHECK: apply [[ID]]([[LOAD]], %1, %{{[0-9]+}}) : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, Optional<MMFont>>) -> Bool
+  %45 = apply %34<MMString, MMFont?>(%37, %1, %14) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
+  dealloc_stack %37 : $*MMString
+
+  return %15 : $MMStorage<MMString, Optional<MMFont>>
+}
+
+// CHECK-LABEL: @$s6callee7inherit8MMStringC_AB6MMFontCSgTg5 : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, Optional<MMFont>>) -> Bool {
+// CHECK: [[META:%[0-9]+]] = metatype $@thick MMString.Type
+// CHECK: [[ID3:%[0-9]+]] = witness_method $MMString, #Equatable."==" :
+// CHECK: [[STACK2:%[0-9]+]] = alloc_stack $MMString
+// CHECK: [[STACK3:%[0-9]+]] = alloc_stack $MMString
+// CHECK: apply [[ID3]]<MMString>([[STACK2]], [[STACK3]], [[META]]) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+
+// CHECK-LABEL: @callee : $@convention(method) <Key, Value where Key : Hashable> (@in Key, Int, @owned MMStorage<Key, Value>) -> Bool {
+sil [noinline] [ossa] @callee : $@convention(method) <Key, Value where Key : Hashable> (@in Key, Int, @owned MMStorage<Key, Value>) -> Bool {
+bb0(%0 : $*Key, %1 : $Int, %2 : @owned $MMStorage<Key, Value>):
+  %25 = metatype $@thick Key.Type
+  // CHECK: [[ID2:%[0-9]+]] = witness_method $Key, #Equatable."==" :
+  %26 = witness_method $Key, #Equatable."==" : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  %27 = alloc_stack $Key
+  %33 = alloc_stack $Key
+  copy_addr %0 to [initialization] %27 : $*Key
+  copy_addr %0 to [initialization] %33 : $*Key
+  // CHECK: apply [[ID2]]<Key>
+  %35 = apply %26<Key>(%27, %33, %25) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  dealloc_stack %33 : $*Key
+  dealloc_stack %27 : $*Key
+  destroy_value %2 : $MMStorage<Key, Value>
+  destroy_addr %0 : $*Key
+  return %35 : $Bool
+}
+
+sil @ext_fn1 : $@convention(thin) (Int, @thin MMStorage<MMString, Optional<MMFont>>.Type) -> @owned MMStorage<MMString, Optional<MMFont>>

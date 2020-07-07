@@ -12,7 +12,16 @@
 
 import os
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import xctest
 from .. import shell
 
 
@@ -93,3 +102,15 @@ class SwiftPM(product.Product):
         self.run_bootstrap_script('install', host_target, [
             '--prefix', install_prefix
         ])
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild]

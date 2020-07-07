@@ -14,7 +14,17 @@ import os
 
 from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import swiftpm
+from . import xctest
 from .. import shell
 
 
@@ -91,3 +101,16 @@ class SwiftSyntax(product.Product):
 
         self.run_swiftsyntax_build_script(target=target_name,
                                           additional_params=additional_params)
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM]

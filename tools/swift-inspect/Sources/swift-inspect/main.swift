@@ -33,16 +33,29 @@ func dumpConformanceCache(context: SwiftReflectionContextRef) throws {
   }
 }
 
-func dumpRawMetadata(context: SwiftReflectionContextRef) throws {
+func dumpRawMetadata(
+  context: SwiftReflectionContextRef,
+  inspector: Inspector,
+  backtraceStyle: Backtrace.Style?
+) throws {
+  let backtraces = backtraceStyle != nil ? context.allocationBacktraces : [:]
   for allocation in context.allocations {
+    let tagNameC = swift_reflection_metadataAllocationTagName(context, allocation.tag)
+    let tagName = tagNameC.map(String.init) ?? "<unknown>"
     print("Metadata allocation at: \(hex: allocation.ptr) " +
-          "size: \(allocation.size) tag: \(allocation.tag)")
+          "size: \(allocation.size) tag: \(allocation.tag) (\(tagName))")
+    printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
   }
 }
 
-func dumpGenericMetadata(context: SwiftReflectionContextRef) throws {
+func dumpGenericMetadata(
+  context: SwiftReflectionContextRef,
+  inspector: Inspector,
+  backtraceStyle: Backtrace.Style?
+) throws {
   let allocations = context.allocations.sorted()
   let metadatas = allocations.findGenericMetadata(in: context)
+  let backtraces = backtraceStyle != nil ? context.allocationBacktraces : [:]
 
   print("Address","Allocation","Size","Offset","Name", separator: "\t")
   for metadata in metadatas {
@@ -53,9 +66,26 @@ func dumpGenericMetadata(context: SwiftReflectionContextRef) throws {
             terminator: "\t")
     } else {
       print("???\t???\t???", terminator: "\t")
-
     }
     print(metadata.name)
+    if let allocation = metadata.allocation {
+      printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
+    }
+  }
+}
+
+func printBacktrace(
+  style: Backtrace.Style?,
+  for ptr: swift_reflection_ptr_t,
+  in backtraces: [swift_reflection_ptr_t: Backtrace],
+  inspector: Inspector
+) {
+  if let style = style {
+    if let backtrace = backtraces[ptr] {
+      print(backtrace.symbolicated(style: style, inspector: inspector))
+    } else {
+      print("Unknown backtrace.")
+    }
   }
 }
 
@@ -86,14 +116,14 @@ func makeReflectionContext(
 
 func withReflectionContext(
   nameOrPid: String,
-  _ body: (SwiftReflectionContextRef) throws -> Void
+  _ body: (SwiftReflectionContextRef, Inspector) throws -> Void
 ) throws {
   let (inspector, context) = makeReflectionContext(nameOrPid: nameOrPid)
   defer {
     swift_reflection_destroyReflectionContext(context)
     inspector.destroyContext()
   }
-  try body(context)
+  try body(context, inspector)
 }
 
 struct SwiftInspect: ParsableCommand {
@@ -114,8 +144,8 @@ struct DumpConformanceCache: ParsableCommand {
   var nameOrPid: String
 
   func run() throws {
-    try withReflectionContext(nameOrPid: nameOrPid) {
-      try dumpConformanceCache(context: $0)
+    try withReflectionContext(nameOrPid: nameOrPid) { context, _ in
+      try dumpConformanceCache(context: context)
     }
   }
 }
@@ -127,23 +157,43 @@ struct DumpRawMetadata: ParsableCommand {
 
   var nameOrPid: String
 
+  @Flag(help: "Show the backtrace for each allocation")
+  var backtrace: Bool
+
+  @Flag(help: "Show a long-form backtrace for each allocation")
+  var backtraceLong: Bool
+
   func run() throws {
+    let style = backtrace ? Backtrace.Style.oneLine :
+                backtraceLong ? Backtrace.Style.long :
+                nil
     try withReflectionContext(nameOrPid: nameOrPid) {
-      try dumpRawMetadata(context: $0)
+      try dumpRawMetadata(context: $0, inspector: $1, backtraceStyle: style)
     }
   }
 }
 
 struct DumpGenericMetadata: ParsableCommand {
   static let configuration = CommandConfiguration(
-    abstract: "Print the target's metadata allocations.")
-  @Argument(help: "The pid or partial name of the target process")
+    abstract: "Print the target's generic metadata allocations.")
 
+  @Argument(help: "The pid or partial name of the target process")
   var nameOrPid: String
 
+  @Flag(help: "Show the backtrace for each allocation")
+  var backtrace: Bool
+
+  @Flag(help: "Show a long-form backtrace for each allocation")
+  var backtraceLong: Bool
+
   func run() throws {
+    let style = backtrace ? Backtrace.Style.oneLine :
+                backtraceLong ? Backtrace.Style.long :
+                nil
     try withReflectionContext(nameOrPid: nameOrPid) {
-      try dumpGenericMetadata(context: $0)
+      try dumpGenericMetadata(context: $0,
+                              inspector: $1,
+                              backtraceStyle: style)
     }
   }
 }

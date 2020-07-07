@@ -25,6 +25,7 @@
 #include <cstdint>
 #include "llvm/ADT/StringRef.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Demangling/NamespaceMacros.h"
 
 namespace llvm {
   class raw_ostream;
@@ -32,6 +33,7 @@ namespace llvm {
 
 namespace swift {
 namespace Demangle {
+SWIFT_BEGIN_INLINE_NAMESPACE
 
 enum class SymbolicReferenceKind : uint8_t;
 
@@ -50,6 +52,7 @@ struct DemangleOptions {
   bool DisplayProtocolConformances = true;
   bool DisplayWhereClauses = true;
   bool DisplayEntityTypes = true;
+  bool DisplayLocalNameContexts = true;
   bool ShortenPartialApply = false;
   bool ShortenThunk = false;
   bool ShortenValueWitness = false;
@@ -620,6 +623,7 @@ bool isFunctionAttr(Node::Kind kind);
 /// contain symbolic references.
 llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 
+SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift
 

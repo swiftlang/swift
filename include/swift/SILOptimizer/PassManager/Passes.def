@@ -248,6 +248,9 @@ PASS(OwnershipModelEliminator, "ownership-model-eliminator",
 PASS(NonTransparentFunctionOwnershipModelEliminator,
      "non-transparent-func-ownership-model-eliminator",
      "Eliminate Ownership Annotations from non-transparent SIL Functions")
+PASS(NonStdlibNonTransparentFunctionOwnershipModelEliminator,
+     "non-stdlib-non-transparent-func-ownership-model-eliminator",
+     "Eliminate Ownership Annotations from non-transparent SIL Functions only when not processing the stdlib.")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 PASS(AlwaysInlineInliner, "always-inline",
@@ -280,6 +283,8 @@ PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
+PASS(TempLValueOpt, "temp-lvalue-opt",
+     "Remove short-lived immutable temporary l-values")
 PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
@@ -340,7 +345,9 @@ PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
-PASS_RANGE(AllPasses, AADumper, BugReducerTester)
+PASS(PruneVTables, "prune-vtables",
+     "Mark class methods that do not require vtable dispatch")
+PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
 #undef IRGEN_PASS
 #undef PASS

@@ -10,7 +10,7 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS, obsoleted: 10.15)
+@available(macOS, obsoleted: 10.14)
 public struct S {
   // LESSTHAN-LABEL: "precise": "s:17ObsoletedReplaced1SV8lessThanyyF",
   // LESSTHAN: "availability": [
@@ -31,11 +31,11 @@ public struct S {
   // GREATERTHAN-NEXT:     "domain": "macOS",
   // GREATERTHAN-NEXT:     "obsoleted": {
   // GREATERTHAN-NEXT:       "major": 10,
-  // GREATERTHAN-NEXT:       "minor": 15
+  // GREATERTHAN-NEXT:       "minor": 14
   // GREATERTHAN-NEXT:     }
   // GREATERTHAN-NEXT:   }
   // GREATERTHAN-NEXT: ]
-  @available(macOS, obsoleted: 10.16)
+  @available(macOS, obsoleted: 10.15)
   public func greaterThan() {}
 
   // EQUAL-LABEL: "precise": "s:17ObsoletedReplaced1SV5equalyyF",
@@ -44,15 +44,15 @@ public struct S {
   // EQUAL-NEXT:     "domain": "macOS",
   // EQUAL-NEXT:     "obsoleted": {
   // EQUAL-NEXT:       "major": 10,
-  // EQUAL-NEXT:       "minor": 15
+  // EQUAL-NEXT:       "minor": 14
   // EQUAL-NEXT:     }
   // EQUAL-NEXT:   }
   // EQUAL-NEXT: ]
-  @available(macOS, obsoleted: 10.15)
+  @available(macOS, obsoleted: 10.14)
   public func equal() {}
 }
 
-@available(macOS, obsoleted: 10.15)
+@available(macOS, obsoleted: 10.14)
 public struct Outer {
   public struct Inner {
     // TRANSITIVELESSTHAN-LABEL: "precise": "s:17ObsoletedReplaced5OuterV5InnerV8lessThanyyF"
@@ -74,11 +74,11 @@ public struct Outer {
     // TRANSITIVEGREATERTHAN-NEXT:     "domain": "macOS",
     // TRANSITIVEGREATERTHAN-NEXT:     "obsoleted": {
     // TRANSITIVEGREATERTHAN-NEXT:       "major": 10,
-    // TRANSITIVEGREATERTHAN-NEXT:       "minor": 15
+    // TRANSITIVEGREATERTHAN-NEXT:       "minor": 14
     // TRANSITIVEGREATERTHAN-NEXT:     }
     // TRANSITIVEGREATERTHAN-NEXT:   }
     // TRANSITIVEGREATERTHAN-NEXT: ]
-    @available(macOS, obsoleted: 10.16)
+    @available(macOS, obsoleted: 10.15)
     public func greaterThan() {}
 
     // TRANSITIVEEQUAL-LABEL:"precise": "s:17ObsoletedReplaced5OuterV5InnerV5equalyyF"
@@ -87,11 +87,11 @@ public struct Outer {
     // TRANSITIVEEQUAL-NEXT:     "domain": "macOS",
     // TRANSITIVEEQUAL-NEXT:     "obsoleted": {
     // TRANSITIVEEQUAL-NEXT:       "major": 10,
-    // TRANSITIVEEQUAL-NEXT:       "minor": 15
+    // TRANSITIVEEQUAL-NEXT:       "minor": 14
     // TRANSITIVEEQUAL-NEXT:     }
     // TRANSITIVEEQUAL-NEXT:   }
     // TRANSITIVEEQUAL-NEXT: ]
-    @available(macOS, obsoleted: 10.15)
+    @available(macOS, obsoleted: 10.14)
     public func equal() {}
   }
 }

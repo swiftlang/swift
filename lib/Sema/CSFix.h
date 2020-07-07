@@ -336,10 +336,12 @@ protected:
 /// Unwrap an optional base when we have a member access.
 class UnwrapOptionalBase final : public ConstraintFix {
   DeclNameRef MemberName;
+  Type MemberBaseType;
 
   UnwrapOptionalBase(ConstraintSystem &cs, FixKind kind, DeclNameRef member,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, kind, locator), MemberName(member) {
+                     Type memberBaseType, ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), MemberName(member),
+        MemberBaseType(memberBaseType) {
     assert(kind == FixKind::UnwrapOptionalBase ||
            kind == FixKind::UnwrapOptionalBaseWithOptionalResult);
   }
@@ -352,11 +354,12 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclNameRef member,
+                                    Type memberBaseType,
                                     ConstraintLocator *locator);
 
   static UnwrapOptionalBase *
   createWithOptionalResult(ConstraintSystem &cs, DeclNameRef member,
-                           ConstraintLocator *locator);
+                           Type memberBaseType, ConstraintLocator *locator);
 };
 
 // Treat rvalue as if it was an lvalue
@@ -368,6 +371,10 @@ public:
   std::string getName() const override { return "treat rvalue as lvalue"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
@@ -521,6 +528,8 @@ public:
   Type getToType() const { return RHS; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
@@ -798,6 +807,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
                                     bool usingStorageWrapper, Type base,
                                     Type wrapper, ConstraintLocator *locator);
@@ -824,6 +837,10 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
@@ -882,6 +899,33 @@ public:
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::DefineMemberBasedOnUse;
   }
+};
+
+class DefineMemberBasedOnUnintendedGenericParam final : public ConstraintFix {
+  Type BaseType;
+  DeclNameRef Name;
+  Identifier ParamName;
+
+  DefineMemberBasedOnUnintendedGenericParam(ConstraintSystem &cs, Type baseType,
+                                            DeclNameRef member,
+                                            Identifier paramName,
+                                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
+        BaseType(baseType), Name(member), ParamName(paramName) {}
+
+public:
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = Name.getString(scratch);
+    return "allow access to invalid member '" + memberName.str() +
+           "' on archetype presumed intended to conform to protocol";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static DefineMemberBasedOnUnintendedGenericParam *
+  create(ConstraintSystem &cs, Type baseType, DeclNameRef member,
+         Identifier paramName, ConstraintLocator *locator);
 };
 
 class AllowInvalidMemberRef : public ConstraintFix {
@@ -1076,6 +1120,8 @@ public:
                            bool asNote = false) const override;
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 };
 
 
@@ -1372,16 +1418,16 @@ private:
                                           ConstraintLocator *locator);
 };
 
-class RemoveReturn final : public ConstraintFix {
-  RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
+class RemoveReturn final : public ContextualMismatch {
+  RemoveReturn(ConstraintSystem &cs, Type resultTy, ConstraintLocator *locator);
 
 public:
   std::string getName() const override { return "remove or omit return type"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
+  static RemoveReturn *create(ConstraintSystem &cs, Type resultTy,
+                              ConstraintLocator *locator);
 };
 
 class CollectionElementContextualMismatch final : public ContextualMismatch {
@@ -1500,10 +1546,6 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
-
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
@@ -1520,6 +1562,8 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static IgnoreAssignmentDestinationType *create(ConstraintSystem &cs,
                                                  Type sourceTy, Type destTy,

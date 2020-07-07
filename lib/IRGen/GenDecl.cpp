@@ -443,6 +443,7 @@ public:
 
 /// Emit all the top-level code in the source file.
 void IRGenModule::emitSourceFile(SourceFile &SF) {
+  assert(SF.ASTStage == SourceFile::TypeChecked);
   PrettySourceFileEmission StackEntry(SF);
 
   // Emit types and other global decls.
@@ -1105,8 +1106,11 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     IGM->emitSILDifferentiabilityWitness(&dw);
   }
 
-  // Emit code coverage mapping data.
-  PrimaryIGM->emitCoverageMapping();
+  // Emit code coverage mapping data for all modules
+  for (auto Iter : *this) {
+    IRGenModule *IGM = Iter.second;
+    IGM->emitCoverageMapping();
+  }
 
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
@@ -2566,7 +2570,7 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   // Don't emit accessors for functions that are not dynamic or dynamic
   // replacements.
   if (!abstractStorage) {
-    isNativeDynamic = namingDecl->isNativeDynamic();
+    isNativeDynamic = namingDecl->shouldUseNativeDynamicDispatch();
     if (!isNativeDynamic && !isDynamicReplacement)
       return;
   }
@@ -3303,7 +3307,10 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
 }
 
 void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
-  // Add this protocol conformance.
+
+  emitProtocolConformance(record);
+
+  // Add this conformance to the conformance list.
   ProtocolConformances.push_back(std::move(record));
 }
 
@@ -3311,10 +3318,6 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
 llvm::Constant *IRGenModule::emitProtocolConformances() {
   if (ProtocolConformances.empty())
     return nullptr;
-
-  // Emit the conformances.
-  for (const auto &record : ProtocolConformances)
-    emitProtocolConformance(record);
 
   // Define the global variable for the conformance list.
   ConstantInitBuilder builder(*this);

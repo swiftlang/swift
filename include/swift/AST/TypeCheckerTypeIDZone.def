@@ -41,6 +41,9 @@ SWIFT_REQUEST(TypeChecker, CodeCompletionFileRequest,
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
               bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CustomAttrTypeRequest,
+              Type(CustomAttr *, DeclContext *, CustomAttrTypeKind),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultArgumentExprRequest,
               Expr *(ParamDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultArgumentInitContextRequest,
@@ -62,8 +65,8 @@ SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
 SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               ValueDecl *(ValueDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, DeclRange(ClassDecl *),
-              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, ArrayRef<Decl *>(ClassDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
               evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
               SeparatelyCached, NoLocationInfo)
@@ -173,7 +176,7 @@ SWIFT_REQUEST(TypeChecker, ProtocolRequiresClassRequest, bool(ProtocolDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RequirementRequest,
               Requirement(WhereClauseOwner, unsigned, TypeResolutionStage),
-              SeparatelyCached, HasNearestLocation)
+              Cached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest,
               ArrayRef<Requirement>(ProtocolDecl *), SeparatelyCached,
               NoLocationInfo)
@@ -200,6 +203,8 @@ SWIFT_REQUEST(TypeChecker, SuperclassTypeRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
               AccessorDecl *(AbstractStorageDecl *, AccessorKind),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TangentStoredPropertyRequest,
+              llvm::Expected<VarDecl *>(VarDecl *, CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
               bool(AbstractFunctionDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyAtLocRequest,

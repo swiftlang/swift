@@ -174,12 +174,14 @@ public:
 
   MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
+  MemBehavior visitCopyAddrInst(CopyAddrInst *CAI);
   MemBehavior visitApplyInst(ApplyInst *AI);
   MemBehavior visitTryApplyInst(TryApplyInst *AI);
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
   MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
+  MemBehavior visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI);
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   MemBehavior visit##Name##ReleaseInst(Name##ReleaseInst *BI);
 #include "swift/AST/ReferenceStorage.def"
@@ -244,6 +246,10 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
   if (!mayAlias(LI->getOperand()))
     return MemBehavior::None;
 
+  // A take is modelled as a write. See MemoryBehavior::MayWrite.
+  if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+      return MemBehavior::MayReadWrite;
+
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove that load inst does not alias "
                              "pointer. Returning may read.\n");
   return MemBehavior::MayRead;
@@ -265,6 +271,34 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove store does not alias inst. "
                              "Returning MayWrite.\n");
   return MemBehavior::MayWrite;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitCopyAddrInst(CopyAddrInst *CAI) {
+  // If it's an assign to the destination, a destructor might be called on the
+  // old value. This can have any side effects.
+  // We could also check if it's a trivial type (which cannot have any side
+  // effect on destruction), but such copy_addr instructions are optimized to
+  // load/stores anyway, so it's probably not worth it.
+  if (!CAI->isInitializationOfDest())
+    return MemBehavior::MayHaveSideEffects;
+
+  bool mayWrite = mayAlias(CAI->getDest());
+  bool mayRead = mayAlias(CAI->getSrc());
+  
+  if (mayRead) {
+    if (mayWrite)
+      return MemBehavior::MayReadWrite;
+
+    // A take is modelled as a write. See MemoryBehavior::MayWrite.
+    if (CAI->isTakeOfSrc())
+      return MemBehavior::MayReadWrite;
+
+    return MemBehavior::MayRead;
+  }
+  if (mayWrite)
+    return MemBehavior::MayWrite;
+
+  return MemBehavior::None;
 }
 
 MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
@@ -392,6 +426,14 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
 }
 
 MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst *SDI) {
+  return MemBehavior::None;
+}
+
+MemBehavior MemoryBehaviorVisitor::
+visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI) {
+  // begin_cow_mutation is defined to have side effects, because it has
+  // dependencies with instructions which retain the buffer operand.
+  // But it never interferes with any memory address.
   return MemBehavior::None;
 }
 

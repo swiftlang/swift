@@ -86,14 +86,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return closure->wasTypeCheckedInEnclosingContext();
+        return !closure->wasSeparatelyTypeChecked();
       return false;
     }
 
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -1290,8 +1290,8 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -1459,12 +1459,12 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
       if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
-        return closure->wasTypeCheckedInEnclosingContext();
+        return !closure->wasSeparatelyTypeChecked();
       return false;
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -3265,8 +3265,8 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -3415,8 +3415,8 @@ public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
 
-  bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-    return expr->hasAppliedFunctionBuilder();
+  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+    return false;
   }
 
   bool shouldWalkIntoTapExpression() override { return false; }
@@ -3759,7 +3759,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
                              diag::optional_check_promotion,
                              subExpr->getType())
             .highlight(subExpr->getSourceRange())
-            .fixItReplace(TP->getTypeLoc().getSourceRange(),
+            .fixItReplace(TP->getTypeRepr()->getSourceRange(),
                           ooType->getString());
           return;
         }
@@ -4155,8 +4155,8 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -4231,8 +4231,8 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
       }
     }
 
-    bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-      return expr->hasAppliedFunctionBuilder();
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
@@ -4286,7 +4286,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       if (!property)
         return;
       auto propertyVar = cast<VarDecl>(property);
-      if (propertyVar->isObjCDynamic() ||
+      if (propertyVar->shouldUseObjCDispatch() ||
           (propertyVar->isObjC() &&
            propertyVar->getParsedAccessor(AccessorKind::Set)))
         return;

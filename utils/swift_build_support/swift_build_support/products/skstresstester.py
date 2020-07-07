@@ -1,4 +1,3 @@
-
 # swift_build_support/products/skstresstester.py -----------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -16,7 +15,18 @@ import platform
 
 from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import product
+from . import swift
+from . import swiftpm
+from . import swiftsyntax
+from . import xctest
 from .. import shell
 
 
@@ -90,3 +100,17 @@ class SKStressTester(product.Product):
         self.run_build_script_helper('install', [
             '--prefix', install_prefix
         ])
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM,
+                swiftsyntax.SwiftSyntax]

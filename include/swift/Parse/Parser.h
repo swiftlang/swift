@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
@@ -92,8 +93,11 @@ public:
   /// This is called to update the kind of a token whose start location is Loc.
   virtual void registerTokenKindChange(SourceLoc Loc, tok NewKind) {};
 
-  /// This is called when a source file is fully parsed.
-  virtual void finalize() {};
+  /// This is called when a source file is fully parsed. It returns the
+  /// finalized vector of tokens, or \c None if the receiver isn't configured to
+  /// record them.
+  virtual Optional<std::vector<Token>> finalize() { return None; }
+
   virtual ~ConsumeTokenReceiver() = default;
 };
 
@@ -124,7 +128,10 @@ public:
   /// Tracks parsed decls that LLDB requires to be inserted at the top-level.
   std::vector<Decl *> ContextSwitchedTopLevelDecls;
 
-  NullablePtr<llvm::MD5> CurrentTokenHash;
+  /// The current token hash, or \c None if the parser isn't computing a hash
+  /// for the token stream.
+  Optional<llvm::MD5> CurrentTokenHash;
+
   void recordTokenHash(const Token Tok) {
     if (!Tok.getText().empty())
       recordTokenHash(Tok.getText());
@@ -416,6 +423,14 @@ public:
     return SyntaxContext->finalizeRoot();
   }
 
+  /// Retrieve the token receiver from the parser once it has finished parsing.
+  std::unique_ptr<ConsumeTokenReceiver> takeTokenReceiver() {
+    assert(Tok.is(tok::eof) && "not done parsing yet");
+    auto *receiver = TokReceiver;
+    TokReceiver = nullptr;
+    return std::unique_ptr<ConsumeTokenReceiver>(receiver);
+  }
+
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
 
@@ -471,6 +486,9 @@ public:
         savedConsumer(receiver, this) {}
       void receive(Token tok) override {
         delayedTokens.push_back(tok);
+      }
+      Optional<std::vector<Token>> finalize() override {
+        llvm_unreachable("Cannot finalize a DelayedTokenReciever");
       }
       ~DelayedTokenReceiver() {
         if (!shouldTransfer)
@@ -928,9 +946,8 @@ public:
   std::pair<std::vector<Decl *>, Optional<std::string>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
-  bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                           SourceLoc PosBeforeLB,
-                           Diag<> ErrorDiag,
+  bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
+                           Diag<> LBraceDiag, Diag<> RBraceDiag,
                            IterableDeclContext *IDC);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,

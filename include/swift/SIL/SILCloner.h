@@ -1032,6 +1032,15 @@ SILCloner<ImplClass>::visitGlobalValueInst(GlobalValueInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createBaseAddrForOffset(getOpLocation(Inst->getLoc()),
+                                                  getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitIntegerLiteralInst(IntegerLiteralInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -2853,6 +2862,7 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiableFunction(
                 getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
+                Inst->getResultIndices(),
                 getOpValue(Inst->getOriginalFunction()), derivativeFns));
 }
 

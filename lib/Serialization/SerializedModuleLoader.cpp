@@ -12,6 +12,7 @@
 
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "ModuleFile.h"
+#include "ModuleFileSharedCore.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
@@ -364,15 +365,16 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
     return moduleBuf.getError();
 
   // Load the module file without validation.
-  std::unique_ptr<ModuleFile> loadedModuleFile;
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
+  serialization::ExtendedValidationInfo extInfo;
   serialization::ValidationInfo loadInfo =
-      ModuleFile::load(modulePath.str(),
+      ModuleFileSharedCore::load(modulePath.str(),
                        std::move(moduleBuf.get()),
                        nullptr,
                        nullptr,
                        isFramework, loadedModuleFile,
-                       nullptr);
+                       &extInfo);
 
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str());
@@ -674,14 +676,17 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
   serialization::ExtendedValidationInfo extendedInfo;
   std::unique_ptr<ModuleFile> loadedModuleFile;
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFileCore;
   serialization::ValidationInfo loadInfo =
-      ModuleFile::load(moduleInterfacePath,
+      ModuleFileSharedCore::load(moduleInterfacePath,
                        std::move(moduleInputBuffer),
                        std::move(moduleDocInputBuffer),
                        std::move(moduleSourceInfoInputBuffer),
-                       isFramework, loadedModuleFile,
+                       isFramework, loadedModuleFileCore,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
+    loadedModuleFile =
+        std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
     M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
@@ -690,6 +695,8 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
       M.setTestingEnabled();
     if (extendedInfo.arePrivateImportsEnabled())
       M.setPrivateImportsEnabled();
+    if (extendedInfo.isImplicitDynamicEnabled())
+      M.setImplicitDynamicEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =
@@ -714,16 +721,19 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
   // From here on is the failure path.
 
-  // Even though the module failed to load, it's possible its contents include
-  // a source buffer that need to survive because it's already been used for
-  // diagnostics.
-  if (auto orphanedBuffer = loadedModuleFile->takeBufferForDiagnostics())
-    OrphanedMemoryBuffers.push_back(std::move(orphanedBuffer));
-
   if (diagLoc)
     serialization::diagnoseSerializedASTLoadFailure(
         Ctx, *diagLoc, loadInfo, extendedInfo, moduleBufferID,
         moduleDocBufferID, loadedModuleFile.get(), M.getName());
+
+  // Even though the module failed to load, it's possible its contents include
+  // a source buffer that need to survive because it's already been used for
+  // diagnostics.
+  // Note this is only necessary in case a bridging header failed to load
+  // during the `associateWithFileContext()` call.
+  if (loadedModuleFile && loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
+    OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
+
   return nullptr;
 }
 
@@ -791,20 +801,20 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                Ctx.LangOpts.DebuggerSupport)) {
             return false;
           }
-          return duplicates.insert(dependency.RawPath).second;
+          return duplicates.insert(dependency.Core.RawPath).second;
         });
 
     // FIXME: only show module part of RawAccessPath
     assert(!missing.empty() && "unknown missing dependency?");
     if (missing.size() == 1) {
       Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_single_dependency,
-                         missing.front().getPrettyPrintedPath());
+                         missing.front().Core.getPrettyPrintedPath());
     } else {
       llvm::SmallString<64> missingNames;
       missingNames += '\'';
       interleave(missing,
                  [&](const ModuleFile::Dependency &next) {
-                   missingNames += next.getPrettyPrintedPath();
+                   missingNames += next.Core.getPrettyPrintedPath();
                  },
                  [&] { missingNames += "', '"; });
       missingNames += '\'';
@@ -838,7 +848,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     // hard because we're discovering this /while/ resolving imports, which
     // means the problematic modules haven't been recorded yet.
     Ctx.Diags.diagnose(diagLoc, diag::serialization_circular_dependency,
-                       circularDependencyIter->getPrettyPrintedPath(),
+                       circularDependencyIter->Core.getPrettyPrintedPath(),
                        ModuleName);
     break;
   }
@@ -957,7 +967,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   auto M = ModuleDecl::create(moduleID.Item, Ctx);
   M->setIsSystemModule(isSystemModule);
-  Ctx.LoadedModules[moduleID.Item] = M;
+  Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   StringRef moduleInterfacePathStr =
@@ -1008,7 +1018,7 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
     return nullptr;
 
   M->addFile(*file);
-  Ctx.LoadedModules[moduleID.Item] = M;
+  Ctx.addLoadedModule(M);
   return M;
 }
 
@@ -1085,12 +1095,9 @@ void SerializedASTFile::getImportedModules(
 
 void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
-  ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
-
   llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  File.getImportedModules(Imports, ImportFilter);
+  File.getImportedModules(Imports, {ModuleDecl::ImportFilterKind::Public,
+                                    ModuleDecl::ImportFilterKind::Private});
 
   for (auto Import : Imports)
     Import.importedModule->collectLinkLibraries(callback);
@@ -1106,7 +1113,7 @@ void SerializedASTFile::collectLinkLibraries(
 }
 
 bool SerializedASTFile::isSIB() const {
-  return File.IsSIB;
+  return File.isSIB();
 }
 
 bool SerializedASTFile::hadLoadError() const {

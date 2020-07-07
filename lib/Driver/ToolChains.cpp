@@ -242,6 +242,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_emit_fine_grained_dependency_sourcefile_dot_files);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
+  inputArgs.AddLastArg(arguments, options::OPT_locale);
+  inputArgs.AddLastArg(arguments, options::OPT_localization_path);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
   inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
@@ -254,13 +256,15 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments,
-                       options::OPT_experimental_private_intransitive_dependencies);
+                       options::OPT_enable_direct_intramodule_dependencies,
+                       options::OPT_disable_direct_intramodule_dependencies);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
   // Pass on file paths that should be remapped in debug info.
   inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
+  inputArgs.AddAllArgs(arguments, options::OPT_coverage_prefix_map);
 
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);

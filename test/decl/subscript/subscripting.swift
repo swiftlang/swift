@@ -349,9 +349,9 @@ func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }
-  // expected-note@-1 5 {{found this candidate}} expected-note@-1 {{found candidate with type 'Bool'}}
+  // expected-note@-1 5 {{found this candidate}} expected-note@-1 {{'subscript(_:)' produces 'Bool', not the expected contextual result type 'Int'}}
   subscript(keyword:String) -> String? {return nil }
-  // expected-note@-1 5 {{found this candidate}} expected-note@-1 {{found candidate with type 'String?'}}
+  // expected-note@-1 5 {{found this candidate}} expected-note@-1 {{'subscript(_:)' produces 'String?', not the expected contextual result type 'Int'}}
 
   subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
   // expected-note@-1 2 {{found this candidate}}
@@ -397,14 +397,12 @@ func testSubscript1(_ s1 : SubscriptTest1) {
 
 struct SubscriptTest2 {
   subscript(a : String, b : Int) -> Int { return 0 } // expected-note {{candidate expects value of type 'Int' for parameter #2}}
-  // expected-note@-1 {{declared here}}
-  // expected-note@-2 {{candidate has partially matching parameter list (String, Int)}}
-    subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' for parameter #2}}
-  // expected-note@-1 {{candidate has partially matching parameter list (String, String)}}
+  // expected-note@-1 2 {{declared here}}
+  subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' for parameter #2}}
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
-  _ = s2["foo"] // expected-error {{no exact matches in call to subscript}}
+  _ = s2["foo"] // expected-error {{missing argument for parameter #2 in call}}
 
   let a = s2["foo", 1.0] // expected-error {{no exact matches in call to subscript}}
 

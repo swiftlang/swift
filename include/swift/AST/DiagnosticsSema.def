@@ -94,6 +94,9 @@ ERROR(could_not_find_enum_case,none,
 
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
+     
+NOTE(did_you_mean_generic_param_as_conformance,none,
+     "did you mean to declare %0 as a protocol conformance for %1?", (DeclName, Type))
 
 NOTE(any_as_anyobject_fixit, none,
      "cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members", ())
@@ -249,6 +252,10 @@ ERROR(cannot_call_non_function_value,none,
 ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
+
+ERROR(no_candidates_match_argument_type,none,
+      "no '%0' candidates produce the expected type %1 for parameter #%2",
+      (StringRef, Type, unsigned))
 
 ERROR(cannot_infer_closure_parameter_type,none,
       "unable to infer type of a closure parameter %0 in the current context",
@@ -1068,6 +1075,9 @@ ERROR(optional_base_not_unwrapped,none,
 NOTE(optional_base_chain,none,
      "chain the optional using '?' to access member %0 only for non-'nil' "
      "base values", (DeclNameRef))
+NOTE(optional_base_remove_optional_for_keypath_root, none,
+     "use unwrapped type %0 as key path root", (Type))
+
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
@@ -1791,11 +1801,11 @@ ERROR(type_cannot_conform_to_nsobject,none,
 
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
-
 ERROR(type_cannot_conform, none,
-      "%select{|value of protocol }0type %1 cannot conform to %2; "
-      "only struct/enum/class types can conform to protocols",
-      (bool, Type, Type))
+      "%select{type %1|protocol %1 as a type}0 cannot conform to "
+      "%select{%3|the protocol itself}2; "
+      "only concrete types such as structs, enums and classes can conform to protocols",
+      (bool, Type, bool, Type))
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
 NOTE(required_by_decl,none,
@@ -2665,6 +2675,9 @@ ERROR(enum_non_integer_convertible_raw_type_no_value,none,
       "expressible by integer or string literal", ())
 ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
+ERROR(enum_raw_value_magic_literal,none,
+      "use of '%0' literal as raw value for enum case is not supported",
+      (StringRef))
 NOTE(enum_raw_value_used_here,none,
      "raw value previously used here", ())
 NOTE(enum_raw_value_incrementing_from_here,none,
@@ -2679,7 +2692,8 @@ ERROR(decl_from_hidden_module,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
-      "it is an SPI imported from %3}4",
+      "it is an SPI imported from %3|"
+      "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -3081,6 +3095,16 @@ ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
 ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "cannot register derivative for 'init' in a non-final class; consider "
       "making %0 final", (Type))
+ERROR(derivative_attr_unsupported_accessor_kind,none,
+      "cannot register derivative for %0", (/*accessorKind*/ DescriptiveDeclKind))
+// TODO(SR-13096): Remove this temporary diagnostic.
+ERROR(derivative_attr_class_setter_unsupported,none,
+      "cannot yet register derivative for class property or subscript setters",
+      ())
+// TODO(TF-982): Remove this temporary diagnostic.
+NOTE(derivative_attr_protocol_requirement_unsupported,none,
+     "cannot yet register derivative default implementation for protocol "
+     "requirements", ())
 ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
@@ -3116,13 +3140,25 @@ NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
      "%1", (Type, Type))
 
 // Automatic differentiation attributes
-ERROR(autodiff_attr_original_decl_invalid_kind,none,
-      "%0 is not a 'func', 'init', 'subscript', or 'var' computed property "
-      "declaration", (DeclNameRef))
-ERROR(autodiff_attr_original_decl_none_valid_found,none,
-      "could not find function %0 with expected type %1", (DeclNameRef, Type))
-ERROR(autodiff_attr_original_decl_not_same_type_context,none,
-      "%0 is not defined in the current type context", (DeclNameRef))
+ERROR(autodiff_attr_original_decl_ambiguous,none,
+      "referenced declaration %0 is ambiguous", (DeclNameRef))
+NOTE(autodiff_attr_original_decl_ambiguous_candidate,none,
+     "candidate %0 found here", (DescriptiveDeclKind))
+ERROR(autodiff_attr_original_decl_none_valid,none,
+      "referenced declaration %0 could not be resolved", (DeclNameRef))
+NOTE(autodiff_attr_original_decl_invalid_kind,none,
+     "candidate %0 is not a 'func', 'init', 'subscript', or 'var' computed "
+     "property declaration", (DescriptiveDeclKind))
+NOTE(autodiff_attr_original_decl_missing_accessor,none,
+     "candidate %0 does not have a %1",
+     (DescriptiveDeclKind, /*accessorDeclKind*/ DescriptiveDeclKind))
+NOTE(autodiff_attr_original_decl_type_mismatch,none,
+     "candidate %0 does not have "
+     "%select{expected type|type equal to or less constrained than}2 %1",
+     (DescriptiveDeclKind, Type, /*hasGenericSignature*/ bool))
+NOTE(autodiff_attr_original_decl_not_same_type_context,none,
+     "candidate %0 is not defined in the current type context",
+     (DescriptiveDeclKind))
 ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
@@ -3131,6 +3167,8 @@ ERROR(autodiff_attr_original_multiple_semantic_results,none,
 ERROR(autodiff_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+ERROR(autodiff_attr_opaque_result_type_unsupported,none,
+      "cannot differentiate functions returning opaque result types", ())
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
@@ -4753,7 +4791,8 @@ WARNING(resilience_decl_unavailable_warn,
 ERROR(inlinable_decl_ref_from_hidden_module,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
       "because %select{%3 was imported implementation-only|"
-      "it is an SPI imported from %3}4",
+      "it is an SPI imported from %3|"
+      "it is SPI}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 #undef FRAGILE_FUNC_KIND
@@ -5075,8 +5114,8 @@ ERROR(function_builder_infer_ambig, none,
 NOTE(function_builder_infer_add_return, none,
      "add an explicit 'return' statement to not use a function builder", ())
 NOTE(function_builder_infer_pick_specific, none,
-     "apply function builder %0 (inferred from protocol %1)",
-     (Type, DeclName))
+     "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
+     (Type, unsigned, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

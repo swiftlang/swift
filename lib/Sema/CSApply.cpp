@@ -2488,7 +2488,7 @@ namespace {
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
         LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, TypeChecker::getIntType(ctx));
+        cs.setType(expr, ctx.getIntDecl()->getDeclaredInterfaceType());
         return handleIntegerLiteralExpr(expr);
       };
 
@@ -2533,14 +2533,15 @@ namespace {
       if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
         return expr;
 
-      auto &ctx = cs.getASTContext();
-
       // Figure out the type we're converting to.
       auto openedType = cs.getType(expr);
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
 
-      if (type->is<UnresolvedType>()) return expr;
+      if (type->is<UnresolvedType>())
+        return expr;
+
+      auto &ctx = cs.getASTContext();
 
       Type conformingType = type;
       if (auto baseType = conformingType->getOptionalObjectType()) {
@@ -2550,7 +2551,7 @@ namespace {
       }
 
       // Find the appropriate object literal protocol.
-      auto proto = TypeChecker::getLiteralProtocol(cs.getASTContext(), expr);
+      auto proto = TypeChecker::getLiteralProtocol(ctx, expr);
       assert(proto && "Missing object literal protocol?");
       auto conformance =
         TypeChecker::conformsToProtocol(conformingType, proto, cs.DC);
@@ -2560,9 +2561,24 @@ namespace {
 
       ConcreteDeclRef witness = conformance.getWitnessByName(
           conformingType->getRValueType(), constrName);
-      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
+
+      auto selectedOverload = solution.getOverloadChoiceIfAvailable(
+          cs.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
+
+      if (!selectedOverload)
         return nullptr;
+
+      auto fnType =
+          simplifyType(selectedOverload->openedType)->castTo<FunctionType>();
+
+      auto newArg = coerceCallArguments(
+          expr->getArg(), fnType, witness,
+          /*applyExpr=*/nullptr, expr->getArgumentLabels(),
+          expr->hasTrailingClosure(),
+          cs.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+
       expr->setInitializer(witness);
+      expr->setArg(newArg);
       return expr;
     }
 
@@ -3492,20 +3508,23 @@ namespace {
     Expr *visitIsExpr(IsExpr *expr) {
       // Turn the subexpression into an rvalue.
       auto &ctx = cs.getASTContext();
-      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       auto sub = cs.coerceToRValue(expr->getSubExpr());
-
       expr->setSubExpr(sub);
 
-      // Set the type we checked against.
-      expr->getCastTypeLoc().setType(toType);
-      auto fromType = cs.getType(sub);
+      // Simplify and update the type we checked against.
+      auto *const castTypeRepr = expr->getCastTypeRepr();
+
+      const auto fromType = cs.getType(sub);
+      const auto toType = simplifyType(cs.getType(castTypeRepr));
+      expr->setCastType(toType);
+      cs.setType(castTypeRepr, toType);
+
       auto castContextKind =
           SuppressDiagnostics ? CheckedCastContextKind::None
                               : CheckedCastContextKind::IsExpr;
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
-          expr->getCastTypeLoc().getSourceRange());
+          castTypeRepr->getSourceRange());
 
       switch (castKind) {
       case CheckedCastKind::Unresolved:
@@ -3556,13 +3575,9 @@ namespace {
           castKind == CheckedCastKind::ArrayDowncast ||
           castKind == CheckedCastKind::DictionaryDowncast ||
           castKind == CheckedCastKind::SetDowncast) {
-        auto toOptType = OptionalType::get(toType);
-        ConditionalCheckedCastExpr *cast = new (ctx) ConditionalCheckedCastExpr(
-            sub, expr->getLoc(), SourceLoc(), expr->getCastTypeLoc());
-        cs.setType(cast, toOptType);
-        cs.setType(cast->getCastTypeLoc(), toType);
-        if (expr->isImplicit())
-          cast->setImplicit();
+        auto *const cast = ConditionalCheckedCastExpr::createImplicit(
+            ctx, sub, castTypeRepr, toType);
+        cs.setType(cast, cast->getType());
 
         // Type-check this conditional case.
         Expr *result = handleConditionalCheckedCastExpr(cast, true);
@@ -3823,7 +3838,7 @@ namespace {
     }
 
     bool hasForcedOptionalResult(ExplicitCastExpr *expr) {
-      auto *TR = expr->getCastTypeLoc().getTypeRepr();
+      const auto *const TR = expr->getCastTypeRepr();
       if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
         auto *locator = cs.getConstraintLocator(
             expr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
@@ -3848,18 +3863,19 @@ namespace {
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr, Optional<unsigned> choice) {
-      // Simplify the type we're casting to.
-      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      expr->getCastTypeLoc().setType(toType);
-
-      auto &ctx = cs.getASTContext();
+      // Simplify and update the type we're coercing to.
+      assert(expr->getCastTypeRepr());
+      const auto toType = simplifyType(cs.getType(expr->getCastTypeRepr()));
+      expr->setCastType(toType);
+      cs.setType(expr->getCastTypeRepr(), toType);
 
       // If this is a literal that got converted into constructor call
       // lets put proper source information in place.
       if (expr->isLiteralInit()) {
         auto *literalInit = expr->getSubExpr();
         if (auto *call = dyn_cast<CallExpr>(literalInit)) {
-          call->getFn()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+          forEachExprInConstraintSystem(call->getFn(),
+                                        [&](Expr *subExpr) -> Expr * {
             auto *TE = dyn_cast<TypeExpr>(subExpr);
             if (!TE)
               return subExpr;
@@ -3871,7 +3887,8 @@ namespace {
             if (!type->isEqual(toType))
               return subExpr;
 
-            return cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(), toType, ctx));
+            return cs.cacheType(TypeExpr::createImplicitHack(
+                expr->getLoc(), toType, cs.getASTContext()));
           });
         }
 
@@ -3933,26 +3950,29 @@ namespace {
 
     // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
-      // Simplify the type we're casting to.
-      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      if (hasForcedOptionalResult(expr))
-        toType = toType->getOptionalObjectType();
-
-      expr->getCastTypeLoc().setType(toType);
-
       // The subexpression is always an rvalue.
       auto &ctx = cs.getASTContext();
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
+      // Simplify and update the type we're casting to.
+      auto *const castTypeRepr = expr->getCastTypeRepr();
+
+      const auto fromType = cs.getType(sub);
+      auto toType = simplifyType(cs.getType(castTypeRepr));
+      if (hasForcedOptionalResult(expr))
+        toType = toType->getOptionalObjectType();
+
+      expr->setCastType(toType);
+      cs.setType(castTypeRepr, toType);
+
       auto castContextKind =
           SuppressDiagnostics ? CheckedCastContextKind::None
                               : CheckedCastContextKind::ForcedCast;
 
-      auto fromType = cs.getType(sub);
-      auto castKind = TypeChecker::typeCheckCheckedCast(
+      const auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
-          expr->getCastTypeLoc().getSourceRange());
+          castTypeRepr->getSourceRange());
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -3961,8 +3981,8 @@ namespace {
       case CheckedCastKind::BridgingCoercion: {
         if (cs.getType(sub)->isEqual(toType)) {
           ctx.Diags.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
-              .fixItRemove(SourceRange(
-                  expr->getLoc(), expr->getCastTypeLoc().getSourceRange().End));
+              .fixItRemove(SourceRange(expr->getLoc(),
+                                       castTypeRepr->getSourceRange().End));
 
         } else {
           ctx.Diags
@@ -4007,14 +4027,18 @@ namespace {
 
     Expr *handleConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr,
                                            bool isInsideIsExpr = false) {
-      // Simplify the type we're casting to.
-      auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      expr->getCastTypeLoc().setType(toType);
-
       // The subexpression is always an rvalue.
       auto &ctx = cs.getASTContext();
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
+
+      // Simplify and update the type we're casting to.
+      auto *const castTypeRepr = expr->getCastTypeRepr();
+
+      const auto fromType = cs.getType(sub);
+      const auto toType = simplifyType(cs.getType(castTypeRepr));
+      expr->setCastType(toType);
+      cs.setType(castTypeRepr, toType);
 
       bool isSubExprLiteral = isa<LiteralExpr>(sub);
       auto castContextKind =
@@ -4022,10 +4046,9 @@ namespace {
             ? CheckedCastContextKind::None
             : CheckedCastContextKind::ConditionalCast;
 
-      auto fromType = cs.getType(sub);
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
-          expr->getCastTypeLoc().getSourceRange());
+          castTypeRepr->getSourceRange());
       switch (castKind) {
       // Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -4047,7 +4070,7 @@ namespace {
                 .diagnose(expr->getLoc(), diag::downcast_to_unrelated, fromType,
                           toType)
                 .highlight(sub->getSourceRange())
-                .highlight(expr->getCastTypeLoc().getSourceRange());
+                .highlight(castTypeRepr->getSourceRange());
           }
         }
         expr->setCastKind(CheckedCastKind::ValueCast);
@@ -4691,7 +4714,9 @@ namespace {
                                  StringRef(stringCopy, compatStringBuf.size()),
                                  SourceRange(),
                                  /*implicit*/ true);
-          cs.setType(stringExpr, TypeChecker::getStringType(cs.getASTContext()));
+          cs.setType(
+              stringExpr,
+              cs.getASTContext().getStringDecl()->getDeclaredInterfaceType());
           E->setObjCStringLiteralExpr(stringExpr);
         }
       }
@@ -5752,16 +5777,9 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
   return cs.cacheType(arg);
 }
 
-static ClosureExpr *getClosureLiteralExpr(Expr *expr) {
+static bool isClosureLiteralExpr(Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
-
-  if (auto *captureList = dyn_cast<CaptureListExpr>(expr))
-    return captureList->getClosureBody();
-
-  if (auto *closure = dyn_cast<ClosureExpr>(expr))
-    return closure;
-
-  return nullptr;
+  return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
 }
 
 /// If the expression is an explicit closure expression (potentially wrapped in
@@ -5788,7 +5806,7 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
     cs.setType(CE, toType);
 
     // If this closure isn't type-checked in its enclosing expression, write
-    // theg type into the ClosureExpr directly here, since the visitor won't.
+    // the type into the ClosureExpr directly here, since the visitor won't.
     if (!shouldTypeCheckInEnclosingExpression(CE))
       CE->setType(toType);
 
@@ -7304,7 +7322,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // An immediate application of a closure literal is always noescape.
-  if (getClosureLiteralExpr(fn)) {
+  if (isClosureLiteralExpr(fn)) {
     if (auto fnTy = cs.getType(fn)->getAs<FunctionType>()) {
       fnTy = cast<FunctionType>(
         fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape()));
@@ -8103,6 +8121,25 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     }
 
     return target;
+  } else if (auto patternBinding = target.getAsPatternBinding()) {
+    ConstraintSystem &cs = solution.getConstraintSystem();
+    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
+      // Find the solution application target for this.
+      auto knownTarget = *cs.getSolutionApplicationTarget(
+          {patternBinding, index});
+
+      // Rewrite the target.
+      auto resultTarget = rewriteTarget(knownTarget);
+      if (!resultTarget)
+        return None;
+
+      patternBinding->setPattern(
+          index, resultTarget->getInitializationPattern(),
+          resultTarget->getDeclContext());
+      patternBinding->setInit(index, resultTarget->getAsExpr());
+    }
+
+    return target;
   } else {
     auto fn = *target.getAsFunction();
     if (rewriteFunction(fn))
@@ -8379,6 +8416,10 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
     }
 
     return *this;
+
+  case Kind::patternBinding:
+    return *this;
   }
+
   llvm_unreachable("invalid target kind");
 }

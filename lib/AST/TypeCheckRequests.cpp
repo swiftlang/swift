@@ -459,60 +459,6 @@ bool RequirementRequest::isCached() const {
   return std::get<2>(getStorage()) == TypeResolutionStage::Interface;
 }
 
-Optional<Requirement> RequirementRequest::getCachedResult() const {
-  auto &reqRepr = getRequirement();
-  switch (reqRepr.getKind()) {
-  case RequirementReprKind::TypeConstraint:
-    if (!reqRepr.getSubjectLoc().wasValidated() ||
-        !reqRepr.getConstraintLoc().wasValidated())
-      return None;
-
-    return Requirement(reqRepr.getConstraint()->getClassOrBoundGenericClass()
-                         ? RequirementKind::Superclass
-                         : RequirementKind::Conformance,
-                       reqRepr.getSubject(),
-                       reqRepr.getConstraint());
-
-  case RequirementReprKind::SameType:
-    if (!reqRepr.getFirstTypeLoc().wasValidated() ||
-        !reqRepr.getSecondTypeLoc().wasValidated())
-      return None;
-
-    return Requirement(RequirementKind::SameType, reqRepr.getFirstType(),
-                       reqRepr.getSecondType());
-
-  case RequirementReprKind::LayoutConstraint:
-    if (!reqRepr.getSubjectLoc().wasValidated())
-      return None;
-
-    return Requirement(RequirementKind::Layout, reqRepr.getSubject(),
-                       reqRepr.getLayoutConstraint());
-  }
-  llvm_unreachable("unhandled kind");
-}
-
-void RequirementRequest::cacheResult(Requirement value) const {
-  auto &reqRepr = getRequirement();
-  switch (value.getKind()) {
-  case RequirementKind::Conformance:
-  case RequirementKind::Superclass:
-    reqRepr.getSubjectLoc().setType(value.getFirstType());
-    reqRepr.getConstraintLoc().setType(value.getSecondType());
-    break;
-
-  case RequirementKind::SameType:
-    reqRepr.getFirstTypeLoc().setType(value.getFirstType());
-    reqRepr.getSecondTypeLoc().setType(value.getSecondType());
-    break;
-
-  case RequirementKind::Layout:
-    reqRepr.getSubjectLoc().setType(value.getFirstType());
-    reqRepr.getLayoutConstraintLoc()
-      .setLayoutConstraint(value.getLayoutConstraint());
-    break;
-  }
-}
-
 //----------------------------------------------------------------------------//
 // DefaultTypeRequest.
 //----------------------------------------------------------------------------//
@@ -835,23 +781,6 @@ void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
   auto kind = std::get<1>(getStorage());
 
   storage->setSynthesizedAccessor(kind, accessor);
-}
-
-//----------------------------------------------------------------------------//
-// EmittedMembersRequest computation.
-//----------------------------------------------------------------------------//
-
-Optional<DeclRange>
-EmittedMembersRequest::getCachedResult() const {
-  auto *classDecl = std::get<0>(getStorage());
-  if (classDecl->hasForcedEmittedMembers())
-    return classDecl->getMembers();
-  return None;
-}
-
-void EmittedMembersRequest::cacheResult(DeclRange result) const {
-  auto *classDecl = std::get<0>(getStorage());
-  classDecl->setHasForcedEmittedMembers();
 }
 
 //----------------------------------------------------------------------------//
@@ -1410,16 +1339,22 @@ void LookupAllConformancesInContextRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 
 Optional<Type> ResolveTypeEraserTypeRequest::getCachedResult() const {
-  auto ty = std::get<1>(getStorage())->TypeEraserLoc.getType();
-  if (ty.isNull()) {
+  auto *TyExpr = std::get<1>(getStorage())->TypeEraserExpr;
+  if (!TyExpr || !TyExpr->getType()) {
     return None;
   }
-  return ty;
+  return TyExpr->getInstanceType();
 }
 
 void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
   assert(value && "Resolved type erasure type to null type!");
-  std::get<1>(getStorage())->TypeEraserLoc.setType(value);
+  auto *attr = std::get<1>(getStorage());
+  if (attr->TypeEraserExpr) {
+    attr->TypeEraserExpr->setType(MetatypeType::get(value));
+  } else {
+    attr->TypeEraserExpr = TypeExpr::createImplicit(value,
+                                                    value->getASTContext());
+  }
 }
 
 //----------------------------------------------------------------------------//
@@ -1497,4 +1432,34 @@ SourceLoc swift::extractNearestSourceLoc(const TypeRepr *repr) {
   if (!repr)
     return SourceLoc();
   return repr->getLoc();
+}
+
+//----------------------------------------------------------------------------//
+// CustomAttrTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
+  switch (value) {
+  case CustomAttrTypeKind::NonGeneric:
+    out << "non-generic";
+    return;
+
+  case CustomAttrTypeKind::PropertyDelegate:
+    out << "property-delegate";
+    return;
+  }
+  llvm_unreachable("bad kind");
+}
+
+Optional<Type> CustomAttrTypeRequest::getCachedResult() const {
+  auto *attr = std::get<0>(getStorage());
+  if (auto ty = attr->getType()) {
+    return ty;
+  }
+  return None;
+}
+
+void CustomAttrTypeRequest::cacheResult(Type value) const {
+  auto *attr = std::get<0>(getStorage());
+  attr->setType(value);
 }

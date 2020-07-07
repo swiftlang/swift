@@ -25,6 +25,7 @@ target_sources(swiftSILOptimizer PRIVATE
   ObjectOutliner.cpp
   PerformanceInliner.cpp
   PhiArgumentOptimizations.cpp
+  PruneVTables.cpp
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
   ReleaseDevirtualizer.cpp
@@ -37,5 +38,6 @@ target_sources(swiftSILOptimizer PRIVATE
   Sink.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
+  TempLValueOpt.cpp
   TempRValueElimination.cpp
   UnsafeGuaranteedPeephole.cpp)

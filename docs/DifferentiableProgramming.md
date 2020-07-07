@@ -1,7 +1,7 @@
 # Differentiable Programming Manifesto
 
 *   Authors: [Richard Wei], [Dan Zheng], [Marc Rasi], [Bart Chrzaszcz]
-*   Status: Partially implemented
+*   Status: Partially implemented on master, feature gated under `import _Differentiation`
 
 ## Table of contents
 
@@ -1949,7 +1949,7 @@ One concrete example is `sinf(_:)` from the C standard library. It can be made
 differentiable by defining a derivative retroactively.
 
 ```swift
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import func Darwin.sinf
 #else
 import func Glibc.sinf

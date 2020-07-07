@@ -273,6 +273,8 @@ public:
     assert(isASTNode());
   }
 
+  static SILLocation invalid() { return SILLocation(); }
+
   /// Check if the location wraps an AST node or a valid SIL file
   /// location.
   ///
@@ -490,6 +492,8 @@ public:
            Loc.ASTNode.ForDebugger.getOpaqueValue() ==
                R.Loc.ASTNode.ForDebugger.getOpaqueValue();
   }
+
+  inline bool operator!=(const SILLocation &R) const { return !(*this == R); }
 };
 
 /// Allowed on any instruction.

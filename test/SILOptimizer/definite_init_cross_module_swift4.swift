@@ -3,8 +3,8 @@
 // RUN: %target-swift-frontend -emit-sil -verify -verify-ignore-unknown -I %t -swift-version 4 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift
-// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -emit-sil -verify -verify-ignore-unknown -I %t -swift-version 4 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
+// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift
+// RUN: %target-swift-frontend -emit-sil -verify -verify-ignore-unknown -I %t -swift-version 4 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
 
 import OtherModule
 

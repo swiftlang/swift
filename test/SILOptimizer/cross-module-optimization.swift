@@ -17,7 +17,9 @@
 
 // Second test: check if CMO really imports the SIL of functions in other modules.
 
-// RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil -o %t/out.sil
+// RUN: %FileCheck %s -check-prefix=CHECK-SIL < %t/out.sil
+// RUN: %FileCheck %s -check-prefix=CHECK-SIL2 < %t/out.sil
 
 import Test
 
@@ -54,13 +56,18 @@ func testClass() {
   print(createClass_gen(0))
 }
 
+// CHECK-SIL2-LABEL: sil hidden [noinline] @$s4Main9testErroryyF
+@inline(never)
 func testError() {
   // CHECK-OUTPUT: PrivateError()
-  // CHECK-SIL-DAG: sil @$s4Test12PrivateError33_{{.*}} : $@convention(method) (@thin PrivateError.Type) -> PrivateError{{$}}
+  // CHECK-SIL2: struct $PrivateError ()
+  // CHECK-SIL2: alloc_existential_box $Error, $PrivateError
   print(returnPrivateError(27))
   // CHECK-OUTPUT: InternalError()
-  // CHECK-SIL-DAG: sil @$s4Test13InternalErrorVACycfC : $@convention(method) (@thin InternalError.Type) -> InternalError{{$}}
+  // CHECK-SIL2: struct $InternalError ()
+  // CHECK-SIL2: alloc_existential_box $Error, $InternalError
   print(returnInternalError(27))
+  // CHECK-SIL2: } // end sil function '$s4Main9testErroryyF'
 }
 
 class DerivedFromOpen<T> : OpenClass<T> { }
@@ -123,6 +130,15 @@ func testMisc() {
   print(classWithPublicProperty(33))
 }
 
+// CHECK-SIL2-LABEL: sil hidden [noinline] @$s4Main10testGlobalyyF
+@inline(never)
+func testGlobal() {
+  // CHECK-OUTPUT: 529387
+  // CHECK-SIL2: integer_literal $Builtin.Int{{[0-9]+}}, 529387
+  print(globalLet)
+  // CHECK-SIL2: } // end sil function '$s4Main10testGlobalyyF'
+}
+
 testNestedTypes()
 testClass()
 testError()
@@ -131,3 +147,5 @@ testSubModule()
 testClosures()
 testKeypath()
 testMisc()
+testGlobal()
+

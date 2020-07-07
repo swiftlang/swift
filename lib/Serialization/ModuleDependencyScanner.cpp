@@ -44,6 +44,16 @@ public:
                                    /*IgnoreSwiftSourceInfoFile=*/true),
         moduleName(moduleName), astDelegate(astDelegate) { }
 
+  std::string getCompiledModulePath(const SerializedModuleBaseName &BaseName) {
+    if (LoadMode == ModuleLoadingMode::OnlySerialized) {
+      return BaseName.getName(file_types::TY_SwiftModuleFile);
+    }
+    return static_cast<SerializedModuleLoaderBase*>(Ctx
+      .getModuleInterfaceLoader())->getUpToDateCompiledModuleForInterface(
+         moduleName.str(),
+         BaseName.getName(file_types::TY_SwiftModuleInterfaceFile));
+  }
+
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID,
       const SerializedModuleBaseName &BaseName,
@@ -56,12 +66,9 @@ public:
     auto &fs = *Ctx.SourceMgr.getFileSystem();
 
     // Compute the full path of the module we're looking for.
-    auto ModPath = BaseName.getName(file_types::TY_SwiftModuleFile);
-    if (LoadMode == ModuleLoadingMode::OnlySerialized) {
-      // If there is no module file, there's nothing we can do.
-      if (!fs.exists(ModPath))
-        return std::make_error_code(std::errc::no_such_file_or_directory);
+    auto ModPath = getCompiledModulePath(BaseName);
 
+    if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
       auto dependencies = scanModuleFile(ModPath);
       if (dependencies) {
@@ -108,10 +115,11 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
                                               moduleInterfacePath.str(),
                                               StringRef(),
                                               SourceLoc(),
-                [&](ASTContext &Ctx, ArrayRef<StringRef> Args, StringRef Hash) {
-    Result = ModuleDependencies::forSwiftInterface(modulePath.str().str(),
-                                                   moduleInterfacePath.str(),
+                [&](ASTContext &Ctx, ArrayRef<StringRef> Args,
+                    ArrayRef<StringRef> PCMArgs, StringRef Hash) {
+    Result = ModuleDependencies::forSwiftInterface(moduleInterfacePath.str(),
                                                    Args,
+                                                   PCMArgs,
                                                    Hash);
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();

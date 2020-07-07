@@ -179,6 +179,12 @@ static void validateDebugInfoArgs(DiagnosticEngine &diags,
   for (auto A : args.getAllArgValues(options::OPT_debug_prefix_map))
     if (A.find('=') == StringRef::npos)
       diags.diagnose(SourceLoc(), diag::error_invalid_debug_prefix_map, A);
+
+  // Check for any -coverage-prefix-map options that aren't of the form
+  // 'original=remapped' (either side can be empty, however).
+  for (auto A : args.getAllArgValues(options::OPT_coverage_prefix_map))
+    if (A.find('=') == StringRef::npos)
+      diags.diagnose(SourceLoc(), diag::error_invalid_coverage_prefix_map, A);
 }
 
 static void validateVerifyIncrementalDependencyArgs(DiagnosticEngine &diags,
@@ -1958,6 +1964,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         }
       case file_types::TY_AutolinkFile:
       case file_types::TY_Object:
+      case file_types::TY_TBD:
         // Object inputs are only okay if linking.
         if (OI.shouldLink()) {
           AllLinkerInputs.push_back(Current);
@@ -1981,7 +1988,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_IndexData:
       case file_types::TY_PCH:
       case file_types::TY_ImportedModules:
-      case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
       case file_types::TY_YAMLOptRecord:
       case file_types::TY_BitstreamOptRecord:

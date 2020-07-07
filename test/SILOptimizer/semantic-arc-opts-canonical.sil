@@ -323,8 +323,6 @@ bb0(%0 : @guaranteed $StructMemberTest):
 // multiple trivial arguments), we can.
 //
 // CHECK-LABEL: sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
-// CHECK: copy_value
-// CHECK: copy_value
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'multiple_arg_forwarding_inst_test'
 sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {

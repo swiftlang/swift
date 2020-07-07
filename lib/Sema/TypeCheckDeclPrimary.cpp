@@ -924,7 +924,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
           if (reqRepr &&
               req.getFirstType()->isEqual(proto->getSelfInterfaceType())) {
             auto &diags = proto->getASTContext().Diags;
-            diags.diagnose(reqRepr->getSubjectLoc().getLoc(),
+            diags.diagnose(reqRepr->getSubjectRepr()->getLoc(),
                            diag::protocol_where_clause_self_requirement);
           }
 
@@ -1730,7 +1730,8 @@ public:
       auto mentionsItself =
         defaultType.findIf([&](Type defaultType) {
           if (auto DMT = defaultType->getAs<DependentMemberType>()) {
-            return DMT->getAssocType() == AT;
+            return (DMT->getAssocType() == AT &&
+                    DMT->getBase()->isEqual(proto->getSelfInterfaceType()));
           }
           return false;
         });

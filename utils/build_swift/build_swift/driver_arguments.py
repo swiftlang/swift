@@ -184,10 +184,12 @@ def _apply_default_arguments(args):
         args.test_watchos = False
         args.test_android = False
         args.test_swiftpm = False
+        args.test_swift_driver = False
         args.test_swiftsyntax = False
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
+        args.test_swiftformat = False
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
 
@@ -345,6 +347,8 @@ def create_argument_parser():
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
            help='the path to use as the filesystem root for the installation')
+    option('--install-all', toggle_true,
+           help='Assume all built products should be installed')
 
     option(['-j', '--jobs'], store_int('build_jobs'),
            default=multiprocessing.cpu_count(),
@@ -497,6 +501,10 @@ def create_argument_parser():
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
 
+    option('--llvm-install-components', store,
+           default=defaults.llvm_install_components(),
+           help='A semi-colon split list of llvm components to install')
+
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
 
@@ -541,6 +549,9 @@ def create_argument_parser():
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
 
+    option('--infer', store_true('infer_dependencies'),
+           help='Infer any downstream dependencies from enabled projects')
+
     option(['-l', '--lldb'], store_true('build_lldb'),
            help='build LLDB')
 
@@ -562,8 +573,14 @@ def create_argument_parser():
     option(['--skstresstester'], store_true('build_skstresstester'),
            help='build the SourceKit stress tester')
 
+    option(['--swiftformat'], store_true('build_swiftformat'),
+           help='build swift-format')
+
     option(['--swiftevolve'], store_true('build_swiftevolve'),
            help='build the swift-evolve tool')
+
+    option(['--swift-driver'], toggle_true('build_swift_driver'),
+           help='build swift-driver')
 
     option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
@@ -587,6 +604,8 @@ def create_argument_parser():
            help='install SourceKitLSP')
     option(['--install-skstresstester'], toggle_true('install_skstresstester'),
            help='install the SourceKit stress tester')
+    option(['--install-swift-driver'], toggle_true('install_swift_driver'),
+           help='install new Swift driver')
     option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
            help='install SwiftEvolve')
     option(['--toolchain-benchmarks'],
@@ -1000,6 +1019,8 @@ def create_argument_parser():
 
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
+    option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
+           help='skip testing Swift driver')
     option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
            help='skip testing SwiftSyntax')
     option('--skip-test-indexstore-db', toggle_false('test_indexstoredb'),
@@ -1011,6 +1032,8 @@ def create_argument_parser():
            help='skip testing PlaygroundSupport')
     option('--skip-test-skstresstester', toggle_false('test_skstresstester'),
            help='skip testing the SourceKit Stress tester')
+    option('--skip-test-swiftformat', toggle_false('test_swiftformat'),
+           help='skip testing swift-format')
     option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
            help='skip testing SwiftEvolve')
     option('--skip-test-toolchain-benchmarks',
@@ -1092,6 +1115,16 @@ def create_argument_parser():
 
     # -------------------------------------------------------------------------
     in_group('Build-script-impl arguments (for disambiguation)')
+
+    # We need to represent these options so that we can skip installing them if
+    # the user is running in install-all mode.
+    option('--skip-build-cmark', toggle_false('build_cmark'),
+           help='skip building cmark')
+    option('--skip-build-llvm', toggle_false('build_llvm'),
+           help='skip building llvm')
+    option('--skip-build-swift', toggle_false('build_swift'),
+           help='skip building swift')
+
     # We need to list --skip-test-swift explicitly because otherwise argparse
     # will auto-expand arguments like --skip-test-swift to the only known
     # argument --skip-test-swiftevolve.

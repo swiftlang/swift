@@ -150,6 +150,7 @@ public:
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          ArrayRef<std::string> ExplicitModulePaths,
+         StringRef ExplicitSwiftModuleMap,
          bool IgnoreSwiftSourceInfoFile);
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -201,7 +202,6 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
   bool isCached(StringRef DepPath) override;
-
 public:
   static std::unique_ptr<ModuleInterfaceLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
@@ -234,6 +234,9 @@ public:
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     ModuleInterfaceLoaderOptions Opts);
+
+  std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
+                                                    StringRef interfacePath) override;
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -244,7 +247,6 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation subInvocation;
-  std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -280,7 +282,8 @@ public:
                        StringRef interfacePath,
                        StringRef outputPath,
                        SourceLoc diagLoc,
-    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>, StringRef)> action) override;
+    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>,
+                            ArrayRef<StringRef>, StringRef)> action) override;
   bool runInSubCompilerInstance(StringRef moduleName,
                                 StringRef interfacePath,
                                 StringRef outputPath,

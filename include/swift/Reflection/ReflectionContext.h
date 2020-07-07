@@ -34,9 +34,9 @@
 #include "swift/Runtime/Unreachable.h"
 
 #include <set>
-#include <vector>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -320,10 +320,8 @@ public:
         
         // FIXME: This code needs to be cleaned up and updated
         // to make it work for 32 bit platforms.
-        if (SectionName != ".sw5cptr" && SectionName != ".sw5bltn") {
-          Begin = Begin.atByteOffset(8);
-          Size -= 16;
-        }
+        Begin = Begin.atByteOffset(8);
+        Size -= 16;
 
         return {Begin, Size};
       }
@@ -794,7 +792,7 @@ public:
   llvm::Optional<std::string> iterateConformances(
     std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     std::string ConformancesPointerName =
-      "__swift_debug_protocolConformanceStatePointer";
+        "_swift_debug_protocolConformanceStatePointer";
     auto ConformancesAddrAddr =
       getReader().getSymbolAddress(ConformancesPointerName);
     if (!ConformancesAddrAddr)
@@ -838,15 +836,27 @@ public:
     return 0;
   }
 
+  /// Get the name of a metadata tag, if known.
+  llvm::Optional<std::string> metadataAllocationTagName(int Tag) {
+    switch (Tag) {
+#define TAG(name, value)                                                       \
+  case value:                                                                  \
+    return std::string(#name);
+#include "../../../stdlib/public/runtime/MetadataAllocatorTags.def"
+    default:
+      return llvm::None;
+    }
+  }
+
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
   llvm::Optional<std::string> iterateMetadataAllocations(
     std::function<void (MetadataAllocation<Runtime>)> Call) {
     std::string IterationEnabledName =
-      "__swift_debug_metadataAllocationIterationEnabled";
+        "_swift_debug_metadataAllocationIterationEnabled";
     std::string AllocationPoolPointerName =
-      "__swift_debug_allocationPoolPointer";
+        "_swift_debug_allocationPoolPointer";
 
     auto IterationEnabledAddr =
       getReader().getSymbolAddress(IterationEnabledName);
@@ -918,6 +928,52 @@ public:
       }
       
       TrailerPtr = Trailer->PrevTrailer;
+    }
+    return llvm::None;
+  }
+
+  llvm::Optional<std::string> iterateMetadataAllocationBacktraces(
+      std::function<void(StoredPointer, uint32_t, const StoredPointer *)>
+          Call) {
+    std::string BacktraceListName =
+        "_swift_debug_metadataAllocationBacktraceList";
+
+    auto BacktraceListAddr = getReader().getSymbolAddress(BacktraceListName);
+    if (!BacktraceListAddr)
+      return "unable to look up debug variable " + BacktraceListName;
+    auto BacktraceListNextPtr =
+        getReader().readPointer(BacktraceListAddr, sizeof(StoredPointer));
+    if (!BacktraceListNextPtr)
+      return llvm::None;
+
+    auto BacktraceListNext = BacktraceListNextPtr->getResolvedAddress();
+    while (BacktraceListNext) {
+      auto HeaderBytes = getReader().readBytes(
+          RemoteAddress(BacktraceListNext),
+          sizeof(MetadataAllocationBacktraceHeader<Runtime>));
+      auto HeaderPtr =
+          reinterpret_cast<const MetadataAllocationBacktraceHeader<Runtime> *>(
+              HeaderBytes.get());
+      if (HeaderPtr == nullptr) {
+        // FIXME: std::stringstream would be better, but LLVM's standard library
+        // introduces a vtable and we don't want that.
+        char result[128];
+        std::snprintf(result, sizeof(result), "unable to read Next pointer %p",
+            BacktraceListNext.getAddressData());
+        return std::string(result);
+      }
+      auto BacktraceAddrPtr =
+          BacktraceListNext +
+          sizeof(MetadataAllocationBacktraceHeader<Runtime>);
+      auto BacktraceBytes =
+          getReader().readBytes(RemoteAddress(BacktraceAddrPtr),
+                                HeaderPtr->Count * sizeof(StoredPointer));
+      auto BacktracePtr =
+          reinterpret_cast<const StoredPointer *>(BacktraceBytes.get());
+
+      Call(HeaderPtr->Allocation, HeaderPtr->Count, BacktracePtr);
+
+      BacktraceListNext = RemoteAddress(HeaderPtr->Next);
     }
     return llvm::None;
   }

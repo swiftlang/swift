@@ -562,7 +562,6 @@ r32432145 { _,_ in
 // rdar://problem/30106822 - Swift ignores type error in closure and presents a bogus error about the caller
 [1, 2].first { $0.foo = 3 }
 // expected-error@-1 {{value of type 'Int' has no member 'foo'}}
-// expected-error@-2 {{cannot convert value of type '()' to closure result type 'Bool'}}
 
 // rdar://problem/32433193, SR-5030 - Higher-order function diagnostic mentions the wrong contextual type conversion problem
 protocol A_SR_5030 {
@@ -827,7 +826,7 @@ func rdar_40537960() {
   }
 
   var arr: [S] = []
-  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<P>'}}
+  _ = A(arr, fn: { L($0.v) })
   // expected-error@-1 {{generic parameter 'P' could not be inferred}}
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{8-8=<[S], <#P: P_40537960#>>}}
 }

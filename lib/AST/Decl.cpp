@@ -44,7 +44,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/SwiftNameTranslation.h"
-#include "swift/Parse/Lexer.h"
+#include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
@@ -738,9 +738,6 @@ bool Decl::hasUnderscoredNaming() const {
   }
 
   if (const auto PD = dyn_cast<ProtocolDecl>(D)) {
-    if (PD->getAttrs().hasAttribute<ShowInInterfaceAttr>()) {
-      return false;
-    }
     StringRef NameStr = PD->getNameStr();
     if (NameStr.startswith("_Builtin")) {
       return true;
@@ -795,6 +792,10 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   if (isa<ProtocolDecl>(D)) {
     if (treatNonBuiltinProtocolsAsPublic)
       return false;
+  }
+
+  if (D->getAttrs().hasAttribute<ShowInInterfaceAttr>()) {
+    return false;
   }
 
   return hasUnderscoredNaming();
@@ -872,6 +873,15 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   auto fromContext = AvailabilityContext::forDeploymentTarget(
       fromModule->getASTContext());
   return !fromContext.isContainedIn(containingContext);
+}
+
+
+SourceRange RequirementRepr::getSourceRange() const {
+  if (getKind() == RequirementReprKind::LayoutConstraint)
+    return SourceRange(FirstType->getSourceRange().Start,
+                       SecondLayout.getSourceRange().End);
+  return SourceRange(FirstType->getSourceRange().Start,
+                     SecondType->getSourceRange().End);
 }
 
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
@@ -1287,7 +1297,16 @@ bool ExtensionDecl::isConstrainedExtension() const {
 
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
   auto decl = getExtendedNominal();
-  return getParentModule() == decl->getParentModule()
+  bool extendDeclFromSameModule = false;
+  if (!decl->getAlternateModuleName().empty()) {
+    // if the extended type was defined in the same module with the extension,
+    // we should consider them as the same module to preserve ABI stability.
+    extendDeclFromSameModule = decl->getAlternateModuleName() ==
+      getParentModule()->getNameStr();
+  } else {
+    extendDeclFromSameModule = decl->getParentModule() == getParentModule();
+  }
+  return extendDeclFromSameModule
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
 }
@@ -1859,7 +1878,7 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   // If the pattern is typed as optional (or tuples thereof), it is
   // default initializable.
   if (const auto typedPattern = dyn_cast<TypedPattern>(entry.getPattern())) {
-    if (const auto typeRepr = typedPattern->getTypeLoc().getTypeRepr()) {
+    if (const auto typeRepr = typedPattern->getTypeRepr()) {
       if (::isDefaultInitializable(typeRepr, ctx))
         return true;
     } else if (typedPattern->isImplicit()) {
@@ -1869,11 +1888,15 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
       //
       // All lazy storage is implicitly default initializable, though, because
       // lazy backing storage is optional.
-      if (const auto *varDecl = typedPattern->getSingleVar())
+      if (const auto *varDecl = typedPattern->getSingleVar()) {
         // Lazy storage is never user accessible.
-        if (!varDecl->isUserAccessible())
-          if (typedPattern->getTypeLoc().getType()->getOptionalObjectType())
+        if (!varDecl->isUserAccessible()) {
+          if (typedPattern->hasType() &&
+              typedPattern->getType()->getOptionalObjectType()) {
             return true;
+          }
+        }
+      }
     }
   }
 
@@ -1912,7 +1935,7 @@ SourceRange IfConfigDecl::getSourceRange() const {
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
-  if (storage->isObjCDynamic())
+  if (storage->shouldUseObjCDispatch())
     return true;
 
 
@@ -2063,7 +2086,7 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
     return AccessStrategy::getStorage();
   case ReadWriteImplKind::Stored: {
     // If the storage isDynamic (and not @objc) use the accessors.
-    if (storage->isNativeDynamic())
+    if (storage->shouldUseNativeDynamicDispatch())
       return AccessStrategy::getMaterializeToTemporary(
           getOpaqueReadAccessStrategy(storage, false),
           getOpaqueWriteAccessStrategy(storage, false));
@@ -2148,7 +2171,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       if (isPolymorphic(this))
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true);
 
-      if (isNativeDynamic())
+      if (shouldUseNativeDynamicDispatch())
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
 
       // If the storage is resilient from the given module and resilience
@@ -2840,7 +2863,7 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
           assert(NP->getDecl() == VD);
           (void) NP;
 
-          returnRepr = TP->getTypeLoc().getTypeRepr();
+          returnRepr = TP->getTypeRepr();
         }
       }
     } else {
@@ -2904,6 +2927,59 @@ bool ValueDecl::isDynamic() const {
   return evaluateOrDefault(ctx.evaluator,
     IsDynamicRequest{const_cast<ValueDecl *>(this)},
     getAttrs().hasAttribute<DynamicAttr>());
+}
+
+bool ValueDecl::isObjCDynamicInGenericClass() const {
+  if (!isObjCDynamic())
+    return false;
+
+  auto *DC = this->getDeclContext();
+  auto *classDecl = DC->getSelfClassDecl();
+  if (!classDecl)
+    return false;
+
+  return classDecl->isGenericContext() && !classDecl->usesObjCGenericsModel();
+}
+
+bool ValueDecl::shouldUseObjCMethodReplacement() const {
+  if (isNativeDynamic())
+    return false;
+
+  if (getModuleContext()->isImplicitDynamicEnabled() &&
+      isObjCDynamicInGenericClass())
+    return false;
+
+  return isObjCDynamic();
+}
+
+bool ValueDecl::shouldUseNativeMethodReplacement() const {
+  if (isNativeDynamic())
+    return true;
+
+  if (!isObjCDynamicInGenericClass())
+    return false;
+
+  auto *replacedDecl = getDynamicallyReplacedDecl();
+  if (replacedDecl)
+    return false;
+
+  return getModuleContext()->isImplicitDynamicEnabled();
+}
+
+bool ValueDecl::isNativeMethodReplacement() const {
+  // Is this a @_dynamicReplacement(for:) that use the native dynamic function
+  // replacement mechanism.
+  auto *replacedDecl = getDynamicallyReplacedDecl();
+  if (!replacedDecl)
+    return false;
+
+  if (isNativeDynamic())
+    return true;
+
+  if (isObjCDynamicInGenericClass())
+    return replacedDecl->getModuleContext()->isImplicitDynamicEnabled();
+
+  return false;
 }
 
 void ValueDecl::setIsDynamic(bool value) {
@@ -3478,16 +3554,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open: {
-    if (useDC && VD->isSPI()) {
-      auto useModuleScopeContext = useDC->getModuleScopeContext();
-      if (useModuleScopeContext == sourceDC->getModuleScopeContext()) return true;
-
-      auto *useSF = dyn_cast<SourceFile>(useModuleScopeContext);
-      return !useSF || useSF->isImportedAsSPI(VD);
-    }
+  case AccessLevel::Open:
     return true;
-  }
   }
   llvm_unreachable("bad access level");
 }
@@ -4213,11 +4281,11 @@ DestructorDecl *ClassDecl::getDestructor() const {
                            nullptr);
 }
 
-DeclRange ClassDecl::getEmittedMembers() const {
+ArrayRef<Decl *> ClassDecl::getEmittedMembers() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
                            EmittedMembersRequest{const_cast<ClassDecl *>(this)},
-                           getMembers());
+                           ArrayRef<Decl *>());
 }
 
 /// Synthesizer callback for an empty implicit function body.
@@ -4245,6 +4313,10 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
   if (ctx.LangOpts.EnableObjCInterop)
     CD->recordObjCMethod(DD, DD->getObjCSelector());
+
+  // Mark it as synthesized to make its location in getEmittedMembers()
+  // deterministic.
+  DD->setSynthesized(true);
 
   return DD;
 }
@@ -5132,7 +5204,7 @@ bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
 
 bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
   for (auto accessor : getAllAccessors()) {
-    if (accessor->isNativeDynamic())
+    if (accessor->shouldUseNativeDynamicDispatch())
       return true;
   }
   return false;
@@ -5532,7 +5604,7 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (auto *VP = dyn_cast<VarPattern>(Pat))
     Pat = VP->getSubPattern();
   if (auto *TP = dyn_cast<TypedPattern>(Pat))
-    if (auto typeRepr = TP->getTypeLoc().getTypeRepr())
+    if (auto typeRepr = TP->getTypeRepr())
       return typeRepr->getSourceRange();
 
   return SourceRange();
@@ -6194,6 +6266,36 @@ SourceRange ParamDecl::getSourceRange() const {
   return startLoc;
 }
 
+bool ParamDecl::isNonEphemeral() const {
+  if (getAttrs().hasAttribute<NonEphemeralAttr>())
+    return true;
+
+  // Only enum element parameters are non-ephemeral without '@_nonEphemeral'.
+  auto *parentDecl = getDeclContext()->getAsDecl();
+  if (!parentDecl || !isa<EnumElementDecl>(parentDecl))
+    return false;
+
+  // Only pointer parameters can be non-ephemeral.
+  auto ty = getInterfaceType();
+  if (!ty->lookThroughSingleOptionalType()->getAnyPointerElementType())
+    return false;
+
+  return true;
+}
+
+void ParamDecl::setNonEphemeralIfPossible() {
+  assert(hasInterfaceType() && "Must be pre-typechecked.");
+  // Don't apply the attribute if this isn't a pointer param.
+  auto type = getInterfaceType();
+  if (!type->lookThroughSingleOptionalType()->getAnyPointerElementType())
+    return;
+
+  if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
+    auto &ctx = getASTContext();
+    getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
+  }
+}
+
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   TypeBase *T = VarArgT.getPointer();
   if (auto *AT = dyn_cast<ArraySliceType>(T))
@@ -6457,7 +6559,7 @@ ParamDecl::getDefaultValueStringRepresentation(
       if (wrapperAttrs.size() > 0) {
         auto attr = wrapperAttrs.front();
         if (auto arg = attr->getArg()) {
-          SourceRange fullRange(attr->getTypeLoc().getSourceRange().Start,
+          SourceRange fullRange(attr->getTypeRepr()->getSourceRange().Start,
                                 arg->getEndLoc());
           auto charRange = Lexer::getCharSourceRangeFromSourceRange(
               getASTContext().SourceMgr, fullRange);

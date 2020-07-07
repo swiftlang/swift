@@ -121,9 +121,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   (void) namelookup::getAllImports(decl);
 
   // Register the module with the ASTContext so it is available for lookups.
-  ModuleDecl *&loaded = SwiftContext.LoadedModules[name];
-  if (!loaded)
-    loaded = decl;
+  if (!SwiftContext.getLoadedModule(name))
+    SwiftContext.addLoadedModule(decl);
 
   return decl;
 }

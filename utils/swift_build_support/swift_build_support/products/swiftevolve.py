@@ -10,7 +10,18 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import cmark
+from . import foundation
+from . import libcxx
+from . import libdispatch
+from . import libicu
+from . import llbuild
+from . import llvm
 from . import skstresstester
+from . import swift
+from . import swiftpm
+from . import swiftsyntax
+from . import xctest
 
 
 class SwiftEvolve(skstresstester.SKStressTester):
@@ -35,3 +46,18 @@ class SwiftEvolve(skstresstester.SKStressTester):
 
     def should_install(self, host_target):
         return self.args.install_swiftevolve
+
+    @classmethod
+    def get_dependencies(cls):
+        return [cmark.CMark,
+                llvm.LLVM,
+                libcxx.LibCXX,
+                libicu.LibICU,
+                swift.Swift,
+                libdispatch.LibDispatch,
+                foundation.Foundation,
+                xctest.XCTest,
+                llbuild.LLBuild,
+                swiftpm.SwiftPM,
+                swiftsyntax.SwiftSyntax,
+                skstresstester.SKStressTester]

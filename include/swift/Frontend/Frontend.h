@@ -441,8 +441,9 @@ class CompilerInstance {
   std::vector<unsigned> InputSourceCodeBufferIDs;
 
   /// Contains \c MemoryBuffers for partial serialized module files and
-  /// corresponding partial serialized module documentation files.
-  std::vector<ModuleBuffers> PartialModules;
+  /// corresponding partial serialized module documentation files. This is
+  /// \c mutable as it is consumed by \c loadPartialModulesAndImplicitImports.
+  mutable std::vector<ModuleBuffers> PartialModules;
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
@@ -460,7 +461,7 @@ class CompilerInstance {
   /// If \p BufID is already in the set, do nothing.
   void recordPrimaryInputBuffer(unsigned BufID);
 
-  bool isWholeModuleCompilation() { return PrimaryBufferIDs.empty(); }
+  bool isWholeModuleCompilation() const { return PrimaryBufferIDs.empty(); }
 
 public:
   // Out of line to avoid having to import SILModule.h.
@@ -497,10 +498,6 @@ public:
     Diagnostics.removeConsumer(*DC);
   }
 
-  void createDependencyTracker(bool TrackSystemDeps) {
-    assert(!Context && "must be called before setup()");
-    DepTracker = std::make_unique<DependencyTracker>(TrackSystemDeps);
-  }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
@@ -581,6 +578,7 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDiagnosticVerifierIfNeeded();
+  void setupDependencyTrackerIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.
@@ -615,10 +613,6 @@ public:
   /// Parses and type-checks all input files.
   void performSema();
 
-  /// Parses the input file but does no type-checking or module imports.
-  void performParseOnly(bool EvaluateConditionals = false,
-                        bool CanDelayBodies = true);
-
   /// Parses and performs import resolution on all input files.
   ///
   /// This is similar to a parse-only invocation, but module imports will also
@@ -631,10 +625,15 @@ public:
   bool performSILProcessing(SILModule *silModule);
 
 private:
-  SourceFile *
-  createSourceFileForMainModule(SourceFileKind FileKind,
-                                Optional<unsigned> BufferID,
-                                SourceFile::ParsingOptions options = {});
+  /// Creates a new source file for the main module.
+  SourceFile *createSourceFileForMainModule(ModuleDecl *mod,
+                                            SourceFileKind FileKind,
+                                            Optional<unsigned> BufferID) const;
+
+  /// Creates all the files to be added to the main module, appending them to
+  /// \p files. If a loading error occurs, returns \c true.
+  bool createFilesForMainModule(ModuleDecl *mod,
+                                SmallVectorImpl<FileUnit *> &files) const;
 
 public:
   void freeASTContext();
@@ -644,14 +643,17 @@ public:
   bool loadStdlibIfNeeded();
 
 private:
+  /// Compute the parsing options for a source file in the main module.
+  SourceFile::ParsingOptions getSourceFileParsingOptions(bool forPrimary) const;
+
   /// Retrieve a description of which modules should be implicitly imported.
   ImplicitImportInfo getImplicitImportInfo() const;
 
-  void performSemaUpTo(SourceFile::ASTStage_t LimitStage,
-                       SourceFile::ParsingOptions POpts = {});
-
-  /// Return true if had load error
-  bool loadPartialModulesAndImplicitImports();
+  /// For any serialized AST inputs, loads them in as partial module files,
+  /// appending them to \p partialModules. If a loading error occurs, returns
+  /// \c true.
+  bool loadPartialModulesAndImplicitImports(
+      ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const;
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 

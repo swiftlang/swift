@@ -208,11 +208,6 @@ protected:
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
 
-  bool isCollectionType(Type type) const {
-    auto &cs = getConstraintSystem();
-    return cs.isCollectionType(type);
-  }
-
   bool isArrayType(Type type) const {
     auto &cs = getConstraintSystem();
     return bool(cs.isArrayType(type));
@@ -479,16 +474,32 @@ public:
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
   DeclNameRef Member;
+  Type MemberBaseType;
   bool ResultTypeIsOptional;
 
 public:
   MemberAccessOnOptionalBaseFailure(const Solution &solution,
                                     ConstraintLocator *locator,
-                                    DeclNameRef memberName, bool resultOptional)
+                                    DeclNameRef memberName,
+                                    Type memberBaseType,
+                                    bool resultOptional)
       : FailureDiagnostic(solution, locator), Member(memberName),
+        MemberBaseType(resolveType(memberBaseType)),
         ResultTypeIsOptional(resultOptional) {}
 
   bool diagnoseAsError() override;
+  
+  Type getMemberBaseType() const {
+    return MemberBaseType;
+  }
+  
+  SourceLoc getLoc() const override {
+    // The end location points to the dot in the member access.
+    return getSourceRange().End;
+  }
+  
+  SourceRange getSourceRange() const override;
+
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -1039,7 +1050,7 @@ protected:
 ///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
 /// }
 /// ```
-class MissingMemberFailure final : public InvalidMemberRefFailure {
+class MissingMemberFailure : public InvalidMemberRefFailure {
 public:
   MissingMemberFailure(const Solution &solution, Type baseType,
                        DeclNameRef memberName, ConstraintLocator *locator)
@@ -1066,6 +1077,22 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
+};
+
+class UnintendedExtraGenericParamMemberFailure final
+    : public MissingMemberFailure {
+  Identifier ParamName;
+
+public:
+  UnintendedExtraGenericParamMemberFailure(const Solution &solution,
+                                           Type baseType,
+                                           DeclNameRef memberName,
+                                           Identifier paramName,
+                                           ConstraintLocator *locator)
+      : MissingMemberFailure(solution, baseType, memberName, locator),
+        ParamName(paramName) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose cases where a member only accessible on generic constraints

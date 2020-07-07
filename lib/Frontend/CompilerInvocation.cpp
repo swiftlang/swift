@@ -34,6 +34,11 @@ using namespace llvm::opt;
 /// The path for Swift libraries in the OS on Darwin.
 #define DARWIN_OS_LIBRARY_PATH "/usr/lib/swift"
 
+static constexpr const char *const localeCodes[] = {
+#define SUPPORTED_LOCALE(Code, Language) #Code,
+#include "swift/AST/LocalizationLanguages.def"
+};
+
 swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
@@ -57,6 +62,14 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::append(DiagnosticDocsPath, "share", "doc", "swift",
                           "diagnostics");
   DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath.str());
+
+  // Compute the path of the YAML diagnostic messages directory files
+  // in the toolchain.
+  llvm::SmallString<128> DiagnosticMessagesDir(Path);
+  llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /swift
+  llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift");
+  DiagnosticOpts.LocalizationPath = std::string(DiagnosticMessagesDir.str());
 }
 
 void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
@@ -435,8 +448,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
-  if (Args.hasArg(OPT_experimental_private_intransitive_dependencies))
-    Opts.EnableExperientalPrivateIntransitiveDependencies = true;
+  Opts.DirectIntramoduleDependencies =
+      Args.hasFlag(OPT_enable_direct_intramodule_dependencies,
+                   OPT_disable_direct_intramodule_dependencies,
+                   Opts.DirectIntramoduleDependencies);
 
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
@@ -724,6 +739,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   Opts.SolverEnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_solver_enable_operator_designated_types);
+  Opts.EnableOneWayClosureParameters |=
+      Args.hasArg(OPT_experimental_one_way_closure_params);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
@@ -868,6 +885,8 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   for (auto A: Args.filtered(OPT_swift_module_file)) {
     Opts.ExplicitSwiftModules.push_back(resolveSearchPath(A->getValue()));
   }
+  if (const Arg *A = Args.getLastArg(OPT_explict_swift_module_map))
+    Opts.ExplicitSwiftModuleMap = A->getValue();
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
@@ -921,6 +940,43 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
+  }
+  if (Arg *A = Args.getLastArg(OPT_locale)) {
+    std::string localeCode = A->getValue();
+
+    // Check if the locale code is available.
+    if (llvm::none_of(localeCodes, [&](const char *locale) {
+          return localeCode == locale;
+        })) {
+      std::string availableLocaleCodes = "";
+      llvm::interleave(
+          std::begin(localeCodes), std::end(localeCodes),
+          [&](std::string locale) { availableLocaleCodes += locale; },
+          [&] { availableLocaleCodes += ", "; });
+
+      Diags.diagnose(SourceLoc(), diag::warning_invalid_locale_code,
+                     availableLocaleCodes);
+    } else {
+      Opts.LocalizationCode = localeCode;
+    }
+  }
+  if (Arg *A = Args.getLastArg(OPT_localization_path)) {
+    if (!llvm::sys::fs::exists(A->getValue())) {
+      Diags.diagnose(SourceLoc(), diag::warning_locale_path_not_found,
+                     A->getValue());
+    } else if (!Opts.LocalizationCode.empty()) {
+      // Check if the localization path exists but it doesn't have a file
+      // for the specified locale code.
+      llvm::SmallString<128> localizationPath(A->getValue());
+      llvm::sys::path::append(localizationPath, Opts.LocalizationCode);
+      llvm::sys::path::replace_extension(localizationPath, ".yaml");
+      if (!llvm::sys::fs::exists(localizationPath)) {
+        Diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
+                       Opts.LocalizationCode, localizationPath);
+      }
+
+      Opts.LocalizationPath = A->getValue();
+    }
   }
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");
@@ -985,18 +1041,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
       return true;
-    }
-  }
-  if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
-    if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      return true;
-    }
-    if (environmentVariableRequestedMaximumDeterminism()) {
-      Opts.NumThreads = 1;
-      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
-                     "-num-threads");
     }
   }
 
@@ -1097,7 +1141,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.StripOwnershipAfterSerialization |= Args.hasArg(OPT_enable_ownership_stripping_after_serialization);
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
 
@@ -1204,7 +1247,7 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
                             CompilerInvocation &Invocation) {
   using namespace options;
 
-  Opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  Opts.HasMultipleIGMs = Invocation.getIRGenOptions().hasMultipleIGMs();
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
     Opts.ModuleLinkName = A->getValue();
@@ -1301,6 +1344,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.DebugPrefixMap.addMapping(SplitMap.first, SplitMap.second);
+  }
+
+  for (auto A : Args.getAllArgValues(options::OPT_coverage_prefix_map)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.CoveragePrefixMap.addMapping(SplitMap.first, SplitMap.second);
   }
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
@@ -1531,6 +1579,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
         getRuntimeCompatVersion();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
+    if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+    if (environmentVariableRequestedMaximumDeterminism()) {
+      Opts.NumThreads = 1;
+      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
+                     "-num-threads");
+    }
   }
 
   return false;

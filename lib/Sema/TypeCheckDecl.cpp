@@ -25,6 +25,7 @@
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -838,7 +839,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
+  if (decl->isFinal() || decl->shouldUseObjCDispatch() || decl->hasClangNode())
     return false;
 
   auto &ctx = dc->getASTContext();
@@ -868,7 +869,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 
   auto base = decl->getOverriddenDecl();
 
-  if (!base || base->hasClangNode() || base->isObjCDynamic())
+  if (!base || base->hasClangNode() || base->shouldUseObjCDispatch())
     return true;
 
   // As above, convenience initializers are not formally overridable in Swift
@@ -1082,6 +1083,21 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     if (ED->LazySemanticInfo.hasFixedRawValues())
       continue;
 
+    // Using magic literals like #file as raw value is not supported right now.
+    // TODO: We could potentially support #file, #function, #line and #column.
+    auto &Diags = ED->getASTContext().Diags;
+    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
+                            ? elt->getLoc()
+                            : uncheckedRawValueOf(elt)->getLoc();
+    if (auto magicLiteralExpr =
+            dyn_cast<MagicIdentifierLiteralExpr>(prevValue)) {
+      auto kindString =
+          magicLiteralExpr->getKindString(magicLiteralExpr->getKind());
+      Diags.diagnose(diagLoc, diag::enum_raw_value_magic_literal, kindString);
+      elt->setInvalid();
+      continue;
+    }
+
     // Check that the raw value is unique.
     RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};
@@ -1091,9 +1107,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       continue;
 
     // Diagnose the duplicate value.
-    auto &Diags = ED->getASTContext().Diags;
-    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
-        ? elt->getLoc() : uncheckedRawValueOf(elt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
     assert(lastExplicitValueElt &&
            "should not be able to have non-unique raw values when "
@@ -1155,6 +1168,10 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   if (decl->getAccessorKind() != AccessorKind::DidSet) {
     return false;
   }
+
+  // Always assume non-simple 'didSet' in code completion mode.
+  if (decl->getASTContext().SourceMgr.hasCodeCompletionBuffer())
+    return false;
 
   // didSet must have a single parameter.
   if (decl->getParameters()->size() != 1) {
@@ -2101,7 +2118,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   if (decl->isVariadic()) {
     Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
-    if (Ty.isNull()) {
+    if (Ty->hasError()) {
       decl->setInvalid();
       return ErrorType::get(ctx);
     }
@@ -2401,13 +2418,64 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   return namingPattern;
 }
 
-DeclRange
+namespace {
+
+// Utility class for deterministically ordering vtable entries for
+// synthesized methods.
+struct SortedFuncList {
+  using Entry = std::pair<std::string, AbstractFunctionDecl *>;
+  SmallVector<Entry, 2> elts;
+  bool sorted = false;
+
+  void add(AbstractFunctionDecl *afd) {
+    Mangle::ASTMangler mangler;
+    std::string mangledName;
+    if (auto *cd = dyn_cast<ConstructorDecl>(afd))
+      mangledName = mangler.mangleConstructorEntity(cd, /*allocator=*/false);
+    else if (auto *dd = dyn_cast<DestructorDecl>(afd))
+      mangledName = mangler.mangleDestructorEntity(dd, /*deallocating=*/false);
+    else
+      mangledName = mangler.mangleEntity(afd);
+
+    elts.push_back(std::make_pair(mangledName, afd));
+  }
+
+  bool empty() { return elts.empty(); }
+
+  void sort() {
+    assert(!sorted);
+    sorted = true;
+    std::sort(elts.begin(),
+              elts.end(),
+              [](const Entry &lhs, const Entry &rhs) -> bool {
+                return lhs.first < rhs.first;
+              });
+  }
+
+  decltype(elts)::const_iterator begin() const {
+    assert(sorted);
+    return elts.begin();
+  }
+
+  decltype(elts)::const_iterator end() const {
+    assert(sorted);
+    return elts.end();
+  }
+};
+
+} // end namespace
+
+ArrayRef<Decl *>
 EmittedMembersRequest::evaluate(Evaluator &evaluator,
                                 ClassDecl *CD) const {
-  if (!CD->getParentSourceFile())
-    return CD->getMembers();
-
   auto &Context = CD->getASTContext();
+  SmallVector<Decl *, 8> result;
+
+  if (!CD->getParentSourceFile()) {
+    auto members = CD->getMembers();
+    result.append(members.begin(), members.end());
+    return Context.AllocateCopy(result);
+  }
 
   // We need to add implicit initializers because they
   // affect vtable layout.
@@ -2435,16 +2503,40 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
+  forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
 
-  // The projected storage wrapper ($foo) might have dynamically-dispatched
-  // accessors, so force them to be synthesized.
   for (auto *member : CD->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      // The projected storage wrapper ($foo) might have dynamically-dispatched
+      // accessors, so force them to be synthesized.
       if (var->hasAttachedPropertyWrapper())
         (void) var->getPropertyWrapperBackingProperty();
+    }
   }
 
-  return CD->getMembers();
+  SortedFuncList synthesizedMembers;
+
+  for (auto *member : CD->getMembers()) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+      // Add synthesized members to a side table and sort them by their mangled
+      // name, since they could have been added to the class in any order.
+      if (afd->isSynthesized()) {
+        synthesizedMembers.add(afd);
+        continue;
+      }
+    }
+
+    result.push_back(member);
+  }
+
+  if (!synthesizedMembers.empty()) {
+    synthesizedMembers.sort();
+
+    for (const auto &pair : synthesizedMembers)
+      result.push_back(pair.second);
+  }
+
+  return Context.AllocateCopy(result);
 }
 
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,

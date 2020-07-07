@@ -236,9 +236,8 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
     decls.push_back(decl);
   }
 
-  // Finalize the token receiver.
+  // Finalize the syntax context.
   SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
-  TokReceiver->finalize();
 }
 
 bool Parser::parseTopLevelSIL() {
@@ -579,6 +578,20 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     return nullptr;
   }
 
+  if (PlatformKind) {
+      if (!Introduced.empty())
+        Introduced.Version =
+            canonicalizePlatformVersion(*PlatformKind, Introduced.Version);
+
+      if (!Deprecated.empty())
+        Deprecated.Version =
+            canonicalizePlatformVersion(*PlatformKind, Deprecated.Version);
+
+      if (!Obsoleted.empty())
+        Obsoleted.Version =
+            canonicalizePlatformVersion(*PlatformKind, Obsoleted.Version);
+  }
+
   auto Attr = new (Context)
   AvailableAttr(AtLoc, SourceRange(AttrLoc, Tok.getLoc()),
                 PlatformKind.getValue(),
@@ -812,10 +825,10 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   }
 
   // FIXME(ModQual): Reject module qualification on MemberName.
-
+  auto *TE = new (Context) TypeExpr(ProtocolType.get());
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
-                           ProtocolType.get(), MemberName.getFullName(),
+                           TE, MemberName.getFullName(),
                            MemberNameLoc));
 }
 
@@ -1038,11 +1051,24 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
+// Helper function that returns the accessor kind if a token is an accessor
+// label.
+static Optional<AccessorKind> isAccessorLabel(const Token &token) {
+  if (token.is(tok::identifier)) {
+    StringRef tokText = token.getText();
+    for (auto accessor : allAccessorKinds())
+      if (tokText == getAccessorLabel(accessor))
+        return accessor;
+  }
+  return None;
+}
+
 /// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
 /// Returns true on error. Sets `baseType` to the parsed base type if present,
 /// or to `nullptr` if not. A missing base type is not considered an error.
 static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   baseType = nullptr;
+  Parser::BacktrackingScope backtrack(P);
 
   // If base type cannot be parsed, return false (no error).
   if (!P.canParseBaseTypeForQualifiedDeclName())
@@ -1058,6 +1084,28 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   // `parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)` leaves the
   // leading period unparsed to avoid syntax verification errors.
   assert(P.startsWithSymbol(P.Tok, '.') && "false");
+
+  // Check if this is a reference to a property or subscript accessor.
+  //
+  // Note: There is an parsing ambiguity here. An accessor label identifier
+  // (e.g. "set") may refer to the final declaration name component instead of
+  // an accessor kind.
+  //
+  // FIXME: It is wrong to backtrack parsing the entire base type if an accessor
+  // label is found. Instead, only the final component of the base type should
+  // be backtracked. It may be best to implement this in
+  // `Parser::parseTypeIdentifier`.
+  //
+  // Example: consider parsing `A.B.property.set`.
+  // Current behavior: base type is entirely backtracked.
+  // Ideal behavior: base type is parsed as `A.B`.
+  if (P.Tok.is(tok::period)) {
+    const Token &nextToken = P.peekToken();
+    if (isAccessorLabel(nextToken).hasValue())
+      return false;
+  }
+
+  backtrack.cancelBacktrack();
   P.consumeStartingCharacterOfCurrentToken(tok::period);
 
   // Set base type and return false (no error).
@@ -1080,20 +1128,52 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
 static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
                                    TypeRepr *&baseType,
                                    DeclNameRefWithLoc &original) {
-  SyntaxParsingContext DeclNameContext(P.SyntaxContext,
-                                       SyntaxKind::QualifiedDeclName);
-  // Parse base type.
-  if (parseBaseTypeForQualifiedDeclName(P, baseType))
-    return true;
-  // Parse final declaration name.
-  original.Name = P.parseDeclNameRef(
-      original.Loc, nameParseError,
-      Parser::DeclNameFlag::AllowZeroArgCompoundNames |
-      Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
-      Parser::DeclNameFlag::AllowOperators);
-  // The base type is optional, but the final unqualified declaration name is
-  // not. If name could not be parsed, return true for error.
-  return !original.Name;
+  {
+    SyntaxParsingContext DeclNameContext(P.SyntaxContext,
+                                         SyntaxKind::QualifiedDeclName);
+    // Parse base type.
+    if (parseBaseTypeForQualifiedDeclName(P, baseType))
+      return true;
+    // Parse final declaration name.
+    original.Name = P.parseDeclNameRef(
+        original.Loc, nameParseError,
+        Parser::DeclNameFlag::AllowZeroArgCompoundNames |
+            Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
+            Parser::DeclNameFlag::AllowOperators);
+    // The base type is optional, but the final unqualified declaration name is
+    // not. If name could not be parsed, return true for error.
+    if (!original.Name)
+      return true;
+  }
+
+  // Parse an optional accessor kind.
+  //
+  // Note: there is an parsing ambiguity here.
+  //
+  // Example: `A.B.property.set` may be parsed as one of the following:
+  //
+  // 1. No accessor kind.
+  // - Base type: `A.B.property`
+  // - Declaration name: `set`
+  // - Accessor kind: <none>
+  //
+  // 2. Accessor kind exists.
+  // - Base type: `A.B`
+  // - Declaration name: `property`
+  // - Accessor kind: `set`
+  //
+  // Currently, we follow (2) because it's more useful in practice.
+  if (P.Tok.is(tok::period)) {
+    const Token &nextToken = P.peekToken();
+    Optional<AccessorKind> kind = isAccessorLabel(nextToken);
+    if (kind.hasValue()) {
+      original.AccessorKind = kind;
+      P.consumeIf(tok::period);
+      P.consumeIf(tok::identifier);
+    }
+  }
+
+  return false;
 }
 
 /// Parse a `@derivative(of:)` attribute, returning true on error.
@@ -1968,6 +2048,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           continue;
         }
 
+        Version = canonicalizePlatformVersion(Platform, Version);
+
         Attributes.add(new (Context)
                        AvailableAttr(AtLoc, AttrRange,
                                      Platform,
@@ -2219,7 +2301,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (invalid)
       return false;
 
-    Attributes.add(TypeEraserAttr::create(Context, AtLoc, {Loc, RParenLoc}, ErasedType.get()));
+    auto *TE = new (Context) TypeExpr(ErasedType.get());
+    Attributes.add(TypeEraserAttr::create(Context, AtLoc, {Loc, RParenLoc}, TE));
     break;
   }
 
@@ -2592,7 +2675,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
     }
 
     // Form the attribute.
-    auto attr = CustomAttr::create(Context, AtLoc, type.get(), hasInitializer,
+    auto *TE = new (Context) TypeExpr(type.get());
+    auto attr = CustomAttr::create(Context, AtLoc, TE, hasInitializer,
                                    initContext, lParenLoc, args, argLabels,
                                    argLabelLocs, rParenLoc);
     Attributes.add(attr);
@@ -4422,10 +4506,18 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   return Result;
 }
 
-bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                                 SourceLoc PosBeforeLB,
-                                 Diag<> ErrorDiag,
+bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
+                                 Diag<> LBraceDiag, Diag<> RBraceDiag,
                                  IterableDeclContext *IDC) {
+  if (parseToken(tok::l_brace, LBLoc, LBraceDiag)) {
+    LBLoc = RBLoc = PreviousLoc;
+
+    // Cache the empty result to prevent delayed parsing.
+    Context.evaluator.cacheOutput(
+        ParseMembersRequest{IDC}, FingerprintAndMembers{None, {}});
+    return true;
+  }
+
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
 
@@ -4444,7 +4536,7 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     bool hadError = false;
     ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
     auto membersAndHash =
-        parseDeclList(LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
+        parseDeclList(LBLoc, RBLoc, RBraceDiag, Options, IDC, hadError);
     IDC->setMaybeHasOperatorDeclarations();
     IDC->setMaybeHasNestedClassDeclarations();
     Context.evaluator.cacheOutput(
@@ -4470,16 +4562,14 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                       ParseDeclOptions Options, IterableDeclContext *IDC,
                       bool &hadError) {
 
-  // Record the curly braces but nothing inside.
+  // If we're hashing the type body separately, record the curly braces but
+  // nothing inside for the interface hash.
+  Optional<llvm::SaveAndRestore<Optional<llvm::MD5>>> MemberHashingScope;
   if (IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()) {
     recordTokenHash("{");
     recordTokenHash("}");
+    MemberHashingScope.emplace(CurrentTokenHash, llvm::MD5());
   }
-  llvm::MD5 tokenHashForThisDeclList;
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(
-      CurrentTokenHash, IDC->areTokensHashedForThisBodyInsteadOfInterfaceHash()
-                            ? &tokenHashForThisDeclList
-                            : CurrentTokenHash);
 
   std::vector<Decl *> decls;
   ParserStatus Status;
@@ -4514,7 +4604,8 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
     return std::make_pair(decls, None);
 
   llvm::MD5::MD5Result result;
-  tokenHashForThisDeclList.final(result);
+  auto declListHash = MemberHashingScope ? *CurrentTokenHash : llvm::MD5();
+  declListHash.final(result);
   llvm::SmallString<32> tokenHashString;
   llvm::MD5::stringifyResult(result, tokenHashString);
   return std::make_pair(decls, tokenHashString.str().str());
@@ -4614,16 +4705,12 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
 
-  auto PosBeforeLB = Tok.getLoc();
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
-    LBLoc = PreviousLoc;
-    RBLoc = LBLoc;
-    status.setIsParseError();
-  } else {
+  {
     ContextChange CC(*this, ext);
     Scope S(this, ScopeKind::Extension);
 
-    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+    if (parseMemberDeclList(LBLoc, RBLoc,
+                            diag::expected_lbrace_extension,
                             diag::expected_rbrace_extension,
                             ext))
       status.setIsParseError();
@@ -5692,12 +5779,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   if (!PrimaryVar)
     return nullptr;
 
-  TypeLoc TyLoc;
-  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
-    TyLoc = TP->getTypeLoc();
-  }
-
-  if (!TyLoc.hasLocation()) {
+  if (!isa<TypedPattern>(pattern)) {
     if (accessors.Get || accessors.Set || accessors.Address ||
         accessors.MutableAddress) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
@@ -6409,7 +6491,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   recordTokenHash("{");
   recordTokenHash("}");
 
-  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> T(CurrentTokenHash, nullptr);
+  llvm::SaveAndRestore<Optional<llvm::MD5>> T(CurrentTokenHash, None);
 
   // If we can delay parsing this body, or this is the first pass of code
   // completion, skip until the end. If we encounter a code completion token
@@ -6576,15 +6658,11 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
-  SourceLoc PosBeforeLB = Tok.getLoc();
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
-    LBLoc = PreviousLoc;
-    RBLoc = LBLoc;
-    Status.setIsParseError();
-  } else {
+  {
     Scope S(this, ScopeKind::EnumBody);
 
-    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+    if (parseMemberDeclList(LBLoc, RBLoc,
+                            diag::expected_lbrace_enum,
                             diag::expected_rbrace_enum,
                             ED))
       Status.setIsParseError();
@@ -6862,16 +6940,12 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Make the entities of the struct as a code block.
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
-  SourceLoc PosBeforeLB = Tok.getLoc();
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
-    LBLoc = PreviousLoc;
-    RBLoc = LBLoc;
-    Status.setIsParseError();
-  } else {
+  {
     // Parse the body.
     Scope S(this, ScopeKind::StructBody);
 
-    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+    if (parseMemberDeclList(LBLoc, RBLoc,
+                            diag::expected_lbrace_struct,
                             diag::expected_rbrace_struct,
                             SD))
       Status.setIsParseError();
@@ -6978,16 +7052,12 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
-  auto PosBeforeLB = Tok.getLoc();
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
-    LBLoc = PreviousLoc;
-    RBLoc = LBLoc;
-    Status.setIsParseError();
-  } else {
+  {
     // Parse the body.
     Scope S(this, ScopeKind::ClassBody);
 
-    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+    if (parseMemberDeclList(LBLoc, RBLoc,
+                            diag::expected_lbrace_class,
                             diag::expected_rbrace_class,
                             CD))
       Status.setIsParseError();
@@ -7079,14 +7149,10 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;
-    SourceLoc PosBeforeLB = Tok.getLoc();
-    if (parseToken(tok::l_brace, LBraceLoc, diag::expected_lbrace_protocol)) {
-      LBraceLoc = PreviousLoc;
-      RBraceLoc = LBraceLoc;
-      Status.setIsParseError();
-    } else {
+    {
       // Parse the members.
-      if (parseMemberDeclList(LBraceLoc, RBraceLoc, PosBeforeLB,
+      if (parseMemberDeclList(LBraceLoc, RBraceLoc,
+                              diag::expected_lbrace_protocol,
                               diag::expected_rbrace_protocol,
                               Proto))
         Status.setIsParseError();

@@ -66,18 +66,20 @@ bool isOwnedForwardingInstruction(SILInstruction *inst);
 /// previous terminator.
 bool isOwnedForwardingValue(SILValue value);
 
-struct BorrowingOperandKind {
-  enum Kind {
+class BorrowingOperandKind {
+public:
+  enum Kind : uint8_t {
     BeginBorrow,
     BeginApply,
     Branch,
   };
 
+private:
   Kind value;
 
+public:
   BorrowingOperandKind(Kind newValue) : value(newValue) {}
-  BorrowingOperandKind(const BorrowingOperandKind &other)
-      : value(other.value) {}
+
   operator Kind() const { return value; }
 
   static Optional<BorrowingOperandKind> get(SILInstructionKind kind) {
@@ -207,15 +209,20 @@ private:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const BorrowingOperand &operand);
 
-struct BorrowedValueKind {
+class BorrowedValueKind {
+public:
   /// Enum we use for exhaustive pattern matching over borrow scope introducers.
-  enum Kind {
+  enum Kind : uint8_t {
     LoadBorrow,
     BeginBorrow,
     SILFunctionArgument,
     Phi,
   };
 
+private:
+  Kind value;
+
+public:
   static Optional<BorrowedValueKind> get(SILValue value) {
     if (value.getOwnershipKind() != ValueOwnershipKind::Guaranteed)
       return None;
@@ -240,10 +247,8 @@ struct BorrowedValueKind {
     }
   }
 
-  Kind value;
-
   BorrowedValueKind(Kind newValue) : value(newValue) {}
-  BorrowedValueKind(const BorrowedValueKind &other) : value(other.value) {}
+
   operator Kind() const { return value; }
 
   /// Is this a borrow scope that begins and ends within the same function and
@@ -383,18 +388,20 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 Optional<BorrowedValue> getSingleBorrowIntroducingValue(SILValue inputValue);
 
-struct InteriorPointerOperandKind {
+class InteriorPointerOperandKind {
+public:
   enum Kind : uint8_t {
     RefElementAddr,
     RefTailAddr,
     OpenExistentialBox,
   };
 
+private:
   Kind value;
 
+public:
   InteriorPointerOperandKind(Kind newValue) : value(newValue) {}
-  InteriorPointerOperandKind(const InteriorPointerOperandKind &other)
-      : value(other.value) {}
+
   operator Kind() const { return value; }
 
   static Optional<InteriorPointerOperandKind> get(Operand *use) {
@@ -467,8 +474,9 @@ private:
       : operand(op), kind(kind) {}
 };
 
-struct OwnedValueIntroducerKind {
-  enum Kind {
+class OwnedValueIntroducerKind {
+public:
+  enum Kind : uint8_t {
     /// An owned value that is a result of an Apply.
     Apply,
 
@@ -502,6 +510,10 @@ struct OwnedValueIntroducerKind {
     /// owned.
     Struct,
 
+    /// An owned value that is from a tuple that has multiple operands that are
+    /// owned.
+    Tuple,
+
     /// An owned value that is a function argument.
     FunctionArgument,
 
@@ -515,6 +527,10 @@ struct OwnedValueIntroducerKind {
     AllocRefInit,
   };
 
+private:
+  Kind value;
+
+public:
   static Optional<OwnedValueIntroducerKind> get(SILValue value) {
     if (value.getOwnershipKind() != ValueOwnershipKind::Owned)
       return None;
@@ -528,6 +544,8 @@ struct OwnedValueIntroducerKind {
       return OwnedValueIntroducerKind(BeginApply);
     case ValueKind::StructInst:
       return OwnedValueIntroducerKind(Struct);
+    case ValueKind::TupleInst:
+      return OwnedValueIntroducerKind(Tuple);
     case ValueKind::SILPhiArgument: {
       auto *phiArg = cast<SILPhiArgument>(value);
       if (dyn_cast_or_null<TryApplyInst>(phiArg->getSingleTerminator())) {
@@ -563,11 +581,8 @@ struct OwnedValueIntroducerKind {
     llvm_unreachable("Default should have caught this");
   }
 
-  Kind value;
-
   OwnedValueIntroducerKind(Kind newValue) : value(newValue) {}
-  OwnedValueIntroducerKind(const OwnedValueIntroducerKind &other)
-      : value(other.value) {}
+
   operator Kind() const { return value; }
 
   void print(llvm::raw_ostream &os) const;
@@ -621,6 +636,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::LoadTake:
     case OwnedValueIntroducerKind::Phi:
     case OwnedValueIntroducerKind::Struct:
+    case OwnedValueIntroducerKind::Tuple:
     case OwnedValueIntroducerKind::FunctionArgument:
     case OwnedValueIntroducerKind::PartialApplyInit:
     case OwnedValueIntroducerKind::AllocBoxInit:
@@ -639,6 +655,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::Phi:
       return true;
     case OwnedValueIntroducerKind::Struct:
+    case OwnedValueIntroducerKind::Tuple:
     case OwnedValueIntroducerKind::Copy:
     case OwnedValueIntroducerKind::LoadCopy:
     case OwnedValueIntroducerKind::Apply:

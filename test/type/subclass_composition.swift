@@ -413,7 +413,7 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   // expected-error@-1 {{global function 'conformsToAnyObject' requires that 'P1' be a class type}}
 
   conformsToP1(p1)
-  // expected-error@-1 {{value of protocol type 'P1' cannot conform to 'P1'; only struct/enum/class types can conform to protocols}}
+  // expected-error@-1 {{protocol 'P1' as a type cannot conform to the protocol itself; only concrete types such as structs, enums and classes can conform to protocols}}
 
   // FIXME: Following diagnostics are not great because when
   // `conformsTo*` methods are re-typechecked, they loose information

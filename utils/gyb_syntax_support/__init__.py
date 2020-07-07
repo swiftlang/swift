@@ -1,3 +1,4 @@
+import hashlib
 import textwrap
 from . import Classification  # noqa: I201
 from . import Token
@@ -143,34 +144,36 @@ def dedented_lines(description):
     return textwrap.dedent(description).split('\n')
 
 
-def hash_syntax_node(node):
-    # Hash into the syntax name and serialization code
-    result = hash((node.name, get_serialization_code(node.syntax_kind)))
-    for child in node.children:
-        # Hash into the expected child syntax
-        result = hash((result, child.syntax_kind))
-        # Hash into the child name
-        result = hash((result, child.name))
-        # Hash into whether the child is optional
-        result = hash((result, child.is_optional))
-    return result
-
-
-def hash_token_syntax(token):
-    # Hash into the token name and serialization code
-    return hash((token.name, token.serialization_code))
-
-
-def hash_trivia(trivia):
-    return hash((trivia.name, trivia.serialization_code, trivia.characters))
-
-
 def calculate_node_hash():
-    result = 0
+    digest = hashlib.sha1()
+
+    def _digest_syntax_node(node):
+        # Hash into the syntax name and serialization code
+        digest.update(node.name.encode("utf-8"))
+        digest.update(str(get_serialization_code(node.syntax_kind)).encode("utf-8"))
+        for child in node.children:
+            # Hash into the expected child syntax
+            digest.update(child.syntax_kind.encode("utf-8"))
+            # Hash into the child name
+            digest.update(child.name.encode("utf-8"))
+            # Hash into whether the child is optional
+            digest.update(str(child.is_optional).encode("utf-8"))
+
+    def _digest_syntax_token(token):
+        # Hash into the token name and serialization code
+        digest.update(token.name.encode("utf-8"))
+        digest.update(str(token.serialization_code).encode("utf-8"))
+
+    def _digest_trivia(trivia):
+        digest.update(trivia.name.encode("utf-8"))
+        digest.update(str(trivia.serialization_code).encode("utf-8"))
+        digest.update(str(trivia.characters).encode("utf-8"))
+
     for node in SYNTAX_NODES:
-        result = hash((result, hash_syntax_node(node)))
+        _digest_syntax_node(node)
     for token in SYNTAX_TOKENS:
-        result = hash((result, hash_token_syntax(token)))
+        _digest_syntax_token(token)
     for trivia in TRIVIAS:
-        result = hash((result, hash_trivia(trivia)))
-    return result
+        _digest_trivia(trivia)
+
+    return digest.hexdigest()

@@ -1077,24 +1077,23 @@ LookupConformanceInModuleRequest::evaluate(
   return ProtocolConformanceRef(conformance);
 }
 
-struct SourceFile::SourceFileSyntaxInfo {
-  const bool Enable;
-  /// The root of the syntax tree representing the source file.
-  Optional<syntax::SourceFileSyntax> SyntaxRoot;
-  SourceFileSyntaxInfo(bool Enable): Enable(Enable) {}
-};
-
-bool SourceFile::hasSyntaxRoot() const {
-  return SyntaxInfo->SyntaxRoot.hasValue();
+void SourceFile::getInterfaceHash(llvm::SmallString<32> &str) const {
+  assert(hasInterfaceHash() && "Interface hash not enabled");
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  auto md5 = *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+                  .InterfaceHash;
+  llvm::MD5::MD5Result result;
+  md5.final(result);
+  llvm::MD5::stringifyResult(result, str);
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
-  assert(hasSyntaxRoot() && "no syntax root is set.");
-  return *SyntaxInfo->SyntaxRoot;
-}
-
-void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
-  SyntaxInfo->SyntaxRoot.emplace(Root);
+  assert(shouldBuildSyntaxTree() && "Syntax tree disabled");
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+              .SyntaxRoot;
 }
 
 void DirectOperatorLookupRequest::writeDependencySink(
@@ -1520,6 +1519,7 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
 namespace swift {
 /// Represents a file containing information about cross-module overlays.
 class OverlayFile {
+  friend class ModuleDecl;
   /// The file that data should be loaded from.
   StringRef filePath;
 
@@ -1536,7 +1536,10 @@ class OverlayFile {
   ///          before returning.
   bool loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
                               Identifier bystandingModule);
-
+  bool loadOverlayModuleNames(ASTContext &ctx,
+                              StringRef module,
+                              StringRef bystandingModule,
+                              SourceLoc diagLoc);
 public:
   // Only allocate in ASTContexts.
   void *operator new(size_t bytes) = delete;
@@ -1575,6 +1578,21 @@ void ModuleDecl::addCrossImportOverlayFile(StringRef file) {
   Identifier secondaryModule = ctx.getIdentifier(llvm::sys::path::stem(file));
   declaredCrossImports[secondaryModule]
       .push_back(new (ctx) OverlayFile(ctx.AllocateCopy(file)));
+}
+
+llvm::SmallSetVector<Identifier, 4>
+ModuleDecl::collectCrossImportOverlay(ASTContext &ctx,
+                                      StringRef file,
+                                      StringRef moduleName,
+                                      StringRef &bystandingModule) {
+  OverlayFile ovFile(file);
+  bystandingModule = llvm::sys::path::stem(file);
+  ovFile.loadOverlayModuleNames(ctx, moduleName, bystandingModule, SourceLoc());
+  llvm::SmallSetVector<Identifier, 4> result;
+  for (auto Id: ovFile.overlayModuleNames) {
+    result.insert(Id);
+  }
+  return result;
 }
 
 bool ModuleDecl::mightDeclareCrossImportOverlays() const {
@@ -1803,15 +1821,15 @@ OverlayFileContents::load(std::unique_ptr<llvm::MemoryBuffer> input,
 }
 
 bool
-OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
-                                    Identifier bystanderName) {
-  auto &ctx = M->getASTContext();
+OverlayFile::loadOverlayModuleNames(ASTContext &ctx, StringRef module,
+                                    StringRef bystanderName,
+                                    SourceLoc diagLoc) {
   llvm::vfs::FileSystem &fs = *ctx.SourceMgr.getFileSystem();
 
   auto bufOrError = fs.getBufferForFile(filePath);
   if (!bufOrError) {
     ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
-                       M->getName(), bystanderName,
+                       module, bystanderName,
                        bufOrError.getError().message(), filePath);
     return false;
   }
@@ -1825,7 +1843,7 @@ OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
 
     for (auto message : errorMessages)
       ctx.Diags.diagnose(diagLoc, diag::cannot_load_swiftoverlay_file,
-                         M->getName(), bystanderName, message, filePath);
+                         module, bystanderName, message, filePath);
     return false;
   }
 
@@ -1837,6 +1855,15 @@ OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
   }
 
   return true;
+}
+
+bool
+OverlayFile::loadOverlayModuleNames(const ModuleDecl *M, SourceLoc diagLoc,
+                                    Identifier bystanderName) {
+  return loadOverlayModuleNames(M->getASTContext(),
+                                M->getName().str(),
+                                bystanderName.str(),
+                                diagLoc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2216,11 +2243,9 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       bool KeepParsedTokens, bool BuildSyntaxTree,
                        ParsingOptions parsingOpts, bool isPrimary)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K),
-      SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
 
   assert(!IsPrimary || M.isMainModule() &&
@@ -2231,47 +2256,36 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
-  if (KeepParsedTokens) {
-    AllCorrectedTokens = std::vector<Token>();
-  }
 }
 
-std::vector<Token> &SourceFile::getTokenVector() {
-  assert(shouldCollectToken() && "Disabled");
-  return *AllCorrectedTokens;
+SourceFile::ParsingOptions
+SourceFile::getDefaultParsingOptions(const LangOptions &langOpts) {
+  ParsingOptions opts;
+  if (langOpts.DisablePoundIfEvaluation)
+    opts |= ParsingFlags::DisablePoundIfEvaluation;
+  if (langOpts.BuildSyntaxTree)
+    opts |= ParsingFlags::BuildSyntaxTree;
+  if (langOpts.CollectParsedToken)
+    opts |= ParsingFlags::CollectParsedTokens;
+  return opts;
 }
 
 ArrayRef<Token> SourceFile::getAllTokens() const {
-  assert(shouldCollectToken() && "Disabled");
-  return *AllCorrectedTokens;
+  assert(shouldCollectTokens() && "Disabled");
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return *evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+              .CollectedTokens;
 }
 
-bool SourceFile::shouldCollectToken() const {
-  switch (Kind) {
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-    return (bool)AllCorrectedTokens;
-  case SourceFileKind::SIL:
-    return false;
-  }
-  llvm_unreachable("unhandled kind");
+bool SourceFile::shouldCollectTokens() const {
+  return Kind != SourceFileKind::SIL &&
+         ParsingOpts.contains(ParsingFlags::CollectParsedTokens);
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
-  return canBeParsedInFull() && SyntaxInfo->Enable;
-}
-
-bool SourceFile::canBeParsedInFull() const {
-  switch (Kind) {
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-    return true;
-  case SourceFileKind::SIL:
-    return false;
-  }
-  llvm_unreachable("unhandled kind");
+  return Kind != SourceFileKind::SIL &&
+         ParsingOpts.contains(ParsingFlags::BuildSyntaxTree);
 }
 
 bool SourceFile::hasDelayedBodyParsing() const {
@@ -2283,7 +2297,7 @@ bool SourceFile::hasDelayedBodyParsing() const {
     return false;
   if (hasInterfaceHash())
     return false;
-  if (shouldCollectToken())
+  if (shouldCollectTokens())
     return false;
   if (shouldBuildSyntaxTree())
     return false;
@@ -2295,7 +2309,7 @@ ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
-                           {});
+                           {}).TopLevelDecls;
 }
 
 bool FileUnit::walk(ASTWalker &walker) {

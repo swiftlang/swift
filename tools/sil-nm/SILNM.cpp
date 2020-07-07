@@ -126,8 +126,8 @@ static void nmModule(SILModule *M) {
   {
     std::vector<StringRef> VTableNames;
     llvm::transform(M->getVTables(), std::back_inserter(VTableNames),
-                    [](const SILVTable &VT) -> StringRef {
-                      return VT.getClass()->getName().str();
+                    [](const SILVTable *VT) -> StringRef {
+                      return VT->getClass()->getName().str();
                     });
     printAndSortNames(VTableNames, 'V');
   }

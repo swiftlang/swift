@@ -212,8 +212,8 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
   } else {
     SmallVector<ASTNode, 4> cases;
     for (auto *elt : elements) {
-      auto *pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                             SourceLoc(), DeclNameLoc(),
+      auto *baseTE = TypeExpr::createImplicit(enumType, C);
+      auto *pat = new (C) EnumElementPattern(baseTE, SourceLoc(), DeclNameLoc(),
                                              DeclNameRef(), elt, nullptr);
       pat->setImplicit();
 
@@ -284,9 +284,9 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
 
     auto labelItem = CaseLabelItem(litPat);
 
-    auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*Implicit=*/true);
     auto *metaTyRef = TypeExpr::createImplicit(enumType, C);
-    auto *valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    auto *valueExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), elt,
+                                            DeclNameLoc(), /*Implicit=*/true);
 
     auto *assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
                                           /*Implicit=*/true);

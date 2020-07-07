@@ -40,8 +40,8 @@ struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;
   std::vector<std::function<void()>> freeFuncs;
   std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
-  std::string lastError;
-  
+  std::string lastString;
+
   SwiftReflectionContext(MemoryReaderImpl impl) {
     auto Reader = std::make_shared<CMemoryReader>(impl);
     nativeContext = new NativeReflectionContext(Reader);
@@ -71,7 +71,7 @@ static int minimalDataLayoutQueryFunction(void *ReaderContext,
 #else
     auto applePlatform = false;
 #endif
-#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || defined(__arm64__))
     auto iosDerivedPlatform = true;
 #else
     auto iosDerivedPlatform = false;
@@ -406,6 +406,9 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
 }
 
 static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
+  if (!TI)
+    return {};
+
   const FieldInfo *FieldInfo;
   if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
     FieldInfo = &(EnumTI->getCases()[Index]);
@@ -423,11 +426,11 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   };
 }
 
-static const char *convertError(SwiftReflectionContextRef ContextRef,
-                                llvm::Optional<std::string> Error) {
-  if (Error) {
-    ContextRef->lastError = *Error;
-    return ContextRef->lastError.c_str();
+static const char *returnableCString(SwiftReflectionContextRef ContextRef,
+                                      llvm::Optional<std::string> String) {
+  if (String) {
+    ContextRef->lastString = *String;
+    return ContextRef->lastString.c_str();
   }
   return nullptr;
 }
@@ -605,7 +608,7 @@ const char *swift_reflection_iterateConformanceCache(
   auto Error = Context->iterateConformances([&](auto Type, auto Proto) {
     Call(Type, Proto, ContextPtr);
   });
-  return convertError(ContextRef, Error);
+  return returnableCString(ContextRef, Error);
 }
 
 const char *swift_reflection_iterateMetadataAllocations(
@@ -621,10 +624,9 @@ const char *swift_reflection_iterateMetadataAllocations(
     CAllocation.Size = Allocation.Size;
     Call(CAllocation, ContextPtr);
   });
-  return convertError(ContextRef, Error);
+  return returnableCString(ContextRef, Error);
 }
 
-SWIFT_REMOTE_MIRROR_LINKAGE
 swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
   SwiftReflectionContextRef ContextRef,
   swift_metadata_allocation_t Allocation) {
@@ -634,4 +636,29 @@ swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
   NativeAllocation.Ptr = Allocation.Ptr;
   NativeAllocation.Size = Allocation.Size;
   return Context->allocationMetadataPointer(NativeAllocation);
+}
+
+const char *swift_reflection_metadataAllocationTagName(
+    SwiftReflectionContextRef ContextRef, swift_metadata_allocation_tag_t Tag) {
+  auto Context = ContextRef->nativeContext;
+  auto Result = Context->metadataAllocationTagName(Tag);
+  return returnableCString(ContextRef, Result);
+}
+
+const char *swift_reflection_iterateMetadataAllocationBacktraces(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadataAllocationBacktraceIterator Call, void *ContextPtr) {
+  auto Context = ContextRef->nativeContext;
+  auto Error = Context->iterateMetadataAllocationBacktraces(
+      [&](auto AllocationPtr, auto Count, auto Ptrs) {
+        // Ptrs is an array of StoredPointer, but the callback expects an array
+        // of swift_reflection_ptr_t. Those may are not always the same type.
+        // (For example, swift_reflection_ptr_t can be 64-bit on 32-bit systems,
+        // while StoredPointer is always the pointer size of the target system.)
+        // Convert the array to an array of swift_reflection_ptr_t.
+        std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
+                                                          &Ptrs[Count]};
+        Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
+      });
+  return returnableCString(ContextRef, Error);
 }

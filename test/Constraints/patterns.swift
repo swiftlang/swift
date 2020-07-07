@@ -274,9 +274,7 @@ struct StaticMembers: Equatable {
   static var optProp: Optional = StaticMembers()
 
   static func method(_: Int) -> StaticMembers { return prop }
-  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func method(withLabel: Int) -> StaticMembers { return prop }
-  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func optMethod(_: Int) -> StaticMembers? { return optProp }
 
   static func ==(x: StaticMembers, y: StaticMembers) -> Bool { return true }
@@ -301,7 +299,7 @@ switch staticMembers {
   // TODO: repeated error message
   case .optProp: break // expected-error* {{not unwrapped}}
 
-  case .method: break // expected-error{{no exact matches in reference to static method 'method'}}
+  case .method: break // expected-error{{member 'method' expects argument of type 'Int'}}
   case .method(0): break
   case .method(_): break // expected-error{{'_' can only appear in a pattern}}
   case .method(let x): break // expected-error{{cannot appear in an expression}}
@@ -486,12 +484,37 @@ func rdar63510989() {
   }
 
   enum E {
-    case foo(P?)
+    case single(P?)
+    case double(P??)
+    case triple(P???)
   }
 
   func test(e: E) {
-    if case .foo(_ as Value) = e {} // Ok
-    if case .foo(let v as Value) = e {} // Ok
+    if case .single(_ as Value) = e {} // Ok
+    if case .single(let v as Value) = e {} // Ok
     // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .double(_ as Value) = e {} // Ok
+    if case .double(let v as Value) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .double(let v as Value?) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .triple(_ as Value) = e {} // Ok
+    if case .triple(let v as Value) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .triple(let v as Value?) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+    if case .triple(let v as Value??) = e {} // Ok
+    // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
+  }
+}
+
+// rdar://problem/64157451 - compiler crash when using undefined type in pattern
+func rdar64157451() {
+  enum E {
+  case foo(Int)
+  }
+
+  func test(e: E) {
+    if case .foo(let v as DoeNotExist) = e {} // expected-error {{cannot find type 'DoeNotExist' in scope}}
   }
 }

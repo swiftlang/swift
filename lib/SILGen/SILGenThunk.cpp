@@ -214,8 +214,9 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
       derivativeId->getParameterIndices(),
       derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
-  auto diffFn =
-      SGF.B.createDifferentiableFunction(loc, loweredParamIndices, originalFn);
+  auto *loweredResultIndices = IndexSubset::get(getASTContext(), 1, {0});
+  auto diffFn = SGF.B.createDifferentiableFunction(
+      loc, loweredParamIndices, loweredResultIndices, originalFn);
   auto derivativeFn = SGF.B.createDifferentiableFunctionExtract(
       loc, NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
       diffFn);

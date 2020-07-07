@@ -78,7 +78,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                               ModuleCachePath,
                                               FEOpts.PrebuiltModuleCachePath,
                                               FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                              FEOpts.TrackSystemDeps);
+                                              FEOpts.shouldTrackSystemDependencies());
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
@@ -138,7 +138,38 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
       }
     }
   }
-
+  // Only resolve cross-import overlays when this is the main module.
+  // For other modules, these overlays are explicitly written.
+  bool isMainModule =
+    instance.getMainModule()->getName().str() == module.first &&
+    module.second == ModuleDependenciesKind::Swift;
+  if (isMainModule) {
+    // Modules explicitly imported. Only these can be secondary module.
+    std::vector<ModuleDependencyID> explicitImports = result;
+    for (unsigned I = 0; I != result.size(); ++I) {
+      auto dep = result[I];
+      auto moduleName = dep.first;
+      auto dependencies = *cache.findDependencies(moduleName, dep.second);
+      // Collect a map from secondary module name to cross-import overlay names.
+      auto overlayMap = dependencies.collectCrossImportOverlayNames(
+        instance.getASTContext(), moduleName);
+      if (overlayMap.empty())
+        continue;
+      std::for_each(explicitImports.begin(), explicitImports.end(),
+                    [&](ModuleDependencyID Id) {
+        // check if any explicitly imported modules can serve as a secondary
+        // module, and add the overlay names to the dependencies list.
+        for (auto overlayName: overlayMap[Id.first]) {
+          if (auto found = ctx.getModuleDependencies(overlayName.str(),
+                                                     /*onlyClangModule=*/false,
+                                                     cache,
+                                                     ASTDelegate)) {
+            result.emplace_back(overlayName.str(), found->getKind());
+          }
+        }
+      });
+    }
+  }
   return result;
 }
 
@@ -307,9 +338,26 @@ static void writeJSON(llvm::raw_ostream &out,
           out << "\n";
         }
         out.indent(5 * 2);
-        out << "]\n";
+        out << "],\n";
+      } else if (!swiftDeps->compiledModulePath.empty()) {
+        writeJSONSingleField(
+            out, "compiledModulePath",
+            swiftDeps->compiledModulePath, 5,
+            /*trailingComma=*/false);
       }
-
+      if (!swiftDeps->extraPCMArgs.empty()) {
+        out.indent(5 * 2);
+        out << "\"extraPcmArgs\": [\n";
+        for (auto &arg :swiftDeps->extraPCMArgs) {
+          out.indent(6 * 2);
+          out << "\"" << arg << "\"";
+          if (&arg != &swiftDeps->extraPCMArgs.back())
+            out << ",";
+          out << "\n";
+        }
+        out.indent(5 * 2);
+        out << (swiftDeps->bridgingHeaderFile.hasValue() ? "],\n" : "]\n");
+      }
       /// Bridging header and its source file dependencies, if any.
       if (swiftDeps->bridgingHeaderFile) {
         out.indent(5 * 2);
@@ -381,9 +429,16 @@ bool swift::scanDependencies(CompilerInstance &instance) {
   llvm::SmallString<32> mainModulePath = mainModule->getName().str();
   llvm::sys::path::replace_extension(mainModulePath, newExt);
 
+  std::string apinotesVer = (llvm::Twine("-fapinotes-swift-version=")
+    + instance.getASTContext().LangOpts.EffectiveLanguageVersion
+      .asAPINotesVersionString()).str();
   // Compute the dependencies of the main module.
   auto mainDependencies =
-      ModuleDependencies::forSwiftModule(mainModulePath.str().str());
+    ModuleDependencies::forMainSwiftModule({
+      // ExtraPCMArgs
+      "-Xcc", "-target", "-Xcc", instance.getASTContext().LangOpts.Target.str(),
+      "-Xcc", apinotesVer
+    });
   {
     llvm::StringSet<> alreadyAddedModules;
     for (auto fileUnit : mainModule->getFiles()) {
@@ -405,12 +460,6 @@ bool swift::scanDependencies(CompilerInstance &instance) {
     case ImplicitStdlibKind::Stdlib:
       mainDependencies.addModuleDependency("Swift", alreadyAddedModules);
       break;
-    }
-
-    // Swift -Onone support library.
-    if (invocation.shouldImportSwiftONoneSupport()) {
-      mainDependencies.addModuleDependency(
-          SWIFT_ONONE_SUPPORT, alreadyAddedModules);
     }
 
     // Add any implicit module names.

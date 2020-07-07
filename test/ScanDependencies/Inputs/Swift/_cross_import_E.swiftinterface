@@ -1,0 +1,6 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name _cross_import_E
+import Swift
+import E
+import SubE
+public func funcCrossImportE() {}

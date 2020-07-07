@@ -453,8 +453,8 @@ private:
         continue;
       }
 
-      AvailabilityContext NewConstraint = contextForSpec(Spec);
-      Query->setAvailableRange(NewConstraint.getOSVersion());
+      AvailabilityContext NewConstraint = contextForSpec(Spec, false);
+      Query->setAvailableRange(contextForSpec(Spec, true).getOSVersion());
 
       // When compiling zippered for macCatalyst, we need to collect both
       // a macOS version (the target version) and an iOS/macCatalyst version
@@ -464,7 +464,8 @@ private:
       if (Context.LangOpts.TargetVariant) {
         AvailabilitySpec *VariantSpec =
             bestActiveSpecForQuery(Query, /*ForTargetVariant*/ true);
-        VersionRange VariantRange = contextForSpec(VariantSpec).getOSVersion();
+        VersionRange VariantRange =
+            contextForSpec(VariantSpec, true).getOSVersion();
         Query->setVariantAvailableRange(VariantRange);
       }
 
@@ -594,13 +595,19 @@ private:
   }
 
   /// Return the availability context for the given spec.
-  AvailabilityContext contextForSpec(AvailabilitySpec *Spec) {
+  AvailabilityContext contextForSpec(AvailabilitySpec *Spec,
+                                    bool GetRuntimeContext) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
       return AvailabilityContext::alwaysAvailable();
     }
 
     auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-    return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
+
+    llvm::VersionTuple Version = (GetRuntimeContext ?
+                                    VersionSpec->getRuntimeVersion() :
+                                    VersionSpec->getVersion());
+
+    return AvailabilityContext(VersionRange::allGTE(Version));
   }
 
   Expr *walkToExprPost(Expr *E) override {
@@ -1129,7 +1136,7 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
         if (Expr *ParentExpr = Parent.getAsExpr()) {
           auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
           if (!ParentClosure ||
-              !ParentClosure->wasTypeCheckedInEnclosingContext()) {
+              ParentClosure->wasSeparatelyTypeChecked()) {
             return false;
           }
         } else if (auto *ParentStmt = Parent.getAsStmt()) {
@@ -2343,8 +2350,8 @@ public:
     return true;
   }
 
-  bool shouldWalkIntoNonSingleExpressionClosure(ClosureExpr *expr) override {
-    return expr->hasAppliedFunctionBuilder();
+  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+    return false;
   }
 
   bool shouldWalkIntoTapExpression() override { return false; }

@@ -441,7 +441,7 @@ class RequirementRequest :
     public SimpleRequest<RequirementRequest,
                          Requirement(WhereClauseOwner, unsigned,
                                      TypeResolutionStage),
-                         RequestFlags::SeparatelyCached> {
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -464,10 +464,8 @@ public:
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
                            
-  // Separate caching.
+  // Caching.
   bool isCached() const;
-  Optional<Requirement> getCachedResult() const;
-  void cacheResult(Requirement value) const;
 };
 
 /// Generate the USR for the given declaration.
@@ -1066,8 +1064,8 @@ public:
 
 class EmittedMembersRequest :
     public SimpleRequest<EmittedMembersRequest,
-                         DeclRange(ClassDecl *),
-                         RequestFlags::SeparatelyCached> {
+                         ArrayRef<Decl *>(ClassDecl *),
+                         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1075,14 +1073,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  DeclRange
+  ArrayRef<Decl *>
   evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
 
 public:
-  // Separate caching.
   bool isCached() const { return true; }
-  Optional<DeclRange> getCachedResult() const;
-  void cacheResult(DeclRange value) const;
 };
 
 class IsImplicitlyUnwrappedOptionalRequest :
@@ -2193,6 +2188,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Resolves the "tangent stored property" corresponding to an original stored
+/// property in a `Differentiable`-conforming type.
+class TangentStoredPropertyRequest
+    : public SimpleRequest<TangentStoredPropertyRequest,
+                           TangentPropertyInfo(VarDecl *, CanType),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  TangentPropertyInfo evaluate(Evaluator &evaluator, VarDecl *originalField,
+                               CanType parentType) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether a type eraser has a viable initializer.
 class TypeEraserHasViableInitRequest
     : public SimpleRequest<TypeEraserHasViableInitRequest,
@@ -2511,6 +2527,41 @@ private:
 public:
   // Cached.
   bool isCached() const { return true; }
+};
+
+/// Kinds of types for CustomAttr.
+enum class CustomAttrTypeKind {
+  /// The type is required to not be expressed in terms of
+  /// any contextual type parameters.
+  NonGeneric,
+
+  /// Property delegates have some funky rules, like allowing
+  /// unbound generic types.
+  PropertyDelegate,
+};
+
+void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
+
+class CustomAttrTypeRequest
+    : public SimpleRequest<CustomAttrTypeRequest,
+                           Type(CustomAttr *, DeclContext *,
+                                CustomAttrTypeKind),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, CustomAttr *, DeclContext *,
+                CustomAttrTypeKind) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

@@ -650,6 +650,26 @@ namespace RuntimeConstants {
     }
     return RuntimeAvailability::AlwaysAvailable;
   }
+
+  RuntimeAvailability
+  CompareTypeContextDescriptorsAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCompareTypeContextDescriptorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  CompareProtocolConformanceDescriptorsAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getCompareProtocolConformanceDescriptorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the

@@ -69,6 +69,9 @@ documentation, please create a thread on the Swift forums under the
     How to build Swift on Windows using Visual Studio.
   - [WindowsCrossCompile.md](/docs/WindowsCrossCompile.md):
     How to cross compile Swift for Windows on a non-Windows host OS.
+- [RunningIncludeWhatYouUse.md](/docs/RunningIncludeWhatYouUse.md):
+  Describes how to run [include-what-you-use](https://include-what-you-use.org)
+  on the Swift project.
 
 ## Explanations
 
@@ -249,12 +252,10 @@ They are preserved mostly for historical interest.
 
 ## External Resources
 
-The official [Swift blog](https://swift.org/blog/) contains a lot of useful
-information, such as how library evolution works and how the compiler's new
-diagnostic architecture is structured, helping us provide more precise
-diagnostics.
-
-TODO: Add a new document ExternalResources.md.
+External resources are listed in [docs/ExternalResources.md](ExternalResources.md).
+These cover a variety of topics,
+such as the design of different aspects of the Swift compiler and runtime
+and contributing to the project more effectively.
 
 ## Uncategorized
 

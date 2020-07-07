@@ -662,11 +662,6 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   auto bytes = (char*) cache.getAllocator().withTag(GenericValueMetadataTag)
     .Allocate(totalSize, alignof(void*));
 
-#ifndef NDEBUG
-  // Fill the metadata record with garbage.
-  memset(bytes, 0xAA, totalSize);
-#endif
-
   auto addressPoint = bytes + sizeof(ValueMetadata::HeaderType);
   auto metadata = reinterpret_cast<ValueMetadata *>(addressPoint);
 
@@ -1916,6 +1911,33 @@ bool swift::equalContexts(const ContextDescriptor *a,
     // Conservatively return false.
     return false;
   }
+}
+
+SWIFT_CC(swift)
+bool swift::swift_compareTypeContextDescriptors(
+    const TypeContextDescriptor *a, const TypeContextDescriptor *b) {
+  // The implementation is the same as the implementation of
+  // swift::equalContexts except that the handling of non-type
+  // context descriptors and casts to TypeContextDescriptor are removed.
+
+  // Fast path: pointer equality.
+  if (a == b) return true;
+
+  // If either context is null, we're done.
+  if (a == nullptr || b == nullptr)
+    return false;
+
+  // If either descriptor is known to be unique, we're done.
+  if (a->isUnique() || b->isUnique()) return false;
+  
+  // Do the kinds match?
+  if (a->getKind() != b->getKind()) return false;
+  
+  // Do the parents match?
+  if (!equalContexts(a->Parent.get(), b->Parent.get()))
+    return false;
+
+  return TypeContextIdentity(a) == TypeContextIdentity(b);
 }
 
 /***************************************************************************/
@@ -4537,8 +4559,8 @@ WitnessTableCacheEntry::allocate(
   // Find the allocation.
   void **fullTable = reinterpret_cast<void**>(this + 1);
 
-  // Zero out the private storage area.
-  memset(fullTable, 0, privateSizeInWords * sizeof(void*));
+  // Zero out the witness table.
+  memset(fullTable, 0, getWitnessTableSize(conformance));
 
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
@@ -4969,6 +4991,12 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
   return swift_getAssociatedConformanceWitnessSlow(wtable, conformingType,
                                                    assocType, reqBase,
                                                    assocConformance);
+}
+
+bool swift::swift_compareProtocolConformanceDescriptors(
+    const ProtocolConformanceDescriptor *lhs,
+    const ProtocolConformanceDescriptor *rhs) {
+  return MetadataCacheKey::compareProtocolConformanceDescriptors(lhs, rhs) == 0;
 }
 
 /***************************************************************************/
@@ -5503,12 +5531,19 @@ AllocationPool{PoolRange{InitialAllocationPool.Pool,
 
 bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
 const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
+std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
 
 static void checkAllocatorDebugEnvironmentVariable(void *context) {
   _swift_debug_metadataAllocationIterationEnabled
     = runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION();
-  if (!_swift_debug_metadataAllocationIterationEnabled)
+  if (!_swift_debug_metadataAllocationIterationEnabled) {
+    if (runtime::environment::SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING())
+      swift::warning(RuntimeErrorFlagNone,
+                     "Warning: SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING "
+                     "without SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION "
+                     "has no effect.\n");
     return;
+  }
 
   // Write a PoolTrailer to the end of InitialAllocationPool and shrink
   // the pool accordingly.
@@ -5522,6 +5557,39 @@ static void checkAllocatorDebugEnvironmentVariable(void *context) {
   AllocationPool.store(poolCopy, std::memory_order_relaxed);
 }
 
+static void recordBacktrace(void *allocation) {
+  withCurrentBacktrace([&](void **addrs, int count) {
+    MetadataAllocationBacktraceHeader<InProcess> *record =
+        (MetadataAllocationBacktraceHeader<InProcess> *)malloc(
+            sizeof(*record) + count * sizeof(void *));
+    record->Allocation = allocation;
+    record->Count = count;
+    memcpy(record + 1, addrs, count * sizeof(void *));
+
+    record->Next = _swift_debug_metadataAllocationBacktraceList.load(
+        std::memory_order_relaxed);
+    while (!_swift_debug_metadataAllocationBacktraceList.compare_exchange_weak(
+        record->Next, record, std::memory_order_release,
+        std::memory_order_relaxed))
+      ; // empty
+  });
+}
+
+template <typename Pointee>
+static inline void memsetScribble(Pointee *bytes, size_t totalSize) {
+#ifndef NDEBUG
+  // When DEBUG is defined, always scribble.
+  memset(bytes, 0xAA, totalSize);
+#else
+  // When DEBUG is not defined, only scribble when the
+  // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE environment variable is set.
+  if (SWIFT_UNLIKELY(
+          runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE())) {
+    memset(bytes, 0xAA, totalSize);
+  }
+#endif
+}
+
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   assert(Tag != 0);
   assert(alignment <= alignof(void*));
@@ -5531,8 +5599,11 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   SWIFT_ONCE_F(getenvToken, checkAllocatorDebugEnvironmentVariable, nullptr);
 
   // If the size is larger than the maximum, just use malloc.
-  if (size > PoolRange::MaxPoolAllocationSize)
-    return malloc(size);
+  if (size > PoolRange::MaxPoolAllocationSize) {
+    void *allocation = malloc(size);
+    memsetScribble(allocation, size);
+    return allocation;
+  }
 
   // Allocate out of the pool.
   auto sizeWithHeader = size;
@@ -5576,13 +5647,20 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);
-      
+      memsetScribble(allocation, sizeWithHeader);
+
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
         AllocationHeader *header = (AllocationHeader *)allocation;
         header->Size = size;
         header->Tag = Tag;
-      
-        return allocation + sizeof(AllocationHeader);
+
+        auto *returnedAllocation = allocation + sizeof(AllocationHeader);
+
+        if (runtime::environment ::
+                SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING())
+          recordBacktrace(returnedAllocation);
+
+        return returnedAllocation;
       } else {
         return allocation;
       }
@@ -5648,13 +5726,8 @@ static bool referencesAnonymousContext(Demangle::Node *node) {
 }
 
 void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
-  // Enable verification when a special environment variable is set.
-  // Some metatypes crash when going through the mangler or demangler. A
-  // lot of tests currently trigger those crashes, resulting in failing
-  // tests which are still usefully testing something else. This
-  // variable lets us easily turn on verification to find and fix these
-  // bugs. Remove this and leave it permanently on once everything works
-  // with it enabled.
+  // Enable verification when a special environment variable is set. This helps
+  // us stress test the mangler/demangler and type lookup machinery.
   if (!swift::runtime::environment::SWIFT_ENABLE_MANGLED_NAME_VERIFICATION())
     return;
   

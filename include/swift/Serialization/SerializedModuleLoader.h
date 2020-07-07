@@ -58,7 +58,7 @@ class SerializedModuleLoaderBase : public ModuleLoader {
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
 
-  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> OrphanedMemoryBuffers;
+  SmallVector<std::unique_ptr<ModuleFile>, 2> OrphanedModuleFiles;
 
 protected:
   ASTContext &Ctx;
@@ -200,6 +200,11 @@ public:
   virtual Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
+
+  virtual std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
+                                                      StringRef interfacePath) {
+    return std::string();
+  }
 };
 
 /// Imports serialized Swift modules into an ASTContext.

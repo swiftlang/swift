@@ -69,42 +69,45 @@ llvm::cl::opt<std::string>
                                     "whose name contains this substring"));
 
 llvm::cl::list<std::string>
-    SILPrintBefore("sil-print-before",
+    SILPrintBefore("sil-print-before", llvm::cl::CommaSeparated,
                    llvm::cl::desc("Print out the sil before passes which "
                                   "contain a string from this list."));
 
 llvm::cl::list<std::string>
-    SILPrintAfter("sil-print-after",
+    SILPrintAfter("sil-print-after", llvm::cl::CommaSeparated,
                   llvm::cl::desc("Print out the sil after passes which contain "
                                  "a string from this list."));
 
 llvm::cl::list<std::string>
-    SILPrintAround("sil-print-around",
+    SILPrintAround("sil-print-around", llvm::cl::CommaSeparated,
                    llvm::cl::desc("Print out the sil before and after passes "
                                   "which contain a string from this list"));
 
 llvm::cl::list<std::string>
-    SILDisablePass("sil-disable-pass",
+    SILDisablePass("sil-disable-pass", llvm::cl::CommaSeparated,
                      llvm::cl::desc("Disable passes "
                                     "which contain a string from this list"));
+llvm::cl::list<std::string> SILDisablePassOnlyFun(
+    "sil-disable-pass-only-function", llvm::cl::CommaSeparated,
+    llvm::cl::desc("Apply -sil-disable-pass only on this function"));
 
 llvm::cl::list<std::string> SILVerifyBeforePass(
-    "sil-verify-before-pass",
+    "sil-verify-before-pass", llvm::cl::CommaSeparated,
     llvm::cl::desc("Verify the module/analyses before we run "
                    "a pass from this list"));
 
 llvm::cl::list<std::string> SILVerifyAroundPass(
-    "sil-verify-around-pass",
+    "sil-verify-around-pass", llvm::cl::CommaSeparated,
     llvm::cl::desc("Verify the module/analyses before/after we run "
                    "a pass from this list"));
 
 llvm::cl::list<std::string>
-    SILVerifyAfterPass("sil-verify-after-pass",
+    SILVerifyAfterPass("sil-verify-after-pass", llvm::cl::CommaSeparated,
                        llvm::cl::desc("Verify the module/analyses after we run "
                                       "a pass from this list"));
 
 llvm::cl::list<std::string> SILForceVerifyAroundPass(
-    "sil-verify-force-analysis-around-pass",
+    "sil-verify-force-analysis-around-pass", llvm::cl::CommaSeparated,
     llvm::cl::desc("For the given passes, precompute analyses before the pass "
                    "and verify analyses after the pass"));
 
@@ -204,7 +207,13 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
   return Default;
 }
 
-static bool isDisabled(SILTransform *T) {
+static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
+  if (!SILDisablePassOnlyFun.empty() && F &&
+      SILDisablePassOnlyFun.end() == std::find(SILDisablePassOnlyFun.begin(),
+                                               SILDisablePassOnlyFun.end(),
+                                               F->getName()))
+    return false;
+
   for (const std::string &NamePattern : SILDisablePass) {
     if (T->getTag().find(NamePattern) != StringRef::npos
         || T->getID().find(NamePattern) != StringRef::npos) {
@@ -395,7 +404,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     return;
   }
 
-  if (isDisabled(SFT)) {
+  if (isDisabled(SFT, F)) {
     if (SILPrintPassName)
       dumpPassInfo("(Disabled)", TransIdx, F);
     return;

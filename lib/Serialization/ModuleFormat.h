@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 558; // SILVTable entry kind for non-overridden entries
+const uint16_t SWIFTMODULE_VERSION_MINOR = 562; // base_addr_for_offset instruction
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -356,7 +356,7 @@ using ParameterConventionField = BCFixed<4>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class SILParameterDifferentiability : uint8_t {
-  DifferentiableOrNotApplicable,
+  DifferentiableOrNotApplicable = 0,
   NotDifferentiable,
 };
 
@@ -370,6 +370,13 @@ enum class ResultConvention : uint8_t {
   Autoreleased,
 };
 using ResultConventionField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class SILResultDifferentiability : uint8_t {
+  DifferentiableOrNotApplicable = 0,
+  NotDifferentiable,
+};
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -768,7 +775,8 @@ namespace options_block {
     IS_SIB,
     IS_TESTABLE,
     RESILIENCE_STRATEGY,
-    ARE_PRIVATE_IMPORTS_ENABLED
+    ARE_PRIVATE_IMPORTS_ENABLED,
+    IS_IMPLICIT_DYNAMIC_ENABLED
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -792,6 +800,10 @@ namespace options_block {
 
   using ArePrivateImportsEnabledLayout = BCRecordLayout<
     ARE_PRIVATE_IMPORTS_ENABLED
+  >;
+
+  using IsImplicitDynamicEnabledLayout = BCRecordLayout<
+    IS_IMPLICIT_DYNAMIC_ENABLED
   >;
 
   using ResilienceStrategyLayout = BCRecordLayout<

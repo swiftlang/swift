@@ -34,7 +34,7 @@ func instanceMethods(_ b: B) {
 func extensionMethods(b b: B) {
   // CHECK:      load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
   // CHECK:      [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
-  // CHECK-NEXT: [[T1:%.*]] = {{.*}}call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T0]])
+  // CHECK:      [[T1:%.*]] = {{.*}}call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T0]])
   // CHECK-NOT:  [[T0]]
   // CHECK:      [[T1]]
   b.method(1, separateExtMethod:1.5)

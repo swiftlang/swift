@@ -697,6 +697,29 @@ public:
     return !isa<llvm::Constant>(Storage);
   }
 
+#ifndef NDEBUG
+  /// Check if \p Val can be stored into \p Alloca, and emit some diagnostic
+  /// info if it can't.
+  bool canAllocaStoreValue(Address Alloca, llvm::Value *Val,
+                           SILDebugVariable VarInfo,
+                           const SILDebugScope *Scope) {
+    bool canStore =
+        cast<llvm::PointerType>(Alloca->getType())->getElementType() ==
+        Val->getType();
+    if (canStore)
+      return true;
+    llvm::errs() << "Invalid shadow copy:\n"
+                 << "  Value : " << *Val << "\n"
+                 << "  Alloca: " << *Alloca.getAddress() << "\n"
+                 << "---\n"
+                 << "Previous shadow copy into " << VarInfo.Name
+                 << " in the same scope!\n"
+                 << "Scope:\n";
+    Scope->print(getSILModule());
+    return false;
+  }
+#endif
+
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo, llvm::Optional<Alignment> _Align) {
@@ -707,7 +730,8 @@ public:
     if (!Alloca.isValid())
       Alloca = createAlloca(Storage->getType(), Align, VarInfo.Name + ".debug");
     zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
-
+    assert(canAllocaStoreValue(Alloca, Storage, VarInfo, Scope) &&
+           "bad scope?");
     ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
@@ -845,6 +869,7 @@ public:
   void visitAllocGlobalInst(AllocGlobalInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);
   void visitGlobalValueInst(GlobalValueInst *i);
+  void visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
@@ -1853,7 +1878,8 @@ void IRGenSILFunction::visitDifferentiableFunctionInst(
     auto origFnType =
         i->getOriginalFunction()->getType().castTo<SILFunctionType>();
     auto derivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
-        i->getParameterIndices(), /*resultIndex*/ 0, kind, i->getModule().Types,
+        i->getParameterIndices(), i->getResultIndices(), kind,
+        i->getModule().Types,
         LookUpConformanceInModule(i->getModule().getSwiftModule()));
     auto *undef = SILUndef::get(
         SILType::getPrimitiveObjectType(derivativeFnType), *i->getFunction());
@@ -2048,6 +2074,12 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
   Explosion e;
   e.add(InitRef);
   setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitBaseAddrForOffsetInst(BaseAddrForOffsetInst *i) {
+  auto storagePtrTy = IGM.getStoragePointerType(i->getType());
+  llvm::Value *addr = llvm::ConstantPointerNull::get(storagePtrTy);
+  setLoweredAddress(i, Address(addr, Alignment()));
 }
 
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {

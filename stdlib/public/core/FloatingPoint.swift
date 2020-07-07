@@ -1746,7 +1746,6 @@ extension BinaryFloatingPoint {
     )
   }
 
-  @inlinable
   public // @testable
   static func _convert<Source: BinaryFloatingPoint>(
     from source: Source
@@ -1935,7 +1934,6 @@ extension BinaryFloatingPoint {
 
 extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   
-  @inlinable
   public // @testable
   static func _convert<Source: BinaryInteger>(
     from source: Source

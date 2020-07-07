@@ -458,6 +458,12 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
 endif()
 message(STATUS "")
 
+if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_CROSS_COMPILING FALSE)
+else()
+  set(SWIFT_CROSS_COMPILING TRUE)
+endif()
+
 include(SwiftSharedCMakeConfig)
 
 # NOTE: We include this before SwiftComponents as it relies on some LLVM CMake
@@ -485,16 +491,6 @@ swift_configure_components()
 include(SwiftToolchainUtils)
 if(NOT SWIFT_LIPO)
   find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
-endif()
-
-# Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
-# CMake refuses to use `uname -m` on OS X
-# http://public.kitware.com/Bug/view.php?id=10326
-if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-  execute_process(
-      COMMAND "uname" "-m"
-      OUTPUT_VARIABLE CMAKE_SYSTEM_PROCESSOR
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
 get_filename_component(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)

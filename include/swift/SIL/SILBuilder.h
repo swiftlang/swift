@@ -631,6 +631,10 @@ public:
     return insert(new (getModule()) GlobalValueInst(getSILDebugLocation(Loc), g,
                                                     getTypeExpansionContext()));
   }
+  BaseAddrForOffsetInst *createBaseAddrForOffset(SILLocation Loc, SILType Ty) {
+    return insert(new (F->getModule())
+                  BaseAddrForOffsetInst(getSILDebugLocation(Loc), Ty));
+  }
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E);
 
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
@@ -722,7 +726,8 @@ public:
   }
 
   LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
-    assert(isLoadableOrOpaque(LV->getType()));
+    assert(isLoadableOrOpaque(LV->getType()) &&
+           !LV->getType().isTrivial(getFunction()));
     return insert(new (getModule())
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
@@ -733,11 +738,19 @@ public:
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  /// Convenience function for creating a load_borrow on non-trivial values and
+  /// load [trivial] on trivial values. Becomes load unqualified in non-ossa
+  /// functions.
   SILValue emitLoadBorrowOperation(SILLocation loc, SILValue v) {
     if (!hasOwnership()) {
       return emitLoadValueOperation(loc, v,
                                     LoadOwnershipQualifier::Unqualified);
     }
+
+    if (v->getType().isTrivial(getFunction())) {
+      return emitLoadValueOperation(loc, v, LoadOwnershipQualifier::Trivial);
+    }
+
     return createLoadBorrow(loc, v);
   }
 
@@ -873,6 +886,33 @@ public:
                       StoreBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
   }
 
+  /// A helper function for emitting store_borrow in operations where one must
+  /// handle both ossa and non-ossa code.
+  ///
+  /// In words:
+  ///
+  /// * If the function does not have ownership, this just emits an unqualified
+  ///   store.
+  ///
+  /// * If the function has ownership, but the type is trivial, use store
+  ///   [trivial].
+  ///
+  /// * Otherwise, emit an actual store_borrow.
+  void emitStoreBorrowOperation(SILLocation loc, SILValue src,
+                                SILValue destAddr) {
+    if (!hasOwnership()) {
+      return emitStoreValueOperation(loc, src, destAddr,
+                                     StoreOwnershipQualifier::Unqualified);
+    }
+
+    if (src->getType().isTrivial(getFunction())) {
+      return emitStoreValueOperation(loc, src, destAddr,
+                                     StoreOwnershipQualifier::Trivial);
+    }
+
+    createStoreBorrow(loc, src, destAddr);
+  }
+
   MarkUninitializedInst *
   createMarkUninitialized(SILLocation Loc, SILValue src,
                           MarkUninitializedInst::Kind k) {
@@ -898,6 +938,14 @@ public:
                                    SILDebugVariable Var);
   DebugValueAddrInst *createDebugValueAddr(SILLocation Loc, SILValue src,
                                            SILDebugVariable Var);
+
+  /// Create a debug_value_addr if \p src is an address; a debug_value if not.
+  SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,
+                                       SILDebugVariable Var) {
+    if (src->getType().isAddress())
+      return createDebugValueAddr(Loc, src, Var);
+    return createDebugValue(Loc, src, Var);
+  }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   Load##Name##Inst *createLoad##Name(SILLocation Loc, \
@@ -2179,10 +2227,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   DifferentiableFunctionInst *createDifferentiableFunction(
-      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      SILLocation Loc, IndexSubset *ParameterIndices,
+      IndexSubset *ResultIndices, SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     return insert(DifferentiableFunctionInst::create(
-        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        getModule(), getSILDebugLocation(Loc), ParameterIndices, ResultIndices,
         OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
   }
 

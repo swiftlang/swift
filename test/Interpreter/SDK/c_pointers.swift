@@ -7,13 +7,14 @@
 // REQUIRES: objc_interop
 
 import Foundation
-#if os(macOS)
+#if canImport(AppKit)
 import AppKit
 typealias XXColor = NSColor
-#endif
-#if os(iOS) || os(tvOS) || os(watchOS)
+#elseif canImport(UIKit)
 import UIKit
 typealias XXColor = UIColor
+#else
+#error("Unsupported platform")
 #endif
 
 

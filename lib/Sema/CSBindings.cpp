@@ -69,6 +69,9 @@ void ConstraintSystem::inferTransitiveSupertypeBindings(
 
       auto type = binding.BindingType;
 
+      if (type->isHole())
+        continue;
+
       if (!existingTypes.insert(type->getCanonicalType()).second)
         continue;
 
@@ -710,7 +713,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       }
       break;
 
-    case ConstraintKind::OneWayEqual: {
+    case ConstraintKind::OneWayEqual:
+    case ConstraintKind::OneWayBindParam: {
       // Don't produce any bindings if this type variable is on the left-hand
       // side of a one-way binding.
       auto firstType = constraint->getFirstType();
@@ -1030,19 +1034,18 @@ bool TypeVarBindingProducer::computeNext() {
 
     auto srcLocator = binding.getLocator();
     if (srcLocator &&
-        srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
-        !type->hasTypeVariable() && CS.isCollectionType(type)) {
+        (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+         srcLocator->isLastElement<LocatorPathElt::AutoclosureResult>()) &&
+        !type->hasTypeVariable() && type->isKnownStdlibCollectionType()) {
       // If the type binding comes from the argument conversion, let's
       // instead of binding collection types directly, try to bind
       // using temporary type variables substituted for element
       // types, that's going to ensure that subtype relationship is
       // always preserved.
       auto *BGT = type->castTo<BoundGenericType>();
-      auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
-                                         BGT->getASTContext());
-
       auto dstLocator = TypeVar->getImpl().getLocator();
-      auto newType = CS.openUnboundGenericType(UGT, dstLocator)
+      auto newType = CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
+                                               dstLocator)
                          ->reconstituteSugar(/*recursive=*/false);
       addNewBinding(binding.withType(newType));
     }
@@ -1071,7 +1074,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
 
   if (Binding.hasDefaultedLiteralProtocol()) {
-    type = cs.openUnboundGenericType(type, dstLocator);
+    type = cs.openUnboundGenericTypes(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
@@ -1108,8 +1111,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
         fix = SpecifyClosureParameterType::create(cs, dstLocator);
       } else if (TypeVar->getImpl().isClosureResultType()) {
         fix = SpecifyClosureReturnType::create(cs, dstLocator);
-      } else if (srcLocator->getAnchor() &&
-                 isExpr<ObjectLiteralExpr>(srcLocator->getAnchor())) {
+      } else if (srcLocator->directlyAt<ObjectLiteralExpr>()) {
         fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
       } else if (srcLocator->isKeyPathRoot()) {
         fix = SpecifyKeyPathRootType::create(cs, dstLocator);

@@ -169,6 +169,9 @@ public:
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
+  /// Path prefixes that should be rewritten in coverage info.
+  PathRemapper CoveragePrefixMap;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
@@ -281,6 +284,9 @@ public:
   /// Whether to disable using mangled names for accessing concrete type metadata.
   unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
 
+  /// The number of threads for multi-threaded code generation.
+  unsigned NumThreads = 0;
+
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
@@ -380,6 +386,10 @@ public:
   llvm::hash_code getPCHHashComponents() const {
     return llvm::hash_value(0);
   }
+
+  bool hasMultipleIRGenThreads() const { return NumThreads > 1; }
+  bool shouldPerformIRGenerationInParallel() const { return NumThreads != 0; }
+  bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
 };
 
 } // end namespace swift

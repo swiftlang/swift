@@ -269,26 +269,12 @@ protected:
       return;
     }
 
-    // If we aren't generating constraints, there's nothing to do.
-    if (!cs)
-      return;
-
-    /// Generate constraints for each pattern binding entry
-    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
-      // Type check the pattern.
-      auto pattern = patternBinding->getPattern(index);
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
-      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-
-      // Generate constraints for the initialization.
-      auto target = SolutionApplicationTarget::forInitialization(
-          patternBinding->getInit(index), dc, patternType, pattern,
-          /*bindPatternVarsOneWay=*/true);
+    // If there is a constraint system, generate constraints for the pattern
+    // binding.
+    if (cs) {
+      SolutionApplicationTarget target(patternBinding);
       if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
-        continue;
-
-      // Keep track of this binding entry.
-      applied.patternBindingEntries.insert({{patternBinding, index}, target});
+        hadError = true;
     }
   }
 
@@ -1035,11 +1021,11 @@ private:
     for (unsigned index : range(patternBinding->getNumPatternEntries())) {
       // Find the solution application target for this.
       auto knownTarget =
-          builderTransform.patternBindingEntries.find({patternBinding, index});
-      assert(knownTarget != builderTransform.patternBindingEntries.end());
+          *solution.getConstraintSystem().getSolutionApplicationTarget(
+            {patternBinding, index});
 
       // Rewrite the target.
-      auto resultTarget = rewriteTarget(knownTarget->second);
+      auto resultTarget = rewriteTarget(knownTarget);
       if (!resultTarget)
         continue;
 
@@ -1401,6 +1387,64 @@ BraceStmt *swift::applyFunctionBuilderTransform(
         captured.first, captured.second)));
 }
 
+/// Produce any additional syntactic diagnostics for the body of a function
+/// that had a function builder applied.
+static void performAddOnDiagnostics(BraceStmt *stmt, DeclContext *dc) {
+  class AddOnDiagnosticWalker : public ASTWalker {
+    SmallVector<DeclContext *, 4> dcStack;
+
+  public:
+    AddOnDiagnosticWalker(DeclContext *dc) {
+      dcStack.push_back(dc);
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      performSyntacticExprDiagnostics(
+          expr, dcStack.back(), /*isExprStmt=*/false);
+
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        if (closure->wasSeparatelyTypeChecked()) {
+          dcStack.push_back(closure);
+          return { true, expr };
+        }
+      }
+
+      return { false, expr };
+    }
+
+    Expr *walkToExprPost(Expr *expr) override {
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        if (closure->wasSeparatelyTypeChecked()) {
+          assert(dcStack.back() == closure);
+          dcStack.pop_back();
+        }
+      }
+
+      return expr;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      performStmtDiagnostics(dcStack.back()->getASTContext(), stmt);
+      return { true, stmt };
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
+      return { false, pattern };
+    }
+
+    bool walkToTypeLocPre(TypeLoc &typeLoc) override { return false; }
+
+    bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
+
+    bool walkToParameterListPre(ParameterList *params) override {
+      return false;
+    }
+  };
+
+  AddOnDiagnosticWalker walker(dc);
+  stmt->walk(walker);
+}
+
 Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     FuncDecl *func, Type builderType) {
   // Pre-check the body: pre-check any expressions in it and look
@@ -1519,6 +1563,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   if (auto result = cs.applySolution(
           solutions.front(),
           SolutionApplicationTarget(func))) {
+    performAddOnDiagnostics(result->getFunctionBody(), func);
     return result->getFunctionBody();
   }
 

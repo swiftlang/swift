@@ -3,11 +3,12 @@
 
 // REQUIRES: objc_interop
 
-#if os(macOS)
+#if canImport(AppKit)
 import AppKit
-#endif
-#if os(iOS) || os(tvOS) || os(watchOS)
+#elseif canImport(UIKit)
 import UIKit
+#else
+#error("Unsupported platform")
 #endif
 
 let foo: [CGColor] =
