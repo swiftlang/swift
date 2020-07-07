@@ -3752,7 +3752,9 @@ namespace {
       if (auto *cty = T->getClangFunctionType()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        cty->dump(os);
+        auto &ctx = T->getASTContext().getClangModuleLoader()
+          ->getClangASTContext();
+        cty->dump(os, ctx);
         printField("clang_type", os.str());
       }
       printAnyFunctionParams(T->getParams(), "input");

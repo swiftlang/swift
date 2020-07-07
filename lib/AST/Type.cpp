@@ -3388,8 +3388,8 @@ AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
     SmallString<256> buf;
     llvm::raw_svector_ostream os(buf);
     os << "Expected a Clang function type wrapped in a pointer type or "
-       << "a block pointer type but found:\n";
-    type->dump(os);
+       << "a block pointer type but found:\n <TODO>";
+    // type->dump(os);
     llvm_unreachable(os.str().data());
   }
 #endif

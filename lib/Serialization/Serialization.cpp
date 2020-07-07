@@ -611,7 +611,8 @@ serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
     isSerializable = false;
   }
   if (!isSerializable) {
-    PrettyStackTraceClangType trace("staging a serialized reference to", ty);
+    PrettyStackTraceClangType trace(loader->getClangASTContext(),
+                                    "staging a serialized reference to", ty);
     llvm::report_fatal_error("Clang function type is not serializable");
   }
 
@@ -4396,7 +4397,8 @@ public:
 
 void Serializer::writeASTBlockEntity(const clang::Type *ty) {
   using namespace decls_block;
-  PrettyStackTraceClangType traceRAII("serializing clang type", ty);
+  auto &ctx = getASTContext().getClangModuleLoader()->getClangASTContext();
+  PrettyStackTraceClangType traceRAII(ctx, "serializing clang type", ty);
   assert(ClangTypesToSerialize.hasRef(ty));
 
   // Serialize the type as an opaque sequence of data.
