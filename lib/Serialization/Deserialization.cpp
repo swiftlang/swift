@@ -56,7 +56,7 @@ using namespace swift::serialization;
 using llvm::Expected;
 
 StringRef swift::getNameOfModule(const ModuleFile *MF) {
-  return MF->Name;
+  return MF->getName();
 }
 
 namespace {
@@ -166,13 +166,13 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 
 void ModuleFile::fatal(llvm::Error error) {
   if (FileContext) {
-    getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Name);
+    getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Core->Name);
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_misc_version,
-      Name, MiscVersion);
+      Core->Name, Core->MiscVersion);
 
-    if (!CompatibilityVersion.empty()) {
+    if (!Core->CompatibilityVersion.empty()) {
       if (getContext().LangOpts.EffectiveLanguageVersion
-            != CompatibilityVersion) {
+            != Core->CompatibilityVersion) {
         SmallString<16> effectiveVersionBuffer, compatVersionBuffer;
         {
           llvm::raw_svector_ostream out(effectiveVersionBuffer);
@@ -180,19 +180,16 @@ void ModuleFile::fatal(llvm::Error error) {
         }
         {
           llvm::raw_svector_ostream out(compatVersionBuffer);
-          out << CompatibilityVersion;
+          out << Core->CompatibilityVersion;
         }
         getContext().Diags.diagnose(
             SourceLoc(), diag::serialization_compatibility_version_mismatch,
-            effectiveVersionBuffer, Name, compatVersionBuffer);
+            effectiveVersionBuffer, Core->Name, compatVersionBuffer);
       }
     }
   }
 
-  logAllUnhandledErrors(std::move(error), llvm::errs(),
-                        "\n*** DESERIALIZATION FAILURE (please include this "
-                        "section in any bug report) ***\n");
-  abort();
+  ModuleFileSharedCore::fatal(std::move(error));
 }
 
 static Optional<swift::AccessorKind>
@@ -1871,13 +1868,7 @@ StringRef ModuleFile::getIdentifierText(IdentifierID IID) {
   if (!identRecord.Ident.empty())
     return identRecord.Ident.str();
 
-  assert(!IdentifierData.empty() && "no identifier data in module");
-
-  StringRef rawStrPtr = IdentifierData.substr(identRecord.Offset);
-  size_t terminatorOffset = rawStrPtr.find('\0');
-  assert(terminatorOffset != StringRef::npos &&
-         "unterminated identifier string data");
-  return rawStrPtr.slice(0, terminatorOffset);
+  return Core->getIdentifierText(IID);
 }
 
 DeclContext *ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) {

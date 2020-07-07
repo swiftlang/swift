@@ -17,8 +17,8 @@ import Swift
 // CHECK-powerpc64:   .cfi_startproc
 // CHECK-powerpc64le: .cfi_startproc
 // CHECK-s390x:       .cfi_startproc
-// CHECK-OPT-macosx:  ## InlineAsm Start
-// CHECK-OPT-macosx:  ## InlineAsm End
+// CHECK-OPT-macosx:  InlineAsm Start
+// CHECK-OPT-macosx:  InlineAsm End
 // CHECK-OPT-linux:   ##APP
 // CHECK-OPT-linux:   ##NO_APP
 // CHECK-OPT-windows:   ##APP
@@ -27,8 +27,8 @@ import Swift
 // CHECK-OPT-linux-androideabi:   @NO_APP
 // CHECK-OPT-linux-android:       //APP
 // CHECK-OPT-linux-android:       //NO_APP
-// CHECK-NOOPT-macosx-NOT: ## InlineAsm Start
-// CHECK-NOOPT-macosx-NOT: ## InlineAsm End
+// CHECK-NOOPT-macosx-NOT: InlineAsm Start
+// CHECK-NOOPT-macosx-NOT: InlineAsm End
 // CHECK-NOOPT-linux-NOT:  ##APP
 // CHECK-NOOPT-linux-NOT:  ##NO_APP
 // CHECK-NOOPT-windows-NOT:  ##APP
@@ -55,14 +55,14 @@ import Swift
 // CHECK-NOT-powerpc64:   .cfi_endproc
 // CHECK-NOT-powerpc64le: .cfi_endproc
 // CHECK-NOT-s390x:       .cfi_endproc
-// CHECK-OPT-macosx:  ## InlineAsm Start
-// CHECK-OPT-macosx:  ## InlineAsm End
+// CHECK-OPT-macosx:  InlineAsm Start
+// CHECK-OPT-macosx:  InlineAsm End
 // CHECK-OPT-linux:   ##APP
 // CHECK-OPT-linux:   ##NO_APP
 // CHECK-OPT-windows:   ##APP
 // CHECK-OPT-windows:   ##NO_APP
-// CHECK-NOOPT-macosx-NOT: ## InlineAsm Start
-// CHECK-NOOPT-macosx-NOT: ## InlineAsm End
+// CHECK-NOOPT-macosx-NOT: InlineAsm Start
+// CHECK-NOOPT-macosx-NOT: InlineAsm End
 // CHECK-NOOPT-linux-NOT:  ##APP
 // CHECK-NOOPT-linux-NOT:  ##NO_APP
 // CHECK-NOOPT-windows-NOT:  ##APP

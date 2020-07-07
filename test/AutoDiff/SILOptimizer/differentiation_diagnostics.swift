@@ -624,6 +624,22 @@ func testClassTangentPropertyNotStored(_ c: ClassTangentPropertyNotStored) -> Fl
 // CHECK-LABEL: sil {{.*}} @test_class_tangent_property_not_stored
 // CHECK: ref_element_addr {{%.*}} : $ClassTangentPropertyNotStored, #ClassTangentPropertyNotStored.x
 
+// SR-13134: Test stored property access with conditionally `Differentiable` base type.
+
+struct Complex<T: FloatingPoint> {
+  var real: T
+  var imaginary: T
+}
+extension Complex: Differentiable where T: Differentiable {
+  typealias TangentVector = Complex
+}
+extension Complex: AdditiveArithmetic {}
+
+@differentiable
+func SR_13134(lhs: Complex<Float>, rhs: Complex<Float>) -> Float {
+  return lhs.real + rhs.real
+}
+
 //===----------------------------------------------------------------------===//
 // Wrapped property differentiation
 //===----------------------------------------------------------------------===//
