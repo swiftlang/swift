@@ -198,6 +198,9 @@ class SubprocessMock(Mock):
         self.calls.append(args)
         return self.respond.get(args, "")
 
+    def test_mode():
+        return True
+
 
 class TestBenchmarkDriverInitialization(unittest.TestCase):
     def setUp(self):
@@ -206,13 +209,19 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
 
     def test_test_harness(self):
         self.assertEqual(
-            BenchmarkDriver(self.args, tests=["ignored"]).test_harness,
+            BenchmarkDriver(
+                self.args,
+                tests=["ignored"],
+                _subprocess=self.subprocess_mock).test_harness,
             "/benchmarks/Benchmark_O",
         )
         self.args.tests = "/path"
         self.args.optimization = "Suffix"
         self.assertEqual(
-            BenchmarkDriver(self.args, tests=["ignored"]).test_harness,
+            BenchmarkDriver(
+                self.args,
+                tests=["ignored"],
+                _subprocess=self.subprocess_mock).test_harness,
             "/path/Benchmark_Suffix",
         )
 
@@ -271,6 +280,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
                 swift_repo=None,
             ),
             tests=["ignored"],
+            _subprocess=self.subprocess_mock
         )
         self.assertEqual(driver.log_file, "/path/Benchmark_Suffix-" + now + ".log")
 

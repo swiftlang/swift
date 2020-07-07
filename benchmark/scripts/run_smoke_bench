@@ -48,12 +48,13 @@ VERBOSE = False
 class DriverArgs(object):
     """Arguments for BenchmarkDriver."""
 
-    def __init__(self, tests, optimization="O"):
+    def __init__(self, tests, optimization="O", architecture=None):
         """Initialize with path to the build-dir and optimization level."""
         self.benchmarks = None
         self.filters = None
         self.tests = os.path.join(tests, "bin")
         self.optimization = optimization
+        self.architecture = architecture
 
 
 def log(msg):
@@ -127,6 +128,12 @@ def main():
         default=8,
     )
     argparser.add_argument(
+        "-arch",
+        type=str,
+        help="The architecture. The default is x86_64",
+        default="x86_64",
+    )
+    argparser.add_argument(
         "-platform", type=str, help="The benchmark build platform", default="macosx"
     )
     argparser.add_argument(
@@ -158,6 +165,7 @@ def test_opt_levels(args):
                 args.num_samples,
                 args.num_reruns,
                 output_file,
+                args.arch
             ):
                 changes = True
 
@@ -167,6 +175,7 @@ def test_opt_levels(args):
                 opt_level,
                 args.oldbuilddir[0],
                 args.newbuilddir[0],
+                args.arch,
                 args.platform,
                 output_file,
             ):
@@ -177,6 +186,7 @@ def test_opt_levels(args):
             "swiftlibs",
             args.oldbuilddir[0],
             args.newbuilddir[0],
+            args.arch,
             args.platform,
             output_file,
         ):
@@ -221,7 +231,8 @@ def merge(results, other_results):
 
 
 def test_performance(
-    opt_level, old_dir, new_dir, threshold, num_samples, num_reruns, output_file
+    opt_level, old_dir, new_dir, threshold, num_samples, num_reruns,
+    output_file, arch
 ):
     """Detect performance changes in benchmarks.
 
@@ -231,7 +242,7 @@ def test_performance(
 
     i, unchanged_length_count = 0, 0
     old, new = [
-        BenchmarkDriver(DriverArgs(dir, optimization=opt_level))
+        BenchmarkDriver(DriverArgs(dir, optimization=opt_level, architecture=arch))
         for dir in [old_dir, new_dir]
     ]
     results = [measure(driver, driver.tests, i) for driver in [old, new]]
@@ -260,12 +271,13 @@ def test_performance(
     )
 
 
-def report_code_size(opt_level, old_dir, new_dir, platform, output_file):
+def report_code_size(opt_level, old_dir, new_dir, architecture, platform, output_file):
     if opt_level == "swiftlibs":
         files = glob.glob(os.path.join(old_dir, "lib", "swift", platform, "*.dylib"))
     else:
         files = glob.glob(
-            os.path.join(old_dir, opt_level + "-*" + platform + "*", "*.o")
+            os.path.join(old_dir, opt_level + "-" + architecture + "*" +
+                         platform + "*", "*.o")
         )
 
     idx = 1
@@ -370,8 +382,8 @@ performance team (@eeckstein).
 
 
 def check_added(args, output_file=None):
-    old = BenchmarkDriver(DriverArgs(args.oldbuilddir[0]))
-    new = BenchmarkDriver(DriverArgs(args.newbuilddir[0]))
+    old = BenchmarkDriver(DriverArgs(args.oldbuilddir[0], architecture=args.arch))
+    new = BenchmarkDriver(DriverArgs(args.newbuilddir[0], architecture=args.arch))
     added = set(new.tests).difference(set(old.tests))
     new.tests = list(added)
     doctor = BenchmarkDoctor(args, driver=new)
