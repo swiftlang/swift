@@ -1161,7 +1161,7 @@ namespace {
       ExprStack.pop_back();
 
       // Mark the direct callee as being a callee.
-      if (auto *call = dyn_cast<CallExpr>(expr))
+      if (auto *call = dyn_cast<ApplyExpr>(expr))
         markDirectCallee(call->getFn());
 
       // Fold sequence expressions.
