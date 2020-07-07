@@ -404,6 +404,20 @@ static void computeSwiftModuleTraceInfo(
   });
 }
 
+static void extractImportsForTrace(ModuleDecl *module,
+                                   SmallPtrSetImpl<ModuleDecl *> &imports) {
+  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
+  filter |= ModuleDecl::ImportFilterKind::Private;
+  filter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
+  filter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
+  SmallVector<ModuleDecl::ImportedModule, 8> importList;
+  module->getImportedModules(importList, filter);
+
+  for (ModuleDecl::ImportedModule &import : importList)
+    imports.insert(import.importedModule);
+}
+
 static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                           DependencyTracker *depTracker,
                                           StringRef prebuiltCachePath,
@@ -424,17 +438,8 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     return true;
   }
 
-  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
-  filter |= ModuleDecl::ImportFilterKind::Private;
-  filter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
-  filter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
-  SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  mainModule->getImportedModules(imports, filter);
-
   SmallPtrSet<ModuleDecl *, 8> importedModules;
-  for (ModuleDecl::ImportedModule &import : imports)
-    importedModules.insert(import.importedModule);
+  extractImportsForTrace(mainModule, importedModules);
 
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
   for (const auto &module : ctxt.getLoadedModules()) {
