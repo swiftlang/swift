@@ -50,7 +50,7 @@ where
   // NOTE(TF-1094): serialized `@derivative` for `.swiftinterface` compilation.
   @inlinable
   @derivative(of: subscript(_:))
-  internal func _vjpSubscript(index: Int)
+  internal func _vjpSubscript(_ index: Int)
     -> (value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector)
   {
     return (self[index], { v in
@@ -67,6 +67,25 @@ where
   {
     return (self[index], { v in
       return .init(v[index])
+    })
+  }
+}
+
+extension SIMD${n}
+where
+  Scalar: Differentiable & BinaryFloatingPoint,
+  Scalar.TangentVector == Scalar
+{
+  @inlinable
+  @derivative(of: subscript(_:).set)
+  internal mutating func _vjpSubscriptSetter(_ newValue: Scalar, _ index: Int)
+    -> (value: Void, pullback: (inout TangentVector) -> Scalar.TangentVector)
+  {
+    self[index] = newValue
+    return ((), { dSelf in
+      let dNewValue = dSelf[index]
+      dSelf[index] = 0
+      return dNewValue
     })
   }
 }
