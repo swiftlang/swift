@@ -356,7 +356,7 @@
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2020-06-29-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-06-29-a",
                 "swift-tools-support-core": "0.1.8",
-                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-06-29-a",
+                "swiftpm": "3b56accc865173b0e0588b1df310e74f124c784b",
                 "swift-argument-parser": "0.2.0",
                 "swift-driver": "master",
                 "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-06-29-a",
