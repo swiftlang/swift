@@ -217,7 +217,7 @@ def validate_arguments(toolchain, args):
                 "must be specified")
     if args.wasm:
         if args.wasi_sdk is None:
-            diagnostics.fatal(
+            fatal_error(
                 "when building for WebAssembly, --wasi-sdk must be specified")
 
     targets_needing_toolchain = [
