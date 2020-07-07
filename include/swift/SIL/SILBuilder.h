@@ -1853,7 +1853,18 @@ public:
   // Unchecked cast helpers
   //===--------------------------------------------------------------------===//
 
-  // Create the appropriate cast instruction based on result type.
+  /// Create the appropriate cast instruction based on result type.
+  ///
+  /// NOTE: We allow for non-layout compatible casts that shrink the underlying
+  /// type we are bit casting!
+  SingleValueInstruction *
+  createUncheckedReinterpretCast(SILLocation Loc, SILValue Op, SILType Ty);
+
+  /// Create an appropriate cast instruction based on result type.
+  ///
+  /// NOTE: This assumes that the input and the result cast are layout
+  /// compatible. Reduces to createUncheckedReinterpretCast when ownership is
+  /// disabled.
   SingleValueInstruction *createUncheckedBitCast(SILLocation Loc, SILValue Op,
                                                  SILType Ty);
 

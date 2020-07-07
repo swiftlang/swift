@@ -36,8 +36,9 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -46,6 +47,16 @@ using namespace swift;
 llvm::cl::opt<bool> EagerSpecializeFlag(
     "enable-eager-specializer", llvm::cl::init(true),
     llvm::cl::desc("Run the eager-specializer pass."));
+
+static void
+cleanupCallArguments(SILBuilder &builder, SILLocation loc,
+                     ArrayRef<SILValue> values,
+                     ArrayRef<unsigned> valueIndicesThatNeedEndBorrow) {
+  for (int index : valueIndicesThatNeedEndBorrow) {
+    auto *lbi = cast<LoadBorrowInst>(values[index]);
+    builder.createEndBorrow(loc, lbi);
+  }
+}
 
 /// Returns true if the given return or throw block can be used as a merge point
 /// for new return or error values.
@@ -127,12 +138,16 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
     }
   }
+
   // Create a CFG edge from NewRetBB to MergedBB.
   Builder.setInsertionPoint(NewRetBB);
   SmallVector<SILValue, 1> BBArgs;
   if (!NewRetVal->getType().isVoid())
     BBArgs.push_back(NewRetVal);
   Builder.createBranch(Loc, MergedBB, BBArgs);
+
+  // Then split any critical edges we created to the merged block.
+  splitCriticalEdgesTo(MergedBB);
 }
 
 /// Adds a CFG edge from the unterminated NewRetBB to a merged "return" block.
@@ -154,14 +169,10 @@ static void addThrowValue(SILBasicBlock *NewThrowBB, SILValue NewErrorVal) {
 ///
 /// TODO: Move this to Utils.
 static SILValue
-emitApplyWithRethrow(SILBuilder &Builder,
-                     SILLocation Loc,
-                     SILValue FuncRef,
-                     CanSILFunctionType CanSILFuncTy,
-                     SubstitutionMap Subs,
+emitApplyWithRethrow(SILBuilder &Builder, SILLocation Loc, SILValue FuncRef,
+                     CanSILFunctionType CanSILFuncTy, SubstitutionMap Subs,
                      ArrayRef<SILValue> CallArgs,
-                     void (*EmitCleanup)(SILBuilder&, SILLocation)) {
-
+                     ArrayRef<unsigned> CallArgIndicesThatNeedEndBorrow) {
   auto &F = Builder.getFunction();
   SILFunctionConventions fnConv(CanSILFuncTy, Builder.getModule());
 
@@ -176,30 +187,31 @@ emitApplyWithRethrow(SILBuilder &Builder,
     SILValue Error = ErrorBB->createPhiArgument(
         fnConv.getSILErrorType(F.getTypeExpansionContext()),
         ValueOwnershipKind::Owned);
-
-    EmitCleanup(Builder, Loc);
+    cleanupCallArguments(Builder, Loc, CallArgs,
+                         CallArgIndicesThatNeedEndBorrow);
     addThrowValue(ErrorBB, Error);
   }
+
   // Advance Builder to the fall-thru path and return a SILArgument holding the
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createPhiArgument(
+  SILValue finalArgument = Builder.getInsertionBB()->createPhiArgument(
       fnConv.getSILResultType(F.getTypeExpansionContext()),
       ValueOwnershipKind::Owned);
+  cleanupCallArguments(Builder, Loc, CallArgs, CallArgIndicesThatNeedEndBorrow);
+  return finalArgument;
 }
 
 /// Emits code to invoke the specified specialized CalleeFunc using the
 /// provided SILBuilder.
 ///
 /// TODO: Move this to Utils.
-static SILValue
-emitInvocation(SILBuilder &Builder,
-               const ReabstractionInfo &ReInfo,
-               SILLocation Loc,
-               SILFunction *CalleeFunc,
-               ArrayRef<SILValue> CallArgs,
-               void (*EmitCleanup)(SILBuilder&, SILLocation)) {
+static SILValue emitInvocation(SILBuilder &Builder,
+                               const ReabstractionInfo &ReInfo, SILLocation Loc,
+                               SILFunction *CalleeFunc,
+                               ArrayRef<SILValue> CallArgs,
+                               ArrayRef<unsigned> ArgsNeedEndBorrow) {
 
   auto *FuncRefInst = Builder.createFunctionRef(Loc, CalleeFunc);
   auto CanSILFuncTy = CalleeFunc->getLoweredFunctionType();
@@ -256,14 +268,15 @@ emitInvocation(SILBuilder &Builder,
   // or de-facto?
   if (!CanSILFuncTy->hasErrorResult() ||
       CalleeFunc->findThrowBB() == CalleeFunc->end()) {
-    return Builder.createApply(CalleeFunc->getLocation(), FuncRefInst,
-                               Subs, CallArgs, isNonThrowing);
+    auto *AI = Builder.createApply(CalleeFunc->getLocation(), FuncRefInst, Subs,
+                                   CallArgs, isNonThrowing);
+    cleanupCallArguments(Builder, Loc, CallArgs, ArgsNeedEndBorrow);
+    return AI;
   }
 
-  return emitApplyWithRethrow(Builder, CalleeFunc->getLocation(),
-                              FuncRefInst, CalleeSubstFnTy, Subs,
-                              CallArgs,
-                              EmitCleanup);
+  return emitApplyWithRethrow(Builder, CalleeFunc->getLocation(), FuncRefInst,
+                              CalleeSubstFnTy, Subs, CallArgs,
+                              ArgsNeedEndBorrow);
 }
 
 /// Returns the thick metatype for the given SILType.
@@ -323,8 +336,11 @@ protected:
   SILValue emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
                             SILFunctionArgument *OrigArg, unsigned Idx);
 
-  SILValue emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs);
+  SILValue
+  emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs,
+                         SmallVectorImpl<unsigned> &ArgAtIndexNeedsEndBorrow);
 };
+
 } // end anonymous namespace
 
 /// Inserts type checks in the original generic function for dispatching to the
@@ -335,6 +351,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   auto ReturnBB = GenericFunc->findReturnBB();
   if (ReturnBB != GenericFunc->end())
       OldReturnBB = &*ReturnBB;
+
   // 1. Emit a cascading sequence of type checks blocks.
 
   // First split the entry BB, moving all instructions to the FailedTypeCheckBB.
@@ -384,23 +401,24 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   // 2. Convert call arguments, casting and adjusting for calling convention.
 
   SmallVector<SILValue, 8> CallArgs;
-  SILValue StoreResultTo = emitArgumentConversion(CallArgs);
+  SmallVector<unsigned, 8> ArgAtIndexNeedsEndBorrow;
+  SILValue StoreResultTo =
+      emitArgumentConversion(CallArgs, ArgAtIndexNeedsEndBorrow);
 
   // 3. Emit an invocation of the specialized function.
 
   // Emit any rethrow with no cleanup since all args have been forwarded and
   // nothing has been locally allocated or copied.
-  auto NoCleanup = [](SILBuilder&, SILLocation){};
-  SILValue Result =
-      emitInvocation(Builder, ReInfo, Loc, NewFunc, CallArgs, NoCleanup);
+  SILValue Result = emitInvocation(Builder, ReInfo, Loc, NewFunc, CallArgs,
+                                   ArgAtIndexNeedsEndBorrow);
 
   // 4. Handle the return value.
 
   auto VoidTy = Builder.getModule().Types.getEmptyTupleType();
   if (StoreResultTo) {
     // Store the direct result to the original result address.
-    Builder.createStore(Loc, Result, StoreResultTo,
-                        StoreOwnershipQualifier::Unqualified);
+    Builder.emitStoreValueOperation(Loc, Result, StoreResultTo,
+                                    StoreOwnershipQualifier::Init);
     // And return Void.
     Result = Builder.createTuple(Loc, VoidTy, { });
   }
@@ -416,7 +434,10 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     auto resultTy = GenericFunc->getConventions().getSILResultType(
         Builder.getTypeExpansionContext());
     auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
-    auto CastResult = Builder.createUncheckedBitCast(Loc, Result, GenResultTy);
+
+    SILValue CastResult =
+        Builder.createUncheckedBitCast(Loc, Result, GenResultTy);
+
     addReturnValue(Builder.getInsertionBB(), OldReturnBB, CastResult);
   }
 }
@@ -620,8 +641,9 @@ SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
 ///
 /// Returns the SILValue to store the result into if the specialized function
 /// has a direct result.
-SILValue EagerDispatch::
-emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
+SILValue EagerDispatch::emitArgumentConversion(
+    SmallVectorImpl<SILValue> &CallArgs,
+    SmallVectorImpl<unsigned> &ArgAtIndexNeedsEndBorrow) {
   auto OrigArgs = GenericFunc->begin()->getSILFunctionArguments();
   assert(OrigArgs.size() == substConv.getNumSILArguments()
          && "signature mismatch");
@@ -661,6 +683,7 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
       CallArgs.push_back(CastArg);
       continue;
     }
+
     if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
       // Handle result arguments.
       unsigned formalIdx =
@@ -672,29 +695,43 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
         StoreResultTo = CastArg;
         continue;
       }
-    } else {
-      // Handle arguments for formal parameters.
-      unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
-      if (ReInfo.isParamConverted(paramIdx)) {
-        // An argument is converted from indirect to direct. Instead of the
-        // address we pass the loaded value.
-        // FIXME: If type of CastArg is an archetype, but it is loadable because
-        // of a layout constraint on the caller side, we have a problem here 
-        // We need to load the value on the caller side, but this archetype is
-        // not statically known to be loadable on the caller side (though we
-        // have proven dynamically that it has a fixed size).
-        // We can try to load it as an int value of width N, but then it is not
-        // clear how to convert it into a value of the archetype type, which is
-        // expected. May be we should pass it as @in parameter and make it
-        // loadable on the caller's side?
-        SILValue Val = Builder.createLoad(Loc, CastArg,
-                                          LoadOwnershipQualifier::Unqualified);
-        CallArgs.push_back(Val);
-        continue;
-      }
+      CallArgs.push_back(CastArg);
+      continue;
     }
-    CallArgs.push_back(CastArg);
+
+    // Handle arguments for formal parameters.
+    unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
+    if (!ReInfo.isParamConverted(paramIdx)) {
+      CallArgs.push_back(CastArg);
+      continue;
+    }
+
+    // An argument is converted from indirect to direct. Instead of the
+    // address we pass the loaded value.
+    //
+    // FIXME: If type of CastArg is an archetype, but it is loadable because
+    // of a layout constraint on the caller side, we have a problem here
+    // We need to load the value on the caller side, but this archetype is
+    // not statically known to be loadable on the caller side (though we
+    // have proven dynamically that it has a fixed size).
+    //
+    // We can try to load it as an int value of width N, but then it is not
+    // clear how to convert it into a value of the archetype type, which is
+    // expected. May be we should pass it as @in parameter and make it
+    // loadable on the caller's side?
+    auto argConv = substConv.getSILArgumentConvention(ArgIdx);
+    SILValue Val;
+    if (!argConv.isGuaranteedConvention()) {
+      Val = Builder.emitLoadValueOperation(Loc, CastArg,
+                                           LoadOwnershipQualifier::Take);
+    } else {
+      Val = Builder.emitLoadBorrowOperation(Loc, CastArg);
+      if (Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+        ArgAtIndexNeedsEndBorrow.push_back(CallArgs.size());
+    }
+    CallArgs.push_back(Val);
   }
+
   return StoreResultTo;
 }
 
@@ -745,11 +782,9 @@ void EagerSpecializerTransform::run() {
 
   // Process functions in any order.
   for (auto &F : *getModule()) {
-    // TODO: we should support ownership here but first we'll have to support
-    // ownership in GenericFuncSpecializer.
-    if (!F.shouldOptimize() || F.hasOwnership()) {
+    if (!F.shouldOptimize()) {
       LLVM_DEBUG(llvm::dbgs() << "  Cannot specialize function " << F.getName()
-                              << " because it has ownership or is marked to be "
+                              << " because it is marked to be "
                                  "excluded from optimizations.\n");
       continue;
     }
@@ -787,6 +822,7 @@ void EagerSpecializerTransform::run() {
               [&](const SILSpecializeAttr *SA, SILFunction *NewFunc,
                   const ReabstractionInfo &ReInfo) {
                 if (NewFunc) {
+                  NewFunc->verify();
                   Changed = true;
                   EagerDispatch(&F, ReInfo).emitDispatchTo(NewFunc);
                 }
@@ -800,6 +836,7 @@ void EagerSpecializerTransform::run() {
 
     // As specializations are created, the attributes should be removed.
     F.clearSpecializeAttrs();
+    F.verify();
   }
 }
 
