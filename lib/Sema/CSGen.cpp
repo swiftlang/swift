@@ -4693,6 +4693,13 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   if (LookupResult.ViableCandidates.empty())
     return Result;
 
+  // If there's only one viable member, that is the best one.
+  if (LookupResult.ViableCandidates.size() == 1) {
+    Result.Impl->BestIdx = Result.Impl->AllDecls.size();
+    Result.Impl->AllDecls.push_back(LookupResult.ViableCandidates[0].getDecl());
+    return Result;
+  }
+
   // Try to figure out the best overload.
   ConstraintLocator *Locator = CS.getConstraintLocator(nullptr);
   TypeVariableType *TV = CS.createTypeVariable(Locator,
