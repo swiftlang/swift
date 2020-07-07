@@ -290,3 +290,9 @@ func rdar_62054241() {
     return arr.sorted(by: <) // expected-error {{no exact matches in reference to operator function '<'}}
   }
 }
+
+// SR-11399 - Operator returning IUO doesn't implicitly unwrap
+postfix operator ^^^
+postfix func ^^^ (lhs: Int) -> Int! { 0 }
+
+let x: Int = 1^^^
