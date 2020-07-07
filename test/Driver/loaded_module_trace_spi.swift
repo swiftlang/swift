@@ -17,5 +17,4 @@ import Module0
 
 #endif
 
-// FIXME: SPI imports are marked indirect in trace.
-// CHECK: "name":"Module0","path":"{{[^"]*}}","isImportedDirectly":false
+// CHECK: "name":"Module0","path":"{{[^"]*}}","isImportedDirectly":true
