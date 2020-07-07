@@ -358,7 +358,7 @@
                 "swift-tools-support-core": "0.0.1",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-06-08-a",
                 "swift-argument-parser": "0.1.0",
-                "swift-driver": "master",
+                "swift-driver": "f44c66392e325d71d51f09cfa29c523f8a2e5256",
                 "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-06-08-a",
                 "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-06-08-a",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-06-08-a",
