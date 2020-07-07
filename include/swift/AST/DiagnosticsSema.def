@@ -3095,10 +3095,16 @@ ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
 ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "cannot register derivative for 'init' in a non-final class; consider "
       "making %0 final", (Type))
+ERROR(derivative_attr_unsupported_accessor_kind,none,
+      "cannot register derivative for %0", (/*accessorKind*/ DescriptiveDeclKind))
 // TODO(SR-13096): Remove this temporary diagnostic.
 ERROR(derivative_attr_class_setter_unsupported,none,
       "cannot yet register derivative for class property or subscript setters",
       ())
+// TODO(TF-982): Remove this temporary diagnostic.
+NOTE(derivative_attr_protocol_requirement_unsupported,none,
+     "cannot yet register derivative default implementation for protocol "
+     "requirements", ())
 ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
@@ -3134,15 +3140,25 @@ NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
      "%1", (Type, Type))
 
 // Automatic differentiation attributes
-ERROR(autodiff_attr_original_decl_invalid_kind,none,
-      "%0 is not a 'func', 'init', 'subscript', or 'var' computed property "
-      "declaration", (DeclNameRef))
-ERROR(autodiff_attr_accessor_not_found,none,
-      "%0 does not have a '%1' accessor", (DeclNameRef, StringRef))
-ERROR(autodiff_attr_original_decl_none_valid_found,none,
-      "could not find function %0 with expected type %1", (DeclNameRef, Type))
-ERROR(autodiff_attr_original_decl_not_same_type_context,none,
-      "%0 is not defined in the current type context", (DeclNameRef))
+ERROR(autodiff_attr_original_decl_ambiguous,none,
+      "referenced declaration %0 is ambiguous", (DeclNameRef))
+NOTE(autodiff_attr_original_decl_ambiguous_candidate,none,
+     "candidate %0 found here", (DescriptiveDeclKind))
+ERROR(autodiff_attr_original_decl_none_valid,none,
+      "referenced declaration %0 could not be resolved", (DeclNameRef))
+NOTE(autodiff_attr_original_decl_invalid_kind,none,
+     "candidate %0 is not a 'func', 'init', 'subscript', or 'var' computed "
+     "property declaration", (DescriptiveDeclKind))
+NOTE(autodiff_attr_original_decl_missing_accessor,none,
+     "candidate %0 does not have a %1",
+     (DescriptiveDeclKind, /*accessorDeclKind*/ DescriptiveDeclKind))
+NOTE(autodiff_attr_original_decl_type_mismatch,none,
+     "candidate %0 does not have "
+     "%select{expected type|type equal to or less constrained than}2 %1",
+     (DescriptiveDeclKind, Type, /*hasGenericSignature*/ bool))
+NOTE(autodiff_attr_original_decl_not_same_type_context,none,
+     "candidate %0 is not defined in the current type context",
+     (DescriptiveDeclKind))
 ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
