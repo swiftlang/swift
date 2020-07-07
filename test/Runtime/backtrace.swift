@@ -1,3 +1,5 @@
+// See SR-13165
+// UNSUPPORTED: static_stdlib
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %{python} %S/../Inputs/not.py "%target-run %t/a.out" 2>&1 | %{python} %utils/backtrace-check
