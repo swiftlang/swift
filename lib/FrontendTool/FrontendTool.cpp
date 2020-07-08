@@ -1985,6 +1985,12 @@ static void printTargetInfo(const CompilerInvocation &invocation,
                             llvm::raw_ostream &out) {
   out << "{\n";
 
+  // Compiler version, as produced by --version.
+  out << "  \"compilerVersion\": \"";
+  out.write_escaped(version::getSwiftFullVersion(
+                                                 version::Version::getCurrentLanguageVersion()));
+  out << "\",\n";
+
   // Target triple and target variant triple.
   auto &langOpts = invocation.getLangOptions();
   out << "  \"target\": ";

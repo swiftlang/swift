@@ -9,6 +9,8 @@
 
 // RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
 
+// CHECK-IOS:   "compilerVersion": "Swift version
+
 // CHECK-IOS:   "target": {
 // CHECK-IOS:     "triple": "arm64-apple-ios12.0",
 // CHECK-IOS:     "unversionedTriple": "arm64-apple-ios",
@@ -27,6 +29,8 @@
 // CHECK-IOS:     "runtimeResourcePath": "{{.*}}lib{{(/|\\\\)}}swift"
 // CHECK-IOS:   }
 
+
+// CHECK-LINUX:   "compilerVersion": "Swift version
 
 // CHECK-LINUX:   "target": {
 // CHECK-LINUX:     "triple": "x86_64-unknown-linux",
