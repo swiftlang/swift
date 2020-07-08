@@ -1102,6 +1102,12 @@ public:
         getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
   }
 
+  UncheckedValueCastInst *createUncheckedValueCast(SILLocation Loc, SILValue Op,
+                                                   SILType Ty) {
+    return insert(UncheckedValueCastInst::create(
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+  }
+
   RefToBridgeObjectInst *createRefToBridgeObject(SILLocation Loc, SILValue Ref,
                                                  SILValue Bits) {
     auto Ty = SILType::getBridgeObjectType(getASTContext());
