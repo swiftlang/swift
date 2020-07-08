@@ -9,7 +9,7 @@
 
 // RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
 
-// CHECK-IOS:   "compilerVersion": "Swift version
+// CHECK-IOS:   "compilerVersion": "{{.*}}Swift version
 
 // CHECK-IOS:   "target": {
 // CHECK-IOS:     "triple": "arm64-apple-ios12.0",
