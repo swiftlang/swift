@@ -29,7 +29,7 @@
 #endif
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
+extern "C" {
 #endif
 
 // This declaration might not be universally correct.
@@ -184,7 +184,7 @@ long double lgammal_r(long double x, int *psigngam);
 #endif // defined(__APPLE__)
 
 #ifdef __cplusplus
-}} // extern "C", namespace swift
+} // extern "C"
 #endif
 
 #if __has_feature(nullability)
