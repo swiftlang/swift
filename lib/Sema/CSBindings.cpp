@@ -289,6 +289,19 @@ void ConstraintSystem::PotentialBindings::finalize(
     addPotentialBinding(PotentialBinding::forHole(cs.getASTContext(), locator));
   }
 
+  // Let's always consider `Any` to be a last resort binding because
+  // it's always better to infer concrete type and erase it if required
+  // by the context.
+  if (Bindings.size() > 1) {
+    auto anyType = llvm::find_if(Bindings, [](const PotentialBinding &binding) {
+      return binding.BindingType->isAny() && !binding.isDefaultableBinding();
+    });
+
+    if (anyType != Bindings.end()) {
+      std::rotate(Bindings.begin(), anyType + 1, Bindings.end());
+    }
+  }
+
   // Determine if the bindings only constrain the type variable from above with
   // an existential type; such a binding is not very helpful because it's
   // impossible to enumerate the existential type's subtypes.
