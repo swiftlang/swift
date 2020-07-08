@@ -1884,9 +1884,6 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     return nullptr;
   }
 
-  SourceFile *file = cast<SourceFile>(declContext->getModuleScopeContext());
-  assert(file);
-
   // Create a function
   //
   //     func $main() {
@@ -1953,28 +1950,6 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   func->setBodySynthesizer(synthesizeMainBody, params);
 
   iterableDeclContext->addMember(func);
-
-  // This function must be type-checked. Why?  Consider the following scenario:
-  //
-  //     protocol AlmostMainable {}
-  //     protocol ReallyMainable {}
-  //     extension AlmostMainable where Self : ReallyMainable {
-  //         static func main() {}
-  //     }
-  //     @main struct Main : AlmostMainable {}
-  //
-  // Note in particular that Main does not conform to ReallyMainable.
-  //
-  // In this case, resolveValueMember will find the function main in the 
-  // extension, and so, since there is one candidate, the function $main will
-  // accordingly be formed as usual:
-  //
-  //     func $main() {
-  //         return Main.main()
-  //     }
-  //
-  // Of course, this function's body does not type-check.
-  file->DelayedFunctions.push_back(func);
 
   return func;
 }
