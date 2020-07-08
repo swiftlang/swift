@@ -104,7 +104,8 @@ public:
 // value here.
 #    define SWIFT_ISA_MASK 0xfffffffffffffff8ULL
 #  elif __arm64__
-#    if __has_feature(ptrauth_calls)
+// ARM64 simulators always use the ARM64e mask.
+#    if __has_feature(ptrauth_calls) || TARGET_OS_SIMULATOR
 #      define SWIFT_ISA_MASK 0x007ffffffffffff8ULL
 #    else
 #      if TARGET_OS_OSX
