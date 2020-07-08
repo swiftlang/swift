@@ -2564,6 +2564,23 @@ public:
   void cacheResult(Type value) const;
 };
 
+class SynthesizeMainFunctionRequest
+    : public SimpleRequest<SynthesizeMainFunctionRequest,
+                           FuncDecl *(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  FuncDecl *evaluate(Evaluator &evaluator, Decl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

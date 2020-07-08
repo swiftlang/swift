@@ -1843,7 +1843,15 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   return std::make_pair(body, /*typechecked=*/false);
 }
 
-void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
+FuncDecl *
+SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
+                                        Decl *D) const {
+  auto &context = D->getASTContext();
+
+  MainTypeAttr *attr = D->getAttrs().getAttribute<MainTypeAttr>();
+  if (attr == nullptr)
+    return nullptr;
+
   auto *extension = dyn_cast<ExtensionDecl>(D);
 
   IterableDeclContext *iterableDeclContext;
@@ -1870,10 +1878,10 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
 
   // The type cannot be generic.
   if (nominal->isGenericContext()) {
-    diagnose(attr->getLocation(),
-             diag::attr_generic_ApplicationMain_not_supported, 2);
+    context.Diags.diagnose(attr->getLocation(),
+                           diag::attr_generic_ApplicationMain_not_supported, 2);
     attr->setInvalid();
-    return;
+    return nullptr;
   }
 
   SourceFile *file = cast<SourceFile>(declContext->getModuleScopeContext());
@@ -1890,7 +1898,6 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   // usual type-checking.  The alternative would be to directly call
   // mainType.main() from the entry point, and that would require fully
   // type-checking the call to mainType.main().
-  auto &context = D->getASTContext();
 
   auto resolution = resolveValueMember(
       *declContext, nominal->getInterfaceType(), context.Id_main);
@@ -1918,10 +1925,11 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
     }
 
     if (viableCandidates.size() != 1) {
-      diagnose(attr->getLocation(), diag::attr_MainType_without_main,
-               nominal->getBaseName());
+      context.Diags.diagnose(attr->getLocation(),
+                             diag::attr_MainType_without_main,
+                             nominal->getBaseName());
       attr->setInvalid();
-      return;
+      return nullptr;
     }
     mainFunction = viableCandidates[0];
   }
@@ -1968,12 +1976,23 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   // Of course, this function's body does not type-check.
   file->DelayedFunctions.push_back(func);
 
+  return func;
+}
+
+void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
+  auto &context = D->getASTContext();
+
+  SourceFile *file = D->getDeclContext()->getParentSourceFile();
+  assert(file);
+
+  auto *func = evaluateOrDefault(context.evaluator,
+                                 SynthesizeMainFunctionRequest{D},
+                                 nullptr);
+
   // Register the func as the main decl in the module. If there are multiples
   // they will be diagnosed.
-  if (file->registerMainDecl(func, attr->getLocation())) {
+  if (file->registerMainDecl(func, attr->getLocation()))
     attr->setInvalid();
-    return;
-  }
 }
 
 /// Determine whether the given context is an extension to an Objective-C class
