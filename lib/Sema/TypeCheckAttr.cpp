@@ -1871,10 +1871,6 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
 
   bool mainFunctionThrows = mainFunction->hasThrows();
 
-  auto voidToVoidFunctionType =
-      FunctionType::get({}, context.TheEmptyTupleType,
-                        FunctionType::ExtInfo().withThrows(mainFunctionThrows));
-  auto nominalToVoidToVoidFunctionType = FunctionType::get({AnyFunctionType::Param(nominal->getInterfaceType())}, voidToVoidFunctionType);
   auto *func = FuncDecl::create(
       context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::KeywordStatic,
       /*FuncLoc*/ SourceLoc(),
@@ -1930,7 +1926,6 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   auto *body = BraceStmt::create(context, SourceLoc(), stmts,
                                 SourceLoc(), /*Implicit*/true);
   func->setBodyParsed(body);
-  func->setInterfaceType(nominalToVoidToVoidFunctionType);
 
   iterableDeclContext->addMember(func);
 
