@@ -1,4 +1,4 @@
-//===--- JVPEmitter.cpp - JVP generation in differentiation ---*- C++ -*---===//
+//===--- JVPCloner.cpp - JVP function generation --------------*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,7 +17,7 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SILOptimizer/Differentiation/JVPEmitter.h"
+#include "swift/SILOptimizer/Differentiation/JVPCloner.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
@@ -32,8 +32,8 @@ namespace autodiff {
 //--------------------------------------------------------------------------//
 
 /*static*/
-SubstitutionMap JVPEmitter::getSubstitutionMap(SILFunction *original,
-                                               SILFunction *jvp) {
+SubstitutionMap JVPCloner::getSubstitutionMap(SILFunction *original,
+                                              SILFunction *jvp) {
   auto substMap = original->getForwardingSubstitutionMap();
   if (auto *jvpGenEnv = jvp->getGenericEnvironment()) {
     auto jvpSubstMap = jvpGenEnv->getForwardingSubstitutionMap();
@@ -46,8 +46,8 @@ SubstitutionMap JVPEmitter::getSubstitutionMap(SILFunction *original,
 
 /*static*/
 const DifferentiableActivityInfo &
-JVPEmitter::getActivityInfo(ADContext &context, SILFunction *original,
-                            SILAutoDiffIndices indices, SILFunction *jvp) {
+JVPCloner::getActivityInfo(ADContext &context, SILFunction *original,
+                           SILAutoDiffIndices indices, SILFunction *jvp) {
   // Get activity info of the original function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
@@ -60,9 +60,9 @@ JVPEmitter::getActivityInfo(ADContext &context, SILFunction *original,
   return activityInfo;
 }
 
-JVPEmitter::JVPEmitter(ADContext &context, SILFunction *original,
-                       SILDifferentiabilityWitness *witness, SILFunction *jvp,
-                       DifferentiationInvoker invoker)
+JVPCloner::JVPCloner(ADContext &context, SILFunction *original,
+                     SILDifferentiabilityWitness *witness, SILFunction *jvp,
+                     DifferentiationInvoker invoker)
     : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
       context(context), original(original), witness(witness), jvp(jvp),
       invoker(invoker),
@@ -81,7 +81,7 @@ JVPEmitter::JVPEmitter(ADContext &context, SILFunction *original,
 // Differential struct mapping
 //--------------------------------------------------------------------------//
 
-void JVPEmitter::initializeDifferentialStructElements(
+void JVPCloner::initializeDifferentialStructElements(
     SILBasicBlock *origBB, SILInstructionResultArray values) {
   auto *diffStructDecl = differentialInfo.getLinearMapStruct(origBB);
   assert(diffStructDecl->getStoredProperties().size() == values.size() &&
@@ -99,8 +99,8 @@ void JVPEmitter::initializeDifferentialStructElements(
   }
 }
 
-SILValue JVPEmitter::getDifferentialStructElement(SILBasicBlock *origBB,
-                                                  VarDecl *field) {
+SILValue JVPCloner::getDifferentialStructElement(SILBasicBlock *origBB,
+                                                 VarDecl *field) {
   assert(differentialInfo.getLinearMapStruct(origBB) ==
          cast<StructDecl>(field->getDeclContext()));
   assert(differentialStructElements.count(field) &&
@@ -113,7 +113,7 @@ SILValue JVPEmitter::getDifferentialStructElement(SILBasicBlock *origBB,
 //--------------------------------------------------------------------------//
 
 SILBasicBlock::iterator
-JVPEmitter::getNextDifferentialLocalAllocationInsertionPoint() {
+JVPCloner::getNextDifferentialLocalAllocationInsertionPoint() {
   // If there are no local allocations, insert at the beginning of the tangent
   // entry.
   if (differentialLocalAllocations.empty())
@@ -126,20 +126,20 @@ JVPEmitter::getNextDifferentialLocalAllocationInsertionPoint() {
   return it;
 }
 
-SILType JVPEmitter::getLoweredType(Type type) {
+SILType JVPCloner::getLoweredType(Type type) {
   auto jvpGenSig = jvp->getLoweredFunctionType()->getSubstGenericSignature();
   Lowering::AbstractionPattern pattern(jvpGenSig,
                                        type->getCanonicalType(jvpGenSig));
   return jvp->getLoweredType(pattern, type);
 }
 
-SILType JVPEmitter::getNominalDeclLoweredType(NominalTypeDecl *nominal) {
+SILType JVPCloner::getNominalDeclLoweredType(NominalTypeDecl *nominal) {
   auto nominalType =
       getOpASTType(nominal->getDeclaredInterfaceType()->getCanonicalType());
   return getLoweredType(nominalType);
 }
 
-StructInst *JVPEmitter::buildDifferentialValueStructValue(TermInst *termInst) {
+StructInst *JVPCloner::buildDifferentialValueStructValue(TermInst *termInst) {
   assert(termInst->getFunction() == original);
   auto loc = termInst->getFunction()->getLocation();
   auto *origBB = termInst->getParent();
@@ -160,11 +160,11 @@ StructInst *JVPEmitter::buildDifferentialValueStructValue(TermInst *termInst) {
 // Tangent value factory methods
 //--------------------------------------------------------------------------//
 
-AdjointValue JVPEmitter::makeZeroTangentValue(SILType type) {
+AdjointValue JVPCloner::makeZeroTangentValue(SILType type) {
   return AdjointValue::createZero(allocator, remapSILTypeInDifferential(type));
 }
 
-AdjointValue JVPEmitter::makeConcreteTangentValue(SILValue value) {
+AdjointValue JVPCloner::makeConcreteTangentValue(SILValue value) {
   return AdjointValue::createConcrete(allocator, value);
 }
 
@@ -172,8 +172,8 @@ AdjointValue JVPEmitter::makeConcreteTangentValue(SILValue value) {
 // Tangent materialization
 //--------------------------------------------------------------------------//
 
-void JVPEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
-                                  SILLocation loc) {
+void JVPCloner::emitZeroIndirect(CanType type, SILValue bufferAccess,
+                                 SILLocation loc) {
   auto builder = getDifferentialBuilder();
   auto tangentSpace = getTangentSpace(type);
   assert(tangentSpace && "No tangent space for this type");
@@ -194,7 +194,7 @@ void JVPEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   }
 }
 
-SILValue JVPEmitter::emitZeroDirect(CanType type, SILLocation loc) {
+SILValue JVPCloner::emitZeroDirect(CanType type, SILLocation loc) {
   auto diffBuilder = getDifferentialBuilder();
   auto silType = getModule().Types.getLoweredLoadableType(
       type, TypeExpansionContext::minimal(), getModule());
@@ -206,8 +206,8 @@ SILValue JVPEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   return loaded;
 }
 
-SILValue JVPEmitter::materializeTangentDirect(AdjointValue val,
-                                              SILLocation loc) {
+SILValue JVPCloner::materializeTangentDirect(AdjointValue val,
+                                             SILLocation loc) {
   assert(val.getType().isObject());
   LLVM_DEBUG(getADDebugStream()
              << "Materializing tangents for " << val << '\n');
@@ -225,7 +225,7 @@ SILValue JVPEmitter::materializeTangentDirect(AdjointValue val,
   llvm_unreachable("invalid value kind");
 }
 
-SILValue JVPEmitter::materializeTangent(AdjointValue val, SILLocation loc) {
+SILValue JVPCloner::materializeTangent(AdjointValue val, SILLocation loc) {
   if (val.isConcrete()) {
     LLVM_DEBUG(getADDebugStream()
                << "Materializing tangent: Value is concrete.\n");
@@ -240,9 +240,8 @@ SILValue JVPEmitter::materializeTangent(AdjointValue val, SILLocation loc) {
 // Tangent buffer mapping
 //--------------------------------------------------------------------------//
 
-void JVPEmitter::setTangentBuffer(SILBasicBlock *origBB,
-                                  SILValue originalBuffer,
-                                  SILValue tangentBuffer) {
+void JVPCloner::setTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
+                                 SILValue tangentBuffer) {
   assert(originalBuffer->getType().isAddress());
   auto insertion =
       bufferMap.try_emplace({origBB, originalBuffer}, tangentBuffer);
@@ -250,8 +249,8 @@ void JVPEmitter::setTangentBuffer(SILBasicBlock *origBB,
   (void)insertion;
 }
 
-SILValue &JVPEmitter::getTangentBuffer(SILBasicBlock *origBB,
-                                       SILValue originalBuffer) {
+SILValue &JVPCloner::getTangentBuffer(SILBasicBlock *origBB,
+                                      SILValue originalBuffer) {
   assert(originalBuffer->getType().isAddress());
   assert(originalBuffer->getFunction() == original);
   auto insertion = bufferMap.try_emplace({origBB, originalBuffer}, SILValue());
@@ -266,23 +265,23 @@ SILValue &JVPEmitter::getTangentBuffer(SILBasicBlock *origBB,
 /// Substitutes all replacement types of the given substitution map using the
 /// tangent function's substitution map.
 SubstitutionMap
-JVPEmitter::remapSubstitutionMapInDifferential(SubstitutionMap substMap) {
+JVPCloner::remapSubstitutionMapInDifferential(SubstitutionMap substMap) {
   return substMap.subst(getDifferential().getForwardingSubstitutionMap());
 }
 
-Type JVPEmitter::remapTypeInDifferential(Type ty) {
+Type JVPCloner::remapTypeInDifferential(Type ty) {
   if (ty->hasArchetype())
     return getDifferential().mapTypeIntoContext(ty->mapTypeOutOfContext());
   return getDifferential().mapTypeIntoContext(ty);
 }
 
-SILType JVPEmitter::remapSILTypeInDifferential(SILType ty) {
+SILType JVPCloner::remapSILTypeInDifferential(SILType ty) {
   if (ty.hasArchetype())
     return getDifferential().mapTypeIntoContext(ty.mapTypeOutOfContext());
   return getDifferential().mapTypeIntoContext(ty);
 }
 
-Optional<TangentSpace> JVPEmitter::getTangentSpace(CanType type) {
+Optional<TangentSpace> JVPCloner::getTangentSpace(CanType type) {
   // Use witness generic signature to remap types.
   if (auto witnessGenSig = witness->getDerivativeGenericSignature())
     type = witnessGenSig->getCanonicalTypeInContext(type);
@@ -290,7 +289,7 @@ Optional<TangentSpace> JVPEmitter::getTangentSpace(CanType type) {
       LookUpConformanceInModule(getModule().getSwiftModule()));
 }
 
-SILType JVPEmitter::getRemappedTangentType(SILType type) {
+SILType JVPCloner::getRemappedTangentType(SILType type) {
   return SILType::getPrimitiveType(
       getTangentSpace(remapSILTypeInDifferential(type).getASTType())
           ->getCanonicalType(),
@@ -301,7 +300,7 @@ SILType JVPEmitter::getRemappedTangentType(SILType type) {
 // Tangent value mapping
 //--------------------------------------------------------------------------//
 
-AdjointValue JVPEmitter::getTangentValue(SILValue originalValue) {
+AdjointValue JVPCloner::getTangentValue(SILValue originalValue) {
   assert(originalValue->getType().isObject());
   assert(originalValue->getFunction() == original);
   auto insertion = tangentValueMap.try_emplace(
@@ -310,8 +309,8 @@ AdjointValue JVPEmitter::getTangentValue(SILValue originalValue) {
   return insertion.first->getSecond();
 }
 
-void JVPEmitter::setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
-                                 AdjointValue newTangentValue) {
+void JVPCloner::setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
+                                AdjointValue newTangentValue) {
 #ifndef NDEBUG
   if (auto *defInst = originalValue->getDefiningInstruction()) {
     bool isTupleTypedApplyResult =
@@ -339,12 +338,12 @@ void JVPEmitter::setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
 //--------------------------------------------------------------------------//
 
 #define CLONE_AND_EMIT_TANGENT(INST, ID)                                       \
-  void JVPEmitter::visit##INST##Inst(INST##Inst *inst) {                       \
+  void JVPCloner::visit##INST##Inst(INST##Inst *inst) {                        \
     TypeSubstCloner::visit##INST##Inst(inst);                                  \
     if (differentialInfo.shouldDifferentiateInstruction(inst))                 \
       emitTangentFor##INST##Inst(inst);                                        \
   }                                                                            \
-  void JVPEmitter::emitTangentFor##INST##Inst(INST##Inst *(ID))
+  void JVPCloner::emitTangentFor##INST##Inst(INST##Inst *(ID))
 
 CLONE_AND_EMIT_TANGENT(BeginBorrow, bbi) {
   auto &diffBuilder = getDifferentialBuilder();
@@ -711,7 +710,7 @@ CLONE_AND_EMIT_TANGENT(DestructureTuple, dti) {
 /// Handle `apply` instruction.
 ///   Original: y = apply f(x0, x1, ...)
 ///    Tangent: tan[y] = apply diff_f(tan[x0], tan[x1], ...)
-void JVPEmitter::emitTangentForApplyInst(
+void JVPCloner::emitTangentForApplyInst(
     ApplyInst *ai, SILAutoDiffIndices applyIndices,
     CanSILFunctionType originalDifferentialType) {
   assert(differentialInfo.shouldDifferentiateApplySite(ai));
@@ -837,7 +836,7 @@ void JVPEmitter::emitTangentForApplyInst(
 }
 
 /// Generate a `return` instruction in the current differential basic block.
-void JVPEmitter::emitReturnInstForDifferential() {
+void JVPCloner::emitReturnInstForDifferential() {
   auto &differential = getDifferential();
   auto diffLoc = differential.getLocation();
   auto &diffBuilder = getDifferentialBuilder();
@@ -860,7 +859,7 @@ void JVPEmitter::emitReturnInstForDifferential() {
                            joinElements(retElts, diffBuilder, diffLoc));
 }
 
-void JVPEmitter::prepareForDifferentialGeneration() {
+void JVPCloner::prepareForDifferentialGeneration() {
   // Create differential blocks and arguments.
   auto &differential = getDifferential();
   auto *origEntry = original->getEntryBlock();
@@ -959,9 +958,9 @@ void JVPEmitter::prepareForDifferentialGeneration() {
 }
 
 /*static*/ SILFunction *
-JVPEmitter::createEmptyDifferential(ADContext &context,
-                                    SILDifferentiabilityWitness *witness,
-                                    LinearMapInfo *linearMapInfo) {
+JVPCloner::createEmptyDifferential(ADContext &context,
+                                   SILDifferentiabilityWitness *witness,
+                                   LinearMapInfo *linearMapInfo) {
   auto &module = context.getModule();
   auto *original = witness->getOriginalFunction();
   auto *jvp = witness->getJVP();
@@ -1069,7 +1068,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
 }
 
 /// Run JVP generation. Returns true on error.
-bool JVPEmitter::run() {
+bool JVPCloner::run() {
   PrettyStackTraceSILFunction trace("generating JVP and differential for",
                                     original);
   LLVM_DEBUG(getADDebugStream() << "Cloning original @" << original->getName()
@@ -1095,23 +1094,23 @@ bool JVPEmitter::run() {
   return errorOccurred;
 }
 
-void JVPEmitter::postProcess(SILInstruction *orig, SILInstruction *cloned) {
+void JVPCloner::postProcess(SILInstruction *orig, SILInstruction *cloned) {
   if (errorOccurred)
     return;
   SILClonerWithScopes::postProcess(orig, cloned);
 }
 
 /// Remap original basic blocks.
-SILBasicBlock *JVPEmitter::remapBasicBlock(SILBasicBlock *bb) {
+SILBasicBlock *JVPCloner::remapBasicBlock(SILBasicBlock *bb) {
   auto *jvpBB = BBMap[bb];
   return jvpBB;
 }
 
-void JVPEmitter::visit(SILInstruction *inst) {
+void JVPCloner::visit(SILInstruction *inst) {
   if (errorOccurred)
     return;
   if (differentialInfo.shouldDifferentiateInstruction(inst)) {
-    LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]" << *inst);
+    LLVM_DEBUG(getADDebugStream() << "JVPCloner visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
     auto diffBuilder = getDifferentialBuilder();
     auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
@@ -1128,13 +1127,13 @@ void JVPEmitter::visit(SILInstruction *inst) {
   }
 }
 
-void JVPEmitter::visitSILInstruction(SILInstruction *inst) {
+void JVPCloner::visitSILInstruction(SILInstruction *inst) {
   context.emitNondifferentiabilityError(
       inst, invoker, diag::autodiff_expression_not_differentiable_note);
   errorOccurred = true;
 }
 
-void JVPEmitter::visitInstructionsInBlock(SILBasicBlock *bb) {
+void JVPCloner::visitInstructionsInBlock(SILBasicBlock *bb) {
   // Destructure the differential struct to get the elements.
   auto &diffBuilder = getDifferentialBuilder();
   auto diffLoc = getDifferential().getLocation();
@@ -1149,7 +1148,7 @@ void JVPEmitter::visitInstructionsInBlock(SILBasicBlock *bb) {
 
 // If an `apply` has active results or active inout parameters, replace it
 // with an `apply` of its JVP.
-void JVPEmitter::visitApplyInst(ApplyInst *ai) {
+void JVPCloner::visitApplyInst(ApplyInst *ai) {
   // If the function should not be differentiated or its the array literal
   // initialization intrinsic, just do standard cloning.
   if (!differentialInfo.shouldDifferentiateApplySite(ai) ||
@@ -1375,7 +1374,7 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   emitTangentForApplyInst(ai, indices, originalDifferentialType);
 }
 
-void JVPEmitter::visitReturnInst(ReturnInst *ri) {
+void JVPCloner::visitReturnInst(ReturnInst *ri) {
   auto loc = ri->getOperand().getLoc();
   auto *origExit = ri->getParent();
   auto &builder = getBuilder();
@@ -1432,19 +1431,19 @@ void JVPEmitter::visitReturnInst(ReturnInst *ri) {
   builder.createReturn(ri->getLoc(), joinElements(directResults, builder, loc));
 }
 
-void JVPEmitter::visitBranchInst(BranchInst *bi) {
+void JVPCloner::visitBranchInst(BranchInst *bi) {
   llvm_unreachable("Unsupported SIL instruction.");
 }
 
-void JVPEmitter::visitCondBranchInst(CondBranchInst *cbi) {
+void JVPCloner::visitCondBranchInst(CondBranchInst *cbi) {
   llvm_unreachable("Unsupported SIL instruction.");
 }
 
-void JVPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
+void JVPCloner::visitSwitchEnumInst(SwitchEnumInst *sei) {
   llvm_unreachable("Unsupported SIL instruction.");
 }
 
-void JVPEmitter::visitDifferentiableFunctionInst(
+void JVPCloner::visitDifferentiableFunctionInst(
     DifferentiableFunctionInst *dfi) {
   // Clone `differentiable_function` from original to JVP, then add the cloned
   // instruction to the `differentiable_function` worklist.
