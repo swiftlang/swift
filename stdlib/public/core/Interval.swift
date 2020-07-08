@@ -1,4 +1,4 @@
-//===--- Interval.swift ---------------------------------------*- swift -*-===//
+// Interval.swift - Unified and complete interval represenatation.
 //
 // This source file is part of the Swift.org open source project
 //
@@ -8,7 +8,14 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===----------------------------------------------------------------------===//
+// -----------------------------------------------------------------------------
+///
+/// This file comtains the definitaion of the `Interval` generic struct, along
+/// with its extensions. Extensions of `Comparable`, `Range`, and `Collection`
+/// that closely relate to `Interval` are also contained within, but potentially
+/// will be moved into their own files.
+///
+// -----------------------------------------------------------------------------
 
 // TODO: Decide whether to allow closed unbounded intervals: [-∞, ∞],
 // and up date the documentation if the decision is yes.
