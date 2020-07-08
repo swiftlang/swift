@@ -105,7 +105,7 @@ macro(configure_build)
 endmacro()
 
 macro(configure_sdks_darwin)
-  set(macosx_arch "x86_64")
+  set(macosx_arch "x86_64" "arm64")
   set(iphoneos_arch "arm64" "arm64e" "armv7")
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k")
@@ -609,11 +609,7 @@ function (swift_benchmark_compile_archopts)
 
   if(is_darwin)
     # If host == target.
-    if("${BENCH_COMPILE_ARCHOPTS_PLATFORM}" STREQUAL "macosx")
-      set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
-    else()
-      set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
-    endif()
+    set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   else()
     # If we are on Linux, we do not support cross compiling.
     set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")

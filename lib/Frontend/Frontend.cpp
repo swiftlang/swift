@@ -410,6 +410,11 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
+  if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
+    Diagnostics.setLocalization(
+        Invocation.getDiagnosticOptions().LocalizationCode,
+        Invocation.getDiagnosticOptions().LocalizationPath);
+  }
 }
 
 // The ordering of ModuleLoaders is important!
@@ -499,7 +504,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
         LoaderOpts,
         IgnoreSourceInfoFile);
-    Context->addModuleLoader(std::move(PIML));
+    Context->addModuleLoader(std::move(PIML), false, false, true);
   }
 
   std::unique_ptr<SerializedModuleLoader> SML =
@@ -977,22 +982,17 @@ void CompilerInstance::freeASTContext() {
 /// Perform "stable" optimizations that are invariant across compiler versions.
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
+  // Don't run diagnostic passes at all when merging modules.
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::MergeModules) {
-    // Don't run diagnostic passes at all.
-  } else if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
-    if (runSILDiagnosticPasses(*SM))
-      return true;
-  } else {
+    return false;
+  }
+  if (Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
     // Even if we are not supposed to run the diagnostic passes, we still need
     // to run the ownership evaluator.
-    if (runSILOwnershipEliminatorPass(*SM))
-      return true;
+    return runSILOwnershipEliminatorPass(*SM);
   }
-
-  if (Invocation.getSILOptions().MergePartialModules)
-    SM->linkAllFromCurrentModule();
-  return false;
+  return runSILDiagnosticPasses(*SM);
 }
 
 /// Perform SIL optimization passes if optimizations haven't been disabled.

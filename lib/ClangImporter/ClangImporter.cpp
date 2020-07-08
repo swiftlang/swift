@@ -40,6 +40,7 @@
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
@@ -742,10 +743,19 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-mcpu=" + importerOpts.TargetCPU);
 
   } else if (triple.isOSDarwin()) {
-    // Special case: arm64 defaults to the "cyclone" CPU for Darwin,
-    // and arm64e defaults to the "vortex" CPU for Darwin,
-    // but Clang only detects this if we use -arch.
+    // Special case CPU based on known deployments:
+    //   - arm64 deploys to cyclone
+    //   - arm64 on macOS
+    //   - arm64 for iOS/tvOS/watchOS simulators
+    //   - arm64e deploys to vortex
+    // and arm64e (everywhere) and arm64e macOS defaults to the "vortex" CPU
+    // for Darwin, but Clang only detects this if we use -arch.
     if (triple.getArchName() == "arm64e")
+      invocationArgStrs.push_back("-mcpu=vortex");
+    else if (triple.isAArch64() && triple.isMacOSX())
+      invocationArgStrs.push_back("-mcpu=vortex");
+    else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
+             (triple.isiOS() || triple.isWatchOS()))
       invocationArgStrs.push_back("-mcpu=vortex");
     else if (triple.getArch() == llvm::Triple::aarch64 ||
              triple.getArch() == llvm::Triple::aarch64_be) {
@@ -1213,7 +1223,8 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
   // Set up the imported header module.
-  auto *importedHeaderModule = ModuleDecl::create(ctx.getIdentifier("__ObjC"), ctx);
+  auto *importedHeaderModule =
+      ModuleDecl::create(ctx.getIdentifier(CLANG_HEADER_MODULE_NAME), ctx);
   importer->Impl.ImportedHeaderUnit =
     new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
@@ -2919,11 +2930,12 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
 bool ClangImporter::Implementation::isVisibleClangEntry(
     const clang::NamedDecl *clangDecl) {
   // For a declaration, check whether the declaration is hidden.
-  if (!clangDecl->isHidden()) return true;
+  clang::Sema &clangSema = getClangSema();
+  if (clangSema.isVisible(clangDecl)) return true;
 
   // Is any redeclaration visible?
   for (auto redecl : clangDecl->redecls()) {
-    if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+    if (clangSema.isVisible(cast<clang::NamedDecl>(redecl))) return true;
   }
 
   return false;
@@ -3034,8 +3046,10 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     SmallVector<clang::NamedDecl *, 4> DelayedCategories;
 
     // Simply importing the categories adds them to the list of extensions.
-    for (const auto *Cat : objcClass->visible_categories()) {
-      Impl.importDeclReal(Cat, Impl.CurrentVersion);
+    for (const auto *Cat : objcClass->known_categories()) {
+      if (getClangSema().isVisible(Cat)) {
+        Impl.importDeclReal(Cat, Impl.CurrentVersion);
+      }
     }
   }
 
@@ -3616,6 +3630,18 @@ void ClangImporter::Implementation::lookupValue(
        VisibleDeclConsumer &consumer) {
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
+
+  // For operators we have to look up static member functions in addition to the
+  // top-level function lookup below.
+  if (name.isOperator()) {
+    for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
+      if (isVisibleClangEntry(entry)) {
+        if (auto decl = dyn_cast<ValueDecl>(
+                importDeclReal(entry->getMostRecentDecl(), CurrentVersion)))
+          consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+      }
+    }
+  }
 
   for (auto entry : table.lookup(name.getBaseName(), clangTU)) {
     // If the entry is not visible, skip it.

@@ -75,8 +75,8 @@ void PrettyStackTraceSILLocation::print(llvm::raw_ostream &out) const {
 }
 
 void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
-  out << "While " << Action << " SIL function ";
-  if (!TheFn) {
+  out << "While " << action << " SIL function ";
+  if (!func) {
     out << " <<null>>";
     return;
   }
@@ -86,16 +86,16 @@ void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
 
 void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) const {  
   out << "\"";
-  TheFn->printName(out);
+  func->printName(out);
   out << "\".\n";
 
-  if (!TheFn->getLocation().isNull()) {
+  if (!func->getLocation().isNull()) {
     out << " for ";
-    printSILLocationDescription(out, TheFn->getLocation(),
-                                TheFn->getModule().getASTContext());
+    printSILLocationDescription(out, func->getLocation(),
+                                func->getModule().getASTContext());
   }
   if (SILPrintOnError)
-    TheFn->print(out);
+    func->print(out);
 }
 
 void PrettyStackTraceSILNode::print(llvm::raw_ostream &out) const {

@@ -8,7 +8,7 @@
 //
 // RUN: %FileCheck %s < %t/error-output
 //
-// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: VENDOR=apple
 
 // Test that the functions defined in the OSLogPrototype overlay annotated as
 // constant evaluable are so (with the constexpr-limit defined above).

@@ -29,7 +29,7 @@
 #endif
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
+extern "C" {
 #endif
 
 // This declaration might not be universally correct.
@@ -497,7 +497,7 @@ long double _stdlib_lgammal(long double x) {
 // SWIFT_ENABLE_TENSORFLOW END
 
 #ifdef __cplusplus
-}} // extern "C", namespace swift
+} // extern "C"
 #endif
 
 #if __has_feature(nullability)

@@ -597,7 +597,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     fn->setSerialized(IsSerialized_t(isSerialized));
 
-    if (SILMod.getOptions().MergePartialModules)
+    // If the serialized function comes from the same module, we're merging
+    // modules, and can update the the linkage directly. This is needed to
+    // correctly update the linkage for forward declarations to entities defined
+    // in another file of the same module – we want to ensure the linkage
+    // reflects the fact that the entity isn't really external and shouldn't be
+    // dropped from the resulting merged module.
+    if (getFile()->getParentModule() == SILMod.getSwiftModule())
       fn->setLinkage(linkage);
 
     // Don't override the transparency or linkage of a function with
@@ -666,7 +672,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // Mark this function as deserialized. This avoids rerunning diagnostic
   // passes. Certain passes in the madatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
-  if (!MF->IsSIB)
+  if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
 
   fn->setBare(IsBare);
@@ -1592,6 +1598,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
     break;
   }
+  case SILInstructionKind::BaseAddrForOffsetInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createBaseAddrForOffset(Loc,
+              getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    break;
   case SILInstructionKind::DeallocStackInst: {
     auto Ty = MF->getType(TyID);
     ResultVal = Builder.createDeallocStack(

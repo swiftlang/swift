@@ -416,7 +416,7 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 }
 
 bool MissingConformanceFailure::diagnoseAsError() {
-  auto *anchor = castToExpr(getAnchor());
+  auto anchor = getAnchor();
   auto nonConformingType = getLHS();
   auto protocolType = getRHS();
 
@@ -425,8 +425,9 @@ bool MissingConformanceFailure::diagnoseAsError() {
   // with it and if so skip conformance error, otherwise we'd
   // produce an unrelated `<type> doesn't conform to Equatable protocol`
   // diagnostic.
-  if (isPatternMatchingOperator(const_cast<Expr *>(anchor))) {
-    if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(findParentExpr(anchor))) {
+  if (isPatternMatchingOperator(anchor)) {
+    auto *expr = castToExpr(anchor);
+    if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(findParentExpr(expr))) {
       auto *caseExpr = binaryOp->getArg()->getElement(0);
 
       llvm::SmallPtrSet<Expr *, 4> anchors;
@@ -454,6 +455,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
   // says that conformances for enums with associated values can't be
   // synthesized.
   if (isStandardComparisonOperator(anchor)) {
+    auto *expr = castToExpr(anchor);
     auto isEnumWithAssociatedValues = [](Type type) -> bool {
       if (auto *enumType = type->getAs<EnumType>())
         return !enumType->getDecl()->hasOnlyCasesWithoutAssociatedValues();
@@ -466,7 +468,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
         (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
          protocol->isSpecificProtocol(KnownProtocolKind::Comparable))) {
       if (RequirementFailure::diagnoseAsError()) {
-        auto opName = getOperatorName(anchor);
+        auto opName = getOperatorName(expr);
         emitDiagnostic(diag::no_binary_op_overload_for_enum_with_payload,
                        opName->str());
         return true;
@@ -502,7 +504,9 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
   }
 
   emitDiagnostic(diag::type_cannot_conform,
-                 nonConformingType->isExistentialType(), nonConformingType,
+                 nonConformingType->isExistentialType(), 
+                 nonConformingType, 
+                 nonConformingType->isEqual(protocolType),
                  protocolType);
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
@@ -613,6 +617,10 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_subscript_assign;
   case CTP_Condition:
     return diag::cannot_convert_condition_value;
+  case CTP_WrappedProperty:
+    return diag::wrapped_value_mismatch;
+  case CTP_ComposedPropertyWrapper:
+    return diag::composed_property_wrapper_mismatch;
 
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
@@ -2089,7 +2097,8 @@ bool ContextualFailure::diagnoseAsError() {
     if (CTP == CTP_ForEachStmt) {
       if (fromType->isAnyExistentialType()) {
         emitDiagnostic(diag::type_cannot_conform,
-                       /*isExistentialType=*/true, fromType, toType);
+                       /*isExistentialType=*/true, fromType, 
+                       fromType->isEqual(toType), toType);
         return true;
       }
 
@@ -2206,6 +2215,8 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
   case CTP_YieldByReference:
+  case CTP_WrappedProperty:
+  case CTP_ComposedPropertyWrapper:
     return None;
 
   case CTP_EnumCaseRawValue:
@@ -2904,6 +2915,11 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_Condition:
     return diag::cannot_convert_condition_value;
 
+  case CTP_WrappedProperty:
+    return diag::wrapped_value_mismatch;
+  case CTP_ComposedPropertyWrapper:
+    return diag::composed_property_wrapper_mismatch;
+
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
   case CTP_Unused:
@@ -3375,7 +3391,7 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
 
   auto parentType = getType(parentExpr);
 
-  if (!isCollectionType(parentType) && !parentType->is<TupleType>())
+  if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
     return false;
 
   if (isa<TupleExpr>(parentExpr)) {
@@ -5000,8 +5016,15 @@ bool MissingGenericArgumentsFailure::diagnoseAsError() {
         scopedParameters[base].push_back(GP);
       });
 
-  if (!isScoped)
-    return diagnoseForAnchor(castToExpr(getAnchor()), Parameters);
+  // FIXME: this code should be generalized now that we can anchor the
+  // fixes on the TypeRepr with the missing generic arg.
+  if (!isScoped) {
+    assert(getAnchor().is<Expr *>() || getAnchor().is<TypeRepr *>());
+    if (auto *expr = getAsExpr(getAnchor()))
+      return diagnoseForAnchor(expr, Parameters);
+
+    return diagnoseForAnchor(getAnchor().get<TypeRepr *>(), Parameters);
+  }
 
   bool diagnosed = false;
   for (const auto &scope : scopedParameters)

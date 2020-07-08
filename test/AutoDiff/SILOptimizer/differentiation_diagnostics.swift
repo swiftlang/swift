@@ -346,12 +346,8 @@ func multipleResults(_ x: Float) -> (Float, Float) {
   return (x, x)
 }
 
-// TODO(TF-983): Support differentiation of multiple results.
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+2 {{when differentiating this function definition}}
 @differentiable
 func usesMultipleResults(_ x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate through multiple results}}
   let tuple = multipleResults(x)
   return tuple.0 + tuple.1
 }
@@ -440,27 +436,19 @@ func activeInoutParamMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
   nonactive = result.0
 }
 
-// TODO(TF-983): Support differentiation of multiple results.
 func twoInoutParameters(_ x: inout Float, _ y: inout Float) {}
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+2 {{when differentiating this function definition}}
 @differentiable
 func testTwoInoutParameters(_ x: Float, _ y: Float) -> Float {
   var x = x
   var y = y
-  // expected-note @+1 {{cannot differentiate through multiple results}}
   twoInoutParameters(&x, &y)
   return x
 }
 
-// TODO(TF-983): Support differentiation of multiple results.
 func inoutParameterAndFormalResult(_ x: inout Float) -> Float { x }
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+2 {{when differentiating this function definition}}
 @differentiable
 func testInoutParameterAndFormalResult(_ x: Float) -> Float {
   var x = x
-  // expected-note @+1 {{cannot differentiate through multiple results}}
   return inoutParameterAndFormalResult(&x)
 }
 

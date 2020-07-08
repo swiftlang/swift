@@ -5,6 +5,7 @@
 // RUN: cd %S && %swift_driver -sdk %sdk -lInputs/libTestLoad.dylib %s | %FileCheck -check-prefix=WITH-LIB %s
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
+// REQUIRES: swift_interpreter
 
 import ObjectiveC
 

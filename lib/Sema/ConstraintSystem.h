@@ -856,6 +856,7 @@ public:
     stmtCondElement,
     stmt,
     patternBindingEntry,
+    varDecl,
   };
 
 private:
@@ -870,6 +871,8 @@ private:
       const PatternBindingDecl *patternBinding;
       unsigned index;
     } patternBindingEntry;
+
+    const VarDecl *varDecl;
   } storage;
 
 public:
@@ -895,6 +898,11 @@ public:
     storage.patternBindingEntry.index = index;
   }
 
+  SolutionApplicationTargetsKey(const VarDecl *varDecl) {
+    kind = Kind::varDecl;
+    storage.varDecl = varDecl;
+  }
+
   friend bool operator==(
       SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
     if (lhs.kind != rhs.kind)
@@ -916,6 +924,9 @@ public:
                 == rhs.storage.patternBindingEntry.patternBinding) &&
           (lhs.storage.patternBindingEntry.index
              == rhs.storage.patternBindingEntry.index);
+
+    case Kind::varDecl:
+      return lhs.storage.varDecl == rhs.storage.varDecl;
     }
     llvm_unreachable("invalid SolutionApplicationTargetsKey kind");
   }
@@ -951,6 +962,11 @@ public:
               storage.patternBindingEntry.patternBinding),
           DenseMapInfo<unsigned>::getHashValue(
               storage.patternBindingEntry.index));
+
+    case Kind::varDecl:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.varDecl));
     }
     llvm_unreachable("invalid statement kind");
   }
@@ -1343,6 +1359,7 @@ public:
     stmtCondition,
     caseLabelItem,
     patternBinding,
+    uninitializedWrappedVar,
   } kind;
 
 private:
@@ -1409,6 +1426,8 @@ private:
     } caseLabelItem;
 
     PatternBindingDecl *patternBinding;
+
+    VarDecl *uninitializedWrappedVar;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1454,6 +1473,11 @@ public:
     this->patternBinding = patternBinding;
   }
 
+  SolutionApplicationTarget(VarDecl *wrappedVar) {
+    kind = Kind::uninitializedWrappedVar;
+    this->uninitializedWrappedVar= wrappedVar;
+  }
+
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
@@ -1471,6 +1495,11 @@ public:
       ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
       bool bindPatternVarsOneWay);
 
+  /// Form a target for a property with an attached property wrapper that is
+  /// initialized out-of-line.
+  static SolutionApplicationTarget forUninitializedWrappedVar(
+      VarDecl *wrappedVar);
+
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
@@ -1480,6 +1509,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::uninitializedWrappedVar:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -1501,6 +1531,9 @@ public:
 
     case Kind::patternBinding:
       return patternBinding->getDeclContext();
+
+    case Kind::uninitializedWrappedVar:
+      return uninitializedWrappedVar->getDeclContext();
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -1653,6 +1686,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::uninitializedWrappedVar:
       return None;
 
     case Kind::function:
@@ -1667,6 +1701,7 @@ public:
     case Kind::function:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::uninitializedWrappedVar:
       return None;
 
     case Kind::stmtCondition:
@@ -1681,6 +1716,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::patternBinding:
+    case Kind::uninitializedWrappedVar:
       return None;
 
     case Kind::caseLabelItem:
@@ -1695,10 +1731,25 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
+    case Kind::uninitializedWrappedVar:
       return nullptr;
 
     case Kind::patternBinding:
       return patternBinding;
+    }
+  }
+
+  VarDecl *getAsUninitializedWrappedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return nullptr;
+
+    case Kind::uninitializedWrappedVar:
+      return uninitializedWrappedVar;
     }
   }
 
@@ -1730,6 +1781,9 @@ public:
 
     case Kind::patternBinding:
       return patternBinding->getSourceRange();
+
+    case Kind::uninitializedWrappedVar:
+      return uninitializedWrappedVar->getSourceRange();
     }
     llvm_unreachable("invalid target type");
   }
@@ -1751,6 +1805,9 @@ public:
 
     case Kind::patternBinding:
       return patternBinding->getLoc();
+
+    case Kind::uninitializedWrappedVar:
+      return uninitializedWrappedVar->getLoc();
     }
     llvm_unreachable("invalid target type");
   }
@@ -3347,9 +3404,6 @@ public:
   /// Determine if the type in question is a Set<T> and, if so, provide the
   /// element type of the set.
   static Optional<Type> isSetType(Type t);
-
-  /// Determine if the type in question is one of the known collection types.
-  static bool isCollectionType(Type t);
 
   /// Determine if the type in question is AnyHashable.
   static bool isAnyHashableType(Type t);
@@ -4973,6 +5027,25 @@ public:
   void print(raw_ostream &out, Expr *) const;
 };
 
+/// A function object suitable for use as an \c OpenUnboundGenericTypeFn that
+/// "opens" the given unbound type by introducing fresh type variables for
+/// generic parameters and constructing a bound generic type from these
+/// type variables.
+class OpenUnboundGenericType {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+
+public:
+  explicit OpenUnboundGenericType(ConstraintSystem &cs,
+                                  const ConstraintLocatorBuilder &locator)
+      : cs(cs), locator(locator) {}
+
+  Type operator()(UnboundGenericType *unboundTy) const {
+    return cs.openUnboundGenericType(unboundTy->getDecl(),
+                                     unboundTy->getParent(), locator);
+  }
+};
+
 /// Compute the shuffle required to map from a given tuple type to
 /// another tuple type.
 ///
@@ -5167,13 +5240,13 @@ bool isArgumentOfPatternMatchingOperator(ConstraintLocator *locator);
 /// associated with `===` and `!==` operators.
 bool isArgumentOfReferenceEqualityOperator(ConstraintLocator *locator);
 
-/// Determine whether given expression is a reference to a
+/// Determine whether the given AST node is a reference to a
 /// pattern-matching operator `~=`
-bool isPatternMatchingOperator(Expr *expr);
+bool isPatternMatchingOperator(ASTNode node);
 
-/// Determine whether given expression is a reference to a
+/// Determine whether the given AST node is a reference to a
 /// "standard" comparison operator such as "==", "!=", ">" etc.
-bool isStandardComparisonOperator(Expr *expr);
+bool isStandardComparisonOperator(ASTNode node);
 
 /// If given expression references operator overlaod(s)
 /// extract and produce name of the operator.

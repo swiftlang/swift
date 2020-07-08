@@ -202,7 +202,6 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
   bool isCached(StringRef DepPath) override;
-
 public:
   static std::unique_ptr<ModuleInterfaceLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
@@ -235,6 +234,9 @@ public:
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     ModuleInterfaceLoaderOptions Opts);
+
+  std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
+                                                    StringRef interfacePath) override;
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {

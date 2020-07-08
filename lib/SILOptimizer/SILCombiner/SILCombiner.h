@@ -246,8 +246,11 @@ public:
   bool tryOptimizeKeypath(ApplyInst *AI);
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
   bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee);
-  bool tryOptimizeKeypathKVCString(ApplyInst *AI, SILDeclRef callee);
-      
+  bool tryOptimizeKeypathOffsetOf(ApplyInst *AI, FuncDecl *calleeFn,
+                                  KeyPathInst *kp);
+  bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
+                                  KeyPathInst *kp);
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);

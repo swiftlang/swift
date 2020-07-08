@@ -1,0 +1,53 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-generic-specializer-enable-ownership -generic-specializer %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+public protocol ResilientProtocol {
+  func defaultA()
+  func defaultB()
+}
+
+struct ConformingStruct : ResilientProtocol {
+  func defaultA()
+  func defaultB()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK:       bb0(%0 : $ConformingStruct):
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main16ConformingStructV_Tg5
+// CHECK:    [[RESULT:%.*]] = apply [[FN]]
+// CHECK:    return [[RESULT]]
+
+sil [ossa] @defaultA : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %fn = function_ref @defaultB : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  %result = apply %fn<Self>(%0) : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s8defaultB4main16ConformingStructV_Tg5
+// CHECK:       bb0(%0 : $ConformingStruct):
+// CHECK:    [[RESULT:%.*]] = tuple ()
+// CHECK:    return [[RESULT]]
+
+sil [ossa] @defaultB : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_specialize_default_witness_method
+// CHECK:       bb0(%0 : $*ConformingStruct):
+// CHECK:         [[FN:%.*]] = function_ref @$s8defaultA4main16ConformingStructV_Tg5
+// CHECK:    [[RESULT:%.*]] = apply [[FN]]
+// CHECK:    return [[RESULT]]
+
+sil hidden [ossa] @test_specialize_default_witness_method : $@convention(thin) (@in_guaranteed ConformingStruct) -> () {
+bb0(%0 : $*ConformingStruct):
+  %fn = function_ref @defaultA : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  %result = apply %fn<ConformingStruct>(%0) : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
+  return %result : $()
+}

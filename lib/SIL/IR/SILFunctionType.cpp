@@ -18,6 +18,7 @@
 
 #define DEBUG_TYPE "libsil"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
@@ -315,15 +316,12 @@ getDifferentiabilityParameters(SILFunctionType *originalFnTy,
 /// Collects the semantic results of the given function type in
 /// `originalResults`. The semantic results are formal results followed by
 /// `inout` parameters, in type order.
-// TODO(TF-983): Generalize to support multiple `inout` parameters. The current
-// singular `inoutParam` and `isWrtInoutParameter` are hacky.
 static void
 getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
-                   Optional<SILParameterInfo> &inoutParam,
-                   bool &isWrtInoutParameter,
+                   IndexSubset *&inoutParameterIndices,
                    SmallVectorImpl<SILResultInfo> &originalResults) {
-  inoutParam = None;
-  isWrtInoutParameter = false;
+  auto &C = functionType->getASTContext();
+  SmallVector<unsigned, 4> inoutParamIndices;
   // Collect original formal results.
   originalResults.append(functionType->getResults().begin(),
                          functionType->getResults().end());
@@ -332,11 +330,12 @@ getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
     auto param = functionType->getParameters()[i];
     if (!param.isIndirectInOut())
       continue;
-    inoutParam = param;
-    isWrtInoutParameter = parameterIndices->contains(i);
+    inoutParamIndices.push_back(i);
     originalResults.push_back(
         SILResultInfo(param.getInterfaceType(), ResultConvention::Indirect));
   }
+  inoutParameterIndices =
+      IndexSubset::get(C, parameterIndices->getCapacity(), inoutParamIndices);
 }
 
 /// Returns the differential type for the given original function type,
@@ -402,11 +401,10 @@ static CanSILFunctionType getAutoDiffDifferentialType(
   SmallVector<Type, 4> substReplacements;
   SmallVector<ProtocolConformanceRef, 4> substConformances;
 
-  Optional<SILParameterInfo> inoutParam = None;
-  bool isWrtInoutParameter = false;
+  IndexSubset *inoutParamIndices;
   SmallVector<SILResultInfo, 2> originalResults;
-  getSemanticResults(originalFnTy, parameterIndices, inoutParam,
-                     isWrtInoutParameter, originalResults);
+  getSemanticResults(originalFnTy, parameterIndices, inoutParamIndices,
+                     originalResults);
 
   SmallVector<SILParameterInfo, 4> diffParams;
   getDifferentiabilityParameters(originalFnTy, parameterIndices, diffParams);
@@ -430,7 +428,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     }
   }
   SmallVector<SILResultInfo, 1> differentialResults;
-  if (!inoutParam || !isWrtInoutParameter) {
+  if (inoutParamIndices->isEmpty()) {
     for (auto resultIndex : resultIndices->getIndices()) {
       auto &result = originalResults[resultIndex];
       auto resultTan =
@@ -480,11 +478,10 @@ static CanSILFunctionType getAutoDiffPullbackType(
   SmallVector<Type, 4> substReplacements;
   SmallVector<ProtocolConformanceRef, 4> substConformances;
 
-  Optional<SILParameterInfo> inoutParam = None;
-  bool isWrtInoutParameter = false;
+  IndexSubset *inoutParamIndices;
   SmallVector<SILResultInfo, 2> originalResults;
-  getSemanticResults(originalFnTy, parameterIndices, inoutParam,
-                     isWrtInoutParameter, originalResults);
+  getSemanticResults(originalFnTy, parameterIndices, inoutParamIndices,
+                     originalResults);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterConventionForOriginalResult =
@@ -551,27 +548,11 @@ static CanSILFunctionType getAutoDiffPullbackType(
     return conv;
   };
 
+  // Collect pullback parameters.
   SmallVector<SILParameterInfo, 1> pullbackParams;
-  if (inoutParam) {
-    auto paramTan = inoutParam->getInterfaceType()->getAutoDiffTangentSpace(
-        lookupConformance);
-    assert(paramTan && "Parameter type does not have a tangent space?");
-    auto paramTanConvention = isWrtInoutParameter
-                                  ? inoutParam->getConvention()
-                                  : ParameterConvention::Indirect_In_Guaranteed;
-    auto paramTanType = paramTan->getCanonicalType();
-    if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
-      pullbackParams.push_back(
-          SILParameterInfo(paramTanType, paramTanConvention));
-    } else {
-      auto gpIndex = substGenericParams.size();
-      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
-      substGenericParams.push_back(gpType);
-      substReplacements.push_back(paramTanType);
-      pullbackParams.push_back({gpType, paramTanConvention});
-    }
-  } else {
-    for (auto resultIndex : resultIndices->getIndices()) {
+  for (auto resultIndex : resultIndices->getIndices()) {
+    // Handle formal original result.
+    if (resultIndex < originalFnTy->getNumResults()) {
       auto &origRes = originalResults[resultIndex];
       auto resultTan = origRes.getInterfaceType()->getAutoDiffTangentSpace(
           lookupConformance);
@@ -590,12 +571,46 @@ static CanSILFunctionType getAutoDiffPullbackType(
         substReplacements.push_back(resultTanType);
         pullbackParams.push_back({gpType, paramTanConvention});
       }
+      continue;
+    }
+    // Handle original `inout` parameter.
+    auto inoutParamIndex = resultIndex - originalFnTy->getNumResults();
+    auto inoutParamIt = std::next(
+        originalFnTy->getIndirectMutatingParameters().begin(), inoutParamIndex);
+    auto paramIndex =
+        std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
+    auto inoutParam = originalFnTy->getParameters()[paramIndex];
+    auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+        lookupConformance);
+    assert(paramTan && "Parameter type does not have a tangent space?");
+    // The pullback parameter convention depends on whether the original `inout`
+    // paramater is a differentiability parameter.
+    // - If yes, the pullback parameter convention is `@inout`.
+    // - If no, the pullback parameter convention is `@in_guaranteed`.
+    bool isWrtInoutParameter = parameterIndices->contains(paramIndex);
+    auto paramTanConvention = isWrtInoutParameter
+                                  ? inoutParam.getConvention()
+                                  : ParameterConvention::Indirect_In_Guaranteed;
+    auto paramTanType = paramTan->getCanonicalType();
+    if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
+      pullbackParams.push_back(
+          SILParameterInfo(paramTanType, paramTanConvention));
+    } else {
+      auto gpIndex = substGenericParams.size();
+      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+      substGenericParams.push_back(gpType);
+      substReplacements.push_back(paramTanType);
+      pullbackParams.push_back({gpType, paramTanConvention});
     }
   }
+
+  // Collect pullback results.
   SmallVector<SILParameterInfo, 4> diffParams;
   getDifferentiabilityParameters(originalFnTy, parameterIndices, diffParams);
   SmallVector<SILResultInfo, 8> pullbackResults;
   for (auto &param : diffParams) {
+    // Skip `inout` parameters, which semantically behave as original results
+    // and always appear as pullback parameters.
     if (param.isIndirectInOut())
       continue;
     auto paramTan =
@@ -2769,7 +2784,8 @@ getSILFunctionTypeForClangDecl(TypeConverter &TC, const clang::Decl *clangDecl,
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    AbstractionPattern origPattern =
+    AbstractionPattern origPattern = method->isOverloadedOperator() ?
+        AbstractionPattern::getCXXOperatorMethod(origType, method):
         AbstractionPattern::getCXXMethod(origType, method);
     auto conventions = CXXMethodConventions(method);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
@@ -4025,7 +4041,10 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       assert(numParameterLists == 2);
       if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
-        return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
+        return method->isOverloadedOperator()
+                   ? AbstractionPattern::getCurriedCXXOperatorMethod(fnType,
+                                                                     bridgedFn)
+                   : AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {
         // C function imported as a method.
         return AbstractionPattern::getCurriedCFunctionAsMethod(fnType,
@@ -4109,8 +4128,25 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     }
 
     auto partialFnPattern = bridgingFnPattern.getFunctionResultType();
-    getBridgedParams(rep, partialFnPattern, methodParams, bridgedParams,
-                     bridging);
+    for (unsigned i : indices(methodParams)) {
+      // C++ operators that are implemented as non-static member functions get
+      // imported into Swift as static methods that have an additional
+      // parameter for the left-hand-side operand instead of the receiver
+      // object. These are inout parameters and don't get bridged.
+      // TODO: Undo this if we stop using inout.
+      if (auto method = dyn_cast_or_null<clang::CXXMethodDecl>(
+              constant.getDecl()->getClangDecl())) {
+        if (i==0 && method->isOverloadedOperator()) {
+          bridgedParams.push_back(methodParams[0]);
+          continue;
+        }
+      }
+
+      auto paramPattern = partialFnPattern.getFunctionParamType(i);
+      auto bridgedParam =
+          getBridgedParam(rep, paramPattern, methodParams[i], bridging);
+      bridgedParams.push_back(bridgedParam);
+    }
 
     bridgedResultType =
       getBridgedResultType(rep,

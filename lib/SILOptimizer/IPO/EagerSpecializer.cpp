@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 ///
+/// \file
+///
 /// Eager Specializer
 /// -----------------
 ///
@@ -25,8 +27,11 @@
 ///
 /// TODO: We have not determined whether to support inexact type checks. It
 /// will be a tradeoff between utility of the attribute vs. cost of the check.
+///
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "eager-specializer"
+
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILFunction.h"
@@ -36,7 +41,6 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
-using llvm::dbgs;
 
 // Temporary flag.
 llvm::cl::opt<bool> EagerSpecializeFlag(
@@ -650,7 +654,8 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
     unsigned ArgIdx = OrigArg->getIndex();
 
     auto CastArg = emitArgumentCast(SubstitutedType, OrigArg, ArgIdx);
-    LLVM_DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
+    LLVM_DEBUG(llvm::dbgs() << "  Cast generic arg: ";
+               CastArg->print(llvm::dbgs()));
 
     if (!substConv.useLoweredAddresses()) {
       CallArgs.push_back(CastArg);
@@ -710,16 +715,15 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
                                     SILFunction *GenericFunc,
                                     const SILSpecializeAttr &SA,
                                     const ReabstractionInfo &ReInfo) {
-  LLVM_DEBUG(dbgs() << "Specializing " << GenericFunc->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Specializing " << GenericFunc->getName() << "\n");
 
   LLVM_DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
-             dbgs() << "  Generic Sig:";
-             dbgs().indent(2); FT->getInvocationGenericSignature()->print(dbgs());
-             dbgs() << "  Generic Env:";
-             dbgs().indent(2);
-             GenericFunc->getGenericEnvironment()->dump(dbgs());
-             dbgs() << "  Specialize Attr:";
-             SA.print(dbgs()); dbgs() << "\n");
+             llvm::dbgs() << "  Generic Sig:"; llvm::dbgs().indent(2);
+             FT->getInvocationGenericSignature()->print(llvm::dbgs());
+             llvm::dbgs() << "  Generic Env:"; llvm::dbgs().indent(2);
+             GenericFunc->getGenericEnvironment()->dump(llvm::dbgs());
+             llvm::dbgs() << "  Specialize Attr:"; SA.print(llvm::dbgs());
+             llvm::dbgs() << "\n");
 
   GenericFuncSpecializer
       FuncSpecializer(FuncBuilder, GenericFunc,
@@ -728,7 +732,7 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)
-    LLVM_DEBUG(dbgs() << "  Failed. Cannot specialize function.\n");
+    LLVM_DEBUG(llvm::dbgs() << "  Failed. Cannot specialize function.\n");
   return NewFunc;
 }
 
@@ -744,11 +748,12 @@ void EagerSpecializerTransform::run() {
     // TODO: we should support ownership here but first we'll have to support
     // ownership in GenericFuncSpecializer.
     if (!F.shouldOptimize() || F.hasOwnership()) {
-      LLVM_DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
-                        << " because it has ownership or is marked to be "
-                           "excluded from optimizations.\n");
+      LLVM_DEBUG(llvm::dbgs() << "  Cannot specialize function " << F.getName()
+                              << " because it has ownership or is marked to be "
+                                 "excluded from optimizations.\n");
       continue;
     }
+
     // Only specialize functions in their home module.
     if (F.isExternalDeclaration() || F.isAvailableExternally())
       continue;
@@ -786,11 +791,13 @@ void EagerSpecializerTransform::run() {
                   EagerDispatch(&F, ReInfo).emitDispatchTo(NewFunc);
                 }
               });
+
     // Invalidate everything since we delete calls as well as add new
     // calls and branches.
     if (Changed) {
       invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
     }
+
     // As specializations are created, the attributes should be removed.
     F.clearSpecializeAttrs();
   }

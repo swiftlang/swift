@@ -61,9 +61,13 @@ public struct CGFloat {
 }
 
 extension CGFloat : SignedNumeric {
+  @_alwaysEmitIntoClient // availability
+  public init<T: BinaryInteger>(_ source: T) {
+    self.native = NativeType(source)
+  }
 
   @_transparent
-  public init?<T : BinaryInteger>(exactly source: T) {
+  public init?<T: BinaryInteger>(exactly source: T) {
     guard let native = NativeType(exactly: source) else { return nil }
     self.native = native
   }
@@ -72,7 +76,6 @@ extension CGFloat : SignedNumeric {
   public var magnitude: CGFloat {
     return CGFloat(native.magnitude)
   }
-
 }
 
 extension CGFloat : BinaryFloatingPoint {

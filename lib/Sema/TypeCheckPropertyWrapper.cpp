@@ -577,9 +577,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!rawType || rawType->hasError())
     return Type();
 
-  if (!rawType->hasUnboundGenericType())
-    return rawType->mapTypeOutOfContext();
-
   auto binding = var->getParentPatternBinding();
   if (!binding)
     return Type();
@@ -592,72 +589,23 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))
       TypeChecker::typeCheckPatternBinding(binding, index);
+  } else {
+    using namespace constraints;
+    auto dc = var->getInnermostDeclContext();
+    ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
+    auto target = SolutionApplicationTarget::forUninitializedWrappedVar(var);
+    auto solutions = cs.solve(target, FreeTypeVariableBinding::Disallow);
 
-    ASTContext &ctx = var->getASTContext();
-    Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
-    assert(type || ctx.Diags.hadAnyError());
-    return type;
-  }
-
-  // Compute the type of the property to plug in to the wrapper type.
-  Type propertyType = var->getType();
-  if (propertyType->hasError())
-    return Type();
-
-  using namespace constraints;
-  auto dc = var->getInnermostDeclContext();
-  ConstraintSystem cs(dc, None);
-  auto emptyLocator = cs.getConstraintLocator({});
-  
-  auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  Type valueMemberType;
-  Type outermostOpenedWrapperType;
-  for (unsigned i : indices(wrapperAttrs)) {
-    Type rawWrapperType = var->getAttachedPropertyWrapperType(i);
-    if (!rawWrapperType)
+    if (!solutions || !cs.applySolution(solutions->front(), target)) {
+      var->setInvalid();
       return Type();
-    
-    // Open the type.
-    Type openedWrapperType =
-      cs.openUnboundGenericTypes(rawWrapperType, emptyLocator);
-    if (!outermostOpenedWrapperType)
-      outermostOpenedWrapperType = openedWrapperType;
-    
-    // If we already have a value member type, it must be equivalent to
-    // this opened wrapper type.
-    if (valueMemberType) {
-      cs.addConstraint(ConstraintKind::Equal, valueMemberType,
-                       openedWrapperType, emptyLocator);
     }
-    
-    // Retrieve the type of the wrapped value.
-    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-    if (!wrapperInfo)
-      return Type();
-
-    valueMemberType = openedWrapperType->getTypeOfMember(
-        dc->getParentModule(), wrapperInfo.valueVar);
-  }
-  
-  // The resulting value member type must be equivalent to the property
-  // type.
-  cs.addConstraint(ConstraintKind::Equal, valueMemberType,
-                   propertyType, emptyLocator);
-
-  SmallVector<Solution, 4> solutions;
-  if (cs.solve(solutions) || solutions.size() != 1) {
-    var->diagnose(diag::property_wrapper_incompatible_property,
-                  propertyType, rawType);
-    var->setInvalid();
-    if (auto nominalWrapper = rawType->getAnyNominal()) {
-      nominalWrapper->diagnose(diag::property_wrapper_declared_here,
-                               nominalWrapper->getName());
-    }
-    return Type();
   }
 
-  Type wrapperType = solutions.front().simplifyType(outermostOpenedWrapperType);
-  return wrapperType->mapTypeOutOfContext();
+  ASTContext &ctx = var->getASTContext();
+  Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
+  assert(type || ctx.Diags.hadAnyError());
+  return type;
 }
 
 Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,

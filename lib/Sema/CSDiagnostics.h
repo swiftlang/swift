@@ -208,11 +208,6 @@ protected:
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
 
-  bool isCollectionType(Type type) const {
-    auto &cs = getConstraintSystem();
-    return cs.isCollectionType(type);
-  }
-
   bool isArrayType(Type type) const {
     auto &cs = getConstraintSystem();
     return bool(cs.isArrayType(type));
@@ -265,8 +260,9 @@ public:
     assert(getGenericContext() &&
            "Affected decl not within a generic context?");
 
-    if (auto *parentExpr = findParentExpr(getRawAnchor().get<Expr *>()))
-      Apply = dyn_cast<ApplyExpr>(parentExpr);
+    if (auto *expr = getAsExpr(getRawAnchor()))
+      if (auto *parentExpr = findParentExpr(expr))
+        Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
   unsigned getRequirementIndex() const {

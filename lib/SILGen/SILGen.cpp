@@ -1929,12 +1929,12 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
   }
 
   // Also make sure to process any intermediate files that may contain SIL.
-  bool hasSIB = llvm::any_of(desc.getFiles(), [](const FileUnit *File) -> bool {
-    auto *SASTF = dyn_cast<SerializedASTFile>(File);
-    return SASTF && SASTF->isSIB();
-  });
-  if (hasSIB) {
-    auto primary = desc.context.dyn_cast<FileUnit *>();
+  bool shouldDeserialize =
+      llvm::any_of(desc.getFiles(), [](const FileUnit *File) -> bool {
+        return isa<SerializedASTFile>(File);
+      });
+  if (shouldDeserialize) {
+    auto *primary = desc.context.dyn_cast<FileUnit *>();
     silMod->getSILLoader()->getAllForModule(silMod->getSwiftModule()->getName(),
                                             primary);
   }

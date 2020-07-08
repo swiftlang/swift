@@ -1017,44 +1017,47 @@ bool PullbackEmitter::run() {
   }
 
   auto *pullbackEntry = pullback.getEntryBlock();
-  // The pullback function has type (seed, exit_pbs) -> ([arg0], ..., [argn]).
+  // The pullback function has type:
+  // `(seed0, seed1, ..., exit_pb_struct) -> (d_arg0, ..., d_argn)`.
   auto pbParamArgs = pullback.getArgumentsWithoutIndirectResults();
-  assert(pbParamArgs.size() == 2);
-  seed = pbParamArgs[0];
-  // TODO(TF-983): Handle multiple original results.
-  assert(getIndices().results->getNumIndices() == 1);
-  auto origResult = origFormalResults[*getIndices().results->begin()];
-
-  // Assign adjoint for original result.
+  assert(getIndices().results->getNumIndices() == pbParamArgs.size() - 1 &&
+         pbParamArgs.size() >= 2);
+  // Assign adjoints for original result.
   builder.setInsertionPoint(pullbackEntry,
                             getNextFunctionLocalAllocationInsertionPoint());
-  if (seed->getType().isAddress()) {
-    // If the pullback `seed` is an `inout` parameter, assign it directly as the
-    // adjoint buffer of the original result.
-    if (pullback.getLoweredFunctionType()
-            ->getParameters()
-            .front()
-            .isIndirectInOut()) {
-      setAdjointBuffer(origExit, origResult, seed);
-    }
-    // Otherwise, assign a copy of `seed` as the adjoint buffer of the original
-    // result.
-    else {
-      auto *seedBufCopy = builder.createAllocStack(pbLoc, seed->getType());
-      builder.createCopyAddr(pbLoc, seed, seedBufCopy, IsNotTake,
-                             IsInitialization);
-      functionLocalAllocations.push_back(seedBufCopy);
-      setAdjointBuffer(origExit, origResult, seedBufCopy);
+  unsigned seedIndex = 0;
+  for (auto resultIndex : getIndices().results->getIndices()) {
+    auto origResult = origFormalResults[resultIndex];
+    auto *seed = pbParamArgs[seedIndex];
+    if (seed->getType().isAddress()) {
+      // If the seed argument is an `inout` parameter, assign it directly as
+      // the adjoint buffer of the original result.
+      auto seedParamInfo =
+          pullback.getLoweredFunctionType()->getParameters()[seedIndex];
+      if (seedParamInfo.isIndirectInOut()) {
+        setAdjointBuffer(origExit, origResult, seed);
+      }
+      // Otherwise, assign a copy of the seed argument as the adjoint buffer of
+      // the original result.
+      else {
+        auto *seedBufCopy =
+            createFunctionLocalAllocation(seed->getType(), pbLoc);
+        builder.createCopyAddr(pbLoc, seed, seedBufCopy, IsNotTake,
+                               IsInitialization);
+        setAdjointBuffer(origExit, origResult, seedBufCopy);
+        LLVM_DEBUG(getADDebugStream()
+                   << "Assigned seed buffer " << *seedBufCopy
+                   << " as the adjoint of original indirect result "
+                   << origResult);
+      }
+    } else {
+      addAdjointValue(origExit, origResult, makeConcreteAdjointValue(seed),
+                      pbLoc);
       LLVM_DEBUG(getADDebugStream()
-                 << "Assigned seed buffer " << seedBufCopy
-                 << " as the adjoint of original indirect result "
-                 << origResult);
+                 << "Assigned seed " << *seed
+                 << " as the adjoint of original result " << origResult);
     }
-  } else {
-    setAdjointValue(origExit, origResult, makeConcreteAdjointValue(seed));
-    LLVM_DEBUG(getADDebugStream()
-               << "Assigned seed " << *seed
-               << " as the adjoint of original result " << origResult);
+    ++seedIndex;
   }
 
   // If the original function is an accessor with special-case pullback
@@ -1336,6 +1339,7 @@ void PullbackEmitter::visitSILBasicBlock(SILBasicBlock *bb) {
   // 1. Get the pullback struct pullback block argument.
   // 2. Extract the predecessor enum value from the pullback struct value.
   auto *predEnum = getPullbackInfo().getBranchingTraceDecl(bb);
+  (void)predEnum;
   auto *predEnumField = getPullbackInfo().lookUpLinearMapStructEnumField(bb);
   auto predEnumVal = getPullbackStructElement(bb, predEnumField);
 
@@ -1583,8 +1587,7 @@ void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
     args.push_back(alloc);
   }
 
-  // Get formal callee pullback arguments.
-  assert(applyInfo.indices.results->getNumIndices() == 1);
+  // Collect callee pullback formal arguments.
   for (auto resultIndex : applyInfo.indices.results->getIndices()) {
     assert(resultIndex < origAllResults.size());
     auto origResult = origAllResults[resultIndex];
@@ -1688,14 +1691,16 @@ void PullbackEmitter::visitStructInst(StructInst *si) {
     break;
   case AdjointValueKind::Concrete: {
     auto adjStruct = materializeAdjointDirect(std::move(av), loc);
+    auto *dti = builder.createDestructureStruct(si->getLoc(), adjStruct);
+
     // Find the struct `TangentVector` type.
     auto structTy = remapType(si->getType()).getASTType();
+#ifndef NDEBUG
     auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
     assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
-    auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
-    assert(tangentVectorDecl);
+    assert(tangentVectorTy->getStructOrBoundGenericStruct());
+#endif
 
-    auto *dti = builder.createDestructureStruct(si->getLoc(), adjStruct);
     // Accumulate adjoints for the fields of the `struct` operand.
     unsigned fieldIndex = 0;
     for (auto it = structDecl->getStoredProperties().begin();

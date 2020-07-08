@@ -1387,7 +1387,8 @@ BraceStmt *swift::applyFunctionBuilderTransform(
         captured.first, captured.second)));
 }
 
-/// Produce any additional syntactic diagnostics for the body of a
+/// Produce any additional syntactic diagnostics for the body of a function
+/// that had a function builder applied.
 static void performAddOnDiagnostics(BraceStmt *stmt, DeclContext *dc) {
   class AddOnDiagnosticWalker : public ASTWalker {
     SmallVector<DeclContext *, 4> dcStack;

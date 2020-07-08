@@ -2,12 +2,14 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-import Darwin.C
+#if canImport(Darwin)
+  import Darwin.C
+#elseif canImport(Glibc)
+  import Glibc
 #elseif os(Windows)
-import ucrt
+  import ucrt
 #else
-import Glibc
+#error("Unsupported platform")
 #endif
 import DifferentiationUnittest
 

@@ -3708,7 +3708,7 @@ bool ConstraintSystem::repairFailures(
     // func foo<T>(_: [T]) {}
     // foo(1) // expected '[Int]', got 'Int'
     // ```
-    if (isCollectionType(rhs)) {
+    if (rhs->isKnownStdlibCollectionType()) {
       std::function<Type(Type)> getArrayOrSetType = [&](Type type) -> Type {
         if (auto eltTy = isArrayType(type))
           return getArrayOrSetType(*eltTy);
@@ -10156,6 +10156,8 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_CoerceOperand:
   case CTP_SubscriptAssignSource:
   case CTP_ForEachStmt:
+  case CTP_WrappedProperty:
+  case CTP_ComposedPropertyWrapper:
     break;
   }
 

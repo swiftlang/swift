@@ -34,6 +34,11 @@ using namespace llvm::opt;
 /// The path for Swift libraries in the OS on Darwin.
 #define DARWIN_OS_LIBRARY_PATH "/usr/lib/swift"
 
+static constexpr const char *const localeCodes[] = {
+#define SUPPORTED_LOCALE(Code, Language) #Code,
+#include "swift/AST/LocalizationLanguages.def"
+};
+
 swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
@@ -57,6 +62,14 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::append(DiagnosticDocsPath, "share", "doc", "swift",
                           "diagnostics");
   DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath.str());
+
+  // Compute the path of the YAML diagnostic messages directory files
+  // in the toolchain.
+  llvm::SmallString<128> DiagnosticMessagesDir(Path);
+  llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /swift
+  llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /bin
+  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift");
+  DiagnosticOpts.LocalizationPath = std::string(DiagnosticMessagesDir.str());
 }
 
 void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
@@ -928,6 +941,43 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
   }
+  if (Arg *A = Args.getLastArg(OPT_locale)) {
+    std::string localeCode = A->getValue();
+
+    // Check if the locale code is available.
+    if (llvm::none_of(localeCodes, [&](const char *locale) {
+          return localeCode == locale;
+        })) {
+      std::string availableLocaleCodes = "";
+      llvm::interleave(
+          std::begin(localeCodes), std::end(localeCodes),
+          [&](std::string locale) { availableLocaleCodes += locale; },
+          [&] { availableLocaleCodes += ", "; });
+
+      Diags.diagnose(SourceLoc(), diag::warning_invalid_locale_code,
+                     availableLocaleCodes);
+    } else {
+      Opts.LocalizationCode = localeCode;
+    }
+  }
+  if (Arg *A = Args.getLastArg(OPT_localization_path)) {
+    if (!llvm::sys::fs::exists(A->getValue())) {
+      Diags.diagnose(SourceLoc(), diag::warning_locale_path_not_found,
+                     A->getValue());
+    } else if (!Opts.LocalizationCode.empty()) {
+      // Check if the localization path exists but it doesn't have a file
+      // for the specified locale code.
+      llvm::SmallString<128> localizationPath(A->getValue());
+      llvm::sys::path::append(localizationPath, Opts.LocalizationCode);
+      llvm::sys::path::replace_extension(localizationPath, ".yaml");
+      if (!llvm::sys::fs::exists(localizationPath)) {
+        Diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
+                       Opts.LocalizationCode, localizationPath);
+      }
+
+      Opts.LocalizationPath = A->getValue();
+    }
+  }
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");
 
@@ -993,29 +1043,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       return true;
     }
   }
-  if (Args.hasArg(OPT_sil_existential_specializer)) {
-    Opts.ExistentialSpecializer = true;
-  }
-  if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
-    if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      return true;
-    }
-    if (environmentVariableRequestedMaximumDeterminism()) {
-      Opts.NumThreads = 1;
-      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
-                     "-num-threads");
-    }
-  }
 
   // If we're only emitting a module, stop optimizations once we've serialized
   // the SIL for the module.
   if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly)
     Opts.StopOptimizationAfterSerialization = true;
-
-  if (Args.hasArg(OPT_sil_merge_partial_modules))
-    Opts.MergePartialModules = true;
 
   // Propagate the typechecker's understanding of
   // -experimental-skip-non-inlinable-function-bodies to SIL.
@@ -1212,7 +1244,7 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
                             CompilerInvocation &Invocation) {
   using namespace options;
 
-  Opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  Opts.HasMultipleIGMs = Invocation.getIRGenOptions().hasMultipleIGMs();
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
     Opts.ModuleLinkName = A->getValue();
@@ -1439,6 +1471,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
+    auto LLVMLTOKind =
+        llvm::StringSwitch<Optional<IRGenLLVMLTOKind>>(A->getValue())
+            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
+            .Case("llvm-full", IRGenLLVMLTOKind::Full)
+            .Default(llvm::None);
+    if (LLVMLTOKind)
+      Opts.LLVMLTOKind = LLVMLTOKind.getValue();
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
@@ -1544,6 +1588,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
         getRuntimeCompatVersion();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
+    if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+    if (environmentVariableRequestedMaximumDeterminism()) {
+      Opts.NumThreads = 1;
+      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
+                     "-num-threads");
+    }
   }
 
   return false;

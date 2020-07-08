@@ -88,6 +88,7 @@ function(_add_host_variant_c_compile_link_flags name)
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     target_compile_options(${name} PRIVATE -target;${target})
+    target_link_options(${name} PRIVATE -target;${target})
   endif()
 
   set(_sysroot
@@ -120,6 +121,7 @@ function(_add_host_variant_c_compile_link_flags name)
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
   if (_lto_flag_out)
     target_compile_options(${name} PRIVATE ${_lto_flag_out})
+    target_link_options(${name} PRIVATE ${_lto_flag_out})
   endif()
 endfunction()
 
@@ -470,6 +472,7 @@ function(add_swift_host_library name)
 
   _add_host_variant_c_compile_flags(${name})
   _add_host_variant_link_flags(${name})
+  _add_host_variant_c_compile_link_flags(${name})
   _set_target_prefix_and_suffix(${name} "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
   # Set compilation and link flags.
@@ -502,35 +505,12 @@ function(add_swift_host_library name)
   endif()
 
   if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
-    if(SWIFT_EMBED_BITCODE_SECTION)
-      target_compile_options(${name} PRIVATE
-        -fembed-bitcode)
-      target_link_options(${name} PRIVATE
-        "LINKER:-bitcode_bundle"
-        "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
-
-      # Please note that using a generator expression to fit this in a single
-      # target_link_options does not work (at least in CMake 3.15 and 3.16),
-      # since that seems not to allow the LINKER: prefix to be evaluated (i.e.
-      # it will be added as-is to the linker parameters)
-      if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
-        target_link_options(${name} PRIVATE
-          "LINKER:-bitcode_hide_symbols")
-      endif()
-    endif()
-
     target_link_options(${name} PRIVATE
       "LINKER:-compatibility_version,1")
     if(SWIFT_COMPILER_VERSION)
       target_link_options(${name} PRIVATE
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
-
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    target_link_options(${name} PRIVATE -target;${target})
   endif()
 
   add_dependencies(dev ${name})
@@ -575,6 +555,7 @@ function(add_swift_host_tool executable)
   add_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
   _add_host_variant_c_compile_flags(${executable})
   _add_host_variant_link_flags(${executable})
+  _add_host_variant_c_compile_link_flags(${executable})
   target_link_directories(${executable} PRIVATE
     ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
   add_dependencies(${executable} ${LLVM_COMMON_DEPENDS})

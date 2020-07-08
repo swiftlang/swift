@@ -8049,6 +8049,8 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     case swift::CTP_AssignSource:
     case swift::CTP_SubscriptAssignSource:
     case swift::CTP_Condition:
+    case swift::CTP_WrappedProperty:
+    case swift::CTP_ComposedPropertyWrapper:
     case swift::CTP_CannotFail:
       result.setExpr(rewrittenExpr);
       break;
@@ -8148,6 +8150,17 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
           resultTarget->getDeclContext());
       patternBinding->setInit(index, resultTarget->getAsExpr());
     }
+
+    return target;
+  } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
+    // Get the outermost wrapper type from the solution
+    auto outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
+    auto backingType = solution.simplifyType(
+        solution.getType(outermostWrapper->getTypeRepr()));
+
+    auto &ctx = solution.getConstraintSystem().getASTContext();
+    ctx.setSideCachedPropertyWrapperBackingPropertyType(
+        wrappedVar, backingType->mapTypeOutOfContext());
 
     return target;
   } else {
@@ -8428,6 +8441,9 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
     return *this;
 
   case Kind::patternBinding:
+    return *this;
+
+  case Kind::uninitializedWrappedVar:
     return *this;
   }
 
