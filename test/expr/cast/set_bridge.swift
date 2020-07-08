@@ -94,7 +94,7 @@ func testConditionalDowncastBridge() {
   if let s = setB as? Set<Root> { _ = s } // expected-warning{{conditional cast from 'Set<BridgedToObjC>' to 'Set<Root>' always succeeds}}
   if let s = setB as? Set<ObjC> { _ = s } // expected-warning{{conditional cast from 'Set<BridgedToObjC>' to 'Set<ObjC>' always succeeds}}
   if let s = setB as? Set<DerivesObjC> { _ = s }
-  if let s = setB as? Set<Unrelated> { _ = s } // expected-warning {{cast from 'Set<BridgedToObjC>' to unrelated type 'Set<Unrelated>' always fails}}
+  if let s = setB as? Set<Unrelated> { _ = s } // OK
 
   _ = setR
   _ = setO

@@ -3037,7 +3037,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                                   Expr *fromExpr,
                                                   SourceRange diagToRange) {
   // Determine whether we should suppress diagnostics.
-  const bool suppressDiagnostics = contextKind == CheckedCastContextKind::None;
+  const bool suppressDiagnostics =
+      contextKind == CheckedCastContextKind::None ||
+      contextKind == CheckedCastContextKind::Coercion;
   assert((suppressDiagnostics || diagLoc.isValid()) &&
          "diagnostics require a valid source location");
 
@@ -3133,6 +3135,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
         switch (contextKind) {
         case CheckedCastContextKind::None:
+        case CheckedCastContextKind::Coercion:
           llvm_unreachable("suppressing diagnostics");
 
         case CheckedCastContextKind::ForcedCast: {
@@ -3264,7 +3267,15 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       return castKind;
 
     case CheckedCastKind::Unresolved:
-      return failed();
+      // Even though we know the elements cannot be downcast, we cannot return
+      // failed() here as it's possible for an empty Array, Set or Dictionary to
+      // be cast to any element type at runtime (SR-6192). The one exception to
+      // this is when we're checking whether we can treat a coercion as a checked
+      // cast because we don't want to tell the user to use as!, as it's probably
+      // the wrong suggestion.
+      if (contextKind == CheckedCastContextKind::Coercion)
+        return failed();
+      return castKind;
     }
     llvm_unreachable("invalid cast type");
   };
@@ -3295,15 +3306,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                          BridgingCoercion);
         break;
 
+      case CheckedCastKind::Unresolved:
+        // Handled the same as in checkElementCast; see comment there for
+        // rationale.
+        if (contextKind == CheckedCastContextKind::Coercion)
+          return failed();
+        LLVM_FALLTHROUGH;
+
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
         hasCast = true;
         break;
-
-      case CheckedCastKind::Unresolved:
-        return failed();
       }
 
       switch (typeCheckCheckedCast(fromKeyValue->second, toKeyValue->second,
@@ -3318,15 +3333,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                          BridgingCoercion);
         break;
 
+      case CheckedCastKind::Unresolved:
+        // Handled the same as in checkElementCast; see comment there for
+        // rationale.
+        if (contextKind == CheckedCastContextKind::Coercion)
+          return failed();
+        LLVM_FALLTHROUGH;
+
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
         hasCast = true;
         break;
-
-      case CheckedCastKind::Unresolved:
-        return failed();
       }
 
       if (hasCast) return CheckedCastKind::DictionaryDowncast;
@@ -3357,7 +3376,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         const auto &fromElt = fromTuple->getElement(i);
         const auto &toElt = toTuple->getElement(i);
 
-        // We should only perform name validation if both element have a label,
+        // We should only perform name validation if both elements have a label,
         // because unlabeled tuple elements can be converted to labeled ones
         // e.g.
         // 
@@ -3423,6 +3442,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     case CheckedCastContextKind::EnumElementPattern:
     case CheckedCastContextKind::IsExpr:
     case CheckedCastContextKind::None:
+    case CheckedCastContextKind::Coercion:
       break;
     }
   }
@@ -3552,6 +3572,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (auto *protocolDecl =
           dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
       if (!couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
+        return failed();
+      }
+    } else if (auto protocolComposition =
+                   fromType->getAs<ProtocolCompositionType>()) {
+      if (llvm::any_of(protocolComposition->getMembers(),
+                       [&](Type protocolType) {
+                         if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
+                                 protocolType->getAnyNominal())) {
+                           return !couldDynamicallyConformToProtocol(
+                               toType, protocolDecl, dc);
+                         }
+                         return false;
+                       })) {
         return failed();
       }
     }
