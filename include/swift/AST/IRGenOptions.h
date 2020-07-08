@@ -65,6 +65,12 @@ enum class IRGenDebugInfoFormat : unsigned {
   CodeView
 };
 
+enum class IRGenLLVMLTOKind : unsigned {
+  None,
+  Thin,
+  Full,
+};
+
 enum class IRGenEmbedMode : unsigned {
   None,
   EmbedMarker,
@@ -220,6 +226,8 @@ public:
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
 
+  IRGenLLVMLTOKind LLVMLTOKind : 2;
+
   /// Add names to LLVM values.
   unsigned HasValueNamesSetting : 1;
   unsigned ValueNames : 1;
@@ -320,21 +328,21 @@ public:
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
-        DisableLLVMOptzns(false),
-        DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
-        Playground(false), EmitStackPromotionChecks(false),
-        FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
-        HasValueNamesSetting(false), ValueNames(false),
-        EnableReflectionMetadata(true), EnableReflectionNames(true),
-        EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
-        LazyInitializeClassMetadata(false),
+        DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
+        DisableLLVMSLPVectorizer(false), Playground(false),
+        EmitStackPromotionChecks(false), FunctionSections(false),
+        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),
+        ValueNames(false), EnableReflectionMetadata(true),
+        EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
+        ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), UseTypeLayoutValueHandling(true), GenerateProfile(false),
-        EnableDynamicReplacementChaining(false),
+        UseSwiftCall(false), UseTypeLayoutValueHandling(true),
+        GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
-        DisableConcreteTypeMetadataMangledNameAccessors(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        DisableConcreteTypeMetadataMangledNameAccessors(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   /// Appends to \p os an arbitrary string representing all options which

@@ -988,6 +988,14 @@ public:
       }
       
       if (S->hasResult()) {
+        if (isa<ConstructorDecl>(func)) {
+          Out << "Expected ReturnStmt not to have a result. A constructor "
+                 "should not return a result. Returned expression: ";
+          S->getResult()->dump(Out);
+          Out << "\n";
+          abort();
+        }
+
         auto result = S->getResult();
         auto returnType = result->getType();
         // Make sure that the return has the same type as the function.

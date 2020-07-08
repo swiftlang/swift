@@ -113,10 +113,10 @@ func protocol_concrete_casts(_ p1: P1, p2: P2, p12: P1 & P2) {
 
   _ = p2 as! S1 // expected-warning {{cast from 'P2' to unrelated type 'S1' always fails}}
 
-  _ = p12 as! S1
-  _ = p12 as! S2
+  _ = p12 as! S1 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S1' always fails}}
+  _ = p12 as! S2 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S2' always fails}}
   _ = p12 as! S12
-  _ = p12 as! S3
+  _ = p12 as! S3 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S3' always fails}}
 
   // Type queries.
   var _:Bool = p1 is S1
@@ -128,10 +128,10 @@ func protocol_concrete_casts(_ p1: P1, p2: P2, p12: P1 & P2) {
 
   var _:Bool = p2 is S1 // expected-warning {{cast from 'P2' to unrelated type 'S1' always fails}}
 
-  var _:Bool = p12 is S1
-  var _:Bool = p12 is S2
+  var _:Bool = p12 is S1 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S1' always fails}}
+  var _:Bool = p12 is S2 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S2' always fails}}
   var _:Bool = p12 is S12
-  var _:Bool = p12 is S3
+  var _:Bool = p12 is S3 // expected-warning {{cast from 'P1 & P2' to unrelated type 'S3' always fails}}
 }
 
 func conditional_cast(_ b: B) -> D? {
@@ -232,7 +232,7 @@ func test_tuple_casts_no_warn() {
   _ = arr as! [(Foo, Foo)] // Ok
   _ = tup as! (Foo, Foo) // Ok
 
-  _ = arr as! [(Foo, Foo, Foo)] // expected-warning {{cast from '[(Any, Any)]' to unrelated type '[(Foo, Foo, Foo)]' always fails}}
+  _ = arr as! [(Foo, Foo, Foo)] // Ok
   _ = tup as! (Foo, Foo, Foo) // expected-warning {{cast from '(Any, Any)' to unrelated type '(Foo, Foo, Foo)' always fails}}
 
   _ = arr as! [(a: Foo, Foo)] // Ok
@@ -372,6 +372,26 @@ enum ConcreteA: EventA {
   }
 }
 
+protocol ProtocolP1 {}
+protocol ProtocolQ1 {}
+typealias Composition = ProtocolP1 & ProtocolQ1
+
+protocol ProtocolP {}
+protocol ProtocolQ {}
+
+class ConcreteP: ProtocolP {}
+class ConcreteQ: ProtocolQ {}
+class ConcretePQ: ProtocolP, ProtocolQ {}
+class ConcreteCPQ: ConcreteP, ProtocolQ {}
+
+class ConcreteP1: ProtocolP1 {}
+class ConcretePQ1: ProtocolP1, ProtocolQ1 {}
+
+class ConcretePPQ1: ProtocolP, ProtocolP1, ProtocolQ1 {}
+class NotConforms {}
+struct StructNotComforms {}
+final class NotConformsFinal {}
+
 func tests_SR13088_false_positive_always_fail_casts() {
   // SR-13081
   let x: JSON = [4] // [4]
@@ -402,4 +422,48 @@ func tests_SR13088_false_positive_always_fail_casts() {
       break
     }
   }
+
+  // SR-7187
+  let a: [Any] = [String?.some("hello") as Any, String?.none as Any]
+  let b: [AnyObject] = [String?.some("hello") as AnyObject, String?.none as AnyObject]
+
+  _ = a is [String?] // Ok
+  _ = a as? [String?] as Any // OK
+  _ = b is [String?] // Ok
+  _ = b as? [String?] as AnyObject // OK
+
+  // SR-6192
+  let items = [String]()
+  let dict = [String: Any]()
+  let set = Set<String>()
+
+  _ = items is [Int] // Ok
+  _ = items as? [Int] as Any // Ok
+  _ = items as! [Int] // Ok
+
+  _ = dict is [Int: Any] // Ok
+  _ = dict as? [Int: Any] as Any // Ok
+  _ = dict as! [Int: Any] as Any // Ok
+
+  _ = set is Set<Int> // Ok
+  _ = set as? Set<Int> as Any // Ok
+  _ = set as! Set<Int> // Ok
+
+}
+
+// Protocol composition
+func protocol_composition(_ c: ProtocolP & ProtocolQ, _ c1: ProtocolP & Composition) {
+  _ = c as? ConcretePQ // Ok
+  _ = c as? ConcreteCPQ // Ok
+  _ = c as? ConcreteP // Ok
+  _ = c as? NotConforms // Ok
+  _ = c as? StructNotComforms // expected-warning {{cast from 'ProtocolP & ProtocolQ' to unrelated type 'StructNotComforms' always fails}}
+  _ = c as? NotConformsFinal // expected-warning {{cast from 'ProtocolP & ProtocolQ' to unrelated type 'NotConformsFinal' always fails}}
+  _ = c1 as? ConcreteP // Ok
+  _ = c1 as? ConcreteP1 // OK
+  _ = c1 as? ConcretePQ1 // OK
+  _ = c1 as? ConcretePPQ1 // Ok
+  _ = c1 as? NotConforms // Ok
+  _ = c1 as? StructNotComforms // expected-warning {{cast from 'ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'StructNotComforms' always fails}}
+  _ = c1 as? NotConformsFinal // expected-warning {{cast from 'ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'NotConformsFinal' always fails}}
 }

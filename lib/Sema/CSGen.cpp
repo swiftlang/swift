@@ -3879,28 +3879,30 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
 /// \param wrappedVar The property that has a property wrapper.
 /// \returns the type of the property.
 static Type generateWrappedPropertyTypeConstraints(
-   ConstraintSystem &cs, Type initializerType,
-   VarDecl *wrappedVar, ConstraintLocator *locator) {
+   ConstraintSystem &cs, Type initializerType, VarDecl *wrappedVar) {
   auto dc = wrappedVar->getInnermostDeclContext();
 
   Type wrapperType = LValueType::get(initializerType);
   Type wrappedValueType;
 
-  for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
+  auto wrapperAttributes = wrappedVar->getAttachedPropertyWrappers();
+  for (unsigned i : indices(wrapperAttributes)) {
     Type rawWrapperType = wrappedVar->getAttachedPropertyWrapperType(i);
-    if (!rawWrapperType || rawWrapperType->hasError())
+    auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
+    if (rawWrapperType->hasError() || !wrapperInfo)
       return Type();
 
     // The former wrappedValue type must be equal to the current wrapper type
     if (wrappedValueType) {
+      auto *typeRepr = wrapperAttributes[i]->getTypeRepr();
+      auto *locator =
+          cs.getConstraintLocator(typeRepr, LocatorPathElt::ContextualType());
       wrapperType = cs.openUnboundGenericTypes(rawWrapperType, locator);
-      cs.addConstraint(ConstraintKind::Equal, wrappedValueType, wrapperType,
+      cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType,
                        locator);
+      cs.setContextualType(typeRepr, TypeLoc::withoutLoc(wrappedValueType),
+                           CTP_ComposedPropertyWrapper);
     }
-
-    auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
-    if (!wrapperInfo)
-      return Type();
 
     wrappedValueType = wrapperType->getTypeOfMember(
         dc->getParentModule(), wrapperInfo.valueVar);
@@ -3908,6 +3910,7 @@ static Type generateWrappedPropertyTypeConstraints(
 
   // Set up an equality constraint to drop the lvalue-ness of the value
   // type we produced.
+  auto locator = cs.getConstraintLocator(wrappedVar);
   Type propertyType = cs.createTypeVariable(locator, 0);
   cs.addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType, locator);
   return propertyType;
@@ -3929,7 +3932,7 @@ static bool generateInitPatternConstraints(
 
   if (auto wrappedVar = target.getInitializationWrappedVar()) {
     Type propertyType = generateWrappedPropertyTypeConstraints(
-        cs, cs.getType(target.getAsExpr()), wrappedVar, locator);
+        cs, cs.getType(target.getAsExpr()), wrappedVar);
     if (!propertyType)
       return true;
 
@@ -4171,6 +4174,27 @@ bool ConstraintSystem::generateConstraints(
     }
 
     return hadError;
+  }
+
+  case SolutionApplicationTarget::Kind::uninitializedWrappedVar: {
+    auto *wrappedVar = target.getAsUninitializedWrappedVar();
+    auto *outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
+    auto *typeRepr = outermostWrapper->getTypeRepr();
+    auto backingType = openUnboundGenericTypes(outermostWrapper->getType(),
+                                               getConstraintLocator(typeRepr));
+    setType(typeRepr, backingType);
+
+    auto wrappedValueType =
+        generateWrappedPropertyTypeConstraints(*this, backingType, wrappedVar);
+    Type propertyType = wrappedVar->getType();
+    if (!wrappedValueType || propertyType->hasError())
+      return true;
+
+    addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType,
+        getConstraintLocator(wrappedVar, LocatorPathElt::ContextualType()));
+    setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
+                      CTP_WrappedProperty);
+    return false;
   }
   }
 }
