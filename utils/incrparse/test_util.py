@@ -104,14 +104,19 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
             # Nothing more to do
             line = ''
 
-    return (pre_edit_line.encode('utf-8'), post_edit_line.encode('utf-8'), current_reparse_start)
+    return (pre_edit_line.encode('utf-8'),
+            post_edit_line.encode('utf-8'),
+            current_reparse_start)
 
 
 def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
                         incremental_edit_args, reparse_args):
-    with io.open(test_file, mode='r', encoding='utf-8', newline='\n') as test_file_handle, \
-            io.open(pre_edit_file, mode='w+', encoding='utf-8', newline='\n') as pre_edit_file_handle, \
-            io.open(post_edit_file, mode='w+', encoding='utf-8', newline='\n') as post_edit_file_handle:
+    with io.open(test_file, mode='r', encoding='utf-8',
+                 newline='\n') as test_file_handle, \
+            io.open(pre_edit_file, mode='w+', encoding='utf-8',
+                    newline='\n') as pre_edit_file_handle, \
+            io.open(post_edit_file, mode='w+', encoding='utf-8',
+                    newline='\n') as post_edit_file_handle:
 
         current_reparse_start = None
 
