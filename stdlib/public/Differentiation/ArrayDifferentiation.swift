@@ -312,6 +312,27 @@ extension Array where Element: Differentiable {
     }
     return (value: values, pullback: pullback)
   }
+
+  @inlinable
+  @derivative(of: differentiableMap)
+  internal func _jvpDifferentiableMap<Result: Differentiable>(
+      _ body: @differentiable (Element) -> Result
+  ) -> (
+    value: [Result],
+    differential: (Array.TangentVector) -> Array<Result>.TangentVector
+  ) {
+    var values: [Result] = []
+    var differentials: [(Element.TangentVector) -> Result.TangentVector] = []
+    for x in self {
+      let (y, df) = valueWithDifferential(at: x, in: body)
+      values.append(y)
+      differentials.append(df)
+    }
+    func differential(_ tans: Array.TangentVector) -> Array<Result>.TangentVector {
+      .init(zip(tans.base, differentials).map { tan, df in df(tan) })
+    }
+    return (value: values, differential: differential)
+  }
 }
 
 extension Array where Element: Differentiable {
