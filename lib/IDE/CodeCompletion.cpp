@@ -4429,7 +4429,6 @@ public:
       if (ParamIndex == 0) {
         addDeclAttrParamKeyword("*", "Platform", false);
 
-        // For code completion, suggest 'macOS' instead of 'OSX'.
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                  \
         addDeclAttrParamKeyword(swift::platformString(PlatformKind::X),       \
                                 "Platform", false);
