@@ -42,19 +42,20 @@ InheritedTypeRequest::evaluate(
       dc = typeDecl->getDeclContext();
     }
   } else {
-    auto ext = decl.get<ExtensionDecl *>();
-    dc = ext;
+    dc = decl.get<ExtensionDecl *>();
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
-    resolution = TypeResolution::forStructural(dc, options);
+    resolution =
+        TypeResolution::forStructural(dc, options, /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
-    resolution = TypeResolution::forInterface(dc, options);
+    resolution =
+        TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Contextual: {

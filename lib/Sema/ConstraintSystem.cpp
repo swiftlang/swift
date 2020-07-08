@@ -698,7 +698,8 @@ Type ConstraintSystem::openUnboundGenericType(
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
   return TypeChecker::applyUnboundGenericArguments(
-      decl, parentTy, SourceLoc(), TypeResolution::forContextual(DC, None),
+      decl, parentTy, SourceLoc(),
+      TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr),
       arguments);
 }
 
@@ -1217,7 +1218,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // Resolve the reference to this type declaration in our current context.
     auto type = TypeChecker::resolveTypeInContext(
         typeDecl, nullptr,
-        TypeResolution::forContextual(useDC, TypeResolverContext::InExpression),
+        TypeResolution::forContextual(useDC, TypeResolverContext::InExpression,
+                                      /*unboundTyOpener*/ nullptr),
         /*isSpecialized=*/false);
 
     checkNestedTypeConstraints(*this, type, locator);

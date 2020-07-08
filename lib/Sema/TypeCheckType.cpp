@@ -56,40 +56,42 @@ using namespace swift;
 
 /// Type resolution.
 
-TypeResolution TypeResolution::forStructural(DeclContext *dc,
-                                             TypeResolutionOptions options) {
-  return TypeResolution(dc, TypeResolutionStage::Structural, options);
+TypeResolution
+TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
+                              OpenUnboundGenericTypeFn unboundTyOpener) {
+  return TypeResolution(dc, TypeResolutionStage::Structural, options,
+                        unboundTyOpener);
 }
 
-TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            TypeResolutionOptions options) {
-  return forInterface(dc, dc->getGenericSignatureOfContext(), options);
-}
-
-TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            GenericSignature genericSig,
-                                            TypeResolutionOptions options) {
-  TypeResolution result(dc, TypeResolutionStage::Interface, options);
-  result.complete.genericSig = genericSig;
+TypeResolution
+TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
+                             OpenUnboundGenericTypeFn unboundTyOpener) {
+  TypeResolution result(dc, TypeResolutionStage::Interface, options,
+                        unboundTyOpener);
+  result.complete.genericSig = dc->getGenericSignatureOfContext();
   result.complete.builder = nullptr;
   return result;
 }
 
-TypeResolution TypeResolution::forContextual(DeclContext *dc,
-                                             TypeResolutionOptions options) {
-  return forContextual(dc, dc->getGenericEnvironmentOfContext(), options);
+TypeResolution
+TypeResolution::forContextual(DeclContext *dc, TypeResolutionOptions options,
+                              OpenUnboundGenericTypeFn unboundTyOpener) {
+  return forContextual(dc, dc->getGenericEnvironmentOfContext(), options,
+                       unboundTyOpener);
 }
 
-TypeResolution TypeResolution::forContextual(DeclContext *dc,
-                                             GenericEnvironment *genericEnv,
-                                             TypeResolutionOptions options) {
-  TypeResolution result(dc, TypeResolutionStage::Contextual, options);
+TypeResolution
+TypeResolution::forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
+                              TypeResolutionOptions options,
+                              OpenUnboundGenericTypeFn unboundTyOpener) {
+  TypeResolution result(dc, TypeResolutionStage::Contextual, options,
+                        unboundTyOpener);
   result.genericEnv = genericEnv;
   return result;
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
-  TypeResolution result(dc, stage, opts);
+  TypeResolution result(dc, stage, opts, unboundTyOpener);
   result.genericEnv = genericEnv;
   result.complete = complete;
   return result;
@@ -679,11 +681,20 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
   auto *generic = dyn_cast<GenericIdentTypeRepr>(comp);
   if (!generic) {
-    if (type->is<UnboundGenericType>() &&
-        !options.is(TypeResolverContext::TypeAliasDecl) &&
-        !options.contains(TypeResolutionFlags::AllowUnboundGenerics)) {
-      diagnoseUnboundGenericType(type, loc);
-      return ErrorType::get(type->getASTContext());
+    if (auto *const unboundTy = type->getAs<UnboundGenericType>()) {
+      if (!options.is(TypeResolverContext::TypeAliasDecl)) {
+        // If the resolution object carries an opener, attempt to open
+        // the unbound generic type.
+        if (const auto openerFn = resolution.getUnboundTypeOpener())
+          if (const auto boundTy = openerFn(unboundTy))
+            return boundTy;
+
+        // Complain if we're allowed to and bail out with an error.
+        if (!options.contains(TypeResolutionFlags::SilenceErrors))
+          diagnoseUnboundGenericType(type, loc);
+
+        return ErrorType::get(resolution.getASTContext());
+      }
     }
 
     if (resolution.getStage() == TypeResolutionStage::Structural)
@@ -1518,7 +1529,7 @@ resolveIdentTypeComponent(TypeResolution resolution,
   auto comp = components.back();
 
   // The first component uses unqualified lookup.
-  auto parentComps = components.slice(0, components.size()-1);
+  const auto parentComps = components.drop_back();
   if (parentComps.empty()) {
     return resolveTopLevelIdentTypeComponent(resolution, comp);
   }
@@ -1782,7 +1793,7 @@ namespace {
   };
 } // end anonymous namespace
 
-Type TypeResolution::resolveType(TypeRepr *TyR) {
+Type TypeResolution::resolveType(TypeRepr *TyR) const {
   auto &ctx = getASTContext();
   auto Ty =
       evaluateOrDefault(ctx.evaluator, ResolveTypeRequest{this, TyR}, Type());
@@ -1792,7 +1803,7 @@ Type TypeResolution::resolveType(TypeRepr *TyR) {
 }
 
 Type ResolveTypeRequest::evaluate(Evaluator &evaluator,
-                                  TypeResolution *resolution,
+                                  const TypeResolution *resolution,
                                   TypeRepr *TyR) const {
   const auto options = resolution->getOptions();
   auto &ctx = resolution->getASTContext();
@@ -2745,8 +2756,8 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     Optional<llvm::SaveAndRestore<TypeResolution>>
       useSILBoxGenericEnv;
     if (auto env = repr->getGenericEnvironment()) {
-      resolveSILBoxGenericParams =
-          TypeResolution::forContextual(DC, env, options);
+      resolveSILBoxGenericParams = TypeResolution::forContextual(
+          DC, env, options, resolution.getUnboundTypeOpener());
       useSILBoxGenericEnv.emplace(resolution, *resolveSILBoxGenericParams);
     }
     
@@ -2825,8 +2836,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     Optional<llvm::SaveAndRestore<TypeResolution>> useSILFunctionGenericEnv;
 
     if (componentTypeEnv) {
-      resolveSILFunctionGenericParams =
-          TypeResolution::forContextual(DC, componentTypeEnv, options);
+      resolveSILFunctionGenericParams = TypeResolution::forContextual(
+          DC, componentTypeEnv, options, resolution.getUnboundTypeOpener());
       useSILFunctionGenericEnv.emplace(resolution,
                                        *resolveSILFunctionGenericParams);
     }
@@ -2889,8 +2900,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     Optional<TypeResolution> resolveSILFunctionGenericParams;
     Optional<llvm::SaveAndRestore<TypeResolution>> useSILFunctionGenericEnv;
     if (genericEnv) {
-      resolveSILFunctionGenericParams =
-          TypeResolution::forContextual(DC, genericEnv, options);
+      resolveSILFunctionGenericParams = TypeResolution::forContextual(
+          DC, genericEnv, options, resolution.getUnboundTypeOpener());
       useSILFunctionGenericEnv.emplace(resolution,
                                        *resolveSILFunctionGenericParams);
     }
@@ -3859,15 +3870,22 @@ void TypeChecker::checkUnsupportedProtocolType(
 Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
                                      DeclContext *dc,
                                      CustomAttrTypeKind typeKind) const {
-  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
+  const TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
+  OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   // Property delegates allow their type to be an unbound generic.
-  if (typeKind == CustomAttrTypeKind::PropertyDelegate)
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
+  if (typeKind == CustomAttrTypeKind::PropertyDelegate) {
+    unboundTyOpener = [](auto unboundTy) {
+      // FIXME: Don't let unbound generic types
+      // escape type resolution. For now, just
+      // return the unbound generic type.
+      return unboundTy;
+    };
+  }
 
   ASTContext &ctx = dc->getASTContext();
-  auto type = TypeResolution::forContextual(dc, options)
-                  .resolveType(attr->getTypeRepr());
+  const auto type = TypeResolution::forContextual(dc, options, unboundTyOpener)
+                        .resolveType(attr->getTypeRepr());
 
   // We always require the type to resolve to a nominal type.
   if (!type->getAnyNominal()) {
