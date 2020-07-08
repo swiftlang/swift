@@ -399,7 +399,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   }
 }
 
-// MARK: - Comparable Extensions
+// MARK: - Comparable Extensions for Testing Proximity between Values
 
 extension Comparable where Self: Strideable {
   /// Tests if this value is right next to the given other value.
@@ -447,4 +447,238 @@ extension Comparable {
   public func sharesCommonNeighbor(with other: Self) -> Bool {
     self == other
   }
+}
+
+// MARK: - Comparable Extension for Interval Operators
+
+extension Comparable where Self: Hashable {
+  
+  /// Creates a closed and bounded interval from the given endpoints.
+  /// - Parameters:
+  ///   - lowerEndpoint: The given lower endpoint.
+  ///   - upperEndpoint: The given upper endpoint.
+  /// - Returns: A closed and bounded interval.
+  @_transparent
+  public static func <=~<= (
+    lowerEndpoint: Self,
+    upperEndpoint: Self
+  ) -> Interval<Self> {
+    return Interval(from: lowerEndpoint, to: upperEndpoint, .inclusive)
+  }
+  
+  /// Creates a lower-closed, upper-open, and bounded interval from the given
+  /// endpoints.
+  /// - Parameters:
+  ///   - lowerEndpoint: The given lower endpoint.
+  ///   - upperEndpoint: The given upper endpoint.
+  /// - Returns: A lower-closed, upper-open, and bounded interval.
+  @_transparent
+  public static func <=~~< (
+    lowerEndpoint: Self,
+    upperEndpoint: Self
+  ) -> Interval<Self> {
+    return Interval(
+      from: lowerEndpoint, .inclusive,
+      to: upperEndpoint, .exclusive
+    )
+  }
+  
+  /// Creates a lower-open, upper-closed, and bounded interval from the given
+  /// endpoints.
+  /// - Parameters:
+  ///   - lowerEndpoint: The given lower endpoint.
+  ///   - upperEndpoint: The given upper endpoint.
+  /// - Returns: A lower-open, upper-closed, and bounded interval.
+  @_transparent
+  public static func <~~<= (
+    lowerEndpoint: Self,
+    upperEndpoint: Self
+  ) -> Interval<Self> {
+    return Interval(
+      from: lowerEndpoint, .exclusive,
+      to: upperEndpoint, .inclusive
+    )
+  }
+  
+  /// Creates an open and bounded interval from the given endpoints.
+  /// - Parameters:
+  ///   - lowerEndpoint: The given lower endpoint.
+  ///   - upperEndpoint: The given upper endpoint.
+  /// - Returns: An open and bounded interval.
+  @_transparent
+  public static func <~~~< (
+    lowerEndpoint: Self,
+    upperEndpoint: Self
+  ) -> Interval<Self> {
+    return Interval(from: lowerEndpoint, to: upperEndpoint, .exclusive)
+  }
+  
+  /// Creates a lower-open and -unbounded and upper-closed and -bounded interval
+  /// from the given upper endpoint.
+  /// - Parameter upperEndpoint: The given upper endpoint.
+  /// - Returns: A lower-open and -unbounded and right-closed and -bounded
+  ///   interval.
+  @_transparent
+  public static prefix func ~~~<= (upperEndpoint: Self) -> Interval<Self> {
+    return Interval(fromUnboundedTo: upperEndpoint, .inclusive)
+  }
+  
+  /// Creates a lower-unbounded, upper-bounded, and open interval from the given
+  /// upper endpoint.
+  /// - Parameter upperEndpoint: The given upper endpoint.
+  /// - Returns: A lower-unbounded, upper-bounded, and open interval.
+  @_transparent
+  public static prefix func ~~~~< (upperEndpoint: Self) -> Interval<Self> {
+    return Interval(fromUnboundedTo: upperEndpoint, .exclusive)
+  }
+  
+  /// Creates a lower-closed and -bounded and upper-open and -unbounded interval
+  /// from the given lower endpoint.
+  /// - Parameter lowerEndpoint: The given lower endpoint.
+  /// - Returns: A lower-closed and -bounded and upper-open and -unbounded
+  ///   interval.
+  @_transparent
+  public static postfix func <=~~~ (lowerEndpoint: Self) -> Interval<Self> {
+    return Interval(toUnboundedFrom: lowerEndpoint, .inclusive)
+  }
+  
+  /// Creates a lower-bounded, upper-unbounded, and open interval from the given
+  /// lower endpoint.
+  /// - Parameter lowerEndpoint: The given lower endpoint.
+  /// - Returns: A lower-bounded, upper-unbounded, and open interval.
+  @_transparent
+  public static postfix func <~~~~ (lowerEndpoint: Self) -> Interval<Self> {
+    return Interval(toUnboundedFrom: lowerEndpoint, .exclusive)
+  }
+  
+}
+
+  // MARK: Inverse Interval Operators
+
+extension Comparable where Self: Hashable & Strideable {
+  
+  /// Creates a closed and bounded interval from the given endpoints that's
+  /// iterated in reverse.
+  /// - Parameters:
+  ///   - upperEndpoint: The given upper endpoint.
+  ///   - lowerEndpoint: The given lower endpoint.
+  /// - Returns: A closed and bounded interval that's iterated in reverse.
+  @_transparent
+  public static func >=~>= (
+    upperEndpoint: Self,
+    lowerEndpoint: Self
+  ) -> Interval<Self> {
+    return Interval(
+      from: lowerEndpoint, to: upperEndpoint, .inclusive,
+      inInverseStridingDirection: true
+    )
+  }
+  
+  /// Creates a lower-closed, upper-open, and bounded interval from the given
+  /// endpoints that's iterated in reverse.
+  /// - Parameters:
+  ///   - upperEndpoint: The given upper endpoint.
+  ///   - lowerEndpoint: The given lower endpoint.
+  /// - Returns: A lower-closed, upper-open, and bounded interval that's
+  ///   iterated in reverse.
+  @_transparent
+  public static func >~~>= (
+    upperEndpoint: Self,
+    lowerEndpoint: Self
+  ) -> Interval<Self> {
+    return Interval(
+      from: lowerEndpoint, .inclusive,
+      to: upperEndpoint, .exclusive,
+      inInverseStridingDirection: true
+    )
+  }
+  
+  /// Creates a lower-open, upper-closed, and bounded interval from the given
+  /// endpoints that's iterated in reverse.
+  /// - Parameters:
+  ///   - upperEndpoint: The given upper endpoint.
+  ///   - lowerEndpoint: The given lower endpoint.
+  /// - Returns: A lower-open, upper-closed, and bounded interval that's
+  ///   iterated in reverse.
+  @_transparent
+  public static func >=~~> (
+    upperEndpoint: Self,
+    lowerEndpoint: Self
+  ) -> Interval<Self> {
+    return Interval(
+      from: lowerEndpoint, .exclusive,
+      to: upperEndpoint, .inclusive,
+      inInverseStridingDirection: true
+    )
+  }
+  
+  /// Creates an open and bounded interval from the given endpoints that's
+  /// iterated in reverse.
+  /// - Parameters:
+  ///   - upperEndpoint: The given upper endpoint.
+  ///   - lowerEndpoint: The given lower endpoint.
+  /// - Returns: An open and bounded interval that's iterated in reverse.
+  @_transparent
+  public static func >~~~> (
+    upperEndpoint: Self,
+    lowerEndpoint: Self
+  ) -> Interval<Self> {
+    return Interval(
+      from: lowerEndpoint, to: upperEndpoint, .exclusive,
+      inInverseStridingDirection: true
+    )
+  }
+  
+  /// Creates a lower-open and -unbounded and upper-closed and -bounded interval
+  /// from the given upper endpoint that's iterated in reverse.
+  /// - Parameter upperEndpoint: The given upper endpoint.
+  /// - Returns: A lower-open and -unbounded and right-closed and -bounded
+  ///   interval that's iterated in reverse.
+  @_transparent
+  public static postfix func >=~~~ (upperEndpoint: Self) -> Interval<Self> {
+    return Interval(
+      fromUnboundedTo: upperEndpoint, .inclusive,
+      inInverseStridingDirection: true
+    )
+  }
+  
+  /// Creates a lower-unbounded, upper-bounded, and open interval from the given
+  /// upper endpoint that's iterated in reverse.
+  /// - Parameter upperEndpoint: The given upper endpoint.
+  /// - Returns: A lower-unbounded, upper-bounded, and open interval that's
+  ///   iterated in reverse.
+  @_transparent
+  public static postfix func >~~~~ (upperEndpoint: Self) -> Interval<Self> {
+    return Interval(
+      fromUnboundedTo: upperEndpoint, .exclusive,
+      inInverseStridingDirection: true
+    )
+  }
+  
+  /// Creates a lower-closed and -bounded and upper-open and -unbounded interval
+  /// from the given lower endpoint that's iterated in reverse.
+  /// - Parameter lowerEndpoint: The given lower endpoint.
+  /// - Returns: A lower-closed and -bounded and upper-open and -unbounded
+  ///   interval that's iterated in reverse.
+  @_transparent
+  public static prefix func ~~~>= (lowerEndpoint: Self) -> Interval<Self> {
+    return Interval(
+      toUnboundedFrom: lowerEndpoint, .inclusive,
+      inInverseStridingDirection: true
+    )
+  }
+  
+  /// Creates a lower-bounded, upper-unbounded, and open interval from the given
+  /// lower endpoint that's iterated in reverse.
+  /// - Parameter lowerEndpoint: The given lower endpoint.
+  /// - Returns: A lower-bounded, upper-unbounded, and open interval that's
+  ///   iterated in reverse.
+  @_transparent
+  public static prefix func ~~~~> (lowerEndpoint: Self) -> Interval<Self> {
+    return Interval(
+      toUnboundedFrom: lowerEndpoint, .exclusive,
+      inInverseStridingDirection: true
+    )
+  }
+  
 }

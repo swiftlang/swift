@@ -484,3 +484,32 @@ infix operator   |=: AssignmentPrecedence, BinaryInteger
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~>
+
+// The use of "~"s instead of "." is due to the rules over how dots are
+// interpreted in operators.
+
+// Interval operators.
+
+infix operator <=~<=: RangeFormatiPrecedence, Comparable
+infix operator <=~~<: RangeFormatiPrecedence, Comparable
+infix operator <~~<=: RangeFormatiPrecedence, Comparable
+infix operator <~~~<: RangeFormatiPrecedence, Comparable
+
+prefix operator ~~~<=: Comparable
+prefix operator ~~~~<: Comparable
+
+postfix operator <=~~~: Comparable
+postfix operator <~~~~: Comparable
+
+// Inverse interval operators.
+
+infix operator >=~>=: RangeFormatiPrecedence, Comparable
+infix operator >~~>=: RangeFormatiPrecedence, Comparable
+infix operator >=~~>: RangeFormatiPrecedence, Comparable
+infix operator >~~~>: RangeFormatiPrecedence, Comparable
+
+postfix operator >=~~~: Comparable
+postfix operator >~~~~: Comparable
+
+prefix operator ~~~>=: Comparable
+prefix operator ~~~~>: Comparable
