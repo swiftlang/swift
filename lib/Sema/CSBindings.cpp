@@ -94,6 +94,92 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
 
 void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
+  // If we have any literal constraints, check whether there is already a
+  // binding that provides a type that conforms to that literal protocol. In
+  // such cases, don't add the default binding suggestion because the existing
+  // suggestion is better.
+  llvm::SmallPtrSet<ProtocolDecl *, 4> coveredLiteralProtocols;
+
+  for (auto &binding : Bindings) {
+    Type type;
+
+    switch (binding.Kind) {
+    case AllowedBindingKind::Exact:
+      type = binding.BindingType;
+      break;
+
+    case AllowedBindingKind::Subtypes:
+    case AllowedBindingKind::Supertypes:
+      type = binding.BindingType->getRValueType();
+      break;
+    }
+
+    if (type->isTypeVariableOrMember() || type->isHole())
+      continue;
+
+    bool requiresUnwrap = false;
+    for (auto *constraint : Protocols) {
+      if (constraint->getKind() != ConstraintKind::LiteralConformsTo)
+        continue;
+
+      auto *protocol = constraint->getProtocol();
+
+      assert(protocol);
+
+      if (coveredLiteralProtocols.count(protocol))
+        continue;
+
+      do {
+        // If the type conforms to this protocol, we're covered.
+        if (TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
+          coveredLiteralProtocols.insert(protocol);
+          break;
+        }
+
+        // If we're allowed to bind to subtypes, look through optionals.
+        // FIXME: This is really crappy special case of computing a reasonable
+        // result based on the given constraints.
+        if (binding.Kind == AllowedBindingKind::Subtypes) {
+          if (auto objTy = type->getOptionalObjectType()) {
+            requiresUnwrap = true;
+            type = objTy;
+            continue;
+          }
+        }
+
+        requiresUnwrap = false;
+        break;
+      } while (true);
+    }
+
+    if (requiresUnwrap)
+      binding.BindingType = type;
+  }
+
+  for (auto *constraint : Protocols) {
+    auto *protocol = constraint->getProtocol();
+    if (coveredLiteralProtocols.count(protocol))
+      continue;
+
+    auto defaultType = TypeChecker::getDefaultType(protocol, cs.DC);
+    if (!defaultType)
+      continue;
+
+    if (!existingTypes.insert(defaultType->getCanonicalType()).second)
+      continue;
+
+    // We need to figure out whether this is a direct conformance
+    // requirement or inferred transitive one to identify binding
+    // kind correctly.
+    auto *conformingVar = cs.getRepresentative(
+        constraint->getFirstType()->castTo<TypeVariableType>());
+    addPotentialBinding({defaultType,
+                         TypeVar == conformingVar
+                             ? AllowedBindingKind::Subtypes
+                             : AllowedBindingKind::Supertypes,
+                         constraint});
+  }
+
   /// Add defaultable constraints.
   for (auto *constraint : Defaults) {
     Type type = constraint->getSecondType();
@@ -704,50 +790,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       // Record constraint where protocol requirement originated
       // this is useful to use for the binding later.
       result.Protocols.push_back(constraint);
-
-      // If there is a default literal type for this protocol, it's a
-      // potential binding.
-      auto defaultType = TypeChecker::getDefaultType(constraint->getProtocol(), DC);
-      if (!defaultType)
-        continue;
-
       hasNonDependentMemberRelationalConstraints = true;
-
-      // Handle unspecialized types directly.
-      if (!defaultType->hasUnboundGenericType()) {
-        if (!exactTypes.insert(defaultType->getCanonicalType()).second)
-          continue;
-
-        literalBindings.push_back(
-            {defaultType, AllowedBindingKind::Subtypes, constraint});
-        continue;
-      }
-
-      // For generic literal types, check whether we already have a
-      // specialization of this generic within our list.
-      // FIXME: This assumes that, e.g., the default literal
-      // int/float/char/string types are never generic.
-      auto nominal = defaultType->getAnyNominal();
-      if (!nominal)
-        continue;
-
-      bool matched = false;
-      for (auto exactType : exactTypes) {
-        if (auto exactNominal = exactType->getAnyNominal()) {
-          // FIXME: Check parents?
-          if (nominal == exactNominal) {
-            matched = true;
-            break;
-          }
-        }
-      }
-
-      if (!matched) {
-        exactTypes.insert(defaultType->getCanonicalType());
-        literalBindings.push_back(
-            {defaultType, AllowedBindingKind::Subtypes, constraint});
-      }
-
       break;
     }
 
@@ -810,80 +853,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
 
       break;
     }
-    }
-  }
-
-  // If we have any literal constraints, check whether there is already a
-  // binding that provides a type that conforms to that literal protocol. In
-  // such cases, remove the default binding suggestion because the existing
-  // suggestion is better.
-  if (!literalBindings.empty()) {
-    SmallPtrSet<ProtocolDecl *, 5> coveredLiteralProtocols;
-    for (auto &binding : result.Bindings) {
-      Type testType;
-
-      switch (binding.Kind) {
-      case AllowedBindingKind::Exact:
-        testType = binding.BindingType;
-        break;
-
-      case AllowedBindingKind::Subtypes:
-      case AllowedBindingKind::Supertypes:
-        testType = binding.BindingType->getRValueType();
-        break;
-      }
-
-      // Attempting to check conformance of the type variable,
-      // or unresolved type is invalid since it would result
-      // in lose of viable literal bindings because that check
-      // always returns trivial conformance.
-      if (testType->isTypeVariableOrMember() || testType->is<UnresolvedType>())
-        continue;
-
-      // Check each non-covered literal protocol to determine which ones
-      // might be covered by non-defaulted bindings.
-      bool updatedBindingType = false;
-      for (auto &literalBinding : literalBindings) {
-        auto *protocol = literalBinding.getDefaultedLiteralProtocol();
-
-        assert(protocol);
-
-        // Has already been covered by one of the bindings.
-        if (coveredLiteralProtocols.count(protocol))
-          continue;
-
-        do {
-          // If the type conforms to this protocol, we're covered.
-          if (DC->getParentModule()->lookupConformance(testType, protocol)) {
-            coveredLiteralProtocols.insert(protocol);
-            break;
-          }
-
-          // If we're allowed to bind to subtypes, look through optionals.
-          // FIXME: This is really crappy special case of computing a reasonable
-          // result based on the given constraints.
-          if (binding.Kind == AllowedBindingKind::Subtypes) {
-            if (auto objTy = testType->getOptionalObjectType()) {
-              updatedBindingType = true;
-              testType = objTy;
-              continue;
-            }
-          }
-
-          updatedBindingType = false;
-          break;
-        } while (true);
-      }
-
-      if (updatedBindingType)
-        binding.BindingType = testType;
-    }
-
-    for (auto &literalBinding : literalBindings) {
-      auto *protocol = literalBinding.getDefaultedLiteralProtocol();
-      // For any literal type that has been covered, skip them.
-      if (coveredLiteralProtocols.count(protocol) == 0)
-        result.addPotentialBinding(std::move(literalBinding));
     }
   }
 
