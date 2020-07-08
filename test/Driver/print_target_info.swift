@@ -16,6 +16,12 @@
 // CHECK-IOS:     "unversionedTriple": "arm64-apple-ios",
 // CHECK-IOS:     "moduleTriple": "arm64-apple-ios",
 // CHECK-IOS:     "swiftRuntimeCompatibilityVersion": "5.0",
+// CHECK-IOS:     "compatibilityLibraries": [
+// CHECK-IOS:       "libraryName": "swiftCompatibility50",
+// CHECK-IOS:       "libraryName": "swiftCompatibility51",
+// CHECK-IOS:       "libraryName": "swiftCompatibilityDynamicReplacements"
+// CHECK-IOS:       "filter": "executable"
+// CHECK-IOS:     ],
 // CHECK-IOS:     "librariesRequireRPath": true
 // CHECK-IOS:   }
 
