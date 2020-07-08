@@ -17,7 +17,7 @@
 
 /// Serialize and deserialize this module, then print.
 // RUN: %target-swift-frontend -emit-module %s -emit-module-path %t/merged-partial.swiftmodule -swift-version 5 -I %t -module-name merged -enable-library-evolution
-// RUN: %target-swift-frontend -merge-modules %t/merged-partial.swiftmodule -module-name merged -sil-merge-partial-modules -emit-module -emit-module-path %t/merged.swiftmodule -I %t -emit-module-interface-path %t/merged.swiftinterface -emit-private-module-interface-path %t/merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
+// RUN: %target-swift-frontend -merge-modules %t/merged-partial.swiftmodule -module-name merged -emit-module -emit-module-path %t/merged.swiftmodule -I %t -emit-module-interface-path %t/merged.swiftinterface -emit-private-module-interface-path %t/merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
 // RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/merged.swiftinterface
 // RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/merged.private.swiftinterface
 
