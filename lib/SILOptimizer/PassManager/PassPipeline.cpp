@@ -453,13 +453,13 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // is linked in from the stdlib.
   P.addTempRValueOpt();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions.
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-
   // Needed to serialize static initializers of globals for cross-module
   // optimization.
   P.addGlobalOpt();
+
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Add the outliner pass (Osize).
   P.addOutliner();
