@@ -1250,6 +1250,7 @@ def main_normal():
 
         if platform.system() == 'Darwin':
             prefix = targets.darwin_toolchain_prefix(args.install_prefix)
+            prefix = os.path.join(args.host_target, prefix.lstrip('/'))
         else:
             prefix = args.install_prefix
 
