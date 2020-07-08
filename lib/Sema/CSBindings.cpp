@@ -92,6 +92,32 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
   }
 }
 
+static bool
+isUnviableDefaultType(Type defaultType,
+                      llvm::SmallPtrSetImpl<CanType> &existingTypes) {
+  auto canType = defaultType->getCanonicalType();
+
+  if (!defaultType->hasUnboundGenericType())
+    return !existingTypes.insert(canType).second;
+
+  // For generic literal types, check whether we already have a
+  // specialization of this generic within our list.
+  // FIXME: This assumes that, e.g., the default literal
+  // int/float/char/string types are never generic.
+  auto nominal = defaultType->getAnyNominal();
+  if (!nominal)
+    return true;
+
+  if (llvm::any_of(existingTypes, [&nominal](CanType existingType) {
+        // FIXME: Check parents?
+        return nominal == existingType->getAnyNominal();
+      }))
+    return true;
+
+  existingTypes.insert(canType);
+  return false;
+}
+
 void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
   // If we have any literal constraints, check whether there is already a
@@ -165,7 +191,7 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     if (!defaultType)
       continue;
 
-    if (!existingTypes.insert(defaultType->getCanonicalType()).second)
+    if (isUnviableDefaultType(defaultType, existingTypes))
       continue;
 
     // We need to figure out whether this is a direct conformance
