@@ -6135,7 +6135,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
           // If this is an attempt to access read-only member via
           // writable key path, let's fail this choice early.
           auto &ctx = getASTContext();
-          if (isReadOnlyKeyPathComponent(storage) &&
+          if (isReadOnlyKeyPathComponent(storage, SourceLoc()) &&
               (keyPath == ctx.getWritableKeyPathDecl() ||
                keyPath == ctx.getReferenceWritableKeyPathDecl())) {
             result.addUnviable(
@@ -7850,7 +7850,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       if (!storage)
         return SolutionKind::Error;
 
-      if (isReadOnlyKeyPathComponent(storage)) {
+      if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
         capability = ReadOnly;
         continue;
       }
