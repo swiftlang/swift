@@ -23,6 +23,11 @@ private func _isClassFirstSeen(_ theClass: AnyClass) -> Bool {
   }
 }
 
+internal func _logRuntimeIssue(_ message: String) {
+  NSLog("%@", message)
+  _swift_reportToDebugger(0, message, nil)
+}
+
 extension NSKeyedUnarchiver {
   /// Checks if class `theClass` is good for archiving.
   ///
@@ -56,8 +61,7 @@ extension NSKeyedUnarchiver {
         If there are no existing archives containing this class, you should choose a unique, prefixed name instead:
         "@objc(ABCMyModel)"
         """
-      NSLog("%@", message)
-      _swift_reportToDebugger(0, message, nil)
+      _logRuntimeIssue(message)
     }
     return 1
   }
