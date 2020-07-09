@@ -36,7 +36,7 @@
 // CHECK-IOS:   }
 
 
-// CHECK-LINUX:   "compilerVersion": "Swift version
+// CHECK-LINUX:   "compilerVersion": "{{.*}}Swift version
 
 // CHECK-LINUX:   "target": {
 // CHECK-LINUX:     "triple": "x86_64-unknown-linux",
