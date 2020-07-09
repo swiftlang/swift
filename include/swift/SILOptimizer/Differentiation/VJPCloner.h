@@ -1,4 +1,4 @@
-//===--- VJPEmitter.h - VJP Generation in differentiation -----*- C++ -*---===//
+//===--- VJPCloner.h - VJP function generation ----------------*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_VJPEMITTER_H
-#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_VJPEMITTER_H
+#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_VJPCLONER_H
+#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_VJPCLONER_H
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
@@ -35,11 +35,11 @@ class SILInstruction;
 namespace autodiff {
 
 class ADContext;
-class PullbackEmitter;
+class PullbackCloner;
 
-class VJPEmitter final
-    : public TypeSubstCloner<VJPEmitter, SILOptFunctionBuilder> {
-  friend class PullbackEmitter;
+class VJPCloner final
+    : public TypeSubstCloner<VJPCloner, SILOptFunctionBuilder> {
+  friend class PullbackCloner;
 
 private:
   /// The global context.
@@ -90,9 +90,9 @@ private:
                   SILAutoDiffIndices indices, SILFunction *vjp);
 
 public:
-  explicit VJPEmitter(ADContext &context, SILFunction *original,
-                      SILDifferentiabilityWitness *witness, SILFunction *vjp,
-                      DifferentiationInvoker invoker);
+  explicit VJPCloner(ADContext &context, SILFunction *original,
+                     SILDifferentiabilityWitness *witness, SILFunction *vjp,
+                     DifferentiationInvoker invoker);
 
   SILFunction *createEmptyPullback();
 
@@ -170,4 +170,4 @@ public:
 } // end namespace autodiff
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_VJPEMITTER_H
+#endif // SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_VJPCLONER_H
