@@ -2523,6 +2523,12 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
 
+  // If the class has a @main attribute, we need to force synthesis of the
+  // $main function.
+  (void) evaluateOrDefault(Context.evaluator,
+                           SynthesizeMainFunctionRequest{CD},
+                           nullptr);
+
   for (auto *member : CD->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have dynamically-dispatched
