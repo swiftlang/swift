@@ -124,7 +124,14 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
   // binding that provides a type that conforms to that literal protocol. In
   // such cases, don't add the default binding suggestion because the existing
   // suggestion is better.
-  llvm::SmallPtrSet<ProtocolDecl *, 4> coveredLiteralProtocols;
+  //
+  // Note that ordering is important when it comes to bindings, we'd like to
+  // add any "direct" default types first to attempt them before transitive ones.
+  llvm::SmallMapVector<ProtocolDecl *, bool, 4> literalProtocols;
+  for (auto *constraint : Protocols) {
+    if (constraint->getKind() == ConstraintKind::LiteralConformsTo)
+      literalProtocols.insert({constraint->getProtocol(), false});
+  }
 
   for (auto &binding : Bindings) {
     Type type;
@@ -144,21 +151,21 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       continue;
 
     bool requiresUnwrap = false;
-    for (auto *constraint : Protocols) {
-      if (constraint->getKind() != ConstraintKind::LiteralConformsTo)
+    for (auto &entry : literalProtocols) {
+      auto *protocol = entry.first;
+      bool &isCovered = entry.second;
+
+      if (isCovered)
         continue;
 
-      auto *protocol = constraint->getProtocol();
-
-      assert(protocol);
-
-      if (coveredLiteralProtocols.count(protocol))
-        continue;
-
+      // FIXME: This is a hack and it's incorrect because it depends
+      // on ordering of the literal procotols e.g. if `ExpressibleByNilLiteral`
+      // appears before e.g. `ExpressibleByIntegerLiteral` we'd drop
+      // optionality although that would be incorrect.
       do {
         // If the type conforms to this protocol, we're covered.
         if (TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
-          coveredLiteralProtocols.insert(protocol);
+          isCovered = true;
           break;
         }
 
@@ -182,10 +189,31 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
       binding.BindingType = type;
   }
 
+  // If this is not a literal protocol or it has been "covered" by an existing
+  // binding it can't provide a default type.
+  auto isUnviableForDefaulting = [&literalProtocols](ProtocolDecl *protocol) {
+    auto literal = literalProtocols.find(protocol);
+    return literal == literalProtocols.end() || literal->second;
+  };
+
   for (auto *constraint : Protocols) {
     auto *protocol = constraint->getProtocol();
-    if (coveredLiteralProtocols.count(protocol))
+
+    if (isUnviableForDefaulting(protocol))
       continue;
+
+    // Let's try to coalesce integer and floating point literal protocols
+    // if they appear together because the only possible default type that
+    // could satisfy both requirements is `Double`.
+    if (protocol->isSpecificProtocol(
+          KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+      auto *floatLiteral = cs.getASTContext().getProtocol(
+          KnownProtocolKind::ExpressibleByFloatLiteral);
+      // If `ExpressibleByFloatLiteral` is a requirement and it isn't
+      // covered, let's skip `ExpressibleByIntegerLiteral` requirement.
+      if (!isUnviableForDefaulting(floatLiteral))
+        continue;
+    }
 
     auto defaultType = TypeChecker::getDefaultType(protocol, cs.DC);
     if (!defaultType)
