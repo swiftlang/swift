@@ -795,6 +795,11 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-arch");
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
 
+  // On Darwin, we only support libc++.
+  if (context.Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
+    Arguments.push_back("-lc++");
+  }
+
   addArgsToLinkStdlib(Arguments, job, context);
 
   addProfileGenerationArgs(Arguments, context);
@@ -937,6 +942,13 @@ toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
   // Validating darwin unsupported -static-stdlib argument.
   if (args.hasArg(options::OPT_static_stdlib)) {
     diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+  }
+
+  // If a C++ standard library is specified, it has to be libc++.
+  if (auto arg = args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+    if (StringRef(arg->getValue()) != "libc++") {
+      diags.diagnose(SourceLoc(), diag::error_darwin_only_supports_libcxx); 
+    }
   }
 }
 

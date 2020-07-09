@@ -556,6 +556,14 @@ def disable_direct_intramodule_dependencies : Flag<["-"],
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable experimental dependency tracking that never cascades">;
 
+def enable_experimental_cxx_interop :
+  Flag<["-"], "enable-experimental-cxx-interop">,
+  HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
+
+def experimental_cxx_stdlib :
+  Separate<["-"], "experimental-cxx-stdlib">,
+  HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
+
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
