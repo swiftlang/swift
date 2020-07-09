@@ -22,7 +22,8 @@ def escapeCmdArg(arg):
 
 
 def run_command(cmd):
-    cmd = list(map(lambda s: s.encode('utf-8'), cmd))
+    if sys.version_info[0] < 3:
+      cmd = list(map(lambda s: s.encode('utf-8'), cmd))
     print(' '.join([escapeCmdArg(arg) for arg in cmd]))
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
