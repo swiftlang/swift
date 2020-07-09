@@ -222,7 +222,7 @@ SILValue JVPCloner::materializeTangentDirect(AdjointValue val,
   case AdjointValueKind::Concrete:
     return val.getConcreteValue();
   }
-  llvm_unreachable("invalid value kind");
+  llvm_unreachable("Invalid adjoint value kind"); // silences MSVC C4715
 }
 
 SILValue JVPCloner::materializeTangent(AdjointValue val, SILLocation loc) {
@@ -245,7 +245,7 @@ void JVPCloner::setTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
   assert(originalBuffer->getType().isAddress());
   auto insertion =
       bufferMap.try_emplace({origBB, originalBuffer}, tangentBuffer);
-  assert(insertion.second && "tangent buffer already exists.");
+  assert(insertion.second && "Tangent buffer already exists");
   (void)insertion;
 }
 
@@ -254,7 +254,7 @@ SILValue &JVPCloner::getTangentBuffer(SILBasicBlock *origBB,
   assert(originalBuffer->getType().isAddress());
   assert(originalBuffer->getFunction() == original);
   auto insertion = bufferMap.try_emplace({origBB, originalBuffer}, SILValue());
-  assert(!insertion.second && "tangent buffer should already exist");
+  assert(!insertion.second && "Tangent buffer should already exist");
   return insertion.first->getSecond();
 }
 
