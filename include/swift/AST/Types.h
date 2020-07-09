@@ -403,13 +403,6 @@ protected:
     Count : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
-    : NumPadBits,
-
-    /// The number of generic arguments.
-    GenericArgCount : 32
-  );
-
   SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1,
     : NumPadBits,
 
@@ -2209,33 +2202,37 @@ typedef ArrayRefView<Type,CanType,getAsCanType> CanTypeArrayRef;
 /// given type arguments.
 class BoundGenericType : public NominalOrBoundGenericNominalType,
     public llvm::FoldingSetNode {
-  
-  /// Retrieve the intrusive pointer storage from the subtype
-  const Type *getTrailingObjectsPointer() const;
-  Type *getTrailingObjectsPointer() {
-    const BoundGenericType *temp = this;
-    return const_cast<Type *>(temp->getTrailingObjectsPointer());
-  }
+  const SubstitutionMap Substitutions;
 
 protected:
-  BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
-                   ArrayRef<Type> genericArgs, const ASTContext *context,
-                   RecursiveTypeProperties properties);
+  BoundGenericType(TypeKind K, NominalTypeDecl *TheDecl, Type Parent,
+                   SubstitutionMap Substitutions, const ASTContext *C,
+                   RecursiveTypeProperties Properties)
+      : NominalOrBoundGenericNominalType(TheDecl, Parent, K, C, Properties),
+        Substitutions(Substitutions) {}
 
 public:
-  static BoundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
-                               ArrayRef<Type> GenericArgs);
+  static BoundGenericType *get(NominalTypeDecl *TheDecl, Type Parent,
+                               SubstitutionMap Substitutions);
 
-  /// Retrieve the set of generic arguments provided at this level.
-  ArrayRef<Type> getGenericArgs() const {
-    return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
+  /// Deprecated version of the above .
+  static BoundGenericType *get(NominalTypeDecl *TheDecl, Type Parent,
+                               ArrayRef<Type> GenericArgs,
+                               ModuleDecl *M = nullptr);
+
+  /// Retrieve the substitution map applied to the declaration's underlying
+  /// to produce the described type.
+  SubstitutionMap getSubstitutionMap() const {
+    return Substitutions;
   }
 
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent(), getGenericArgs());
+  ArrayRef<Type> getDirectGenericArgs() const;
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getDecl(), getParent(), Substitutions);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
-                      Type Parent, ArrayRef<Type> GenericArgs);
+                      Type Parent, SubstitutionMap Substitutions);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2244,35 +2241,24 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
-  CanTypeArrayRef getGenericArgs() const {
-    return CanTypeArrayRef(getPointer()->getGenericArgs());
+  CanTypeArrayRef getDirectGenericArgs() const {
+    return CanTypeArrayRef(getPointer()->getDirectGenericArgs());
   }
 END_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
 
 
 /// BoundGenericClassType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic class type.
-class BoundGenericClassType final : public BoundGenericType,
-    private llvm::TrailingObjects<BoundGenericClassType, Type> {
-  friend TrailingObjects;
-
-private:
-  BoundGenericClassType(ClassDecl *theDecl, Type parent,
-                        ArrayRef<Type> genericArgs, const ASTContext *context,
-                        RecursiveTypeProperties properties)
+class BoundGenericClassType final : public BoundGenericType {
+  BoundGenericClassType(ClassDecl *TheDecl, Type Parent,
+                        SubstitutionMap Substitutions, const ASTContext *C,
+                        RecursiveTypeProperties Properties)
     : BoundGenericType(TypeKind::BoundGenericClass,
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
+                       reinterpret_cast<NominalTypeDecl*>(TheDecl), Parent,
+                       Substitutions, C, Properties) {}
   friend class BoundGenericType;
 
 public:
-  static BoundGenericClassType* get(ClassDecl *theDecl, Type parent,
-                                    ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericClassType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
-  }
-
   /// Returns the declaration that declares this type.
   ClassDecl *getDecl() const {
     return reinterpret_cast<ClassDecl*>(BoundGenericType::getDecl());
@@ -2286,27 +2272,16 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 
 /// BoundGenericEnumType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic enum type.
-class BoundGenericEnumType final : public BoundGenericType,
-    private llvm::TrailingObjects<BoundGenericEnumType, Type> {
-  friend TrailingObjects;
-
-private:
-  BoundGenericEnumType(EnumDecl *theDecl, Type parent,
-                       ArrayRef<Type> genericArgs, const ASTContext *context,
-                       RecursiveTypeProperties properties)
+class BoundGenericEnumType final : public BoundGenericType {
+  BoundGenericEnumType(EnumDecl *TheDecl, Type Parent,
+                       SubstitutionMap Substitutions, const ASTContext *C,
+                       RecursiveTypeProperties Properties)
     : BoundGenericType(TypeKind::BoundGenericEnum,
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
+                       reinterpret_cast<NominalTypeDecl*>(TheDecl), Parent,
+                       Substitutions, C, Properties) {}
   friend class BoundGenericType;
 
 public:
-  static BoundGenericEnumType* get(EnumDecl *theDecl, Type parent,
-                                    ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericEnumType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
-  }
-
   /// Returns the declaration that declares this type.
   EnumDecl *getDecl() const {
     return reinterpret_cast<EnumDecl*>(BoundGenericType::getDecl());
@@ -2320,27 +2295,16 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericEnumType, BoundGenericType)
 
 /// BoundGenericStructType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic struct type.
-class BoundGenericStructType final : public BoundGenericType,
-    private llvm::TrailingObjects<BoundGenericStructType, Type> {
-  friend TrailingObjects;
-
-private:
-  BoundGenericStructType(StructDecl *theDecl, Type parent,
-                         ArrayRef<Type> genericArgs, const ASTContext *context,
-                         RecursiveTypeProperties properties)
+class BoundGenericStructType final : public BoundGenericType {
+  BoundGenericStructType(StructDecl *TheDecl, Type Parent,
+                         SubstitutionMap Substitutions, const ASTContext *C,
+                         RecursiveTypeProperties Properties)
     : BoundGenericType(TypeKind::BoundGenericStruct, 
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
+                       reinterpret_cast<NominalTypeDecl*>(TheDecl), Parent,
+                       Substitutions, C, Properties) {}
   friend class BoundGenericType;
 
 public:
-  static BoundGenericStructType* get(StructDecl *theDecl, Type parent,
-                                    ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericStructType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
-  }
-
   /// Returns the declaration that declares this type.
   StructDecl *getDecl() const {
     return reinterpret_cast<StructDecl*>(BoundGenericType::getDecl());
@@ -6399,7 +6363,7 @@ inline Type TupleTypeElt::getVarargBaseTy() const {
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.
-    return BGT->getGenericArgs()[0];
+    return BGT->getDirectGenericArgs()[0];
   }
   assert(T->hasError());
   return T;
@@ -6429,16 +6393,6 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ValueOwnership::InOut;
   }
   return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isNoDerivative};
-}
-
-inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
-  if (auto ty = dyn_cast<BoundGenericStructType>(this))
-    return ty->getTrailingObjects<Type>();
-  if (auto ty = dyn_cast<BoundGenericEnumType>(this))
-    return ty->getTrailingObjects<Type>();
-  if (auto ty = dyn_cast<BoundGenericClassType>(this))
-    return ty->getTrailingObjects<Type>();
-  llvm_unreachable("Unhandled BoundGenericType!");
 }
 
 inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {

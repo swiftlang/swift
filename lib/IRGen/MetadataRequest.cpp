@@ -2498,7 +2498,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       // accessor.
       //
       // TODO: Also need to count the parent type's generic arguments.
-      for (auto arg : bgt->getGenericArgs()) {
+      for (const auto arg : bgt->getDirectGenericArgs()) {
         visit(arg);
       }
       NumCalls += 1;
@@ -2914,9 +2914,9 @@ public:
       auto payloadTy = visit(objectTy);
       if (payloadTy == objectTy)
         return ty;
-      auto &C = ty->getASTContext();
-      auto optDecl = C.getOptionalDecl();
-      return CanType(BoundGenericEnumType::get(optDecl, Type(), payloadTy));
+      auto *const optDecl = ty->getASTContext().getOptionalDecl();
+      return BoundGenericType::get(optDecl, Type(), payloadTy)
+          ->getCanonicalType();
     }
 
     // Otherwise, generic arguments are not lowered.

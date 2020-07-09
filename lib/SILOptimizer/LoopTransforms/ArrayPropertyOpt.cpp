@@ -368,7 +368,7 @@ private:
     if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
       // Check the array element type parameter.
       bool isClass = false;
-      for (auto EltTy : BGT->getGenericArgs()) {
+      for (const auto &EltTy : BGT->getDirectGenericArgs()) {
         if (!EltTy->hasReferenceSemantics())
           return false;
         isClass = true;

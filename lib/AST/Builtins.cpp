@@ -1331,7 +1331,7 @@ static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
 
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
-  auto optionalRawPointerType = BoundGenericEnumType::get(
+  auto optionalRawPointerType = BoundGenericType::get(
       Context.getOptionalDecl(), Type(), {Context.TheRawPointerType});
   return getBuiltinFunction(Id, {int1Type, optionalRawPointerType},
                             Context.TheEmptyTupleType);

@@ -977,7 +977,7 @@ namespace {
             }
           }
           assert(importedTypeArgs.size() == typeParamCount);
-          importedType = BoundGenericClassType::get(
+          importedType = BoundGenericType::get(
             imported, nullptr, importedTypeArgs);
         } else {
           importedType = imported->getDeclaredType();
@@ -1293,10 +1293,10 @@ static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
   if (boundGenericBase != impl.SwiftContext.getUnmanagedDecl())
     return Type();
 
-  assert(boundGenericTy->getGenericArgs().size() == 1 &&
+  assert(boundGenericTy->getDirectGenericArgs().size() == 1 &&
          "signature of Unmanaged has changed");
 
-  auto resultTy = boundGenericTy->getGenericArgs().front();
+  auto resultTy = boundGenericTy->getDirectGenericArgs().front();
   if (isOptional)
     resultTy = OptionalType::get(resultTy);
 

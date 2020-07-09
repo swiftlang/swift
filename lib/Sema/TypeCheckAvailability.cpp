@@ -2147,7 +2147,7 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
   if (!inputTy)
     return false;
 
-  auto genericArgs = inputTy->getGenericArgs();
+  const auto genericArgs = inputTy->getDirectGenericArgs();
   if (genericArgs.size() != 1)
     return false;
 

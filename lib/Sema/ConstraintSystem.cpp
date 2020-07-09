@@ -853,7 +853,7 @@ FunctionType *ConstraintSystem::openFunctionType(
 Optional<Type> ConstraintSystem::isArrayType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
     if (boundStruct->getDecl() == type->getASTContext().getArrayDecl())
-      return boundStruct->getGenericArgs()[0];
+      return boundStruct->getDirectGenericArgs()[0];
   }
 
   return None;
@@ -862,7 +862,7 @@ Optional<Type> ConstraintSystem::isArrayType(Type type) {
 Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
     if (boundStruct->getDecl() == type->getASTContext().getDictionaryDecl()) {
-      auto genericArgs = boundStruct->getGenericArgs();
+      const auto genericArgs = boundStruct->getDirectGenericArgs();
       return std::make_pair(genericArgs[0], genericArgs[1]);
     }
   }
@@ -873,7 +873,7 @@ Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
 Optional<Type> ConstraintSystem::isSetType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
     if (boundStruct->getDecl() == type->getASTContext().getSetDecl())
-      return boundStruct->getGenericArgs()[0];
+      return boundStruct->getDirectGenericArgs()[0];
   }
 
   return None;
@@ -2228,8 +2228,8 @@ void ConstraintSystem::bindOverloadType(
     auto *keyPathLoc = getConstraintLocator(
         locator, LocatorPathElt::KeyPathDynamicMember(keyPathDecl));
 
-    auto rootTy = keyPathTy->getGenericArgs()[0];
-    auto leafTy = keyPathTy->getGenericArgs()[1];
+    const auto rootTy = keyPathTy->getDirectGenericArgs()[0];
+    const auto leafTy = keyPathTy->getDirectGenericArgs()[1];
 
     // Member would either point to mutable or immutable property, we
     // don't which at the moment, so let's allow its type to be l-value.

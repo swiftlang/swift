@@ -586,7 +586,7 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
     // Check the array element type parameter.
     bool isClass = true;
-    for (auto EltTy : BGT->getGenericArgs()) {
+    for (const auto &EltTy : BGT->getDirectGenericArgs()) {
       if (EltTy->isBridgeableObjectType())
         return true;
       isClass = false;

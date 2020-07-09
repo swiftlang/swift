@@ -1657,8 +1657,8 @@ namespace {
             llvm_unreachable("unknown key path class!");
           }
         } else {
-          auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
-          baseTy = keyPathBGT->getGenericArgs()[0];
+          const auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
+          baseTy = keyPathBGT->getDirectGenericArgs()[0];
 
           // Coerce the index to the key path's type
           indexKP = coerceToType(indexKP, keyPathTy, locator);
@@ -1677,7 +1677,7 @@ namespace {
           } else {
             // *KeyPath<T, U> is T -> U, with rvalueness based on mutability
             // of base and keypath
-            valueTy = keyPathBGT->getGenericArgs()[1];
+            valueTy = keyPathBGT->getDirectGenericArgs()[1];
         
             // The result may be an lvalue based on the base and key path kind.
             if (keyPathBGT->getDecl() == cs.getASTContext().getKeyPathDecl()) {
@@ -4575,9 +4575,10 @@ namespace {
         leafTy = fnTy->getResult();
         isFunctionType = true;
       } else {
-        auto keyPathTy = exprType->castTo<BoundGenericType>();
-        baseTy = keyPathTy->getGenericArgs()[0];
-        leafTy = keyPathTy->getGenericArgs()[1];
+        const auto genericArgs =
+            exprType->castTo<BoundGenericType>()->getDirectGenericArgs();
+        baseTy = genericArgs[0];
+        leafTy = genericArgs[1];
       }
 
       // Track the type of the current component. Once we finish projecting
@@ -5990,9 +5991,9 @@ buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
                              unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
   Type srcType = srcCollectionType->castTo<BoundGenericType>()
-                                  ->getGenericArgs()[typeArgIndex];
+                                  ->getDirectGenericArgs()[typeArgIndex];
   Type destType = destCollectionType->castTo<BoundGenericType>()
-                                    ->getGenericArgs()[typeArgIndex];
+                                    ->getDirectGenericArgs()[typeArgIndex];
 
   // Build the conversion.
   auto &cs = rewriter.getConstraintSystem();
@@ -6310,8 +6311,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       TypeChecker::requireOptionalIntrinsics(cs.getASTContext(),
                                              expr->getLoc());
 
-      Type valueType = toGenericType->getGenericArgs()[0];
-      expr = coerceToType(expr, valueType, locator);
+      expr = coerceToType(expr, toGenericType->getDirectGenericArgs()[0],
+                          locator);
       if (!expr) return nullptr;
 
       auto *result =
@@ -6721,8 +6722,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (cs.getType(expr)->getOptionalObjectType())
       return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
-    Type valueType = toGenericType->getGenericArgs()[0];
-    expr = coerceToType(expr, valueType, locator);
+    expr = coerceToType(expr, toGenericType->getDirectGenericArgs()[0],
+                        locator);
     if (!expr) return nullptr;
 
     auto *result = cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, toType));

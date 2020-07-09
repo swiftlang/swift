@@ -71,9 +71,9 @@ SILType SILType::getBuiltinWordType(const ASTContext &C) {
 
 SILType SILType::getOptionalType(SILType type) {
   auto &ctx = type.getASTContext();
-  auto optType = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
-                                           { type.getASTType() });
-  return getPrimitiveType(CanType(optType), type.getCategory());
+  auto optType = BoundGenericType::get(ctx.getOptionalDecl(), Type(),
+                                       { type.getASTType() });
+  return getPrimitiveType(optType->getCanonicalType(), type.getCategory());
 }
 
 SILType SILType::getSILTokenType(const ASTContext &C) {

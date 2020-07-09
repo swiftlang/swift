@@ -1023,7 +1023,8 @@ namespace {
           
           if (isa<IntegerLiteralExpr>(indexExpr)) {
             
-            outputTy = baseObjTy->getAs<BoundGenericType>()->getGenericArgs()[0];
+            outputTy = baseObjTy->getAs<BoundGenericType>()
+                ->getDirectGenericArgs()[0];
             
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);
@@ -1699,7 +1700,7 @@ namespace {
       if (AnyMetatypeType *meta = baseTy->getAs<AnyMetatypeType>()) {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
-          ArrayRef<Type> typeVars = bgt->getGenericArgs();
+          const ArrayRef<Type> typeVars = bgt->getDirectGenericArgs();
           auto specializations = expr->getUnresolvedParams();
 
           // If we have too many generic arguments, complain.

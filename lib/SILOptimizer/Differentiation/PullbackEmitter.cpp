@@ -1438,7 +1438,8 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
   auto &ctx = builder.getASTContext();
   auto arrayTanType = cast<StructType>(arrayAdjoint->getType().getASTType());
   auto arrayType = arrayTanType->getParent()->castTo<BoundGenericStructType>();
-  auto eltTanType = arrayType->getGenericArgs().front()->getCanonicalType();
+  auto eltTanType =
+      arrayType->getDirectGenericArgs().front()->getCanonicalType();
   auto eltTanSILType = remapType(SILType::getPrimitiveAddressType(eltTanType));
   // Get `function_ref` and generic signature of
   // `Array.TangentVector.subscript.getter`.

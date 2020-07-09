@@ -1045,10 +1045,11 @@ private:
     if (!genericTy || genericTy->getDecl() != getASTContext().getArrayDecl())
       return false;
 
-    assert(genericTy->getGenericArgs().size() == 1);
+    const auto genericArgs = genericTy->getDirectGenericArgs();
+    assert(genericArgs.size() == 1);
 
-    auto argTy = genericTy->getGenericArgs().front();
-    if (auto classDecl = argTy->getClassOrBoundGenericClass())
+    if (const auto classDecl =
+            genericArgs.front()->getClassOrBoundGenericClass())
       os << "IBOutletCollection(" << getNameForObjC(classDecl) << ") ";
     else
       os << "IBOutletCollection(id) ";
@@ -1160,7 +1161,7 @@ private:
           os << ", unsafe_unretained";
           // Don't print unsafe_unretained twice.
           if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
-            ty = boundTy->getGenericArgs().front();
+            ty = boundTy->getDirectGenericArgs().front();
             if (isOptional)
               ty = OptionalType::get(ty);
           }
@@ -1692,7 +1693,7 @@ private:
     ASTContext &ctx = getASTContext();
 
     if (SD == ctx.getUnmanagedDecl()) {
-      auto args = BGT->getGenericArgs();
+      const auto args = BGT->getDirectGenericArgs();
       assert(args.size() == 1);
       visitPart(args.front(), optionalKind);
       os << " __unsafe_unretained";
@@ -1711,7 +1712,7 @@ private:
       return false;
     }
 
-    auto args = BGT->getGenericArgs();
+    const auto args = BGT->getDirectGenericArgs();
     assert(args.size() == 1);
     visitPart(args.front(), OTK_None);
     if (isConst)
@@ -1724,7 +1725,7 @@ private:
   void visitBoundGenericStructType(BoundGenericStructType *BGT,
                                    Optional<OptionalTypeKind> optionalKind) {
     // Handle bridged types.
-    if (printIfObjCBridgeable(BGT->getDecl(), BGT->getGenericArgs(),
+    if (printIfObjCBridgeable(BGT->getDecl(), BGT->getDirectGenericArgs(),
                               optionalKind))
       return;
 
@@ -1736,7 +1737,7 @@ private:
 
   void printGenericArgs(BoundGenericType *BGT) {
     os << '<';
-    interleave(BGT->getGenericArgs(),
+    interleave(BGT->getDirectGenericArgs(),
                [this](Type t) { print(t, None); },
                [this] { os << ", "; });
     os << '>';
@@ -1768,7 +1769,7 @@ private:
                              Optional<OptionalTypeKind> optionalKind) {
     // Handle bridged types.
     if (!isa<StructDecl>(BGT->getDecl()) &&
-        printIfObjCBridgeable(BGT->getDecl(), BGT->getGenericArgs(),
+        printIfObjCBridgeable(BGT->getDecl(), BGT->getDirectGenericArgs(),
                               optionalKind))
       return;
 

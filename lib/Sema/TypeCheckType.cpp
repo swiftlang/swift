@@ -593,8 +593,8 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
       BGT->getDecl() != Ctx.getUnsafeMutablePointerDecl())
     return false;
   IsMutable = BGT->getDecl() == Ctx.getUnsafeMutablePointerDecl();
-  assert(BGT->getGenericArgs().size() == 1);
-  return BGT->getGenericArgs().front()->isVoid();
+  assert(BGT->getDirectGenericArgs().size() == 1);
+  return BGT->getDirectGenericArgs().front()->isVoid();
 }
 
 static Type checkContextualRequirements(Type type,
@@ -820,7 +820,7 @@ Type TypeChecker::applyUnboundGenericArguments(GenericTypeDecl *decl,
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   auto genericSig = decl->getGenericSignature();
-  assert(!genericSig.isNull());
+  assert(genericSig);
 
   TypeSubstitutionMap subs;
 

@@ -1674,7 +1674,8 @@ static CanType computeLoweredOptionalType(TypeConverter &tc,
   }
 
   auto optDecl = tc.Context.getOptionalDecl();
-  return CanType(BoundGenericEnumType::get(optDecl, Type(), loweredObjectType));
+  return BoundGenericType::get(optDecl, Type(), loweredObjectType)
+      ->getCanonicalType();
 }
 
 static CanType

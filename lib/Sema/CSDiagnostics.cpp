@@ -644,8 +644,8 @@ void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
   auto genericTypeDecl = paramSourceTy->getAnyGeneric();
   auto param = genericTypeDecl->getGenericParams()->getParams()[position];
 
-  auto lhs = getActual()->getGenericArgs()[position];
-  auto rhs = getRequired()->getGenericArgs()[position];
+  const auto lhs = getActual()->getDirectGenericArgs()[position];
+  const auto rhs = getRequired()->getDirectGenericArgs()[position];
 
   auto noteLocation = param->getLoc();
 

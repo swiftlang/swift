@@ -125,8 +125,7 @@ RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
   auto keyPathType = param->getType()->getAs<BoundGenericType>();
   if (!keyPathType)
     return TypePair();
-  auto genericArgs = keyPathType->getGenericArgs();
-  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
-         "invalid keypath dynamic member");
+  const auto genericArgs = keyPathType->getDirectGenericArgs();
+  assert(genericArgs.size() == 2 && "invalid keypath dynamic member");
   return TypePair(genericArgs[0], genericArgs[1]);
 }

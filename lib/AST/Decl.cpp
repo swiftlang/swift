@@ -3759,15 +3759,9 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, ParentTy, ctx);
     case DeclTypeKind::DeclaredInterfaceType: {
-      // Note that here, we need to be able to produce a type
-      // before the decl has been validated, so we rely on
-      // the generic parameter list directly instead of looking
-      // at the signature.
-      SmallVector<Type, 4> args;
-      for (auto param : decl->getGenericParams()->getParams())
-        args.push_back(param->getDeclaredInterfaceType());
-
-      return BoundGenericType::get(decl, ParentTy, args);
+      const auto sig = decl->getGenericSignature();
+      return BoundGenericType::get(decl, ParentTy,
+                                   sig->getIdentitySubstitutionMap());
     }
     }
 
@@ -4935,7 +4929,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
 
   // Bound generic types are invariant.
   if (auto boundGenericType = type->getAs<BoundGenericType>()) {
-    for (auto paramType : boundGenericType->getGenericArgs()) {
+    for (const auto &paramType : boundGenericType->getDirectGenericArgs()) {
       if (findProtocolSelfReferences(proto, paramType,
                                      skipAssocTypes)) {
         return SelfReferenceKind::Other();
@@ -6302,7 +6296,7 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.
-    return BGT->getGenericArgs()[0];
+    return BGT->getDirectGenericArgs()[0];
   }
   return T;
 }

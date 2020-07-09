@@ -2599,7 +2599,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If our arguments line up with our innermost generic parameters, it's
   // a passthrough typealias.
   auto innermostGenericParams = typealiasSig->getInnermostGenericParams();
-  auto boundArgs = boundGenericType->getGenericArgs();
+  const auto boundArgs = boundGenericType->getDirectGenericArgs();
   if (boundArgs.size() != innermostGenericParams.size())
     return false;
 

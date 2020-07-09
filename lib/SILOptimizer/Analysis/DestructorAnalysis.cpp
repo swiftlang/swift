@@ -111,7 +111,7 @@ bool DestructorAnalysis::areTypeParametersSafe(CanType Ty) {
     return false;
 
   // Make sure all type parameters are safe.
-  for (auto TP : BGT->getGenericArgs()) {
+  for (const auto &TP : BGT->getDirectGenericArgs()) {
     if (!isSafeType(TP->getCanonicalType()))
       return false;
   }

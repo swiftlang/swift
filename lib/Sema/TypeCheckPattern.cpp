@@ -1108,7 +1108,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       }
     } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
       if (BST->getDecl() == Context.getArrayDecl())
-          shouldRequireType = BST->getGenericArgs()[0]->isEqual(Context.TheEmptyTupleType);
+        shouldRequireType = BST->getDirectGenericArgs()[0]
+            ->isEqual(Context.TheEmptyTupleType);
     }
     
     if (shouldRequireType &&

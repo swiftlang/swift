@@ -93,8 +93,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
     }
     ++Depth;
     unsigned MaxTypeDepth = 0;
-    auto GenericArgs = BGT->getGenericArgs();
-    for (auto Ty : GenericArgs) {
+    for (const auto &Ty : BGT->getDirectGenericArgs()) {
       unsigned TypeWidth;
       unsigned TypeDepth;
       std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Ty);

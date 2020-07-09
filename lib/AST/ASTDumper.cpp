@@ -3868,7 +3868,7 @@ namespace {
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
         printRec("parent", T->getParent());
-      for (auto arg : T->getGenericArgs())
+      for (const auto &arg : T->getDirectGenericArgs())
         printRec(arg);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3879,7 +3879,7 @@ namespace {
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
         printRec("parent", T->getParent());
-      for (auto arg : T->getGenericArgs())
+      for (const auto &arg : T->getDirectGenericArgs())
         printRec(arg);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3889,7 +3889,7 @@ namespace {
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
         printRec("parent", T->getParent());
-      for (auto arg : T->getGenericArgs())
+      for (const auto &arg : T->getDirectGenericArgs())
         printRec(arg);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
