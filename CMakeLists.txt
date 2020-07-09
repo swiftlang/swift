@@ -1113,6 +1113,12 @@ add_subdirectory(utils)
 
 add_subdirectory(userdocs)
 
+file(GLOB LOCALIZATION_FILES
+  "include/swift/AST/diagnostics/*.yaml"
+)
+
+file(COPY ${LOCALIZATION_FILES} DESTINATION "share/diagnostics")
+
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   if(SWIFT_BUILD_PERF_TESTSUITE)
     add_subdirectory(benchmark)
