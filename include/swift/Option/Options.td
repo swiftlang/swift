@@ -959,6 +959,12 @@ def deprecated_integrated_repl : Flag<["-"], "deprecated-integrated-repl">,
   Flags<[FrontendOption, NoBatchOption]>, ModeOpt;
 def i : Flag<["-"], "i">, ModeOpt; // only used to provide diagnostics.
 
+// A JIT compilation mode where a stub executable is created and a frontend
+// process will register itself as a "provider" that will be able to JIT code
+// for it.
+def jit_build : Flag<["-"], "jit-build">, HelpText<"JIT compilation mode">,
+  Flags<[NoInteractiveOption, HelpHidden]>, ModeOpt;
+
 def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
   HelpText<"Optimize input files together instead of individually">,
   Flags<[FrontendOption, NoInteractiveOption]>;

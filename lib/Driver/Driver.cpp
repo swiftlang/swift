@@ -1585,6 +1585,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::REPL;
       break;
 
+    case options::OPT_jit_build:
+      Diags.diagnose(SourceLoc(), diag::jit_build_unsupported);
+      break;
+
     default:
       llvm_unreachable("unknown mode");
     }
