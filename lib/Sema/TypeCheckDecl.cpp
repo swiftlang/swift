@@ -2527,6 +2527,12 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
       Context.getProtocol(KnownProtocolKind::EuclideanDifferentiable));
   // SWIFT_ENABLE_TENSORFLOW END
 
+  // If the class has a @main attribute, we need to force synthesis of the
+  // $main function.
+  (void) evaluateOrDefault(Context.evaluator,
+                           SynthesizeMainFunctionRequest{CD},
+                           nullptr);
+
   for (auto *member : CD->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have dynamically-dispatched
