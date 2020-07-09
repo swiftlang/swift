@@ -1,23 +1,23 @@
 // Test limitations on SPI protocol requirements.
 
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-library-evolution
 
 // Reject SPI protocol requirements without a default implementation.
 public protocol PublicProtoRejected {
-  @_spi(Private) // expected-error{{protocol requirement 'reqWithoutDefault()' cannot be declared '@_spi' without a default implementation in a protocol extension}}
-  func reqWithoutDefault()
+  @_spi(Private)
+  func reqWithoutDefault() // expected-error{{protocol requirement 'reqWithoutDefault()' cannot be declared '@_spi' without a default implementation in a protocol extension}}
 
-  @_spi(Private) // expected-error{{protocol requirement 'property' cannot be declared '@_spi' without a default implementation in a protocol extension}}
-  var property: Int { get set }
+  @_spi(Private)
+  var property: Int { get set } // expected-error{{protocol requirement 'property' cannot be declared '@_spi' without a default implementation in a protocol extension}}
 
-  @_spi(Private) // expected-error{{protocol requirement 'propertyWithoutSetter' cannot be declared '@_spi' without a default implementation in a protocol extension}}
-  var propertyWithoutSetter: Int { get set }
+  @_spi(Private)
+  var propertyWithoutSetter: Int { get set } // expected-error{{protocol requirement 'propertyWithoutSetter' cannot be declared '@_spi' without a default implementation in a protocol extension}}
 
-  @_spi(Private) // expected-error{{protocol requirement 'subscript(_:)' cannot be declared '@_spi' without a default implementation in a protocol extension}}
-  subscript(index: Int) -> Int { get set }
+  @_spi(Private)
+  subscript(index: Int) -> Int { get set } // expected-error{{protocol requirement 'subscript(_:)' cannot be declared '@_spi' without a default implementation in a protocol extension}}
 
-  @_spi(Private) // expected-error{{protocol requirement 'init()' cannot be declared '@_spi' without a default implementation in a protocol extension}}
-  init()
+  @_spi(Private)
+  init() // expected-error{{protocol requirement 'init()' cannot be declared '@_spi' without a default implementation in a protocol extension}}
 
   @_spi(Private) // expected-error{{'@_spi' attribute cannot be applied to this declaration}}
   associatedtype T

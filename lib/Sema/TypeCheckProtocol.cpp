@@ -5755,7 +5755,14 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (!valueDecl->isProtocolRequirement())
       continue;
 
-    checker.resolveWitnessViaLookup(valueDecl);
+    ResolveWitnessResult result = checker.resolveWitnessViaLookup(valueDecl);
+
+    if (result == ResolveWitnessResult::Missing &&
+        requirement->isSPI()) {
+      // SPI requirements need a default value.
+      valueDecl->diagnose(diag::spi_attribute_on_protocol_requirement,
+                          valueDecl->getName());
+    }
   }
 
   // Find defaults for any associated conformances rooted on defaulted
