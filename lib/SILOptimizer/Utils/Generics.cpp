@@ -1936,48 +1936,53 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
   SILLocation Loc = AI.getLoc();
   auto substConv = AI.getSubstCalleeConv();
   unsigned ArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
-  for (auto &Op : AI.getArgumentOperands()) {
-    auto handleConversion = [&]() {
-      // Rewriting SIL arguments is only for lowered addresses.
-      if (!substConv.useLoweredAddresses())
-        return false;
 
-      if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
-        // Handle result arguments.
-        unsigned formalIdx =
-            substConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
-        if (ReInfo.isFormalResultConverted(formalIdx)) {
-          // The result is converted from indirect to direct. We need to insert
-          // a store later.
-          assert(!StoreResultTo);
-          StoreResultTo = Op.get();
-          return true;
-        }
-      } else {
-        // Handle arguments for formal parameters.
-        unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
-        if (ReInfo.isParamConverted(paramIdx)) {
-          // An argument is converted from indirect to direct. Instead of the
-          // address we pass the loaded value.
-          auto argConv = substConv.getSILArgumentConvention(ArgIdx);
-          SILValue Val;
-          if (!argConv.isGuaranteedConvention() || isa<PartialApplyInst>(AI)) {
-            Val = Builder.emitLoadValueOperation(Loc, Op.get(),
-                                                 LoadOwnershipQualifier::Take);
-          } else {
-            Val = Builder.emitLoadBorrowOperation(Loc, Op.get());
-            if (Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-              ArgAtIndexNeedsEndBorrow.push_back(Arguments.size());
-          }
-          Arguments.push_back(Val);
-          return true;
-        }
-      }
+  auto handleConversion = [&](SILValue InputValue) {
+    // Rewriting SIL arguments is only for lowered addresses.
+    if (!substConv.useLoweredAddresses())
       return false;
-    };
-    if (!handleConversion())
-      Arguments.push_back(Op.get());
 
+    if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
+      // Handle result arguments.
+      unsigned formalIdx =
+          substConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
+      if (!ReInfo.isFormalResultConverted(formalIdx)) {
+        return false;
+      }
+
+      // The result is converted from indirect to direct. We need to insert
+      // a store later.
+      assert(!StoreResultTo);
+      StoreResultTo = InputValue;
+      return true;
+    }
+
+    // Handle arguments for formal parameters.
+    unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
+    if (!ReInfo.isParamConverted(paramIdx)) {
+      return false;
+    }
+
+    // An argument is converted from indirect to direct. Instead of the
+    // address we pass the loaded value.
+    auto argConv = substConv.getSILArgumentConvention(ArgIdx);
+    SILValue Val;
+    if (!argConv.isGuaranteedConvention() || isa<PartialApplyInst>(AI)) {
+      Val = Builder.emitLoadValueOperation(Loc, InputValue,
+                                           LoadOwnershipQualifier::Take);
+    } else {
+      Val = Builder.emitLoadBorrowOperation(Loc, InputValue);
+      if (Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+        ArgAtIndexNeedsEndBorrow.push_back(Arguments.size());
+    }
+
+    Arguments.push_back(Val);
+    return true;
+  };
+
+  for (auto &Op : AI.getArgumentOperands()) {
+    if (!handleConversion(Op.get()))
+      Arguments.push_back(Op.get());
     ++ArgIdx;
   }
 }
