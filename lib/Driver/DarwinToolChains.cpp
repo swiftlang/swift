@@ -330,6 +330,26 @@ toolchains::Darwin::addSanitizerArgs(ArgStringList &Arguments,
                                      /*shared=*/false);
 }
 
+namespace {
+
+enum class BackDeployLibFilter {
+  executable,
+  all
+};
+
+// Whether the given job matches the backward-deployment library filter.
+bool jobMatchesFilter(LinkKind jobKind, BackDeployLibFilter filter) {
+  switch (filter) {
+  case BackDeployLibFilter::executable:
+    return jobKind == LinkKind::Executable;
+    
+  case BackDeployLibFilter::all:
+    return true;
+  }
+}
+
+}
+
 void
 toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
                                         const DynamicLinkJobAction &job,
@@ -359,47 +379,31 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   }
   
   if (runtimeCompatibilityVersion) {
-    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
-      // Swift 5.0 compatibility library
-      SmallString<128> BackDeployLib;
-      BackDeployLib.append(SharedResourceDirPath);
-      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
-      
-      if (llvm::sys::fs::exists(BackDeployLib)) {
-        Arguments.push_back("-force_load");
-        Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
-      }
-    }
+    auto addBackDeployLib = [&](llvm::VersionTuple version,
+                                BackDeployLibFilter filter,
+                                StringRef libraryName) {
+      if (*runtimeCompatibilityVersion > version)
+        return;
 
-    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 1)) {
-      // Swift 5.1 compatibility library
+      if (!jobMatchesFilter(job.getKind(), filter))
+        return;
+      
       SmallString<128> BackDeployLib;
       BackDeployLib.append(SharedResourceDirPath);
-      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility51.a");
+      llvm::sys::path::append(BackDeployLib, "lib" + libraryName + ".a");
       
       if (llvm::sys::fs::exists(BackDeployLib)) {
         Arguments.push_back("-force_load");
         Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
       }
-    }
+    };
+
+    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName) \
+      addBackDeployLib(                                       \
+          llvm::VersionTuple Version, BackDeployLibFilter::Filter, LibraryName);
+    #include "swift/Frontend/BackDeploymentLibs.def"
   }
     
-  if (job.getKind() == LinkKind::Executable) {
-    if (runtimeCompatibilityVersion)
-      if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
-        // Swift 5.0 dynamic replacement compatibility library.
-        SmallString<128> BackDeployLib;
-        BackDeployLib.append(SharedResourceDirPath);
-        llvm::sys::path::append(BackDeployLib,
-                                "libswiftCompatibilityDynamicReplacements.a");
-
-        if (llvm::sys::fs::exists(BackDeployLib)) {
-          Arguments.push_back("-force_load");
-          Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
-        }
-      }
-  }
-
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   SmallVector<std::string, 4> RuntimeLibPaths;
