@@ -549,9 +549,8 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
 
 /// Remove the 'self' type from the given type, if it's a method type.
 static Type removeSelfParam(ValueDecl *value, Type type) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (func->getDeclContext()->isTypeContext())
-      return type->castTo<AnyFunctionType>()->getResult();
+  if (value->hasCurriedSelf()) {
+    return type->castTo<AnyFunctionType>()->getResult();
   }
 
   return type;
