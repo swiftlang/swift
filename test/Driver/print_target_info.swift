@@ -7,11 +7,21 @@
 // RUN: %swift_driver -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 // RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 
+// RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
+
+// CHECK-IOS:   "compilerVersion": "{{.*}}Swift version
+
 // CHECK-IOS:   "target": {
 // CHECK-IOS:     "triple": "arm64-apple-ios12.0",
 // CHECK-IOS:     "unversionedTriple": "arm64-apple-ios",
 // CHECK-IOS:     "moduleTriple": "arm64-apple-ios",
 // CHECK-IOS:     "swiftRuntimeCompatibilityVersion": "5.0",
+// CHECK-IOS:     "compatibilityLibraries": [
+// CHECK-IOS:       "libraryName": "swiftCompatibility50",
+// CHECK-IOS:       "libraryName": "swiftCompatibility51",
+// CHECK-IOS:       "libraryName": "swiftCompatibilityDynamicReplacements"
+// CHECK-IOS:       "filter": "executable"
+// CHECK-IOS:     ],
 // CHECK-IOS:     "librariesRequireRPath": true
 // CHECK-IOS:   }
 
@@ -25,6 +35,8 @@
 // CHECK-IOS:     "runtimeResourcePath": "{{.*}}lib{{(/|\\\\)}}swift"
 // CHECK-IOS:   }
 
+
+// CHECK-LINUX:   "compilerVersion": "{{.*}}Swift version
 
 // CHECK-LINUX:   "target": {
 // CHECK-LINUX:     "triple": "x86_64-unknown-linux",

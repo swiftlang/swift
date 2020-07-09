@@ -2,8 +2,8 @@ target_sources(swiftSILOptimizer PRIVATE
   ADContext.cpp
   Common.cpp
   DifferentiationInvoker.cpp
-  JVPEmitter.cpp
+  JVPCloner.cpp
   LinearMapInfo.cpp
-  PullbackEmitter.cpp
+  PullbackCloner.cpp
   Thunk.cpp
-  VJPEmitter.cpp)
+  VJPCloner.cpp)
