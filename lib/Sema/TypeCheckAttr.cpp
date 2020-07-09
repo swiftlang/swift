@@ -2660,8 +2660,11 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    auto resolution = TypeResolution::forContextual(PD, None);
-    return resolution.resolveType(typeEraserRepr);
+    return TypeResolution::forContextual(PD, None,
+                                         // Unbound generics are not allowed
+                                         // within this attribute.
+                                         /*unboundTyOpener*/ nullptr)
+        .resolveType(typeEraserRepr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -2842,11 +2845,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
   Type T = attr->getProtocolType();
   if (!T && attr->getProtocolTypeRepr()) {
-    TypeResolutionOptions options = None;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-
-    T = TypeResolution::forContextual(DC, options)
-          .resolveType(attr->getProtocolTypeRepr());
+    T = TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr)
+            .resolveType(attr->getProtocolTypeRepr());
   }
 
   // Definite error-types were already diagnosed in resolveType.
@@ -3417,7 +3417,7 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Returns true if the given type conforms to `Differentiable` in the given
-/// contxt. If `tangentVectorEqualsSelf` is true, also check whether the given
+/// context. If `tangentVectorEqualsSelf` is true, also check whether the given
 /// type satisfies `TangentVector == Self`.
 static bool conformsToDifferentiable(Type type, DeclContext *DC,
                                      bool tangentVectorEqualsSelf = false) {
@@ -3480,13 +3480,13 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// Computes the differentiability parameter indices from the given parsed
-// differentiability parameters for the given original or derivative
-// `AbstractFunctionDecl` and derivative generic environment. On error, emits
-// diagnostics and returns `nullptr`.
-// - If parsed parameters are empty, infer parameter indices.
-// - Otherwise, build parameter indices from parsed parameters.
-// The attribute name/location are used in diagnostics.
+/// Computes the differentiability parameter indices from the given parsed
+/// differentiability parameters for the given original or derivative
+/// `AbstractFunctionDecl` and derivative generic environment. On error, emits
+/// diagnostics and returns `nullptr`.
+/// - If parsed parameters are empty, infer parameter indices.
+/// - Otherwise, build parameter indices from parsed parameters.
+/// The attribute name/location are used in diagnostics.
 static IndexSubset *computeDifferentiabilityParameters(
     ArrayRef<ParsedAutoDiffParameter> parsedDiffParams,
     AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
@@ -3645,17 +3645,17 @@ enum class AbstractFunctionDeclLookupErrorKind {
   CandidateNotFunctionDeclaration
 };
 
-// Returns the function declaration corresponding to the given base type
-// (optional), function name, and lookup context.
-//
-// If the base type of the function is specified, member lookup is performed.
-// Otherwise, unqualified lookup is performed.
-//
-// If the function declaration cannot be resolved, emits a diagnostic and
-// returns nullptr.
-//
-// Used for resolving the referenced declaration in `@derivative` and
-// `@transpose` attributes.
+/// Returns the function declaration corresponding to the given base type
+/// (optional), function name, and lookup context.
+///
+/// If the base type of the function is specified, member lookup is performed.
+/// Otherwise, unqualified lookup is performed.
+///
+/// If the function declaration cannot be resolved, emits a diagnostic and
+/// returns nullptr.
+///
+/// Used for resolving the referenced declaration in `@derivative` and
+/// `@transpose` attributes.
 static AbstractFunctionDecl *findAbstractFunctionDecl(
     DeclAttribute *attr, Type baseType, DeclNameRefWithLoc funcNameWithLoc,
     DeclContext *lookupContext, NameLookupOptions lookupOptions,
@@ -3818,10 +3818,10 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
   return validCandidates.front();
 }
 
-// Checks that the `candidate` function type equals the `required` function
-// type, disregarding parameter labels and tuple result labels.
-// `checkGenericSignature` is used to check generic signatures, if specified.
-// Otherwise, generic signatures are checked for equality.
+/// Checks that the `candidate` function type equals the `required` function
+/// type, disregarding parameter labels and tuple result labels.
+/// `checkGenericSignature` is used to check generic signatures, if specified.
+/// Otherwise, generic signatures are checked for equality.
 static bool checkFunctionSignature(
     CanAnyFunctionType required, CanType candidate,
     Optional<std::function<bool(GenericSignature, GenericSignature)>>
@@ -3890,8 +3890,8 @@ static bool checkFunctionSignature(
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
 };
 
-// Returns an `AnyFunctionType` from the given parameters, result type, and
-// generic signature.
+/// Returns an `AnyFunctionType` from the given parameters, result type, and
+/// generic signature.
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
                  GenericSignature genericSignature) {
@@ -3900,8 +3900,8 @@ makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
   return FunctionType::get(parameters, resultType);
 }
 
-// Computes the original function type corresponding to the given derivative
-// function type. Used for `@derivative` attribute type-checking.
+/// Computes the original function type corresponding to the given derivative
+/// function type. Used for `@derivative` attribute type-checking.
 static AnyFunctionType *
 getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   // Unwrap curry levels. At most, two parameter lists are necessary, for
@@ -3940,8 +3940,8 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   return originalType;
 }
 
-// Computes the original function type corresponding to the given transpose
-// function type. Used for `@transpose` attribute type-checking.
+/// Computes the original function type corresponding to the given transpose
+/// function type. Used for `@transpose` attribute type-checking.
 static AnyFunctionType *
 getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
                                  IndexSubset *linearParamIndices,
@@ -4572,11 +4572,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   Type baseType;
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
-    TypeResolutionOptions options = None;
-    options |= TypeResolutionFlags::AllowModule;
-    auto resolution =
-        TypeResolution::forContextual(derivative->getDeclContext(), options);
-    baseType = resolution.resolveType(baseTypeRepr);
+    const auto options =
+        TypeResolutionOptions(None) | TypeResolutionFlags::AllowModule;
+    baseType =
+        TypeResolution::forContextual(derivative->getDeclContext(), options,
+                                      /*unboundTyOpener*/ nullptr)
+            .resolveType(baseTypeRepr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -4878,11 +4879,11 @@ DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
-// Computes the linearity parameter indices from the given parsed linearity
-// parameters for the given transpose function. On error, emits diagnostics and
-// returns `nullptr`.
-//
-// The attribute location is used in diagnostics.
+/// Computes the linearity parameter indices from the given parsed linearity
+/// parameters for the given transpose function. On error, emits diagnostics and
+/// returns `nullptr`.
+///
+/// The attribute location is used in diagnostics.
 static IndexSubset *
 computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
                            AbstractFunctionDecl *transposeFunction,
@@ -4969,12 +4970,12 @@ computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// Checks if the given linearity parameter types are valid for the given
-// original function in the given derivative generic environment and module
-// context. Returns true on error.
-//
-// The parsed differentiability parameters and attribute location are used in
-// diagnostics.
+/// Checks if the given linearity parameter types are valid for the given
+/// original function in the given derivative generic environment and module
+/// context. Returns true on error.
+///
+/// The parsed differentiability parameters and attribute location are used in
+/// diagnostics.
 static bool checkLinearityParameters(
     AbstractFunctionDecl *originalAFD,
     SmallVector<AnyFunctionType::Param, 4> linearParams,
@@ -5007,9 +5008,9 @@ static bool checkLinearityParameters(
   return false;
 }
 
-// Given a transpose function type where `self` is a linearity parameter,
-// sets `staticSelfType` and `instanceSelfType` and returns true if they are
-// equals. Otherwise, returns false.
+/// Given a transpose function type where `self` is a linearity parameter,
+/// sets `staticSelfType` and `instanceSelfType` and returns true if they are
+/// equals. Otherwise, returns false.
 static bool
 doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
                                            Type &staticSelfType,
@@ -5142,11 +5143,12 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     return None;
   };
 
-  auto resolution =
-      TypeResolution::forContextual(transpose->getDeclContext(), None);
   Type baseType;
-  if (attr->getBaseTypeRepr())
-    baseType = resolution.resolveType(attr->getBaseTypeRepr());
+  if (attr->getBaseTypeRepr()) {
+    baseType = TypeResolution::forContextual(transpose->getDeclContext(), None,
+                                             /*unboundTyOpener*/ nullptr)
+                   .resolveType(attr->getBaseTypeRepr());
+  }
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |
@@ -5170,7 +5172,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   // Diagnose if original function has opaque result types.
   if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
-    diagnose(attr->getLocation(), diag::autodiff_attr_opaque_result_type_unsupported);
+    diagnose(attr->getLocation(),
+             diag::autodiff_attr_opaque_result_type_unsupported);
     attr->setInvalid();
     return;
   }

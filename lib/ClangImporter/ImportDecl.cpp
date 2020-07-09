@@ -7097,9 +7097,12 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
           return;
 
         bool inNearbyCategory =
-            std::any_of(interfaceDecl->visible_categories_begin(),
-                        interfaceDecl->visible_categories_end(),
+            std::any_of(interfaceDecl->known_categories_begin(),
+                        interfaceDecl->known_categories_end(),
                         [=](const clang::ObjCCategoryDecl *category) -> bool {
+                          if (!Impl.getClangSema().isVisible(category)) {
+                            return false;
+                          }
                           if (category != decl) {
                             auto *categoryModule =
                                 Impl.getClangModuleForDecl(category);

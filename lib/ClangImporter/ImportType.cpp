@@ -236,7 +236,9 @@ namespace {
       case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
         return unwrapCType(Impl.getNamedSwiftType(Impl.getStdlibModule(), \
                                         #SWIFT_TYPE_NAME));
-          
+#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)       \
+      case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), #SWIFT_TYPE_NAME);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
       // Types that cannot be mapped into Swift, and probably won't ever be.

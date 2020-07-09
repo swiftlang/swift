@@ -2444,7 +2444,7 @@ public:
 
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
-                           Type(TypeResolution *, TypeRepr *),
+                           Type(const TypeResolution *, TypeRepr *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2457,7 +2457,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, TypeResolution *resolution,
+  Type evaluate(Evaluator &evaluator, const TypeResolution *resolution,
                 TypeRepr *repr) const;
 };
 

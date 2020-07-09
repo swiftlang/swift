@@ -1036,9 +1036,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly)
     Opts.StopOptimizationAfterSerialization = true;
 
-  if (Args.hasArg(OPT_sil_merge_partial_modules))
-    Opts.MergePartialModules = true;
-
   // Propagate the typechecker's understanding of
   // -experimental-skip-non-inlinable-function-bodies to SIL.
   Opts.SkipNonInlinableFunctionBodies = TCOpts.SkipNonInlinableFunctionBodies;

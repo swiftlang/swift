@@ -1391,11 +1391,16 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     // Resolve the TypeRepr to get the base type for the lookup.
     // Disable availability diagnostics here, because the final
     // TypeRepr will be resolved again when generating constraints.
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::AllowUnavailable;
-    auto resolution = TypeResolution::forContextual(DC, options);
-    auto BaseTy = resolution.resolveType(InnerTypeRepr);
+    const auto options =
+        TypeResolutionOptions(TypeResolverContext::InExpression) |
+        TypeResolutionFlags::AllowUnavailable;
+    const auto resolution =
+        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          return unboundTy;
+        });
+    const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1919,11 +1924,15 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   } else {
     const auto options =
         TypeResolutionOptions(TypeResolverContext::InExpression) |
-        TypeResolutionFlags::AllowUnboundGenerics |
         TypeResolutionFlags::SilenceErrors;
 
-    auto result = TypeResolution::forContextual(DC, options)
-                      .resolveType(typeExpr->getTypeRepr());
+    const auto resolution =
+        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          return unboundTy;
+        });
+    const auto result = resolution.resolveType(typeExpr->getTypeRepr());
     if (result->hasError())
       return nullptr;
     castTy = result;

@@ -2908,11 +2908,12 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
 bool ClangImporter::Implementation::isVisibleClangEntry(
     const clang::NamedDecl *clangDecl) {
   // For a declaration, check whether the declaration is hidden.
-  if (!clangDecl->isHidden()) return true;
+  clang::Sema &clangSema = getClangSema();
+  if (clangSema.isVisible(clangDecl)) return true;
 
   // Is any redeclaration visible?
   for (auto redecl : clangDecl->redecls()) {
-    if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+    if (clangSema.isVisible(cast<clang::NamedDecl>(redecl))) return true;
   }
 
   return false;
@@ -3023,8 +3024,10 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     SmallVector<clang::NamedDecl *, 4> DelayedCategories;
 
     // Simply importing the categories adds them to the list of extensions.
-    for (const auto *Cat : objcClass->visible_categories()) {
-      Impl.importDeclReal(Cat, Impl.CurrentVersion);
+    for (const auto *Cat : objcClass->known_categories()) {
+      if (getClangSema().isVisible(Cat)) {
+        Impl.importDeclReal(Cat, Impl.CurrentVersion);
+      }
     }
   }
 
