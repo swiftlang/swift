@@ -154,7 +154,7 @@ Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalB
 def disable_only_one_dependency_file :
 Flag<["-"], "disable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
  HelpText<"Disables incremental build optimization that only produces one dependencies file">;
- 
+
 
 def enable_source_range_dependencies :
 Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
@@ -167,7 +167,7 @@ HelpText<"Print a simple message comparing dependencies with source ranges (w/ f
 
 def driver_compare_incremental_schemes_path :
 Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
-HelpText<"Path to use for machine-readable comparision">,
+HelpText<"Path to use for machine-readable comparison">,
 MetaVarName<"<path>">;
 
 def driver_compare_incremental_schemes_path_EQ :
