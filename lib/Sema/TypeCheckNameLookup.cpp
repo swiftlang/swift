@@ -353,8 +353,7 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
     // underlying type is not dependent.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
       if (!aliasDecl->isGeneric() &&
-          aliasDecl->getUnderlyingType()->getCanonicalType()
-            ->hasTypeParameter()) {
+          aliasDecl->getUnderlyingType()->hasTypeParameter()) {
         return true;
       }
     }
