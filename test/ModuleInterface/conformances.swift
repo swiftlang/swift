@@ -57,21 +57,21 @@ public struct B3: PublicBaseProto & PrivateSubProto {}
 public struct B4: PublicBaseProto {}
 extension B4: PrivateSubProto {}
 // CHECK: public struct B5 {
-// CHECK: extension B5 : conformances.PublicBaseProto {
-// NEGATIVE-NOT: extension conformances.B5
+// CHECK: extension conformances.B5 : conformances.PublicBaseProto {
+// NEGATIVE-NOT: extension B5
 public struct B5: PrivateSubProto {}
 extension B5: PublicBaseProto {}
 // CHECK: public struct B6 {
-// NEGATIVE-NOT: extension B6 {
-// CHECK: extension B6 : conformances.PublicBaseProto {
-// NEGATIVE-NOT: extension conformances.B6
+// NEGATIVE-NOT: extension conformances.B6 {
+// CHECK: extension conformances.B6 : conformances.PublicBaseProto {
+// NEGATIVE-NOT: extension B6
 public struct B6 {}
 extension B6: PrivateSubProto {}
 extension B6: PublicBaseProto {}
 // CHECK: public struct B7 {
-// CHECK: extension B7 : conformances.PublicBaseProto {
-// NEGATIVE-NOT: extension B7 {
-// NEGATIVE-NOT: extension conformances.B7
+// CHECK: extension conformances.B7 : conformances.PublicBaseProto {
+// NEGATIVE-NOT: extension conformances.B7 {
+// NEGATIVE-NOT: extension B7
 public struct B7 {}
 extension B7: PublicBaseProto {}
 extension B7: PrivateSubProto {}
@@ -107,7 +107,7 @@ public struct C1: PrivateSubProto, AnotherPrivateSubProto {}
 // CHECK-END: extension conformances.C2 : conformances.PublicBaseProto {}
 public struct C2: PrivateSubProto & AnotherPrivateSubProto {}
 // CHECK: public struct C3 {
-// NEGATIVE-NOT: extension C3 {
+// NEGATIVE-NOT: extension conformances.C3 {
 // CHECK-END: extension conformances.C3 : conformances.PublicBaseProto {}
 public struct C3: PrivateSubProto {}
 extension C3: AnotherPrivateSubProto {}
@@ -130,13 +130,13 @@ public struct D3: PrivateSubProto & PublicSubProto {}
 // CHECK-END: extension conformances.D4 : conformances.PublicBaseProto {}
 public struct D4: APublicSubProto & PrivateSubProto {}
 // CHECK: public struct D5 {
-// CHECK: extension D5 : conformances.PublicSubProto {
-// NEGATIVE-NOT: extension conformances.D5
+// CHECK: extension conformances.D5 : conformances.PublicSubProto {
+// NEGATIVE-NOT: extension D5
 public struct D5: PrivateSubProto {}
 extension D5: PublicSubProto {}
 // CHECK: public struct D6 : conformances.PublicSubProto {
-// NEGATIVE-NOT: extension D6 {
-// NEGATIVE-NOT: extension conformances.D6
+// NEGATIVE-NOT: extension conformances.D6 {
+// NEGATIVE-NOT: extension D6
 public struct D6: PublicSubProto {}
 extension D6: PrivateSubProto {}
 
@@ -217,12 +217,12 @@ extension PrivateProtoConformer : PrivateProto {
   public var member: Int { return 0 }
 }
 // CHECK: public struct PrivateProtoConformer {
-// CHECK: extension PrivateProtoConformer {
+// CHECK: extension conformances.PrivateProtoConformer {
 // CHECK-NEXT: public var member: Swift.Int {
 // CHECK-NEXT:   get
 // CHECK-NEXT: }
 // CHECK-NEXT: {{^}$}}
-// NEGATIVE-NOT: extension conformances.PrivateProtoConformer
+// NEGATIVE-NOT: extension PrivateProtoConformer
 
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Hashable
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Equatable

@@ -195,6 +195,10 @@ struct PrintOptions {
   /// type might be ambiguous.
   bool FullyQualifiedTypesIfAmbiguous = false;
 
+  /// Whether to keep extended types from being printed fully qualified, even
+  /// if other types would be.
+  bool RemoveQualificationOfExtendedTypes = true;
+
   /// If true, printed module names will use the "exported" name, which may be
   /// different from the regular name.
   ///

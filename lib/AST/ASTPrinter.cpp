@@ -111,6 +111,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr,
   result.PrintIfConfig = false;
   result.FullyQualifiedTypes = true;
   result.UseExportedModuleNames = true;
+  result.RemoveQualificationOfExtendedTypes = false;
   result.AllowNullTypes = false;
   result.SkipImports = true;
   result.OmitNameOfInaccessibleProperties = true;
@@ -2185,8 +2186,10 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 
 static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
                                   PrintOptions Options) {
-  Options.FullyQualifiedTypes = false;
-  Options.FullyQualifiedTypesIfAmbiguous = false;
+  if (Options.RemoveQualificationOfExtendedTypes) {
+    Options.FullyQualifiedTypes = false;
+    Options.FullyQualifiedTypesIfAmbiguous = false;
+  }
 
   // Strip off generic arguments, if any.
   auto Ty = ExtendedType->getAnyNominal()->getDeclaredType();
@@ -2282,7 +2285,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      if (!extendedType) {
+      if (!extendedType || Options.PreferTypeRepr) {
         // Fallback to TypeRepr.
         printTypeLoc(decl->getExtendedTypeRepr());
         return;

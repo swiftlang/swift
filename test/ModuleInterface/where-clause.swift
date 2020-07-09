@@ -44,7 +44,7 @@ public struct Holder<Value> {
 // CHECK-NEXT: }
 }
 
-// CHECK-NEXT: extension Holder.Transform where Value == Swift.Int {
+// CHECK-NEXT: extension main.Holder.Transform where Value == Swift.Int {
 extension Holder.Transform where Value == Int {
     // CHECK-NEXT: public func negate(_ holder: main.Holder<Value>) -> Result{{$}}
     public func negate(_ holder: Holder<Value>) -> Result {
