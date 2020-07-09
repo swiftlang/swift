@@ -1,4 +1,4 @@
-//===--- VJPEmitter.cpp - VJP generation in differentiation ---*- C++ -*---===//
+//===--- VJPCloner.cpp - VJP function generation --------------*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,9 +17,9 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SILOptimizer/Differentiation/VJPEmitter.h"
+#include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
-#include "swift/SILOptimizer/Differentiation/PullbackEmitter.h"
+#include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
@@ -30,8 +30,8 @@ namespace swift {
 namespace autodiff {
 
 /*static*/
-SubstitutionMap VJPEmitter::getSubstitutionMap(SILFunction *original,
-                                               SILFunction *vjp) {
+SubstitutionMap VJPCloner::getSubstitutionMap(SILFunction *original,
+                                              SILFunction *vjp) {
   auto substMap = original->getForwardingSubstitutionMap();
   if (auto *vjpGenEnv = vjp->getGenericEnvironment()) {
     auto vjpSubstMap = vjpGenEnv->getForwardingSubstitutionMap();
@@ -44,8 +44,8 @@ SubstitutionMap VJPEmitter::getSubstitutionMap(SILFunction *original,
 
 /*static*/
 const DifferentiableActivityInfo &
-VJPEmitter::getActivityInfo(ADContext &context, SILFunction *original,
-                            SILAutoDiffIndices indices, SILFunction *vjp) {
+VJPCloner::getActivityInfo(ADContext &context, SILFunction *original,
+                           SILAutoDiffIndices indices, SILFunction *vjp) {
   // Get activity info of the original function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
@@ -58,9 +58,9 @@ VJPEmitter::getActivityInfo(ADContext &context, SILFunction *original,
   return activityInfo;
 }
 
-VJPEmitter::VJPEmitter(ADContext &context, SILFunction *original,
-                       SILDifferentiabilityWitness *witness, SILFunction *vjp,
-                       DifferentiationInvoker invoker)
+VJPCloner::VJPCloner(ADContext &context, SILFunction *original,
+                     SILDifferentiabilityWitness *witness, SILFunction *vjp,
+                     DifferentiationInvoker invoker)
     : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
       context(context), original(original), witness(witness), vjp(vjp),
       invoker(invoker),
@@ -73,7 +73,7 @@ VJPEmitter::VJPEmitter(ADContext &context, SILFunction *original,
   context.recordGeneratedFunction(pullback);
 }
 
-SILFunction *VJPEmitter::createEmptyPullback() {
+SILFunction *VJPCloner::createEmptyPullback() {
   auto &module = context.getModule();
   auto origTy = original->getLoweredFunctionType();
   // Get witness generic signature for remapping types.
@@ -259,13 +259,13 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   return pullback;
 }
 
-void VJPEmitter::postProcess(SILInstruction *orig, SILInstruction *cloned) {
+void VJPCloner::postProcess(SILInstruction *orig, SILInstruction *cloned) {
   if (errorOccurred)
     return;
   SILClonerWithScopes::postProcess(orig, cloned);
 }
 
-SILBasicBlock *VJPEmitter::remapBasicBlock(SILBasicBlock *bb) {
+SILBasicBlock *VJPCloner::remapBasicBlock(SILBasicBlock *bb) {
   auto *vjpBB = BBMap[bb];
   // If error has occurred, or if block has already been remapped, return
   // remapped, return remapped block.
@@ -282,9 +282,9 @@ SILBasicBlock *VJPEmitter::remapBasicBlock(SILBasicBlock *bb) {
   return vjpBB;
 }
 
-SILBasicBlock *VJPEmitter::createTrampolineBasicBlock(TermInst *termInst,
-                                                      StructInst *pbStructVal,
-                                                      SILBasicBlock *succBB) {
+SILBasicBlock *VJPCloner::createTrampolineBasicBlock(TermInst *termInst,
+                                                     StructInst *pbStructVal,
+                                                     SILBasicBlock *succBB) {
   assert(llvm::find(termInst->getSuccessorBlocks(), succBB) !=
              termInst->getSuccessorBlocks().end() &&
          "Basic block is not a successor of terminator instruction");
@@ -307,32 +307,32 @@ SILBasicBlock *VJPEmitter::createTrampolineBasicBlock(TermInst *termInst,
   return trampolineBB;
 }
 
-void VJPEmitter::visit(SILInstruction *inst) {
+void VJPCloner::visit(SILInstruction *inst) {
   if (errorOccurred)
     return;
   TypeSubstCloner::visit(inst);
 }
 
-void VJPEmitter::visitSILInstruction(SILInstruction *inst) {
+void VJPCloner::visitSILInstruction(SILInstruction *inst) {
   context.emitNondifferentiabilityError(
       inst, invoker, diag::autodiff_expression_not_differentiable_note);
   errorOccurred = true;
 }
 
-SILType VJPEmitter::getLoweredType(Type type) {
+SILType VJPCloner::getLoweredType(Type type) {
   auto vjpGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
   Lowering::AbstractionPattern pattern(vjpGenSig,
                                        type->getCanonicalType(vjpGenSig));
   return vjp->getLoweredType(pattern, type);
 }
 
-SILType VJPEmitter::getNominalDeclLoweredType(NominalTypeDecl *nominal) {
+SILType VJPCloner::getNominalDeclLoweredType(NominalTypeDecl *nominal) {
   auto nominalType =
       getOpASTType(nominal->getDeclaredInterfaceType()->getCanonicalType());
   return getLoweredType(nominalType);
 }
 
-StructInst *VJPEmitter::buildPullbackValueStructValue(TermInst *termInst) {
+StructInst *VJPCloner::buildPullbackValueStructValue(TermInst *termInst) {
   assert(termInst->getFunction() == original);
   auto loc = RegularLocation::getAutoGeneratedLocation();
   auto origBB = termInst->getParent();
@@ -348,10 +348,10 @@ StructInst *VJPEmitter::buildPullbackValueStructValue(TermInst *termInst) {
   return getBuilder().createStruct(loc, structLoweredTy, bbPullbackValues);
 }
 
-EnumInst *VJPEmitter::buildPredecessorEnumValue(SILBuilder &builder,
-                                                SILBasicBlock *predBB,
-                                                SILBasicBlock *succBB,
-                                                SILValue pbStructVal) {
+EnumInst *VJPCloner::buildPredecessorEnumValue(SILBuilder &builder,
+                                               SILBasicBlock *predBB,
+                                               SILBasicBlock *succBB,
+                                               SILValue pbStructVal) {
   auto loc = RegularLocation::getAutoGeneratedLocation();
   auto *succEnum = pullbackInfo.getBranchingTraceDecl(succBB);
   auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
@@ -374,7 +374,7 @@ EnumInst *VJPEmitter::buildPredecessorEnumValue(SILBuilder &builder,
   return builder.createEnum(loc, newBox, enumEltDecl, enumLoweredTy);
 }
 
-void VJPEmitter::visitReturnInst(ReturnInst *ri) {
+void VJPCloner::visitReturnInst(ReturnInst *ri) {
   auto loc = ri->getOperand().getLoc();
   auto &builder = getBuilder();
 
@@ -431,7 +431,7 @@ void VJPEmitter::visitReturnInst(ReturnInst *ri) {
   builder.createReturn(ri->getLoc(), joinElements(directResults, builder, loc));
 }
 
-void VJPEmitter::visitBranchInst(BranchInst *bi) {
+void VJPCloner::visitBranchInst(BranchInst *bi) {
   // Build pullback struct value for original block.
   // Build predecessor enum value for destination block.
   auto *origBB = bi->getParent();
@@ -450,7 +450,7 @@ void VJPEmitter::visitBranchInst(BranchInst *bi) {
                             args);
 }
 
-void VJPEmitter::visitCondBranchInst(CondBranchInst *cbi) {
+void VJPCloner::visitCondBranchInst(CondBranchInst *cbi) {
   // Build pullback struct value for original block.
   auto *pbStructVal = buildPullbackValueStructValue(cbi);
   // Create a new `cond_br` instruction.
@@ -460,7 +460,7 @@ void VJPEmitter::visitCondBranchInst(CondBranchInst *cbi) {
       createTrampolineBasicBlock(cbi, pbStructVal, cbi->getFalseBB()));
 }
 
-void VJPEmitter::visitSwitchEnumInstBase(SwitchEnumInstBase *sei) {
+void VJPCloner::visitSwitchEnumInstBase(SwitchEnumInstBase *sei) {
   // Build pullback struct value for original block.
   auto *pbStructVal = buildPullbackValueStructValue(sei);
 
@@ -492,15 +492,15 @@ void VJPEmitter::visitSwitchEnumInstBase(SwitchEnumInstBase *sei) {
   }
 }
 
-void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
+void VJPCloner::visitSwitchEnumInst(SwitchEnumInst *sei) {
   visitSwitchEnumInstBase(sei);
 }
 
-void VJPEmitter::visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
+void VJPCloner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
   visitSwitchEnumInstBase(seai);
 }
 
-void VJPEmitter::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
+void VJPCloner::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
   // Build pullback struct value for original block.
   auto *pbStructVal = buildPullbackValueStructValue(ccbi);
   // Create a new `checked_cast_branch` instruction.
@@ -513,7 +513,7 @@ void VJPEmitter::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
       ccbi->getTrueBBCount(), ccbi->getFalseBBCount());
 }
 
-void VJPEmitter::visitCheckedCastValueBranchInst(
+void VJPCloner::visitCheckedCastValueBranchInst(
     CheckedCastValueBranchInst *ccvbi) {
   // Build pullback struct value for original block.
   auto *pbStructVal = buildPullbackValueStructValue(ccvbi);
@@ -527,7 +527,7 @@ void VJPEmitter::visitCheckedCastValueBranchInst(
       createTrampolineBasicBlock(ccvbi, pbStructVal, ccvbi->getFailureBB()));
 }
 
-void VJPEmitter::visitCheckedCastAddrBranchInst(
+void VJPCloner::visitCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *ccabi) {
   // Build pullback struct value for original block.
   auto *pbStructVal = buildPullbackValueStructValue(ccabi);
@@ -541,7 +541,7 @@ void VJPEmitter::visitCheckedCastAddrBranchInst(
       ccabi->getTrueBBCount(), ccabi->getFalseBBCount());
 }
 
-void VJPEmitter::visitApplyInst(ApplyInst *ai) {
+void VJPCloner::visitApplyInst(ApplyInst *ai) {
   // If callee should not be differentiated, do standard cloning.
   if (!pullbackInfo.shouldDifferentiateApplySite(ai)) {
     LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
@@ -815,7 +815,7 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
           getOpValue(origCallee)->getDefiningInstruction());
 }
 
-void VJPEmitter::visitDifferentiableFunctionInst(
+void VJPCloner::visitDifferentiableFunctionInst(
     DifferentiableFunctionInst *dfi) {
   // Clone `differentiable_function` from original to VJP, then add the cloned
   // instruction to the `differentiable_function` worklist.
@@ -824,7 +824,7 @@ void VJPEmitter::visitDifferentiableFunctionInst(
   context.addDifferentiableFunctionInstToWorklist(newDFI);
 }
 
-bool VJPEmitter::run() {
+bool VJPCloner::run() {
   PrettyStackTraceSILFunction trace("generating VJP for", original);
   LLVM_DEBUG(getADDebugStream() << "Cloning original @" << original->getName()
                                 << " to vjp @" << vjp->getName() << '\n');
@@ -853,8 +853,8 @@ bool VJPEmitter::run() {
              << *vjp);
 
   // Generate pullback code.
-  PullbackEmitter PullbackEmitter(*this);
-  if (PullbackEmitter.run()) {
+  PullbackCloner PullbackCloner(*this);
+  if (PullbackCloner.run()) {
     errorOccurred = true;
     return true;
   }

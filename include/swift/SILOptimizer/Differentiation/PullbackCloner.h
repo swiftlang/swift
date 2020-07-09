@@ -1,4 +1,4 @@
-//===--- PullbackEmitter.h - Pullback in differentiation ------*- C++ -*---===//
+//===--- PullbackCloner.h - Pullback function generation -----*- C++ -*----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKEMITTER_H
-#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKEMITTER_H
+#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKCLONER_H
+#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKCLONER_H
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/AdjointValue.h"
@@ -36,12 +36,12 @@ class SILInstruction;
 namespace autodiff {
 
 class ADContext;
-class VJPEmitter;
+class VJPCloner;
 
-class PullbackEmitter final : public SILInstructionVisitor<PullbackEmitter> {
+class PullbackCloner final : public SILInstructionVisitor<PullbackCloner> {
 private:
-  /// The parent VJP emitter.
-  VJPEmitter &vjpEmitter;
+  /// The parent VJP cloner.
+  VJPCloner &vjpCloner;
 
   /// Dominance info for the original function.
   DominanceInfo *domInfo = nullptr;
@@ -60,7 +60,7 @@ private:
   /// adjoint values.
   llvm::DenseMap<std::pair<SILBasicBlock *, SILValue>, AdjointValue> valueMap;
 
-  /// Mapping from original basic blocks and original buffers to corresponding
+  /// Mapping from original basic blocks and original values to corresponding
   /// adjoint buffers.
   llvm::DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
 
@@ -124,7 +124,7 @@ private:
   const DifferentiableActivityInfo &getActivityInfo() const;
 
 public:
-  explicit PullbackEmitter(VJPEmitter &vjpEmitter);
+  explicit PullbackCloner(VJPCloner &vjpCloner);
 
 private:
   //--------------------------------------------------------------------------//
@@ -134,77 +134,9 @@ private:
   void initializePullbackStructElements(SILBasicBlock *origBB,
                                         SILInstructionResultArray values);
 
+  /// Returns the pullback struct element value corresponding to the given
+  /// original block and pullback struct field.
   SILValue getPullbackStructElement(SILBasicBlock *origBB, VarDecl *field);
-
-  //--------------------------------------------------------------------------//
-  // Adjoint value factory methods
-  //--------------------------------------------------------------------------//
-
-  AdjointValue makeZeroAdjointValue(SILType type);
-
-  AdjointValue makeConcreteAdjointValue(SILValue value);
-
-  template <typename EltRange>
-  AdjointValue makeAggregateAdjointValue(SILType type, EltRange elements);
-
-  //--------------------------------------------------------------------------//
-  // Temporary value management
-  //--------------------------------------------------------------------------//
-
-  /// Record a temporary value for cleanup before its block's terminator.
-  SILValue recordTemporary(SILValue value);
-
-  /// Clean up all temporary values for the given pullback block.
-  void cleanUpTemporariesForBlock(SILBasicBlock *bb, SILLocation loc);
-
-  //--------------------------------------------------------------------------//
-  // Symbolic value materializers
-  //--------------------------------------------------------------------------//
-
-  /// Materialize an adjoint value. The type of the given adjoint value must be
-  /// loadable.
-  SILValue materializeAdjointDirect(AdjointValue val, SILLocation loc);
-
-  /// Materialize an adjoint value indirectly to a SIL buffer.
-  void materializeAdjointIndirect(AdjointValue val, SILValue destBuffer,
-                                  SILLocation loc);
-
-  //--------------------------------------------------------------------------//
-  // Helpers for symbolic value materializers
-  //--------------------------------------------------------------------------//
-
-  /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
-  /// must conform to `AdditiveArithmetic`.
-  void emitZeroIndirect(CanType type, SILValue bufferAccess, SILLocation loc);
-
-  /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
-  /// must conform to `AdditiveArithmetic` and be loadable in SIL.
-  SILValue emitZeroDirect(CanType type, SILLocation loc);
-
-  //--------------------------------------------------------------------------//
-  // Accumulator
-  //--------------------------------------------------------------------------//
-
-  /// Materialize an adjoint value in the most efficient way.
-  SILValue materializeAdjoint(AdjointValue val, SILLocation loc);
-
-  /// Given two adjoint values, accumulate them.
-  AdjointValue accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
-                                        SILLocation loc);
-
-  /// Given two materialized adjoint values, accumulate them. These two
-  /// adjoints must be objects of loadable type.
-  SILValue accumulateDirect(SILValue lhs, SILValue rhs, SILLocation loc);
-
-  /// Given two materialized adjoint values, accumulate them using
-  /// `AdditiveArithmetic.+`, depending on the differentiation mode.
-  void accumulateIndirect(SILValue resultBufAccess, SILValue lhsBufAccess,
-                          SILValue rhsBufAccess, SILLocation loc);
-
-  /// Given two buffers of an `AdditiveArithmetic` type, accumulate the right
-  /// hand side into the left hand side using `+=`.
-  void accumulateIndirect(SILValue lhsDestAccess, SILValue rhsAccess,
-                          SILLocation loc);
 
   //--------------------------------------------------------------------------//
   // Type transformer
@@ -230,25 +162,72 @@ private:
   SubstitutionMap remapSubstitutionMap(SubstitutionMap substMap);
 
   //--------------------------------------------------------------------------//
-  // Managed value mapping
+  // Temporary value management
   //--------------------------------------------------------------------------//
 
-  /// Returns true if the original value has a corresponding adjoint value.
+  /// Record a temporary value for cleanup before its block's terminator.
+  SILValue recordTemporary(SILValue value);
+
+  /// Clean up all temporary values for the given pullback block.
+  void cleanUpTemporariesForBlock(SILBasicBlock *bb, SILLocation loc);
+
+  //--------------------------------------------------------------------------//
+  // Adjoint value factory methods
+  //--------------------------------------------------------------------------//
+
+  AdjointValue makeZeroAdjointValue(SILType type);
+
+  AdjointValue makeConcreteAdjointValue(SILValue value);
+
+  template <typename EltRange>
+  AdjointValue makeAggregateAdjointValue(SILType type, EltRange elements);
+
+  //--------------------------------------------------------------------------//
+  // Adjoint value materialization
+  //--------------------------------------------------------------------------//
+
+  /// Materializes an adjoint value. The type of the given adjoint value must be
+  /// loadable.
+  SILValue materializeAdjointDirect(AdjointValue val, SILLocation loc);
+
+  /// Materializes an adjoint value indirectly to a SIL buffer.
+  void materializeAdjointIndirect(AdjointValue val, SILValue destBuffer,
+                                  SILLocation loc);
+
+  //--------------------------------------------------------------------------//
+  // Helpers for adjoint value materialization
+  //--------------------------------------------------------------------------//
+
+  /// Emits a zero value into the given address by calling
+  /// `AdditiveArithmetic.zero`. The given type must conform to
+  /// `AdditiveArithmetic`.
+  void emitZeroIndirect(CanType type, SILValue address, SILLocation loc);
+
+  /// Emits a zero value by calling `AdditiveArithmetic.zero`. The given type
+  /// must conform to `AdditiveArithmetic` and be loadable in SIL.
+  SILValue emitZeroDirect(CanType type, SILLocation loc);
+
+  //--------------------------------------------------------------------------//
+  // Adjoint value mapping
+  //--------------------------------------------------------------------------//
+
+  /// Returns true if the given value in the original function has a
+  /// corresponding adjoint value.
   bool hasAdjointValue(SILBasicBlock *origBB, SILValue originalValue) const;
 
-  /// Initializes an original value's corresponding adjoint value. It must not
-  /// have an adjoint value before this function is called.
+  /// Initializes the adjoint value for the original value. Asserts that the
+  /// original value does not already have an adjoint value.
   void setAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
                        AdjointValue adjointValue);
 
-  /// Get the adjoint for an original value. The given value must be in the
-  /// original function.
+  /// Returns the adjoint value for a value in the original function.
   ///
-  /// This method first tries to find an entry in `adjointMap`. If an adjoint
-  /// doesn't exist, create a zero adjoint.
+  /// This method first tries to find an existing entry in the adjoint value
+  /// mapping. If no entry exists, creates a zero adjoint value.
   AdjointValue getAdjointValue(SILBasicBlock *origBB, SILValue originalValue);
 
-  /// Add an adjoint value for the given original value.
+  /// Adds `newAdjointValue` to the adjoint value for `originalValue` and sets
+  /// the sum as the new adjoint value.
   void addAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
                        AdjointValue newAdjointValue, SILLocation loc);
 
@@ -258,30 +237,58 @@ private:
                                                    SILValue activeValue);
 
   //--------------------------------------------------------------------------//
-  // Buffer mapping
+  // Adjoint value accumulation
   //--------------------------------------------------------------------------//
 
-  void setAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
+  /// Given two adjoint values, accumulates them and returns their sum.
+  AdjointValue accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
+                                        SILLocation loc);
+
+  /// Generates code returning `result = lhs + rhs`.
+  ///
+  /// Given two materialized adjoint values, accumulates them and returns their
+  /// sum. The adjoint values must have a loadable type.
+  SILValue accumulateDirect(SILValue lhs, SILValue rhs, SILLocation loc);
+
+  /// Generates code for `resultAddress = lhsAddress + rhsAddress`.
+  ///
+  /// Given two addresses with the same `AdditiveArithmetic`-conforming type,
+  /// accumulates them into a result address using `AdditiveArithmetic.+`.
+  void accumulateIndirect(SILValue resultAddress, SILValue lhsAddress,
+                          SILValue rhsAddress, SILLocation loc);
+
+  /// Generates code for `lhsDestAddress += rhsAddress`.
+  ///
+  /// Given two addresses with the same `AdditiveArithmetic`-conforming type,
+  /// accumulates the rhs into the lhs using `AdditiveArithmetic.+=`.
+  void accumulateIndirect(SILValue lhsDestAddress, SILValue rhsAddress,
+                          SILLocation loc);
+
+  //--------------------------------------------------------------------------//
+  // Adjoint buffer mapping
+  //--------------------------------------------------------------------------//
+
+  /// If the given original value is an address projection, returns a
+  /// corresponding adjoint projection to be used as its adjoint buffer.
+  ///
+  /// Helper function for `getAdjointBuffer`.
+  SILValue getAdjointProjection(SILBasicBlock *origBB, SILValue originalValue);
+
+  /// Returns the adjoint buffer for the original value.
+  ///
+  /// This method first tries to find an existing entry in the adjoint buffer
+  /// mapping. If no entry exists, creates a zero adjoint buffer.
+  SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalValue);
+
+  /// Initializes the adjoint buffer for the original value. Asserts that the
+  /// original value does not already have an adjoint buffer.
+  void setAdjointBuffer(SILBasicBlock *origBB, SILValue originalValue,
                         SILValue adjointBuffer);
 
-  SILValue getAdjointProjection(SILBasicBlock *origBB,
-                                SILValue originalProjection);
-
-  SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer);
-
-  SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint();
-
-  /// Creates and returns a local allocation with the given type.
-  ///
-  /// Local allocations are created uninitialized in the pullback entry and
-  /// deallocated in the pullback exit. All local allocations not in
-  /// `destroyedLocalAllocations` are also destroyed in the pullback exit.
-  AllocStackInst *createFunctionLocalAllocation(SILType type, SILLocation loc);
-
-  /// Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
-  /// `originalBuffer`.
-  void addToAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
-                          SILValue rhsBufferAccess, SILLocation loc);
+  /// Accumulates `rhsAddress` into the adjoint buffer corresponding to the
+  /// original value.
+  void addToAdjointBuffer(SILBasicBlock *origBB, SILValue originalValue,
+                          SILValue rhsAddress, SILLocation loc);
 
   /// Given the adjoint value of an array initialized from an
   /// `array.uninitialized_intrinsic` application and an array element index,
@@ -291,11 +298,27 @@ private:
                                                int eltIndex, SILLocation loc);
 
   /// Given the adjoint value of an array initialized from an
-  /// `array.uninitialized_intrinsic` application, accumulate the adjoint
+  /// `array.uninitialized_intrinsic` application, accumulates the adjoint
   /// value's elements into the adjoint buffers of its element addresses.
   void accumulateArrayLiteralElementAddressAdjoints(
       SILBasicBlock *origBB, SILValue originalValue,
       AdjointValue arrayAdjointValue, SILLocation loc);
+
+  /// Returns a next insertion point for creating a local allocation: either
+  /// before the previous local allocation, or at the start of the pullback
+  /// entry if no local allocations exist.
+  ///
+  /// Helper for `createFunctionLocalAllocation`.
+  SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint();
+
+  /// Creates and returns a local allocation with the given type.
+  ///
+  /// Local allocations are created uninitialized in the pullback entry and
+  /// deallocated in the pullback exit. All local allocations not in
+  /// `destroyedLocalAllocations` are also destroyed in the pullback exit.
+  ///
+  /// Helper for `getAdjointBuffer`.
+  AllocStackInst *createFunctionLocalAllocation(SILType type, SILLocation loc);
 
   //--------------------------------------------------------------------------//
   // CFG mapping
@@ -346,19 +369,21 @@ public:
 
   using TrampolineBlockSet = SmallPtrSet<SILBasicBlock *, 4>;
 
-  /// Determine the pullback successor block for a given original block and one
-  /// of its predecessors. When a trampoline block is necessary, emit code into
+  /// Determines the pullback successor block for a given original block and one
+  /// of its predecessors. When a trampoline block is necessary, emits code into
   /// the trampoline block to trampoline the original block's active value's
-  /// adjoint values. A dense map `trampolineArgs` will be populated to keep
-  /// track of which pullback successor blocks each active value's adjoint value
-  /// is used, so that we can release those values in pullback successor blocks
-  /// that are not using them.
+  /// adjoint values.
+  ///
+  /// Populates `pullbackTrampolineBlockMap`, which maps active values' adjoint
+  /// values to the pullback successor blocks in which they are used. This
+  /// allows us to release those values in pullback successor blocks that do not
+  /// use them.
   SILBasicBlock *
   buildPullbackSuccessor(SILBasicBlock *origBB, SILBasicBlock *origPredBB,
                          llvm::SmallDenseMap<SILValue, TrampolineBlockSet>
                              &pullbackTrampolineBlockMap);
 
-  /// Emit pullback code in the corresponding pullback block.
+  /// Emits pullback code in the corresponding pullback block.
   void visitSILBasicBlock(SILBasicBlock *bb);
 
   void visit(SILInstruction *inst);
@@ -513,4 +538,4 @@ public:
 } // end namespace autodiff
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKEMITTER_H
+#endif // SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKCLONER_H

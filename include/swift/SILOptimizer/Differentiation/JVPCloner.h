@@ -1,4 +1,4 @@
-//===--- JVPEmitter.h - JVP Generation in Differentiation -----*- C++ -*---===//
+//===--- JVPCloner.h - JVP function generation ----------------*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPEMITTER_H
-#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPEMITTER_H
+#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPCLONER_H
+#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPCLONER_H
 
 #include "swift/SILOptimizer/Differentiation/AdjointValue.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
@@ -40,8 +40,8 @@ namespace autodiff {
 
 class ADContext;
 
-class JVPEmitter final
-    : public TypeSubstCloner<JVPEmitter, SILOptFunctionBuilder> {
+class JVPCloner final
+    : public TypeSubstCloner<JVPCloner, SILOptFunctionBuilder> {
 private:
   /// The global context.
   ADContext &context;
@@ -368,9 +368,9 @@ private:
   void prepareForDifferentialGeneration();
 
 public:
-  explicit JVPEmitter(ADContext &context, SILFunction *original,
-                      SILDifferentiabilityWitness *witness, SILFunction *jvp,
-                      DifferentiationInvoker invoker);
+  explicit JVPCloner(ADContext &context, SILFunction *original,
+                     SILDifferentiabilityWitness *witness, SILFunction *jvp,
+                     DifferentiationInvoker invoker);
 
   static SILFunction *
   createEmptyDifferential(ADContext &context,
@@ -411,4 +411,4 @@ public:
 } // end namespace autodiff
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_VJPEMITTER_H
+#endif // SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPCLONER_H
