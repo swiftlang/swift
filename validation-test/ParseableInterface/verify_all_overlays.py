@@ -14,9 +14,6 @@
 
 # REQUIRES: nonexecutable_test
 
-# rdar://problem/50648519
-# XFAIL: asan
-
 # Expected failures by platform
 # -----------------------------
 # macosx: XCTest
