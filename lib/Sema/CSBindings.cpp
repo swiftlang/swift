@@ -491,6 +491,16 @@ bool ConstraintSystem::PotentialBindings::favoredOverDisjunction(
   return !InvolvesTypeVariables;
 }
 
+ConstraintSystem::PotentialBindings
+ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar) {
+  auto bindings = getPotentialBindings(typeVar);
+
+  llvm::SmallDenseMap<TypeVariableType *, ConstraintSystem::PotentialBindings>
+      inferred;
+  bindings.finalize(*this, inferred);
+  return bindings;
+}
+
 Optional<ConstraintSystem::PotentialBinding>
 ConstraintSystem::getPotentialBindingForRelationalConstraint(
     PotentialBindings &result, Constraint *constraint,
