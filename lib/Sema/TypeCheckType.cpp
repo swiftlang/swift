@@ -651,6 +651,8 @@ static Type checkContextualRequirements(Type type,
     return type;
   }
 
+  auto &ctx = dc->getASTContext();
+
   SourceLoc noteLoc;
   {
     // We are interested in either a contextual where clause or
@@ -669,6 +671,13 @@ static Type checkContextualRequirements(Type type,
 
   const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
   const auto genericSig = decl->getGenericSignature();
+  if (!genericSig) {
+    ctx.Diags.diagnose(loc, diag::recursive_decl_reference,
+                       decl->getDescriptiveKind(), decl->getName());
+    decl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+    return ErrorType::get(ctx);
+  }
+
   const auto result =
     TypeChecker::checkGenericArguments(
         dc, loc, noteLoc, type,
@@ -681,7 +690,7 @@ static Type checkContextualRequirements(Type type,
   switch (result) {
   case RequirementCheckResult::Failure:
   case RequirementCheckResult::SubstitutionFailure:
-    return ErrorType::get(dc->getASTContext());
+    return ErrorType::get(ctx);
   case RequirementCheckResult::Success:
     return type;
   }
