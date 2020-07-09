@@ -43,6 +43,7 @@
     "Unicode.swift",
     "UnicodeEncoding.swift",
     "UnicodeHelpers.swift",
+    "UnicodeLatin1.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
     "UnicodeScalarProperties.swift",

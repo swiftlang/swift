@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -106,6 +106,83 @@ UnicodeAPIs.test("UTF-8 and UTF-16 queries") {
         expectTrue(UTF8.isContinuation(scalar.utf8[i]))
         expectFalse(UTF8.isASCII(scalar.utf8[i]))
       }
+    }
+  }
+}
+
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  var UnicodeLatin1 = TestSuite("UnicodeLatin1")
+
+  UnicodeLatin1.test("Encoding") {
+    let unicodeScalars = (UInt8.min ... UInt8.max).map { Unicode.Scalar($0) }
+    let encodedScalars = unicodeScalars.compactMap { Unicode.Latin1.encode($0) }
+    let decodedScalars = encodedScalars.map { Unicode.Latin1.decode($0) }
+    expectEqualSequence(unicodeScalars, decodedScalars)
+    expectNil(Unicode.Latin1.encode("\u{0100}"))
+    expectNil(Unicode.Latin1.encode("\u{10FFFF}"))
+  }
+
+  UnicodeLatin1.test("Parser") {
+    let codeUnits = UInt8.min ... UInt8.max
+    var codeUnitsIterator = codeUnits.makeIterator()
+    var encodedScalars: [Unicode.Latin1.EncodedScalar] = []
+    var forwardParser = Unicode.Latin1.ForwardParser()
+    loop: while true {
+      switch forwardParser.parseScalar(from: &codeUnitsIterator) {
+      case .valid(let encodedScalar):
+        encodedScalars.append(encodedScalar)
+      case .emptyInput:
+        expectEqualSequence(codeUnits, encodedScalars.joined())
+        break loop
+      case .error:
+        expectUnreachable()
+        break loop
+      }
+    }
+  }
+
+  UnicodeLatin1.test("Transcode") {
+    let codeUnitsAndText: [ClosedRange<UInt8>: String] = [
+      UInt8(0x20) ... UInt8(0x7E):
+        """
+        \u{20}!"#$%&'()*+,-./0123456789:;<=>?\
+        @ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_\
+        `abcdefghijklmnopqrstuvwxyz{|}~
+        """,
+      UInt8(0xA0) ... UInt8(0xFF):
+        """
+        \u{A0}¡¢£¤¥¦§¨©ª«¬\u{AD}®¯°±²³´µ¶·¸¹º»¼½¾¿\
+        ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß\
+        àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ
+        """,
+    ]
+    for (codeUnits, expectedText) in codeUnitsAndText {
+      let actualText = String(decoding: codeUnits, as: Unicode.Latin1.self)
+      expectEqual(expectedText, actualText)
+    }
+    for (expectedCodeUnits, text) in codeUnitsAndText {
+      var actualCodeUnits: [UInt8] = []
+      let hadError = transcode(
+        text.utf8.makeIterator(),
+        from: Unicode.UTF8.self,
+        to: Unicode.Latin1.self,
+        stoppingOnError: false,
+        into: { actualCodeUnits.append($0) }
+      )
+      expectEqualSequence(expectedCodeUnits, actualCodeUnits)
+      expectFalse(hadError)
+    }
+    do {
+      var actualCodeUnits: [UInt8] = []
+      let hadError = transcode(
+        "A\u{0100}B\u{10FFFF}C".utf8.makeIterator(),
+        from: Unicode.UTF8.self,
+        to: Unicode.Latin1.self,
+        stoppingOnError: false,
+        into: { actualCodeUnits.append($0) }
+      )
+      expectEqualSequence([0x41, 0x1A, 0x42, 0x1A, 0x43], actualCodeUnits)
+      expectFalse(hadError)
     }
   }
 }
