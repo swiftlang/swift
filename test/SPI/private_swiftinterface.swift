@@ -93,8 +93,7 @@ private class PrivateClassLocal {}
 // CHECK-PUBLIC-NOT: SPIProto3
 
   associatedtype AssociatedType
-  // CHECK-PRIVATE: associatedtype AssociatedType
-  // CHECK-PRIVATE-NOT: @_spi(LocalSPI) associatedtype AssociatedType
+  // CHECK-PRIVATE: {{^}}  associatedtype AssociatedType
   // CHECK-PUBLIC-NOT: AssociatedType
 
   func implicitSPIMethod()
