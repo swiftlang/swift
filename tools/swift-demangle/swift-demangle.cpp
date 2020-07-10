@@ -270,7 +270,7 @@ int main(int argc, char **argv) {
     for (llvm::StringRef name : InputNames) {
       std::string correctedName = name;
       if (name.startswith("S:") || name.startswith("s:")) {
-        correctedName = std::string("$s" ) + name.drop_front(2).str();
+        correctedName = std::string("$s") + name.drop_front(2).str();
       } else if (name.startswith("S") || name.startswith("s") ) {
         correctedName = std::string("$") + name.str();
       }
