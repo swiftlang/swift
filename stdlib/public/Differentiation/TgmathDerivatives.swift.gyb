@@ -12,6 +12,29 @@
 // This file defines derivatives for tgmath functions.
 //===----------------------------------------------------------------------===//
 
+// SWIFT_ENABLE_TENSORFLOW
+// `_Differentiation` module sources are currently compiled as part of the core
+// standard library on tensorflow branch, so import declarations are not
+// necessary.
+#if false
+// SWIFT_ENABLE_TENSORFLOW END
+
+import Swift
+
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin.C.tgmath
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
+#endif
+
+// SWIFT_ENABLE_TENSORFLOW
+#endif
+// SWIFT_ENABLE_TENSORFLOW END
+
 @usableFromInline
 @derivative(of: fma)
 func _jvpFma<T: FloatingPoint & Differentiable> (
