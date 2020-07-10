@@ -18,7 +18,11 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
+#include "swift/SILOptimizer/Differentiation/AdjointValue.h"
+#include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
+#include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 
@@ -27,8 +31,10 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
@@ -49,8 +55,12 @@ class VJPCloner;
 /// instructions per basic block in reverse order. This visitation order is
 /// necessary for generating pullback functions, whose control flow graph is
 /// ~a transposed version of the original function's control flow graph.
-struct PullbackCloner::Implementation final
+class PullbackCloner::Implementation final
     : public SILInstructionVisitor<PullbackCloner::Implementation> {
+
+public:
+  explicit Implementation(VJPCloner &vjpCloner);
+
 private:
   /// The parent VJP cloner.
   VJPCloner &vjpCloner;
@@ -124,23 +134,21 @@ private:
 
   bool errorOccurred = false;
 
-  ADContext &getContext() const { return vjpCloner.context; }
+  ADContext &getContext() const { return vjpCloner.getContext(); }
   SILModule &getModule() const { return getContext().getModule(); }
   ASTContext &getASTContext() const { return getPullback().getASTContext(); }
-  SILFunction &getOriginal() const { return *vjpCloner.original; }
-  SILFunction &getPullback() const { return *vjpCloner.pullback; }
-  SILDifferentiabilityWitness *getWitness() const { return vjpCloner.witness; }
-  DifferentiationInvoker getInvoker() const { return vjpCloner.invoker; }
-  LinearMapInfo &getPullbackInfo() { return vjpCloner.pullbackInfo; }
+  SILFunction &getOriginal() const { return vjpCloner.getOriginal(); }
+  SILFunction &getPullback() const { return vjpCloner.getPullback(); }
+  SILDifferentiabilityWitness *getWitness() const {
+    return vjpCloner.getWitness();
+  }
+  DifferentiationInvoker getInvoker() const { return vjpCloner.getInvoker(); }
+  LinearMapInfo &getPullbackInfo() const { return vjpCloner.getPullbackInfo(); }
   const SILAutoDiffIndices getIndices() const { return vjpCloner.getIndices(); }
   const DifferentiableActivityInfo &getActivityInfo() const {
-    return vjpCloner.activityInfo;
+    return vjpCloner.getActivityInfo();
   }
 
-public:
-  explicit Implementation(VJPCloner &vjpCloner);
-
-private:
   //--------------------------------------------------------------------------//
   // Pullback struct mapping
   //--------------------------------------------------------------------------//
@@ -1520,9 +1528,10 @@ PullbackCloner::Implementation::Implementation(VJPCloner &vjpCloner)
   auto *domAnalysis = passManager.getAnalysis<DominanceAnalysis>();
   auto *postDomAnalysis = passManager.getAnalysis<PostDominanceAnalysis>();
   auto *postOrderAnalysis = passManager.getAnalysis<PostOrderAnalysis>();
-  domInfo = domAnalysis->get(vjpCloner.original);
-  postDomInfo = postDomAnalysis->get(vjpCloner.original);
-  postOrderInfo = postOrderAnalysis->get(vjpCloner.original);
+  auto *original = &vjpCloner.getOriginal();
+  domInfo = domAnalysis->get(original);
+  postDomInfo = postDomAnalysis->get(original);
+  postOrderInfo = postOrderAnalysis->get(original);
 }
 
 PullbackCloner::PullbackCloner(VJPCloner &vjpCloner)
