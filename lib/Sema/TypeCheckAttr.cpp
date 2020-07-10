@@ -4194,24 +4194,6 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
   }
 
-  // Set the resolved derivative generic signature in the attribute.
-  // Do not set the derivative generic signature if the original function's
-  // generic signature is equal to `derivativeGenSig` and all generic parameters
-  // are concrete. In that case, the original function and derivative functions
-  // are all lowered as SIL functions with no generic signature (specialized
-  // with concrete types from same-type requirements), so the derivative generic
-  // signature should not be set.
-  auto skipDerivativeGenericSignature = [&] {
-    auto origCanGenSig =
-        original->getGenericSignature().getCanonicalSignature();
-    auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
-    if (!derivativeCanGenSig)
-      return false;
-    return origCanGenSig == derivativeCanGenSig &&
-           derivativeCanGenSig->areAllParamsConcrete();
-  };
-  if (skipDerivativeGenericSignature())
-    derivativeGenSig = GenericSignature();
   attr->setDerivativeGenericSignature(derivativeGenSig);
   return false;
 }
