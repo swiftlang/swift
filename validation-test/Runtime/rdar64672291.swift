@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: objc_interop
+// REQUIRES: executable_test
 
 import Foundation
 
