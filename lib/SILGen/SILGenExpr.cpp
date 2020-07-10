@@ -2066,8 +2066,8 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
   if (value.getType() == opaqueTL.getLoweredType())
     return RValue(SGF, E, value);
 
-  auto cast = SGF.B.createUncheckedBitCast(E, value.forward(SGF),
-                                           opaqueTL.getLoweredType());
+  auto cast = SGF.B.createUncheckedReinterpretCast(E, value.forward(SGF),
+                                                   opaqueTL.getLoweredType());
   value = SGF.emitManagedRValueWithCleanup(cast);
 
   return RValue(SGF, E, value);

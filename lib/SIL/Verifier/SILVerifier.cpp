@@ -1917,6 +1917,12 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
   }
 
+  void checkUncheckedValueCastInst(UncheckedValueCastInst *) {
+    require(
+        F.hasOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
+  }
+
   template <class AI>
   void checkAccessEnforcement(AI *AccessInst) {
     if (AccessInst->getModule().getStage() != SILStage::Raw) {
