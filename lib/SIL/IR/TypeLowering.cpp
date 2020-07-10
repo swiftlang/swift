@@ -1453,6 +1453,7 @@ namespace {
 
       if (D->isCxxNotTriviallyCopyable()) {
         properties.setAddressOnly();
+        properties.setNonTrivial();
       }
 
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);

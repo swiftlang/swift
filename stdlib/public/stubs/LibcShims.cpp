@@ -31,11 +31,6 @@
 
 #include "../SwiftShims/LibcShims.h"
 
-#if !defined(_WIN32) || defined(__CYGWIN__)
-static_assert(std::is_same<mode_t, __swift_mode_t>::value,
-              "__swift_mode_t must be defined as equivalent to mode_t in LibcShims.h");
-#endif
-
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int _swift_stdlib_putchar_unlocked(int c) {
 #if defined(_WIN32)
