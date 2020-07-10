@@ -26,7 +26,7 @@ import StdlibUnittestFoundationExtras
 import Foundation
 import CoreGraphics
 
-#if os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(UIKit)
 import UIKit
 #endif
 
@@ -73,7 +73,7 @@ ${ testCase("CGAffineTransform", "CGAffineTransform(rotationAngle: .pi)",      N
 
 #endif
 
-#if os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(UIKit)
 
 ${ testCase("CGRect",            "CGRect(x: 17, y: 38, width: 6, height: 79)", "cgRect",            "(==)") }
 ${ testCase("CGPoint",           "CGPoint(x: 17, y: 38)",                      "cgPoint",           "(==)") }

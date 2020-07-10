@@ -1802,11 +1802,11 @@ ERROR(type_cannot_conform_to_nsobject,none,
 
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
-
 ERROR(type_cannot_conform, none,
-      "%select{|value of protocol }0type %1 cannot conform to %2; "
-      "only struct/enum/class types can conform to protocols",
-      (bool, Type, Type))
+      "%select{type %1|protocol %1 as a type}0 cannot conform to "
+      "%select{%3|the protocol itself}2; "
+      "only concrete types such as structs, enums and classes can conform to protocols",
+      (bool, Type, bool, Type))
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
 NOTE(required_by_decl,none,
@@ -3116,6 +3116,16 @@ ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
 ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "cannot register derivative for 'init' in a non-final class; consider "
       "making %0 final", (Type))
+ERROR(derivative_attr_unsupported_accessor_kind,none,
+      "cannot register derivative for %0", (/*accessorKind*/ DescriptiveDeclKind))
+// TODO(SR-13096): Remove this temporary diagnostic.
+ERROR(derivative_attr_class_setter_unsupported,none,
+      "cannot yet register derivative for class property or subscript setters",
+      ())
+// TODO(TF-982): Remove this temporary diagnostic.
+NOTE(derivative_attr_protocol_requirement_unsupported,none,
+     "cannot yet register derivative default implementation for protocol "
+     "requirements", ())
 ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
@@ -3151,13 +3161,25 @@ NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
      "%1", (Type, Type))
 
 // Automatic differentiation attributes
-ERROR(autodiff_attr_original_decl_invalid_kind,none,
-      "%0 is not a 'func', 'init', 'subscript', or 'var' computed property "
-      "declaration", (DeclNameRef))
-ERROR(autodiff_attr_original_decl_none_valid_found,none,
-      "could not find function %0 with expected type %1", (DeclNameRef, Type))
-ERROR(autodiff_attr_original_decl_not_same_type_context,none,
-      "%0 is not defined in the current type context", (DeclNameRef))
+ERROR(autodiff_attr_original_decl_ambiguous,none,
+      "referenced declaration %0 is ambiguous", (DeclNameRef))
+NOTE(autodiff_attr_original_decl_ambiguous_candidate,none,
+     "candidate %0 found here", (DescriptiveDeclKind))
+ERROR(autodiff_attr_original_decl_none_valid,none,
+      "referenced declaration %0 could not be resolved", (DeclNameRef))
+NOTE(autodiff_attr_original_decl_invalid_kind,none,
+     "candidate %0 is not a 'func', 'init', 'subscript', or 'var' computed "
+     "property declaration", (DescriptiveDeclKind))
+NOTE(autodiff_attr_original_decl_missing_accessor,none,
+     "candidate %0 does not have a %1",
+     (DescriptiveDeclKind, /*accessorDeclKind*/ DescriptiveDeclKind))
+NOTE(autodiff_attr_original_decl_type_mismatch,none,
+     "candidate %0 does not have "
+     "%select{expected type|type equal to or less constrained than}2 %1",
+     (DescriptiveDeclKind, Type, /*hasGenericSignature*/ bool))
+NOTE(autodiff_attr_original_decl_not_same_type_context,none,
+     "candidate %0 is not defined in the current type context",
+     (DescriptiveDeclKind))
 ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
@@ -3166,6 +3188,8 @@ ERROR(autodiff_attr_original_multiple_semantic_results,none,
 ERROR(autodiff_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+ERROR(autodiff_attr_opaque_result_type_unsupported,none,
+      "cannot differentiate functions returning opaque result types", ())
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,

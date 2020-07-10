@@ -11,24 +11,25 @@
 //===----------------------------------------------------------------------===//
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
+// RUN: not --crash %target-build-swift -swift-version 4 -o %t/a.out %s
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
-
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 
 // SWIFT_ENABLE_TENSORFLOW
 // This test is currently unsupported because the addition of `+` operators
 // to the stdlib (via `VectorProtocol`) causes type-checking to fail.
 // Re-enable when type-checking no longer fails.
-// UNSUPPORTED: executable_test
+// REQUIRES: no_tensorflow
+// SWIFT_ENABLE_TENSORFLOW END
+
+// rdar://problem/65015626
+// XFAIL: asserts
 
 import StdlibUnittest
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if canImport(Darwin)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif canImport(Glibc)
   import Glibc
 #elseif os(Windows)
   import MSVCRT

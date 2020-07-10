@@ -238,12 +238,14 @@ void collectMinimalIndicesForFunctionCall(
     resultIndices.push_back(inoutParamResultIndex++);
   }
   // Make sure the function call has active results.
+#ifndef NDEBUG
   auto numResults = calleeFnTy->getNumResults() +
                     calleeFnTy->getNumIndirectMutatingParameters();
   assert(results.size() == numResults);
   assert(llvm::any_of(results, [&](SILValue result) {
     return activityInfo.isActive(result, parentIndices);
   }));
+#endif
 }
 
 //===----------------------------------------------------------------------===//

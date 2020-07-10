@@ -1034,8 +1034,9 @@ bool TypeVarBindingProducer::computeNext() {
 
     auto srcLocator = binding.getLocator();
     if (srcLocator &&
-        srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
-        !type->hasTypeVariable() && CS.isCollectionType(type)) {
+        (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+         srcLocator->isLastElement<LocatorPathElt::AutoclosureResult>()) &&
+        !type->hasTypeVariable() && type->isKnownStdlibCollectionType()) {
       // If the type binding comes from the argument conversion, let's
       // instead of binding collection types directly, try to bind
       // using temporary type variables substituted for element

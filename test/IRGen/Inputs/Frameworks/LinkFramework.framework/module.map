@@ -1,0 +1,4 @@
+framework module LinkFramework {
+  header "LinkFramework.h"
+  export *
+}

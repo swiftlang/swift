@@ -502,7 +502,9 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
   }
 
   emitDiagnostic(diag::type_cannot_conform,
-                 nonConformingType->isExistentialType(), nonConformingType,
+                 nonConformingType->isExistentialType(), 
+                 nonConformingType, 
+                 nonConformingType->isEqual(protocolType),
                  protocolType);
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
@@ -2089,7 +2091,8 @@ bool ContextualFailure::diagnoseAsError() {
     if (CTP == CTP_ForEachStmt) {
       if (fromType->isAnyExistentialType()) {
         emitDiagnostic(diag::type_cannot_conform,
-                       /*isExistentialType=*/true, fromType, toType);
+                       /*isExistentialType=*/true, fromType, 
+                       fromType->isEqual(toType), toType);
         return true;
       }
 
@@ -3375,7 +3378,7 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
 
   auto parentType = getType(parentExpr);
 
-  if (!isCollectionType(parentType) && !parentType->is<TupleType>())
+  if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
     return false;
 
   if (isa<TupleExpr>(parentExpr)) {

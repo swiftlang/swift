@@ -15,10 +15,10 @@ import SwiftPrivate
 import SwiftPrivateThreadExtras
 import SwiftPrivateLibcExtras
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 import Foundation
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
+#elseif canImport(Glibc)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -1728,7 +1728,7 @@ public final class TestSuite {
   var _testNameToIndex: [String : Int] = [:]
 }
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if canImport(Darwin)
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
   return NSDictionary(contentsOfFile: "/System/Library/CoreServices/SystemVersion.plist")?[propertyName] as? String
 }

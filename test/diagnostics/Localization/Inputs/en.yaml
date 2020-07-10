@@ -1,4 +1,4 @@
-#===--- fr.yaml - Localized diagnostic messages for French ---*- YAML -*-===#
+#===--- en.yaml - Localized diagnostic messages for English ---*- YAML -*-===#
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,10 +10,21 @@
 #
 #===----------------------------------------------------------------------===#
 #
-# This file defines the diagnostic messages for the French language.
+# This file defines the diagnostic messages for the English language.
 # Each diagnostic is described in the following format:
 # - id: "<diagnostic-id>"
 #   msg: "<diagnostic-message>"
 # 
 #===----------------------------------------------------------------------===#
 
+- id: "lex_unterminated_string"
+  msg: "unterminated string literal"
+  
+- id: "var_init_self_referential"
+  msg: "variable used within its own initial value"
+
+- id: "cannot_find_in_scope"
+  msg: "cannot %select{find|find operator}1 %0 in scope"
+
+- id: "warning_invalid_locale_code"
+  msg: "unsupported locale code; supported locale codes are '%0'"

@@ -71,7 +71,7 @@ static int minimalDataLayoutQueryFunction(void *ReaderContext,
 #else
     auto applePlatform = false;
 #endif
-#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV) || defined(__arm64__))
     auto iosDerivedPlatform = true;
 #else
     auto iosDerivedPlatform = false;
@@ -406,6 +406,9 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
 }
 
 static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
+  if (!TI)
+    return {};
+
   const FieldInfo *FieldInfo;
   if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
     FieldInfo = &(EnumTI->getCases()[Index]);

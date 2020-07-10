@@ -19,6 +19,10 @@ llvm::cl::opt<std::string>
     SILInlineNeverFuns("sil-inline-never-functions", llvm::cl::init(""),
                        llvm::cl::desc("Never inline functions whose name "
                                       "includes this string."));
+llvm::cl::list<std::string>
+    SILInlineNeverFun("sil-inline-never-function", llvm::cl::CommaSeparated,
+                       llvm::cl::desc("Never inline functions whose name "
+                                      "is this string"));
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -696,6 +700,13 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (!SILInlineNeverFuns.empty()
       && Callee->getName().find(SILInlineNeverFuns, 0) != StringRef::npos)
     return nullptr;
+
+  if (!SILInlineNeverFun.empty() &&
+      SILInlineNeverFun.end() != std::find(SILInlineNeverFun.begin(),
+                                           SILInlineNeverFun.end(),
+                                           Callee->getName())) {
+    return nullptr;
+  }
 
   if (!Callee->shouldOptimize()) {
     return nullptr;

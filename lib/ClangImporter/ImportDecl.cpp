@@ -3807,14 +3807,20 @@ namespace {
             decl->isVariadic(), isInSystemModule(dc), name, bodyParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
-          if (!mdecl->isStatic()) {
+          if (mdecl->isStatic() ||
+              // C++ operators that are implemented as non-static member
+              // functions get imported into Swift as static member functions
+              // that use an additional parameter for the left-hand side operand
+              // instead of the receiver object.
+              mdecl->getDeclName().getNameKind() ==
+                  clang::DeclarationName::CXXOperatorName) {
+            selfIdx = None;
+          } else {
             selfIdx = 0;
             // Workaround until proper const support is handled: Force
             // everything to be mutating. This implicitly makes the parameter
             // indirect.
             selfIsInOut = true;
-          } else {
-            selfIdx = None;
           }
         }
       }
@@ -5026,27 +5032,6 @@ namespace {
         }
       }
       result->setSuperclass(superclassType);
-
-      // Mark the class as runtime-only if it is named 'OS_object', even
-      // if it doesn't have the runtime-only Clang attribute. This is a
-      // targeted fix allowing IRGen to emit convenience initializers
-      // correctly.
-      //
-      // FIXME: Remove this once SILGen gets proper support for factory
-      // initializers.
-      if (decl->getName() == "OS_object" ||
-          decl->getName() == "OS_os_log") {
-        result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
-      }
-
-      // If the superclass is runtime-only, our class is also. This only
-      // matters in the case above.
-      if (superclassType) {
-        auto superclassDecl = cast<ClassDecl>(superclassType->getAnyNominal());
-        auto kind = superclassDecl->getForeignClassKind();
-        if (kind != ClassDecl::ForeignKind::Normal)
-          result->setForeignClassKind(kind);
-      }
 
       // Import protocols this class conforms to.
       importObjCProtocols(result, decl->getReferencedProtocols(),

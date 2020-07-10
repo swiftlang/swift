@@ -286,6 +286,12 @@ private:
   Type lookupSubstitution(CanSubstitutableType type) const;
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const SubstitutionMap &subs) {
+  subs.dump(OS);
+  return OS;
+}
+
 /// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c SubstitutionMap.
 struct QuerySubstitutionMap {

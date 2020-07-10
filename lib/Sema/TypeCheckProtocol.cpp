@@ -2963,6 +2963,59 @@ printProtocolStubFixitString(SourceLoc TypeLoc, ProtocolConformance *Conf,
     });
 }
 
+/// Filter the given array of protocol requirements and produce a new vector
+/// containing the non-conflicting requirements to be implemented by the given
+/// \c Adoptee type.
+static llvm::SmallVector<ValueDecl *, 4>
+filterProtocolRequirements(ArrayRef<ValueDecl *> Reqs, Type Adoptee) {
+  llvm::SmallVector<ValueDecl *, 4> Filtered;
+  if (Reqs.empty()) {
+    return Filtered;
+  }
+
+  const auto getProtocolSubstitutionMap = [&](ValueDecl *Req) {
+    auto *const PD = cast<ProtocolDecl>(Req->getDeclContext());
+    return SubstitutionMap::getProtocolSubstitutions(
+        PD, Adoptee, ProtocolConformanceRef(PD));
+  };
+
+  llvm::SmallDenseMap<DeclName, llvm::SmallVector<ValueDecl *, 2>, 4>
+      DeclsByName;
+  for (auto *const Req : Reqs) {
+    if (DeclsByName.find(Req->getName()) == DeclsByName.end()) {
+      DeclsByName[Req->getName()] = {Req};
+      Filtered.push_back(Req);
+      continue;
+    }
+
+    auto OverloadTy = Req->getOverloadSignatureType();
+    if (OverloadTy) {
+      OverloadTy =
+          OverloadTy.subst(getProtocolSubstitutionMap(Req))->getCanonicalType();
+    }
+    if (llvm::any_of(DeclsByName[Req->getName()], [&](ValueDecl *OtherReq) {
+          auto OtherOverloadTy = OtherReq->getOverloadSignatureType();
+          if (OtherOverloadTy) {
+            OtherOverloadTy =
+                OtherOverloadTy.subst(getProtocolSubstitutionMap(OtherReq))
+                    ->getCanonicalType();
+          }
+          return conflicting(Req->getASTContext(), Req->getOverloadSignature(),
+                             OverloadTy, OtherReq->getOverloadSignature(),
+                             OtherOverloadTy,
+                             /*wouldConflictInSwift5*/ nullptr,
+                             /*skipProtocolExtensionCheck*/ true);
+        })) {
+      continue;
+    }
+
+    DeclsByName[Req->getName()].push_back(Req);
+    Filtered.push_back(Req);
+  }
+
+  return Filtered;
+}
+
 void ConformanceChecker::
 diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   auto LocalMissing = getLocalMissingWitness();
@@ -2971,12 +3024,10 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   if (LocalMissing.empty())
     return;
 
-  SourceLoc ComplainLoc = Loc;
-  bool EditorMode = getASTContext().LangOpts.DiagnosticsEditorMode;
-  llvm::SetVector<ValueDecl*> MissingWitnesses(GlobalMissingWitnesses.begin(),
-                                               GlobalMissingWitnesses.end());
-  auto InsertFixitCallback = [ComplainLoc, EditorMode, MissingWitnesses]
-      (NormalProtocolConformance *Conf) {
+  const auto InsertFixit = [](NormalProtocolConformance *Conf,
+                              SourceLoc ComplainLoc, bool EditorMode,
+                              llvm::SmallVector<ValueDecl *, 4>
+                                  MissingWitnesses) {
     DeclContext *DC = Conf->getDeclContext();
     // The location where to insert stubs.
     SourceLoc FixitLocation;
@@ -2996,9 +3047,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     llvm::SetVector<ValueDecl*> NoStubRequirements;
 
     // Print stubs for all known missing witnesses.
-    printProtocolStubFixitString(TypeLoc, Conf,
-                                 MissingWitnesses.getArrayRef(),
-                                 FixIt, NoStubRequirements);
+    printProtocolStubFixitString(TypeLoc, Conf, MissingWitnesses, FixIt,
+                                 NoStubRequirements);
     auto &Diags = DC->getASTContext().Diags;
 
     // If we are in editor mode, squash all notes into a single fixit.
@@ -3072,27 +3122,33 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     }
   };
 
+  const bool IsEditorMode = Context.LangOpts.DiagnosticsEditorMode;
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
+    const auto MissingWitnesses = filterProtocolRequirements(
+        GlobalMissingWitnesses.getArrayRef(), Adoptee);
     if (SuppressDiagnostics) {
       // If the diagnostics are suppressed, we register these missing witnesses
       // for later revisiting.
       Conformance->setInvalid();
-      getASTContext().addDelayedMissingWitnesses(
-          Conformance, MissingWitnesses.getArrayRef());
+      getASTContext().addDelayedMissingWitnesses(Conformance, MissingWitnesses);
     } else {
-      diagnoseOrDefer(LocalMissing[0], true, InsertFixitCallback);
+      diagnoseOrDefer(
+          LocalMissing[0], true, [&](NormalProtocolConformance *Conf) {
+            InsertFixit(Conf, Loc, IsEditorMode, std::move(MissingWitnesses));
+          });
     }
     clearGlobalMissingWitnesses();
     return;
   }
   case MissingWitnessDiagnosisKind::ErrorOnly: {
-    diagnoseOrDefer(LocalMissing[0], true,
-                    [](NormalProtocolConformance *Conf) {});
+    diagnoseOrDefer(LocalMissing[0], true, [](NormalProtocolConformance *) {});
     return;
   }
   case MissingWitnessDiagnosisKind::FixItOnly:
-    InsertFixitCallback(Conformance);
+    InsertFixit(Conformance, Loc, IsEditorMode,
+                filterProtocolRequirements(GlobalMissingWitnesses.getArrayRef(),
+                                           Adoptee));
     clearGlobalMissingWitnesses();
     return;
   }
@@ -4256,7 +4312,8 @@ void swift::diagnoseConformanceFailure(Type T,
 
     if (!T->isObjCExistentialType()) {
       diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
-                     T, Proto->getDeclaredType());
+                     T, T->isEqual(Proto->getDeclaredType()), 
+                     Proto->getDeclaredType());
       return;
     }
 
@@ -4468,6 +4525,40 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
   }
 
   return lookupResult;
+}
+
+bool
+TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
+                                               DeclContext *DC) {
+  // An existential may have a concrete underlying type with protocol conformances
+  // we cannot know statically.
+  if (type->isExistentialType())
+    return true;
+  
+  // A generic archetype may have protocol conformances we cannot know
+  // statically.
+  if (type->is<ArchetypeType>())
+    return true;
+  
+  // A non-final class might have a subclass that conforms to the protocol.
+  if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+    if (!classDecl->isFinal())
+      return true;
+  }
+
+  ModuleDecl *M = DC->getParentModule();
+  // For standard library collection types such as Array, Set or Dictionary
+  // which have custom casting machinery implemented in situations like:
+  //
+  //  func encodable(_ value: Encodable) {
+  //    _ = value as! [String : Encodable]
+  //  }
+  // we are skipping checking conditional requirements using lookupConformance,
+  // as an intermediate collection cast can dynamically change if the conditions
+  // are met or not.
+  if (type->isKnownStdlibCollectionType())
+    return !M->lookupConformance(type, Proto).isInvalid();
+  return !conformsToProtocol(type, Proto, DC).isInvalid();
 }
 
 /// Exposes TypeChecker functionality for querying protocol conformance.

@@ -410,6 +410,11 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
+  if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
+    Diagnostics.setLocalization(
+        Invocation.getDiagnosticOptions().LocalizationCode,
+        Invocation.getDiagnosticOptions().LocalizationPath);
+  }
 }
 
 // The ordering of ModuleLoaders is important!
@@ -499,7 +504,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
         LoaderOpts,
         IgnoreSourceInfoFile);
-    Context->addModuleLoader(std::move(PIML));
+    Context->addModuleLoader(std::move(PIML), false, false, true);
   }
 
   std::unique_ptr<SerializedModuleLoader> SML =

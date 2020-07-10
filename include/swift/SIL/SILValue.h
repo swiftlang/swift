@@ -20,6 +20,8 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"

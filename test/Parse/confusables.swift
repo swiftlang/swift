@@ -17,7 +17,7 @@ if (true ꝸꝸꝸ false) {} // expected-note {{identifier 'ꝸꝸꝸ' contains 
 
 // expected-error @+3 {{invalid character in source file}}
 // expected-error @+2 {{expected ',' separator}}
-// expected-error @+1 {{type '(Int, Int)' cannot conform to 'BinaryInteger'; only struct/enum/class types can conform to protocols}}
+// expected-error @+1 {{type '(Int, Int)' cannot conform to 'BinaryInteger'; only concrete types such as structs, enums and classes can conform to protocols}}
 if (5 ‒ 5) == 0 {} // expected-note {{unicode character '‒' looks similar to '-'; did you mean to use '-'?}} {{7-10=-}}
 // expected-note @-1 {{operator function '=='}}
 

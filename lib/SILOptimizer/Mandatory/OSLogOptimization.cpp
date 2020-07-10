@@ -540,13 +540,15 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   assert(arrayAllocateFun);
 
   SILFunction *arrayFinalizeFun = nullptr;
-  if (FuncDecl *arrayFinalizeDecl = astContext.getFinalizeUninitializedArray()) {
-    std::string finalizeMangledName =
-        SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
-    arrayFinalizeFun =
-        module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
-    assert(arrayFinalizeFun);
-    module.linkFunction(arrayFinalizeFun);
+  if (numElements != 0) {
+    if (FuncDecl *arrayFinalizeDecl = astContext.getFinalizeUninitializedArray()) {
+      std::string finalizeMangledName =
+          SILDeclRef(arrayFinalizeDecl, SILDeclRef::Kind::Func).mangle();
+      arrayFinalizeFun =
+          module.findFunction(finalizeMangledName, SILLinkage::SharedExternal);
+      assert(arrayFinalizeFun);
+      module.linkFunction(arrayFinalizeFun);
+    }
   }
 
   // Call the _allocateUninitializedArray function with numElementsSIL. The
