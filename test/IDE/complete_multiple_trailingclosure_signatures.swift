@@ -17,12 +17,12 @@ func test() {
 
 // GLOBALFUNC_SAMELINE: Begin completions
 // GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn2:  () -> Void {|}#}[#() -> Void#];
-// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn3:  (Int) -> Void {(<#Int#>) in|}#}[#(Int) -> Void#];
-// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn4:  (Int, String) -> Void {(<#Int#>, <#String#>) in|}#}[#(Int, String) -> Void#];
-// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn5:  (Int, String) -> Int {(<#Int#>, <#String#>) -> Int in|}#}[#(Int, String) -> Int#];
+// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn3:  (Int) -> Void {<#Int#> in|}#}[#(Int) -> Void#];
+// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn4:  (Int, String) -> Void {<#Int#>, <#String#> in|}#}[#(Int, String) -> Void#];
+// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn5:  (Int, String) -> Int {<#Int#>, <#String#> in|}#}[#(Int, String) -> Int#];
 // FIXME: recover names
-// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn6:  (Int, String) -> Int {(<#Int#>, <#String#>) -> Int in|}#}[#(Int, String) -> Int#];
-// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn7:  (inout Int) -> Void {(<#inout Int#>) in|}#}[#(inout Int) -> Void#];
-// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn8:  (Int...) -> Void {(<#Int...#>) in|}#}[#(Int...) -> Void#];
+// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn6:  (Int, String) -> Int {<#Int#>, <#String#> in|}#}[#(Int, String) -> Int#];
+// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn7:  (inout Int) -> Void {<#inout Int#> in|}#}[#(inout Int) -> Void#];
+// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific: {#fn8:  (Int...) -> Void {<#Int...#> in|}#}[#(Int...) -> Void#];
 // GLOBALFUNC_SAMELINE: End completions
 }

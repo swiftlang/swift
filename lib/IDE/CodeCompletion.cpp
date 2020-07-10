@@ -1016,10 +1016,6 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
       SmallString<32> buffer;
       llvm::raw_svector_ostream OS(buffer);
 
-      bool returnsVoid = AFT->getResult()->isVoid();
-      bool hasSignature = !returnsVoid || !AFT->getParams().empty();
-      if (hasSignature)
-        OS << "(";
       bool firstParam = true;
       for (const auto &param : AFT->getParams()) {
         if (!firstParam)
@@ -1038,12 +1034,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
           OS << "#>";
         }
       }
-      if (hasSignature)
-        OS << ")";
-      if (!returnsVoid)
-        OS << " -> " << AFT->getResult()->getString(PO);
 
-      if (hasSignature)
+      if (!firstParam)
         OS << " in";
 
       addChunkWithText(

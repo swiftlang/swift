@@ -2129,23 +2129,10 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
 }
 
-bool isReturningVoid(const SourceManager &SM, CharSourceRange Range) {
-  if (Range.isInvalid())
-    return false;
-  StringRef Text = SM.extractText(Range);
-  return "()" == Text || "Void" == Text;
-}
-
 static void
 printClosureBody(const PlaceholderExpansionScanner::ClosureInfo &closure,
                  llvm::raw_ostream &OS, const SourceManager &SM) {
-  bool ReturningVoid = isReturningVoid(SM, closure.ReturnTypeRange);
-
-  bool HasSignature = !closure.Params.empty() ||
-                      (closure.ReturnTypeRange.isValid() && !ReturningVoid);
   bool FirstParam = true;
-  if (HasSignature)
-    OS << "(";
   for (auto &Param : closure.Params) {
     if (!FirstParam)
       OS << ", ";
@@ -2153,30 +2140,19 @@ printClosureBody(const PlaceholderExpansionScanner::ClosureInfo &closure,
     if (Param.NameRange.isValid()) {
       // If we have a parameter name, just output the name as is and skip
       // the type. For example:
-      // <#(arg1: Int, arg2: Int)#> turns into (arg1, arg2).
+      // <#(arg1: Int, arg2: Int)#> turns into '{ arg1, arg2 in'.
       OS << SM.extractText(Param.NameRange);
     } else {
       // If we only have the parameter type, output the type as a
       // placeholder. For example:
-      // <#(Int, Int)#> turns into (<#Int#>, <#Int#>).
+      // <#(Int, Int)#> turns into '{ <#Int#>, <#Int#> in'.
       OS << "<#";
       OS << SM.extractText(Param.TypeRange);
       OS << "#>";
     }
   }
-  if (HasSignature)
-    OS << ") ";
-  if (closure.ReturnTypeRange.isValid()) {
-    auto ReturnTypeText = SM.extractText(closure.ReturnTypeRange);
-
-    // We need return type if it is not Void.
-    if (!ReturningVoid) {
-      OS << "-> ";
-      OS << ReturnTypeText << " ";
-    }
-  }
-  if (HasSignature)
-    OS << "in";
+  if (!FirstParam)
+    OS << " in";
   OS << "\n" << getCodePlaceholder() << "\n";
 }
 
