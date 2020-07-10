@@ -23,7 +23,7 @@ SequenceAlgorithmTests.test("Array<Int>().max()") {
 }
 
 SequenceAlgorithmTests.test("[1,2,3,4,5,-9,6,7,8,9,0].minmax()") {
-  expectEqual([1,2,3,4,5,-9,6,7,8,9,0].minmax()!, (-9,9))
+    expectEqual([1,2,3,4,5,-9,6,7,8,9,0].minmax()!, (min: -9, max: 9))
 }
 
 runAllTests()

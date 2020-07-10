@@ -31,11 +31,11 @@ CollectionMinMaxIndices.test("Array<Int>().maxIndex()") {
 }
 
 CollectionMinMaxIndices.test("[1,2,3,4,5,-9,6,7,8,9,0].minmaxIndices()") {
-  expectEqual([1,2,3,4,5,-9,6,7,8,9,0].minmaxIndices()!, (5,9))
+  expectEqual([1,2,3,4,5,-9,6,7,8,9,0].minmaxIndices()!, (minIndex: 5, maxIndex: 9))
 }
 
 CollectionMinMaxIndices.test("[3.14].minmaxIndices()") {
-    expectEqual([3.14].minmaxIndices()!, (0,0))
+  expectEqual([3.14].minmaxIndices()!, (minIndex: 0, maxIndex: 0))
 }
 
 CollectionMinMaxIndices.test("Array<Int>().minmaxIndices()") {

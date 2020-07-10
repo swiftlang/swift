@@ -1704,7 +1704,7 @@ extension Collection {
   @warn_unqualified_access
   public func minmaxIndices(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) rethrows -> (Index, Index)? {
+  ) rethrows -> (minIndex: Index, maxIndex: Index)? {
     guard !isEmpty else { return nil }
     var minIndex = startIndex
     var maxIndex = startIndex
@@ -1712,7 +1712,7 @@ extension Collection {
       if try areInIncreasingOrder(self[index], self[minIndex]) { minIndex = index }
       else if try areInIncreasingOrder(self[maxIndex], self[index]) { maxIndex = index }
     }
-    return (minIndex, maxIndex)
+    return (minIndex: minIndex, maxIndex: maxIndex)
   }
 
 }
