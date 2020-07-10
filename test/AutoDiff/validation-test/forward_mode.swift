@@ -1325,16 +1325,17 @@ ForwardModeTests.test("ForceUnwrapping") {
 
 ForwardModeTests.test("Array.differentiableMap") {
   let a: [Float] = [1, 2, 3]
+  let tan = Array<Float>.TangentVector.init(a)
 
   func multiplyMap(_ a: [Float]) -> [Float] {
     return a.differentiableMap({ x in 3 * x })
   }
-  expectEqual([3, 3, 3], differential(at: [1, 1, 1], in: multiplyMap)(a))
+  expectEqual([3, 3, 3], differential(at: [1, 1, 1], in: multiplyMap)(tan))
 
   func squareMap(_ a: [Float]) -> [Float] {
     return a.differentiableMap({ x in x * x })
   }
-  expectEqual([2, 4, 6], differential(at: [1, 1, 1], in: squareMap)(a))
+  expectEqual([2, 4, 6], differential(at: [1, 1, 1], in: squareMap)(tan))
 }
 
 runAllTests()
