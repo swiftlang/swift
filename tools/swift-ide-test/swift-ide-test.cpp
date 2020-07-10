@@ -1198,6 +1198,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
 
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
+    bool wasASTContextReused = false;
     bool isSuccess = CompletionInst.performOperation(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
         /*EnableASTCaching=*/true, Error,
@@ -1217,11 +1218,15 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
 
           auto *SF = CI.getCodeCompletionFile();
           performCodeCompletionSecondPass(*SF, *callbacksFactory);
+          wasASTContextReused = reusingASTContext;
         });
     auto completionEnd = std::chrono::high_resolution_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         completionEnd - completionStart);
-    llvm::errs() << "Elapsed: " << elapsed.count() << " msec\n";
+    llvm::errs() << "Elapsed: " << elapsed.count() << " msec";
+    if (wasASTContextReused)
+      llvm::errs() << " (reusing ASTContext)";
+    llvm::errs() << "\n";
     OS.flush();
 
     if (OutputDir.empty()) {
