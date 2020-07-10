@@ -1971,7 +1971,7 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
           } else {
             RootProtocolConformance *rootConformance =
                 concreteConformance->getRootConformance();
-            auto *expectedDescriptor =
+            llvm::Value *expectedDescriptor =
                 IGF.IGM.getAddrOfProtocolConformanceDescriptor(rootConformance);
             auto *witnessTable = valueAtIndex(requirementIndex);
             auto *witnessBuffer =
@@ -1981,6 +1981,32 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
             auto *providedDescriptor = IGF.Builder.CreateBitCast(
                 uncastProvidedDescriptor,
                 IGM.ProtocolConformanceDescriptorPtrTy);
+
+            // Auth the stored descriptor.
+            auto storedScheme =
+                IGF.IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors;
+            if (storedScheme) {
+              auto authInfo = PointerAuthInfo::emit(
+                  IGF, storedScheme, witnessTable,
+                  PointerAuthEntity::Special::ProtocolConformanceDescriptor);
+              providedDescriptor =
+                  emitPointerAuthAuth(IGF, providedDescriptor, authInfo);
+            }
+
+            // Sign the descriptors.
+            auto argScheme =
+                IGF.IGM.getOptions()
+                    .PointerAuth.ProtocolConformanceDescriptorsAsArguments;
+            if (argScheme) {
+              auto authInfo = PointerAuthInfo::emit(
+                  IGF, argScheme, nullptr,
+                  PointerAuthEntity::Special::
+                      ProtocolConformanceDescriptorAsArgument);
+              expectedDescriptor =
+                  emitPointerAuthSign(IGF, expectedDescriptor, authInfo);
+              providedDescriptor =
+                  emitPointerAuthSign(IGF, providedDescriptor, authInfo);
+            }
 
             auto *call = IGF.Builder.CreateCall(
                 IGF.IGM.getCompareProtocolConformanceDescriptorsFn(),

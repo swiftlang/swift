@@ -21,6 +21,10 @@
 
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+//                            MARK: General Helpers
+//===----------------------------------------------------------------------===//
+
 SILValue swift::stripAccessMarkers(SILValue v) {
   while (auto *bai = dyn_cast<BeginAccessInst>(v)) {
     v = bai->getOperand();
@@ -82,6 +86,10 @@ bool swift::isLetAddress(SILValue accessedAddress) {
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+//                            MARK: AccessedStorage
+//===----------------------------------------------------------------------===//
+
 AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
   assert(base && "invalid storage base");
   initKind(kind);
@@ -136,6 +144,20 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     setElementIndex(REA->getFieldNo());
   }
   }
+}
+
+// Return true if the given access is on a 'let' lvalue.
+bool AccessedStorage::isLetAccess(SILFunction *F) const {
+  if (auto *decl = dyn_cast_or_null<VarDecl>(getDecl()))
+    return decl->isLet();
+
+  // It's unclear whether a global will ever be missing it's varDecl, but
+  // technically we only preserve it for debug info. So if we don't have a decl,
+  // check the flag on SILGlobalVariable, which is guaranteed valid,
+  if (getKind() == AccessedStorage::Global)
+    return getGlobal()->isLet();
+
+  return false;
 }
 
 const ValueDecl *AccessedStorage::getDecl() const {
@@ -217,93 +239,7 @@ void AccessedStorage::print(raw_ostream &os) const {
 
 void AccessedStorage::dump() const { print(llvm::dbgs()); }
 
-// Return true if the given apply invokes a global addressor defined in another
-// module.
-bool swift::isExternalGlobalAddressor(ApplyInst *AI) {
-  FullApplySite apply(AI);
-  auto *funcRef = apply.getReferencedFunctionOrNull();
-  if (!funcRef)
-    return false;
-  
-  return funcRef->isGlobalInit() && funcRef->isExternalDeclaration();
-}
-
-// Return true if the given StructExtractInst extracts the RawPointer from
-// Unsafe[Mutable]Pointer.
-bool swift::isUnsafePointerExtraction(StructExtractInst *SEI) {
-  assert(isa<BuiltinRawPointerType>(SEI->getType().getASTType()));
-  auto &C = SEI->getModule().getASTContext();
-  auto *decl = SEI->getStructDecl();
-  return decl == C.getUnsafeMutablePointerDecl()
-    || decl == C.getUnsafePointerDecl();
-}
-
-// Given a block argument address base, check if it is actually a box projected
-// from a switch_enum. This is a valid pattern at any SIL stage resulting in a
-// block-type phi. In later SIL stages, the optimizer may form address-type
-// phis, causing this assert if called on those cases.
-void swift::checkSwitchEnumBlockArg(SILPhiArgument *arg) {
-  assert(!arg->getType().isAddress());
-  SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
-  if (!Pred || !isa<SwitchEnumInst>(Pred->getTerminator())) {
-    arg->dump();
-    llvm_unreachable("unexpected box source.");
-  }
-}
-
-/// Return true if the given address value is produced by a special address
-/// producer that is only used for local initialization, not formal access.
-bool swift::isAddressForLocalInitOnly(SILValue sourceAddr) {
-  switch (sourceAddr->getKind()) {
-  default:
-    return false;
-
-  // Value to address conversions: the operand is the non-address source
-  // value. These allow local mutation of the value but should never be used
-  // for formal access of an lvalue.
-  case ValueKind::OpenExistentialBoxInst:
-  case ValueKind::ProjectExistentialBoxInst:
-    return true;
-
-  // Self-evident local initialization.
-  case ValueKind::InitEnumDataAddrInst:
-  case ValueKind::InitExistentialAddrInst:
-  case ValueKind::AllocExistentialBoxInst:
-  case ValueKind::AllocValueBufferInst:
-  case ValueKind::ProjectValueBufferInst:
-    return true;
-  }
-}
-
 namespace {
-// The result of an accessed storage query. A complete result produces an
-// AccessedStorage object, which may or may not be valid. An incomplete result
-// produces a SILValue representing the source address for use with deeper
-// queries. The source address is not necessarily a SIL address type because
-// the query can extend past pointer-to-address casts.
-class AccessedStorageResult {
-  AccessedStorage storage;
-  SILValue address;
-  bool complete;
-
-  explicit AccessedStorageResult(SILValue address)
-    : address(address), complete(false) {}
-
-public:
-  AccessedStorageResult(const AccessedStorage &storage)
-    : storage(storage), complete(true) {}
-
-  static AccessedStorageResult incomplete(SILValue address) {
-    return AccessedStorageResult(address);
-  }
-
-  bool isComplete() const { return complete; }
-
-  AccessedStorage getStorage() const { assert(complete); return storage; }
-
-  SILValue getAddress() const { assert(!complete); return address; }
-};
-
 struct FindAccessedStorageVisitor
   : public AccessUseDefChainVisitor<FindAccessedStorageVisitor>
 {
@@ -372,19 +308,9 @@ AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
   }
 }
 
-// Return true if the given access is on a 'let' lvalue.
-bool AccessedStorage::isLetAccess(SILFunction *F) const {
-  if (auto *decl = dyn_cast_or_null<VarDecl>(getDecl()))
-    return decl->isLet();
-
-  // It's unclear whether a global will ever be missing it's varDecl, but
-  // technically we only preserve it for debug info. So if we don't have a decl,
-  // check the flag on SILGlobalVariable, which is guaranteed valid, 
-  if (getKind() == AccessedStorage::Global)
-    return getGlobal()->isLet();
-
-  return false;
-}
+//===----------------------------------------------------------------------===//
+//                               MARK: Helper API
+//===----------------------------------------------------------------------===//
 
 static bool isScratchBuffer(SILValue value) {
   // Special case unsafe value buffer access.
@@ -416,6 +342,125 @@ bool swift::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::Store##Name##Inst: \
     return cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
 #include "swift/AST/ReferenceStorage.def"
+  }
+}
+
+bool swift::isSingleInitAllocStack(AllocStackInst *asi,
+                                   SmallVectorImpl<Operand *> &destroyingUses) {
+  // For now, we just look through projections and rely on memInstMustInitialize
+  // to classify all other uses as init or not.
+  SmallVector<Operand *, 32> worklist(asi->getUses());
+  bool foundInit = false;
+
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+    auto *user = use->getUser();
+
+    if (Projection::isAddressProjection(user)
+        || isa<OpenExistentialAddrInst>(user)) {
+      // Look through address projections.
+      for (SILValue r : user->getResults()) {
+        llvm::copy(r->getUses(), std::back_inserter(worklist));
+      }
+      continue;
+    }
+
+    if (auto *li = dyn_cast<LoadInst>(user)) {
+      // If we are not taking,
+      if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Take) {
+        continue;
+      }
+      // Treat load [take] as a write.
+      return false;
+    }
+
+    switch (user->getKind()) {
+    default:
+      break;
+    case SILInstructionKind::DestroyAddrInst:
+      destroyingUses.push_back(use);
+      continue;
+    case SILInstructionKind::DeallocStackInst:
+    case SILInstructionKind::LoadBorrowInst:
+    case SILInstructionKind::DebugValueAddrInst:
+      continue;
+    }
+
+    // See if we have an initializer and that such initializer is in the same
+    // block.
+    if (memInstMustInitialize(use)) {
+      if (user->getParent() != asi->getParent() || foundInit) {
+        return false;
+      }
+
+      foundInit = true;
+      continue;
+    }
+
+    // Otherwise, if we have found something not in our whitelist, return false.
+    return false;
+  }
+
+  // We did not find any users that we did not understand. So we can
+  // conservatively return true here.
+  return true;
+}
+
+/// Return true if the given address value is produced by a special address
+/// producer that is only used for local initialization, not formal access.
+bool swift::isAddressForLocalInitOnly(SILValue sourceAddr) {
+  switch (sourceAddr->getKind()) {
+  default:
+    return false;
+
+  // Value to address conversions: the operand is the non-address source
+  // value. These allow local mutation of the value but should never be used
+  // for formal access of an lvalue.
+  case ValueKind::OpenExistentialBoxInst:
+  case ValueKind::ProjectExistentialBoxInst:
+    return true;
+
+  // Self-evident local initialization.
+  case ValueKind::InitEnumDataAddrInst:
+  case ValueKind::InitExistentialAddrInst:
+  case ValueKind::AllocExistentialBoxInst:
+  case ValueKind::AllocValueBufferInst:
+  case ValueKind::ProjectValueBufferInst:
+    return true;
+  }
+}
+
+// Return true if the given apply invokes a global addressor defined in another
+// module.
+bool swift::isExternalGlobalAddressor(ApplyInst *AI) {
+  FullApplySite apply(AI);
+  auto *funcRef = apply.getReferencedFunctionOrNull();
+  if (!funcRef)
+    return false;
+
+  return funcRef->isGlobalInit() && funcRef->isExternalDeclaration();
+}
+
+// Return true if the given StructExtractInst extracts the RawPointer from
+// Unsafe[Mutable]Pointer.
+bool swift::isUnsafePointerExtraction(StructExtractInst *SEI) {
+  assert(isa<BuiltinRawPointerType>(SEI->getType().getASTType()));
+  auto &C = SEI->getModule().getASTContext();
+  auto *decl = SEI->getStructDecl();
+  return decl == C.getUnsafeMutablePointerDecl()
+         || decl == C.getUnsafePointerDecl();
+}
+
+// Given a block argument address base, check if it is actually a box projected
+// from a switch_enum. This is a valid pattern at any SIL stage resulting in a
+// block-type phi. In later SIL stages, the optimizer may form address-type
+// phis, causing this assert if called on those cases.
+void swift::checkSwitchEnumBlockArg(SILPhiArgument *arg) {
+  assert(!arg->getType().isAddress());
+  SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
+  if (!Pred || !isa<SwitchEnumInst>(Pred->getTerminator())) {
+    arg->dump();
+    llvm_unreachable("unexpected box source.");
   }
 }
 
@@ -476,6 +521,26 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
 
   return true;
 }
+
+SILBasicBlock::iterator swift::removeBeginAccess(BeginAccessInst *beginAccess) {
+  while (!beginAccess->use_empty()) {
+    Operand *op = *beginAccess->use_begin();
+
+    // Delete any associated end_access instructions.
+    if (auto endAccess = dyn_cast<EndAccessInst>(op->getUser())) {
+      endAccess->eraseFromParent();
+
+      // Forward all other uses to the original address.
+    } else {
+      op->set(beginAccess->getSource());
+    }
+  }
+  return beginAccess->getParent()->erase(beginAccess);
+}
+
+//===----------------------------------------------------------------------===//
+//                            Verification
+//===----------------------------------------------------------------------===//
 
 /// Helper for visitApplyAccesses that visits address-type call arguments,
 /// including arguments to @noescape functions that are passed as closures to
@@ -706,81 +771,4 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::ValueMetatypeInst:
     return;
   }
-}
-
-SILBasicBlock::iterator swift::removeBeginAccess(BeginAccessInst *beginAccess) {
-  while (!beginAccess->use_empty()) {
-    Operand *op = *beginAccess->use_begin();
-
-    // Delete any associated end_access instructions.
-    if (auto endAccess = dyn_cast<EndAccessInst>(op->getUser())) {
-      endAccess->eraseFromParent();
-
-      // Forward all other uses to the original address.
-    } else {
-      op->set(beginAccess->getSource());
-    }
-  }
-  return beginAccess->getParent()->erase(beginAccess);
-}
-
-bool swift::isSingleInitAllocStack(AllocStackInst *asi,
-                                   SmallVectorImpl<Operand *> &destroyingUses) {
-  // For now, we just look through projections and rely on memInstMustInitialize
-  // to classify all other uses as init or not.
-  SmallVector<Operand *, 32> worklist(asi->getUses());
-  bool foundInit = false;
-
-  while (!worklist.empty()) {
-    auto *use = worklist.pop_back_val();
-    auto *user = use->getUser();
-
-    if (Projection::isAddressProjection(user) ||
-        isa<OpenExistentialAddrInst>(user)) {
-      // Look through address projections.
-      for (SILValue r : user->getResults()) {
-        llvm::copy(r->getUses(), std::back_inserter(worklist));
-      }
-      continue;
-    }
-
-    if (auto *li = dyn_cast<LoadInst>(user)) {
-      // If we are not taking,
-      if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Take) {
-        continue;
-      }
-      // Treat load [take] as a write.
-      return false;
-    }
-
-    switch (user->getKind()) {
-    default:
-      break;
-    case SILInstructionKind::DestroyAddrInst:
-      destroyingUses.push_back(use);
-      continue;
-    case SILInstructionKind::DeallocStackInst:
-    case SILInstructionKind::LoadBorrowInst:
-    case SILInstructionKind::DebugValueAddrInst:
-      continue;
-    }
-
-    // See if we have an initializer and that such initializer is in the same
-    // block.
-    if (memInstMustInitialize(use)) {
-      if (user->getParent() != asi->getParent() || foundInit) {
-        return false;
-      }
-
-      foundInit = true;
-      continue;
-    }
-
-    // Otherwise, if we have found something not in our whitelist, return false.
-    return false;
-  }
-
-  // We did not find any users that we did not understand. So we can
-  // conservatively return true here.
-  return true;
 }

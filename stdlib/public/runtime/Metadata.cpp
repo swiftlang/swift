@@ -4996,6 +4996,11 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
 bool swift::swift_compareProtocolConformanceDescriptors(
     const ProtocolConformanceDescriptor *lhs,
     const ProtocolConformanceDescriptor *rhs) {
+  lhs = swift_auth_data_non_address(
+      lhs, SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor);
+  rhs = swift_auth_data_non_address(
+      rhs, SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor);
+
   return MetadataCacheKey::compareProtocolConformanceDescriptors(lhs, rhs) == 0;
 }
 

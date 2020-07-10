@@ -625,7 +625,7 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
     // macOS triples represent their versions differently, so we have to use the
     // special accessor.
     triple.getMacOSXVersion(major, minor, micro);
-    osName = swift::prettyPlatformString(PlatformKind::OSX);
+    osName = swift::prettyPlatformString(PlatformKind::macOS);
   } else {
     triple.getOSVersion(major, minor, micro);
     if (triple.isWatchOS()) {

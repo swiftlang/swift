@@ -1253,8 +1253,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     auto Platform = targetPlatform(Context.LangOpts);
     if (RunningVers.getMajor() != RequiredVers.getMajor())
       return false;
-    if ((Platform == PlatformKind::OSX ||
-         Platform == PlatformKind::OSXApplicationExtension) &&
+    if ((Platform == PlatformKind::macOS ||
+         Platform == PlatformKind::macOSApplicationExtension) &&
         !(RunningVers.getMinor().hasValue() &&
           RequiredVers.getMinor().hasValue() &&
           RunningVers.getMinor().getValue() ==

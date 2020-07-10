@@ -12,5 +12,5 @@
 
 @available(iOS 10.16, OSX 10.16, *)
 func introduced10_16() {}
-// PASS_COMMON: {{^}}@available(iOS 10.16, OSX 11.0, *){{$}}
+// PASS_COMMON: {{^}}@available(iOS 10.16, macOS 11.0, *){{$}}
 // PASS_COMMON-NEXT: {{^}}func introduced10_16(){{$}}
