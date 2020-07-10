@@ -1929,8 +1929,8 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     deprecatedAsUnavailableMessage = "";
     break;
 
-  case PlatformKind::OSX:
-  case PlatformKind::OSXApplicationExtension:
+  case PlatformKind::macOS:
+  case PlatformKind::macOSApplicationExtension:
     deprecatedAsUnavailableMessage =
         "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
     break;
@@ -1942,9 +1942,9 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
 
 bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
   switch (platformKind) {
-  case PlatformKind::OSX:
+  case PlatformKind::macOS:
     return name == "macos";
-  case PlatformKind::OSXApplicationExtension:
+  case PlatformKind::macOSApplicationExtension:
     return name == "macos" || name == "macos_app_extension";
 
   case PlatformKind::iOS:
@@ -1984,8 +1984,8 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::none:
     llvm_unreachable("version but no platform?");
 
-  case PlatformKind::OSX:
-  case PlatformKind::OSXApplicationExtension:
+  case PlatformKind::macOS:
+  case PlatformKind::macOSApplicationExtension:
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     return major < 10 ||
            (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));

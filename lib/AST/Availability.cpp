@@ -358,7 +358,7 @@ AvailabilityContext ASTContext::getSwift53Availability() {
       return AvailabilityContext::alwaysAvailable();
 
     llvm::VersionTuple macOVersion53(10, 16, 0);
-    macOVersion53 = canonicalizePlatformVersion(PlatformKind::OSX, macOVersion53);
+    macOVersion53 = canonicalizePlatformVersion(PlatformKind::macOS, macOVersion53);
     return AvailabilityContext(
         VersionRange::allGTE(macOVersion53));
   } else if (target.isiOS()) {

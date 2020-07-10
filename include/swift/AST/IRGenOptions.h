@@ -123,6 +123,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Type descriptor data pointers when passed as arguments.
   PointerAuthSchema TypeDescriptorsAsArguments;
 
+  /// Protocol conformance descriptors.
+  PointerAuthSchema ProtocolConformanceDescriptors;
+
+  /// Protocol conformance descriptors when passed as arguments.
+  PointerAuthSchema ProtocolConformanceDescriptorsAsArguments;
+
   /// Resumption functions from yield-once coroutines.
   PointerAuthSchema YieldOnceResumeFunctions;
 

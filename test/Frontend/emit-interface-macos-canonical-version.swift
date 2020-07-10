@@ -6,13 +6,13 @@
 
 @available(macOS 10.16, *)
 public func introduced10_16() { }
-// CHECK: @available(OSX 11.0, *)
+// CHECK: @available(macOS 11.0, *)
 // CHECK-NEXT: public func introduced10_16()
 
 
 @available(OSX 11.0, *)
 public func introduced11_0() { }
-// CHECK-NEXT: @available(OSX 11.0, *)
+// CHECK-NEXT: @available(macOS 11.0, *)
 // CHECK-NEXT: public func introduced11_0()
 
 

@@ -257,8 +257,8 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
   case swift::PlatformKind::watchOSApplicationExtension:
     return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
                              LinkerPlatformId::watchOS;
-  case swift::PlatformKind::OSX:
-  case swift::PlatformKind::OSXApplicationExtension:
+  case swift::PlatformKind::macOS:
+  case swift::PlatformKind::macOSApplicationExtension:
     return LinkerPlatformId::macOS;
   case swift::PlatformKind::macCatalyst:
   case swift::PlatformKind::macCatalystApplicationExtension:

@@ -53,8 +53,8 @@ Optional<PlatformKind> swift::platformFromString(StringRef Name) {
   return llvm::StringSwitch<Optional<PlatformKind>>(Name)
 #define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
 #include "swift/AST/PlatformKinds.def"
-      .Case("macOS", PlatformKind::OSX)
-      .Case("macOSApplicationExtension", PlatformKind::OSXApplicationExtension)
+      .Case("OSX", PlatformKind::macOS)
+      .Case("OSXApplicationExtension", PlatformKind::macOSApplicationExtension)
       .Default(Optional<PlatformKind>());
 }
 
@@ -64,7 +64,7 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
   if (Platform == PlatformKind::none)
     return true;
   
-  if (Platform == PlatformKind::OSXApplicationExtension ||
+  if (Platform == PlatformKind::macOSApplicationExtension ||
       Platform == PlatformKind::iOSApplicationExtension ||
       Platform == PlatformKind::macCatalystApplicationExtension)
     if (!EnableAppExtensionRestrictions)
@@ -72,8 +72,8 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
   
   // FIXME: This is an awful way to get the current OS.
   switch (Platform) {
-    case PlatformKind::OSX:
-    case PlatformKind::OSXApplicationExtension:
+    case PlatformKind::macOS:
+    case PlatformKind::macOSApplicationExtension:
       return Target.isMacOSX();
     case PlatformKind::iOS:
     case PlatformKind::iOSApplicationExtension:
@@ -109,8 +109,8 @@ bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
 PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
   if (LangOpts.Target.isMacOSX()) {
     return (LangOpts.EnableAppExtensionRestrictions
-                ? PlatformKind::OSXApplicationExtension
-                : PlatformKind::OSX);
+                ? PlatformKind::macOSApplicationExtension
+                : PlatformKind::macOS);
   }
 
   if (LangOpts.Target.isTvOS()) {
@@ -162,8 +162,8 @@ llvm::VersionTuple swift::canonicalizePlatformVersion(
 
   // Canonicalize macOS version for macOS Big Sur to treat
   // 10.16 as 11.0.
-  if (platform == PlatformKind::OSX ||
-      platform == PlatformKind::OSXApplicationExtension) {
+  if (platform == PlatformKind::macOS ||
+      platform == PlatformKind::macOSApplicationExtension) {
     return llvm::Triple::getCanonicalVersionForOS(llvm::Triple::MacOSX,
                                                   version);
   }

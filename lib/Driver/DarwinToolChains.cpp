@@ -627,7 +627,7 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         // The first deployment of arm64 for macOS is version 10.16;
         if (triple.isAArch64() && major <= 10 && minor < 16) {
           llvm::VersionTuple firstMacARM64e(10, 16, 0);
-          firstMacARM64e = canonicalizePlatformVersion(PlatformKind::OSX,
+          firstMacARM64e = canonicalizePlatformVersion(PlatformKind::macOS,
                                                        firstMacARM64e);
           major = firstMacARM64e.getMajor();
           minor = firstMacARM64e.getMinor().getValueOr(0);
