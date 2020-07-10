@@ -554,12 +554,6 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
   MetaVarName<"<250>">,
   HelpText<"Controls the aggressiveness of loop unrolling">;
 
-def sil_existential_specializer : Flag<["-"], "sil-existential-specializer">,
-  HelpText<"Enable SIL existential specializer optimization">;
-
-def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
-  Alias<merge_modules>;
-
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
   
