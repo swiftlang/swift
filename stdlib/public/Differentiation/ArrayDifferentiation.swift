@@ -316,7 +316,7 @@ extension Array where Element: Differentiable {
   @inlinable
   @derivative(of: differentiableMap)
   internal func _jvpDifferentiableMap<Result: Differentiable>(
-      _ body: @differentiable (Element) -> Result
+    _ body: @differentiable (Element) -> Result
   ) -> (
     value: [Result],
     differential: (Array.TangentVector) -> Array<Result>.TangentVector

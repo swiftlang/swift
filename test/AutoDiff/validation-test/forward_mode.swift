@@ -1322,16 +1322,17 @@ ForwardModeTests.test("ForceUnwrapping") {
 //===----------------------------------------------------------------------===//
 // Array methods from ArrayDifferentiation.swift
 //===----------------------------------------------------------------------===//
-ForwardModeTests.test("Array.differentiableMap") {
-  let a: Array<Float> = [1, 2, 3]
 
-  func multiplyMap(a: Array<Float>) -> Array<Float> {
-    return a.differentiableMap({x in 3 * x});
+ForwardModeTests.test("Array.differentiableMap") {
+  let a: [Float] = [1, 2, 3]
+
+  func multiplyMap(_ a: [Float]) -> [Float] {
+    return a.differentiableMap({ x in 3 * x })
   }
   expectEqual([3, 3, 3], differential(at: [1, 1, 1], in: multiplyMap)(a))
 
-  func squareMap(a: Array<Float>) -> Array<Float> {
-    return a.differentiableMap({x in x * x});
+  func squareMap(_ a: [Float]) -> [Float] {
+    return a.differentiableMap({ x in x * x })
   }
   expectEqual([2, 4, 6], differential(at: [1, 1, 1], in: squareMap)(a))
 }
