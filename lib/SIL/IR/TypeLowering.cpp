@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "libsil"
+
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -780,8 +781,14 @@ namespace {
       if (qual != LoadOwnershipQualifier::Copy)
         return loadValue;
 
-      // Otherwise, emit the copy value operation.
-      return B.emitCopyValueOperation(loc, loadValue);
+      // Otherwise, emit the copy value operation and return our original
+      // value. This is a small non-ownership optimization to not destabilize
+      // the optimizer pipeline.
+      //
+      // TODO: Once the pass pipeline is fixed, we should evaluate if we can do
+      // this again.
+      B.emitCopyValueOperation(loc, loadValue);
+      return loadValue;
     }
 
     SILValue emitLoweredLoad(SILBuilder &B, SILLocation loc, SILValue addr,
@@ -798,7 +805,15 @@ namespace {
         return loadValue;
 
       // Otherwise, emit the copy value operation.
-      return B.emitLoweredCopyValueOperation(loc, loadValue, expansionKind);
+      B.emitLoweredCopyValueOperation(loc, loadValue, expansionKind);
+
+      // Otherwise, emit the copy value operation and return our original
+      // value. This is a small non-ownership optimization to not destabilize
+      // the optimizer pipeline.
+      //
+      // TODO: Once the pass pipeline is fixed, we should evaluate if we can do
+      // this again.
+      return loadValue;
     }
 
     void emitLoweredStore(SILBuilder &B, SILLocation loc, SILValue value,
@@ -949,6 +964,13 @@ namespace {
             loweredChildValues.push_back(childValue);
           });
 
+      // Without ownership, return our original value. This is a small
+      // non-ownership optimization to not destabilize the optimizer pipeline.
+      //
+      // TODO: Once the pass pipeline is fixed, we should evaluate if we can do
+      // this again.
+      if (!B.hasOwnership())
+        return aggValue;
       return rebuildAggregate(B, loc, loweredChildValues);
     }
 
