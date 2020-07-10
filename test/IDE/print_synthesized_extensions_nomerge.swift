@@ -15,7 +15,7 @@ public extension S1 {
   func bar() {}
 }
 
-// CHECK1: <decl:Extension>@available(OSX 10.15, *)
+// CHECK1: <decl:Extension>@available(macOS 10.15, *)
 // CHECK1:  extension <loc><ref:Struct>S1</ref></loc> {
 // CHECK1: <decl:Extension>@available(iOS 13, *)
 // CHECK1: extension <loc><ref:Struct>S1</ref></loc> {

@@ -6,7 +6,7 @@ public func fiveOnly() -> Int {
 }
 
 // CHECK: @available(swift 5.0)
-// CHECK-NEXT: @available(OSX 10.1, *)
+// CHECK-NEXT: @available(macOS 10.1, *)
 // CHECK-NEXT: func fiveOnlyWithMac() -> Int
 @available(swift, introduced: 5.0)
 @available(macOS, introduced: 10.1)
@@ -15,7 +15,7 @@ public func fiveOnlyWithMac() -> Int {
 }
 
 // CHECK: @available(swift 5.0)
-// CHECK-NEXT: @available(OSX 10.1, *)
+// CHECK-NEXT: @available(macOS 10.1, *)
 // CHECK-NEXT: func fiveOnlyWithMac2() -> Int
 @available(macOS, introduced: 10.1)
 @available(swift, introduced: 5.0)
