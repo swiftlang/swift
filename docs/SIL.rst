@@ -962,13 +962,13 @@ called within the addressor.
 
 The function is a getter of a lazy property for which the backing storage is
 an ``Optional`` of the property's type. The getter contains a top-level
-``switch_enum`` (or ``switch_enum_addr``), which tests if the lazy property
+`switch_enum`_ (or `switch_enum_addr`_), which tests if the lazy property
 is already computed. In the ``None``-case, the property is computed and stored
 to the backing storage of the property.
 
 After the first call of a lazy property getter, it is guaranteed that the
 property is computed and consecutive calls always execute the ``Some``-case of
-the top-level ``switch_enum``.
+the top-level `switch_enum`_.
 ::
 
   sil-function-attribute ::= '[weak_imported]'
@@ -4601,7 +4601,7 @@ but turns the control flow dependency into a data flow dependency.
 For address-only enums, `select_enum_addr`_ offers the same functionality for
 an indirectly referenced enum value in memory.
 
-Like `switch_enum`_, ``select_enum`` must have a ``default`` case unless the
+Like `switch_enum`_, `select_enum`_ must have a ``default`` case unless the
 enum can be exhaustively switched in the current function.
 
 select_enum_addr
@@ -4626,7 +4626,7 @@ Selects one of the "case" or "default" operands based on the case of the
 referenced enum value. This is the address-only counterpart to
 `select_enum`_.
 
-Like `switch_enum_addr`_, ``select_enum_addr`` must have a ``default`` case
+Like `switch_enum_addr`_, `select_enum_addr`_ must have a ``default`` case
 unless the enum can be exhaustively switched in the current function.
 
 Protocol and Protocol Composition Types
@@ -4650,10 +4650,10 @@ container may use one of several representations:
   type are class protocols, then the existential container for that type is
   address-only and referred to in the implementation as an *opaque existential
   container*. The value semantics of the existential container propagate to the
-  contained concrete value. Applying ``copy_addr`` to an opaque existential
+  contained concrete value. Applying `copy_addr`_ to an opaque existential
   container copies the contained concrete value, deallocating or reallocating
   the destination container's owned buffer if necessary. Applying
-  ``destroy_addr`` to an opaque existential container destroys the concrete
+  `destroy_addr`_ to an opaque existential container destroys the concrete
   value and deallocates any buffers owned by the existential container. The
   following instructions manipulate opaque existential containers:
 
@@ -4705,8 +4705,8 @@ Some existential types may additionally support specialized representations
 when they contain certain known concrete types. For example, when Objective-C
 interop is available, the ``Error`` protocol existential supports
 a class existential container representation for ``NSError`` objects, so it
-can be initialized from one using ``init_existential_ref`` instead of the
-more expensive ``alloc_existential_box``::
+can be initialized from one using `init_existential_ref`_ instead of the
+more expensive `alloc_existential_box`_::
 
   bb(%nserror: $NSError):
     // The slow general way to form an Error, allocating a box and
@@ -4739,9 +4739,9 @@ instruction is an address referencing the storage for the contained value, which
 remains uninitialized. The contained value must be ``store``-d or
 ``copy_addr``-ed to in order for the existential value to be fully initialized.
 If the existential container needs to be destroyed while the contained value
-is uninitialized, ``deinit_existential_addr`` must be used to do so. A fully
-initialized existential container can be destroyed with ``destroy_addr`` as
-usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
+is uninitialized, `deinit_existential_addr`_ must be used to do so. A fully
+initialized existential container can be destroyed with `destroy_addr`_ as
+usual. It is undefined behavior to `destroy_addr`_ a partially-initialized
 existential container.
 
 init_existential_value
@@ -4770,10 +4770,10 @@ deinit_existential_addr
   // composition type P
 
 Undoes the partial initialization performed by
-``init_existential_addr``.  ``deinit_existential_addr`` is only valid for
+`init_existential_addr`_.  `deinit_existential_addr`_ is only valid for
 existential containers that have been partially initialized by
-``init_existential_addr`` but haven't had their contained value initialized.
-A fully initialized existential must be destroyed with ``destroy_addr``.
+`init_existential_addr`_ but haven't had their contained value initialized.
+A fully initialized existential must be destroyed with `destroy_addr`_.
 
 deinit_existential_value
 ````````````````````````
@@ -4786,10 +4786,10 @@ deinit_existential_value
   // composition type P
 
 Undoes the partial initialization performed by
-``init_existential_value``.  ``deinit_existential_value`` is only valid for
+`init_existential_value`_.  `deinit_existential_value`_ is only valid for
 existential containers that have been partially initialized by
-``init_existential_value`` but haven't had their contained value initialized.
-A fully initialized existential must be destroyed with ``destroy_value``.
+`init_existential_value`_ but haven't had their contained value initialized.
+A fully initialized existential must be destroyed with `destroy_value`_.
 
 open_existential_addr
 `````````````````````
@@ -4866,7 +4866,7 @@ Extracts the class instance reference from a class existential
 container. The protocol conformances associated with this existential
 container are associated directly with the archetype ``@opened P``. This
 pointer can be used with any operation on archetypes, such as
-``witness_method``. When the operand is of metatype type, the result
+`witness_method`_. When the operand is of metatype type, the result
 will be the metatype of the opened archetype.
 
 init_existential_metatype
@@ -4916,9 +4916,9 @@ alloc_existential_box
 Allocates a boxed existential container of type ``$P`` with space to hold a
 value of type ``$T'``. The box is not fully initialized until a valid value
 has been stored into the box. If the box must be deallocated before it is
-fully initialized, ``dealloc_existential_box`` must be used. A fully
+fully initialized, `dealloc_existential_box`_ must be used. A fully
 initialized box can be ``retain``-ed and ``release``-d like any
-reference-counted type.  The ``project_existential_box`` instruction is used
+reference-counted type.  The `project_existential_box`_ instruction is used
 to retrieve the address of the value inside the container.
 
 project_existential_box
@@ -4936,7 +4936,7 @@ project_existential_box
 Projects the address of the value inside a boxed existential container.
 The address is dependent on the lifetime of the owner reference ``%0``.
 It is undefined behavior if the concrete type ``$T`` is not the same type for
-which the box was allocated with ``alloc_existential_box``.
+which the box was allocated with `alloc_existential_box`_.
 
 open_existential_box
 ````````````````````
@@ -4987,7 +4987,7 @@ Deallocates a boxed existential container. The value inside the existential
 buffer is not destroyed; either the box must be uninitialized, or the value
 must have been projected out and destroyed beforehand. It is undefined behavior
 if the concrete type ``$T`` is not the same type for which the box was
-allocated with ``alloc_existential_box``.
+allocated with `alloc_existential_box`_.
 
 Blocks
 ~~~~~~
@@ -5052,7 +5052,7 @@ pointer_to_address
 
 Creates an address value corresponding to the ``Builtin.RawPointer`` value
 ``%0``.  Converting a ``RawPointer`` back to an address of the same type as
-its originating ``address_to_pointer`` instruction gives back an equivalent
+its originating `address_to_pointer`_ instruction gives back an equivalent
 address. It is undefined behavior to cast the ``RawPointer`` back to any type
 other than its original address type or `layout compatible types`_. It is
 also undefined behavior to cast a ``RawPointer`` from a heap object to any
@@ -5161,7 +5161,7 @@ ref_to_raw_pointer
 Converts a heap object reference to a ``Builtin.RawPointer``. The ``RawPointer``
 result can be cast back to the originating class type but does not have
 ownership semantics. It is undefined behavior to cast a ``RawPointer`` from a
-heap object reference to an address using ``pointer_to_address``.
+heap object reference to an address using `pointer_to_address`_.
 
 raw_pointer_to_ref
 ``````````````````
