@@ -44,6 +44,10 @@
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/DenseMap.h"
 
+//===----------------------------------------------------------------------===//
+//                            MARK: General Helpers
+//===----------------------------------------------------------------------===//
+
 namespace swift {
 
 /// Get the base address of a formal access by stripping access markers and
@@ -102,6 +106,14 @@ bool isLetAddress(SILValue accessedAddress);
 inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
+
+} // end namespace swift
+
+//===----------------------------------------------------------------------===//
+//                            MARK: AccessedStorage
+//===----------------------------------------------------------------------===//
+
+namespace swift {
 
 /// Represents the identity of a storage object being accessed.
 ///
@@ -406,24 +418,23 @@ private:
   bool operator==(const AccessedStorage &) const = delete;
   bool operator!=(const AccessedStorage &) const = delete;
 };
+
 } // end namespace swift
 
 namespace llvm {
-
 /// Enable using AccessedStorage as a key in DenseMap.
 /// Do *not* include any extra pass data in key equality.
 template <> struct DenseMapInfo<swift::AccessedStorage> {
   static swift::AccessedStorage getEmptyKey() {
     return swift::AccessedStorage(swift::SILValue::getFromOpaqueValue(
-                                    llvm::DenseMapInfo<void *>::getEmptyKey()),
-                                  swift::AccessedStorage::Unidentified);
+                               llvm::DenseMapInfo<void *>::getEmptyKey()),
+                           swift::AccessedStorage::Unidentified);
   }
 
   static swift::AccessedStorage getTombstoneKey() {
-    return swift::AccessedStorage(
-      swift::SILValue::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getTombstoneKey()),
-      swift::AccessedStorage::Unidentified);
+    return swift::AccessedStorage(swift::SILValue::getFromOpaqueValue(
+                               llvm::DenseMapInfo<void *>::getTombstoneKey()),
+                           swift::AccessedStorage::Unidentified);
   }
 
   static unsigned getHashValue(swift::AccessedStorage storage) {
@@ -450,62 +461,9 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     return LHS.hasIdenticalBase(RHS);
   }
 };
-
-} // end namespace llvm
+} // namespace llvm
 
 namespace swift {
-
-/// Abstract CRTP class for a visitor passed to \c visitAccessUseDefChain.
-template<typename Impl, typename Result = void>
-class AccessUseDefChainVisitor {
-protected:
-  Impl &asImpl() {
-    return static_cast<Impl&>(*this);
-  }
-public:
-  // Subclasses can provide a method for any identified access base:
-  // Result visitBase(SILValue base, AccessedStorage::Kind kind);
-  
-  // Visitors for specific identified access kinds. These default to calling out
-  // to visitIdentified.
-  
-  Result visitClassAccess(RefElementAddrInst *field) {
-    return asImpl().visitBase(field, AccessedStorage::Class);
-  }
-  Result visitArgumentAccess(SILFunctionArgument *arg) {
-    return asImpl().visitBase(arg, AccessedStorage::Argument);
-  }
-  Result visitBoxAccess(AllocBoxInst *box) {
-    return asImpl().visitBase(box, AccessedStorage::Box);
-  }
-  /// The argument may be either a GlobalAddrInst or the ApplyInst for a global accessor function.
-  Result visitGlobalAccess(SILValue global) {
-    return asImpl().visitBase(global, AccessedStorage::Global);
-  }
-  Result visitYieldAccess(BeginApplyResult *yield) {
-    return asImpl().visitBase(yield, AccessedStorage::Yield);
-  }
-  Result visitStackAccess(AllocStackInst *stack) {
-    return asImpl().visitBase(stack, AccessedStorage::Stack);
-  }
-  Result visitNestedAccess(BeginAccessInst *access) {
-    return asImpl().visitBase(access, AccessedStorage::Nested);
-  }
-  
-  // Visitors for unidentified base values.
-  
-  Result visitUnidentified(SILValue base) {
-    return asImpl().visitBase(base, AccessedStorage::Unidentified);
-  }
-  
-  // Subclasses must provide implementations to visit non-access bases
-  // and phi arguments, and for incomplete projections from the access:
-  // void visitNonAccess(SILValue base);
-  // void visitPhi(SILPhiArgument *phi);
-  // void visitIncomplete(SILValue projectedAddr, SILValue parentAddr);
-  
-  Result visit(SILValue sourceAddr);
-};
 
 /// Given an address accessed by an instruction that reads or modifies
 /// memory, return an AccessedStorage object that identifies the formal access.
@@ -534,6 +492,14 @@ AccessedStorage findAccessedStorage(SILValue sourceAddr);
 /// access has Unsafe enforcement.
 AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
 
+} // end namespace swift
+
+//===----------------------------------------------------------------------===//
+//                               MARK: Helper API
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
 /// Return true if the given address operand is used by a memory operation that
 /// initializes the memory at that address, implying that the previous value is
 /// uninitialized.
@@ -550,6 +516,24 @@ bool memInstMustInitialize(Operand *memOper);
 bool isSingleInitAllocStack(AllocStackInst *asi,
                             SmallVectorImpl<Operand *> &destroyingUses);
 
+/// Return true if the given address value is produced by a special address
+/// producer that is only used for local initialization, not formal access.
+bool isAddressForLocalInitOnly(SILValue sourceAddr);
+
+/// Return true if the given apply invokes a global addressor defined in another
+/// module.
+bool isExternalGlobalAddressor(ApplyInst *AI);
+
+/// Return true if the given StructExtractInst extracts the RawPointer from
+/// Unsafe[Mutable]Pointer.
+bool isUnsafePointerExtraction(StructExtractInst *SEI);
+
+/// Given a block argument address base, check if it is actually a box projected
+/// from a switch_enum. This is a valid pattern at any SIL stage resulting in a
+/// block-type phi. In later SIL stages, the optimizer may form address-type
+/// phis, causing this assert if called on those cases.
+void checkSwitchEnumBlockArg(SILPhiArgument *arg);
+
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).
 ///
@@ -560,17 +544,14 @@ bool isSingleInitAllocStack(AllocStackInst *asi,
 ///   storage = findAccessedStorage(address)
 ///   needsAccessMarker = storage && isPossibleFormalAccessBase(storage)
 ///
-/// Warning: This is only valid for SIL with well-formed accessed. For example,
+/// Warning: This is only valid for SIL with well-formed accesses. For example,
 /// it will not handle address-type phis. Optimization passes after
 /// DiagnoseStaticExclusivity may violate these assumptions.
-bool isPossibleFormalAccessBase(const AccessedStorage &storage, SILFunction *F);
-
-/// Visit each address accessed by the given memory operation.
 ///
-/// This only visits instructions that modify memory in some user-visible way,
-/// which could be considered part of a formal access.
-void visitAccessedAddress(SILInstruction *I,
-                          llvm::function_ref<void(Operand *)> visitor);
+/// This is not a member of AccessedStorage because it only makes sense to use
+/// in SILGen before access markers are emitted, or when verifying access
+/// markers.
+bool isPossibleFormalAccessBase(const AccessedStorage &storage, SILFunction *F);
 
 /// Perform a RAUW operation on begin_access with it's own source operand.
 /// Then erase the begin_access and all associated end_access instructions.
@@ -580,20 +561,65 @@ void visitAccessedAddress(SILInstruction *I,
 /// instruction following this begin_access was not also erased.
 SILBasicBlock::iterator removeBeginAccess(BeginAccessInst *beginAccess);
 
-/// Return true if the given address value is produced by a special address
-/// producer that is only used for local initialization, not formal access.
-bool isAddressForLocalInitOnly(SILValue sourceAddr);
-/// Return true if the given apply invokes a global addressor defined in another
-/// module.
-bool isExternalGlobalAddressor(ApplyInst *AI);
-/// Return true if the given StructExtractInst extracts the RawPointer from
-/// Unsafe[Mutable]Pointer.
-bool isUnsafePointerExtraction(StructExtractInst *SEI);
-/// Given a block argument address base, check if it is actually a box projected
-/// from a switch_enum. This is a valid pattern at any SIL stage resulting in a
-/// block-type phi. In later SIL stages, the optimizer may form address-type
-/// phis, causing this assert if called on those cases.
-void checkSwitchEnumBlockArg(SILPhiArgument *arg);
+} // end namespace swift
+
+//===----------------------------------------------------------------------===//
+//                        MARK: AccessUseDefChainVisitor
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Abstract CRTP class for a visitor passed to \c visitAccessUseDefChain.
+template <typename Impl, typename Result = void>
+class AccessUseDefChainVisitor {
+protected:
+  Impl &asImpl() { return static_cast<Impl &>(*this); }
+
+public:
+  // Subclasses can provide a method for any identified access base:
+  // Result visitBase(SILValue base, AccessedStorage::Kind kind);
+
+  // Visitors for specific identified access kinds. These default to calling out
+  // to visitIdentified.
+
+  Result visitClassAccess(RefElementAddrInst *field) {
+    return asImpl().visitBase(field, AccessedStorage::Class);
+  }
+  Result visitArgumentAccess(SILFunctionArgument *arg) {
+    return asImpl().visitBase(arg, AccessedStorage::Argument);
+  }
+  Result visitBoxAccess(AllocBoxInst *box) {
+    return asImpl().visitBase(box, AccessedStorage::Box);
+  }
+  /// The argument may be either a GlobalAddrInst or the ApplyInst for a global
+  /// accessor function.
+  Result visitGlobalAccess(SILValue global) {
+    return asImpl().visitBase(global, AccessedStorage::Global);
+  }
+  Result visitYieldAccess(BeginApplyResult *yield) {
+    return asImpl().visitBase(yield, AccessedStorage::Yield);
+  }
+  Result visitStackAccess(AllocStackInst *stack) {
+    return asImpl().visitBase(stack, AccessedStorage::Stack);
+  }
+  Result visitNestedAccess(BeginAccessInst *access) {
+    return asImpl().visitBase(access, AccessedStorage::Nested);
+  }
+
+  // Visitors for unidentified base values.
+
+  Result visitUnidentified(SILValue base) {
+    return asImpl().visitBase(base, AccessedStorage::Unidentified);
+  }
+
+  // Subclasses must provide implementations to visit non-access bases
+  // and phi arguments, and for incomplete projections from the access:
+  // void visitNonAccess(SILValue base);
+  // void visitPhi(SILPhiArgument *phi);
+  // void visitIncomplete(SILValue projectedAddr, SILValue parentAddr);
+
+  Result visit(SILValue sourceAddr);
+};
 
 template<typename Impl, typename Result>
 Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
@@ -727,11 +753,12 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
       return asImpl().visitIncomplete(sourceAddr,
         cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
 
-    // Access to a Builtin.RawPointer. Treat this like the inductive cases
-    // above because some RawPointers originate from identified locations. See
-    // the special case for global addressors, which return RawPointer,
-    // above. AddressToPointer is also handled because it results from inlining a
-    // global addressor without folding the AddressToPointer->PointerToAddress.
+    // Access to a Builtin.RawPointer. Treat this like the inductive cases above
+    // because some RawPointers originate from identified locations. See the
+    // special case for global addressors, which return RawPointer,
+    // above. AddressToPointer is also handled because it results from inlining
+    // a global addressor without folding the
+    // AddressToPointer->PointerToAddress.
     //
     // If the inductive search does not find a valid addressor, it will
     // eventually reach the default case that returns in invalid location. This
@@ -765,6 +792,21 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     }
   };
 }
+
+} // end namespace swift
+
+//===----------------------------------------------------------------------===//
+//                              MARK: Verification
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Visit each address accessed by the given memory operation.
+///
+/// This only visits instructions that modify memory in some user-visible way,
+/// which could be considered part of a formal access.
+void visitAccessedAddress(SILInstruction *I,
+                          llvm::function_ref<void(Operand *)> visitor);
 
 } // end namespace swift
 
