@@ -1022,7 +1022,7 @@ static MagicIdentifierLiteralExpr::Kind
 getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
   case tok::pound_file:
-    // TODO: Enable by default at the next source break.
+    // TODO: Enable by default at the next source break. (SR-13199)
     return Opts.EnableConcisePoundFile
          ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
          : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
