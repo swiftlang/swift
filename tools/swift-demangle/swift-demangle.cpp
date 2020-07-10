@@ -17,6 +17,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -223,10 +224,18 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   DCtx.clear();
 }
 
+std::string correctName(llvm::StringRef name) {
+  std::string correctedName = name;
+  if (name.startswith("S") || name.startswith("s") ) {
+    correctedName = std::string("$") + name.str();
+  }
+  return correctedName;
+}
+
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   // Also accept the future mangling prefix.
-  llvm::Regex maybeSymbol("(_T|_?\\$[Ss])[_a-zA-Z0-9$.]+");
+  llvm::Regex maybeSymbol("(_T|_?\\$?[Ss])[_a-zA-Z0-9$.]+");
 
   swift::Demangle::Context DCtx;
   for (std::string mangled; std::getline(std::cin, mangled);) {
@@ -235,7 +244,7 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       llvm::outs() << substrBefore(inputContents, matches.front());
-      demangle(llvm::outs(), matches.front(), DCtx, options);
+      demangle(llvm::outs(), correctName(matches.front()), DCtx, options);
       inputContents = substrAfter(inputContents, matches.front());
     }
 
@@ -268,12 +277,7 @@ int main(int argc, char **argv) {
   } else {
     swift::Demangle::Context DCtx;
     for (llvm::StringRef name : InputNames) {
-      if (name.startswith("S") || name.startswith("s") ) {
-        std::string correctedName = std::string("$") + name.str();
-        demangle(llvm::outs(), correctedName, DCtx, options);
-      } else {
-        demangle(llvm::outs(), name, DCtx, options);
-      }
+      demangle(llvm::outs(), correctName(name), DCtx, options);
       llvm::outs() << '\n';
     }
 
