@@ -89,6 +89,7 @@ template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
 ///        config block, this function returns \c false.
 static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
                                                            SourceFile *SF) {
+  PrettyStackTraceDeclContext trace("getting equivalent decl context for", DC);
   auto *newDC = DC;
   // NOTE: Shortcut for DC->getParentSourceFile() == SF case is not needed
   // because they should be always different.
@@ -115,13 +116,17 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       D = storage;
     }
 
-    if (auto parentSF = dyn_cast<SourceFile>(parentDC))
+    if (auto parentSF = dyn_cast<SourceFile>(parentDC)) {
       N = findIndexInRange(D, parentSF->getTopLevelDecls());
-    else if (auto parentIDC =
-                 dyn_cast<IterableDeclContext>(parentDC->getAsDecl()))
+    } else if (auto parentIDC = dyn_cast_or_null<IterableDeclContext>(
+                   parentDC->getAsDecl())) {
       N = findIndexInRange(D, parentIDC->getMembers());
-    else
+    } else {
+#ifndef NDEBUG
       llvm_unreachable("invalid DC kind for finding equivalent DC (indexpath)");
+#endif
+      return nullptr;
+    }
 
     // Not found in the decl context tree.
     // FIXME: Probably DC is in an inactive #if block.
