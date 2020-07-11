@@ -1,0 +1,29 @@
+// RUN: %empty-directory(%t)
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all %s 2> %t/err.txt
+// RUN: %FileCheck %s < %t/err.txt
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class MyClass {
+  @_hasStorage @_hasInitialValue var i: Int { get set }
+  deinit
+  init()
+}
+
+// CHECK: SIL verification failed: Store escapes address. Store instruction must store into the unique reference.: store->getDest() == use->get()
+sil @simple : $@convention(thin) () -> () {
+bb0:
+  %arg = alloc_stack $MyClass
+  %0 = alloc_ref [stack] [unique] $MyClass
+  store %0 to %arg : $*MyClass
+  set_deallocating %0 : $MyClass
+  dealloc_ref %0 : $MyClass
+  dealloc_ref [stack] %0 : $MyClass
+  dealloc_stack %arg : $*MyClass
+  %14 = tuple ()
+  return %14 : $()
+}

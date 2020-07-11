@@ -421,17 +421,17 @@ public:
                                          Var, hasDynamicLifetime));
   }
 
-  AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
-                               bool objc, bool canAllocOnStack,
+  AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType, bool objc,
+                               bool canAllocOnStack, bool isUnique,
                                ArrayRef<SILType> ElementTypes,
                                ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefInsts expand to function calls and can therefore not be
     // counted towards the function prologue.
     assert(!Loc.isInPrologue());
-    return insert(AllocRefInst::create(getSILDebugLocation(Loc), getFunction(),
-                                       ObjectType, objc, canAllocOnStack,
-                                       ElementTypes, ElementCountOperands,
-                                       C.OpenedArchetypes));
+    return insert(AllocRefInst::create(
+        getSILDebugLocation(Loc), getFunction(), ObjectType, objc,
+        canAllocOnStack, isUnique, ElementTypes, ElementCountOperands,
+        C.OpenedArchetypes));
   }
 
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation Loc, SILValue operand,

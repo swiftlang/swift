@@ -1418,6 +1418,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     unsigned Flags = ListOfValues[0];
     bool isObjC = (bool)(Flags & 1);
     bool canAllocOnStack = (bool)((Flags >> 1) & 1);
+    bool isUnique = (bool)((Flags >> 2) & 1);
     SILType ClassTy =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
     SmallVector<SILValue, 4> Counts;
@@ -1443,7 +1444,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     } else {
       assert(i == NumVals);
       ResultVal = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack,
-                                         TailTypes, Counts);
+                                         isUnique, TailTypes, Counts);
     }
     break;
   }

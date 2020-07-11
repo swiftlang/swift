@@ -1,0 +1,95 @@
+// RUN: %swift %s -emit-sil -module-name run | %FileCheck %s
+
+// The main thing here is to make sure that we can read in an `alloc_ref` with
+// the `[unique]` flag and print it back out without triggering SILVerifier
+// errors.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class MyClass {
+  @_hasStorage @_hasInitialValue var i: Int { get set }
+  deinit
+  init()
+}
+
+// CHECK-LABEL: sil @simple
+// CHECK: alloc_ref [stack] [unique] $MyClass
+// CHECK-LABEL: end sil function 'simple'
+sil @simple : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] [unique] $MyClass
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  %4 = ref_element_addr %0 : $MyClass, #MyClass.i
+  %5 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*Int
+  store %3 to %5 : $*Int
+  end_access %5 : $*Int
+  set_deallocating %0 : $MyClass
+  dealloc_ref %0 : $MyClass
+  dealloc_ref [stack] %0 : $MyClass
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil @store_then_load
+// CHECK: alloc_ref [stack] [unique] $MyClass
+// CHECK-LABEL: end sil function 'store_then_load'
+sil @store_then_load : $@convention(thin) () -> Int {
+bb0:
+  %0 = alloc_ref [unique] [stack] $MyClass
+  debug_value %0 : $MyClass, let, name "self", argno 1
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  %4 = ref_element_addr %0 : $MyClass, #MyClass.i
+  %5 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*Int
+  store %3 to %5 : $*Int
+  end_access %5 : $*Int
+  debug_value %0 : $MyClass, let, name "x"
+  debug_value %0 : $MyClass, let, name "self", argno 1
+  %10 = begin_access [read] [static] [no_nested_conflict] %4 : $*Int
+  %11 = load %10 : $*Int
+  end_access %10 : $*Int
+  set_deallocating %0 : $MyClass
+  debug_value %0 : $MyClass, let, name "self", argno 1
+  debug_value %0 : $MyClass, let, name "self", argno 1
+  dealloc_ref %0 : $MyClass
+  dealloc_ref [stack] %0 : $MyClass
+  return %11 : $Int
+}
+
+// CHECK-LABEL: sil @multi_block
+// CHECK: alloc_ref [stack] [unique] $MyClass
+// CHECK-LABEL: end sil function 'multi_block'
+sil @multi_block : $@convention(thin) (Bool) -> Int {
+bb0(%0 : $Bool):
+  %2 = alloc_ref [unique] [stack] $MyClass
+  debug_value %2 : $MyClass, let, name "self", argno 1
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int (%4 : $Builtin.Int64)
+  %6 = ref_element_addr %2 : $MyClass, #MyClass.i
+  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %6 : $*Int
+  store %5 to %7 : $*Int
+  end_access %7 : $*Int
+  %10 = struct_extract %0 : $Bool, #Bool._value
+  cond_br %10, bb1, bb2
+
+bb1:
+  %13 = begin_access [read] [static] [no_nested_conflict] %6 : $*Int
+  %14 = load %13 : $*Int
+  end_access %13 : $*Int
+  br bb3(%14 : $Int)
+
+bb2:
+  br bb3(%5 : $Int)
+
+bb3(%20 : $Int):
+  set_deallocating %2 : $MyClass
+  dealloc_ref %2 : $MyClass
+  dealloc_ref [stack] %2 : $MyClass
+  return %20 : $Int
+}
+

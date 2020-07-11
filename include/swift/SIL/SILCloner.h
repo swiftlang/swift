@@ -817,10 +817,9 @@ SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   for (SILType OrigElemType : Inst->getTailAllocatedTypes()) {
     ElemTypes.push_back(getOpType(OrigElemType));
   }
-  auto *NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
-                                      getOpType(Inst->getType()),
-                                      Inst->isObjC(), Inst->canAllocOnStack(),
-                                      ElemTypes, CountArgs);
+  auto *NewInst = getBuilder().createAllocRef(
+      getOpLocation(Inst->getLoc()), getOpType(Inst->getType()), Inst->isObjC(),
+      Inst->canAllocOnStack(), Inst->isUniqueReference(), ElemTypes, CountArgs);
   recordClonedInstruction(Inst, NewInst);
 }
 

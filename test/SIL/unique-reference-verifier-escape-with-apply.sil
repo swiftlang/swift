@@ -1,0 +1,32 @@
+// RUN: %empty-directory(%t)
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all %s 2> %t/err.txt
+// RUN: %FileCheck %s < %t/err.txt
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class MyClass {
+  @_hasStorage @_hasInitialValue var i: Int { get set }
+  deinit
+  init()
+}
+
+sil @user : $@convention(thin) (MyClass) -> ()
+
+// CHECK: The following instruction may escape the reference:
+// CHECK:   %{{[0-9]+}} = apply %{{[0-9]+}}(%{{[0-9]+}}) : $@convention(thin) (MyClass) -> ()
+// CHECK: SIL verification failed: Found unkown use of unique reference.
+sil @simple : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] [unique] $MyClass
+  %fn = function_ref @user : $@convention(thin) (MyClass) -> ()
+  apply %fn(%0) : $@convention(thin) (MyClass) -> ()
+  set_deallocating %0 : $MyClass
+  dealloc_ref %0 : $MyClass
+  dealloc_ref [stack] %0 : $MyClass
+  %14 = tuple ()
+  return %14 : $()
+}

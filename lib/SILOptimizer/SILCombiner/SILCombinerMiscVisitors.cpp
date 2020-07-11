@@ -1888,10 +1888,9 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     if (!SILInstanceTy.getClassOrBoundGenericClass())
       return nullptr;
 
-    NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
-                                     ARDI->isObjC(), false,
-                                     ARDI->getTailAllocatedTypes(),
-                                     getCounts(ARDI));
+    NewInst = Builder.createAllocRef(
+        ARDI->getLoc(), SILInstanceTy, ARDI->isObjC(), false, false,
+        ARDI->getTailAllocatedTypes(), getCounts(ARDI));
 
   } else if (isa<SILArgument>(MDVal)) {
 
@@ -1913,10 +1912,9 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       auto SILInstanceTy = SILType::getPrimitiveObjectType(InstanceTy);
       if (!SILInstanceTy.getClassOrBoundGenericClass())
         return nullptr;
-      NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
-                                       ARDI->isObjC(), false,
-                                       ARDI->getTailAllocatedTypes(),
-                                       getCounts(ARDI));
+      NewInst = Builder.createAllocRef(
+          ARDI->getLoc(), SILInstanceTy, ARDI->isObjC(), false, false,
+          ARDI->getTailAllocatedTypes(), getCounts(ARDI));
     }
   }
   if (NewInst && NewInst->getType() != ARDI->getType()) {

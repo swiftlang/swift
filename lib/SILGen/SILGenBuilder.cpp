@@ -208,7 +208,7 @@ SILGenBuilder::createGuaranteedTransformingTerminatorArgument(SILType type) {
 
 ManagedValue SILGenBuilder::createAllocRef(
     SILLocation loc, SILType refType, bool objc, bool canAllocOnStack,
-    ArrayRef<SILType> inputElementTypes,
+    bool isUnique, ArrayRef<SILType> inputElementTypes,
     ArrayRef<ManagedValue> inputElementCountOperands) {
   llvm::SmallVector<SILType, 8> elementTypes(inputElementTypes.begin(),
                                              inputElementTypes.end());
@@ -217,8 +217,9 @@ ManagedValue SILGenBuilder::createAllocRef(
                   std::back_inserter(elementCountOperands),
                   [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
-  AllocRefInst *i = createAllocRef(loc, refType, objc, canAllocOnStack,
-                                   elementTypes, elementCountOperands);
+  AllocRefInst *i =
+      createAllocRef(loc, refType, objc, canAllocOnStack, isUnique,
+                     elementTypes, elementCountOperands);
   return SGF.emitManagedRValueWithCleanup(i);
 }
 

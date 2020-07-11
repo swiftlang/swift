@@ -1510,12 +1510,9 @@ public:
 /// elements, the remaining operands are opened archetype operands.
 class AllocRefInstBase : public AllocationInst {
 protected:
-
-  AllocRefInstBase(SILInstructionKind Kind,
-                   SILDebugLocation DebugLoc,
-                   SILType ObjectType,
-                   bool objc, bool canBeOnStack,
-                   ArrayRef<SILType> ElementTypes);
+  AllocRefInstBase(SILInstructionKind Kind, SILDebugLocation DebugLoc,
+                   SILType ObjectType, bool objc, bool canBeOnStack,
+                   bool isUnique, ArrayRef<SILType> ElementTypes);
 
   SILType *getTypeStorage();
   const SILType *getTypeStorage() const {
@@ -1533,6 +1530,14 @@ public:
 
   void setStackAllocatable(bool OnStack = true) {
     SILInstruction::Bits.AllocRefInstBase.OnStack = OnStack;
+  }
+
+  bool isUniqueReference() const {
+    return SILInstruction::Bits.AllocRefInstBase.uniqueReference;
+  }
+
+  void setUniqueReference(bool isUnique = true) {
+    SILInstruction::Bits.AllocRefInstBase.uniqueReference = isUnique;
   }
 
   ArrayRef<SILType> getTailAllocatedTypes() const {
@@ -1573,22 +1578,20 @@ class AllocRefInst final
   friend AllocRefInstBase;
   friend SILBuilder;
 
-  AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
-               SILType ObjectType,
-               bool objc, bool canBeOnStack,
-               ArrayRef<SILType> ElementTypes,
-               ArrayRef<SILValue> AllOperands)
+  AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F, SILType ObjectType,
+               bool objc, bool canBeOnStack, bool isUnique,
+               ArrayRef<SILType> ElementTypes, ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ObjectType,
-                        objc, canBeOnStack, ElementTypes) {
+                                            objc, canBeOnStack, isUnique,
+                                            ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size());
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());
   }
 
   static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
-                              SILType ObjectType,
-                              bool objc, bool canBeOnStack,
-                              ArrayRef<SILType> ElementTypes,
+                              SILType ObjectType, bool objc, bool canBeOnStack,
+                              bool isUnique, ArrayRef<SILType> ElementTypes,
                               ArrayRef<SILValue> ElementCountOperands,
                               SILOpenedArchetypesState &OpenedArchetypes);
 
@@ -1616,13 +1619,11 @@ class AllocRefDynamicInst final
   friend AllocRefInstBase;
   friend SILBuilder;
 
-  AllocRefDynamicInst(SILDebugLocation DebugLoc,
-                      SILType ty,
-                      bool objc,
+  AllocRefDynamicInst(SILDebugLocation DebugLoc, SILType ty, bool objc,
                       ArrayRef<SILType> ElementTypes,
                       ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ty, objc,
-                                            false, ElementTypes) {
+                                            false, false, ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size() + 1);
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());
