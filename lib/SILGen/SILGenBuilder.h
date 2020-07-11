@@ -143,7 +143,7 @@ public:
 
   using SILBuilder::createAllocRef;
   ManagedValue createAllocRef(SILLocation loc, SILType refType, bool objc,
-                              bool canAllocOnStack,
+                              bool canAllocOnStack, bool isUnique,
                               ArrayRef<SILType> elementTypes,
                               ArrayRef<ManagedValue> elementCountOperands);
   using SILBuilder::createAllocRefDynamic;

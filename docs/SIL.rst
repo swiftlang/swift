@@ -2238,6 +2238,7 @@ alloc_ref
 ::
 
   sil-instruction ::= 'alloc_ref'
+                        ('[' 'unique' ']')?
                         ('[' 'objc' ']')?
                         ('[' 'stack' ']')?
                         ('[' 'tail_elems' sil-type '*' sil-operand ']')*
@@ -2272,6 +2273,11 @@ The count-operand must be of a builtin integer type.
 The instructions ``ref_tail_addr`` and ``tail_addr`` can be used to project
 the tail elements.
 The ``objc`` attribute cannot be used together with ``tail_elems``.
+
+The optional ``unique`` attribute indicates that this is the only reference to
+the allocated object. In other words, the reference will not escape or be
+written to dynamically. This allows access of the object to be static instead
+of dynamic.
 
 alloc_ref_dynamic
 `````````````````

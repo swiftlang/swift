@@ -1153,6 +1153,8 @@ public:
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
       *this << "[stack] ";
+    if (ARI->isUniqueReference())
+      *this << "[unique] ";
     auto Types = ARI->getTailAllocatedTypes();
     auto Counts = ARI->getTailAllocatedCounts();
     for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {

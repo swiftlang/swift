@@ -200,13 +200,13 @@ DeallocStackInst *AllocStackInst::getSingleDeallocStack() const {
 }
 
 AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
-                                   SILDebugLocation Loc,
-                                   SILType ObjectType,
-                                   bool objc, bool canBeOnStack,
+                                   SILDebugLocation Loc, SILType ObjectType,
+                                   bool objc, bool canBeOnStack, bool isUnique,
                                    ArrayRef<SILType> ElementTypes)
     : AllocationInst(Kind, Loc, ObjectType) {
   SILInstruction::Bits.AllocRefInstBase.ObjC = objc;
   SILInstruction::Bits.AllocRefInstBase.OnStack = canBeOnStack;
+  SILInstruction::Bits.AllocRefInstBase.uniqueReference = isUnique;
   SILInstruction::Bits.AllocRefInstBase.NumTailTypes = ElementTypes.size();
   assert(SILInstruction::Bits.AllocRefInstBase.NumTailTypes ==
          ElementTypes.size() && "Truncation");
@@ -214,8 +214,8 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
 }
 
 AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
-                                   SILType ObjectType,
-                                   bool objc, bool canBeOnStack,
+                                   SILType ObjectType, bool objc,
+                                   bool canBeOnStack, bool isUnique,
                                    ArrayRef<SILType> ElementTypes,
                                    ArrayRef<SILValue> ElementCountOperands,
                                    SILOpenedArchetypesState &OpenedArchetypes) {
@@ -233,7 +233,7 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                                         ElementTypes.size());
   auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefInst));
   return ::new (Buffer) AllocRefInst(Loc, F, ObjectType, objc, canBeOnStack,
-                                     ElementTypes, AllOperands);
+                                     isUnique, ElementTypes, AllOperands);
 }
 
 AllocRefDynamicInst *
