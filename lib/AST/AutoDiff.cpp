@@ -422,6 +422,14 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
   }
 }
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const DeclNameRefWithLoc &name) {
+  os << name.Name;
+  if (auto accessorKind = name.AccessorKind)
+    os << '.' << getAccessorLabel(*accessorKind);
+  return os;
+}
+
 bool swift::operator==(const TangentPropertyInfo::Error &lhs,
                        const TangentPropertyInfo::Error &rhs) {
   if (lhs.kind != rhs.kind)
