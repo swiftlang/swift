@@ -418,6 +418,7 @@ namespace {
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
           return this->getBoolValue() == other.getBoolValue();
 
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Constructor):
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::UnknownCase):
           return false;
 
