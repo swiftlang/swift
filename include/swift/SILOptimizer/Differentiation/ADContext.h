@@ -357,7 +357,7 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     return diagnose(loc, diag::autodiff_when_differentiating_function_call);
   }
   }
-  llvm_unreachable("invalid invoker");
+  llvm_unreachable("Invalid invoker kind"); // silences MSVC C4715
 }
 
 } // end namespace autodiff
