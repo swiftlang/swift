@@ -18,29 +18,14 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKCLONER_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKCLONER_H
 
-#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
-#include "swift/SILOptimizer/Differentiation/AdjointValue.h"
-#include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
-#include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
-
-#include "swift/SIL/TypeSubstCloner.h"
-#include "llvm/ADT/DenseMap.h"
-
 namespace swift {
-
-class SILDifferentiabilityWitness;
-class SILBasicBlock;
-class SILFunction;
-class SILInstruction;
-
 namespace autodiff {
 
-class ADContext;
 class VJPCloner;
 
 /// A helper class for generating pullback functions.
 class PullbackCloner final {
-  struct Implementation;
+  class Implementation;
   Implementation &impl;
 
 public:
