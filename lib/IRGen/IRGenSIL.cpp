@@ -1026,6 +1026,9 @@ public:
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *i);
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *i);
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *i);
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *i) {
+    llvm_unreachable("Should never be seen in Lowered SIL");
+  }
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);

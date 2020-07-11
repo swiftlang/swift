@@ -1340,8 +1340,8 @@ public:
           && loweredResultTy.getASTType()->hasDynamicSelfType()) {
         assert(selfMetaTy);
         selfValue = SGF.emitManagedRValueWithCleanup(
-          SGF.B.createUncheckedBitCast(loc, selfValue.forward(SGF),
-                                       loweredResultTy));
+            SGF.B.createUncheckedReinterpretCast(loc, selfValue.forward(SGF),
+                                                 loweredResultTy));
       } else {
         selfValue = SGF.emitManagedRValueWithCleanup(
             SGF.B.createUpcast(loc, selfValue.forward(SGF), loweredResultTy));

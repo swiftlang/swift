@@ -3,7 +3,7 @@
 // This test checks that we classify C++ types as loadable and address-only
 // correctly.
 
-import LoadableTypes
+import TypeClassification
 
 // Tests for individual special members
 

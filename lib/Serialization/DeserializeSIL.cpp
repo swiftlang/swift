@@ -1263,6 +1263,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
   ONEOPERAND_ONETYPE_INST(UncheckedBitwiseCast)
+  ONEOPERAND_ONETYPE_INST(UncheckedValueCast)
   ONEOPERAND_ONETYPE_INST(BridgeObjectToRef)
   ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)

@@ -2523,6 +2523,14 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Differentiable));
 
+  // If the class conforms to Encodable or Decodable, even via an extension,
+  // the CodingKeys enum is synthesized as a member of the type itself.
+  // Force it into existence.
+  (void) evaluateOrDefault(Context.evaluator,
+                           ResolveImplicitMemberRequest{CD,
+                                      ImplicitMemberAction::ResolveCodingKeys},
+                           {});
+
   // If the class has a @main attribute, we need to force synthesis of the
   // $main function.
   (void) evaluateOrDefault(Context.evaluator,
