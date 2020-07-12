@@ -16,17 +16,15 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%[0-9]*]] : $*Size
   var s2 = s
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[GETTER:%.*]] = function_ref @$s16resilient_struct4SizeV1wSivg : $@convention(method) (@in_guaranteed Size) -> Int
-// CHECK:         [[RESULT:%.*]] = apply [[GETTER]]([[SIZE_BOX]])
+// CHECK:         [[RESULT:%.*]] = apply [[GETTER]](%1)
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] [[OTHER_SIZE_BOX]] : $*Size
 // CHECK:         [[SETTER:%.*]] = function_ref @$s16resilient_struct4SizeV1wSivs : $@convention(method) (Int, @inout Size) -> ()
 // CHECK:         apply [[SETTER]]([[RESULT]], [[WRITE]])
   s2.w = s.w
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[FN:%.*]] = function_ref @$s16resilient_struct4SizeV1hSivg : $@convention(method) (@in_guaranteed Size) -> Int
-// CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
+// CHECK:         [[RESULT:%.*]] = apply [[FN]](%1)
   _ = s.h
 
 // CHECK:         apply %2(%0, %1)
@@ -164,13 +162,8 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   // Since the body of a public transparent function might be inlined into
   // other resilience domains, we have to use accessors
 
-// CHECK:         [[SELF:%.*]] = alloc_stack $MySize
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[SELF]]
-
 // CHECK:         [[GETTER:%.*]] = function_ref @$s17struct_resilience6MySizeV1wSivg
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
-// CHECK-NEXT:    destroy_addr [[SELF]]
-// CHECK-NEXT:    dealloc_stack [[SELF]]
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]](%0)
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 }
@@ -205,13 +198,8 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   // Since the body of a public transparent function might be inlined into
   // other resilience domains, we have to use accessors
 
-// CHECK:         [[SELF:%.*]] = alloc_stack $MySize
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[SELF]]
-
 // CHECK:         [[GETTER:%.*]] = function_ref @$s17struct_resilience6MySizeV1wSivg
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
-// CHECK-NEXT:    destroy_addr [[SELF]]
-// CHECK-NEXT:    dealloc_stack [[SELF]]
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]](%0)
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 

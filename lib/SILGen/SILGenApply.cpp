@@ -5185,12 +5185,20 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
   if (shouldLoadBaseAddress()) {
     if (selfParam.isConsumed() ||
         base.getType().isAddressOnly(SGF.F)) {
-      // The load can only be a take if the base is a +1 rvalue.
-      auto shouldTake = IsTake_t(base.hasCleanup());
+      // Unlike arbitrary methods which can modify self via a capture,
+      // *implicit* accessors have no way to modify self, so self is immutable
+      // within the call. This means we don't have to emit a copy of the self
+      // parameter.
+      if (!selfParam.isIndirectInGuaranteed() ||
+          !cast<AccessorDecl>(accessor.getDecl())->isImplicit()) {
+        // The load can only be a take if the base is a +1 rvalue.
+        auto shouldTake = IsTake_t(base.hasCleanup());
 
-      base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
-                                      SGF.getTypeLowering(baseLoweredType),
-                                      SGFContext(), shouldTake);
+        base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
+                                        SGF.getTypeLowering(baseLoweredType),
+                                        SGFContext(), shouldTake);
+      }
+
       return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
     }
 
