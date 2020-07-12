@@ -457,10 +457,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // optimization.
   P.addGlobalOpt();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions.
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-
   // Add the outliner pass (Osize).
   P.addOutliner();
 
@@ -485,6 +481,11 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("HighLevel,Function+EarlyLoopOpt");
   // FIXME: update EagerSpecializer to be a function pass!
   P.addEagerSpecializer();
+
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions.
+  P.addNonTransparentFunctionOwnershipModelEliminator();
+
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
 
   addHighLevelLoopOptPasses(P);
@@ -714,6 +715,8 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   //
   // FIXME: When *not* emitting a .swiftmodule, skip the high-level function
   // pipeline to save compile time.
+  //
+  // NOTE: Ownership is now stripped within this function!
   addHighLevelFunctionPipeline(P);
 
   addHighLevelModulePipeline(P);
