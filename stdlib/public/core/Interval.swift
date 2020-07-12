@@ -130,20 +130,22 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
     
     // An interval must be proper if it's not bounded.
     
-    switch (lowerEndpoint, upperEndpoint) {
-    case let (.bounded(lowerEndpoint), .bounded(upperEndpoint)):
-      isEmpty =
-        lowerEndpoint > upperEndpoint || (isOpen && (
-          (lowerEndpoint == upperEndpoint) ||
-            lowerEndpoint.borders(on: upperEndpoint)
-        ))
-      isDegenerate = !isEmpty && (
-        (isClosed && lowerEndpoint == upperEndpoint) ||
-          (isHalfOpen && lowerEndpoint.borders(on: upperEndpoint)) ||
-          (isOpen && lowerEndpoint.sharesCommonNeighbor(with: upperEndpoint))
+  if case let .bounded(lowerEndpoint) = lowerEndpoint,
+     case let .bounded(upperEndpoint) = upperEndpoint {
+    
+    isEmpty = lowerEndpoint > upperEndpoint || (
+      isOpen && (
+        lowerEndpoint == upperEndpoint
+          || lowerEndpoint.borders(on: upperEndpoint)
       )
-    default: break
-    }
+    )
+    
+    isDegenerate = !isEmpty && (
+      (isClosed && lowerEndpoint == upperEndpoint)
+        || (isHalfOpen && lowerEndpoint.borders(on: upperEndpoint))
+        || (isOpen && lowerEndpoint.sharesCommonNeighbor(with: upperEndpoint))
+    )
+  }
     
     self.isInverse = isInverse
   }
