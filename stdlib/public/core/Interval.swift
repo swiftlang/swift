@@ -253,7 +253,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   
   /// Creates an interval from the given closed range.
   /// - Parameter closedRange: The closed range.
-  init(closedRange: ClosedRange<Member>) {
+  public init(closedRange: ClosedRange<Member>) {
     self.init(
       from: closedRange.lowerBound,
       to: closedRange.upperBound,
@@ -263,7 +263,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   
   /// Creates an interval from the given lower-closed bounded range.
   /// - Parameter range: The lower-closed bounded range.
-  init(range: Range<Member>) {
+  public init(range: Range<Member>) {
     self.init(
       from: range.lowerBound, .inclusive,
       to: range.upperBound, .exclusive
@@ -272,7 +272,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   
   /// Creates an interval from the given lower-bounded partial range.
   /// - Parameter lowerBoundedPartialRange: The lower-bounded partial range.
-  init(lowerBoundedPartialRange: PartialRangeFrom<Member>) {
+  public init(lowerBoundedPartialRange: PartialRangeFrom<Member>) {
     self.init(
       toUnboundedFrom: lowerBoundedPartialRange.lowerBound,
       .inclusive
@@ -283,7 +283,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// range.
   /// - Parameter upperBoundedAndClosedPartialRange: The upper-bounded and
   ///   -closed partial range.
-  init(upperBoundedAndClosedPartialRange: PartialRangeThrough<Member>) {
+  public init(upperBoundedAndClosedPartialRange: PartialRangeThrough<Member>) {
     self.init(
       toUnboundedFrom: upperBoundedAndClosedPartialRange.upperBound,
       .inclusive
@@ -293,7 +293,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// Creates an interval from the given upper-bounded and -open partial range.
   /// - Parameter upperBoundedAndOpenPartialRange: The upper-bounded and -open
   ///   partial range.
-  init(upperBoundedAndOpenPartialRange: PartialRangeUpTo<Member>) {
+  public init(upperBoundedAndOpenPartialRange: PartialRangeUpTo<Member>) {
     self.init(
       toUnboundedFrom: upperBoundedAndOpenPartialRange.upperBound,
       .exclusive
@@ -302,7 +302,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   
   /// Creates an interval from the given unbounded range.
   /// - Parameter unboundedRange: The unbounded range.
-  init(unboundedRange: UnboundedRange) {
+  public init(unboundedRange: UnboundedRange) {
     self = Self.unbounded
   }
   
