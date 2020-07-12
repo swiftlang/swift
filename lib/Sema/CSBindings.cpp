@@ -551,8 +551,11 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       if (result.FullyBound)
         continue;
 
-      // If this variable is in the application projected result type, it is
-      // fully bound.
+      // If this variable is in the application projected result type, mark the
+      // result as `FullyBound` to ensure we delay binding until we've bound
+      // other type variables in the KeyPathApplication constraint. This ensures
+      // we try to bind the key path type first, which can allow us to discover
+      // additional bindings for the result type.
       SmallPtrSet<TypeVariableType *, 4> typeVars;
       findInferableTypeVars(simplifyType(constraint->getThirdType()), typeVars);
       if (typeVars.count(typeVar))
