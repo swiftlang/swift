@@ -608,6 +608,80 @@ extension Interval: CustomStringConvertible where
   
 }
 
+// MARK: - LosslessStringConvertible Conformance
+
+extension Interval: LosslessStringConvertible where
+  Member: LosslessStringConvertible {
+  
+  public init?(_ description: String) {
+    
+    guard
+      let lowerBoundaryCharacter = description.first,
+      let upperBoundaryCharacter = description.last
+    else { return nil }
+    
+    let descriptionSansBoundaryCharacters = description
+      .prefix(upTo: description.endIndex)
+      .suffix(from: description.index(after: description.startIndex))
+      .drop { $0.isWhitespace }
+    
+    let endpointStrings = descriptionSansBoundaryCharacters
+      .split(separator: ",")
+    
+    guard endpointStrings.count == 2 else { return nil }
+    
+    let lowerEndpointString = endpointStrings[0]
+    let upperEndpointString = endpointStrings[1]
+    
+    var lowerBoundary: Boundary
+    var upperBoundary: Boundary
+    
+    var lowerEndpoint: Endpoint
+    var upperEndpoint: Endpoint
+    
+    switch lowerBoundaryCharacter {
+    case "[": lowerBoundary = .closed
+    case "(": lowerBoundary = .open
+    default: return nil
+    }
+    
+    switch upperBoundaryCharacter {
+    case "]": upperBoundary = .closed
+    case ")": upperBoundary = .open
+    default: return nil
+    }
+    
+    switch lowerEndpointString {
+    case "-∞":
+      lowerEndpoint = .unbounded
+    default:
+      guard let lowerEndpointValue = Member(String(lowerEndpointString)) else {
+        return nil
+      }
+      lowerEndpoint = .bounded(lowerEndpointValue)
+    }
+    
+    switch upperEndpointString {
+    case "-∞":
+      upperEndpoint = .unbounded
+    default:
+      guard let upperEndpointValue = Member(String(upperEndpointString)) else {
+        return nil
+      }
+      upperEndpoint = .bounded(upperEndpointValue)
+    }
+    
+    self.init(
+      lowerBoundary: lowerBoundary,
+      lowerEndpoint: lowerEndpoint,
+      upperEndpoint: upperEndpoint,
+      upperBoundary: upperBoundary
+    )
+    
+  }
+  
+}
+
 // MARK: - Comparable Extensions for Testing Proximity between Values
 
 extension Comparable where Self: Strideable {
