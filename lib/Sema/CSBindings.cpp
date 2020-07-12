@@ -547,13 +547,25 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       }
       break;
     }
+    case ConstraintKind::KeyPathApplication: {
+      if (result.FullyBound)
+        continue;
+
+      // If this variable is in the application projected result type, it is
+      // fully bound.
+      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      findInferableTypeVars(simplifyType(constraint->getThirdType()), typeVars);
+      if (typeVars.count(typeVar))
+        result.FullyBound = true;
+
+      break;
+    }
 
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
-    case ConstraintKind::KeyPathApplication:
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
     case ConstraintKind::OpaqueUnderlyingType:
