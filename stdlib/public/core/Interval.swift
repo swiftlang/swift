@@ -402,6 +402,117 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
     newInterval.reverse()
     return newInterval
   }
+  
+  // MARK: - Comparing Intervals
+  
+  /// Returns a Boolean value that indicates whether this interval is a
+  /// subinterval of the given other interval.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval is a subinterval of `other`; otherwise,
+  ///   `false`.
+  public func isSubinterval(of other: Self) -> Bool {
+    self.assumingBothLowerUnboundedIsContained(within: other)
+      && self.assumingBothUpperUnboundedIsContained(within: other)
+  }
+  
+  /// Returns a Boolean value that indicates whether this interval is a strict
+  /// subinterval of the given other interval.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval is a strict subinterval of `other`;
+  ///   otherwise, `false`.
+  public func isStrictSubinterval(of other: Self) -> Bool {
+    (self.isSubinterval(of: other) && self != other) &&
+      // Because empty intervals still contain their lower and upper endpoint
+      // and boundary information, they need special handling.
+      !(self.isEmpty && other.isEmpty)
+  }
+  
+  /// Returns a Boolean value that indicates whether this interval is a
+  /// superinterval of the given other interval.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval is a superinterval of `other`;
+  ///   otherwise, `false`.
+  public func isSuperinterval(of other: Self) -> Bool {
+    other.isSubinterval(of: self)
+  }
+  
+  /// Returns a Boolean value that indicates whether this interval is a strict
+  /// superinterval of the given other interval.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval is a strict superinterval of `other`;
+  ///   otherwise, `false`.
+  public func isStrictSuperinterval(of other: Self) -> Bool {
+    other.isStrictSubinterval(of: self)
+  }
+  
+  /// Returns a Boolean value that indicates whether this interval overlaps the
+  /// given other interval.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval overlaps `other`; otherwise, `false`.
+  public func overlaps(_ other: Self) -> Bool {
+    !(self.fullyPrecedes(other) || self.fullySucceeds(other))
+  }
+  
+  /// Returns a Boolean value that indicates whether this interval fully
+  /// precedes the given other interval.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval fully precedes `other`; otherwise,
+  ///   `false`.
+  public func fullyPrecedes(_ other: Self) -> Bool {
+    guard
+      case let .bounded(selfUpperEndpoint) = self.upperEndpoint,
+      case let .bounded(otherLowerEndpoint) = other.lowerEndpoint
+    else { return false }
+    
+    return selfUpperEndpoint < otherLowerEndpoint
+  }
+  
+  /// Returns a Boolean value that indicates whether this interval fully
+  /// succeeds the given other interval.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval fully succeeds `other`; otherwise,
+  ///   `false`.
+  public func fullySucceeds(_ other: Self) -> Bool {
+    guard
+      case let .bounded(otherUpperEndpoint) = other.upperEndpoint,
+      case let .bounded(selfLowerEndpoint) = self.lowerEndpoint
+    else { return false }
+    
+    return  otherUpperEndpoint < selfLowerEndpoint
+  }
+  
+  /// Returns a Boolean value that indicates whether this interval's lower
+  /// endpoint fully precedes the given other interval's.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval's lower endpoint fully precedes the
+  ///   other's; otherwise, `false`.
+  private func assumingBothUpperUnboundedIsContained(
+    within other: Self
+  ) -> Bool {
+    guard
+      case let .bounded(selfLowerEndpoint) = self.lowerEndpoint,
+      case let .bounded(otherLowerEndpoint) = other.lowerEndpoint
+    else { return other.isLowerUnbounded || self.isLowerBounded }
+    
+    return selfLowerEndpoint >= otherLowerEndpoint
+  }
+  
+  /// Returns a Boolean value that indicates whether this interval's upper
+  /// endpoint fully succeeds the given other interval's.
+  /// - Parameter other: The other interval.
+  /// - Returns: `true` if the interval's upper endpoint fully succeeds the
+  ///   other's; otherwise, `false`.
+  private func assumingBothLowerUnboundedIsContained(
+    within other: Self
+  ) -> Bool {
+    guard
+      case let .bounded(selfUpperEndpoint) = self.upperEndpoint,
+      case let .bounded(otherUpperEndpoint) = other.upperEndpoint
+    else { return other.isUpperUnbounded || self.isUpperBounded }
+    
+    return selfUpperEndpoint <= otherUpperEndpoint
+  }
+  
 }
 
 // MARK: - Comparable Extensions for Testing Proximity between Values
