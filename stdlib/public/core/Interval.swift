@@ -570,7 +570,42 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
     return selfUpperEndpoint <= otherUpperEndpoint
   }
   
-  // MARK:
+}
+
+// MARK: - CustomStringConvertible Conformance
+
+extension Interval: CustomStringConvertible where
+  Member: CustomStringConvertible {
+  
+  public var description: String {
+    
+    let lowerBoundaryCharacter: Character = self.isLowerBounded ? "[" : "("
+    let upperBoundaryCharacter: Character = self.isUpperBounded ? "]" : ")"
+    
+    var lowerEndpointString: String
+    var upperEndpointString: String
+    
+    switch lowerEndpoint {
+    case .unbounded:
+      lowerEndpointString = "-∞"
+    case .bounded(let lowerEndpoint):
+      lowerEndpointString = String(describing: lowerEndpoint)
+    }
+    
+    switch upperEndpoint {
+    case .unbounded:
+      upperEndpointString = "∞"
+    case .bounded(let upperEndpoint):
+      upperEndpointString = String(describing: upperEndpoint)
+    }
+    
+    return """
+      \(lowerBoundaryCharacter)\(lowerEndpointString), \
+      \(upperEndpointString)\(upperBoundaryCharacter)
+      """
+    
+  }
+  
 }
 
 // MARK: - Comparable Extensions for Testing Proximity between Values
