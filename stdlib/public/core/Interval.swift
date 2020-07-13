@@ -575,7 +575,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// Returns a Boolean value indicating whether the given value is contained
   /// within the interval.
   /// - Parameter value: The value to check for containment.
-  /// - Returns: `true` if `value` is contained in the interval; otherwise,
+  /// - Returns: `true` if `value` is contained within the interval; otherwise,
   ///   `false`.
   public func contains(_ value: Member) -> Bool {
     if self.isUnbounded { return true }
@@ -594,6 +594,31 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
     } else { valueIsBelowUpperEndpoint = true }
     
     return valueIsAboveLowerEndpoint && valueIsBelowUpperEndpoint
+  }
+  
+  /// Returns a Boolean value indicating whether a value is included in an
+  /// interval.
+  ///
+  /// You can use the pattern-matching operator (`~=`) to test whether a value
+  /// is included in an interval. The pattern-matching operator is used
+  /// internally in `case` statements for pattern matching. The following
+  /// example uses the `~=` operator to test whether an integer is included in
+  /// an interval of single-digit numbers:
+  ///
+  ///     let chosenNumber = 3
+  ///     if 0<~~<=10 ~= chosenNumber {
+  ///         print("\(chosenNumber) is a single digit.")
+  ///     }
+  ///     // Prints "3 is a single digit."
+  ///
+  /// - Parameters:
+  ///   - pattern: An interval
+  ///   - bound: A value to match against `pattern`.
+  /// - Returns: `true` if `value` is contained within `pattern`; otherwise,
+  ///   `false`.
+  @inlinable
+  public static func ~= (pattern: Self, value: Member) -> Bool {
+    return pattern.contains(value)
   }
   
 }
