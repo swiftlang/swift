@@ -713,7 +713,7 @@ extension Interval: LosslessStringConvertible where
     }
     
     switch upperEndpointString {
-    case "-∞":
+    case "+∞", "∞":
       upperEndpoint = .unbounded
     default:
       guard let upperEndpointValue = Member(String(upperEndpointString)) else {
