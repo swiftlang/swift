@@ -16,6 +16,7 @@
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
 
+// REQUIRES: rdar65251059
 // rdar://problem/65015626
 // XFAIL: asserts
 
