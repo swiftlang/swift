@@ -390,6 +390,28 @@ public:
                             ///> types.
   };
 
+  /// Emit a load from \p addr given the LoadOwnershipQualifier \p qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types and lets one specify an expansion kind that gets passed to any
+  /// copy_value that we create.
+  virtual SILValue emitLoweredLoad(
+      SILBuilder &B, SILLocation loc, SILValue addr,
+      LoadOwnershipQualifier qual,
+      Lowering::TypeLowering::TypeExpansionKind expansionKind) const = 0;
+
+  /// Emit a store of \p value into \p addr given the StoreOwnershipQualifier
+  /// qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types and allows for one to specify an expansion kind that is passed to
+  /// any destroy operations we create if we are asked to assign in non-ossa
+  /// code.
+  virtual void emitLoweredStore(
+      SILBuilder &B, SILLocation loc, SILValue value, SILValue addr,
+      StoreOwnershipQualifier qual,
+      Lowering::TypeLowering::TypeExpansionKind expansionKind) const = 0;
+
   //===--------------------------------------------------------------------===//
   // DestroyValue
   //===--------------------------------------------------------------------===//
