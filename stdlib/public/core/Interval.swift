@@ -570,6 +570,32 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
     return selfUpperEndpoint <= otherUpperEndpoint
   }
   
+  // MARK: - Testing for Membership
+  
+  /// Returns a Boolean value indicating whether the given value is contained
+  /// within the interval.
+  /// - Parameter value: The value to check for containment.
+  /// - Returns: `true` if `value` is contained in the interval; otherwise,
+  ///   `false`.
+  public func contains(_ value: Member) -> Bool {
+    if self.isUnbounded { return true }
+    
+    var valueIsAboveLowerEndpoint: Bool
+    var valueIsBelowUpperEndpoint: Bool
+    
+    if case let .bounded(lowerEndpoint) = lowerEndpoint {
+      valueIsAboveLowerEndpoint = value > lowerEndpoint
+        || (self.isLowerClosed && value == lowerEndpoint)
+    } else { valueIsAboveLowerEndpoint = true }
+    
+    if case let .bounded(upperEndpoint) = upperEndpoint {
+      valueIsBelowUpperEndpoint = value < upperEndpoint
+        || (self.isUpperClosed && value == upperEndpoint)
+    } else { valueIsBelowUpperEndpoint = true }
+    
+    return valueIsAboveLowerEndpoint && valueIsBelowUpperEndpoint
+  }
+  
 }
 
 // MARK: - CustomStringConvertible Conformance
