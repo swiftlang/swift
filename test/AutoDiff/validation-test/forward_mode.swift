@@ -1593,11 +1593,12 @@ ForwardModeTests.test("Division") {
   expectEqual((3 * a - 5 * g) / (a * a), df3(3, g))
 }
 
-// FIXME(SR-13210): Fix forward-mode SIL verification error.
-/* ForwardModeTests.test("Generics") {
+ForwardModeTests.test("Generics") {
   let a = SIMD3<Double>(1, 2, 3)
   let g = SIMD3<Double>(1, 1, 1)
 
+  // FIXME(SR-13210): Fix forward-mode SIL verification error.
+  /*
   func testInit<Scalar, SIMDType: SIMD>(x: Scalar) -> SIMDType
     where SIMDType.Scalar == Scalar,
           SIMDType : Differentiable,
@@ -1610,6 +1611,7 @@ ForwardModeTests.test("Division") {
   let (val1, df1) = valueWithDifferential(at: 10, in: simd3Init)
   expectEqual(SIMD3<Double>(10, 10, 10), val1)
   expectEqual(SIMD3<Double>(5, 5, 5), df1(5))
+  */
 
   // SIMDType + SIMDType
   func testAddition<Scalar, SIMDType: SIMD>(lhs: SIMDType, rhs: SIMDType)
@@ -1661,6 +1663,6 @@ ForwardModeTests.test("Division") {
   let (val4, df4) = valueWithDifferential(at: a, 5, in: simd3Multiply)
   expectEqual(SIMD3<Double>(5, 10, 15), val4)
   expectEqual(a * 3 + g * 5 , df4(g, 3))
-} */ 
+}
 
 runAllTests()
