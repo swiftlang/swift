@@ -8,6 +8,9 @@ public protocol PublicProtoRejected {
   func reqWithoutDefault() // expected-error{{protocol requirement 'reqWithoutDefault()' cannot be declared '@_spi' without a default implementation in a protocol extension}}
 
   @_spi(Private)
+  func reqWithSharedName(_: Int) // expected-error{{protocol requirement 'reqWithSharedName' cannot be declared '@_spi' without a default implementation in a protocol extension}}
+
+  @_spi(Private)
   var property: Int { get set } // expected-error{{protocol requirement 'property' cannot be declared '@_spi' without a default implementation in a protocol extension}}
 
   @_spi(Private)
@@ -26,6 +29,9 @@ public protocol PublicProtoRejected {
 extension PublicProtoRejected {
   @_spi(Private)
   public var propertyWithoutSetter: Int { get { return 42 } }
+
+  @_spi(Private)
+  public func reqWithSharedName(_: String) {}
 }
 
 extension PublicProtoRejected where Self : Equatable {
