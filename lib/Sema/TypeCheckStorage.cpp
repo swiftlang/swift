@@ -1669,7 +1669,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
   case WriteImplKind::Modify:
     return synthesizeModifyCoroutineSetterBody(setter, ctx);
   }
-  llvm_unreachable("bad ReadImplKind");
+  llvm_unreachable("bad WriteImplKind");
 }
 
 static std::pair<BraceStmt *, bool>
@@ -1950,7 +1950,75 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   // All mutable storage requires a setter.
   assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
+  
+  // Copy availability from the accessor we'll synthesize the setter from.
+  SmallVector<Decl *, 2> asAvailableAs;
+  
+  // That could be a property wrapper...
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasAttachedPropertyWrapper()) {
+      // The property wrapper info may not actually link back to a wrapper
+      // implementation, if there was a semantic error checking the wrapper.
+      auto info = var->getAttachedPropertyWrapperTypeInfo(0);
+      if (info.valueVar) {
+        if (auto setter = info.valueVar->getOpaqueAccessor(AccessorKind::Set)) {
+          asAvailableAs.push_back(setter);
+        }
+      }
+    } else if (auto wrapperSynthesizedKind
+                 = var->getPropertyWrapperSynthesizedPropertyKind()) {
+      switch (*wrapperSynthesizedKind) {
+      case PropertyWrapperSynthesizedPropertyKind::Backing:
+        break;
+    
+      case PropertyWrapperSynthesizedPropertyKind::StorageWrapper: {
+        if (auto origVar = var->getOriginalWrappedProperty(wrapperSynthesizedKind)) {
+          // The property wrapper info may not actually link back to a wrapper
+          // implementation, if there was a semantic error checking the wrapper.
+          auto info = origVar->getAttachedPropertyWrapperTypeInfo(0);
+          if (info.projectedValueVar) {
+            if (auto setter
+                = info.projectedValueVar->getOpaqueAccessor(AccessorKind::Set)){
+              asAvailableAs.push_back(setter);
+            }
+          }
+        }
+        break;
+      }
+      }
+    }
+  }
 
+
+  // ...or another accessor.
+  switch (storage->getWriteImpl()) {
+  case WriteImplKind::Immutable:
+    llvm_unreachable("synthesizing setter from immutable storage");
+  case WriteImplKind::Stored:
+  case WriteImplKind::StoredWithObservers:
+  case WriteImplKind::InheritedWithObservers:
+  case WriteImplKind::Set:
+    // Setter's availability shouldn't be externally influenced in these
+    // cases.
+    break;
+      
+  case WriteImplKind::MutableAddress:
+    if (auto addr = storage->getOpaqueAccessor(AccessorKind::MutableAddress)) {
+      asAvailableAs.push_back(addr);
+    }
+    break;
+  case WriteImplKind::Modify:
+    if (auto mod = storage->getOpaqueAccessor(AccessorKind::Modify)) {
+      asAvailableAs.push_back(mod);
+    }
+    break;
+  }
+  
+  if (!asAvailableAs.empty()) {
+    AvailabilityInference::applyInferredAvailableAttrs(
+        setter, asAvailableAs, ctx);
+  }
+  
   finishImplicitAccessor(setter, ctx);
 
   return setter;
