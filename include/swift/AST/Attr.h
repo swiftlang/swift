@@ -1715,13 +1715,6 @@ public:
   }
 };
 
-/// A declaration name with location.
-struct DeclNameRefWithLoc {
-  DeclNameRef Name;
-  DeclNameLoc Loc;
-  Optional<AccessorKind> AccessorKind;
-};
-
 /// Attribute that marks a function as differentiable.
 ///
 /// Examples:
@@ -1845,6 +1838,18 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
   }
+};
+
+/// A declaration name with location.
+struct DeclNameRefWithLoc {
+  /// The declaration name.
+  DeclNameRef Name;
+  /// The declaration name location.
+  DeclNameLoc Loc;
+  /// An optional accessor kind.
+  Optional<AccessorKind> AccessorKind;
+
+  void print(ASTPrinter &Printer) const;
 };
 
 /// The `@derivative(of:)` attribute registers a function as a derivative of

@@ -50,8 +50,11 @@ extension S {
     self + t
   }
 
+  // Note: qualified name base types are not yet serialized and are not printed
+  // when round-tripping.
+
   // CHECK: @transpose(of: instanceMethod, wrt: self)
-  @transpose(of: instanceMethod, wrt: self)
+  @transpose(of: S.instanceMethod, wrt: self)
   static func transposeInstanceMethodWrtSelf(_ other: S, t: S) -> S {
     other + t
   }
