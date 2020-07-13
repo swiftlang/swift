@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: echo 'import SerializedSIL' | %target-swift-frontend -typecheck -module-cache-path %t -I %S -
-// RUN: %target-sil-opt -disable-sil-linking %t/SerializedSIL-*.swiftmodule -module-name SerializedSIL > %t/SerializedSIL.sil
+// RUN: %target-sil-opt %t/SerializedSIL-*.swiftmodule -module-name SerializedSIL > %t/SerializedSIL.sil
 // RUN: %FileCheck %s < %t/SerializedSIL.sil
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t/SerializedSIL.sil
 

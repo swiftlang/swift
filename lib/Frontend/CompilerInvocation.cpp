@@ -1049,9 +1049,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly)
     Opts.StopOptimizationAfterSerialization = true;
 
-  if (Args.hasArg(OPT_sil_merge_partial_modules))
-    Opts.MergePartialModules = true;
-
   // Propagate the typechecker's understanding of
   // -experimental-skip-non-inlinable-function-bodies to SIL.
   Opts.SkipNonInlinableFunctionBodies = TCOpts.SkipNonInlinableFunctionBodies;
@@ -1474,6 +1471,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
+    auto LLVMLTOKind =
+        llvm::StringSwitch<Optional<IRGenLLVMLTOKind>>(A->getValue())
+            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
+            .Case("llvm-full", IRGenLLVMLTOKind::Full)
+            .Default(llvm::None);
+    if (LLVMLTOKind)
+      Opts.LLVMLTOKind = LLVMLTOKind.getValue();
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =

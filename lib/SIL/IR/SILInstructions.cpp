@@ -2217,6 +2217,21 @@ UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                              TypeDependentOperands, Ty);
 }
 
+UncheckedValueCastInst *
+UncheckedValueCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                               SILType Ty, SILFunction &F,
+                               SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               Ty.getASTType());
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(UncheckedValueCastInst));
+  return ::new (Buffer)
+      UncheckedValueCastInst(DebugLoc, Operand, TypeDependentOperands, Ty);
+}
+
 UncheckedAddrCastInst *
 UncheckedAddrCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                               SILType Ty, SILFunction &F,

@@ -44,10 +44,12 @@
 
 #include <algorithm> // required for std::min
 
+using namespace swift;
+
 #if defined(__APPLE__)
 
 SWIFT_RUNTIME_STDLIB_API
-void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   arc4random_buf(buf, nbytes);
 }
 
@@ -55,7 +57,7 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 #warning TODO: Test swift_stdlib_random on Windows
 
 SWIFT_RUNTIME_STDLIB_API
-void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   if (nbytes > ULONG_MAX) {
     fatalError(0, "Fatal error: %zd exceeds ULONG_MAX\n", nbytes);
   }
@@ -79,7 +81,7 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 }())
 
 SWIFT_RUNTIME_STDLIB_API
-void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
     __swift_ssize_t actual_nbytes = -1;
 

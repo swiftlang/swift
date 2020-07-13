@@ -554,9 +554,6 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
   MetaVarName<"<250>">,
   HelpText<"Controls the aggressiveness of loop unrolling">;
 
-def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
-  HelpText<"Merge SIL from all partial swiftmodules into the final module">;
-
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
   

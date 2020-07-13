@@ -388,6 +388,7 @@ static void collectPossibleCalleesByQualifiedLookup(
                           decls))
     return;
 
+  llvm::DenseMap<std::pair<char, CanType>, size_t> known;
   auto *baseNominal = baseInstanceTy->getAnyNominal();
   for (auto *VD : decls) {
     if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
@@ -420,27 +421,43 @@ static void collectPossibleCalleesByQualifiedLookup(
         DC.getParentModule(), VD,
         VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
     auto fnType = declaredMemberType.subst(subs);
-    if (!fnType)
+    if (!fnType || !fnType->is<AnyFunctionType>())
       continue;
 
-    if (fnType->is<AnyFunctionType>()) {
-      // If we are calling to typealias type,
-      if (isa<SugarType>(baseInstanceTy.getPointer())) {
-        auto canBaseTy = baseInstanceTy->getCanonicalType();
-        fnType = fnType.transform([&](Type t) -> Type {
-          if (t->getCanonicalType()->isEqual(canBaseTy))
-            return baseInstanceTy;
-          return t;
-        });
-      }
-      auto semanticContext = SemanticContextKind::CurrentNominal;
-      if (baseNominal &&
-          VD->getDeclContext()->getSelfNominalTypeDecl() != baseNominal)
-        semanticContext = SemanticContextKind::Super;
-
-      candidates.emplace_back(fnType->castTo<AnyFunctionType>(), VD,
-                              semanticContext);
+    // If we are calling on a type alias type, replace the canonicalized type
+    // in the function type with the type alias.
+    if (isa<SugarType>(baseInstanceTy.getPointer())) {
+      auto canBaseTy = baseInstanceTy->getCanonicalType();
+      fnType = fnType.transform([&](Type t) -> Type {
+        if (t->getCanonicalType()->isEqual(canBaseTy))
+          return baseInstanceTy;
+        return t;
+      });
     }
+
+    auto semanticContext = SemanticContextKind::CurrentNominal;
+    if (baseNominal &&
+        VD->getDeclContext()->getSelfNominalTypeDecl() != baseNominal)
+      semanticContext = SemanticContextKind::Super;
+
+    FunctionTypeAndDecl entry(fnType->castTo<AnyFunctionType>(), VD,
+                              semanticContext);
+    // Remember the index of the entry.
+    auto knownResult = known.insert(
+        {{VD->isStatic(), fnType->getCanonicalType()}, candidates.size()});
+    if (knownResult.second) {
+      candidates.push_back(entry);
+      continue;
+    }
+
+    auto idx = knownResult.first->second;
+    if (AvailableAttr::isUnavailable(candidates[idx].Decl) &&
+        !AvailableAttr::isUnavailable(VD)) {
+      // Replace the previously found "unavailable" with the "available" one.
+      candidates[idx] = entry;
+    }
+
+    // Otherwise, skip redundant results.
   }
 }
 

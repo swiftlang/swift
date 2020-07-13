@@ -597,7 +597,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     fn->setSerialized(IsSerialized_t(isSerialized));
 
-    if (SILMod.getOptions().MergePartialModules)
+    // If the serialized function comes from the same module, we're merging
+    // modules, and can update the the linkage directly. This is needed to
+    // correctly update the linkage for forward declarations to entities defined
+    // in another file of the same module – we want to ensure the linkage
+    // reflects the fact that the entity isn't really external and shouldn't be
+    // dropped from the resulting merged module.
+    if (getFile()->getParentModule() == SILMod.getSwiftModule())
       fn->setLinkage(linkage);
 
     // Don't override the transparency or linkage of a function with
@@ -1257,6 +1263,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
   ONEOPERAND_ONETYPE_INST(UncheckedBitwiseCast)
+  ONEOPERAND_ONETYPE_INST(UncheckedValueCast)
   ONEOPERAND_ONETYPE_INST(BridgeObjectToRef)
   ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)

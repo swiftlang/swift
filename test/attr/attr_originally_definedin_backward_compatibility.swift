@@ -1,6 +1,10 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
+// rdar://problem/64298096
+// XFAIL: OS=ios && CPU=arm64
+// rdar://problem/65399527
+// XFAIL: OS=ios && CPU=armv7s
 //
 // RUN: %empty-directory(%t)
 //

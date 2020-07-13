@@ -1797,12 +1797,12 @@ public:
     checkGenericParams(ED);
 
     // Check for circular inheritance of the raw type.
-    (void)ED->hasCircularRawValue();
+    (void) ED->hasCircularRawValue();
+
+    TypeChecker::checkDeclAttributes(ED);
 
     for (Decl *member : ED->getMembers())
       visit(member);
-
-    TypeChecker::checkDeclAttributes(ED);
 
     checkInheritanceClause(ED);
 
@@ -1845,12 +1845,12 @@ public:
 
     installCodingKeysIfNecessary(SD);
 
+    TypeChecker::checkDeclAttributes(SD);
+
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
     TypeChecker::checkPatternBindingCaptures(SD);
-
-    TypeChecker::checkDeclAttributes(SD);
 
     checkInheritanceClause(SD);
 
@@ -1974,6 +1974,8 @@ public:
     // Force creation of an implicit destructor, if any.
     (void) CD->getDestructor();
 
+    TypeChecker::checkDeclAttributes(CD);
+
     for (Decl *Member : CD->getEmittedMembers())
       visit(Member);
 
@@ -2084,8 +2086,6 @@ public:
       }
     }
 
-    TypeChecker::checkDeclAttributes(CD);
-
     checkInheritanceClause(CD);
 
     checkAccessControl(CD);
@@ -2105,11 +2105,11 @@ public:
     // Check for circular inheritance within the protocol.
     (void)PD->hasCircularInheritedProtocols();
 
+    TypeChecker::checkDeclAttributes(PD);
+
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
-
-    TypeChecker::checkDeclAttributes(PD);
 
     checkAccessControl(PD);
 
@@ -2428,6 +2428,8 @@ public:
 
     checkGenericParams(ED);
 
+    TypeChecker::checkDeclAttributes(ED);
+
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
@@ -2435,7 +2437,6 @@ public:
 
     TypeChecker::checkConformancesInContext(ED);
 
-    TypeChecker::checkDeclAttributes(ED);
     checkAccessControl(ED);
 
     checkExplicitAvailability(ED);

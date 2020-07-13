@@ -2431,11 +2431,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalFunction(ctx) &&
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
-      auto origName = attr->getOriginalFunctionName().Name.getBaseName();
+      auto origDeclNameRef = attr->getOriginalFunctionName();
+      auto origName = origDeclNameRef.Name.getBaseName();
       IdentifierID origNameId = S.addDeclBaseNameRef(origName);
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction(ctx));
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
+      uint8_t rawAccessorKind = 0;
+      auto origAccessorKind = origDeclNameRef.AccessorKind;
+      if (origAccessorKind)
+        rawAccessorKind = uint8_t(getStableAccessorKind(*origAccessorKind));
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
       SmallVector<bool, 4> paramIndicesVector;
@@ -2443,7 +2448,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         paramIndicesVector.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origDeclID, derivativeKind, paramIndicesVector);
+          origAccessorKind.hasValue(), rawAccessorKind, origDeclID,
+          derivativeKind, paramIndicesVector);
       return;
     }
 
