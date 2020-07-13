@@ -4539,8 +4539,9 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.contextualPurpose = contextualPurpose;
   expression.convertType = convertType;
   expression.pattern = nullptr;
-  expression.wrappedVar = nullptr;
-  expression.innermostWrappedValueInit = nullptr;
+  expression.propertyWrapper.wrappedVar = nullptr;
+  expression.propertyWrapper.innermostWrappedValueInit = nullptr;
+  expression.propertyWrapper.hasInitialWrappedValue = false;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
   expression.initialization.patternBinding = nullptr;
@@ -4564,11 +4565,14 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   auto outermostWrapperAttr = wrapperAttrs.front();
   Expr *backingInitializer;
   if (Expr *initializer = expression.expression) {
+    if (!isa<PropertyWrapperValuePlaceholderExpr>(initializer)) {
+      expression.propertyWrapper.hasInitialWrappedValue = true;
+    }
     // Form init(wrappedValue:) call(s).
     Expr *wrappedInitializer = buildPropertyWrapperWrappedValueCall(
         singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false,
         [&](ApplyExpr *innermostInit) {
-          expression.innermostWrappedValueInit = innermostInit;
+          expression.propertyWrapper.innermostWrappedValueInit = innermostInit;
         });
     if (!wrappedInitializer)
       return;
@@ -4609,7 +4613,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
 
   // Note that we have applied to property wrapper, so we can adjust
   // the initializer type later.
-  expression.wrappedVar = singleVar;
+  expression.propertyWrapper.wrappedVar = singleVar;
   expression.expression = backingInitializer;
   expression.convertType = {outermostWrapperAttr->getTypeRepr(),
                             outermostWrapperAttr->getType()};

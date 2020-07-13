@@ -1463,13 +1463,13 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 PropertyWrapperValuePlaceholderExpr *
 PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
-                                            Type ty, Expr *wrappedValue) {
+                                            Type ty, Expr *wrappedValue,
+                                            bool isAutoClosure) {
   auto *placeholder =
       new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
 
-  return new (ctx) PropertyWrapperValuePlaceholderExpr(range, ty,
-                                                       placeholder,
-                                                       wrappedValue);
+  return new (ctx) PropertyWrapperValuePlaceholderExpr(
+      range, ty, placeholder, wrappedValue, isAutoClosure);
 }
 
 const ParamDecl *DefaultArgumentExpr::getParamDecl() const {

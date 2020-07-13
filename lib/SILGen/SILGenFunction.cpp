@@ -852,7 +852,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
       auto var = cast<VarDecl>(function.getDecl());
       auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
       auto param = params->get(0);
-      opaqueValue.emplace(*this, wrappedInfo.underlyingValue,
+      auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+      opaqueValue.emplace(*this, placeholder->getOpaqueValuePlaceholder(),
                           maybeEmitValueOfLocalVarDecl(param));
 
       assert(value == wrappedInfo.initializeFromOriginal);

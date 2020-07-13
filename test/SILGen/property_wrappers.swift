@@ -313,7 +313,7 @@ struct UseWrapperWithNonEscapingAutoclosure {
 
   // Memberwise init should take an Int arg, not a closure
   // CHECK: // UseWrapperWithNonEscapingAutoclosure.init(foo:)
-  // CHECK: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3fooACSi_tcfC : $@convention(method) (Int, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
+  // CHECK: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3fooACSiyXK_tcfC : $@convention(method) (@noescape @callee_guaranteed () -> Int, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
 }
 
 struct UseStatic {
@@ -423,6 +423,21 @@ struct CompositionWithAutoclosure {
   // In the memberwise init, only p1 should be a closure - p2 and p3 should be just Int
   // CompositionWithAutoclosure.init(p1:p2:p3:)
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers26CompositionWithAutoclosureV2p12p22p3ACSiyXA_S2itcfC : $@convention(method) (@owned @callee_guaranteed () -> Int, Int, Int, @thin CompositionWithAutoclosure.Type) -> CompositionWithAutoclosure
+}
+
+@propertyWrapper
+struct WrapperWithAutoclosureAndExtraArgs<V> {
+  var wrappedValue: V
+  init(wrappedValue: @autoclosure @escaping () -> V, key: String) {
+    self.wrappedValue = wrappedValue()
+  }
+}
+
+struct UseAutoclosureWrapperWithExtraArgs {
+  @WrapperWithAutoclosureAndExtraArgs(key: "")
+  var value = 10
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers34UseAutoclosureWrapperWithExtraArgsV5valueSivpfP : $@convention(thin) (@owned @callee_guaranteed () -> Int) -> WrapperWithAutoclosureAndExtraArgs<Int>
 }
 
 // Observers with non-default mutatingness.

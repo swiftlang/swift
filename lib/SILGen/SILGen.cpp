@@ -772,8 +772,8 @@ static void emitDelayedFunction(SILGenModule &SGM,
               ->isPropertyMemberwiseInitializedWithWrappedType()) {
         auto wrapperInfo =
             originalProperty->getPropertyWrapperBackingPropertyInfo();
-        assert(wrapperInfo.originalInitialValue);
-        init = wrapperInfo.originalInitialValue;
+        assert(wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue());
+        init = wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue();
       }
     }
 

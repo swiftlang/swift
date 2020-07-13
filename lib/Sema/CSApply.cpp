@@ -5489,8 +5489,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
      target->shouldInjectWrappedValuePlaceholder(apply);
 
   auto injectWrappedValuePlaceholder = [&](Expr *arg) -> Expr * {
-    auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(ctx,
-        arg->getSourceRange(), cs.getType(arg), arg);
+    auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
+        ctx, arg->getSourceRange(), cs.getType(arg),
+        target->propertyWrapperHasInitialWrappedValue() ? arg : nullptr,
+        isa<AutoClosureExpr>(arg));
     cs.cacheType(placeholder);
     cs.cacheType(placeholder->getOpaqueValuePlaceholder());
     shouldInjectWrappedValuePlaceholder = false;
@@ -5690,19 +5692,15 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
           locator.withPathElement(ConstraintLocator::AutoclosureResult));
 
       if (shouldInjectWrappedValuePlaceholder) {
-        // If init(wrappedValue:) takes an escaping autoclosure, then we want
+        // If init(wrappedValue:) takes an autoclosure, then we want
         // the effect of autoclosure forwarding of the placeholder
         // autoclosure. The only way to do this is to call the placeholder
         // autoclosure when passing it to the init.
-        if (!closureType->isNoEscape()) {
-          auto *placeholder = injectWrappedValuePlaceholder(
-              cs.buildAutoClosureExpr(arg, closureType));
-          arg = CallExpr::createImplicit(ctx, placeholder, {}, {});
-          arg->setType(closureType->getResult());
-          cs.cacheType(arg);
-        } else {
-          arg = injectWrappedValuePlaceholder(arg);
-        }
+        auto *placeholder = injectWrappedValuePlaceholder(
+            cs.buildAutoClosureExpr(arg, closureType));
+        arg = CallExpr::createImplicit(ctx, placeholder, {}, {});
+        arg->setType(closureType->getResult());
+        cs.cacheType(arg);
       }
 
       convertedArg = cs.buildAutoClosureExpr(arg, closureType);
