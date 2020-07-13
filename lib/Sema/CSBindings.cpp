@@ -120,17 +120,33 @@ isUnviableDefaultType(Type defaultType,
 
 void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
+  auto isDirectRequirement = [&](Constraint *constraint) -> bool {
+    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
+      auto *repr = cs.getRepresentative(typeVar);
+      return repr == TypeVar;
+    }
+
+    return false;
+  };
+
   // If we have any literal constraints, check whether there is already a
   // binding that provides a type that conforms to that literal protocol. In
   // such cases, don't add the default binding suggestion because the existing
   // suggestion is better.
   //
   // Note that ordering is important when it comes to bindings, we'd like to
-  // add any "direct" default types first to attempt them before transitive ones.
-  llvm::SmallMapVector<ProtocolDecl *, bool, 4> literalProtocols;
+  // add any "direct" default types first to attempt them before transitive
+  // ones.
+  //
+  // Key is a literal protocol requirement, Value indicates whether (first)
+  // given protocol is a direct requirement, and (second) whether it has been
+  // covered by an existing binding.
+  llvm::SmallMapVector<ProtocolDecl *, std::pair<bool, bool>, 4>
+      literalProtocols;
   for (auto *constraint : Protocols) {
     if (constraint->getKind() == ConstraintKind::LiteralConformsTo)
-      literalProtocols.insert({constraint->getProtocol(), false});
+      literalProtocols.insert({constraint->getProtocol(),
+                               {isDirectRequirement(constraint), false}});
   }
 
   for (auto &binding : Bindings) {
@@ -153,7 +169,8 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     bool requiresUnwrap = false;
     for (auto &entry : literalProtocols) {
       auto *protocol = entry.first;
-      bool &isCovered = entry.second;
+      bool isDirectRequirement = entry.second.first;
+      bool &isCovered = entry.second.second;
 
       if (isCovered)
         continue;
@@ -168,6 +185,12 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
           isCovered = true;
           break;
         }
+
+        // If this literal protocol is not a direct requirement it
+        // would be possible to change optionality while inferring
+        // bindings for a supertype, so this hack doesn't apply.
+        if (!isDirectRequirement)
+          break;
 
         // If we're allowed to bind to subtypes, look through optionals.
         // FIXME: This is really crappy special case of computing a reasonable
@@ -193,7 +216,7 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
   // binding it can't provide a default type.
   auto isUnviableForDefaulting = [&literalProtocols](ProtocolDecl *protocol) {
     auto literal = literalProtocols.find(protocol);
-    return literal == literalProtocols.end() || literal->second;
+    return literal == literalProtocols.end() || literal->second.second;
   };
 
   for (auto *constraint : Protocols) {
@@ -225,10 +248,8 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
     // We need to figure out whether this is a direct conformance
     // requirement or inferred transitive one to identify binding
     // kind correctly.
-    auto *conformingVar = cs.getRepresentative(
-        constraint->getFirstType()->castTo<TypeVariableType>());
     addPotentialBinding({defaultType,
-                         TypeVar == conformingVar
+                         isDirectRequirement(constraint)
                              ? AllowedBindingKind::Subtypes
                              : AllowedBindingKind::Supertypes,
                          constraint});
