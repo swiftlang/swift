@@ -485,6 +485,24 @@ infix operator   |=: AssignmentPrecedence, BinaryInteger
 // from users.
 infix operator ~>
 
+// TODO: Rename interval operators to be for like range operators?
+// `<=~<=` -> `∙∙∙`
+// `<=~~<` -> `∙∙<`
+// `<~~<=` -> `<∙∙`
+// `<~~~<` -> `<∙<`
+// `~~~<=` -> `∙∙∙`
+// `~~~~<` -> `∙∙<`
+// `<=~~~` -> `∙∙∙`
+// `<~~~~` -> `<∙∙`
+// `>=~>=` -> ?
+// `>~~>=` -> `>∙∙`
+// `>=~~>` -> `∙∙>`
+// `>~~~>` -> `>∙>`
+// `>=~~~` -> ?
+// `>~~~~` -> `>∙∙`
+// `~~~>=` -> ?
+// `~~~~>` -> `∙∙>`
+
 // The use of "~"s instead of "." is due to the rules over how dots are
 // interpreted in operators.
 
