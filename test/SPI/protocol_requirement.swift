@@ -75,3 +75,24 @@ extension PublicProto {
   @_spi(Private)
   public init() { }
 }
+
+@_spi(Private)
+public protocol SPIProtocol {
+  @_spi(Private)
+  func reqWithoutDefault()
+
+  @_spi(Private)
+  var property: Int { get set }
+
+  @_spi(Private)
+  var propertyWithoutSetter: Int { get set }
+
+  @_spi(Private)
+  subscript(index: Int) -> Int { get set }
+
+  @_spi(Private)
+  init()
+
+  @_spi(Private)
+  static var staticProperty: Int { get }
+}
