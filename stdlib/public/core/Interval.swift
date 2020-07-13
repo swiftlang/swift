@@ -641,6 +641,87 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
     return pattern.contains(value)
   }
   
+  // MARK: - Converting Intervals
+  
+  /// Returns the interval of indices described by another interval within the
+  /// given collection.
+  ///
+  /// You can use the `relative(to:)` method to convert an interval, which could
+  /// be half- or fully unbounded, into a bounded interval. The _new_ bounded
+  /// lower endpoint will have a closed boundary, and upper endpoint open. The
+  /// following example uses this method to convert `(-∞, 4)` into `[0, 4)`,
+  /// using an array instance to bound the interval with a lower endpoint.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
+  ///     let upToFour = ~~~~<4
+  ///
+  ///     let i1 = upToFour.relative(to: numbers)
+  ///     // i1 == 0<=~~<4
+  ///
+  /// The `i1` interval is bounded on the lower boundary by `0` because that is
+  /// the starting index of the `numbers` array. When the collection passed to
+  /// `relative(to:)` starts with a different index, that index is used as the
+  /// lower endpoint instead. The next example creates a slice of `numbers`
+  /// starting at index `2`, and then uses the slice with `relative(to:)` to
+  /// convert `upToFour` to a bounded interval.
+  ///
+  ///     let numbersSuffix = numbers[2<=~~~]
+  ///     // numbersSuffix == [30, 40, 50, 60, 70]
+  ///
+  ///     let i2 = upToFour.relative(to: numbersSuffix)
+  ///     // i2 == 2<=~~<4
+  ///
+  /// Use this method only if you need the bounded interval it produces. To
+  /// access a slice of a collection using an interval, use the collection's
+  /// generic subscript that uses an interval as its parameter.
+  ///
+  ///     let numbersPrefix = numbers[upToFour]
+  ///     // numbersPrefix == [10, 20, 30, 40]
+  ///
+  /// - Parameter collection: The collection to evaluate this interval in
+  ///   relation to.
+  /// - Returns: An interval suitable for slicing `collection`. The returned
+  ///   interval is _not_ guaranteed to be inside the bounds of `collection`.
+  ///   Callers should apply the same preconditions to the return value as they
+  ///   would to an interval provided directly by the user.
+  @inlinable
+  public func relative<C: Collection>(
+    to collection: C
+  ) -> Interval<Member> where C.Index == Member {
+    
+    if self.isBounded { return self }
+    
+    var newLowerBoundary: Boundary
+    var newUpperBoundary: Boundary
+    
+    var newLowerEndpoint: Endpoint
+    var newUpperEndpoint: Endpoint
+    
+    if self.isLowerUnbounded {
+      newLowerEndpoint = .bounded(collection.startIndex)
+      newLowerBoundary = .closed
+    } else {
+      newLowerEndpoint = self.lowerEndpoint
+      newLowerBoundary = self.lowerBoundary
+    }
+    
+    if self.isUpperUnbounded {
+      newUpperEndpoint = .bounded(collection.endIndex)
+      newUpperBoundary = .open
+    } else {
+      newUpperEndpoint = self.upperEndpoint
+      newUpperBoundary = self.upperBoundary
+    }
+    
+    return Interval(
+      lowerBoundary: newLowerBoundary,
+      lowerEndpoint: newLowerEndpoint,
+      upperEndpoint: newUpperEndpoint,
+      upperBoundary: newUpperBoundary
+    )
+    
+  }
+  
 }
 
 // MARK: - CustomStringConvertible Conformance
