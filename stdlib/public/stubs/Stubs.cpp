@@ -337,7 +337,11 @@ swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
   return Pos;
 #else
   size_t Capacity = 0;
-  return getline((char **)LinePtr, &Capacity, stdin);
+  int result;
+  do {
+    result = getline((char **)LinePtr, &Capacity, stdin);
+  } while (result < 0 && errno == EINTR);
+  return result;
 #endif
 }
 
