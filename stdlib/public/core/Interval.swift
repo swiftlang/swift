@@ -253,6 +253,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   
   /// Creates an interval from the given closed range.
   /// - Parameter closedRange: The closed range.
+  @inlinable
   public init(closedRange: ClosedRange<Member>) {
     self.init(
       from: closedRange.lowerBound,
@@ -263,6 +264,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   
   /// Creates an interval from the given lower-closed bounded range.
   /// - Parameter range: The lower-closed bounded range.
+  @inlinable
   public init(range: Range<Member>) {
     self.init(
       from: range.lowerBound, .inclusive,
@@ -272,6 +274,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   
   /// Creates an interval from the given lower-bounded partial range.
   /// - Parameter lowerBoundedPartialRange: The lower-bounded partial range.
+  @inlinable
   public init(lowerBoundedPartialRange: PartialRangeFrom<Member>) {
     self.init(
       toUnboundedFrom: lowerBoundedPartialRange.lowerBound,
@@ -283,6 +286,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// range.
   /// - Parameter upperBoundedAndClosedPartialRange: The upper-bounded and
   ///   -closed partial range.
+  @inlinable
   public init(upperBoundedAndClosedPartialRange: PartialRangeThrough<Member>) {
     self.init(
       toUnboundedFrom: upperBoundedAndClosedPartialRange.upperBound,
@@ -293,6 +297,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// Creates an interval from the given upper-bounded and -open partial range.
   /// - Parameter upperBoundedAndOpenPartialRange: The upper-bounded and -open
   ///   partial range.
+  @inlinable
   public init(upperBoundedAndOpenPartialRange: PartialRangeUpTo<Member>) {
     self.init(
       toUnboundedFrom: upperBoundedAndOpenPartialRange.upperBound,
@@ -302,6 +307,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   
   /// Creates an interval from the given unbounded range.
   /// - Parameter unboundedRange: The unbounded range.
+  @inlinable
   public init(unboundedRange: UnboundedRange) {
     self = Self.unbounded
   }
@@ -401,6 +407,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// endpoints of _I_.
   ///
   /// An empty interval's interior is an empty interior.
+  @inlinable
   public var interior: Self? {
 //    guard self.isProper else { return nil }
     // An empty interval's interior is an empty interval.
@@ -419,6 +426,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// The closure of an interval _I_ is the smallest closed interval that
   /// contains _I_; it is also the set _I_ augmented with its finite endpoints.
   ///
+  @inlinable
   public var closure: Self? {
     guard self.isBounded else { return nil }
     
@@ -445,6 +453,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// Reverses the interval's iterating direction.
   ///
   /// It's only effective if `Member` conforms to `Strideable`.
+  @inlinable
   public mutating func reverse() {
     isInverse.toggle()
   }
@@ -454,6 +463,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// It's only effective if `Member` conforms to `Strideable`.
   ///
   /// - Returns: A copy of the interval with its iterating direction reversed.
+  @inlinable
   func reversed() -> Self {
     var newInterval = self
     newInterval.reverse()
@@ -467,6 +477,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval is a subinterval of `other`; otherwise,
   ///   `false`.
+  @inlinable
   public func isSubinterval(of other: Self) -> Bool {
     self.assumingBothLowerUnboundedIsContained(within: other)
       && self.assumingBothUpperUnboundedIsContained(within: other)
@@ -477,6 +488,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval is a strict subinterval of `other`;
   ///   otherwise, `false`.
+  @inlinable
   public func isStrictSubinterval(of other: Self) -> Bool {
     (self.isSubinterval(of: other) && self != other) &&
       // Because empty intervals still contain their lower and upper endpoint
@@ -489,6 +501,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval is a superinterval of `other`;
   ///   otherwise, `false`.
+  @inlinable
   public func isSuperinterval(of other: Self) -> Bool {
     other.isSubinterval(of: self)
   }
@@ -498,6 +511,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval is a strict superinterval of `other`;
   ///   otherwise, `false`.
+  @inlinable
   public func isStrictSuperinterval(of other: Self) -> Bool {
     other.isStrictSubinterval(of: self)
   }
@@ -506,6 +520,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// given other interval.
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval overlaps `other`; otherwise, `false`.
+  @inlinable
   public func overlaps(_ other: Self) -> Bool {
     !(self.fullyPrecedes(other) || self.fullySucceeds(other))
   }
@@ -515,6 +530,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval fully precedes `other`; otherwise,
   ///   `false`.
+  @inlinable
   public func fullyPrecedes(_ other: Self) -> Bool {
     guard
       case let .bounded(selfUpperEndpoint) = self.upperEndpoint,
@@ -529,6 +545,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval fully succeeds `other`; otherwise,
   ///   `false`.
+  @inlinable
   public func fullySucceeds(_ other: Self) -> Bool {
     guard
       case let .bounded(otherUpperEndpoint) = other.upperEndpoint,
@@ -543,6 +560,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval's lower endpoint fully precedes the
   ///   other's; otherwise, `false`.
+  @inlinable
   private func assumingBothUpperUnboundedIsContained(
     within other: Self
   ) -> Bool {
@@ -559,6 +577,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter other: The other interval.
   /// - Returns: `true` if the interval's upper endpoint fully succeeds the
   ///   other's; otherwise, `false`.
+  @inlinable
   private func assumingBothLowerUnboundedIsContained(
     within other: Self
   ) -> Bool {
@@ -577,6 +596,7 @@ public struct Interval<Member: Hashable & Comparable>: Hashable {
   /// - Parameter value: The value to check for containment.
   /// - Returns: `true` if `value` is contained within the interval; otherwise,
   ///   `false`.
+  @inlinable
   public func contains(_ value: Member) -> Bool {
     if self.isUnbounded { return true }
     
@@ -664,6 +684,7 @@ extension Interval: CustomStringConvertible where
 extension Interval: LosslessStringConvertible where
   Member: LosslessStringConvertible {
   
+  @inlinable
   public init?(_ description: String) {
     
     guard
@@ -740,6 +761,7 @@ extension Comparable where Self: Strideable {
   /// - Parameter other: The given other value.
   /// - Returns: `true` if the 2 values are right next to each other, `false`
   ///   otherwise.
+  @inlinable
   public func borders(on other: Self) -> Bool {
     self.separates(from: other, byDegrees: 1)
   }
@@ -749,6 +771,7 @@ extension Comparable where Self: Strideable {
   /// - Returns: `true` if the 2 values are both right next to a 3rd value,
   ///   `false` otherwise.
   /// - Note: The 2 values could be equal, if the function returns true.
+  @inlinable
   public func sharesCommonNeighbor(with other: Self) -> Bool {
     self.separates(from: other, byDegrees: 2) || self == other
   }
@@ -759,6 +782,7 @@ extension Comparable where Self: Strideable {
   ///   - other: The given other value.
   ///   - degrees: The Bacon number to test for.
   /// - Returns: `true` if the Bacon number is correct, `false` otherwise.
+  @inlinable
   public func separates(
     from other: Self, byDegrees degrees: Self.Stride
   ) -> Bool {
@@ -771,6 +795,7 @@ extension Comparable {
   /// - Parameter other: The given other value.
   /// - Returns: `true` if the 2 values are right next to each other, `false`
   ///   otherwise.
+  @inlinable
   public func borders(on other: Self) -> Bool { false }
   
   /// Tests if the value shares a common neighbor with the given other value.
@@ -778,6 +803,7 @@ extension Comparable {
   /// - Returns: `true` if the 2 values are both right next to a 3rd value,
   ///   `false` otherwise.
   /// - Note: The 2 values could be equal, if the function returns true.
+  @inlinable
   public func sharesCommonNeighbor(with other: Self) -> Bool {
     self == other
   }
