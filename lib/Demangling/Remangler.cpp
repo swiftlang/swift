@@ -2515,6 +2515,11 @@ void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
 }
 
+void Remangler::mangleMetadataInstantiationCache(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MK";
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.

@@ -2119,6 +2119,9 @@ void Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node) {
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
 }
+void Remangler::mangleMetadataInstantiationCache(Node *node) {
+  unreachable("unsupported");
+}
 
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNodeOld(NodePointer node) {

@@ -1919,11 +1919,16 @@ namespace {
           llvm::ArrayType::get(IGM.Int8PtrTy,
                                swift::NumGenericMetadataPrivateDataWords);
         auto privateDataInit = llvm::Constant::getNullValue(privateDataTy);
+        
+        IRGenMangler mangler;
+        auto symbolName =
+          mangler.mangleProtocolConformanceInstantiationCache(Conformance);
+        
         auto privateData =
           new llvm::GlobalVariable(IGM.Module, privateDataTy,
                                    /*constant*/ false,
                                    llvm::GlobalVariable::InternalLinkage,
-                                   privateDataInit, "");
+                                   privateDataInit, symbolName);
         B.addRelativeAddress(privateData);
       }
     }
