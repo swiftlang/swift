@@ -50,8 +50,7 @@
 
 namespace swift {
 
-/// Get the base address of a formal access by stripping access markers and
-/// borrows.
+/// Get the base address of a formal access by stripping access markers.
 ///
 /// If \p v is an address, then the returned value is also an address
 /// (pointer-to-address is not stripped).
