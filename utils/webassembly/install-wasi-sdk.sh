@@ -6,7 +6,7 @@ SOURCE_PATH="$( cd "$(dirname $0)/../../../" && pwd  )"
 
 cd $SOURCE_PATH
 
-WASI_SDK_URL="https://github.com/swiftwasm/wasi-sdk/releases/download/0.2.1-swiftwasm/dist-$2-latest.zip"
+WASI_SDK_URL="https://github.com/swiftwasm/wasi-sdk/releases/download/0.2.2-swiftwasm/dist-$2.zip"
 
 [ ! -e dist-wasi-sdk.zip ] && \
   wget -O dist-wasi-sdk.zip $WASI_SDK_URL

@@ -36,7 +36,7 @@ fi
 
 cmake --version
 
-$SWIFT_PATH/utils/webassembly/install-wasi-sdk.sh linux ubuntu
+$SWIFT_PATH/utils/webassembly/install-wasi-sdk.sh linux ubuntu-18.04
 
 # Link wasm32-wasi-unknown to wasm32-wasi because clang finds crt1.o from sysroot
 # with os and environment name `getMultiarchTriple`.
