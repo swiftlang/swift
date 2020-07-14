@@ -1296,78 +1296,11 @@ public:
     // reference does not escape but, the SILVerifier doesn't know about it,
     // then the right thing to do is fail.
     if (ARI->isUniqueReference()) {
-      SmallVector<Operand *, 8> usesToCheck;
-      usesToCheck.append(ARI->use_begin(), ARI->use_end());
-
-      while (!usesToCheck.empty()) {
-        auto *use = usesToCheck.pop_back_val();
-        auto *user = use->getUser();
-
-        if (auto br = dyn_cast<BranchInst>(user)) {
-          unsigned i = 0;
-          for (auto arg : br->getArgs()) {
-            if (arg == use->get())
-              break;
-            i++;
-          }
-          auto arg = br->getDestBB()->getArgument(i);
-          usesToCheck.append(arg->use_begin(), arg->use_end());
-          continue;
-        }
-        
-        if (auto apply = FullApplySite::isa(user)) {
-          if (!apply.getReferencedFunctionOrNull()) {
-            llvm::dbgs()
-                << "Could not find the referenced function of the following full apply site: \n";
-            apply.getInstruction()->print(llvm::dbgs());
-            require(false, "Found unkown use of unique reference.");
-          }
-
-          auto referencedFn = apply.getReferencedFunctionOrNull();
-          unsigned i = 0;
-          for (auto arg : apply.getArguments()) {
-            if (arg == use->get())
-              break;
-            i++;
-          }
-          auto arg = referencedFn->getArgument(i);
-          usesToCheck.append(arg->use_begin(), arg->use_end());
-          continue;
-        }
-        
-        if (isa<StrongReleaseInst>(user)) {
-          auto *destructor = getDestructor(ARI);
-          require(destructor, "Cannot find destructor for reference type while checking strong_release does not escape the unique reference.");
-          auto *selfInDestructor = destructor->begin()->getArgument(0);
-          usesToCheck.append(selfInDestructor->use_begin(),
-                             selfInDestructor->use_end());
-          continue;
-        }
-
-        // These instructions are OK.
-        if (isa<LoadInst>(user) || isa<DeallocRefInst>(user) ||
-            isa<EndAccessInst>(user) || isa<SetDeallocatingInst>(user) ||
-            isa<DebugValueInst>(user) || isa<DebugValueAddrInst>(user) ||
-            isa<ClassMethodInst>(user) || isa<StrongRetainInst>(user))
-          continue;
-
-        if (auto *store = dyn_cast<StoreInst>(user)) {
-          require(store->getDest() == use->get(),
-                  "Store escapes address. Store instruction must store into "
-                  "the unique reference.");
-          continue;
-        }
-
-        if (isa<BeginAccessInst>(user) || isa<RefElementAddrInst>(user)) {
-          auto *userVal = cast<SingleValueInstruction>(user);
-          usesToCheck.append(userVal->use_begin(), userVal->use_end());
-          continue;
-        }
-
-        llvm::dbgs()
-            << "The following instruction may escape the reference: \n";
-        user->print(llvm::dbgs());
-        require(false, "Found unkown use of unique reference.");
+      Optional<StringRef> isNotUnique =
+          isReferenceUnique(ARI, /*verbose=*/true);
+      if (isNotUnique) {
+        llvm::dbgs() << isNotUnique.getValue();
+        require(false, "Failing due to above error.");
       }
     }
   }

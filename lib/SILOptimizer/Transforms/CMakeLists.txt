@@ -20,6 +20,7 @@ target_sources(swiftSILOptimizer PRIVATE
   Devirtualizer.cpp
   DifferentiabilityWitnessDevirtualizer.cpp
   GenericSpecializer.cpp
+  MarkReferenceUnique.cpp
   MergeCondFail.cpp
   Outliner.cpp
   ObjectOutliner.cpp

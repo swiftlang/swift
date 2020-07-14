@@ -683,10 +683,93 @@ SILFunction *swift::getDestructor(AllocRefInstBase *ARI) {
   // analyze it since it could be swapped out from under us at runtime.
   if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     LLVM_DEBUG(llvm::dbgs() << "        Found Objective-C destructor. Can't "
-               "analyze!\n");
+                               "analyze!\n");
     return nullptr;
   }
 
   return Fn;
 }
 
+Optional<StringRef> swift::isReferenceUnique(AllocRefInstBase *ref,
+                                             bool verbose) {
+  SmallVector<Operand *, 8> usesToCheck;
+  usesToCheck.append(ref->use_begin(), ref->use_end());
+
+  while (!usesToCheck.empty()) {
+    auto *use = usesToCheck.pop_back_val();
+    auto *user = use->getUser();
+
+    if (auto br = dyn_cast<BranchInst>(user)) {
+      unsigned i = 0;
+      for (auto arg : br->getArgs()) {
+        if (arg == use->get())
+          break;
+        i++;
+      }
+      auto arg = br->getDestBB()->getArgument(i);
+      usesToCheck.append(arg->use_begin(), arg->use_end());
+      continue;
+    }
+
+    if (auto apply = FullApplySite::isa(user)) {
+      if (!apply.getReferencedFunctionOrNull()) {
+        if (verbose) {
+          llvm::dbgs() << "Could not find the referenced function of the "
+                          "following full apply site: \n";
+          apply.getInstruction()->print(llvm::dbgs());
+        }
+        return {"Found unkown use of unique reference."};
+      }
+
+      auto referencedFn = apply.getReferencedFunctionOrNull();
+      unsigned i = 0;
+      for (auto arg : apply.getArguments()) {
+        if (arg == use->get())
+          break;
+        i++;
+      }
+      auto arg = referencedFn->getArgument(i);
+      usesToCheck.append(arg->use_begin(), arg->use_end());
+      continue;
+    }
+
+    if (isa<StrongReleaseInst>(user)) {
+      auto *destructor = getDestructor(ref);
+      if (!destructor)
+        return {"Cannot find destructor for reference type while checking "
+                "strong_release does not escape the unique reference."};
+      auto *selfInDestructor = destructor->begin()->getArgument(0);
+      usesToCheck.append(selfInDestructor->use_begin(),
+                         selfInDestructor->use_end());
+      continue;
+    }
+
+    // These instructions are OK.
+    if (isa<LoadInst>(user) || isa<DeallocRefInst>(user) ||
+        isa<EndAccessInst>(user) || isa<SetDeallocatingInst>(user) ||
+        isa<DebugValueInst>(user) || isa<DebugValueAddrInst>(user) ||
+        isa<ClassMethodInst>(user) || isa<StrongRetainInst>(user))
+      continue;
+
+    if (auto *store = dyn_cast<StoreInst>(user)) {
+      if (store->getDest() != use->get())
+        return {"Store escapes address. Store instruction must store into "
+                "the unique reference."};
+      continue;
+    }
+
+    if (isa<BeginAccessInst>(user) || isa<RefElementAddrInst>(user)) {
+      auto *userVal = cast<SingleValueInstruction>(user);
+      usesToCheck.append(userVal->use_begin(), userVal->use_end());
+      continue;
+    }
+
+    if (verbose) {
+      llvm::dbgs() << "The following instruction may escape the reference: \n";
+      user->print(llvm::dbgs());
+    }
+    return {"Found unkown use of unique reference."};
+  }
+
+  return None;
+}

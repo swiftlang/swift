@@ -279,6 +279,8 @@ IRGEN_PASS(LoadableByAddress, "loadable-address",
      "SIL Large Loadable type by-address lowering.")
 PASS(MandatorySILLinker, "mandatory-linker",
      "Deserialize all referenced SIL functions that are shared or transparent")
+PASS(MarkReferenceUnique, "mark-reference-unique",
+     "If possible, mark alloc_ref instruction with 'unique' flag")
 PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 PASS(RawSILInstLowering, "raw-sil-inst-lowering",

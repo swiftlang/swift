@@ -355,6 +355,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   //  Do a round of CFG simplification, followed by peepholes, then
   //  more CFG simplification.
 
+  P.addMarkReferenceUnique();
+
   // Jump threading can expose opportunity for SILCombine (enum -> is_enum_tag->
   // cond_br).
   P.addJumpThreadSimplifyCFG();
@@ -628,6 +630,8 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   // Sometimes stack promotion can catch cases only at this late stage of the
   // pipeline, after FunctionSignatureOpts.
   P.addStackPromotion();
+
+  P.addMarkReferenceUnique();
 
   // Optimize overflow checks.
   P.addRedundantOverflowCheckRemoval();

@@ -175,6 +175,12 @@ SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
 
 SILFunction *getDestructor(AllocRefInstBase *ari);
 
+/// \returns None if \p ref is unique. Otherwise, returns an error message in
+/// the form of a string. If \p verbose is true, will print out diagnostics,
+/// such as the reason for failure. This is helpful when the funciton is being
+/// used by the SILVerifier.
+Optional<StringRef> isReferenceUnique(AllocRefInstBase *ref, bool verbose);
+
 } // end namespace swift
 
 #endif
