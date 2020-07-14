@@ -78,7 +78,7 @@ void simple_display(llvm::raw_ostream &out, const TBDGenDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const TBDGenDescriptor &desc);
 
 using TBDFileAndSymbols =
-    std::pair<llvm::MachO::InterfaceFile, llvm::StringSet<>>;
+    std::pair<llvm::MachO::InterfaceFile, std::vector<std::string>>;
 
 /// Computes the TBD file and public symbols for a given module or file.
 class GenerateTBDRequest

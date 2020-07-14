@@ -89,7 +89,7 @@ struct TBDGenOptions {
   }
 };
 
-llvm::StringSet<> getPublicSymbols(TBDGenDescriptor desc);
+std::vector<std::string> getPublicSymbols(TBDGenDescriptor desc);
 
 void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                   const TBDGenOptions &opts);

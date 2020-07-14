@@ -1031,7 +1031,7 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
 }
 
 void IRGenerator::emitGlobalTopLevel(
-    const llvm::StringSet<> &linkerDirectives) {
+    const std::vector<std::string> &linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
@@ -1051,8 +1051,8 @@ void IRGenerator::emitGlobalTopLevel(
     CurrentIGMPtr IGM = getGenModule(wt.getProtocol()->getDeclContext());
     ensureRelativeSymbolCollocation(wt);
   }
-  for (auto &entry: linkerDirectives) {
-    createLinkerDirectiveVariable(*PrimaryIGM, entry.getKey());
+  for (auto &directive: linkerDirectives) {
+    createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
     Decl *decl = v.getDecl();
