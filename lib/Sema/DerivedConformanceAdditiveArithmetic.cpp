@@ -60,25 +60,32 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   if (auto *SF = DC->getParentSourceFile())
     if (!isAdditiveArithmeticConformanceDerivationEnabled(*SF))
       return false;
-  // Nominal type must be a struct. (No stored properties is okay.)
-  auto *structDecl = dyn_cast<StructDecl>(nominal);
-  if (!structDecl)
-    return false;
-  // Must not have any `let` stored properties with an initial value.
-  // - This restriction may be lifted later with support for "true" memberwise
-  //   initializers that initialize all stored properties, including initial
-  //   value information.
-  if (hasLetStoredPropertyWithInitialValue(nominal))
-    return false;
-  // All stored properties must conform to `AdditiveArithmetic`.
+  // Nominal type must be an enum or struct.
   auto &C = nominal->getASTContext();
   auto *proto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (v->getInterfaceType()->hasError())
+
+  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    auto result = DerivedConformance::allAssociatedValuesConformToProtocol(DC, enumDecl, proto);
+    llvm::errs() << "CAN DERIVE? " << result << "\n";
+    return result;
+  }
+
+  if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+    // Must not have any `let` stored properties with an initial value.
+    // - This restriction may be lifted later with support for "true" memberwise
+    //   initializers that initialize all stored properties, including initial
+    //   value information.
+    if (hasLetStoredPropertyWithInitialValue(nominal))
       return false;
-    auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, proto, DC);
-  });
+    // All stored properties must conform to `AdditiveArithmetic`.
+    return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
+      if (v->getInterfaceType()->hasError())
+        return false;
+      auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
+      return (bool)TypeChecker::conformsToProtocol(varType, proto, DC);
+    });
+  }
+  return false;
 }
 
 // Synthesize body for math operator.
@@ -217,6 +224,20 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
+
+#if 0
+  if (isa<EnumDecl>(nominal)) {
+    llvm::errs() << "DERIVING ZERO FOR AN ENUM\n";
+    ValueDecl *fatalErrorDecl = nullptr;
+    auto *fatalErrorDRE =
+        new (C) DeclRefExpr(fatalErrorDecl, DeclNameLoc(), /*Implicit*/ true);
+    auto *callExpr =
+        CallExpr::createImplicit(C, fatalErrorDRE, {}, {});
+    auto *braceStmt =
+        BraceStmt::create(C, SourceLoc(), {callExpr}, SourceLoc(), true);
+    return std::pair<BraceStmt *, bool>(braceStmt, false);
+  }
+#endif
 
   auto *memberwiseInitDecl = nominal->getEffectiveMemberwiseInitializer();
   assert(memberwiseInitDecl && "Memberwise initializer must exist");
