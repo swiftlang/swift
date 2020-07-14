@@ -1501,24 +1501,21 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
 }
 
 static GeneratedModule
-generateIR(const IRGenOptions &IRGenOpts,
+generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            std::unique_ptr<SILModule> SM,
            const PrimarySpecificPaths &PSPs,
            StringRef OutputFilename, ModuleOrSourceFile MSF,
            llvm::GlobalVariable *&HashGlobal,
-           ArrayRef<std::string> parallelOutputFilenames,
-           llvm::StringSet<> &LinkerDirectives) {
+           ArrayRef<std::string> parallelOutputFilenames) {
   if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return performIRGeneration(IRGenOpts, *SF,
+    return performIRGeneration(*SF, IRGenOpts, TBDOpts,
                                std::move(SM), OutputFilename, PSPs,
                                SF->getPrivateDiscriminator().str(),
-                               &HashGlobal,
-                               &LinkerDirectives);
+                               &HashGlobal);
   } else {
-    return performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
+    return performIRGeneration(MSF.get<ModuleDecl *>(), IRGenOpts, TBDOpts,
                                std::move(SM), OutputFilename, PSPs,
-                               parallelOutputFilenames,
-                               &HashGlobal, &LinkerDirectives);
+                               parallelOutputFilenames, &HashGlobal);
   }
 }
 
@@ -1663,19 +1660,6 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
                      OutputFilename, Instance.getStatsReporter());
 }
 
-static llvm::StringSet<>
-collectLinkerDirectives(const CompilerInvocation &Invocation,
-                        ModuleOrSourceFile MSF) {
-  auto tbdOpts = Invocation.getTBDGenOptions();
-  tbdOpts.LinkerDirectivesOnly = true;
-  if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return getPublicSymbols(TBDGenDescriptor::forFile(SF, tbdOpts));
-  } else {
-    return getPublicSymbols(
-        TBDGenDescriptor::forModule(MSF.get<ModuleDecl *>(), tbdOpts));
-  }
-}
-
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
@@ -1783,18 +1767,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Instance, std::move(SM), MSF, observer, ReturnValue);
 
-  llvm::StringSet<> LinkerDirectives;
-  collectLinkerDirectives(Invocation, MSF, LinkerDirectives);
-  // Don't proceed to IRGen if collecting linker directives failed.
-  if (Context.hadError())
-    return true;
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
       opts.InputsAndOutputs.copyOutputFilenames();
   llvm::GlobalVariable *HashGlobal;
   auto IRModule = generateIR(
-      IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, HashGlobal,
-      ParallelOutputFilenames, LinkerDirectives);
+      IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
+      OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
 
   // Just because we had an AST error it doesn't mean we can't performLLVM.
   bool HadError = Instance.getASTContext().hadError();
