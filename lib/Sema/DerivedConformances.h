@@ -50,6 +50,14 @@ public:
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;
 
+  /// Returns the VarDecl of each stored property in the given struct whose type
+  /// does not conform to a protocol.
+  /// \p theStruct The struct whose stored properties should be checked.
+  /// \p protocol The protocol being requested.
+  /// \return The VarDecl of each stored property whose type does not conform.
+  static SmallVector<VarDecl *, 3> storedPropertiesNotConformingToProtocol(
+      DeclContext *DC, StructDecl *theStruct, ProtocolDecl *protocol);
+
   /// True if the type can implicitly derive a conformance for the given
   /// protocol.
   ///
@@ -79,6 +87,30 @@ public:
   static void tryDiagnoseFailedDerivation(DeclContext *DC,
                                           NominalTypeDecl *nominal,
                                           ProtocolDecl *protocol);
+
+  /// Diagnose any members which do not conform to the protocol for which
+  /// we were trying to synthesize the conformance to.
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  ///
+  /// \param protocol The protocol with requirements we would like to diagnose
+  /// derivation failures for
+  static void diagnoseAnyNonConformingMemberTypes(DeclContext *DC,
+                                                  NominalTypeDecl *nominal,
+                                                  ProtocolDecl *protocol);
+
+  /// Diagnose the declaration for which we were trying to synthesize
+  /// the conformance for, if the synthesis is not supported for that
+  /// declaration.
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  ///
+  /// \param protocol The protocol with requirements we would like to diagnose
+  /// derivation failures for
+  static void diagnoseIfSynthesisUnsupportedForDecl(NominalTypeDecl *nominal,
+                                                    ProtocolDecl *protocol);
 
   /// Determine the derivable requirement that would satisfy the given
   /// requirement, if there is one.
