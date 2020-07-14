@@ -1,4 +1,6 @@
 // RUN: not --crash %target-swift-frontend -emit-ir %s
+// rdar://problem/65241930
+// UNSUPPORTED: asan
 
 protocol TreeProtocol {
 
