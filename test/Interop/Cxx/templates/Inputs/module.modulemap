@@ -8,3 +8,7 @@ module DeclWithDefinition {
 module DeclWithDefinitionOfMembers {
   header "decl-with-definition-of-members.h"
 }
+
+module CanonicalTypes {
+  header "canonical-types.h"
+}
