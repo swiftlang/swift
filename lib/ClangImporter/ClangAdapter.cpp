@@ -77,11 +77,26 @@ importer::getDefinitionForClangTypeDecl(const clang::Decl *D) {
   return None;
 }
 
+static bool isInLocalScope(const clang::Decl *D) {
+  const clang::DeclContext *LDC = D->getLexicalDeclContext();
+  while (true) {
+    if (LDC->isFunctionOrMethod())
+      return true;
+    if (!isa<clang::TagDecl>(LDC))
+      return false;
+    if (const auto *CRD = dyn_cast<clang::CXXRecordDecl>(LDC))
+      if (CRD->isLambda())
+        return true;
+    LDC = LDC->getLexicalParent();
+  }
+  return false;
+}
+
 const clang::Decl *
 importer::getFirstNonLocalDecl(const clang::Decl *D) {
   D = D->getCanonicalDecl();
   auto iter = llvm::find_if(D->redecls(), [](const clang::Decl *next) -> bool {
-    return !next->isInLocalScope();
+    return !isInLocalScope(next);
   });
   if (iter == D->redecls_end())
     return nullptr;
