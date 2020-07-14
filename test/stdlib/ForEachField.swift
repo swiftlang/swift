@@ -15,7 +15,6 @@
 
 @_spi(Reflection) import Swift
 import StdlibUnittest
-import Foundation
 
 struct TestStruct {
   var int = 0
@@ -102,6 +101,9 @@ struct ContainsObject {
   var obj: TestClass
 }
 
+#if _runtime(_ObjC)
+import Foundation
+
 class NSObjectSubclass: NSObject {
   var point: (Double, Double)
 
@@ -111,6 +113,7 @@ class NSObjectSubclass: NSObject {
 }
 
 class EmptyNSObject: NSObject {}
+#endif
 
 @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
 func checkFields<T>(
@@ -347,6 +350,7 @@ if #available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *) {
     ])
   }
 
+  #if _runtime(_ObjC)
   tests.test("NSObjectSubclass") {
     expectTrue(_forEachField(of: NSObjectSubclass.self, options: .classType) {
       charPtr, _, type, _ in
@@ -360,6 +364,7 @@ if #available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *) {
       _, _, _, _ in true
     })
   }
+  #endif
 
   tests.test("withTypeEncoding") {
     expectEqual("{@}", getTypeEncoding(ContainsObject.self))
