@@ -19,4 +19,12 @@ OperatorsTestSuite.test("LoadableIntWrapper.plus") {
   expectEqual(19, result.value)
 }
 
+OperatorsTestSuite.test("AddressOnlyIntWrapper.plus") {
+  var lhs = AddressOnlyIntWrapper(42)
+  let rhs = AddressOnlyIntWrapper(23)
+
+  let result = lhs - rhs
+  expectEqual(19, result.value)
+}
+
 runAllTests()
