@@ -93,3 +93,54 @@ bb3(%20 : $Int):
   return %20 : $Int
 }
 
+// CHECK-LABEL: sil @test_multiblock_with_branch
+// CHECK: alloc_ref [stack] [unique] $MyClass
+// CHECK-LABEL: end sil function 'test_multiblock_with_branch'
+sil @test_multiblock_with_branch : $@convention(thin) (Bool, Bool) -> Int {
+bb0(%0 : $Bool, %1 : $Bool):
+  %4 = alloc_ref [stack] [unique] $Foo
+  %6 = integer_literal $Builtin.Int64, 0
+  %7 = struct $Int (%6 : $Builtin.Int64)
+  %8 = ref_element_addr %4 : $Foo, #Foo.x
+  %9 = begin_access [modify] [dynamic] [no_nested_conflict] %8 : $*Int
+  store %7 to %9 : $*Int
+  end_access %9 : $*Int
+  %12 = struct_extract %0 : $Bool, #Bool._value
+  cond_br %12, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2:
+  %15 = integer_literal $Builtin.Int64, 1
+  %16 = struct $Int (%15 : $Builtin.Int64)
+  %19 = begin_access [modify] [static] [no_nested_conflict] %8 : $*Int
+  store %16 to %19 : $*Int
+  end_access %19 : $*Int
+  br bb3
+
+bb3:
+  %23 = struct_extract %1 : $Bool, #Bool._value
+  cond_br %23, bb4, bb5
+
+bb4:
+  %25 = alloc_ref $Foo
+  %27 = ref_element_addr %25 : $Foo, #Foo.x
+  %28 = begin_access [modify] [dynamic] [no_nested_conflict] %27 : $*Int
+  store %7 to %28 : $*Int
+  end_access %28 : $*Int
+  // strong_release %4 : $Foo
+  br bb6(%25 : $Foo)
+
+bb5:
+  br bb6(%4 : $Foo)
+
+bb6(%34 : $Foo):
+  %36 = ref_element_addr %34 : $Foo, #Foo.x
+  %37 = begin_access [read] [dynamic] [no_nested_conflict] %36 : $*Int
+  %38 = load %37 : $*Int
+  end_access %37 : $*Int
+  // strong_release %34 : $Foo
+  dealloc_ref [stack] %4 : $Foo
+  return %38 : $Int
+}

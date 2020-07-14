@@ -1303,7 +1303,17 @@ public:
         auto *use = usesToCheck.pop_back_val();
         auto *user = use->getUser();
 
-        // TODO: Phi arguments.
+        if (auto br = dyn_cast<BranchInst>(user)) {
+          unsigned i = 0;
+          for (auto arg : br->getArgs()) {
+            if (arg == use->get())
+              break;
+            i++;
+          }
+          auto arg = br->getDestBB()->getArgument(i);
+          usesToCheck.append(arg->use_begin(), arg->use_end());
+          continue;
+        }
 
         // These instructions are OK.
         if (isa<LoadInst>(user) || isa<DeallocRefInst>(user) ||
