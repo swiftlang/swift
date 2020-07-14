@@ -2833,9 +2833,12 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "protocol %2, preventing synthesized conformance "
      "of %3 to %2",
      (unsigned, Type, Type, Type))
-NOTE(classes_automatic_protocol_synthesis,none,
-    "automatic synthesis of '%0' is not supported for classes",
-    (StringRef))
+NOTE(automatic_protocol_synthesis_unsupported,none,
+    "automatic synthesis of '%0' is not supported for %select{classes|structs}1",
+    (StringRef, unsigned))
+NOTE(comparable_synthesis_raw_value_not_allowed, none,
+     "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
+     (Type, Type, Type))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
