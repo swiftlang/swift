@@ -144,3 +144,31 @@ bb6(%34 : $Foo):
   dealloc_ref [stack] %4 : $Foo
   return %38 : $Int
 }
+
+sil [noinline] @user : $@convention(thin) (@guaranteed Foo) -> Int {
+bb0(%0 : $Foo):
+  %2 = ref_element_addr %0 : $Foo, #Foo.x
+  %3 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Int
+  %4 = load %3 : $*Int
+  end_access %3 : $*Int
+  return %4 : $Int
+}
+
+// CHECK-LABEL: sil @test_apply
+// CHECK: alloc_ref [stack] [unique] $MyClass
+// CHECK-LABEL: end sil function 'test_apply'
+sil @test_apply : $@convention(thin) (Bool, Bool) -> Int {
+bb0(%0 : $Bool, %1 : $Bool):
+  %2 = alloc_ref [unique] $Foo
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int (%4 : $Builtin.Int64)
+  %6 = ref_element_addr %2 : $Foo, #Foo.x
+  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %6 : $*Int
+  store %5 to %7 : $*Int
+  end_access %7 : $*Int
+  // function_ref user(_:)
+  %10 = function_ref @user : $@convention(thin) (@guaranteed Foo) -> Int
+  %11 = apply %10(%2) : $@convention(thin) (@guaranteed Foo) -> Int
+  // strong_release %2 : $Foo
+  return %11 : $Int
+}

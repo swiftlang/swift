@@ -1314,11 +1314,32 @@ public:
           usesToCheck.append(arg->use_begin(), arg->use_end());
           continue;
         }
+        
+        if (auto apply = FullApplySite::isa(user)) {
+          if (!apply.getReferencedFunctionOrNull()) {
+            llvm::dbgs()
+                << "Could not find the referenced function of the following full apply site: \n";
+            apply.getInstruction()->print(llvm::dbgs());
+            require(false, "Found unkown use of unique reference.");
+          }
+
+          auto referencedFn = apply.getReferencedFunctionOrNull();
+          unsigned i = 0;
+          for (auto arg : apply.getArguments()) {
+            if (arg == use->get())
+              break;
+            i++;
+          }
+          auto arg = referencedFn->getArgument(i);
+          usesToCheck.append(arg->use_begin(), arg->use_end());
+          continue;
+        }
 
         // These instructions are OK.
         if (isa<LoadInst>(user) || isa<DeallocRefInst>(user) ||
             isa<EndAccessInst>(user) || isa<SetDeallocatingInst>(user) ||
-            isa<DebugValueInst>(user) || isa<DebugValueAddrInst>(user))
+            isa<DebugValueInst>(user) || isa<DebugValueAddrInst>(user) ||
+            isa<ClassMethodInst>(user))
           continue;
 
         if (auto *store = dyn_cast<StoreInst>(user)) {
