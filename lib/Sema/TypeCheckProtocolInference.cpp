@@ -75,21 +75,26 @@ void InferredAssociatedTypesByWitness::dump(llvm::raw_ostream &out,
 }
 
 void InferredTypeWitnessesSolution::dump() const {
+  const auto numValueWitnesses = ValueWitnesses.size();
   llvm::errs() << "Type Witnesses:\n";
   for (auto &typeWitness : TypeWitnesses) {
     llvm::errs() << "  " << typeWitness.first->getName() << " := ";
     typeWitness.second.first->print(llvm::errs());
-    llvm::errs() << " value " << typeWitness.second.second << '\n';
+    if (typeWitness.second.second == numValueWitnesses) {
+      llvm::errs() << ", abstract";
+    } else {
+      llvm::errs() << ", inferred from $" << typeWitness.second.second;
+    }
+    llvm::errs() << '\n';
   }
   llvm::errs() << "Value Witnesses:\n";
   for (unsigned i : indices(ValueWitnesses)) {
-    auto &valueWitness = ValueWitnesses[i];
-    llvm::errs() << i << ":  " << (Decl*)valueWitness.first
-    << ' ' << valueWitness.first->getBaseName() << '\n';
-    valueWitness.first->getDeclContext()->printContext(llvm::errs());
-    llvm::errs() << "    for " << (Decl*)valueWitness.second
-    << ' ' << valueWitness.second->getBaseName() << '\n';
-    valueWitness.second->getDeclContext()->printContext(llvm::errs());
+    const auto &valueWitness = ValueWitnesses[i];
+    llvm::errs() << '$' << i << ":\n  ";
+    valueWitness.first->dumpRef(llvm::errs());
+    llvm::errs() << " ->\n  ";
+    valueWitness.second->dumpRef(llvm::errs());
+    llvm::errs() << '\n';
   }
 }
 
@@ -546,9 +551,8 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
 
 /// Remove the 'self' type from the given type, if it's a method type.
 static Type removeSelfParam(ValueDecl *value, Type type) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (func->getDeclContext()->isTypeContext())
-      return type->castTo<AnyFunctionType>()->getResult();
+  if (value->hasCurriedSelf()) {
+    return type->castTo<AnyFunctionType>()->getResult();
   }
 
   return type;

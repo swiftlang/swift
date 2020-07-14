@@ -454,18 +454,12 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   internal var isImmutable: Bool {
     get {
-// TODO: Enable COW runtime checks by default (when INTERNAL_CHECKS_ENABLED
-//       is set). Currently there is a problem with remote AST which needs to be
-//       fixed.
-#if ENABLE_COW_RUNTIME_CHECKS
       if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
       }
-#endif
       return true
     }
     nonmutating set {
-#if ENABLE_COW_RUNTIME_CHECKS
       if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         if newValue {
           if capacity > 0 {
@@ -481,17 +475,14 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
             "re-setting mutable array buffer to mutable")
         }
       }
-#endif
     }
   }
   
   @_alwaysEmitIntoClient
   internal var isMutable: Bool {
-#if ENABLE_COW_RUNTIME_CHECKS
     if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       return !_swift_isImmutableCOWBuffer(_storage)
     }
-#endif
     return true
   }
 #endif

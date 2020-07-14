@@ -471,28 +471,31 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // situations where it isn't useful, such as for dylibs, though this is
   // harmless aside from code size.
   if (!IRGen.Opts.UseJIT) {
-    if (auto compatibilityVersion
-          = IRGen.Opts.AutolinkRuntimeCompatibilityLibraryVersion) {
-      if (*compatibilityVersion <= llvm::VersionTuple(5, 0)) {
-        this->addLinkLibrary(LinkLibrary("swiftCompatibility50",
-                                         LibraryKind::Library,
-                                         /*forceLoad*/ true));
+    auto addBackDeployLib = [&](llvm::VersionTuple version,
+                                StringRef libraryName) {
+      Optional<llvm::VersionTuple> compatibilityVersion;
+      if (libraryName == "swiftCompatibilityDynamicReplacements") {
+        compatibilityVersion = IRGen.Opts.
+            AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+      } else {
+        compatibilityVersion = IRGen.Opts.
+            AutolinkRuntimeCompatibilityLibraryVersion;
       }
-      if (*compatibilityVersion <= llvm::VersionTuple(5, 1)) {
-        this->addLinkLibrary(LinkLibrary("swiftCompatibility51",
-                                         LibraryKind::Library,
-                                         /*forceLoad*/ true));
-      }
-    }
 
-    if (auto compatibilityVersion =
-            IRGen.Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion) {
-      if (*compatibilityVersion <= llvm::VersionTuple(5, 0)) {
-        this->addLinkLibrary(LinkLibrary("swiftCompatibilityDynamicReplacements",
-                                         LibraryKind::Library,
-                                         /*forceLoad*/ true));
-      }
-    }
+      if (!compatibilityVersion)
+        return;
+
+      if (*compatibilityVersion > version)
+        return;
+
+      this->addLinkLibrary(LinkLibrary(libraryName,
+                                       LibraryKind::Library,
+                                       /*forceLoad*/ true));
+    };
+
+    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName)         \
+      addBackDeployLib(llvm::VersionTuple Version, LibraryName);
+    #include "swift/Frontend/BackDeploymentLibs.def"
   }
 }
 
@@ -1027,7 +1030,8 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
   return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
 }
 
-void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
+void IRGenerator::emitGlobalTopLevel(
+    const std::vector<std::string> &linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
@@ -1047,10 +1051,8 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     CurrentIGMPtr IGM = getGenModule(wt.getProtocol()->getDeclContext());
     ensureRelativeSymbolCollocation(wt);
   }
-  if (linkerDirectives) {
-    for (auto &entry: *linkerDirectives) {
-      createLinkerDirectiveVariable(*PrimaryIGM, entry.getKey());
-    }
+  for (auto &directive: linkerDirectives) {
+    createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
     Decl *decl = v.getDecl();

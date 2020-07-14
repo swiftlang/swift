@@ -62,6 +62,7 @@ namespace swift {
   class SourceManager;
   class SyntaxParseActions;
   class SyntaxParsingCache;
+  struct TBDGenOptions;
   class Token;
   class TopLevelContext;
   class TypeCheckerOptions;
@@ -207,23 +208,23 @@ namespace swift {
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
   GeneratedModule
-  performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
+  performIRGeneration(ModuleDecl *M, const IRGenOptions &Opts,
+                      const TBDGenOptions &TBDOpts,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       ArrayRef<std::string> parallelOutputFilenames,
-                      llvm::GlobalVariable **outModuleHash = nullptr,
-                      llvm::StringSet<> *LinkerDirectives = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
   GeneratedModule
-  performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
+  performIRGeneration(SourceFile &SF, const IRGenOptions &Opts, 
+                      const TBDGenOptions &TBDOpts,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       StringRef PrivateDiscriminator,
-                      llvm::GlobalVariable **outModuleHash = nullptr,
-                      llvm::StringSet<> *LinkerDirectives = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be

@@ -69,7 +69,7 @@ public struct Y { }
 // -- instantiator function
 // CHECK-USAGE-SAME: i32 0,
 // -- private data area
-// CHECK-USAGE-SAME: {{@[0-9]+}}
+// CHECK-USAGE-SAME: "$s31protocol_resilience_descriptors1YV010resilient_A022OtherResilientProtocolAAMcMK"
 // --
 // CHECK-USAGE-SAME: }
 extension Y: OtherResilientProtocol { }

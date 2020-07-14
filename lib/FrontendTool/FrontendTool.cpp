@@ -427,6 +427,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
   filter |= ModuleDecl::ImportFilterKind::Private;
   filter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
   filter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   mainModule->getImportedModules(imports, filter);
@@ -1053,9 +1054,9 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
   }
   auto tbdOpts = Invocation.getTBDGenOptions();
   tbdOpts.LinkerDirectivesOnly = true;
-  llvm::StringSet<> ldSymbols;
   auto *module = Instance.getMainModule();
-  enumeratePublicSymbols(module, ldSymbols, tbdOpts);
+  auto ldSymbols =
+      getPublicSymbols(TBDGenDescriptor::forModule(module, tbdOpts));
   std::error_code EC;
   llvm::raw_fd_ostream OS(Path, EC, llvm::sys::fs::F_None);
   if (EC) {
@@ -1073,7 +1074,7 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
     llvm::raw_svector_ostream NameOS(NameBuffer);
     NameOS << "ldAdd_" << Idx;
     OS << "extern const char " << NameOS.str() << " __asm(\"" <<
-      changeToLdAdd(S.getKey()) << "\");\n";
+      changeToLdAdd(S) << "\");\n";
     OS << "const char " << NameOS.str() << " = 0;\n";
     ++ Idx;
   }
@@ -1500,24 +1501,21 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
 }
 
 static GeneratedModule
-generateIR(const IRGenOptions &IRGenOpts,
+generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            std::unique_ptr<SILModule> SM,
            const PrimarySpecificPaths &PSPs,
            StringRef OutputFilename, ModuleOrSourceFile MSF,
            llvm::GlobalVariable *&HashGlobal,
-           ArrayRef<std::string> parallelOutputFilenames,
-           llvm::StringSet<> &LinkerDirectives) {
+           ArrayRef<std::string> parallelOutputFilenames) {
   if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return performIRGeneration(IRGenOpts, *SF,
+    return performIRGeneration(*SF, IRGenOpts, TBDOpts,
                                std::move(SM), OutputFilename, PSPs,
                                SF->getPrivateDiscriminator().str(),
-                               &HashGlobal,
-                               &LinkerDirectives);
+                               &HashGlobal);
   } else {
-    return performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
+    return performIRGeneration(MSF.get<ModuleDecl *>(), IRGenOpts, TBDOpts,
                                std::move(SM), OutputFilename, PSPs,
-                               parallelOutputFilenames,
-                               &HashGlobal, &LinkerDirectives);
+                               parallelOutputFilenames, &HashGlobal);
   }
 }
 
@@ -1662,17 +1660,6 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
                      OutputFilename, Instance.getStatsReporter());
 }
 
-static void collectLinkerDirectives(const CompilerInvocation &Invocation,
-                                    ModuleOrSourceFile MSF,
-                                    llvm::StringSet<> &Symbols) {
-  auto tbdOpts = Invocation.getTBDGenOptions();
-  tbdOpts.LinkerDirectivesOnly = true;
-  if (MSF.is<SourceFile*>())
-    enumeratePublicSymbols(MSF.get<SourceFile*>(), Symbols, tbdOpts);
-  else
-    enumeratePublicSymbols(MSF.get<ModuleDecl*>(), Symbols, tbdOpts);
-}
-
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
@@ -1780,18 +1767,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Instance, std::move(SM), MSF, observer, ReturnValue);
 
-  llvm::StringSet<> LinkerDirectives;
-  collectLinkerDirectives(Invocation, MSF, LinkerDirectives);
-  // Don't proceed to IRGen if collecting linker directives failed.
-  if (Context.hadError())
-    return true;
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
       opts.InputsAndOutputs.copyOutputFilenames();
   llvm::GlobalVariable *HashGlobal;
   auto IRModule = generateIR(
-      IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, HashGlobal,
-      ParallelOutputFilenames, LinkerDirectives);
+      IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
+      OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
 
   // Just because we had an AST error it doesn't mean we can't performLLVM.
   bool HadError = Instance.getASTContext().hadError();
@@ -1948,8 +1930,36 @@ createJSONFixItDiagnosticConsumerIfNeeded(
   });
 }
 
+/// Print information about a
+static void printCompatibilityLibrary(
+    llvm::VersionTuple runtimeVersion, llvm::VersionTuple maxVersion,
+    StringRef filter, StringRef libraryName, bool &printedAny,
+    llvm::raw_ostream &out) {
+  if (runtimeVersion > maxVersion)
+    return;
+
+  if (printedAny) {
+    out << ",";
+  }
+
+  out << "\n";
+  out << "      {\n";
+
+  out << "        \"libraryName\": \"";
+  out.write_escaped(libraryName);
+  out << "\",\n";
+
+  out << "        \"filter\": \"";
+  out.write_escaped(filter);
+  out << "\"\n";
+  out << "      }";
+
+  printedAny = true;
+}
+
 /// Print information about the target triple in JSON.
 static void printTripleInfo(const llvm::Triple &triple,
+                            llvm::Optional<llvm::VersionTuple> runtimeVersion,
                             llvm::raw_ostream &out) {
   out << "{\n";
 
@@ -1965,11 +1975,26 @@ static void printTripleInfo(const llvm::Triple &triple,
   out.write_escaped(getTargetSpecificModuleTriple(triple).getTriple());
   out << "\",\n";
 
-  if (auto runtimeVersion = getSwiftRuntimeCompatibilityVersionForTarget(
-          triple)) {
+  if (runtimeVersion) {
     out << "    \"swiftRuntimeCompatibilityVersion\": \"";
     out.write_escaped(runtimeVersion->getAsString());
     out << "\",\n";
+
+    // Compatibility libraries that need to be linked.
+    out << "    \"compatibilityLibraries\": [";
+    bool printedAnyCompatibilityLibrary = false;
+    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName)           \
+      printCompatibilityLibrary(                                        \
+        *runtimeVersion, llvm::VersionTuple Version, #Filter, LibraryName, \
+        printedAnyCompatibilityLibrary, out);
+    #include "swift/Frontend/BackDeploymentLibs.def"
+
+    if (printedAnyCompatibilityLibrary) {
+      out << "\n   ";
+    }
+    out << " ],\n";
+  } else {
+    out << "    \"compatibilityLibraries\": [ ],\n";
   }
 
   out << "    \"librariesRequireRPath\": "
@@ -1985,15 +2010,23 @@ static void printTargetInfo(const CompilerInvocation &invocation,
                             llvm::raw_ostream &out) {
   out << "{\n";
 
+  // Compiler version, as produced by --version.
+  out << "  \"compilerVersion\": \"";
+  out.write_escaped(version::getSwiftFullVersion(
+                                                 version::Version::getCurrentLanguageVersion()));
+  out << "\",\n";
+
   // Target triple and target variant triple.
+  auto runtimeVersion =
+    invocation.getIRGenOptions().AutolinkRuntimeCompatibilityLibraryVersion;
   auto &langOpts = invocation.getLangOptions();
   out << "  \"target\": ";
-  printTripleInfo(langOpts.Target, out);
+  printTripleInfo(langOpts.Target, runtimeVersion, out);
   out << ",\n";
 
   if (auto &variant = langOpts.TargetVariant) {
     out << "  \"targetVariant\": ";
-    printTripleInfo(*variant, out);
+    printTripleInfo(*variant, runtimeVersion, out);
     out << ",\n";
   }
 

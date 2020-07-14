@@ -34,6 +34,7 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::LinearFunctionInst:
   case SILNodeKind::OpenExistentialRefInst:
   case SILNodeKind::UpcastInst:
+  case SILNodeKind::UncheckedValueCastInst:
   case SILNodeKind::UncheckedRefCastInst:
   case SILNodeKind::ConvertFunctionInst:
   case SILNodeKind::RefToBridgeObjectInst:

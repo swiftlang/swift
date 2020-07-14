@@ -15,20 +15,15 @@
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
+// rdar://problem/64995079
+// XFAIL: OS=ios && CPU=armv7s
 //
 // REQUIRES: objc_interop
-
-// The UIKit overlay isn't present on iOS 10.3.
-// UNSUPPORTED: CPU=i386
 
 import StdlibUnittest
 import StdlibUnittestFoundationExtras
 import Foundation
 import CoreGraphics
-
-#if canImport(UIKit)
-import UIKit
-#endif
 
 var nsValueBridging = TestSuite("NSValueBridging")
 
@@ -73,7 +68,13 @@ ${ testCase("CGAffineTransform", "CGAffineTransform(rotationAngle: .pi)",      N
 
 #endif
 
-#if canImport(UIKit)
+// The last supported iOS version for 32-bit platforms is iOS 10.3, which didn't
+// ship with the UIKit overlay, so we cannot run NSValue bridging tests there.
+//
+// FIXME: Test back-deployment scenarios with the Swift 5.0 compatibility
+// runtime rather than a freshly built stdlib. (rdar://62694723)
+#if canImport(UIKit) && !(os(iOS) && (arch(armv7) || arch(armv7s) || arch(i386)))
+import UIKit
 
 ${ testCase("CGRect",            "CGRect(x: 17, y: 38, width: 6, height: 79)", "cgRect",            "(==)") }
 ${ testCase("CGPoint",           "CGPoint(x: 17, y: 38)",                      "cgPoint",           "(==)") }

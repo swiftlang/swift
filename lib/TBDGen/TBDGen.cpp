@@ -67,10 +67,14 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
   if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
     return;
   Symbols.addSymbol(kind, name, Targets);
-  if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
-    auto isNewValue = StringSymbols->insert(name).second;
-    (void)isNewValue;
-    assert(isNewValue && "symbol appears twice");
+  if (kind == SymbolKind::GlobalSymbol) {
+    StringSymbols.push_back(name);
+#ifndef NDEBUG
+    if (!DuplicateSymbolChecker.insert(name).second) {
+      llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
+      assert(false && "TBDGen symbol appears twice");
+    }
+#endif
   }
 }
 
@@ -252,8 +256,8 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
   case swift::PlatformKind::watchOSApplicationExtension:
     return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
                              LinkerPlatformId::watchOS;
-  case swift::PlatformKind::OSX:
-  case swift::PlatformKind::OSXApplicationExtension:
+  case swift::PlatformKind::macOS:
+  case swift::PlatformKind::macOSApplicationExtension:
     return LinkerPlatformId::macOS;
   case swift::PlatformKind::macCatalyst:
   case swift::PlatformKind::macCatalystApplicationExtension:
@@ -1130,10 +1134,8 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
     llvm::MachO::Target targetVar(*ctx.LangOpts.TargetVariant);
     file.addTarget(targetVar);
   }
-  StringSet symbols;
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  TBDGenVisitor visitor(file, {target}, &symbols,
-                        clang->getTargetInfo().getDataLayout(),
+  TBDGenVisitor visitor(file, {target}, clang->getTargetInfo().getDataLayout(),
                         linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
@@ -1182,22 +1184,12 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
     });
   }
 
-  return std::make_pair(std::move(file), std::move(symbols));
+  return std::make_pair(std::move(file), std::move(visitor.StringSymbols));
 }
 
-void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   const TBDGenOptions &opts) {
-  assert(symbols.empty() && "Additive symbol enumeration not supported");
-  auto &evaluator = file->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forFile(file, opts);
-  symbols = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
-}
-void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   const TBDGenOptions &opts) {
-  assert(symbols.empty() && "Additive symbol enumeration not supported");
-  auto &evaluator = M->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forModule(M, opts);
-  symbols = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
+std::vector<std::string> swift::getPublicSymbols(TBDGenDescriptor desc) {
+  auto &evaluator = desc.getParentModule()->getASTContext().evaluator;
+  return llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                          const TBDGenOptions &opts) {

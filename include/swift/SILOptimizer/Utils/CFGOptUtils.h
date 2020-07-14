@@ -107,6 +107,10 @@ bool splitCriticalEdgesFrom(SILBasicBlock *fromBB,
                             DominanceInfo *domInfo = nullptr,
                             SILLoopInfo *loopInfo = nullptr);
 
+/// Splits all critical edges that have `toBB` as a destination.
+bool splitCriticalEdgesTo(SILBasicBlock *toBB, DominanceInfo *domInfo = nullptr,
+                          SILLoopInfo *loopInfo = nullptr);
+
 /// Splits the edges between two basic blocks.
 ///
 /// Updates dominance information and loop information if not null.

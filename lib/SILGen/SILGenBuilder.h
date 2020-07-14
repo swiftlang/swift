@@ -279,7 +279,7 @@ public:
   ManagedValue createUncheckedAddrCast(SILLocation loc, ManagedValue op,
                                        SILType resultTy);
 
-  using SILBuilder::createUncheckedBitCast;
+  using SILBuilder::createUncheckedReinterpretCast;
   ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
                                       SILType type);
 

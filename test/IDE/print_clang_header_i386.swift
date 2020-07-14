@@ -1,4 +1,5 @@
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux, freebsd
 

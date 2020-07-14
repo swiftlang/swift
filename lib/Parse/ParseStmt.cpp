@@ -1350,10 +1350,9 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
             auto *PlatformSpec =
                 cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
 
-            auto PlatformName = platformString(PlatformSpec->getPlatform());
             auto PlatformNameEndLoc =
-                PlatformSpec->getPlatformLoc().getAdvancedLoc(
-                    PlatformName.size());
+              Lexer::getLocForEndOfToken(SourceManager,
+                                         PlatformSpec->getPlatformLoc());
 
             diagnose(PlatformSpec->getPlatformLoc(),
                      diag::avail_query_meant_introduced)

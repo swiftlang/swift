@@ -32,7 +32,7 @@
 #pragma clang assume_nonnull begin
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
+extern "C" {
 #endif
 
 typedef void (^__swift_shims_dispatch_block_t)(void);
@@ -251,7 +251,7 @@ static inline void _swift_dispatch_release(dispatch_object_t object) {
 }
 
 #ifdef __cplusplus
-}} // extern "C", namespace swift
+} // extern "C"
 #endif
 
 #pragma clang assume_nonnull end

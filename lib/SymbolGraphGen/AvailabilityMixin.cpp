@@ -40,7 +40,7 @@ StringRef getDomain(const AvailableAttr &AvAttr) {
       return { "iOS" };
     case swift::PlatformKind::macCatalyst:
       return { "macCatalyst" };
-    case swift::PlatformKind::OSX:
+    case swift::PlatformKind::macOS:
       return { "macOS" };
     case swift::PlatformKind::tvOS:
       return { "tvOS" };
@@ -50,7 +50,7 @@ StringRef getDomain(const AvailableAttr &AvAttr) {
       return { "iOSAppExtension" };
     case swift::PlatformKind::macCatalystApplicationExtension:
       return { "macCatalystAppExtension" };
-    case swift::PlatformKind::OSXApplicationExtension:
+    case swift::PlatformKind::macOSApplicationExtension:
       return { "macOSAppExtension" };
     case swift::PlatformKind::tvOSApplicationExtension:
       return { "tvOSAppExtension" };

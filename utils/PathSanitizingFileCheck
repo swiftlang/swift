@@ -80,10 +80,9 @@ constants.""")
         # Since we want to use pattern as a regex in some platforms, we need
         # to escape it first, and then replace the escaped slash
         # literal (r'\\/') for our platform-dependent slash regex.
-        stdin = re.sub(re.sub('\\\\/' if sys.version_info[0] < 3 else r'[/\\]',
+        stdin = re.sub(re.sub(r'\\/' if sys.version_info[0] < 3 else r'/',
                               slashes_re, re.escape(pattern)),
-                       replacement,
-                       stdin)
+                       replacement, stdin)
 
     if args.dry_run:
         print(stdin)

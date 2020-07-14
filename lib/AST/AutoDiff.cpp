@@ -422,6 +422,14 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
   }
 }
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const DeclNameRefWithLoc &name) {
+  os << name.Name;
+  if (auto accessorKind = name.AccessorKind)
+    os << '.' << getAccessorLabel(*accessorKind);
+  return os;
+}
+
 bool swift::operator==(const TangentPropertyInfo::Error &lhs,
                        const TangentPropertyInfo::Error &rhs) {
   if (lhs.kind != rhs.kind)
@@ -475,17 +483,16 @@ void swift::simple_display(llvm::raw_ostream &os, TangentPropertyInfo info) {
   os << " }";
 }
 
-TangentPropertyInfo
-TangentStoredPropertyRequest::evaluate(Evaluator &evaluator,
-                                       VarDecl *originalField) const {
-  assert(originalField->hasStorage() && originalField->isInstanceMember() &&
-         "Expected stored property");
+TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
+    Evaluator &evaluator, VarDecl *originalField, CanType baseType) const {
+  assert(((originalField->hasStorage() && originalField->isInstanceMember()) ||
+          originalField->hasAttachedPropertyWrapper()) &&
+         "Expected a stored property or a property-wrapped property");
   auto *parentDC = originalField->getDeclContext();
   assert(parentDC->isTypeContext());
-  auto parentType = parentDC->getDeclaredTypeInContext();
   auto *moduleDecl = originalField->getModuleContext();
-  auto parentTan = parentType->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(moduleDecl));
+  auto parentTan =
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl));
   // Error if parent nominal type does not conform to `Differentiable`.
   if (!parentTan) {
     return TangentPropertyInfo(
@@ -497,13 +504,18 @@ TangentStoredPropertyRequest::evaluate(Evaluator &evaluator,
         TangentPropertyInfo::Error::Kind::NoDerivativeOriginalProperty);
   }
   // Error if original property's type does not conform to `Differentiable`.
-  auto originalFieldTan = originalField->getType()->getAutoDiffTangentSpace(
+  auto originalFieldType = baseType->getTypeOfMember(
+      originalField->getModuleContext(), originalField);
+  auto originalFieldTan = originalFieldType->getAutoDiffTangentSpace(
       LookUpConformanceInModule(moduleDecl));
   if (!originalFieldTan) {
     return TangentPropertyInfo(
         TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable);
   }
-  auto parentTanType = parentTan->getType();
+  // Get the parent `TangentVector` type.
+  auto parentTanType =
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl))
+          ->getType();
   auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
   // Error if parent `TangentVector` is not a struct.
   if (!parentTanStruct) {
@@ -533,7 +545,9 @@ TangentStoredPropertyRequest::evaluate(Evaluator &evaluator,
   // Error if tangent property's type is not equal to the original property's
   // `TangentVector` type.
   auto originalFieldTanType = originalFieldTan->getType();
-  if (!originalFieldTanType->isEqual(tanField->getType())) {
+  auto tanFieldType =
+      parentTanType->getTypeOfMember(tanField->getModuleContext(), tanField);
+  if (!originalFieldTanType->isEqual(tanFieldType)) {
     return TangentPropertyInfo(
         TangentPropertyInfo::Error::Kind::TangentPropertyWrongType,
         originalFieldTanType);

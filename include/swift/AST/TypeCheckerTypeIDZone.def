@@ -204,7 +204,7 @@ SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
               AccessorDecl *(AbstractStorageDecl *, AccessorKind),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TangentStoredPropertyRequest,
-              llvm::Expected<VarDecl *>(VarDecl *), Cached, NoLocationInfo)
+              llvm::Expected<VarDecl *>(VarDecl *, CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyRequest,
               bool(AbstractFunctionDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyAtLocRequest,
@@ -240,7 +240,8 @@ SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
               Type(ProtocolDecl *, TypeEraserAttr *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
-              Type (TypeResolution *, TypeRepr *), Uncached, NoLocationInfo)
+              Type (const TypeResolution *, TypeRepr *),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
               Cached, NoLocationInfo)
@@ -273,3 +274,5 @@ SWIFT_REQUEST(TypeChecker, LookupAllConformancesInContextRequest,
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest, 
               bool(AccessorDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeMainFunctionRequest,
+              FuncDecl *(Decl *), Cached, NoLocationInfo)

@@ -22,6 +22,7 @@
 #include "SwiftTargetInfo.h"
 #include "TypeLayout.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SourceFile.h"
@@ -374,7 +375,7 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  void emitGlobalTopLevel(llvm::StringSet<> *LinkerDirectives);
+  void emitGlobalTopLevel(const std::vector<std::string> &LinkerDirectives);
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.
@@ -1076,7 +1077,7 @@ private:
   SmallVector<llvm::WeakTrackingVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
-  SmallVector<llvm::MDNode *, 32> AutolinkEntries;
+  SmallVector<LinkLibrary, 32> AutolinkEntries;
 
   /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCClasses;

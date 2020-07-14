@@ -69,21 +69,75 @@ doit()
 // CHECK:   [[UNERASED_TABLE_1:%[0-9]+]] = bitcast i8* [[ERASED_TABLE_1]] to i8**
 // CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_1:%[0-9]+]] = load i8*, i8** [[UNERASED_TABLE_1]], align 1
 // CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR_1:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_1]] to %swift.protocol_conformance_descriptor*
-// CHECK:   [[EQUAL_DESCRIPTORS_1:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_1]], %swift.protocol_conformance_descriptor* @"$sSi4main1PAAMc")
+// CHECK-arm64e:  [[ERASED_TABLE_INT_1:%[0-9]+]] = ptrtoint i8* [[ERASED_TABLE_1]] to i64
+// CHECK-arm64e:  [[TABLE_SIGNATURE_1:%[0-9]+]] = call i64 @llvm.ptrauth.blend.i64(i64 [[ERASED_TABLE_INT_1]], i64 50923)
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_1:%[0-9]+]] = call i64 @llvm.ptrauth.auth.i64(i64 %13, i32 2, i64 [[TABLE_SIGNATURE_1]])
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_1:%[0-9]+]] = inttoptr i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_1]] to %swift.protocol_conformance_descriptor*
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_INT_1:%[0-9]+]] = ptrtoint %swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_1]] to i64
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_INT_1:%[0-9]+]] = call i64 @llvm.ptrauth.sign.i64(i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_INT_1]], i32 2, i64 50923)
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_1:%[0-9]+]] = inttoptr i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_INT_1]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS_1:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(
+// CHECK-SAME:     %swift.protocol_conformance_descriptor* 
+// CHECK-arm64e-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_1]], 
+// CHECK-i386-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-x86_64-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7s-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7k-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-arm64-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-SAME:     %swift.protocol_conformance_descriptor* 
+// CHECK-SAME:     $sSi4main1PAAMc
+// CHECK-SAME:   )
 // CHECK:   [[EQUAL_ARGUMENTS_1:%[0-9]+]] = and i1 [[EQUAL_TYPES]], [[EQUAL_DESCRIPTORS_1]]
 // CHECK:   [[POINTER_TO_ERASED_TABLE_2:%[0-9]+]] = getelementptr i8*, i8** %1, i64 2
 // CHECK:   [[ERASED_TABLE_2:%"load argument at index 2 from buffer"]] = load i8*, i8** [[POINTER_TO_ERASED_TABLE_2]], align 1
 // CHECK:   [[UNERASED_TABLE_2:%[0-9]+]] = bitcast i8* [[ERASED_TABLE_2]] to i8**
 // CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_2:%[0-9]+]] = load i8*, i8** [[UNERASED_TABLE_2]], align 1
 // CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR_2:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_2]] to %swift.protocol_conformance_descriptor*
-// CHECK:   [[EQUAL_DESCRIPTORS_2:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_2]], %swift.protocol_conformance_descriptor* @"$sSi4main1QAAMc")
+// CHECK-arm64e:  [[ERASED_TABLE_INT_2:%[0-9]+]] = ptrtoint i8* [[ERASED_TABLE_2]] to i64
+// CHECK-arm64e:  [[TABLE_SIGNATURE_2:%[0-9]+]] = call i64 @llvm.ptrauth.blend.i64(i64 [[ERASED_TABLE_INT_2]], i64 50923)
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_2:%[0-9]+]] = call i64 @llvm.ptrauth.auth.i64(i64 %13, i32 2, i64 [[TABLE_SIGNATURE_2]])
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_2:%[0-9]+]] = inttoptr i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_2]] to %swift.protocol_conformance_descriptor*
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_INT_2:%[0-9]+]] = ptrtoint %swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_2]] to i64
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_INT_2:%[0-9]+]] = call i64 @llvm.ptrauth.sign.i64(i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_INT_2]], i32 2, i64 50923)
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_2:%[0-9]+]] = inttoptr i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_INT_2]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS_2:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(
+// CHECK-SAME:     %swift.protocol_conformance_descriptor* 
+// CHECK-arm64e-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_2]], 
+// CHECK-i386-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-x86_64-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7s-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7k-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-arm64-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-SAME:     %swift.protocol_conformance_descriptor* 
+// CHECK-SAME:     $sSi4main1QAAMc
+// CHECK-SAME:   )
 // CHECK:   [[EQUAL_ARGUMENTS_2:%[0-9]+]] = and i1 [[EQUAL_ARGUMENTS_1]], [[EQUAL_DESCRIPTORS_2]]
 // CHECK:   [[POINTER_TO_ERASED_TABLE_3:%[0-9]+]] = getelementptr i8*, i8** %1, i64 3
 // CHECK:   [[ERASED_TABLE_3:%"load argument at index 3 from buffer"]] = load i8*, i8** [[POINTER_TO_ERASED_TABLE_3]], align 1
 // CHECK:   [[UNERASED_TABLE_3:%[0-9]+]] = bitcast i8* [[ERASED_TABLE_3]] to i8**
 // CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_3:%[0-9]+]] = load i8*, i8** [[UNERASED_TABLE_3]], align 1
 // CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR_3:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR_3]] to %swift.protocol_conformance_descriptor*
-// CHECK:   [[EQUAL_DESCRIPTORS_3:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_3]], %swift.protocol_conformance_descriptor* @"$sSi4main1RAAMc")
+// CHECK-arm64e:  [[ERASED_TABLE_INT_3:%[0-9]+]] = ptrtoint i8* [[ERASED_TABLE_3]] to i64
+// CHECK-arm64e:  [[TABLE_SIGNATURE_3:%[0-9]+]] = call i64 @llvm.ptrauth.blend.i64(i64 [[ERASED_TABLE_INT_3]], i64 50923)
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_3:%[0-9]+]] = call i64 @llvm.ptrauth.auth.i64(i64 %13, i32 2, i64 [[TABLE_SIGNATURE_3]])
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_3:%[0-9]+]] = inttoptr i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_3]] to %swift.protocol_conformance_descriptor*
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_INT_3:%[0-9]+]] = ptrtoint %swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_3]] to i64
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_INT_3:%[0-9]+]] = call i64 @llvm.ptrauth.sign.i64(i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_INT_3]], i32 2, i64 50923)
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_3:%[0-9]+]] = inttoptr i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_INT_3]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS_3:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(
+// CHECK-SAME:     %swift.protocol_conformance_descriptor* 
+// CHECK-arm64e-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_3]], 
+// CHECK-i386-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-x86_64-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7s-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7k-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-arm64-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-SAME:     %swift.protocol_conformance_descriptor* 
+// CHECK-SAME:     $sSi4main1RAAMc
+// CHECK-SAME:   )
 // CHECK:   [[EQUAL_ARGUMENTS_3:%[0-9]+]] = and i1 [[EQUAL_ARGUMENTS_2]], [[EQUAL_DESCRIPTORS_3]]
 // CHECK:   br i1 [[EQUAL_ARGUMENTS_3]], label %[[EXIT_PRESPECIALIZED:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
 // CHECK: [[EXIT_PRESPECIALIZED]]:

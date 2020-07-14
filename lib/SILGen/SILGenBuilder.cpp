@@ -610,7 +610,7 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
                                                    ManagedValue value,
                                                    SILType type) {
   CleanupCloner cloner(*this, value);
-  SILValue cast = createUncheckedBitCast(loc, value.getValue(), type);
+  SILValue cast = createUncheckedReinterpretCast(loc, value.getValue(), type);
 
   // Currently createUncheckedBitCast only produces these
   // instructions. We assert here to make sure if this changes, this code is

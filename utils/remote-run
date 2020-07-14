@@ -89,7 +89,7 @@ class CommandRunner(object):
             print(concatenated_commands, file=sys.stderr)
         if self.dry_run:
             return
-        _, _ = sftp_proc.communicate(concatenated_commands)
+        _, _ = sftp_proc.communicate(concatenated_commands.encode('utf-8'))
         if sftp_proc.returncode:
             sys.exit(sftp_proc.returncode)
 

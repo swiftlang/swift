@@ -1307,3 +1307,24 @@ bb0(%0 : @guaranteed $ClassProtConformingRef, %1 : @owned $ClassProtConformingRe
   %5 = tuple(%3 : $ClassProt, %4 : $ClassProt)
   return %5 : $(ClassProt, ClassProt)
 }
+
+// Make sure that a generic struct that has an AnyObject constraint can be cased
+// successfully.
+
+struct GenericS<T> {
+  var t1: T
+  var t2: T
+}
+
+sil [ossa] @unchecked_value_cast_forwarding : $@convention(thin) <T : AnyObject> (@owned GenericS<T>) -> @owned GenericS<AnyObject> {
+bb0(%0 : @owned $GenericS<T>):
+  %1 = unchecked_value_cast %0 : $GenericS<T> to $GenericS<AnyObject>
+  return %1 : $GenericS<AnyObject>
+}
+
+sil [ossa] @unchecked_value_cast_forwarding_2 : $@convention(thin) <T : AnyObject> (@guaranteed GenericS<T>) -> @owned GenericS<AnyObject> {
+bb0(%0 : @guaranteed $GenericS<T>):
+  %1 = unchecked_value_cast %0 : $GenericS<T> to $GenericS<AnyObject>
+  %2 = copy_value %1 : $GenericS<AnyObject>
+  return %2 : $GenericS<AnyObject>
+}

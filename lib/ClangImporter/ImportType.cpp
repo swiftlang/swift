@@ -27,11 +27,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
@@ -235,7 +237,9 @@ namespace {
       case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
         return unwrapCType(Impl.getNamedSwiftType(Impl.getStdlibModule(), \
                                         #SWIFT_TYPE_NAME));
-          
+#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)       \
+      case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), #SWIFT_TYPE_NAME);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
       // Types that cannot be mapped into Swift, and probably won't ever be.
@@ -1713,6 +1717,30 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
   SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+
+  // C++ operators that are implemented as non-static member functions get
+  // imported into Swift as static methods that have an additional
+  // parameter for the left-hand side operand instead of the receiver object.
+  if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+    if (clangDecl->isOverloadedOperator()) {
+      auto param = new (SwiftContext)
+          ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                    SwiftContext.getIdentifier("lhs"), dc);
+
+      auto parent = CMD->getParent();
+      auto parentType = importType(
+          parent->getASTContext().getRecordType(parent),
+          ImportTypeKind::Parameter, allowNSUIntegerAsInt, Bridgeability::None);
+
+      param->setInterfaceType(parentType.getType());
+
+      // Workaround until proper const support is handled: Force everything to
+      // be mutating. This implicitly makes the parameter indirect.
+      param->setSpecifier(ParamSpecifier::InOut);
+
+      parameters.push_back(param);
+    }
+  }
 
   for (auto param : params) {
     auto paramTy = param->getType();
