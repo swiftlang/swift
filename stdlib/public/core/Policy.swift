@@ -485,7 +485,7 @@ infix operator   |=: AssignmentPrecedence, BinaryInteger
 // from users.
 infix operator ~>
 
-// TODO: Rename interval operators to be for like range operators?
+// TODO: Rename interval operators to be more similar to range operators?
 // `<=~<=` -> `∙∙∙`
 // `<=~~<` -> `∙∙<`
 // `<~~<=` -> `<∙∙`
