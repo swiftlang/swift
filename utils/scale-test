@@ -361,7 +361,7 @@ def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
     assert(len(ys) > 0)
     mean_y = sum(ys) / len(ys)
     ss_total = sum((y - mean_y) ** 2 for y in ys)
-    data = zip(xs, ys)
+    data = list(zip(xs, ys))
 
     def inner(ps):
         s = 0.0
