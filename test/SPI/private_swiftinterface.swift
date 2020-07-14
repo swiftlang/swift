@@ -88,6 +88,19 @@ private class PrivateClassLocal {}
   // CHECK-PUBLIC-NOT: extensionSPIMethod
 }
 
+@_spi(LocalSPI) public protocol SPIProto3 {
+// CHECK-PRIVATE: @_spi(LocalSPI) public protocol SPIProto3
+// CHECK-PUBLIC-NOT: SPIProto3
+
+  associatedtype AssociatedType
+  // CHECK-PRIVATE: {{^}}  associatedtype AssociatedType
+  // CHECK-PUBLIC-NOT: AssociatedType
+
+  func implicitSPIMethod()
+  // CHECK-PRIVATE: @_spi(LocalSPI) func implicitSPIMethod()
+  // CHECK-PUBLIC-NOT: implicitSPIMethod
+}
+
 // Test the dummy conformance printed to replace private types used in
 // conditional conformances. rdar://problem/63352700
 
