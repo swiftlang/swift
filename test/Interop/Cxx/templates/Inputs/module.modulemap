@@ -1,3 +1,7 @@
 module DeclWithDefinition {
   header "decl-with-definition.h"
 }
+
+module DeclWithDefinitionOfMembers {
+  header "decl-with-definition-of-members.h"
+}

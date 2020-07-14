@@ -12,7 +12,7 @@ public:
 
 struct Arg {
 public:
-  inline int method() const { return 48; }
+  inline int method() const { return 24; }
 };
 
 inline Tpl<Arg> forceInstantiating() {
@@ -20,8 +20,8 @@ inline Tpl<Arg> forceInstantiating() {
 }
 
 // Tpl<Arg> ClassTemplateSpecializationDecl has definition because function
-// above forced the instantiation. It's members are not instantiated, we need to
-// instantiate them in Swift.
-typedef Tpl<Arg> DeclWithDefinition;
+// above forced the instantiation. It's members are not instantiated though, we
+// need to instantiate them in Swift.
+typedef Tpl<Arg> HasDefinition;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_H

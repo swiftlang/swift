@@ -2,15 +2,15 @@
 //
 // REQUIRES: executable_test
 
-import DeclWithDefinition
+import DeclWithDefinitionOfMembers
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-TemplatesTestSuite.test("has-definition") {
+TemplatesTestSuite.test("fully-instantiated") {
   let a = Arg()
-  var t = HasDefinition(t: a)
-  expectEqual(t.callMethod(), 29)
+  var t = DefinedMembers(t: a)
+  expectEqual(t.callMethod(), 53)
 }
 
 runAllTests()
