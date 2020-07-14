@@ -63,8 +63,13 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
   llvm::MachO::InterfaceFile &Symbols;
   llvm::MachO::TargetList Targets;
-  StringSet *StringSymbols;
+  std::vector<std::string> StringSymbols;
   const llvm::DataLayout &DataLayout;
+
+#ifndef NDEBUG
+  /// Tracks the symbols emitted to ensure we don't emit any duplicates.
+  llvm::StringSet<> DuplicateSymbolChecker;
+#endif
 
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
@@ -136,13 +141,13 @@ private:
 
 public:
   TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
-                llvm::MachO::TargetList targets, StringSet *stringSymbols,
+                llvm::MachO::TargetList targets,
                 const llvm::DataLayout &dataLayout,
                 const UniversalLinkageInfo &universalLinkInfo,
                 ModuleDecl *swiftModule, const TBDGenOptions &opts)
-      : Symbols(symbols), Targets(targets), StringSymbols(stringSymbols),
-        DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), Opts(opts),
+      : Symbols(symbols), Targets(targets), DataLayout(dataLayout),
+        UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
+        Opts(opts),
         previousInstallNameMap(parsePreviousModuleInstallNameMap())  {}
   ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {

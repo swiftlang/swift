@@ -338,3 +338,40 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
   }
   return deriveComparable_lt(*this, synthesizer);
 }
+
+void DerivedConformance::tryDiagnoseFailedComparableDerivation(
+    DeclContext *DC, NominalTypeDecl *nominal) {
+  auto &ctx = DC->getASTContext();
+  auto *comparableProto = ctx.getProtocol(KnownProtocolKind::Comparable);
+  if (!isa<EnumDecl>(nominal)) {
+    auto contextDecl = DC->getAsDecl();
+    ctx.Diags.diagnose(
+        contextDecl->getLoc(), diag::automatic_protocol_synthesis_unsupported,
+        comparableProto->getName().str(), isa<StructDecl>(contextDecl));
+  }
+
+  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    auto nonconformingAssociatedTypes =
+        DerivedConformance::associatedValuesNotConformingToProtocol(
+            DC, enumDecl, comparableProto);
+    for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
+      SourceLoc reprLoc;
+      if (auto *repr = typeToDiagnose->getTypeRepr())
+        reprLoc = repr->getStartLoc();
+      ctx.Diags.diagnose(
+          reprLoc, diag::missing_member_type_conformance_prevents_synthesis, 0,
+          typeToDiagnose->getInterfaceType(),
+          comparableProto->getDeclaredType(),
+          nominal->getDeclaredInterfaceType());
+    }
+
+    if (enumDecl->hasRawType() && !enumDecl->getRawType()->is<ErrorType>()) {
+      auto rawType = enumDecl->getRawType();
+      auto rawTypeLoc = enumDecl->getInherited()[0].getSourceRange().Start;
+      ctx.Diags.diagnose(rawTypeLoc,
+                         diag::comparable_synthesis_raw_value_not_allowed,
+                         rawType, nominal->getDeclaredInterfaceType(),
+                         comparableProto->getDeclaredType());
+    }
+  }
+}
