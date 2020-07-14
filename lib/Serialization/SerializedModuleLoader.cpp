@@ -110,9 +110,10 @@ Optional<bool> forEachModuleSearchPath(
 // Defined out-of-line so that we can see ~ModuleFile.
 SerializedModuleLoaderBase::SerializedModuleLoaderBase(
     ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode,
-    bool IgnoreSwiftSourceInfoFile)
+    bool IgnoreSwiftSourceInfoFile, bool ImplicitModulesDisabled)
     : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode),
-      IgnoreSwiftSourceInfoFile(IgnoreSwiftSourceInfoFile) {}
+      IgnoreSwiftSourceInfoFile(IgnoreSwiftSourceInfoFile),
+      ImplicitModulesDisabled(ImplicitModulesDisabled) {}
 
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 SerializedModuleLoader::~SerializedModuleLoader() = default;
@@ -409,6 +410,9 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
          "Module and Module Doc buffer must both be initialized or NULL");
 
   if (LoadMode == ModuleLoadingMode::OnlyInterface)
+    return std::make_error_code(std::errc::not_supported);
+
+  if (ImplicitModulesDisabled)
     return std::make_error_code(std::errc::not_supported);
 
   auto ModuleErr = openModuleFile(ModuleID, BaseName, ModuleBuffer);

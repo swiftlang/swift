@@ -64,9 +64,11 @@ protected:
   ASTContext &Ctx;
   ModuleLoadingMode LoadMode;
   bool IgnoreSwiftSourceInfoFile;
+  bool ImplicitModulesDisabled;
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
                              ModuleLoadingMode LoadMode,
-                             bool IgnoreSwiftSourceInfoFile);
+                             bool IgnoreSwiftSourceInfoFile,
+                             bool ImplicitModulesDisabled = false);
 
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
@@ -211,8 +213,11 @@ public:
 class SerializedModuleLoader : public SerializedModuleLoaderBase {
 
   SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
-                         ModuleLoadingMode loadMode, bool IgnoreSwiftSourceInfo)
-    : SerializedModuleLoaderBase(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
+                         ModuleLoadingMode loadMode, bool IgnoreSwiftSourceInfo,
+                         bool DisableImplicitSwiftModule,
+                         bool ImplicitModulesDisabled)
+    : SerializedModuleLoaderBase(ctx, tracker, loadMode, IgnoreSwiftSourceInfo,
+                                 ImplicitModulesDisabled)
   {}
 
   std::error_code findModuleFilesInDirectory(
@@ -241,9 +246,11 @@ public:
   static std::unique_ptr<SerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
          ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
-         bool IgnoreSwiftSourceInfo = false) {
+         bool IgnoreSwiftSourceInfo = false, bool ImplicitModulesDisabled = false) {
     return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
+      new SerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo,
+                                 /* IgnoreSwiftSourceInfo */ false,
+                                 ImplicitModulesDisabled)
     };
   }
 };

@@ -5,13 +5,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/inputs/Foo.swiftmodule -emit-module-doc-path %t/inputs/Foo.swiftdoc -emit-module-source-info -emit-module-source-info-path %t/inputs/Foo.swiftsourceinfo -module-cache-path %t.module-cache %t/foo.swift -module-name Foo
 
 // RUN: touch %t/inputs/Swift.swiftmodule
-// RUN: echo "[{" > %/t/inputs/map.json
-// RUN: echo "\"moduleName\": \"Foo\"," >> %/t/inputs/map.json
-// RUN: echo "\"modulePath\": \"%/t/inputs/Foo.swiftmodule\"," >> %/t/inputs/map.json
-// RUN: echo "\"docPath\": \"%/t/inputs/Foo.swiftdoc\"," >> %/t/inputs/map.json
-// RUN: echo "\"sourceInfoPath\": \"%/t/inputs/Foo.swiftsourceinfo\"" >> %/t/inputs/map.json
-// RUN: echo "}," >> %/t/inputs/map.json
-// RUN: echo "{" >> %/t/inputs/map.json
+// RUN: echo "[{" >> %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"Swift\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%stdlib_dir/Swift.swiftmodule/%module-target-triple.swiftmodule\"," >> %/t/inputs/map.json
 // RUN: echo "}," >> %/t/inputs/map.json
@@ -20,7 +14,8 @@
 // RUN: echo "\"modulePath\": \"%stdlib_dir/SwiftOnoneSupport.swiftmodule/%module-target-triple.swiftmodule\"," >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json
 
-// RUN: %target-swift-frontend -typecheck %s -explicit-swift-module-map-file %t/inputs/map.json -disable-implicit-swift-modules
-#if canImport(Foo)
+// Add the -I search path to ensure we do not accidentally implicitly load Foo.swiftmodule
+// RUN: not %target-swift-frontend -typecheck %s -I %t/inputs -explicit-swift-module-map-file %t/inputs/map.json -disable-implicit-swift-modules
 import Foo
-#endif
+// CHECK: error: no such module 'Foo'
+
