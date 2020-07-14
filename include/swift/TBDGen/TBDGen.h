@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringSet.h"
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Version.h"
 #include <vector>
 
@@ -88,10 +89,7 @@ struct TBDGenOptions {
   }
 };
 
-void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            const TBDGenOptions &opts);
-void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            const TBDGenOptions &opts);
+llvm::StringSet<> getPublicSymbols(TBDGenDescriptor desc);
 
 void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                   const TBDGenOptions &opts);

@@ -1190,19 +1190,9 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
   return std::make_pair(std::move(file), std::move(symbols));
 }
 
-void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   const TBDGenOptions &opts) {
-  assert(symbols.empty() && "Additive symbol enumeration not supported");
-  auto &evaluator = file->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forFile(file, opts);
-  symbols = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
-}
-void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   const TBDGenOptions &opts) {
-  assert(symbols.empty() && "Additive symbol enumeration not supported");
-  auto &evaluator = M->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forModule(M, opts);
-  symbols = llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
+StringSet swift::getPublicSymbols(TBDGenDescriptor desc) {
+  auto &evaluator = desc.getParentModule()->getASTContext().evaluator;
+  return llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                          const TBDGenOptions &opts) {
