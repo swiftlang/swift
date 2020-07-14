@@ -1073,7 +1073,7 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
     llvm::raw_svector_ostream NameOS(NameBuffer);
     NameOS << "ldAdd_" << Idx;
     OS << "extern const char " << NameOS.str() << " __asm(\"" <<
-      changeToLdAdd(S.getKey()) << "\");\n";
+      changeToLdAdd(S) << "\");\n";
     OS << "const char " << NameOS.str() << " = 0;\n";
     ++ Idx;
   }

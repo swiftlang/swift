@@ -67,10 +67,14 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
   if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
     return;
   Symbols.addSymbol(kind, name, Targets);
-  if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
-    auto isNewValue = StringSymbols->insert(name).second;
-    (void)isNewValue;
-    assert(isNewValue && "symbol appears twice");
+  if (kind == SymbolKind::GlobalSymbol) {
+    StringSymbols.push_back(name);
+#ifndef NDEBUG
+    if (!DuplicateSymbolChecker.insert(name).second) {
+      llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
+      assert(false && "TBDGen symbol appears twice");
+    }
+#endif
   }
 }
 
@@ -1130,10 +1134,8 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
     llvm::MachO::Target targetVar(*ctx.LangOpts.TargetVariant);
     file.addTarget(targetVar);
   }
-  StringSet symbols;
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  TBDGenVisitor visitor(file, {target}, &symbols,
-                        clang->getTargetInfo().getDataLayout(),
+  TBDGenVisitor visitor(file, {target}, clang->getTargetInfo().getDataLayout(),
                         linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
@@ -1182,10 +1184,10 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
     });
   }
 
-  return std::make_pair(std::move(file), std::move(symbols));
+  return std::make_pair(std::move(file), std::move(visitor.StringSymbols));
 }
 
-StringSet swift::getPublicSymbols(TBDGenDescriptor desc) {
+std::vector<std::string> swift::getPublicSymbols(TBDGenDescriptor desc) {
   auto &evaluator = desc.getParentModule()->getASTContext().evaluator;
   return llvm::cantFail(evaluator(GenerateTBDRequest{desc})).second;
 }
