@@ -508,6 +508,10 @@ static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
 
   P.addGlobalOpt();
   P.addLetPropertiesOpt();
+
+  P.addAccessEnforcementOpts();
+  P.addAccessEnforcementWMO();
+  // P.addAccessMarkerElimination();
 }
 
 static void addSerializePipeline(SILPassPipelinePlan &P) {
@@ -630,8 +634,6 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   // Sometimes stack promotion can catch cases only at this late stage of the
   // pipeline, after FunctionSignatureOpts.
   P.addStackPromotion();
-
-  P.addMarkReferenceUnique();
 
   // Optimize overflow checks.
   P.addRedundantOverflowCheckRemoval();

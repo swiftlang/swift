@@ -362,6 +362,9 @@ public:
   bool isLetAccess(SILFunction *F) const;
   
   bool isUniquelyIdentified() const {
+    if (auto *ref = dyn_cast<AllocRefInst>(value))
+      return ref->isUniqueReference();
+
     switch (getKind()) {
     case Box:
     case Stack:

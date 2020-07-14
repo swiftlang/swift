@@ -917,6 +917,25 @@ removeLocalNonNestedAccess(const AccessConflictAndMergeAnalysis::Result &result,
   return changed;
 }
 
+static bool promoteAccessToUniquelyIdentified(
+    const AccessConflictAndMergeAnalysis::Result &result,
+    const FunctionAccessedStorage &functionAccess) {
+  if (functionAccess.hasUnidentifiedAccess())
+    return false;
+
+  bool changed = false;
+  for (auto &beginAccessAndInfo : result.accessMap) {
+    BeginAccessInst *beginAccess = beginAccessAndInfo.first;
+    const AccessInfo &info = beginAccessAndInfo.second;
+    // Accesses to unique storage may be marked [static].
+    if (info.isUniquelyIdentified()) {
+      beginAccess->setEnforcement(SILAccessEnforcement::Static);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 // TODO: support multi-end access cases
 static EndAccessInst *getSingleEndAccess(BeginAccessInst *inst) {
   EndAccessInst *end = nullptr;
@@ -1127,6 +1146,12 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     // this function will overlap.
     const FunctionAccessedStorage &functionAccess = ASA->getEffects(F);
     if (removeLocalNonNestedAccess(result, functionAccess))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+
+    // Use the updated AccessedStorageAnalysis to find any uniquely identified
+    // storage accesses. All these accesses can be marked as statically
+    // enforced.
+    if (promoteAccessToUniquelyIdentified(result, functionAccess))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
 
     // Perform the access merging

@@ -758,7 +758,8 @@ Optional<StringRef> swift::isReferenceUnique(AllocRefInstBase *ref,
       continue;
     }
 
-    if (isa<BeginAccessInst>(user) || isa<RefElementAddrInst>(user)) {
+    if (isa<BeginAccessInst>(user) || isa<RefElementAddrInst>(user) ||
+        isa<StructElementAddrInst>(user) || isa<TupleElementAddrInst>(user)) {
       auto *userVal = cast<SingleValueInstruction>(user);
       usesToCheck.append(userVal->use_begin(), userVal->use_end());
       continue;
