@@ -1,3 +1,6 @@
+module DeclWithoutDefinition {
+  header "decl-without-definition.h"
+}
 module DeclWithDefinition {
   header "decl-with-definition.h"
 }
