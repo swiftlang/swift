@@ -1,6 +1,11 @@
+module TemplateWithPrimitiveArgument {
+  header "template-with-primitive-argument.h"
+}
+
 module DeclWithoutDefinition {
   header "decl-without-definition.h"
 }
+
 module DeclWithDefinition {
   header "decl-with-definition.h"
 }
