@@ -63,12 +63,11 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
                           "diagnostics");
   DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath.str());
 
-  // Compute the path of the YAML diagnostic messages directory files
-  // in the toolchain.
+  // Compute the path to the diagnostic translations in the toolchain/build.
   llvm::SmallString<128> DiagnosticMessagesDir(Path);
   llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /swift
   llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /bin
-  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift");
+  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift", "diagnostics");
   DiagnosticOpts.LocalizationPath = std::string(DiagnosticMessagesDir.str());
 }
 

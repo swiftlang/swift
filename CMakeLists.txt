@@ -1133,6 +1133,8 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(tools)
 endif()
 
+add_subdirectory(localization)
+
 add_subdirectory(utils)
 
 add_subdirectory(userdocs)
