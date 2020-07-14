@@ -2320,7 +2320,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     // Invalidate the pattern and the var decl.
     stmt->getPattern()->setType(ErrorType::get(Context));
     stmt->getPattern()->forEachVariable([&](VarDecl *var) {
-      if (var->hasInterfaceType() && !var->getType()->hasError())
+      if (var->hasInterfaceType() && !var->isInvalid())
         return;
       var->setInvalid();
     });
@@ -2403,7 +2403,7 @@ bool TypeChecker::typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
       elt.getPattern()->forEachVariable([&](VarDecl *var) {
         // Don't change the type of a variable that we've been able to
         // compute a type for.
-        if (var->hasInterfaceType() && !var->getType()->hasError())
+        if (var->hasInterfaceType() && !var->isInvalid())
           return;
         var->setInvalid();
       });
