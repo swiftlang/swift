@@ -921,7 +921,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
     // Emit the module contents.
-    irgen.emitGlobalTopLevel(desc.LinkerDirectives);
+    irgen.emitGlobalTopLevel(desc.getLinkerDirectives());
 
     for (auto *file : filesToEmit) {
       if (auto *nextSF = dyn_cast<SourceFile>(file)) {
@@ -1168,7 +1168,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   }
 
   // Emit the module contents.
-  irgen.emitGlobalTopLevel(desc.LinkerDirectives);
+  irgen.emitGlobalTopLevel(desc.getLinkerDirectives());
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
@@ -1296,14 +1296,14 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 }
 
 GeneratedModule swift::performIRGeneration(
-    const IRGenOptions &Opts, swift::ModuleDecl *M,
-    std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
-    const PrimarySpecificPaths &PSPs,
+    swift::ModuleDecl *M, const IRGenOptions &Opts,
+    const TBDGenOptions &TBDOpts, std::unique_ptr<SILModule> SILMod,
+    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
     ArrayRef<std::string> parallelOutputFilenames,
-    llvm::GlobalVariable **outModuleHash, llvm::StringSet<> *LinkerDirectives) {
+    llvm::GlobalVariable **outModuleHash) {
   auto desc = IRGenDescriptor::forWholeModule(
-      Opts, M, std::move(SILMod), ModuleName, PSPs, parallelOutputFilenames,
-      outModuleHash, LinkerDirectives);
+      M, Opts, TBDOpts, std::move(SILMod), ModuleName, PSPs,
+      parallelOutputFilenames, outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty()) {
@@ -1316,15 +1316,15 @@ GeneratedModule swift::performIRGeneration(
 }
 
 GeneratedModule swift::
-performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
+performIRGeneration(SourceFile &SF, const IRGenOptions &Opts,
+                    const TBDGenOptions &TBDOpts,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                     StringRef PrivateDiscriminator,
-                    llvm::GlobalVariable **outModuleHash,
-                    llvm::StringSet<> *LinkerDirectives) {
-  auto desc = IRGenDescriptor::forFile(Opts, SF, std::move(SILMod), ModuleName,
-                                       PSPs, PrivateDiscriminator,
-                                       outModuleHash, LinkerDirectives);
+                    llvm::GlobalVariable **outModuleHash) {
+  auto desc = IRGenDescriptor::forFile(SF, Opts, TBDOpts, std::move(SILMod),
+                                       ModuleName, PSPs, PrivateDiscriminator,
+                                       outModuleHash);
   return llvm::cantFail(SF.getASTContext().evaluator(IRGenRequest{desc}));
 }
 
