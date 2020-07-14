@@ -19,7 +19,8 @@
 // REQUIRES: OS=macosx
 
 %{
-word_bits = int(WORD_BITS) / 2
+from __future__ import division
+word_bits = int(WORD_BITS) // 2
 from SwiftIntTypes import all_integer_types
 }%
 

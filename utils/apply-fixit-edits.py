@@ -46,7 +46,7 @@ def apply_edits(path):
             text = ed.get("text", "")
             edits_per_file[fname].append((offset, length, text))
 
-    for fname, edits in edits_per_file.iteritems():
+    for fname, edits in edits_per_file.items():
         print('Updating', fname)
         edits.sort(reverse=True)
         with open(fname) as f:

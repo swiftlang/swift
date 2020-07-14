@@ -137,3 +137,18 @@ func test_mismatch_with_contextual_optional_result() {
   let _ = A(B(), keyPath: \.arr)
   // expected-error@-1 {{key path value type '[Int]' cannot be converted to contextual type '[Int]?'}}
 }
+
+// SR-11184
+class SR11184 {}
+
+func fSR11184(_ c: SR11184!, _ kp: ReferenceWritableKeyPath<SR11184, String?>, _ str: String) {
+  c[keyPath: kp] = str // OK
+  c![keyPath: kp] = str // OK
+  c?[keyPath: kp] = str // OK
+}
+
+func fSR11184_O(_ c: SR11184!, _ kp: ReferenceWritableKeyPath<SR11184, String?>, _ str: String?) {
+  c[keyPath: kp] = str // OK
+  c![keyPath: kp] = str // OK
+  c?[keyPath: kp] = str // OK
+}
