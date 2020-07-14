@@ -1252,7 +1252,7 @@ function(_add_swift_target_library_single target name)
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
       if(${SWIFTLIB_SINGLE_SDK} STREQUAL "IOS" OR
-         ${SWIFTLIB_SINGLE_SDK} STREQUAL "IOS" OR
+         ${SWIFTLIB_SINGLE_SDK} STREQUAL "TVOS" OR
          ${SWIFTLIB_SINGLE_SDK} STREQUAL "WATCHOS")
         # Please note that using a generator expression to fit
         # this in a single target_link_options does not work
