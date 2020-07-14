@@ -76,7 +76,7 @@ ModuleDecl *IRGenDescriptor::getParentModule() const {
   return Ctx.get<ModuleDecl *>();
 }
 
-llvm::StringSet<> IRGenDescriptor::getLinkerDirectives() const {
+std::vector<std::string> IRGenDescriptor::getLinkerDirectives() const {
   auto opts = TBDOpts;
   opts.LinkerDirectivesOnly = true;
   if (auto *SF = Ctx.dyn_cast<SourceFile *>()) {

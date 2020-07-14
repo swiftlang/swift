@@ -184,7 +184,7 @@ public:
   ModuleDecl *getParentModule() const;
 
   /// Compute the linker directives to emit.
-  llvm::StringSet<> getLinkerDirectives() const;
+  std::vector<std::string> getLinkerDirectives() const;
 };
 
 /// Report that a request of the given kind is being evaluated, so it
