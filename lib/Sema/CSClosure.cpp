@@ -345,7 +345,7 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     ClosureConstraintApplication application(
         solution, closure, closureFnType->getResult(), rewriteTarget);
     application.visit(fn.getBody());
-    closure->setBodyState(ClosureExpr::BodyState::TypeCheckedAtOnce);
+    closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
 
     return SolutionApplicationToFunctionResult::Success;
   }
