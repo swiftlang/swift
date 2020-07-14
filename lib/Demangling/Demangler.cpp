@@ -1911,6 +1911,9 @@ NodePointer Demangler::demangleMetatype() {
     case 'j':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorKey,
                              popNode());
+    case 'K':
+      return createWithChild(Node::Kind::MetadataInstantiationCache,
+                             popNode());
     case 'k':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorVar,
                              popNode());
