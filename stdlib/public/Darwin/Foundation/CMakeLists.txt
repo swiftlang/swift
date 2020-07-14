@@ -7,7 +7,7 @@ add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   BundleLookup.mm
   Calendar.swift
   CharacterSet.swift
-  CheckClass.mm
+  CheckClass.swift
   Codable.swift
   Collections+DataProtocol.swift
   CombineTypealiases.swift
