@@ -442,6 +442,8 @@ struct PrintOptions {
   /// (e.g.  MyFramework).
   bool MapCrossImportOverlaysToDeclaringModule = false;
 
+  bool PreferMacOSSpelling = false;
+
   bool PrintAsMember = false;
   
   /// Whether to print parameter specifiers as 'let' and 'var'.
@@ -530,6 +532,7 @@ struct PrintOptions {
     result.SkipUnderscoredKeywords = true;
     result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
     result.MapCrossImportOverlaysToDeclaringModule = true;
+    result.PreferMacOSSpelling = true;
     return result;
   }
 

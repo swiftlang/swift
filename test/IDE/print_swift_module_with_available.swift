@@ -14,8 +14,8 @@ public extension C1 {
   func ext_foo() {}
 }
 
-// CHECK1: @available(OSX 10.11, iOS 8.0, *)
+// CHECK1: @available(macOS 10.11, iOS 8.0, *)
 // CHECK1-NEXT: public class C1 {
 
-// CHECK1: @available(OSX 10.12, *)
+// CHECK1: @available(macOS 10.12, *)
 // CHECK1-NEXT: extension C1 {

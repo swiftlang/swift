@@ -2169,7 +2169,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
   },
   {
     key.kind: source.lang.swift.decl.extension.class,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)\nextension C1</Declaration><CommentParts><Abstract><Para>some comments</Para></Abstract></CommentParts></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)\nextension C1</Declaration><CommentParts><Abstract><Para>some comments</Para></Abstract></CommentParts></Other>",
     key.offset: 473,
     key.length: 37,
     key.extends: {
@@ -2426,7 +2426,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
   },
   {
     key.kind: source.lang.swift.decl.extension.class,
-    key.doc.full_as_xml: "<Other><Name></Name><Declaration>@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)\nextension C2</Declaration><CommentParts><Abstract><Para>some comments</Para></Abstract></CommentParts></Other>",
+    key.doc.full_as_xml: "<Other><Name></Name><Declaration>@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)\nextension C2</Declaration><CommentParts><Abstract><Para>some comments</Para></Abstract></CommentParts></Other>",
     key.offset: 982,
     key.length: 37,
     key.extends: {

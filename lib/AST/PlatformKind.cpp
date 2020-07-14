@@ -23,7 +23,18 @@
 
 using namespace swift;
 
-StringRef swift::platformString(PlatformKind platform) {
+StringRef swift::platformString(PlatformKind platform, bool useMacOSSpelling) {
+  if (useMacOSSpelling) {
+    switch (platform) {
+    case PlatformKind::OSX:
+      return "macOS";
+    case PlatformKind::OSXApplicationExtension:
+      return "macOSApplicationExtension";
+    default:
+      break;
+    }
+  }
+
   switch (platform) {
   case PlatformKind::none:
     return "*";
