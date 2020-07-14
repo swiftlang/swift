@@ -35,7 +35,9 @@ enum class PlatformKind: uint8_t {
 
 /// Returns the short string representing the platform, suitable for
 /// use in availability specifications (e.g., "OSX").
-StringRef platformString(PlatformKind platform);
+///
+/// \param useMacOSSpelling whether use the "macOS" spelling in place of "OSX".
+StringRef platformString(PlatformKind platform, bool useMacOSSpelling = false);
   
 /// Returns the platform kind corresponding to the passed-in short platform name
 /// or None if such a platform kind does not exist.

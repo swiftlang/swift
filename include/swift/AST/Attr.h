@@ -814,8 +814,8 @@ public:
   }
 
   /// Returns the string for the platform of the attribute.
-  StringRef platformString() const {
-    return swift::platformString(Platform);
+  StringRef platformString(bool PreferMacOSSpelling = false) const {
+    return swift::platformString(Platform, PreferMacOSSpelling);
   }
 
   /// Returns the human-readable string for the platform of the attribute.

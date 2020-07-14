@@ -427,7 +427,8 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
       assert(AvailAttr->Introduced.hasValue());
       if (isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
         continue;
-      Printer << platformString(AvailAttr->Platform) << " "
+      Printer << platformString(AvailAttr->Platform,
+                                Options.PreferMacOSSpelling) << " "
               << AvailAttr->Introduced.getValue().getAsString() << ", ";
     }
     Printer << "*)";
@@ -844,8 +845,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(module: ";
     auto Attr = cast<OriginallyDefinedInAttr>(this);
     Printer << "\"" << Attr->OriginalModuleName << "\", ";
-    Printer << platformString(Attr->Platform) << " " <<
-      Attr->MovedVersion.getAsString();
+    Printer << platformString(Attr->Platform, Options.PreferMacOSSpelling) <<
+      " " << Attr->MovedVersion.getAsString();
     Printer << ")";
     break;
   }
@@ -859,7 +860,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     else if (Attr->isPackageDescriptionVersionSpecific())
       Printer << "_PackageDescription";
     else
-      Printer << Attr->platformString();
+      Printer << Attr->platformString(Options.PreferMacOSSpelling);
 
     if (Attr->isUnconditionallyUnavailable())
       Printer << ", unavailable";
