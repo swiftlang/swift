@@ -506,6 +506,10 @@ static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
 
   P.addGlobalOpt();
   P.addLetPropertiesOpt();
+
+  P.addAccessEnforcementOpts();
+  P.addAccessEnforcementWMO();
+  P.addAccessMarkerElimination();
 }
 
 static void addSerializePipeline(SILPassPipelinePlan &P) {
