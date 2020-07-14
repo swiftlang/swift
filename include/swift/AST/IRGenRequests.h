@@ -27,6 +27,7 @@ namespace swift {
 class SourceFile;
 class IRGenOptions;
 class SILModule;
+struct TBDGenOptions;
 
 namespace irgen {
   class IRGenModule;
@@ -113,15 +114,17 @@ public:
 };
 
 struct IRGenDescriptor {
-  const IRGenOptions &Opts;
   llvm::PointerUnion<ModuleDecl *, SourceFile *> Ctx;
+
+  const IRGenOptions &Opts;
+  const TBDGenOptions &TBDOpts;
+
   SILModule *SILMod;
   StringRef ModuleName;
   const PrimarySpecificPaths &PSPs;
   StringRef PrivateDiscriminator;
   ArrayRef<std::string> parallelOutputFilenames;
   llvm::GlobalVariable **outModuleHash;
-  llvm::StringSet<> *LinkerDirectives;
 
   friend llvm::hash_code hash_value(const IRGenDescriptor &owner) {
     return llvm::hash_combine(owner.Ctx);
@@ -139,38 +142,38 @@ struct IRGenDescriptor {
 
 public:
   static IRGenDescriptor
-  forFile(const IRGenOptions &Opts, SourceFile &SF,
-          std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
-          const PrimarySpecificPaths &PSPs, StringRef PrivateDiscriminator,
-          llvm::GlobalVariable **outModuleHash,
-          llvm::StringSet<> *LinkerDirectives) {
-    return IRGenDescriptor{Opts,
-                           &SF,
+  forFile(SourceFile &SF, const IRGenOptions &Opts,
+          const TBDGenOptions &TBDOpts, std::unique_ptr<SILModule> &&SILMod,
+          StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+          StringRef PrivateDiscriminator,
+          llvm::GlobalVariable **outModuleHash) {
+    return IRGenDescriptor{&SF,
+                           Opts,
+                           TBDOpts,
                            SILMod.release(),
                            ModuleName,
                            PSPs,
                            PrivateDiscriminator,
                            {},
-                           outModuleHash,
-                           LinkerDirectives};
+                           outModuleHash};
   }
 
   static IRGenDescriptor
-  forWholeModule(const IRGenOptions &Opts, swift::ModuleDecl *M,
+  forWholeModule(ModuleDecl *M, const IRGenOptions &Opts,
+                 const TBDGenOptions &TBDOpts,
                  std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
                  const PrimarySpecificPaths &PSPs,
                  ArrayRef<std::string> parallelOutputFilenames,
-                 llvm::GlobalVariable **outModuleHash,
-                 llvm::StringSet<> *LinkerDirectives) {
-    return IRGenDescriptor{Opts,
-                           M,
+                 llvm::GlobalVariable **outModuleHash) {
+    return IRGenDescriptor{M,
+                           Opts,
+                           TBDOpts,
                            SILMod.release(),
                            ModuleName,
                            PSPs,
                            "",
                            parallelOutputFilenames,
-                           outModuleHash,
-                           LinkerDirectives};
+                           outModuleHash};
   }
 
   /// Retrieves the files to perform IR generation for.
@@ -179,6 +182,9 @@ public:
   /// For a single file, returns its parent module, otherwise returns the module
   /// itself.
   ModuleDecl *getParentModule() const;
+
+  /// Compute the linker directives to emit.
+  llvm::StringSet<> getLinkerDirectives() const;
 };
 
 /// Report that a request of the given kind is being evaluated, so it

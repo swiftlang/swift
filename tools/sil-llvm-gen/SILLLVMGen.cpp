@@ -204,7 +204,9 @@ int main(int argc, char **argv) {
   }
 
   const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
-  auto Mod = performIRGeneration(Opts, CI.getMainModule(), std::move(SILMod),
+  auto Mod = performIRGeneration(CI.getMainModule(), Opts,
+                                 CI.getInvocation().getTBDGenOptions(),
+                                 std::move(SILMod),
                                  CI.getMainModule()->getName().str(), PSPs,
                                  ArrayRef<std::string>());
   return CI.getASTContext().hadError();

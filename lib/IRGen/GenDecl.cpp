@@ -1027,7 +1027,8 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
   return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
 }
 
-void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
+void IRGenerator::emitGlobalTopLevel(
+    const llvm::StringSet<> &linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
@@ -1047,10 +1048,8 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
     CurrentIGMPtr IGM = getGenModule(wt.getProtocol()->getDeclContext());
     ensureRelativeSymbolCollocation(wt);
   }
-  if (linkerDirectives) {
-    for (auto &entry: *linkerDirectives) {
-      createLinkerDirectiveVariable(*PrimaryIGM, entry.getKey());
-    }
+  for (auto &entry: linkerDirectives) {
+    createLinkerDirectiveVariable(*PrimaryIGM, entry.getKey());
   }
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
     Decl *decl = v.getDecl();

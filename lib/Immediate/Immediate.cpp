@@ -201,9 +201,10 @@ int swift::RunImmediately(CompilerInstance &CI,
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
   const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
+  const auto &TBDOpts = CI.getInvocation().getTBDGenOptions();
   auto GenModule = performIRGeneration(
-      IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
-      PSPs, ArrayRef<std::string>());
+      swiftModule, IRGenOpts, TBDOpts, std::move(SM),
+      swiftModule->getName().str(), PSPs, ArrayRef<std::string>());
 
   if (Context.hadError())
     return -1;
