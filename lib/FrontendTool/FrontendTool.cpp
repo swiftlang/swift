@@ -1053,9 +1053,9 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
   }
   auto tbdOpts = Invocation.getTBDGenOptions();
   tbdOpts.LinkerDirectivesOnly = true;
-  llvm::StringSet<> ldSymbols;
   auto *module = Instance.getMainModule();
-  enumeratePublicSymbols(module, ldSymbols, tbdOpts);
+  auto ldSymbols =
+      getPublicSymbols(TBDGenDescriptor::forModule(module, tbdOpts));
   std::error_code EC;
   llvm::raw_fd_ostream OS(Path, EC, llvm::sys::fs::F_None);
   if (EC) {
@@ -1662,15 +1662,17 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
                      OutputFilename, Instance.getStatsReporter());
 }
 
-static void collectLinkerDirectives(const CompilerInvocation &Invocation,
-                                    ModuleOrSourceFile MSF,
-                                    llvm::StringSet<> &Symbols) {
+static llvm::StringSet<>
+collectLinkerDirectives(const CompilerInvocation &Invocation,
+                        ModuleOrSourceFile MSF) {
   auto tbdOpts = Invocation.getTBDGenOptions();
   tbdOpts.LinkerDirectivesOnly = true;
-  if (MSF.is<SourceFile*>())
-    enumeratePublicSymbols(MSF.get<SourceFile*>(), Symbols, tbdOpts);
-  else
-    enumeratePublicSymbols(MSF.get<ModuleDecl*>(), Symbols, tbdOpts);
+  if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
+    return getPublicSymbols(TBDGenDescriptor::forFile(SF, tbdOpts));
+  } else {
+    return getPublicSymbols(
+        TBDGenDescriptor::forModule(MSF.get<ModuleDecl *>(), tbdOpts));
+  }
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,

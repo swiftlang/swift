@@ -139,9 +139,7 @@ bool swift::validateTBD(ModuleDecl *M,
                         const llvm::Module &IRModule,
                         const TBDGenOptions &opts,
                         bool diagnoseExtraSymbolsInTBD) {
-  llvm::StringSet<> symbols;
-  enumeratePublicSymbols(M, symbols, opts);
-
+  auto symbols = getPublicSymbols(TBDGenDescriptor::forModule(M, opts));
   return validateSymbolSet(M->getASTContext().Diags, symbols, IRModule,
                            diagnoseExtraSymbolsInTBD);
 }
@@ -150,9 +148,7 @@ bool swift::validateTBD(FileUnit *file,
                         const llvm::Module &IRModule,
                         const TBDGenOptions &opts,
                         bool diagnoseExtraSymbolsInTBD) {
-  llvm::StringSet<> symbols;
-  enumeratePublicSymbols(file, symbols, opts);
-
+  auto symbols = getPublicSymbols(TBDGenDescriptor::forFile(file, opts));
   return validateSymbolSet(file->getParentModule()->getASTContext().Diags,
                            symbols, IRModule,
                            diagnoseExtraSymbolsInTBD);
