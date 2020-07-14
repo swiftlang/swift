@@ -38,6 +38,8 @@
 #include <utility>
 #include <vector>
 
+#include <inttypes.h>
+
 namespace {
 
 template <unsigned PointerSize> struct MachOTraits;
@@ -958,7 +960,8 @@ public:
         // FIXME: std::stringstream would be better, but LLVM's standard library
         // introduces a vtable and we don't want that.
         char result[128];
-        std::snprintf(result, sizeof(result), "unable to read Next pointer %p",
+        std::snprintf(result, sizeof(result),
+            "unable to read Next pointer %#" PRIx64,
             BacktraceListNext.getAddressData());
         return std::string(result);
       }
