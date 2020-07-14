@@ -175,6 +175,10 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   if (*knownProtocol == KnownProtocolKind::Hashable) {
     tryDiagnoseFailedHashableDerivation(DC, nominal);
   }
+
+  if (*knownProtocol == KnownProtocolKind::Comparable) {
+    tryDiagnoseFailedComparableDerivation(DC, nominal);
+  }
 }
 
 ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
