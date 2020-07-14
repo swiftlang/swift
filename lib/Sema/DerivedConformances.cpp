@@ -24,6 +24,8 @@
 
 using namespace swift;
 
+enum NonconformingMemberKind { AssociatedValue, StoredProperty };
+
 DerivedConformance::DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                                        NominalTypeDecl *nominal,
                                        ProtocolDecl *protocol)
@@ -159,6 +161,27 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   return false;
 }
 
+SmallVector<VarDecl *, 3>
+DerivedConformance::storedPropertiesNotConformingToProtocol(
+    DeclContext *DC, StructDecl *theStruct, ProtocolDecl *protocol) {
+  auto storedProperties = theStruct->getStoredProperties();
+  SmallVector<VarDecl *, 3> nonconformingProperties;
+  for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
+    auto type = propertyDecl->getValueInterfaceType();
+    if (!type)
+      nonconformingProperties.push_back(propertyDecl);
+
+    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
+                                         DC)) {
+      nonconformingProperties.push_back(propertyDecl);
+    }
+  }
+  return nonconformingProperties;
+}
+
 void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
                                                      NominalTypeDecl *nominal,
                                                      ProtocolDecl *protocol) {
@@ -166,8 +189,6 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   if (!knownProtocol)
     return;
   
-  // Comparable on eligible type kinds should never fail
-   
   if (*knownProtocol == KnownProtocolKind::Equatable) {
     tryDiagnoseFailedEquatableDerivation(DC, nominal);
   }
@@ -178,6 +199,60 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
 
   if (*knownProtocol == KnownProtocolKind::Comparable) {
     tryDiagnoseFailedComparableDerivation(DC, nominal);
+  }
+}
+
+void DerivedConformance::diagnoseAnyNonConformingMemberTypes(
+    DeclContext *DC, NominalTypeDecl *nominal, ProtocolDecl *protocol) {
+  ASTContext &ctx = DC->getASTContext();
+
+  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    auto nonconformingAssociatedTypes =
+        associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
+    for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
+      SourceLoc reprLoc;
+      if (auto *repr = typeToDiagnose->getTypeRepr())
+        reprLoc = repr->getStartLoc();
+      ctx.Diags.diagnose(
+          reprLoc, diag::missing_member_type_conformance_prevents_synthesis,
+          NonconformingMemberKind::AssociatedValue,
+          typeToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
+          nominal->getDeclaredInterfaceType());
+    }
+  }
+
+  if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+    auto nonconformingStoredProperties =
+        storedPropertiesNotConformingToProtocol(DC, structDecl, protocol);
+    for (auto *propertyToDiagnose : nonconformingStoredProperties) {
+      ctx.Diags.diagnose(
+          propertyToDiagnose->getLoc(),
+          diag::missing_member_type_conformance_prevents_synthesis,
+          NonconformingMemberKind::StoredProperty,
+          propertyToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
+          nominal->getDeclaredInterfaceType());
+    }
+  }
+}
+
+void DerivedConformance::diagnoseIfSynthesisUnsupportedForDecl(
+    NominalTypeDecl *nominal, ProtocolDecl *protocol) {
+  auto shouldDiagnose = false;
+
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Hashable)) {
+    shouldDiagnose = isa<ClassDecl>(nominal);
+  }
+
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Comparable)) {
+    shouldDiagnose = !isa<EnumDecl>(nominal);
+  }
+
+  if (shouldDiagnose) {
+    auto &ctx = nominal->getASTContext();
+    ctx.Diags.diagnose(nominal->getLoc(),
+                       diag::automatic_protocol_synthesis_unsupported,
+                       protocol->getName().str(), isa<StructDecl>(nominal));
   }
 }
 

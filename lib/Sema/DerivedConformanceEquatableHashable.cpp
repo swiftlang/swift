@@ -31,49 +31,6 @@
 
 using namespace swift;
 
-enum NonconformingMemberKind {
-  AssociatedValue,
-  StoredProperty
-};
-
-/// Returns the VarDecl of each stored property in the given struct whose type
-/// does not conform to a protocol.
-/// \p theStruct The struct whose stored properties should be checked.
-/// \p protocol The protocol being requested.
-/// \return The VarDecl of each stored property whose type does not conform.
-static SmallVector<VarDecl *, 3>
-storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
-                                        ProtocolDecl *protocol) {
-  auto storedProperties = theStruct->getStoredProperties();
-  SmallVector<VarDecl *, 3> nonconformingProperties;
-  for (auto propertyDecl : storedProperties) {
-    if (!propertyDecl->isUserAccessible())
-      continue;
-
-    auto type = propertyDecl->getValueInterfaceType();
-    if (!type)
-      nonconformingProperties.push_back(propertyDecl);
-
-    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC)) {
-      nonconformingProperties.push_back(propertyDecl);
-    }
-  }
-  return nonconformingProperties;
-}
-
-/// Returns true if every stored property in the given struct conforms to the
-/// protocol (or, vacuously, if it has no stored properties).
-/// \p theStruct The struct whose stored properties should be checked.
-/// \p protocol The protocol being requested.
-/// \return True if all stored properties of the struct conform.
-static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
-                                                 StructDecl *theStruct,
-                                                 ProtocolDecl *protocol) {
-  return storedPropertiesNotConformingToProtocol(DC, theStruct, protocol)
-      .empty();
-}
-
 /// Common preconditions for Equatable and Hashable.
 static bool canDeriveConformance(DeclContext *DC,
                                  NominalTypeDecl *target,
@@ -86,53 +43,14 @@ static bool canDeriveConformance(DeclContext *DC,
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
-    // All stored properties of the struct must conform to the protocol.
-    return allStoredPropertiesConformToProtocol(DC, structDecl, protocol);
+    // All stored properties of the struct must conform to the protocol. If
+    // there are no stored properties, we will vaccously return true.
+    return DerivedConformance::storedPropertiesNotConformingToProtocol(
+               DC, structDecl, protocol)
+        .empty();
   }
 
   return false;
-}
-
-/// Diagnose failed conformance synthesis caused by a member type not conforming
-/// to the same protocol
-void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
-                              ProtocolDecl *protocol) {
-  ASTContext &ctx = DC->getASTContext();
-
-  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
-    auto nonconformingAssociatedTypes =
-        DerivedConformance::associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
-    for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
-      SourceLoc reprLoc;
-      if (auto *repr = typeToDiagnose->getTypeRepr())
-        reprLoc = repr->getStartLoc();
-      ctx.Diags.diagnose(
-          reprLoc,
-          diag::missing_member_type_conformance_prevents_synthesis,
-          NonconformingMemberKind::AssociatedValue,
-          typeToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
-          nominal->getDeclaredInterfaceType());
-    }
-  }
-
-  if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
-    auto nonconformingStoredProperties =
-        storedPropertiesNotConformingToProtocol(DC, structDecl, protocol);
-    for (auto *propertyToDiagnose : nonconformingStoredProperties) {
-      ctx.Diags.diagnose(
-          propertyToDiagnose->getLoc(),
-          diag::missing_member_type_conformance_prevents_synthesis,
-          NonconformingMemberKind::StoredProperty,
-          propertyToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
-          nominal->getDeclaredInterfaceType());
-    }
-  }
-
-  if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
-    ctx.Diags.diagnose(classDecl->getLoc(),
-                       diag::automatic_protocol_synthesis_unsupported,
-                       protocol->getName().str(), 0);
-  }
 }
 
 static std::pair<BraceStmt *, bool>
@@ -565,7 +483,8 @@ void DerivedConformance::tryDiagnoseFailedEquatableDerivation(
     DeclContext *DC, NominalTypeDecl *nominal) {
   ASTContext &ctx = DC->getASTContext();
   auto *equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
-  diagnoseFailedDerivation(DC, nominal, equatableProto);
+  diagnoseAnyNonConformingMemberTypes(DC, nominal, equatableProto);
+  diagnoseIfSynthesisUnsupportedForDecl(nominal, equatableProto);
 }
 
 /// Returns a new \c CallExpr representing
@@ -1048,7 +967,8 @@ void DerivedConformance::tryDiagnoseFailedHashableDerivation(
     DeclContext *DC, NominalTypeDecl *nominal) {
   ASTContext &ctx = DC->getASTContext();
   auto *hashableProto = ctx.getProtocol(KnownProtocolKind::Hashable);
-  diagnoseFailedDerivation(DC, nominal, hashableProto);
+  diagnoseAnyNonConformingMemberTypes(DC, nominal, hashableProto);
+  diagnoseIfSynthesisUnsupportedForDecl(nominal, hashableProto);
 }
 
 ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
