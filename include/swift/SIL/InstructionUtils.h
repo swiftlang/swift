@@ -173,6 +173,8 @@ private:
 /// return SILValue().
 SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
 
+SILFunction *getDestructor(AllocRefInstBase *ari);
+
 } // end namespace swift
 
 #endif

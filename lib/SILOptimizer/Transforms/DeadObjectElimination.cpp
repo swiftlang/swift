@@ -61,42 +61,6 @@ STATISTIC(DeadAllocApplyEliminated,
 
 using UserList = llvm::SmallSetVector<SILInstruction *, 16>;
 
-// Analyzing the body of this class destructor is valid because the object is
-// dead. This means that the object is never passed to objc_setAssociatedObject,
-// so its destructor cannot be extended at runtime.
-static SILFunction *getDestructor(AllocRefInst *ARI) {
-  // We only support classes.
-  ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
-  if (!ClsDecl)
-    return nullptr;
-
-  // Look up the destructor of ClsDecl.
-  DestructorDecl *Destructor = ClsDecl->getDestructor();
-  assert(Destructor && "getDestructor() should never return a nullptr.");
-
-  // Find the destructor name via SILDeclRef.
-  // FIXME: When destructors get moved into vtables, update this to use the
-  // vtable for the class.
-  SILDeclRef Ref(Destructor);
-  SILFunction *Fn = ARI->getModule().lookUpFunction(Ref);
-  if (!Fn || Fn->empty()) {
-    LLVM_DEBUG(llvm::dbgs() << "    Could not find destructor.\n");
-    return nullptr;
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "    Found destructor!\n");
-
-  // If the destructor has an objc_method calling convention, we cannot
-  // analyze it since it could be swapped out from under us at runtime.
-  if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
-    LLVM_DEBUG(llvm::dbgs() << "        Found Objective-C destructor. Can't "
-               "analyze!\n");
-    return nullptr;
-  }
-
-  return Fn;
-}
-
 /// Analyze the destructor for the class of ARI to see if any instructions in it
 /// could have side effects on the program outside the destructor. If it does
 /// not, then we can eliminate the destructor.

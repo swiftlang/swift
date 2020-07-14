@@ -1334,12 +1334,21 @@ public:
           usesToCheck.append(arg->use_begin(), arg->use_end());
           continue;
         }
+        
+        if (isa<StrongReleaseInst>(user)) {
+          auto *destructor = getDestructor(ARI);
+          require(destructor, "Cannot find destructor for reference type while checking strong_release does not escape the unique reference.");
+          auto *selfInDestructor = destructor->begin()->getArgument(0);
+          usesToCheck.append(selfInDestructor->use_begin(),
+                             selfInDestructor->use_end());
+          continue;
+        }
 
         // These instructions are OK.
         if (isa<LoadInst>(user) || isa<DeallocRefInst>(user) ||
             isa<EndAccessInst>(user) || isa<SetDeallocatingInst>(user) ||
             isa<DebugValueInst>(user) || isa<DebugValueAddrInst>(user) ||
-            isa<ClassMethodInst>(user))
+            isa<ClassMethodInst>(user) || isa<StrongRetainInst>(user))
           continue;
 
         if (auto *store = dyn_cast<StoreInst>(user)) {

@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil -module-name run | %FileCheck %s
+// RUN: %swift %s -emit-sil -module-name test | %FileCheck %s
 
 // The main thing here is to make sure that we can read in an `alloc_ref` with
 // the `[unique]` flag and print it back out without triggering SILVerifier
@@ -171,4 +171,39 @@ bb0(%0 : $Bool, %1 : $Bool):
   %11 = apply %10(%2) : $@convention(thin) (@guaranteed Foo) -> Int
   // strong_release %2 : $Foo
   return %11 : $Int
+}
+
+// Foo.deinit
+sil @$s4test3FooCfd : $@convention(method) (@guaranteed Foo) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo, let, name "self", argno 1 // id: %1
+  %2 = unchecked_ref_cast %0 : $Foo to $Builtin.NativeObject // user: %3
+  return %2 : $Builtin.NativeObject               // id: %3
+} // end sil function '$s4test3FooCfd'
+
+// Foo.__deallocating_deinit
+sil @$s4test3FooCfD : $@convention(method) (@owned Foo) -> () {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo, let, name "self", argno 1 // id: %1
+  debug_value %0 : $Foo, let, name "self", argno 1 // id: %2
+  dealloc_ref %0 : $Foo                           // id: %3
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+} // end sil function '$s4test3FooCfD'
+
+// CHECK-LABEL: sil @test_strong_release
+// CHECK: alloc_ref [stack] [unique] $MyClass
+// CHECK-LABEL: end sil function 'test_strong_release'
+sil @test_strong_release : $@convention(thin) (Bool, Bool) -> () {
+bb0(%0 : $Bool, %1 : $Bool):
+  %2 = alloc_ref [unique] $Foo
+  strong_release %2 : $Foo
+  %t = tuple ()
+  return %t : $()
+}
+
+sil_vtable Foo {
+  #Foo.deinit!deallocator: @$s4test3FooCfD      // Foo.__deallocating_deinit
 }
