@@ -2234,21 +2234,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       }
     }
 
-    if (PD->getTypeRepr()) {
-      return validateParameterType(PD);
-    }
+    if (!PD->getTypeRepr())
+      return Type();
 
-    // Try type checking the closure if it hasn't.
-    if (auto *closure = dyn_cast<ClosureExpr>(PD->getDeclContext())) {
-      if (!closure->getType() && !closure->hasSingleExpressionBody()) {
-        swift::typeCheckASTNodeAtLoc(closure->getParent(), closure->getLoc());
-        if (PD->hasInterfaceType())
-          return PD->getInterfaceType();
-      }
-    }
-
-    // Failed.
-    return Type();
+    return validateParameterType(PD);
   }
 
   case DeclKind::Var: {
