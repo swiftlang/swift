@@ -115,7 +115,7 @@ SerializedModuleLoaderBase::SerializedModuleLoaderBase(
       IgnoreSwiftSourceInfoFile(IgnoreSwiftSourceInfoFile) {}
 
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
-SerializedModuleLoader::~SerializedModuleLoader() = default;
+ImplicitSerializedModuleLoader::~ImplicitSerializedModuleLoader() = default;
 MemoryBufferSerializedModuleLoader::~MemoryBufferSerializedModuleLoader() =
     default;
 
@@ -243,7 +243,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
   });
 }
 
-void SerializedModuleLoader::collectVisibleTopLevelModuleNames(
+void ImplicitSerializedModuleLoader::collectVisibleTopLevelModuleNames(
     SmallVectorImpl<Identifier> &names) const {
   collectVisibleTopLevelModuleNamesImpl(
       names, file_types::getExtension(file_types::TY_SwiftModuleFile));
@@ -397,7 +397,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   return std::move(dependencies);
 }
 
-std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
+std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
@@ -434,7 +434,7 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
-bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
+bool ImplicitSerializedModuleLoader::maybeDiagnoseTargetMismatch(
     SourceLoc sourceLocation, StringRef moduleName,
     const SerializedModuleBaseName &absoluteBaseName) {
   llvm::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();
