@@ -1103,11 +1103,11 @@ struct LLVMCodeGenThreads {
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output files.
 /// All this is done in multiple threads.
-static void performParallelIRGeneration(
-    const IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
-    StringRef ModuleName,
-    ArrayRef<std::string> outputFilenames,
-    llvm::StringSet<> *linkerDirectives) {
+static void performParallelIRGeneration(IRGenDescriptor desc) {
+  const auto &Opts = desc.Opts;
+  auto outputFilenames = desc.parallelOutputFilenames;
+  auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
+  auto *M = desc.getParentModule();
 
   IRGenerator irgen(Opts, *SILMod);
 
@@ -1148,7 +1148,7 @@ static void performParallelIRGeneration(
     // Create the IR emitter.
     IRGenModule *IGM =
         new IRGenModule(irgen, std::move(targetMachine), nextSF,
-                        ModuleName, *OutputIter++, nextSF->getFilename(),
+                        desc.ModuleName, *OutputIter++, nextSF->getFilename(),
                         nextSF->getPrivateDiscriminator().str());
     IGMcreated = true;
 
@@ -1168,7 +1168,7 @@ static void performParallelIRGeneration(
   }
 
   // Emit the module contents.
-  irgen.emitGlobalTopLevel(linkerDirectives);
+  irgen.emitGlobalTopLevel(desc.LinkerDirectives);
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
@@ -1301,18 +1301,17 @@ GeneratedModule swift::performIRGeneration(
     const PrimarySpecificPaths &PSPs,
     ArrayRef<std::string> parallelOutputFilenames,
     llvm::GlobalVariable **outModuleHash, llvm::StringSet<> *LinkerDirectives) {
+  auto desc = IRGenDescriptor::forWholeModule(
+      Opts, M, std::move(SILMod), ModuleName, PSPs, parallelOutputFilenames,
+      outModuleHash, LinkerDirectives);
+
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty()) {
-    ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
-                                  parallelOutputFilenames, LinkerDirectives);
+    ::performParallelIRGeneration(desc);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return GeneratedModule::null();
   }
-
-  auto desc = IRGenDescriptor::forWholeModule(
-      Opts, M, std::move(SILMod), ModuleName, PSPs, parallelOutputFilenames,
-      outModuleHash, LinkerDirectives);
   return llvm::cantFail(M->getASTContext().evaluator(IRGenRequest{desc}));
 }
 
