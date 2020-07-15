@@ -160,7 +160,7 @@ public:
           Lowering::TypeConverter &Conv, std::unique_ptr<SILModule> &&SILMod,
           StringRef ModuleName, const PrimarySpecificPaths &PSPs,
           StringRef PrivateDiscriminator,
-          llvm::GlobalVariable **outModuleHash) {
+          llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{file,
                            Opts,
                            TBDOpts,
@@ -180,8 +180,8 @@ public:
                  Lowering::TypeConverter &Conv,
                  std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
                  const PrimarySpecificPaths &PSPs,
-                 ArrayRef<std::string> parallelOutputFilenames,
-                 llvm::GlobalVariable **outModuleHash) {
+                 ArrayRef<std::string> parallelOutputFilenames = {},
+                 llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{M,
                            Opts,
                            TBDOpts,
