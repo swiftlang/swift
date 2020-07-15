@@ -309,6 +309,13 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   if (Opts.PrintInlineTree)
     ModulePasses.add(createInlineTreePrinterPass());
 
+  // Make sure we do ARC contraction under optimization.  We don't
+  // rely on any other LLVM ARC transformations, but we do need ARC
+  // contraction to add the objc_retainAutoreleasedReturnValue
+  // assembly markers and remove clang.arc.used.
+  if (Opts.shouldOptimize() && !DisableObjCARCContract)
+    ModulePasses.add(createObjCARCContractPass());
+
   // Do it.
   ModulePasses.run(*Module);
 
@@ -530,13 +537,6 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   performLLVMOptimizations(Opts, Module, TargetMachine);
 
   legacy::PassManager EmitPasses;
-
-  // Make sure we do ARC contraction under optimization.  We don't
-  // rely on any other LLVM ARC transformations, but we do need ARC
-  // contraction to add the objc_retainAutoreleasedReturnValue
-  // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract)
-    EmitPasses.add(createObjCARCContractPass());
 
   // Set up the final emission passes.
   switch (Opts.OutputKind) {
