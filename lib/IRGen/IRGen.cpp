@@ -536,44 +536,6 @@ bool swift::performLLVM(const IRGenOptions &Opts,
 
   performLLVMOptimizations(Opts, Module, TargetMachine);
 
-  legacy::PassManager EmitPasses;
-
-  // Set up the final emission passes.
-  switch (Opts.OutputKind) {
-  case IRGenOutputKind::Module:
-    break;
-  case IRGenOutputKind::LLVMAssembly:
-    EmitPasses.add(createPrintModulePass(*RawOS));
-    break;
-  case IRGenOutputKind::LLVMBitcode: {
-    if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-      EmitPasses.add(createWriteThinLTOBitcodePass(*RawOS));
-    } else {
-      EmitPasses.add(createBitcodeWriterPass(*RawOS));
-    }
-    break;
-  }
-  case IRGenOutputKind::NativeAssembly:
-  case IRGenOutputKind::ObjectFile: {
-    CodeGenFileType FileType;
-    FileType = (Opts.OutputKind == IRGenOutputKind::NativeAssembly
-                  ? CGFT_AssemblyFile
-                  : CGFT_ObjectFile);
-
-    EmitPasses.add(createTargetTransformInfoWrapperPass(
-        TargetMachine->getTargetIRAnalysis()));
-
-    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, *RawOS, nullptr,
-                                                   FileType, !Opts.Verify);
-    if (fail) {
-      diagnoseSync(Diags, DiagMutex,
-                   SourceLoc(), diag::error_codegen_init_fail);
-      return true;
-    }
-    break;
-  }
-  }
-
   if (Stats) {
     if (DiagMutex)
       DiagMutex->lock();
@@ -582,16 +544,66 @@ bool swift::performLLVM(const IRGenOptions &Opts,
       DiagMutex->unlock();
   }
 
-  EmitPasses.run(*Module);
+  if (!RawOS)
+    return false;
 
-  if (Stats && RawOS.hasValue()) {
-    if (DiagMutex)
-      DiagMutex->lock();
-    Stats->getFrontendCounters().NumLLVMBytesOutput += RawOS->tell();
-    if (DiagMutex)
-      DiagMutex->unlock();
+  return compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags, *RawOS,
+                             DiagMutex);
+}
+
+bool swift::compileAndWriteLLVM(llvm::Module *module,
+                                llvm::TargetMachine *targetMachine,
+                                const IRGenOptions &opts,
+                                UnifiedStatsReporter *stats,
+                                DiagnosticEngine &diags,
+                                llvm::raw_pwrite_stream &out,
+                                llvm::sys::Mutex *diagMutex) {
+  legacy::PassManager EmitPasses;
+
+  // Set up the final emission passes.
+  switch (opts.OutputKind) {
+  case IRGenOutputKind::Module:
+    break;
+  case IRGenOutputKind::LLVMAssembly:
+    EmitPasses.add(createPrintModulePass(out));
+    break;
+  case IRGenOutputKind::LLVMBitcode: {
+    if (opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
+      EmitPasses.add(createWriteThinLTOBitcodePass(out));
+    } else {
+      EmitPasses.add(createBitcodeWriterPass(out));
+    }
+    break;
+  }
+  case IRGenOutputKind::NativeAssembly:
+  case IRGenOutputKind::ObjectFile: {
+    CodeGenFileType FileType;
+    FileType =
+        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CGFT_AssemblyFile
+                                                            : CGFT_ObjectFile);
+    EmitPasses.add(createTargetTransformInfoWrapperPass(
+        targetMachine->getTargetIRAnalysis()));
+
+    bool fail = targetMachine->addPassesToEmitFile(EmitPasses, out, nullptr,
+                                                   FileType, !opts.Verify);
+    if (fail) {
+      diagnoseSync(diags, diagMutex, SourceLoc(),
+                   diag::error_codegen_init_fail);
+      return true;
+    }
+    break;
+  }
   }
 
+  EmitPasses.run(*module);
+
+  if (stats) {
+    if (diagMutex)
+      diagMutex->lock();
+    stats->getFrontendCounters().NumLLVMBytesOutput += out.tell();
+    if (diagMutex)
+      diagMutex->unlock();
+  }
   return false;
 }
 

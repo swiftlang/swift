@@ -232,6 +232,15 @@ namespace swift {
   void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine);
 
+  /// Compiles and writes the given LLVM module into an output stream in the
+  /// format specified in the \c IRGenOptions.
+  bool compileAndWriteLLVM(llvm::Module *module,
+                           llvm::TargetMachine *targetMachine,
+                           const IRGenOptions &opts,
+                           UnifiedStatsReporter *stats, DiagnosticEngine &diags,
+                           llvm::raw_pwrite_stream &out,
+                           llvm::sys::Mutex *diagMutex = nullptr);
+
   /// Wrap a serialized module inside a swift AST section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                    StringRef OutputPath);
