@@ -20,12 +20,15 @@ bits = self_type.bits
 
 def Availability(bits):
     if bits == 16:
-        return '@available(macOS 10.16, iOS 14.0, tvOS 14.0, watchOS 7.0, *)'
+        return '@available(iOS 14.0, tvOS 14.0, watchOS 7.0, *)'
     return ''
 }%
 
 % if bits == 80:
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+% end
+% if bits == 16:
+#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
 % end
 
 //===----------------------------------------------------------------------===//
@@ -296,7 +299,7 @@ extension ${Self} {
   }
 }
 
-% if bits == 80:
+% if bits == 80 or bits == 16:
 #endif
 % end
 % end
