@@ -1181,3 +1181,15 @@ void takeNullableId(_Nullable id);
 @interface IUOProperty
 @property (readonly) id<OptionalRequirements> iuo;
 @end
+
+@interface ColorDescriptor : NSObject <NSCopying>
+@end
+
+@interface ColorArray : NSObject
+- (ColorDescriptor *)objectAtIndexedSubscript:(NSUInteger)attachmentIndex;
+- (void)setObject:(nullable ColorDescriptor *)attachment atIndexedSubscript:(NSUInteger)attachmentIndex;
+@end
+
+@interface PaletteDescriptor : NSObject <NSCopying>
+@property (readonly, nonnull) ColorArray *colors;
+@end
