@@ -63,7 +63,7 @@ def _make_line_map(target_filename, stream=None):
     """
     >>> try:
     ...     from StringIO import StringIO # py2
-    ... except ModuleNotFoundError:
+    ... except ImportError:
     ...     from io import StringIO # py3
     >>> _make_line_map('box',
     ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
