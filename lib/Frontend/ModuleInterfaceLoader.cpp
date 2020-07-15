@@ -1162,7 +1162,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
 
   if (CompRe.match(SB, &CompMatches)) {
     assert(CompMatches.size() == 2);
-    CompilerVersion = ArgSaver.save(CompMatches[1]);
+    CompilerVersion = std::string(ArgSaver.save(CompMatches[1]));
   }
   else {
     // Don't diagnose; handwritten module interfaces don't include this field.
@@ -1196,7 +1196,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
 }
 
 void InterfaceSubContextDelegateImpl::addExtraClangArg(StringRef arg) {
-  subInvocation.getClangImporterOptions().ExtraArgs.push_back(arg);
+  subInvocation.getClangImporterOptions().ExtraArgs.push_back(std::string(arg));
   GenericArgs.push_back("-Xcc");
   GenericArgs.push_back(ArgSaver.save(arg));
 }
@@ -1254,7 +1254,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // FIXME: we shouldn't need this. Remove it?
   StringRef explictSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   subInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
-    explictSwiftModuleMap;
+    std::string(explictSwiftModuleMap);
   if (!explictSwiftModuleMap.empty()) {
     GenericArgs.push_back("-explicit-swift-module-map-file");
     GenericArgs.push_back(explictSwiftModuleMap);
