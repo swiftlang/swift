@@ -692,12 +692,18 @@ SILFunction *swift::getDestructor(AllocRefInstBase *ARI) {
 
 Optional<StringRef> swift::isReferenceUnique(AllocRefInstBase *ref,
                                              bool verbose) {
+  SmallPtrSet<Operand *, 8> seenUses;
   SmallVector<Operand *, 8> usesToCheck;
   usesToCheck.append(ref->use_begin(), ref->use_end());
 
   while (!usesToCheck.empty()) {
     auto *use = usesToCheck.pop_back_val();
     auto *user = use->getUser();
+
+    // Keep track of the operands that we've already seen to prevent recursion.
+    // If we've already seen this operand, continue.
+    if (!seenUses.insert(use).second)
+      continue;
 
     if (auto br = dyn_cast<BranchInst>(user)) {
       unsigned i = 0;
@@ -722,6 +728,14 @@ Optional<StringRef> swift::isReferenceUnique(AllocRefInstBase *ref,
       }
 
       auto referencedFn = apply.getReferencedFunctionOrNull();
+      if (referencedFn->empty()) {
+        if (verbose) {
+          llvm::dbgs() << "Cannot see the body of the referenced function: \n";
+          referencedFn->print(llvm::dbgs());
+        }
+        return {"Found unkown use of unique reference."};
+      }
+
       unsigned i = 0;
       for (auto arg : apply.getArguments()) {
         if (arg == use->get())
