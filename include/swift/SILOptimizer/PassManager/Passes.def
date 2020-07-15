@@ -345,6 +345,8 @@ PASS(MandatoryCombine, "mandatory-combine",
     "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
+PASS(OptRemarkGenerator, "sil-opt-remark-generator",
+     "Emit small peephole opt remarks that do not use large analyses")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
