@@ -104,6 +104,21 @@ static void printImports(raw_ostream &out,
   allImportFilter |= ModuleDecl::ImportFilterKind::Private;
   allImportFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
 
+  // With -experimental-spi-imports:
+  // When printing the private swiftinterface file, print implementation-only
+  // imports only if they are also SPI. First, list all implementation-only
+  // imports and filter them later.
+  llvm::SmallSet<ModuleDecl::ImportedModule, 4,
+                 ModuleDecl::OrderImportedModules> ioiImportSet;
+  if (Opts.PrintSPIs && Opts.ExperimentalSPIImports) {
+    allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+
+    SmallVector<ModuleDecl::ImportedModule, 4> ioiImport;
+    M->getImportedModules(ioiImport,
+                          ModuleDecl::ImportFilterKind::ImplementationOnly);
+    ioiImportSet.insert(ioiImport.begin(), ioiImport.end());
+  }
+
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
   ModuleDecl::removeDuplicateImports(allImports);
@@ -124,13 +139,21 @@ static void printImports(raw_ostream &out,
       continue;
     }
 
+    llvm::SmallVector<Identifier, 4> spis;
+    M->lookupImportedSPIGroups(importedModule, spis);
+
+    // Only print implementation-only imports which have an SPI import.
+    if (ioiImportSet.count(import)) {
+      if (spis.empty())
+        continue;
+      out << "@_implementationOnly ";
+    }
+
     if (publicImportSet.count(import))
       out << "@_exported ";
 
     // SPI attribute on imports
     if (Opts.PrintSPIs) {
-      SmallVector<Identifier, 4> spis;
-      M->lookupImportedSPIGroups(importedModule, spis);
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";
     }

@@ -627,6 +627,10 @@ def module_interface_preserve_types_as_written :
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+def experimental_spi_imports :
+  Flag<["-"], "experimental-spi-imports">,
+  HelpText<"Enable experimental support for SPI imports">;
+
 def experimental_print_full_convention :
  Flag<["-"], "experimental-print-full-convention">,
  HelpText<"When emitting a module interface, emit additional @convention "
