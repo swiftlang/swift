@@ -21,3 +21,7 @@ module CanonicalTypes {
 module ExplicitSpecialization {
   header "explicit-specialization.h"
 }
+
+module UsingDirective {
+  header "using-directive.h"
+}
