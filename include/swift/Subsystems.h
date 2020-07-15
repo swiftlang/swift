@@ -204,9 +204,8 @@ namespace swift {
              std::string>
   getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx);
 
-  /// Turn the given Swift module into either LLVM IR or native code
-  /// and return the generated LLVM IR module.
-  /// If you set an outModuleHash, then you need to call performLLVM.
+  /// Turn the given Swift module into LLVM IR and return the generated module.
+  /// To compile and output the generated code, call \c performLLVM.
   GeneratedModule
   performIRGeneration(ModuleDecl *M, const IRGenOptions &Opts,
                       const TBDGenOptions &TBDOpts,
@@ -215,9 +214,8 @@ namespace swift {
                       ArrayRef<std::string> parallelOutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
-  /// Turn the given Swift file into either LLVM IR or native code
-  /// and return the generated LLVM IR module.
-  /// If you set an outModuleHash, then you need to call performLLVM.
+  /// Turn the given Swift file into LLVM IR and return the generated module.
+  /// To compile and output the generated code, call \c performLLVM.
   GeneratedModule
   performIRGeneration(FileUnit *file, const IRGenOptions &Opts, 
                       const TBDGenOptions &TBDOpts,

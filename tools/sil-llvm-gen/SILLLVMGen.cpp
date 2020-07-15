@@ -201,5 +201,11 @@ int main(int argc, char **argv) {
                                  std::move(SILMod),
                                  CI.getMainModule()->getName().str(), PSPs,
                                  ArrayRef<std::string>());
+  if (!Mod)
+    return 1;
+
+  performLLVM(Opts, CI.getDiags(), /*diagMutex*/ nullptr, /*hash*/ nullptr,
+              Mod.getModule(), Mod.getTargetMachine(), OutputFilename,
+              CI.getASTContext().Stats);
   return CI.getASTContext().hadError();
 }

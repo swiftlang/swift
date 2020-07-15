@@ -996,7 +996,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   if (Ctx.hadError()) return GeneratedModule::null();
 
   // Free the memory occupied by the SILModule.
-  // Execute this task in parallel to the LLVM compilation.
+  // Execute this task in parallel to the embedding of bitcode.
   auto SILModuleRelease = [&SILMod]() { SILMod.reset(nullptr); };
   auto Thread = std::thread(SILModuleRelease);
   // Wait for the thread to terminate.
@@ -1004,18 +1004,10 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
 
   embedBitcode(IGM.getModule(), Opts);
 
+  // TODO: Turn the module hash into an actual output.
   if (auto **outModuleHash = desc.outModuleHash) {
     *outModuleHash = IGM.ModuleHash;
-  } else {
-    FrontendStatsTracer tracer(Ctx.Stats, "LLVM pipeline");
-
-    // Since no out module hash was set, we need to performLLVM.
-    if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
-                    IGM.getModule(), IGM.TargetMachine.get(),
-                    IGM.OutputFilename, IGM.Context.Stats))
-      return GeneratedModule::null();
   }
-
   return std::move(IGM).intoGeneratedModule();
 }
 
