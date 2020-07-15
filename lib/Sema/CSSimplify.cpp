@@ -3774,6 +3774,14 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::KeyPathRoot: {
+    // The root mismatch is from base U? to U or a subtype of U in keypath 
+    // application so let's suggest an unwrap the optional fix.
+    if (auto unwrapFix = UnwrapOptionalBaseKeyPathApplication::attempt(
+            *this, lhs, rhs, getConstraintLocator(locator))) {
+      conversionsOrFixes.push_back(unwrapFix);
+      break;
+    }
+
     conversionsOrFixes.push_back(AllowKeyPathRootTypeMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
 
@@ -9742,6 +9750,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
   case FixKind::AllowKeyPathRootTypeMismatch:
+  case FixKind::UnwrapOptionalBaseKeyPathApplication:
   case FixKind::AllowCoercionToForceCast:
   case FixKind::SpecifyKeyPathRootType: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;

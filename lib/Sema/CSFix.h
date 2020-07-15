@@ -268,7 +268,9 @@ enum class FixKind : uint8_t {
 
   /// Specify key path root type when it cannot be infered from context.
   SpecifyKeyPathRootType,
-
+  
+  /// Unwrap optional base on key path application.
+  UnwrapOptionalBaseKeyPathApplication,
 };
 
 class ConstraintFix {
@@ -1916,6 +1918,32 @@ class SpecifyKeyPathRootType final : public ConstraintFix {
 
     static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
+};
+
+/// Diagnose missing unwrap of optional base type on key path application.
+///
+/// \code
+/// func f(_ bar: Bar? , keyPath: KeyPath<Bar, Int>) {
+///   bar[keyPath: keyPath]
+/// }
+/// \endcode
+class UnwrapOptionalBaseKeyPathApplication final : public ContextualMismatch {
+protected:
+  UnwrapOptionalBaseKeyPathApplication(ConstraintSystem &cs, Type lhs, Type rhs,
+                                       ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::UnwrapOptionalBaseKeyPathApplication,
+                           lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override {
+    return "force unwrap base on key path application";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static UnwrapOptionalBaseKeyPathApplication *
+  attempt(ConstraintSystem &cs, Type baseTy, Type rootTy,
+          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

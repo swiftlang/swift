@@ -4292,6 +4292,10 @@
   msg: >-
     use unwrapped type %0 as key path root
 
+- id: optional_keypath_application_base 
+  msg: >-
+    use '?' to access key path subscript only for non-'nil' base values
+
 - id: missing_unwrap_optional_try
   msg: >-
     value of optional type %0 not unwrapped; did you mean to use 'try!' or
