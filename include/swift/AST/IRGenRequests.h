@@ -22,6 +22,7 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Target/TargetMachine.h"
 
 namespace swift {
 class SourceFile;
@@ -39,6 +40,7 @@ namespace llvm {
 class GlobalVariable;
 class LLVMContext;
 class Module;
+class TargetMachine;
 
 namespace orc {
 class ThreadSafeModule;
@@ -58,8 +60,9 @@ class GeneratedModule final {
 private:
   std::unique_ptr<llvm::LLVMContext> Context;
   std::unique_ptr<llvm::Module> Module;
+  std::unique_ptr<llvm::TargetMachine> Target;
 
-  GeneratedModule() : Context(nullptr), Module(nullptr) {}
+  GeneratedModule() : Context(nullptr), Module(nullptr), Target(nullptr) {}
 
   GeneratedModule(GeneratedModule const &) = delete;
   GeneratedModule &operator=(GeneratedModule const &) = delete;
@@ -70,10 +73,13 @@ public:
   /// The given pointers must not be null. If a null \c GeneratedModule is
   /// needed, use \c GeneratedModule::null() instead.
   explicit GeneratedModule(std::unique_ptr<llvm::LLVMContext> &&Context,
-                           std::unique_ptr<llvm::Module> &&Module)
-    : Context(std::move(Context)), Module(std::move(Module)) {
+                           std::unique_ptr<llvm::Module> &&Module,
+                           std::unique_ptr<llvm::TargetMachine> &&Target)
+    : Context(std::move(Context)), Module(std::move(Module)),
+      Target(std::move(Target)) {
       assert(getModule() && "Use GeneratedModule::null() instead");
       assert(getContext() && "Use GeneratedModule::null() instead");
+      assert(getTargetMachine() && "Use GeneratedModule::null() instead");
     }
 
   GeneratedModule(GeneratedModule &&) = default;
@@ -96,6 +102,9 @@ public:
 
   const llvm::LLVMContext *getContext() const { return Context.get(); }
   llvm::LLVMContext *getContext() { return Context.get(); }
+
+  const llvm::TargetMachine *getTargetMachine() const { return Target.get(); }
+  llvm::TargetMachine *getTargetMachine() { return Target.get(); }
 
 public:
   /// Release ownership of the context and module to the caller, consuming
