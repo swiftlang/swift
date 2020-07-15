@@ -907,7 +907,8 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   auto *M = desc.getParentModule();
   auto filesToEmit = desc.getFiles();
-  auto *primaryFile = desc.Ctx.dyn_cast<SourceFile *>();
+  auto *primaryFile =
+      dyn_cast_or_null<SourceFile>(desc.Ctx.dyn_cast<FileUnit *>());
 
   auto &Ctx = M->getASTContext();
   assert(!Ctx.hadError());
@@ -1326,16 +1327,16 @@ GeneratedModule swift::performIRGeneration(
 }
 
 GeneratedModule swift::
-performIRGeneration(SourceFile &SF, const IRGenOptions &Opts,
+performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
                     const TBDGenOptions &TBDOpts,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                     StringRef PrivateDiscriminator,
                     llvm::GlobalVariable **outModuleHash) {
-  auto desc = IRGenDescriptor::forFile(SF, Opts, TBDOpts, std::move(SILMod),
+  auto desc = IRGenDescriptor::forFile(file, Opts, TBDOpts, std::move(SILMod),
                                        ModuleName, PSPs, PrivateDiscriminator,
                                        outModuleHash);
-  return llvm::cantFail(SF.getASTContext().evaluator(IRGenRequest{desc}));
+  return llvm::cantFail(file->getASTContext().evaluator(IRGenRequest{desc}));
 }
 
 void

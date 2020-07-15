@@ -215,11 +215,11 @@ namespace swift {
                       ArrayRef<std::string> parallelOutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
-  /// Turn the given Swift module into either LLVM IR or native code
+  /// Turn the given Swift file into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
   GeneratedModule
-  performIRGeneration(SourceFile &SF, const IRGenOptions &Opts, 
+  performIRGeneration(FileUnit *file, const IRGenOptions &Opts, 
                       const TBDGenOptions &TBDOpts,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,

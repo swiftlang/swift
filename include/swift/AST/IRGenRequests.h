@@ -123,7 +123,7 @@ public:
 };
 
 struct IRGenDescriptor {
-  llvm::PointerUnion<ModuleDecl *, SourceFile *> Ctx;
+  llvm::PointerUnion<FileUnit *, ModuleDecl *> Ctx;
 
   const IRGenOptions &Opts;
   const TBDGenOptions &TBDOpts;
@@ -151,12 +151,12 @@ struct IRGenDescriptor {
 
 public:
   static IRGenDescriptor
-  forFile(SourceFile &SF, const IRGenOptions &Opts,
+  forFile(FileUnit *file, const IRGenOptions &Opts,
           const TBDGenOptions &TBDOpts, std::unique_ptr<SILModule> &&SILMod,
           StringRef ModuleName, const PrimarySpecificPaths &PSPs,
           StringRef PrivateDiscriminator,
           llvm::GlobalVariable **outModuleHash) {
-    return IRGenDescriptor{&SF,
+    return IRGenDescriptor{file,
                            Opts,
                            TBDOpts,
                            SILMod.release(),
