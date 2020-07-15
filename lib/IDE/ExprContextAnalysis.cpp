@@ -226,16 +226,30 @@ public:
     } else if (auto tuple = dyn_cast<TupleExpr>(E->getArg())) {
       lParenLoc = tuple->getLParenLoc();
       rParenLoc = tuple->getRParenLoc();
+
+      assert((!E->getUnlabeledTrailingClosureIndex().hasValue() ||
+              (tuple->getNumElements() == E->getArgumentLabels().size() &&
+               tuple->getNumElements() == E->getArgumentLabelLocs().size())) &&
+             "CallExpr with trailing closure must have the same number of "
+             "argument labels");
+      assert(tuple->getNumElements() == E->getArgumentLabels().size());
+      assert(tuple->getNumElements() == E->getArgumentLabelLocs().size() ||
+             E->getArgumentLabelLocs().size() == 0);
+
+      bool hasArgumentLabelLocs = E->getArgumentLabelLocs().size() > 0;
+
       for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i) {
         if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
           removing = true;
           continue;
         }
 
-        if (i < E->getUnlabeledTrailingClosureIndex()) {
+        if (!E->getUnlabeledTrailingClosureIndex().hasValue() ||
+            i < *E->getUnlabeledTrailingClosureIndex()) {
           // Normal arguments.
           argLabels.push_back(E->getArgumentLabels()[i]);
-          argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
+          if (hasArgumentLabelLocs)
+            argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
           args.push_back(tuple->getElement(i));
         } else {
           // Trailing closure arguments.
@@ -259,7 +273,20 @@ public:
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    return {true, visit(E)};
+    if (Removed)
+      return {false, nullptr};
+    E = visit(E);
+    return {!Removed, E};
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (Removed)
+      return {false, nullptr};
+    return {true, S};
+  }
+
+  bool walkToDeclPre(Decl *D) override {
+    return !Removed;
   }
 };
 }
