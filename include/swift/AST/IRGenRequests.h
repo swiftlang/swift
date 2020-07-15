@@ -28,6 +28,7 @@ namespace swift {
 class SourceFile;
 class IRGenOptions;
 class SILModule;
+class SILOptions;
 struct TBDGenOptions;
 
 namespace irgen {
@@ -127,8 +128,11 @@ struct IRGenDescriptor {
 
   const IRGenOptions &Opts;
   const TBDGenOptions &TBDOpts;
+  const SILOptions &SILOpts;
 
+  Lowering::TypeConverter &Conv;
   SILModule *SILMod;
+
   StringRef ModuleName;
   const PrimarySpecificPaths &PSPs;
   StringRef PrivateDiscriminator;
@@ -152,13 +156,16 @@ struct IRGenDescriptor {
 public:
   static IRGenDescriptor
   forFile(FileUnit *file, const IRGenOptions &Opts,
-          const TBDGenOptions &TBDOpts, std::unique_ptr<SILModule> &&SILMod,
+          const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
+          Lowering::TypeConverter &Conv, std::unique_ptr<SILModule> &&SILMod,
           StringRef ModuleName, const PrimarySpecificPaths &PSPs,
           StringRef PrivateDiscriminator,
           llvm::GlobalVariable **outModuleHash) {
     return IRGenDescriptor{file,
                            Opts,
                            TBDOpts,
+                           SILOpts,
+                           Conv,
                            SILMod.release(),
                            ModuleName,
                            PSPs,
@@ -169,7 +176,8 @@ public:
 
   static IRGenDescriptor
   forWholeModule(ModuleDecl *M, const IRGenOptions &Opts,
-                 const TBDGenOptions &TBDOpts,
+                 const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
+                 Lowering::TypeConverter &Conv,
                  std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
                  const PrimarySpecificPaths &PSPs,
                  ArrayRef<std::string> parallelOutputFilenames,
@@ -177,6 +185,8 @@ public:
     return IRGenDescriptor{M,
                            Opts,
                            TBDOpts,
+                           SILOpts,
+                           Conv,
                            SILMod.release(),
                            ModuleName,
                            PSPs,
@@ -225,6 +235,21 @@ public:
 void simple_display(llvm::raw_ostream &out, const IRGenDescriptor &d);
 
 SourceLoc extractNearestSourceLoc(const IRGenDescriptor &desc);
+
+/// Returns the optimized IR for a given file or module. Note this runs the
+/// entire compiler pipeline and ignores the passed SILModule.
+class OptimizedIRRequest
+    : public SimpleRequest<OptimizedIRRequest, GeneratedModule(IRGenDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  GeneratedModule evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
+};
 
 /// The zone number for IRGen.
 #define SWIFT_TYPEID_ZONE IRGen

@@ -21,6 +21,7 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILGenRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
@@ -1311,9 +1312,12 @@ GeneratedModule swift::performIRGeneration(
     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
     ArrayRef<std::string> parallelOutputFilenames,
     llvm::GlobalVariable **outModuleHash) {
+  // Get a pointer to the SILModule to avoid a potential use-after-move.
+  const auto *SILModPtr = SILMod.get();
+  const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forWholeModule(
-      M, Opts, TBDOpts, std::move(SILMod), ModuleName, PSPs,
-      parallelOutputFilenames, outModuleHash);
+      M, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
+      ModuleName, PSPs, parallelOutputFilenames, outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty()) {
@@ -1332,9 +1336,12 @@ performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
                     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                     StringRef PrivateDiscriminator,
                     llvm::GlobalVariable **outModuleHash) {
-  auto desc = IRGenDescriptor::forFile(file, Opts, TBDOpts, std::move(SILMod),
-                                       ModuleName, PSPs, PrivateDiscriminator,
-                                       outModuleHash);
+  // Get a pointer to the SILModule to avoid a potential use-after-move.
+  const auto *SILModPtr = SILMod.get();
+  const auto &SILOpts = SILModPtr->getOptions();
+  auto desc = IRGenDescriptor::forFile(
+      file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
+      ModuleName, PSPs, PrivateDiscriminator, outModuleHash);
   return llvm::cantFail(file->getASTContext().evaluator(IRGenRequest{desc}));
 }
 
@@ -1408,4 +1415,55 @@ bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
                     OutputFilename, Ctx.Stats))
     return true;
   return false;
+}
+
+GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
+                                             IRGenDescriptor desc) const {
+  auto *parentMod = desc.getParentModule();
+  auto &ctx = parentMod->getASTContext();
+
+  // Resolve imports for all the source files.
+  for (auto *file : parentMod->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file))
+      performImportResolution(*SF);
+  }
+
+  bindExtensions(*parentMod);
+
+  // Type-check the files that need lowering to SIL.
+  auto loweringDesc = ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts};
+  for (auto *file : loweringDesc.getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file))
+      performTypeChecking(*SF);
+  }
+
+  if (ctx.hadError())
+    return GeneratedModule::null();
+
+  auto silMod = llvm::cantFail(evaluator(ASTLoweringRequest{loweringDesc}));
+  silMod->installSILRemarkStreamer();
+  silMod->setSerializeSILAction([](){});
+
+  // Run SIL passes.
+  runSILDiagnosticPasses(*silMod);
+  runSILOptimizationPasses(*silMod);
+  silMod->verify();
+
+  if (ctx.hadError())
+    return GeneratedModule::null();
+
+  runSILLoweringPasses(*silMod);
+
+  if (ctx.hadError())
+    return GeneratedModule::null();
+
+  // Perform IRGen with the generated SILModule.
+  desc.SILMod = silMod.release();
+  auto irMod = llvm::cantFail(evaluator(IRGenRequest{desc}));
+  if (!irMod)
+    return irMod;
+
+  performLLVMOptimizations(desc.Opts, irMod.getModule(),
+                           irMod.getTargetMachine());
+  return irMod;
 }
