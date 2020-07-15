@@ -4432,12 +4432,16 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 }
 
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
-                                             FunctionType *closureType) {
+                                             FunctionType *closureType,
+                                             bool isDefaultWrappedValue) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
-  if (auto *init = dyn_cast<Initializer>(DC))
+  if (auto *init = dyn_cast<Initializer>(DC)) {
+    auto initKind = init->getInitializerKind();
     isInDefaultArgumentContext =
-        init->getInitializerKind() == InitializerKind::DefaultArgument;
+        initKind == InitializerKind::DefaultArgument ||
+        (initKind == InitializerKind::PatternBinding && isDefaultWrappedValue);
+  }
 
   auto info = closureType->getExtInfo();
   auto newClosureType = closureType;

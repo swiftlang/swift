@@ -5488,16 +5488,17 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
   bool shouldInjectWrappedValuePlaceholder =
      target->shouldInjectWrappedValuePlaceholder(apply);
 
-  auto injectWrappedValuePlaceholder = [&](Expr *arg) -> Expr * {
-    auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
-        ctx, arg->getSourceRange(), cs.getType(arg),
-        target->propertyWrapperHasInitialWrappedValue() ? arg : nullptr,
-        isa<AutoClosureExpr>(arg));
-    cs.cacheType(placeholder);
-    cs.cacheType(placeholder->getOpaqueValuePlaceholder());
-    shouldInjectWrappedValuePlaceholder = false;
-    return placeholder;
-  };
+  auto injectWrappedValuePlaceholder =
+      [&](Expr *arg, bool isAutoClosure = false) -> Expr * {
+        auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
+            ctx, arg->getSourceRange(), cs.getType(arg),
+            target->propertyWrapperHasInitialWrappedValue() ? arg : nullptr,
+            isAutoClosure);
+        cs.cacheType(placeholder);
+        cs.cacheType(placeholder->getOpaqueValuePlaceholder());
+        shouldInjectWrappedValuePlaceholder = false;
+        return placeholder;
+      };
 
   // Quickly test if any further fix-ups for the argument types are necessary.
   if (AnyFunctionType::equalParams(args, params) &&
@@ -5696,8 +5697,11 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
         // the effect of autoclosure forwarding of the placeholder
         // autoclosure. The only way to do this is to call the placeholder
         // autoclosure when passing it to the init.
+        bool isDefaultWrappedValue =
+            target->propertyWrapperHasInitialWrappedValue();
         auto *placeholder = injectWrappedValuePlaceholder(
-            cs.buildAutoClosureExpr(arg, closureType));
+            cs.buildAutoClosureExpr(arg, closureType, isDefaultWrappedValue),
+            /*isAutoClosure=*/true);
         arg = CallExpr::createImplicit(ctx, placeholder, {}, {});
         arg->setType(closureType->getResult());
         cs.cacheType(arg);
