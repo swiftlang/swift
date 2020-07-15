@@ -56,3 +56,10 @@ extension X where Self : OptionalRequirements {
     let _ = self.name
   }
 }
+
+func rdar61337704() {
+  func setColor(v: ColorDescriptor) { }
+
+  let descriptor = PaletteDescriptor()
+  setColor(v: descriptor.colors[0]) // Ok
+}
