@@ -17,3 +17,7 @@ module DeclWithDefinitionOfMembers {
 module CanonicalTypes {
   header "canonical-types.h"
 }
+
+module ExplicitSpecialization {
+  header "explicit-specialization.h"
+}
