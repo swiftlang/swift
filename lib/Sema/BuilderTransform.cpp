@@ -80,10 +80,21 @@ class BuilderClosureVisitor
     auto simplifiedTy = cs->simplifyType(builderType);
     if (!simplifiedTy->hasTypeVariable()) {
       typeExpr = TypeExpr::createImplicitHack(loc, simplifiedTy, ctx);
+    } else if (auto *decl = simplifiedTy->getAnyGeneric()) {
+      // HACK: If there's not enough information to completely resolve the
+      // builder type, but we have the base available to us, form an *explicit*
+      // TypeExpr pointing at it. We cannot form an implicit base without
+      // a fully-resolved concrete type. Really, whatever we put here has no
+      // bearing on the generated solution because we're going to use this node
+      // to stash the builder type and hand it back to the ambient
+      // constraint system.
+      typeExpr = TypeExpr::createForDecl(DeclNameLoc(loc), decl, dc);
     } else {
       // HACK: If there's not enough information in the constraint system,
       // create a garbage base type to force it to diagnose
       // this as an ambiguous expression.
+      // FIXME: We can also construct an UnresolvedMemberExpr here instead of
+      // an UnresolvedDotExpr and get a slightly better diagnostic.
       typeExpr = TypeExpr::createImplicitHack(loc, ErrorType::get(ctx), ctx);
     }
     cs->setType(typeExpr, MetatypeType::get(builderType));
