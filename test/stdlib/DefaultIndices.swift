@@ -1,5 +1,7 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
+// rdar://problem/65605593
+// UNSUPPORTED: use_os_stdlib
 
 import StdlibUnittest
 
