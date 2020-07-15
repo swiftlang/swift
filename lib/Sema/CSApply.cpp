@@ -5408,7 +5408,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
 
 Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy) {
   auto optTy = cs.getType(expr);
-  // Coerce to an r-value.
+  // Preserve l-valueness of the result.
   if (optTy->is<LValueType>())
     objTy = LValueType::get(objTy);
 
