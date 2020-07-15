@@ -190,6 +190,10 @@ const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
 }
 
 void AccessedStorage::print(raw_ostream &os) const {
+  if (!*this) {
+    os << "INVALID\n";
+    return;
+  }
   os << getKindName(getKind()) << " ";
   switch (getKind()) {
   case Box:
@@ -246,10 +250,16 @@ public:
       this->visit(pointerWorklist.pop_back_val());
     }
     // If a common path component was found, recursively look for the storage.
-    if (commonDefinition && commonDefinition.getValue()) {
-      auto storage = storageVisitor.findStorage(commonDefinition.getValue());
-      (void)storage; // The same storageVisitor called us. It has already
-                     // recorded the storage that it found.
+    if (commonDefinition) {
+      if (commonDefinition.getValue()) {
+        auto storage = storageVisitor.findStorage(commonDefinition.getValue());
+        (void)storage; // The same storageVisitor called us. It has already
+                       // recorded the storage that it found.
+      } else {
+        // If divergent paths were found, invalidate any previously discovered
+        // storage.
+        storageVisitor.setStorage(AccessedStorage());
+      }
     }
   }
 
