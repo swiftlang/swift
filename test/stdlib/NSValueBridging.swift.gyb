@@ -15,8 +15,6 @@
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
-// rdar://problem/64995079
-// XFAIL: OS=ios && CPU=armv7s
 //
 // REQUIRES: objc_interop
 
@@ -73,7 +71,7 @@ ${ testCase("CGAffineTransform", "CGAffineTransform(rotationAngle: .pi)",      N
 //
 // FIXME: Test back-deployment scenarios with the Swift 5.0 compatibility
 // runtime rather than a freshly built stdlib. (rdar://62694723)
-#if canImport(UIKit) && !(os(iOS) && (arch(armv7) || arch(armv7s) || arch(i386)))
+#if canImport(UIKit) && !(os(iOS) && (arch(arm) || arch(i386)))
 import UIKit
 
 ${ testCase("CGRect",            "CGRect(x: 17, y: 38, width: 6, height: 79)", "cgRect",            "(==)") }
