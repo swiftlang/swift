@@ -251,7 +251,6 @@ namespace swift {
   ///                   was already compiled, may be null if not desired.
   /// \param Module LLVM module to code gen, required.
   /// \param TargetMachine target of code gen, required.
-  /// \param effectiveLanguageVersion version of the language, effectively.
   /// \param OutputFilename Filename for output.
   bool performLLVM(const IRGenOptions &Opts,
                    DiagnosticEngine &Diags,
@@ -259,7 +258,6 @@ namespace swift {
                    llvm::GlobalVariable *HashGlobal,
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
-                   const version::Version &effectiveLanguageVersion,
                    StringRef OutputFilename,
                    UnifiedStatsReporter *Stats);
 

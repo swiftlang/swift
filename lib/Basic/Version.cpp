@@ -405,7 +405,7 @@ std::string getSwiftFullVersion(Version effectiveVersion) {
   OS << "-dev";
 #endif
 
-  if (!(effectiveVersion == Version::getCurrentLanguageVersion())) {
+  if (effectiveVersion != Version::getCurrentLanguageVersion()) {
     OS << " effective-" << effectiveVersion;
   }
 

@@ -1648,16 +1648,14 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   const auto &opts = Instance.getInvocation().getIRGenOptions();
   std::unique_ptr<llvm::TargetMachine> TargetMachine =
       createTargetMachine(opts, Instance.getASTContext());
-  version::Version EffectiveLanguageVersion =
-      Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
-                     TargetMachine.get(), EffectiveLanguageVersion,
-                     OutputFilename, Instance.getStatsReporter());
+                     TargetMachine.get(), OutputFilename,
+                     Instance.getStatsReporter());
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,

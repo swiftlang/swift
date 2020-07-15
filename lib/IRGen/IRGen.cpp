@@ -356,23 +356,23 @@ public:
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
 /// and options which influence the compilation.
-static void getHashOfModule(MD5::MD5Result &Result, const IRGenOptions &Opts,
-                            const llvm::Module *Module,
-                            llvm::TargetMachine *TargetMachine,
-                            version::Version const& effectiveLanguageVersion) {
+static MD5::MD5Result getHashOfModule(const IRGenOptions &Opts,
+                                      const llvm::Module *Module) {
   // Calculate the hash of the whole llvm module.
   MD5Stream HashStream;
   llvm::WriteBitcodeToFile(*Module, HashStream);
 
   // Update the hash with the compiler version. We want to recompile if the
   // llvm pipeline of the compiler changed.
-  HashStream << version::getSwiftFullVersion(effectiveLanguageVersion);
+  HashStream << version::getSwiftFullVersion();
 
   // Add all options which influence the llvm compilation but are not yet
   // reflected in the llvm module itself.
   Opts.writeLLVMCodeGenOptionsTo(HashStream);
 
-  HashStream.final(Result);
+  MD5::MD5Result result;
+  HashStream.final(result);
+  return result;
 }
 
 /// Returns false if the hash of the current module \p HashData matches the
@@ -477,27 +477,24 @@ bool swift::performLLVM(const IRGenOptions &Opts,
                         llvm::GlobalVariable *HashGlobal,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
-                        const version::Version &effectiveLanguageVersion,
                         StringRef OutputFilename,
                         UnifiedStatsReporter *Stats) {
 
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
-    MD5::MD5Result Result;
-    getHashOfModule(Result, Opts, Module, TargetMachine,
-                    effectiveLanguageVersion);
+    auto hash = getHashOfModule(Opts, Module);
 
     LLVM_DEBUG(
       if (DiagMutex) DiagMutex->lock();
       SmallString<32> ResultStr;
-      MD5::stringifyResult(Result, ResultStr);
+      MD5::stringifyResult(hash, ResultStr);
       llvm::dbgs() << OutputFilename << ": MD5=" << ResultStr << '\n';
       if (DiagMutex) DiagMutex->unlock();
     );
 
-    ArrayRef<uint8_t> HashData(reinterpret_cast<uint8_t *>(&Result),
-                               sizeof(Result));
+    ArrayRef<uint8_t> HashData(reinterpret_cast<uint8_t *>(&hash),
+                               sizeof(hash));
     if (Opts.OutputKind == IRGenOutputKind::ObjectFile &&
         !Opts.PrintInlineTree &&
         !needsRecompile(OutputFilename, HashData, HashGlobal, DiagMutex)) {
@@ -1003,7 +1000,6 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     // Since no out module hash was set, we need to performLLVM.
     if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
                     IGM.getModule(), IGM.TargetMachine.get(),
-                    IGM.Context.LangOpts.EffectiveLanguageVersion,
                     IGM.OutputFilename, IGM.Context.Stats))
       return GeneratedModule::null();
   }
@@ -1038,7 +1034,6 @@ struct LLVMCodeGenThreads {
         embedBitcode(IGM->getModule(), parent.irgen->Opts);
         performLLVM(parent.irgen->Opts, IGM->Context.Diags, diagMutex,
                     IGM->ModuleHash, IGM->getModule(), IGM->TargetMachine.get(),
-                    IGM->Context.LangOpts.EffectiveLanguageVersion,
                     IGM->OutputFilename, IGM->Context.Stats);
         if (IGM->Context.Diags.hadAnyError())
           return;
@@ -1389,7 +1384,6 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   ASTSym->setAlignment(llvm::MaybeAlign(serialization::SWIFTMODULE_ALIGNMENT));
   ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
                 IGM.TargetMachine.get(),
-                Ctx.LangOpts.EffectiveLanguageVersion,
                 OutputPath, Ctx.Stats);
 }
 
@@ -1407,7 +1401,6 @@ bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
                     TargetMachine.get(),
-                    Ctx.LangOpts.EffectiveLanguageVersion,
                     OutputFilename, Ctx.Stats))
     return true;
   return false;
