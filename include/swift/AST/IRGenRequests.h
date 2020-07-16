@@ -22,11 +22,13 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Target/TargetMachine.h"
 
 namespace swift {
 class SourceFile;
 class IRGenOptions;
 class SILModule;
+class SILOptions;
 struct TBDGenOptions;
 
 namespace irgen {
@@ -39,6 +41,7 @@ namespace llvm {
 class GlobalVariable;
 class LLVMContext;
 class Module;
+class TargetMachine;
 
 namespace orc {
 class ThreadSafeModule;
@@ -58,8 +61,9 @@ class GeneratedModule final {
 private:
   std::unique_ptr<llvm::LLVMContext> Context;
   std::unique_ptr<llvm::Module> Module;
+  std::unique_ptr<llvm::TargetMachine> Target;
 
-  GeneratedModule() : Context(nullptr), Module(nullptr) {}
+  GeneratedModule() : Context(nullptr), Module(nullptr), Target(nullptr) {}
 
   GeneratedModule(GeneratedModule const &) = delete;
   GeneratedModule &operator=(GeneratedModule const &) = delete;
@@ -70,10 +74,13 @@ public:
   /// The given pointers must not be null. If a null \c GeneratedModule is
   /// needed, use \c GeneratedModule::null() instead.
   explicit GeneratedModule(std::unique_ptr<llvm::LLVMContext> &&Context,
-                           std::unique_ptr<llvm::Module> &&Module)
-    : Context(std::move(Context)), Module(std::move(Module)) {
+                           std::unique_ptr<llvm::Module> &&Module,
+                           std::unique_ptr<llvm::TargetMachine> &&Target)
+    : Context(std::move(Context)), Module(std::move(Module)),
+      Target(std::move(Target)) {
       assert(getModule() && "Use GeneratedModule::null() instead");
       assert(getContext() && "Use GeneratedModule::null() instead");
+      assert(getTargetMachine() && "Use GeneratedModule::null() instead");
     }
 
   GeneratedModule(GeneratedModule &&) = default;
@@ -97,6 +104,9 @@ public:
   const llvm::LLVMContext *getContext() const { return Context.get(); }
   llvm::LLVMContext *getContext() { return Context.get(); }
 
+  const llvm::TargetMachine *getTargetMachine() const { return Target.get(); }
+  llvm::TargetMachine *getTargetMachine() { return Target.get(); }
+
 public:
   /// Release ownership of the context and module to the caller, consuming
   /// this value in the process.
@@ -114,12 +124,15 @@ public:
 };
 
 struct IRGenDescriptor {
-  llvm::PointerUnion<ModuleDecl *, SourceFile *> Ctx;
+  llvm::PointerUnion<FileUnit *, ModuleDecl *> Ctx;
 
   const IRGenOptions &Opts;
   const TBDGenOptions &TBDOpts;
+  const SILOptions &SILOpts;
 
+  Lowering::TypeConverter &Conv;
   SILModule *SILMod;
+
   StringRef ModuleName;
   const PrimarySpecificPaths &PSPs;
   StringRef PrivateDiscriminator;
@@ -142,14 +155,17 @@ struct IRGenDescriptor {
 
 public:
   static IRGenDescriptor
-  forFile(SourceFile &SF, const IRGenOptions &Opts,
-          const TBDGenOptions &TBDOpts, std::unique_ptr<SILModule> &&SILMod,
+  forFile(FileUnit *file, const IRGenOptions &Opts,
+          const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
+          Lowering::TypeConverter &Conv, std::unique_ptr<SILModule> &&SILMod,
           StringRef ModuleName, const PrimarySpecificPaths &PSPs,
           StringRef PrivateDiscriminator,
-          llvm::GlobalVariable **outModuleHash) {
-    return IRGenDescriptor{&SF,
+          llvm::GlobalVariable **outModuleHash = nullptr) {
+    return IRGenDescriptor{file,
                            Opts,
                            TBDOpts,
+                           SILOpts,
+                           Conv,
                            SILMod.release(),
                            ModuleName,
                            PSPs,
@@ -160,14 +176,17 @@ public:
 
   static IRGenDescriptor
   forWholeModule(ModuleDecl *M, const IRGenOptions &Opts,
-                 const TBDGenOptions &TBDOpts,
+                 const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
+                 Lowering::TypeConverter &Conv,
                  std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
                  const PrimarySpecificPaths &PSPs,
-                 ArrayRef<std::string> parallelOutputFilenames,
-                 llvm::GlobalVariable **outModuleHash) {
+                 ArrayRef<std::string> parallelOutputFilenames = {},
+                 llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{M,
                            Opts,
                            TBDOpts,
+                           SILOpts,
+                           Conv,
                            SILMod.release(),
                            ModuleName,
                            PSPs,
@@ -216,6 +235,21 @@ public:
 void simple_display(llvm::raw_ostream &out, const IRGenDescriptor &d);
 
 SourceLoc extractNearestSourceLoc(const IRGenDescriptor &desc);
+
+/// Returns the optimized IR for a given file or module. Note this runs the
+/// entire compiler pipeline and ignores the passed SILModule.
+class OptimizedIRRequest
+    : public SimpleRequest<OptimizedIRRequest, GeneratedModule(IRGenDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  GeneratedModule evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
+};
 
 /// The zone number for IRGen.
 #define SWIFT_TYPEID_ZONE IRGen

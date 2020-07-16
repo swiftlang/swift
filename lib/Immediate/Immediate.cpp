@@ -196,6 +196,7 @@ int swift::RunImmediately(CompilerInstance &CI,
                           const IRGenOptions &IRGenOpts,
                           const SILOptions &SILOpts,
                           std::unique_ptr<SILModule> &&SM) {
+  // TODO: Use OptimizedIRRequest for this.
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
@@ -210,6 +211,13 @@ int swift::RunImmediately(CompilerInstance &CI,
     return -1;
 
   assert(GenModule && "Emitted no diagnostics but IR generation failed?");
+
+  performLLVM(IRGenOpts, Context.Diags, /*diagMutex*/ nullptr, /*hash*/ nullptr,
+              GenModule.getModule(), GenModule.getTargetMachine(),
+              PSPs.OutputFilename, Context.Stats);
+
+  if (Context.hadError())
+    return -1;
 
   // Load libSwiftCore to setup process arguments.
   //
