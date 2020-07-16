@@ -1638,7 +1638,8 @@ semantics would trigger a static SILVerifier error allowing us to know that we
 do not have any leaks or use-after-frees in the above code.
 
 The semantics in the previous example is of just one form of ownership semantics
-supported: "owned" semantics. In SIL, we support four different ownership kinds:
+supported: "owned" semantics. In SIL, we allow for values to have one of four
+different ownership kinds:
 
 * **None**. This is used to represent values that do not require memory
   management and are outside of Ownership SSA invariants. Examples: trivial
@@ -1652,8 +1653,8 @@ supported: "owned" semantics. In SIL, we support four different ownership kinds:
 
 * **Guaranteed**. A value with a scoped lifetime whose liveness is dependent on
   the lifetime of some other "base" owned or guaranteed value. Consumed by
-  end_borrow instructions. The "base" value is statically guaranteed to be live
-  at all of the value's paired end_borrow instructions.
+  instructions like `end_borrow`_. The "base" value is statically guaranteed to
+  be live at all of the value's paired end_borrow instructions.
 
 * **Unowned**. A value that is only guaranteed to be instantaneously valid and
   must be copied before the value is used in an ``@owned`` or ``@guaranteed``
