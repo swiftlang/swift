@@ -54,6 +54,13 @@ static StringRef getMathOperatorName(MathOperator op) {
   llvm_unreachable("invalid math operator kind");
 }
 
+static ValueDecl *getFatalErrorFn(ASTContext &C) {
+  auto fatalErrorLookupRes = llvm::SmallVector<ValueDecl*, 1>{};
+  C.lookupInSwiftModule("fatalError", fatalErrorLookupRes);
+  assert((fatalErrorLookupRes.size() == 1) && "Exactly one fatalError Decl must exist");
+  return fatalErrorLookupRes.front();
+}
+
 bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
                                                      DeclContext *DC) {
   // Experimental `AdditiveArithmetic` derivation must be enabled.
@@ -64,11 +71,8 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *proto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
 
-  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
-    auto result = DerivedConformance::allAssociatedValuesConformToProtocol(DC, enumDecl, proto);
-    llvm::errs() << "CAN DERIVE? " << result << "\n";
-    return result;
-  }
+  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal))
+    return DerivedConformance::allAssociatedValuesConformToProtocol(DC, enumDecl, proto);
 
   if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
     // Must not have any `let` stored properties with an initial value.
@@ -88,11 +92,192 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   return false;
 }
 
+// E.g. 'ValueType.+'
+static MemberRefExpr *getMathOperatorForValue(VarDecl *value, MathOperator op,
+                                              DeclContext *parentDC) {
+  auto nominal = parentDC->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+
+  // Get operator protocol requirement.
+  auto proto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+  auto operatorId = C.getIdentifier(getMathOperatorName(op));
+  auto operatorReq = getProtocolRequirement(proto, operatorId);
+
+  auto module = nominal->getModuleContext();
+  auto valueType =
+    parentDC->mapTypeIntoContext(value->getValueInterfaceType());
+
+  auto confRef = module->lookupConformance(valueType, proto);
+  assert(confRef && "Value does not conform to math protocol");
+
+  // Get value type's math operator, e.g. `ValueType.+`.
+  // Use protocol requirement declaration for the operator by default: this
+  // will be dynamically dispatched.
+  ValueDecl *valueOpDecl = operatorReq;
+
+  // If conformance reference is concrete, then use concrete witness
+  // declaration for the operator.
+  if (confRef.isConcrete())
+    if (auto *concreteValueMethodDecl =
+            confRef.getConcrete()->getWitnessDecl(operatorReq))
+      valueOpDecl = concreteValueMethodDecl;
+  assert(valueOpDecl && "Value operator declaration must exist");
+  auto *valueTypeExpr = TypeExpr::createImplicit(valueType, C);
+  auto memberOpExpr =
+      new (C) MemberRefExpr(valueTypeExpr, SourceLoc(), valueOpDecl,
+                            DeclNameLoc(), /*Implicit*/ true);
+  return memberOpExpr;
+}
+
+// Synthesize body for math operator for an enum.
+static std::pair<BraceStmt *, bool>
+deriveBodyMathOperator_enum(AbstractFunctionDecl *funcDecl, MathOperator op) {
+  auto parentDC = funcDecl->getParent();
+  auto nominal = parentDC->getSelfNominalTypeDecl();
+  auto enumDecl = cast<EnumDecl>(nominal);
+  auto &C = nominal->getASTContext();
+
+  // 'lhs' and 'rhs' parameters.
+  auto params = funcDecl->getParameters();
+  auto lhs = params->get(0);
+  auto rhs = params->get(1);
+
+  auto enumType = lhs->getType();
+
+  // Create case statement for every enum element:
+  // 'case (.<elem>(let l0, let l1, ...), .<elem>(let r0, let r1, ...)):
+  //   return .<elem>(l0 + r0, l1 + r1, ...)'
+  auto cases = llvm::SmallVector<ASTNode, 6>{};
+  auto createCaseForEnumElement = [&] (EnumElementDecl *elemDecl) {
+    // Create '.<elem>(let l0, let l1, ...)' pattern
+    auto lhsPayloadVars = llvm::SmallVector<VarDecl*, 3>{};
+    auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elemDecl, 'l', funcDecl,
+                                                                          lhsPayloadVars);
+    auto lhsElemPat = new (C) EnumElementPattern(TypeExpr::createImplicit(enumType, C),
+                                                  SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                                                  elemDecl, lhsSubpattern);
+    lhsElemPat->setImplicit();
+
+    auto numAsocVars = lhsPayloadVars.size();
+
+    // Create '.<elem>(let r0, let r1, ...)' pattern
+    auto rhsPayloadVars = SmallVector<VarDecl*, 3>{};
+    auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elemDecl, 'r', funcDecl,
+                                                                          rhsPayloadVars);
+    auto rhsElemPat = new (C) EnumElementPattern(TypeExpr::createImplicit(enumType, C),
+                                                  SourceLoc(), DeclNameLoc(),
+                                                  DeclNameRef(), elemDecl, rhsSubpattern);
+    rhsElemPat->setImplicit();
+
+    assert((numAsocVars == rhsPayloadVars.size()) && "Lhs and Rhs must have same size");
+
+    // Create 'case (.<elem>(let l0, let l1, ...), .<elem>(let r0, let r1, ...)):' label
+    auto patternElements = { TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) };
+    auto caseTuplePattern = TuplePattern::createImplicit(C, patternElements);
+    caseTuplePattern->setImplicit();
+    auto labelItem = CaseLabelItem(caseTuplePattern);
+
+    // Create <op>s of associated values: 'l0 <op> r0', 'l1 <op> r1', ...
+    auto asocValExprs = llvm::SmallVector<Expr*, 3>{};
+    // Creates 'li <op> ri' expr
+    auto createOpExpr = [&] (auto lhsAndRhsDecls) {
+      VarDecl *lhsVal;
+      VarDecl *rhsVal;
+      std::tie(lhsVal, rhsVal) = lhsAndRhsDecls;
+      auto lhsExpr = new (C) DeclRefExpr(lhsVal, DeclNameLoc(),
+                                                        /*implicit*/true);
+      auto rhsExpr = new (C) DeclRefExpr(rhsVal, DeclNameLoc(),
+                                        /*implicit*/true);
+      // Get 'ValueType.+' operator
+      auto opExpr = getMathOperatorForValue(lhsVal, op, parentDC);
+
+      auto opArgs = TupleExpr::create(C, SourceLoc(), {lhsExpr, rhsExpr},
+                                      {}, {}, SourceLoc(),
+                                      /*hasTrailingClosure*/ false,
+                                      /*implicit*/ true);
+      return new (C) BinaryExpr(opExpr, opArgs, /*implicit*/ true);
+    };
+    llvm::transform(llvm::zip(lhsPayloadVars, rhsPayloadVars),
+                    std::back_inserter(asocValExprs),
+                    createOpExpr);
+
+    // Create '.<elem>(l0 <op> r0, l1 <op> r1, ...)' expr for return
+    auto elemRef = new (C) DeclRefExpr(elemDecl, DeclNameLoc(), /*Implicit*/ true);
+    elemRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+    auto nominalTypeExpr = TypeExpr::createImplicitForDecl(
+        DeclNameLoc(), nominal, funcDecl,
+        funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+    // '.<elem>' expr
+    auto dotExpr = new (C) MemberRefExpr(nominalTypeExpr, SourceLoc(), elemDecl, DeclNameLoc(), true);
+    Expr *enumInit;
+    if (numAsocVars > 0)
+      // '.<elem>(...)'
+      enumInit = CallExpr::createImplicit(C, dotExpr, asocValExprs, {});
+    else
+      // Use '.<elem>' instead of (incorrect) '.<elem>()' when the element
+      // has no associated values
+      enumInit = dotExpr;
+    auto returnStmt = new (C) ReturnStmt(SourceLoc(), enumInit, true);
+    auto caseBody = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt), SourceLoc(), true);
+
+    // Copy all pattern vars ('l0', 'l1', ..., 'r0', 'r1', ...) for CaseStmt
+    auto caseBodyVarDecls = C.Allocate<VarDecl *>(2 * numAsocVars);
+    auto copyDecl = [&] (VarDecl *oldDecl) {
+      auto *newDecl = new (C) VarDecl(/*IsStatic*/ false, oldDecl->getIntroducer(),
+                                      /*IsCaptureList*/ false, oldDecl->getNameLoc(),
+                                      oldDecl->getName(), oldDecl->getDeclContext());
+      newDecl->setHasNonPatternBindingInit();
+      newDecl->setImplicit();
+      return newDecl;
+    };
+    llvm::transform(llvm::concat<VarDecl *>(lhsPayloadVars, rhsPayloadVars),
+                    std::begin(caseBodyVarDecls),
+                    copyDecl);
+
+    return CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                            labelItem, SourceLoc(), SourceLoc(), caseBody, caseBodyVarDecls);
+  };
+  llvm::transform(enumDecl->getAllElements(),
+                  std::back_inserter(cases),
+                  createCaseForEnumElement);
+
+  // Create 'default: fatalError()' case for mismatching enum values
+  // (only necessary if the enum has more than one element)
+  if (cases.size() > 1) {
+    auto defaultPattern = AnyPattern::createImplicit(C);
+    auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
+    auto fatalErrorDecl = getFatalErrorFn(C);
+    auto fatalErrorDRE = new (C) DeclRefExpr(fatalErrorDecl, DeclNameLoc(),
+                                             /*implicit*/ true);
+    auto errorMsg = new (C) StringLiteralExpr("Enum cases mismatch", SourceRange(),
+                                              /*implicit*/ true);
+    auto callExpr = CallExpr::createImplicit(C, fatalErrorDRE, {errorMsg}, {});
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(callExpr),
+                                  SourceLoc());
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                    defaultItem, SourceLoc(), SourceLoc(),
+                    body, /*case body var decls*/ None));
+  }
+
+  // Create 'switch (lhs, rhs) { <case statements> }'
+  auto lhsRef = new (C) DeclRefExpr(lhs, DeclNameLoc(), /*implicit*/true);
+  auto rhsRef = new (C) DeclRefExpr(rhs, DeclNameLoc(), /*implicit*/true);
+  auto lhsRhsExpr = TupleExpr::create(C, SourceLoc(), { lhsRef, rhsRef }, {}, {},
+                                      SourceLoc(), /*hasTrailingClosure*/ false,
+                                      /*implicit*/ true);
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), lhsRhsExpr,
+                                      SourceLoc(), cases, SourceLoc(), C);
+
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt), SourceLoc());
+  return { body, false };
+}
+
 // Synthesize body for math operator.
 static std::pair<BraceStmt *, bool>
-deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
+deriveBodyMathOperator_struct(AbstractFunctionDecl *funcDecl, MathOperator op) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
+  assert(isa<StructDecl>(nominal) && "Must be a struct");
   auto &C = nominal->getASTContext();
 
   // Create memberwise initializer: `Nominal.init(...)`.
@@ -106,37 +291,13 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
       funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
-  // Get operator protocol requirement.
-  auto *proto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto operatorId = C.getIdentifier(getMathOperatorName(op));
-  auto *operatorReq = getProtocolRequirement(proto, operatorId);
-
   // Create reference to operator parameters: lhs and rhs.
   auto params = funcDecl->getParameters();
 
   // Create expression combining lhs and rhs members using member operator.
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
-    auto module = nominal->getModuleContext();
-    auto memberType =
-        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto confRef = module->lookupConformance(memberType, proto);
-    assert(confRef && "Member does not conform to math protocol");
-
     // Get member type's math operator, e.g. `Member.+`.
-    // Use protocol requirement declaration for the operator by default: this
-    // will be dynamically dispatched.
-    ValueDecl *memberOpDecl = operatorReq;
-    // If conformance reference is concrete, then use concrete witness
-    // declaration for the operator.
-    if (confRef.isConcrete())
-      if (auto *concreteMemberMethodDecl =
-              confRef.getConcrete()->getWitnessDecl(operatorReq))
-        memberOpDecl = concreteMemberMethodDecl;
-    assert(memberOpDecl && "Member operator declaration must exist");
-    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
-    auto memberOpExpr =
-        new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), memberOpDecl,
-                              DeclNameLoc(), /*Implicit*/ true);
+    auto memberOpExpr = getMathOperatorForValue(member, op, parentDC);
 
     // Create expression `lhs.member <op> rhs.member`.
     // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
@@ -204,12 +365,24 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
                        /*GenericParams=*/nullptr, params,
                        TypeLoc::withoutLoc(selfInterfaceType), parentDC);
   operatorDecl->setImplicit();
-  auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl,
-                            void *ctx) -> std::pair<BraceStmt *, bool> {
-    auto op = (MathOperator) reinterpret_cast<intptr_t>(ctx);
-    return deriveBodyMathOperator(funcDecl, op);
-  };
-  operatorDecl->setBodySynthesizer(bodySynthesizer, (void *)op);
+  if (isa<StructDecl>(nominal)) {
+    auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl,
+                              void *ctx) -> std::pair<BraceStmt *, bool> {
+      auto op = (MathOperator) reinterpret_cast<intptr_t>(ctx);
+      return deriveBodyMathOperator_struct(funcDecl, op);
+    };
+    operatorDecl->setBodySynthesizer(bodySynthesizer, (void *)op);
+  }
+  else if (isa<EnumDecl>(nominal)) {
+    auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl,
+                              void *ctx) -> std::pair<BraceStmt *, bool> {
+      auto op = (MathOperator) reinterpret_cast<intptr_t>(ctx);
+      return deriveBodyMathOperator_enum(funcDecl, op);
+    };
+    operatorDecl->setBodySynthesizer(bodySynthesizer, (void *)op);
+  }
+  else
+    llvm_unreachable("Must be a struct or enum");
   operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
@@ -225,19 +398,16 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
-#if 0
   if (isa<EnumDecl>(nominal)) {
-    llvm::errs() << "DERIVING ZERO FOR AN ENUM\n";
-    ValueDecl *fatalErrorDecl = nullptr;
-    auto *fatalErrorDRE =
-        new (C) DeclRefExpr(fatalErrorDecl, DeclNameLoc(), /*Implicit*/ true);
-    auto *callExpr =
-        CallExpr::createImplicit(C, fatalErrorDRE, {}, {});
-    auto *braceStmt =
-        BraceStmt::create(C, SourceLoc(), {callExpr}, SourceLoc(), true);
-    return std::pair<BraceStmt *, bool>(braceStmt, false);
+    auto fatalErrorDecl = getFatalErrorFn(C);
+    auto fatalErrorDRE = new (C) DeclRefExpr(fatalErrorDecl, DeclNameLoc(),
+                                             /*implicit*/ true);
+    auto errorMsg = new (C) StringLiteralExpr("Cannot create zero enum", SourceRange(),
+                                              /*implicit*/ true);
+    auto callExpr = CallExpr::createImplicit(C, fatalErrorDRE, {errorMsg}, {});
+    auto braceStmt = BraceStmt::create(C, SourceLoc(), {callExpr}, SourceLoc(), true);
+    return { braceStmt, false };
   }
-#endif
 
   auto *memberwiseInitDecl = nominal->getEffectiveMemberwiseInitializer();
   assert(memberwiseInitDecl && "Memberwise initializer must exist");
