@@ -790,7 +790,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'ClosedRange<Int>'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'ClosedRange<Int>?' and 'Int'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   
