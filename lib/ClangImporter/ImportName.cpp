@@ -1704,7 +1704,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
 
       auto &astContext = classTemplateSpecDecl->getASTContext();
-      clang::MangleContext *mangler = astContext.createMangleContext();
+      clang::MangleContext *mangler = clang::ItaniumMangleContext::create(
+          astContext, astContext.getDiagnostics());
       llvm::SmallString<128> storage;
       llvm::raw_svector_ostream buffer(storage);
       mangler->mangleTypeName(astContext.getRecordType(classTemplateSpecDecl),
