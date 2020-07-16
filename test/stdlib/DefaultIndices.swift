@@ -1,7 +1,5 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
-// rdar://problem/65605593
-// UNSUPPORTED: use_os_stdlib
 
 import StdlibUnittest
 
@@ -25,6 +23,10 @@ extension Collection {
 }
 
 suite.test("Bidirectional dispatch") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    // This used to cause a runtime trap until https://github.com/apple/swift/pull/32019
+    return
+  }
   var r = (0...10).indices
   expectType(DefaultIndices<ClosedRange<Int>>.self, &r)
 
