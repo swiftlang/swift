@@ -531,8 +531,10 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
       config.parameterIndices,
       original->getInterfaceType()->castTo<AnyFunctionType>());
   Mangle::ASTMangler mangler;
-  AutoDiffConfig silConfig{loweredParamIndices, config.resultIndices,
-                           config.derivativeGenericSignature};
+  AutoDiffConfig silConfig{
+      loweredParamIndices, config.resultIndices,
+      autodiff::getDifferentiabilityWitnessGenericSignature(
+          original->getGenericSignature(), config.derivativeGenericSignature)};
   std::string linearMapName =
       mangler.mangleAutoDiffLinearMapHelper(declRef.mangle(), kind, silConfig);
   addSymbol(linearMapName);
@@ -543,7 +545,9 @@ void TBDGenVisitor::addAutoDiffDerivativeFunction(
     GenericSignature derivativeGenericSignature,
     AutoDiffDerivativeFunctionKind kind) {
   auto *assocFnId = AutoDiffDerivativeFunctionIdentifier::get(
-      kind, parameterIndices, derivativeGenericSignature,
+      kind, parameterIndices,
+      autodiff::getDifferentiabilityWitnessGenericSignature(
+          original->getGenericSignature(), derivativeGenericSignature),
       original->getASTContext());
   auto declRef =
       SILDeclRef(original).asForeign(requiresForeignEntryPoint(original));
@@ -570,8 +574,10 @@ void TBDGenVisitor::addDifferentiabilityWitness(
       original->getInterfaceType()->castTo<AnyFunctionType>());
 
   auto originalMangledName = declRef.mangle();
-  AutoDiffConfig config{silParamIndices, resultIndices,
-                        derivativeGenericSignature};
+  AutoDiffConfig config{
+      silParamIndices, resultIndices,
+      autodiff::getDifferentiabilityWitnessGenericSignature(
+          original->getGenericSignature(), derivativeGenericSignature)};
   SILDifferentiabilityWitnessKey key(originalMangledName, config);
 
   Mangle::ASTMangler mangler;
