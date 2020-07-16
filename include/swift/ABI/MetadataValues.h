@@ -1118,6 +1118,9 @@ namespace SpecialPointerAuthDiscriminators {
   /// Runtime function variables exported by the runtime.
   const uint16_t RuntimeFunctionEntry = 0x625b;
 
+  /// Protocol conformance descriptors.
+  const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
+
   /// Value witness functions.
   const uint16_t InitializeBufferWithCopyOfBuffer = 0xda4a;
   const uint16_t Destroy = 0x04f8;

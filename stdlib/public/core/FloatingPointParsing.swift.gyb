@@ -46,7 +46,9 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 
 //===--- Parsing ----------------------------------------------------------===//
 %if bits == 16:
-@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
 %end
 extension ${Self}: LosslessStringConvertible {
   /// Creates a new instance from the given string.

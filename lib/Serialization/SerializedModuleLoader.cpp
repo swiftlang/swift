@@ -12,6 +12,7 @@
 
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "ModuleFile.h"
+#include "ModuleFileSharedCore.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
@@ -365,11 +366,11 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
     return moduleBuf.getError();
 
   // Load the module file without validation.
-  std::unique_ptr<ModuleFile> loadedModuleFile;
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
   serialization::ExtendedValidationInfo extInfo;
   serialization::ValidationInfo loadInfo =
-      ModuleFile::load(modulePath.str(),
+      ModuleFileSharedCore::load(modulePath.str(),
                        std::move(moduleBuf.get()),
                        nullptr,
                        nullptr,
@@ -625,7 +626,7 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
     // macOS triples represent their versions differently, so we have to use the
     // special accessor.
     triple.getMacOSXVersion(major, minor, micro);
-    osName = swift::prettyPlatformString(PlatformKind::OSX);
+    osName = swift::prettyPlatformString(PlatformKind::macOS);
   } else {
     triple.getOSVersion(major, minor, micro);
     if (triple.isWatchOS()) {
@@ -676,14 +677,17 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
   serialization::ExtendedValidationInfo extendedInfo;
   std::unique_ptr<ModuleFile> loadedModuleFile;
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFileCore;
   serialization::ValidationInfo loadInfo =
-      ModuleFile::load(moduleInterfacePath,
+      ModuleFileSharedCore::load(moduleInterfacePath,
                        std::move(moduleInputBuffer),
                        std::move(moduleDocInputBuffer),
                        std::move(moduleSourceInfoInputBuffer),
-                       isFramework, loadedModuleFile,
+                       isFramework, loadedModuleFileCore,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
+    loadedModuleFile =
+        std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
     M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
@@ -718,16 +722,19 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
 
   // From here on is the failure path.
 
-  // Even though the module failed to load, it's possible its contents include
-  // a source buffer that need to survive because it's already been used for
-  // diagnostics.
-  if (auto orphanedBuffer = loadedModuleFile->takeBufferForDiagnostics())
-    OrphanedMemoryBuffers.push_back(std::move(orphanedBuffer));
-
   if (diagLoc)
     serialization::diagnoseSerializedASTLoadFailure(
         Ctx, *diagLoc, loadInfo, extendedInfo, moduleBufferID,
         moduleDocBufferID, loadedModuleFile.get(), M.getName());
+
+  // Even though the module failed to load, it's possible its contents include
+  // a source buffer that need to survive because it's already been used for
+  // diagnostics.
+  // Note this is only necessary in case a bridging header failed to load
+  // during the `associateWithFileContext()` call.
+  if (loadedModuleFile && loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
+    OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
+
   return nullptr;
 }
 
@@ -795,20 +802,20 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                Ctx.LangOpts.DebuggerSupport)) {
             return false;
           }
-          return duplicates.insert(dependency.RawPath).second;
+          return duplicates.insert(dependency.Core.RawPath).second;
         });
 
     // FIXME: only show module part of RawAccessPath
     assert(!missing.empty() && "unknown missing dependency?");
     if (missing.size() == 1) {
       Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_single_dependency,
-                         missing.front().getPrettyPrintedPath());
+                         missing.front().Core.getPrettyPrintedPath());
     } else {
       llvm::SmallString<64> missingNames;
       missingNames += '\'';
       interleave(missing,
                  [&](const ModuleFile::Dependency &next) {
-                   missingNames += next.getPrettyPrintedPath();
+                   missingNames += next.Core.getPrettyPrintedPath();
                  },
                  [&] { missingNames += "', '"; });
       missingNames += '\'';
@@ -842,7 +849,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     // hard because we're discovering this /while/ resolving imports, which
     // means the problematic modules haven't been recorded yet.
     Ctx.Diags.diagnose(diagLoc, diag::serialization_circular_dependency,
-                       circularDependencyIter->getPrettyPrintedPath(),
+                       circularDependencyIter->Core.getPrettyPrintedPath(),
                        ModuleName);
     break;
   }
@@ -1107,7 +1114,7 @@ void SerializedASTFile::collectLinkLibraries(
 }
 
 bool SerializedASTFile::isSIB() const {
-  return File.IsSIB;
+  return File.isSIB();
 }
 
 bool SerializedASTFile::hadLoadError() const {

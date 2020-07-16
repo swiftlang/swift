@@ -4548,7 +4548,7 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
 
   ModuleDecl *M = DC->getParentModule();
   // For standard library collection types such as Array, Set or Dictionary
-  // which have custom casting machinery implemented in situations like:
+  // which have custom casting machinery implemented for situations like:
   //
   //  func encodable(_ value: Encodable) {
   //    _ = value as! [String : Encodable]
@@ -5789,7 +5789,15 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (!valueDecl->isProtocolRequirement())
       continue;
 
-    checker.resolveWitnessViaLookup(valueDecl);
+    ResolveWitnessResult result = checker.resolveWitnessViaLookup(valueDecl);
+
+    if (result == ResolveWitnessResult::Missing &&
+        requirement->isSPI() &&
+        !proto->isSPI()) {
+      // SPI requirements need a default value, unless the protocol is SPI too.
+      valueDecl->diagnose(diag::spi_attribute_on_protocol_requirement,
+                          valueDecl->getName());
+    }
   }
 
   // Find defaults for any associated conformances rooted on defaulted

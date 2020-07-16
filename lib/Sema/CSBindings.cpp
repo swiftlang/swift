@@ -547,13 +547,28 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       }
       break;
     }
+    case ConstraintKind::KeyPathApplication: {
+      if (result.FullyBound)
+        continue;
+
+      // If this variable is in the application projected result type, mark the
+      // result as `FullyBound` to ensure we delay binding until we've bound
+      // other type variables in the KeyPathApplication constraint. This ensures
+      // we try to bind the key path type first, which can allow us to discover
+      // additional bindings for the result type.
+      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      findInferableTypeVars(simplifyType(constraint->getThirdType()), typeVars);
+      if (typeVars.count(typeVar))
+        result.FullyBound = true;
+
+      break;
+    }
 
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
-    case ConstraintKind::KeyPathApplication:
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
     case ConstraintKind::OpaqueUnderlyingType:
@@ -1034,7 +1049,8 @@ bool TypeVarBindingProducer::computeNext() {
 
     auto srcLocator = binding.getLocator();
     if (srcLocator &&
-        srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
+        (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+         srcLocator->isLastElement<LocatorPathElt::AutoclosureResult>()) &&
         !type->hasTypeVariable() && type->isKnownStdlibCollectionType()) {
       // If the type binding comes from the argument conversion, let's
       // instead of binding collection types directly, try to bind

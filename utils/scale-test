@@ -62,7 +62,7 @@ def write_input_file(args, ast, d, n):
 
 def ensure_tmpdir(d):
     if d is not None and not os.path.exists(d):
-        os.makedirs(d, 0700)
+        os.makedirs(d, 0o700)
     return tempfile.mkdtemp(dir=d)
 
 
@@ -74,7 +74,7 @@ def supports_stats_output_dir(args):
     sd = os.path.join(d, "stats-probe")
 
     try:
-        os.makedirs(sd, 0700)
+        os.makedirs(sd, 0o700)
         # Write a trivial test program and try running with
         # -stats-output-dir
         testpath = os.path.join(sd, "test.swift")
@@ -361,7 +361,7 @@ def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
     assert(len(ys) > 0)
     mean_y = sum(ys) / len(ys)
     ss_total = sum((y - mean_y) ** 2 for y in ys)
-    data = zip(xs, ys)
+    data = list(zip(xs, ys))
 
     def inner(ps):
         s = 0.0

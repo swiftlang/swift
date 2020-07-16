@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: llvm-bcanalyzer %t/transpose_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 
@@ -50,8 +50,11 @@ extension S {
     self + t
   }
 
+  // Note: qualified name base types are not yet serialized and are not printed
+  // when round-tripping.
+
   // CHECK: @transpose(of: instanceMethod, wrt: self)
-  @transpose(of: instanceMethod, wrt: self)
+  @transpose(of: S.instanceMethod, wrt: self)
   static func transposeInstanceMethodWrtSelf(_ other: S, t: S) -> S {
     other + t
   }

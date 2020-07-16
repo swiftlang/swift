@@ -853,7 +853,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
         }
 
         // Cast between two metatypes and that's it.
-        return {builder->createUncheckedBitCast(loc, value, destTy), false};
+        return {builder->createUncheckedReinterpretCast(loc, value, destTy),
+                false};
       }
     }
   }

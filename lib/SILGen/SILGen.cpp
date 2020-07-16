@@ -935,6 +935,43 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   emitDifferentiabilityWitnessesForFunction(constant, F);
 }
 
+/// Returns the SIL differentiability witness generic signature given the
+/// original declaration's generic signature and the derivative generic
+/// signature.
+///
+/// In general, the differentiability witness generic signature is equal to the
+/// derivative generic signature.
+///
+/// Edge case, if two conditions are satisfied:
+/// 1. The derivative generic signature is equal to the original generic
+///    signature.
+/// 2. The derivative generic signature has *all concrete* generic parameters
+///    (i.e. all generic parameters are bound to concrete types via same-type
+///    requirements).
+///
+/// Then the differentiability witness generic signature is `nullptr`.
+///
+/// Both the original and derivative declarations are lowered to SIL functions
+/// with a fully concrete type and no generic signature, so the
+/// differentiability witness should similarly have no generic signature.
+static GenericSignature
+getDifferentiabilityWitnessGenericSignature(GenericSignature origGenSig,
+                                            GenericSignature derivativeGenSig) {
+  // If there is no derivative generic signature, return the original generic
+  // signature.
+  if (!derivativeGenSig)
+    return origGenSig;
+  // If derivative generic signature has all concrete generic parameters and is
+  // equal to the original generic signature, return `nullptr`.
+  auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
+  auto origCanGenSig = origGenSig.getCanonicalSignature();
+  if (origCanGenSig == derivativeCanGenSig &&
+      derivativeCanGenSig->areAllParamsConcrete())
+    return GenericSignature();
+  // Otherwise, return the derivative generic signature.
+  return derivativeGenSig;
+}
+
 void SILGenModule::emitDifferentiabilityWitnessesForFunction(
     SILDeclRef constant, SILFunction *F) {
   // Visit `@derivative` attributes and generate SIL differentiability
@@ -955,8 +992,11 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
               diffAttr->getDerivativeGenericSignature()) &&
              "Type-checking should resolve derivative generic signatures for "
              "all original SIL functions with generic signatures");
+      auto witnessGenSig = getDifferentiabilityWitnessGenericSignature(
+          AFD->getGenericSignature(),
+          diffAttr->getDerivativeGenericSignature());
       AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
-                            diffAttr->getDerivativeGenericSignature());
+                            witnessGenSig);
       emitDifferentiabilityWitness(AFD, F, config, /*jvp*/ nullptr,
                                    /*vjp*/ nullptr, diffAttr);
     }
@@ -975,10 +1015,11 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
       auto origDeclRef =
           SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
       auto *origFn = getFunction(origDeclRef, NotForDefinition);
-      auto derivativeGenSig = AFD->getGenericSignature();
+      auto witnessGenSig = getDifferentiabilityWitnessGenericSignature(
+          origAFD->getGenericSignature(), AFD->getGenericSignature());
       auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
       AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
-                            derivativeGenSig);
+                            witnessGenSig);
       emitDifferentiabilityWitness(origAFD, origFn, config, jvp, vjp,
                                    derivAttr);
     }
@@ -1928,12 +1969,12 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
   }
 
   // Also make sure to process any intermediate files that may contain SIL.
-  bool hasSIB = llvm::any_of(desc.getFiles(), [](const FileUnit *File) -> bool {
-    auto *SASTF = dyn_cast<SerializedASTFile>(File);
-    return SASTF && SASTF->isSIB();
-  });
-  if (hasSIB) {
-    auto primary = desc.context.dyn_cast<FileUnit *>();
+  bool shouldDeserialize =
+      llvm::any_of(desc.getFiles(), [](const FileUnit *File) -> bool {
+        return isa<SerializedASTFile>(File);
+      });
+  if (shouldDeserialize) {
+    auto *primary = desc.context.dyn_cast<FileUnit *>();
     silMod->getSILLoader()->getAllForModule(silMod->getSwiftModule()->getName(),
                                             primary);
   }

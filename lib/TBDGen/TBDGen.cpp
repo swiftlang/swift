@@ -256,8 +256,8 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
   case swift::PlatformKind::watchOSApplicationExtension:
     return Ver.IsSimulator ? LinkerPlatformId::watchOS_sim:
                              LinkerPlatformId::watchOS;
-  case swift::PlatformKind::OSX:
-  case swift::PlatformKind::OSXApplicationExtension:
+  case swift::PlatformKind::macOS:
+  case swift::PlatformKind::macOSApplicationExtension:
     return LinkerPlatformId::macOS;
   case swift::PlatformKind::macCatalyst:
   case swift::PlatformKind::macCatalystApplicationExtension:
@@ -709,7 +709,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   if (ASD->exportsPropertyDescriptor()) {
     addSymbol(LinkEntity::forPropertyDescriptor(ASD));
   }
-  
+
   // ...and the opaque result decl if it has one.
   if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));

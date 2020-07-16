@@ -500,6 +500,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedBitwiseCastInst, unchecked_bitwise_cast,
                       ConversionInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(UncheckedValueCastInst, unchecked_value_cast,
+                      ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(RefToRawPointerInst, ref_to_raw_pointer,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(RawPointerToRefInst, raw_pointer_to_ref,

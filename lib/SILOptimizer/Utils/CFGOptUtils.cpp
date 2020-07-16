@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -548,6 +549,20 @@ bool swift::splitCriticalEdgesFrom(SILBasicBlock *fromBB,
         splitCriticalEdge(fromBB->getTerminator(), idx, domInfo, loopInfo);
     changed |= (newBB != nullptr);
   }
+  return changed;
+}
+
+bool swift::splitCriticalEdgesTo(SILBasicBlock *toBB, DominanceInfo *domInfo,
+                                 SILLoopInfo *loopInfo) {
+  bool changed = false;
+  unsigned numPreds = std::distance(toBB->pred_begin(), toBB->pred_end());
+
+  for (unsigned idx = 0; idx != numPreds; ++idx) {
+    SILBasicBlock *fromBB = *std::next(toBB->pred_begin(), idx);
+    auto *newBB = splitIfCriticalEdge(fromBB, toBB);
+    changed |= (newBB != nullptr);
+  }
+
   return changed;
 }
 

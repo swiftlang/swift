@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-swift-frontend -enable-library-evolution -emit-module -target x86_64-apple-macosx10.50 -emit-module-path %t/weak_import_deployment_target_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_deployment_target_helper.swift
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target x86_64-apple-macosx10.50 | %FileCheck %s --check-prefix=CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target x86_64-apple-macosx10.60 | %FileCheck %s --check-prefix=CHECK-NEW
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module -target %target-cpu-apple-macosx10.50 -emit-module-path %t/weak_import_deployment_target_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_deployment_target_helper.swift
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefix=CHECK-OLD
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefix=CHECK-NEW
 //
-// RUN: %target-swift-frontend -enable-library-evolution -emit-module -target x86_64-apple-macosx10.60 -emit-module-path %t/weak_import_deployment_target_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_deployment_target_helper.swift
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target x86_64-apple-macosx10.50 | %FileCheck %s --check-prefix=CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target x86_64-apple-macosx10.60 | %FileCheck %s --check-prefix=CHECK-NEW
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module -target %target-cpu-apple-macosx10.60 -emit-module-path %t/weak_import_deployment_target_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_deployment_target_helper.swift
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefix=CHECK-OLD
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefix=CHECK-NEW
 //
 // REQUIRES: OS=macosx
 

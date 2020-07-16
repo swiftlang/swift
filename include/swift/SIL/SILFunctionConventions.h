@@ -396,6 +396,9 @@ public:
   /// Return the SIL type of the apply/entry argument at the given index.
   SILType getSILArgumentType(unsigned index,
                              TypeExpansionContext context) const;
+
+  /// Returns true if this function does not return to the caller.
+  bool isNoReturn(TypeExpansionContext context) const;
 };
 
 struct SILFunctionConventions::SILResultTypeFunc {
@@ -462,6 +465,11 @@ SILFunctionConventions::getSILArgumentType(unsigned index,
   }
   return getSILType(
       funcTy->getParameters()[index - getNumIndirectSILResults()], context);
+}
+
+inline bool
+SILFunctionConventions::isNoReturn(TypeExpansionContext context) const {
+  return funcTy->isNoReturnFunction(silConv.getModule(), context);
 }
 
 inline SILFunctionConventions

@@ -371,8 +371,13 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
 
   auto Iter = End;
   while (Start != Iter) {
-    // end_cow_mutation is not a projection, but we want to "see through" it.
-    if (!isa<EndCOWMutationInst>(Iter)) {
+    // end_cow_mutation and begin_access are not projections, but we need to be
+    // able to form valid ProjectionPaths across them, otherwise optimization
+    // passes like RLE/DSE cannot recognize their locations.
+    //
+    // TODO: migrate users to getProjectionPath to the AccessPath utility to
+    // avoid this hack.
+    if (!isa<EndCOWMutationInst>(Iter) && !isa<BeginAccessInst>(Iter)) {
       Projection AP(Iter);
       if (!AP.isValid())
         break;
