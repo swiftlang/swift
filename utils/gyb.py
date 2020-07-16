@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 
+import io
 import os
 import re
 import sys
@@ -1208,12 +1209,12 @@ def main():
         help='''Bindings to be set in the template's execution context''')
 
     parser.add_argument(
-        'file', type=argparse.FileType(),
+        'file', type=str,
         help='Path to GYB template file (defaults to stdin)', nargs='?',
         default=sys.stdin)
     parser.add_argument(
-        '-o', dest='target', type=argparse.FileType('w'),
-        help='Output file (defaults to stdout)', default=sys.stdout)
+        '-o', dest='target', type=str,
+        help='Output file (defaults to stdout)', default='-')
     parser.add_argument(
         '--test', action='store_true',
         default=False, help='Run a self-test')
@@ -1245,15 +1246,20 @@ def main():
             sys.exit(1)
 
     bindings = dict(x.split('=', 1) for x in args.defines)
-    ast = parse_template(args.file.name, args.file.read())
+    with io.open(args.file, 'r', encoding='utf-8') as f:
+        ast = parse_template(args.file, f.read())
     if args.dump:
         print(ast)
     # Allow the template to open files and import .py files relative to its own
     # directory
-    os.chdir(os.path.dirname(os.path.abspath(args.file.name)))
+    os.chdir(os.path.dirname(os.path.abspath(args.file)))
     sys.path = ['.'] + sys.path
 
-    args.target.write(execute_template(ast, args.line_directive, **bindings))
+    if args.target == '-':
+        sys.stdout.write(execute_template(ast, args.line_directive, **bindings))
+    else:
+        with io.open(args.target, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(execute_template(ast, args.line_directive, **bindings))
 
 
 if __name__ == '__main__':
