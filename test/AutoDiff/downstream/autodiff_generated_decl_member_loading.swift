@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %s -o %t/autodiff_generated_decl_member_loading_cross_module.swiftmodule
-// RUN: %target-swift-frontend -merge-modules -sil-merge-partial-modules -emit-module %t/autodiff_generated_decl_member_loading_cross_module.swiftmodule
+// RUN: %target-swift-frontend -merge-modules -emit-module %t/autodiff_generated_decl_member_loading_cross_module.swiftmodule
 
 // Tests TF-805.
 //

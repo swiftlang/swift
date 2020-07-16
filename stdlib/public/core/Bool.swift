@@ -43,7 +43,7 @@
 ///         print(i)
 ///         i -= 1
 ///     }
-///     // error: 'Int' is not convertible to 'Bool'
+///     // error: Cannot convert value of type 'Int' to expected condition type 'Bool'
 ///
 /// The correct approach in Swift is to compare the `i` value with zero in the
 /// `while` statement.
@@ -254,7 +254,7 @@ extension Bool {
   /// `lhs` evaluates to `true`. For example:
   ///
   ///     let measurements = [7.44, 6.51, 4.74, 5.88, 6.27, 6.12, 7.76]
-  ///     let sum = measurements.reduce(0, combine: +)
+  ///     let sum = measurements.reduce(0, +)
   ///
   ///     if measurements.count > 0 && sum / Double(measurements.count) < 6.5 {
   ///         print("Average measurement is less than 6.5")

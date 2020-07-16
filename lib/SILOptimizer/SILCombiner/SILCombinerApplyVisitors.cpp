@@ -190,7 +190,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
     } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
-      auto URC = Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
+      auto URC =
+          Builder.createUncheckedReinterpretCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
       Args.push_back(Op);
@@ -381,8 +382,8 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       return false;
 
     // Convert the projected address back to an optional integer.
-    SILValue offset = Builder.createUncheckedBitCast(loc, offsetPtr,
-                                SILType::getPrimitiveObjectType(builtinIntTy));
+    SILValue offset = Builder.createUncheckedReinterpretCast(
+        loc, offsetPtr, SILType::getPrimitiveObjectType(builtinIntTy));
     SILValue offsetInt = Builder.createStruct(loc, intType, { offset });
     result = Builder.createOptionalSome(loc, offsetInt, AI->getType());
   } else {

@@ -2444,7 +2444,7 @@ public:
 
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
-                           Type(TypeResolution *, TypeRepr *),
+                           Type(const TypeResolution *, TypeRepr *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2457,7 +2457,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, TypeResolution *resolution,
+  Type evaluate(Evaluator &evaluator, const TypeResolution *resolution,
                 TypeRepr *repr) const;
 };
 
@@ -2562,6 +2562,23 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+};
+
+class SynthesizeMainFunctionRequest
+    : public SimpleRequest<SynthesizeMainFunctionRequest,
+                           FuncDecl *(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  FuncDecl *evaluate(Evaluator &evaluator, Decl *) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

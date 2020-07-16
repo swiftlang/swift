@@ -1764,8 +1764,9 @@ public:
               "[dynamically_replaceable] function");
 
     // In canonical SIL, direct reference to a shared_external declaration
-    // is an error; we should have deserialized a body. In raw SIL, we may
-    // not have deserialized the body yet.
+    // is an error; we should have deserialized a body. In raw SIL, including
+    // the merge-modules phase, we may not have deserialized the body yet as we
+    // may not have run the SILLinker pass.
     if (F.getModule().getStage() >= SILStage::Canonical) {
       if (RefF->isExternalDeclaration()) {
         require(SingleFunction ||
@@ -1911,6 +1912,12 @@ public:
   }
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {
+    require(
+        F.hasOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
+  }
+
+  void checkUncheckedValueCastInst(UncheckedValueCastInst *) {
     require(
         F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
@@ -5637,20 +5644,13 @@ void SILModule::verify() const {
   // Uniquing set to catch symbol name collisions.
   llvm::DenseSet<StringRef> symbolNames;
 
-  // When merging partial modules, we only link functions from the current
-  // module, without enabling "LinkAll" mode or running the SILLinker pass;
-  // in this case, we need to relax some of the checks.
-  bool SingleFunction = false;
-  if (getOptions().MergePartialModules)
-    SingleFunction = true;
-
   // Check all functions.
   for (const SILFunction &f : *this) {
     if (!symbolNames.insert(f.getName()).second) {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(SingleFunction);
+    f.verify(/*singleFunction*/ false);
   }
 
   // Check all globals.

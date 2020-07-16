@@ -40,16 +40,8 @@ public:
   /// Controls the aggressiveness of the loop unroller.
   int UnrollThreshold = 250;
 
-  /// Controls whether to pull in SIL from partial modules during the
-  /// merge modules step. Could perhaps be merged with the link mode
-  /// above but the interactions between all the flags are tricky.
-  bool MergePartialModules = false;
-
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
-
-  /// Enable existential specializer optimization.
-  bool ExistentialSpecializer = false;
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;

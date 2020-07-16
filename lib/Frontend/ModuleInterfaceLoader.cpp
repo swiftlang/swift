@@ -1627,6 +1627,17 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
+bool ExplicitSwiftModuleLoader::canImportModule(
+    Located<Identifier> mID) {
+  StringRef moduleName = mID.Item.str();
+  auto it = Impl.ExplicitModuleMap.find(moduleName);
+  // If no provided explicit module matches the name, then it cannot be imported.
+  if (it == Impl.ExplicitModuleMap.end()) {
+    return false;
+  }
+  return true;
+}
+
 void ExplicitSwiftModuleLoader::collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const {
   for (auto &entry: Impl.ExplicitModuleMap) {

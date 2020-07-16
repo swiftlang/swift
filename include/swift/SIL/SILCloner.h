@@ -1538,6 +1538,16 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *Inst) {
                                     getOpType(Inst->getType())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitUncheckedValueCastInst(
+    UncheckedValueCastInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createUncheckedValueCast(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getOperand()),
+                                    getOpType(Inst->getType())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::

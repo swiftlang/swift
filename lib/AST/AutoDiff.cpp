@@ -372,6 +372,23 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
   return operationName.empty();
 }
 
+GenericSignature autodiff::getDifferentiabilityWitnessGenericSignature(
+    GenericSignature origGenSig, GenericSignature derivativeGenSig) {
+  // If there is no derivative generic signature, return the original generic
+  // signature.
+  if (!derivativeGenSig)
+    return origGenSig;
+  // If derivative generic signature has all concrete generic parameters and is
+  // equal to the original generic signature, return `nullptr`.
+  auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
+  auto origCanGenSig = origGenSig.getCanonicalSignature();
+  if (origCanGenSig == derivativeCanGenSig &&
+      derivativeCanGenSig->areAllParamsConcrete())
+    return GenericSignature();
+  // Otherwise, return the derivative generic signature.
+  return derivativeGenSig;
+}
+
 Type TangentSpace::getType() const {
   switch (kind) {
   case Kind::TangentVector:
@@ -420,6 +437,14 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
     break;
   }
   }
+}
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const DeclNameRefWithLoc &name) {
+  os << name.Name;
+  if (auto accessorKind = name.AccessorKind)
+    os << '.' << getAccessorLabel(*accessorKind);
+  return os;
 }
 
 bool swift::operator==(const TangentPropertyInfo::Error &lhs,

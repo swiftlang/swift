@@ -1557,6 +1557,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedValueCastInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:
   case SILInstructionKind::UpcastInst:

@@ -330,6 +330,26 @@ toolchains::Darwin::addSanitizerArgs(ArgStringList &Arguments,
                                      /*shared=*/false);
 }
 
+namespace {
+
+enum class BackDeployLibFilter {
+  executable,
+  all
+};
+
+// Whether the given job matches the backward-deployment library filter.
+bool jobMatchesFilter(LinkKind jobKind, BackDeployLibFilter filter) {
+  switch (filter) {
+  case BackDeployLibFilter::executable:
+    return jobKind == LinkKind::Executable;
+    
+  case BackDeployLibFilter::all:
+    return true;
+  }
+}
+
+}
+
 void
 toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
                                         const DynamicLinkJobAction &job,
@@ -359,47 +379,31 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   }
   
   if (runtimeCompatibilityVersion) {
-    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
-      // Swift 5.0 compatibility library
-      SmallString<128> BackDeployLib;
-      BackDeployLib.append(SharedResourceDirPath);
-      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
-      
-      if (llvm::sys::fs::exists(BackDeployLib)) {
-        Arguments.push_back("-force_load");
-        Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
-      }
-    }
+    auto addBackDeployLib = [&](llvm::VersionTuple version,
+                                BackDeployLibFilter filter,
+                                StringRef libraryName) {
+      if (*runtimeCompatibilityVersion > version)
+        return;
 
-    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 1)) {
-      // Swift 5.1 compatibility library
+      if (!jobMatchesFilter(job.getKind(), filter))
+        return;
+      
       SmallString<128> BackDeployLib;
       BackDeployLib.append(SharedResourceDirPath);
-      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility51.a");
+      llvm::sys::path::append(BackDeployLib, "lib" + libraryName + ".a");
       
       if (llvm::sys::fs::exists(BackDeployLib)) {
         Arguments.push_back("-force_load");
         Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
       }
-    }
+    };
+
+    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName) \
+      addBackDeployLib(                                       \
+          llvm::VersionTuple Version, BackDeployLibFilter::Filter, LibraryName);
+    #include "swift/Frontend/BackDeploymentLibs.def"
   }
     
-  if (job.getKind() == LinkKind::Executable) {
-    if (runtimeCompatibilityVersion)
-      if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
-        // Swift 5.0 dynamic replacement compatibility library.
-        SmallString<128> BackDeployLib;
-        BackDeployLib.append(SharedResourceDirPath);
-        llvm::sys::path::append(BackDeployLib,
-                                "libswiftCompatibilityDynamicReplacements.a");
-
-        if (llvm::sys::fs::exists(BackDeployLib)) {
-          Arguments.push_back("-force_load");
-          Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
-        }
-      }
-  }
-
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   SmallVector<std::string, 4> RuntimeLibPaths;
@@ -623,7 +627,7 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         // The first deployment of arm64 for macOS is version 10.16;
         if (triple.isAArch64() && major <= 10 && minor < 16) {
           llvm::VersionTuple firstMacARM64e(10, 16, 0);
-          firstMacARM64e = canonicalizePlatformVersion(PlatformKind::OSX,
+          firstMacARM64e = canonicalizePlatformVersion(PlatformKind::macOS,
                                                        firstMacARM64e);
           major = firstMacARM64e.getMajor();
           minor = firstMacARM64e.getMinor().getValueOr(0);
@@ -799,6 +803,11 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-arch");
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
 
+  // On Darwin, we only support libc++.
+  if (context.Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
+    Arguments.push_back("-lc++");
+  }
+
   addArgsToLinkStdlib(Arguments, job, context);
 
   addProfileGenerationArgs(Arguments, context);
@@ -941,6 +950,13 @@ toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
   // Validating darwin unsupported -static-stdlib argument.
   if (args.hasArg(options::OPT_static_stdlib)) {
     diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+  }
+
+  // If a C++ standard library is specified, it has to be libc++.
+  if (auto arg = args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+    if (StringRef(arg->getValue()) != "libc++") {
+      diags.diagnose(SourceLoc(), diag::error_darwin_only_supports_libcxx); 
+    }
   }
 }
 

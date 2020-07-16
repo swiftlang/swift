@@ -1785,7 +1785,76 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
                                 C.getIdentifier("UIApplicationMain"));
 }
 
-void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
+namespace {
+struct MainTypeAttrParams {
+  FuncDecl *mainFunction;
+  MainTypeAttr *attr;
+};
+
+}
+static std::pair<BraceStmt *, bool>
+synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
+  ASTContext &context = fn->getASTContext();
+  MainTypeAttrParams *params = (MainTypeAttrParams *) arg;
+
+  FuncDecl *mainFunction = params->mainFunction;
+  auto location = params->attr->getLocation();
+  NominalTypeDecl *nominal = fn->getDeclContext()->getSelfNominalTypeDecl();
+
+  auto *typeExpr = TypeExpr::createImplicit(nominal->getDeclaredType(), context);
+
+  SubstitutionMap substitutionMap;
+  if (auto *environment = mainFunction->getGenericEnvironment()) {
+    substitutionMap = SubstitutionMap::get(
+      environment->getGenericSignature(),
+      [&](SubstitutableType *type) { return nominal->getDeclaredType(); },
+      LookUpConformanceInModule(nominal->getModuleContext()));
+  } else {
+    substitutionMap = SubstitutionMap();
+  }
+
+  auto funcDeclRef = ConcreteDeclRef(mainFunction, substitutionMap);
+
+  auto *memberRefExpr = new (context) MemberRefExpr(
+      typeExpr, SourceLoc(), funcDeclRef, DeclNameLoc(location),
+      /*Implicit*/ true);
+  memberRefExpr->setImplicit(true);
+
+  auto *callExpr = CallExpr::createImplicit(context, memberRefExpr, {}, {});
+  callExpr->setImplicit(true);
+  callExpr->setThrows(mainFunction->hasThrows());
+  callExpr->setType(context.TheEmptyTupleType);
+
+  Expr *returnedExpr;
+
+  if (mainFunction->hasThrows()) {
+    auto *tryExpr = new (context) TryExpr(
+        SourceLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
+    returnedExpr = tryExpr;
+  } else {
+    returnedExpr = callExpr;
+  }
+
+  auto *returnStmt =
+      new (context) ReturnStmt(SourceLoc(), callExpr, /*Implicit=*/true);
+
+  SmallVector<ASTNode, 1> stmts;
+  stmts.push_back(returnStmt);
+  auto *body = BraceStmt::create(context, SourceLoc(), stmts,
+                                SourceLoc(), /*Implicit*/true);
+
+  return std::make_pair(body, /*typechecked=*/false);
+}
+
+FuncDecl *
+SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
+                                        Decl *D) const {
+  auto &context = D->getASTContext();
+
+  MainTypeAttr *attr = D->getAttrs().getAttribute<MainTypeAttr>();
+  if (attr == nullptr)
+    return nullptr;
+
   auto *extension = dyn_cast<ExtensionDecl>(D);
 
   IterableDeclContext *iterableDeclContext;
@@ -1805,24 +1874,18 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
     braces = nominal->getBraces();
   }
 
-  if (!nominal) {
-    assert(false && "Should have already recognized that the MainType decl "
+  assert(nominal && "Should have already recognized that the MainType decl "
                     "isn't applicable to decls other than NominalTypeDecls");
-    return;
-  }
   assert(iterableDeclContext);
   assert(declContext);
 
   // The type cannot be generic.
   if (nominal->isGenericContext()) {
-    diagnose(attr->getLocation(),
-             diag::attr_generic_ApplicationMain_not_supported, 2);
+    context.Diags.diagnose(attr->getLocation(),
+                           diag::attr_generic_ApplicationMain_not_supported, 2);
     attr->setInvalid();
-    return;
+    return nullptr;
   }
-
-  SourceFile *file = cast<SourceFile>(declContext->getModuleScopeContext());
-  assert(file);
 
   // Create a function
   //
@@ -1835,8 +1898,6 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   // usual type-checking.  The alternative would be to directly call
   // mainType.main() from the entry point, and that would require fully
   // type-checking the call to mainType.main().
-  auto &context = D->getASTContext();
-  auto location = attr->getLocation();
 
   auto resolution = resolveValueMember(
       *declContext, nominal->getInterfaceType(), context.Id_main);
@@ -1864,26 +1925,21 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
     }
 
     if (viableCandidates.size() != 1) {
-      diagnose(attr->getLocation(), diag::attr_MainType_without_main,
-               nominal->getBaseName());
+      context.Diags.diagnose(attr->getLocation(),
+                             diag::attr_MainType_without_main,
+                             nominal->getBaseName());
       attr->setInvalid();
-      return;
+      return nullptr;
     }
     mainFunction = viableCandidates[0];
   }
 
-  bool mainFunctionThrows = mainFunction->hasThrows();
-
-  auto voidToVoidFunctionType =
-      FunctionType::get({}, context.TheEmptyTupleType,
-                        FunctionType::ExtInfo().withThrows(mainFunctionThrows));
-  auto nominalToVoidToVoidFunctionType = FunctionType::get({AnyFunctionType::Param(nominal->getInterfaceType())}, voidToVoidFunctionType);
   auto *func = FuncDecl::create(
       context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::KeywordStatic,
       /*FuncLoc*/ SourceLoc(),
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
                ParameterList::createEmpty(context)),
-      /*NameLoc*/ SourceLoc(), /*Throws=*/mainFunctionThrows,
+      /*NameLoc*/ SourceLoc(), /*Throws=*/mainFunction->hasThrows(),
       /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TypeLoc::withoutLoc(TupleType::getEmpty(context)),
@@ -1891,80 +1947,30 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   func->setImplicit(true);
   func->setSynthesized(true);
 
-  auto *typeExpr = TypeExpr::createImplicit(nominal->getDeclaredType(), context);
-
-  SubstitutionMap substitutionMap;
-  if (auto *environment = mainFunction->getGenericEnvironment()) {
-    substitutionMap = SubstitutionMap::get(
-      environment->getGenericSignature(),
-      [&](SubstitutableType *type) { return nominal->getDeclaredType(); },
-      LookUpConformanceInModule(nominal->getModuleContext()));
-  } else {
-    substitutionMap = SubstitutionMap();
-  }
-
-  auto funcDeclRef = ConcreteDeclRef(mainFunction, substitutionMap);
-
-  auto *memberRefExpr = new (context) MemberRefExpr(
-      typeExpr, SourceLoc(), funcDeclRef, DeclNameLoc(location),
-      /*Implicit*/ true);
-  memberRefExpr->setImplicit(true);
-
-  auto *callExpr = CallExpr::createImplicit(context, memberRefExpr, {}, {});
-  callExpr->setImplicit(true);
-  callExpr->setThrows(mainFunctionThrows);
-  callExpr->setType(context.TheEmptyTupleType);
-
-  Expr *returnedExpr;
-
-  if (mainFunctionThrows) {
-    auto *tryExpr = new (context) TryExpr(
-        SourceLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
-    returnedExpr = tryExpr;
-  } else {
-    returnedExpr = callExpr;
-  }
-
-  auto *returnStmt =
-      new (context) ReturnStmt(SourceLoc(), callExpr, /*Implicit=*/true);
-
-  SmallVector<ASTNode, 1> stmts;
-  stmts.push_back(returnStmt);
-  auto *body = BraceStmt::create(context, SourceLoc(), stmts,
-                                SourceLoc(), /*Implicit*/true);
-  func->setBodyParsed(body);
-  func->setInterfaceType(nominalToVoidToVoidFunctionType);
+  auto *params = context.Allocate<MainTypeAttrParams>();
+  params->mainFunction = mainFunction;
+  params->attr = attr;
+  func->setBodySynthesizer(synthesizeMainBody, params);
 
   iterableDeclContext->addMember(func);
 
-  // This function must be type-checked. Why?  Consider the following scenario:
-  //
-  //     protocol AlmostMainable {}
-  //     protocol ReallyMainable {}
-  //     extension AlmostMainable where Self : ReallyMainable {
-  //         static func main() {}
-  //     }
-  //     @main struct Main : AlmostMainable {}
-  //
-  // Note in particular that Main does not conform to ReallyMainable.
-  //
-  // In this case, resolveValueMember will find the function main in the 
-  // extension, and so, since there is one candidate, the function $main will
-  // accordingly be formed as usual:
-  //
-  //     func $main() {
-  //         return Main.main()
-  //     }
-  //
-  // Of course, this function's body does not type-check.
-  file->DelayedFunctions.push_back(func);
+  return func;
+}
+
+void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
+  auto &context = D->getASTContext();
+
+  SourceFile *file = D->getDeclContext()->getParentSourceFile();
+  assert(file);
+
+  auto *func = evaluateOrDefault(context.evaluator,
+                                 SynthesizeMainFunctionRequest{D},
+                                 nullptr);
 
   // Register the func as the main decl in the module. If there are multiples
   // they will be diagnosed.
-  if (file->registerMainDecl(func, attr->getLocation())) {
+  if (file->registerMainDecl(func, attr->getLocation()))
     attr->setInvalid();
-    return;
-  }
 }
 
 /// Determine whether the given context is an extension to an Objective-C class
@@ -2663,8 +2669,11 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    auto resolution = TypeResolution::forContextual(PD, None);
-    return resolution.resolveType(typeEraserRepr);
+    return TypeResolution::forContextual(PD, None,
+                                         // Unbound generics are not allowed
+                                         // within this attribute.
+                                         /*unboundTyOpener*/ nullptr)
+        .resolveType(typeEraserRepr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -2845,11 +2854,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
   Type T = attr->getProtocolType();
   if (!T && attr->getProtocolTypeRepr()) {
-    TypeResolutionOptions options = None;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-
-    T = TypeResolution::forContextual(DC, options)
-          .resolveType(attr->getProtocolTypeRepr());
+    T = TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr)
+            .resolveType(attr->getProtocolTypeRepr());
   }
 
   // Definite error-types were already diagnosed in resolveType.
@@ -3420,7 +3426,7 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Returns true if the given type conforms to `Differentiable` in the given
-/// contxt. If `tangentVectorEqualsSelf` is true, also check whether the given
+/// context. If `tangentVectorEqualsSelf` is true, also check whether the given
 /// type satisfies `TangentVector == Self`.
 static bool conformsToDifferentiable(Type type, DeclContext *DC,
                                      bool tangentVectorEqualsSelf = false) {
@@ -3483,13 +3489,13 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// Computes the differentiability parameter indices from the given parsed
-// differentiability parameters for the given original or derivative
-// `AbstractFunctionDecl` and derivative generic environment. On error, emits
-// diagnostics and returns `nullptr`.
-// - If parsed parameters are empty, infer parameter indices.
-// - Otherwise, build parameter indices from parsed parameters.
-// The attribute name/location are used in diagnostics.
+/// Computes the differentiability parameter indices from the given parsed
+/// differentiability parameters for the given original or derivative
+/// `AbstractFunctionDecl` and derivative generic environment. On error, emits
+/// diagnostics and returns `nullptr`.
+/// - If parsed parameters are empty, infer parameter indices.
+/// - Otherwise, build parameter indices from parsed parameters.
+/// The attribute name/location are used in diagnostics.
 static IndexSubset *computeDifferentiabilityParameters(
     ArrayRef<ParsedAutoDiffParameter> parsedDiffParams,
     AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
@@ -3648,17 +3654,17 @@ enum class AbstractFunctionDeclLookupErrorKind {
   CandidateNotFunctionDeclaration
 };
 
-// Returns the function declaration corresponding to the given base type
-// (optional), function name, and lookup context.
-//
-// If the base type of the function is specified, member lookup is performed.
-// Otherwise, unqualified lookup is performed.
-//
-// If the function declaration cannot be resolved, emits a diagnostic and
-// returns nullptr.
-//
-// Used for resolving the referenced declaration in `@derivative` and
-// `@transpose` attributes.
+/// Returns the function declaration corresponding to the given base type
+/// (optional), function name, and lookup context.
+///
+/// If the base type of the function is specified, member lookup is performed.
+/// Otherwise, unqualified lookup is performed.
+///
+/// If the function declaration cannot be resolved, emits a diagnostic and
+/// returns nullptr.
+///
+/// Used for resolving the referenced declaration in `@derivative` and
+/// `@transpose` attributes.
 static AbstractFunctionDecl *findAbstractFunctionDecl(
     DeclAttribute *attr, Type baseType, DeclNameRefWithLoc funcNameWithLoc,
     DeclContext *lookupContext, NameLookupOptions lookupOptions,
@@ -3821,10 +3827,10 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
   return validCandidates.front();
 }
 
-// Checks that the `candidate` function type equals the `required` function
-// type, disregarding parameter labels and tuple result labels.
-// `checkGenericSignature` is used to check generic signatures, if specified.
-// Otherwise, generic signatures are checked for equality.
+/// Checks that the `candidate` function type equals the `required` function
+/// type, disregarding parameter labels and tuple result labels.
+/// `checkGenericSignature` is used to check generic signatures, if specified.
+/// Otherwise, generic signatures are checked for equality.
 static bool checkFunctionSignature(
     CanAnyFunctionType required, CanType candidate,
     Optional<std::function<bool(GenericSignature, GenericSignature)>>
@@ -3893,8 +3899,8 @@ static bool checkFunctionSignature(
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
 };
 
-// Returns an `AnyFunctionType` from the given parameters, result type, and
-// generic signature.
+/// Returns an `AnyFunctionType` from the given parameters, result type, and
+/// generic signature.
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
                  GenericSignature genericSignature) {
@@ -3903,8 +3909,8 @@ makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
   return FunctionType::get(parameters, resultType);
 }
 
-// Computes the original function type corresponding to the given derivative
-// function type. Used for `@derivative` attribute type-checking.
+/// Computes the original function type corresponding to the given derivative
+/// function type. Used for `@derivative` attribute type-checking.
 static AnyFunctionType *
 getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   // Unwrap curry levels. At most, two parameter lists are necessary, for
@@ -3943,8 +3949,8 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   return originalType;
 }
 
-// Computes the original function type corresponding to the given transpose
-// function type. Used for `@transpose` attribute type-checking.
+/// Computes the original function type corresponding to the given transpose
+/// function type. Used for `@transpose` attribute type-checking.
 static AnyFunctionType *
 getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
                                  IndexSubset *linearParamIndices,
@@ -4190,24 +4196,6 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
   }
 
-  // Set the resolved derivative generic signature in the attribute.
-  // Do not set the derivative generic signature if the original function's
-  // generic signature is equal to `derivativeGenSig` and all generic parameters
-  // are concrete. In that case, the original function and derivative functions
-  // are all lowered as SIL functions with no generic signature (specialized
-  // with concrete types from same-type requirements), so the derivative generic
-  // signature should not be set.
-  auto skipDerivativeGenericSignature = [&] {
-    auto origCanGenSig =
-        original->getGenericSignature().getCanonicalSignature();
-    auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
-    if (!derivativeCanGenSig)
-      return false;
-    return origCanGenSig == derivativeCanGenSig &&
-           derivativeCanGenSig->areAllParamsConcrete();
-  };
-  if (skipDerivativeGenericSignature())
-    derivativeGenSig = GenericSignature();
   attr->setDerivativeGenericSignature(derivativeGenSig);
   return false;
 }
@@ -4574,11 +4562,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   Type baseType;
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
-    TypeResolutionOptions options = None;
-    options |= TypeResolutionFlags::AllowModule;
-    auto resolution =
-        TypeResolution::forContextual(derivative->getDeclContext(), options);
-    baseType = resolution.resolveType(baseTypeRepr);
+    const auto options =
+        TypeResolutionOptions(None) | TypeResolutionFlags::AllowModule;
+    baseType =
+        TypeResolution::forContextual(derivative->getDeclContext(), options,
+                                      /*unboundTyOpener*/ nullptr)
+            .resolveType(baseTypeRepr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -4880,11 +4869,11 @@ DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
-// Computes the linearity parameter indices from the given parsed linearity
-// parameters for the given transpose function. On error, emits diagnostics and
-// returns `nullptr`.
-//
-// The attribute location is used in diagnostics.
+/// Computes the linearity parameter indices from the given parsed linearity
+/// parameters for the given transpose function. On error, emits diagnostics and
+/// returns `nullptr`.
+///
+/// The attribute location is used in diagnostics.
 static IndexSubset *
 computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
                            AbstractFunctionDecl *transposeFunction,
@@ -4971,12 +4960,12 @@ computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// Checks if the given linearity parameter types are valid for the given
-// original function in the given derivative generic environment and module
-// context. Returns true on error.
-//
-// The parsed differentiability parameters and attribute location are used in
-// diagnostics.
+/// Checks if the given linearity parameter types are valid for the given
+/// original function in the given derivative generic environment and module
+/// context. Returns true on error.
+///
+/// The parsed differentiability parameters and attribute location are used in
+/// diagnostics.
 static bool checkLinearityParameters(
     AbstractFunctionDecl *originalAFD,
     SmallVector<AnyFunctionType::Param, 4> linearParams,
@@ -5009,9 +4998,9 @@ static bool checkLinearityParameters(
   return false;
 }
 
-// Given a transpose function type where `self` is a linearity parameter,
-// sets `staticSelfType` and `instanceSelfType` and returns true if they are
-// equals. Otherwise, returns false.
+/// Given a transpose function type where `self` is a linearity parameter,
+/// sets `staticSelfType` and `instanceSelfType` and returns true if they are
+/// equals. Otherwise, returns false.
 static bool
 doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
                                            Type &staticSelfType,
@@ -5144,11 +5133,12 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     return None;
   };
 
-  auto resolution =
-      TypeResolution::forContextual(transpose->getDeclContext(), None);
   Type baseType;
-  if (attr->getBaseTypeRepr())
-    baseType = resolution.resolveType(attr->getBaseTypeRepr());
+  if (attr->getBaseTypeRepr()) {
+    baseType = TypeResolution::forContextual(transpose->getDeclContext(), None,
+                                             /*unboundTyOpener*/ nullptr)
+                   .resolveType(attr->getBaseTypeRepr());
+  }
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |
@@ -5172,7 +5162,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   // Diagnose if original function has opaque result types.
   if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
-    diagnose(attr->getLocation(), diag::autodiff_attr_opaque_result_type_unsupported);
+    diagnose(attr->getLocation(),
+             diag::autodiff_attr_opaque_result_type_unsupported);
     attr->setInvalid();
     return;
   }

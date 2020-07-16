@@ -4548,7 +4548,7 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
 
   ModuleDecl *M = DC->getParentModule();
   // For standard library collection types such as Array, Set or Dictionary
-  // which have custom casting machinery implemented in situations like:
+  // which have custom casting machinery implemented for situations like:
   //
   //  func encodable(_ value: Encodable) {
   //    _ = value as! [String : Encodable]

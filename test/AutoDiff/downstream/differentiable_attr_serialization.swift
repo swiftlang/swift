@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %s -o %t/differentiable_attr_serialization.swiftmodule
-// RUN: %target-swift-frontend -merge-modules -sil-merge-partial-modules -emit-module %t/differentiable_attr_serialization.swiftmodule
+// RUN: %target-swift-frontend -merge-modules -emit-module %t/differentiable_attr_serialization.swiftmodule
 
 // Test round-trip `@differentiable` attribute AST serialization.
 

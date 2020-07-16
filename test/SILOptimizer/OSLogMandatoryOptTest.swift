@@ -18,14 +18,8 @@ func testSimpleInterpolation() {
   // CHECK-DAG is used here as it is easier to perform the checks backwards
   // from uses to the definitions.
 
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // We need to wade through some borrows and copy values here.
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "Minimum integer value: %ld"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "Minimum integer value: %ld"
 
   // Check if the size of the argument buffer is a constant.
 
@@ -71,13 +65,8 @@ func testInterpolationWithFormatOptions() {
 
   // Check if there is a call to _os_log_impl with a literal format string.
 
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "Maximum unsigned integer value: %lx"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "Maximum unsigned integer value: %lx"
 
   // Check if the size of the argument buffer is a constant.
 
@@ -124,13 +113,8 @@ func testInterpolationWithFormatOptionsAndPrivacy() {
 
   // Check if there is a call to _os_log_impl with a literal format string.
 
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "Private Identifier: %{private}lx"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "Private Identifier: %{private}lx"
 
   // Check if the size of the argument buffer is a constant.
 
@@ -183,13 +167,8 @@ func testInterpolationWithMultipleArguments() {
 
   // Check if there is a call to _os_log_impl with a literal format string.
 
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "Access prevented: process %{public}ld initiated by user: %{private}ld attempted resetting permissions to %lo"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "Access prevented: process %{public}ld initiated by user: %{private}ld attempted resetting permissions to %lo"
 
   // Check if the size of the argument buffer is a constant.
 
@@ -240,13 +219,8 @@ func testLogMessageWithoutData() {
 
   // Check if there is a call to _os_log_impl with a literal format string.
 
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "A message with no data"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "A message with no data"
 
   // Check if the size of the argument buffer is a constant.
 
@@ -284,37 +258,22 @@ func testLogMessageWithoutData() {
 // CHECK-LABEL: @${{.*}}testEscapingOfPercentsyy
 func testEscapingOfPercents() {
   _osLogTestHelper("Process failed after 99% completion")
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "Process failed after 99%% completion"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "Process failed after 99%% completion"
 }
 
 // CHECK-LABEL: @${{.*}}testDoublePercentsyy
 func testDoublePercents() {
   _osLogTestHelper("Double percents: %%")
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "Double percents: %%%%"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "Double percents: %%%%"
 }
 
 // CHECK-LABEL: @${{.*}}testSmallFormatStringsyy
 func testSmallFormatStrings() {
   _osLogTestHelper("a")
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "a"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "a"
 }
 
 /// A stress test that checks whether the optimizer handle messages with more
@@ -332,13 +291,8 @@ func testMessageWithTooManyArguments() {
 
   // Check if there is a call to _os_log_impl with a literal format string.
 
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "%ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld "
+  // Match the format string first.
+  // CHECK: string_literal utf8 "%ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld "
 
   // Check if the size of the argument buffer is a constant.
 
@@ -382,13 +336,8 @@ func testInt32Interpolation() {
 
   // Check if there is a call to _os_log_impl with a literal format string.
 
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "32-bit integer value: %d"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "32-bit integer value: %d"
 
   // Check if the size of the argument buffer is a constant.
 
@@ -426,13 +375,8 @@ func testDynamicStringArguments() {
   // CHECK-DAG is used here as it is easier to perform the checks backwards
   // from uses to the definitions.
 
-  // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-  // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-  // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-  // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-  // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-  // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-  // CHECK-DAG: [[LIT]] = string_literal utf8 "concat: %{public}s interpolated: %{private}s"
+  // Match the format string first.
+  // CHECK: string_literal utf8 "concat: %{public}s interpolated: %{private}s"
 
   // Check if the size of the argument buffer is a constant.
 
@@ -484,13 +428,8 @@ func testNSObjectInterpolation() {
     // CHECK-DAG is used here as it is easier to perform the checks backwards
     // from uses to the definitions.
 
-    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG: [[LIT]] = string_literal utf8 "NSArray: %{public}@ NSDictionary: %{private}@"
+    // Match the format string first.
+    // CHECK: string_literal utf8 "NSArray: %{public}@ NSDictionary: %{private}@"
 
     // Check if the size of the argument buffer is a constant.
 
@@ -537,13 +476,8 @@ func testDoubleInterpolation() {
     // CHECK-DAG is used here as it is easier to perform the checks backwards
     // from uses to the definitions.
 
-    // CHECK-DAG: builtin "globalStringTablePointer"([[STRING:%[0-9]+]] : $String)
-    // CHECK-DAG: [[STRING]] = begin_borrow [[STRING2:%[0-9]+]]
-    // CHECK-DAG: [[STRING2]] = copy_value [[STRING3:%[0-9]+]]
-    // CHECK-DAG: [[STRING3]] = begin_borrow [[STRING4:%[0-9]+]]
-    // CHECK-DAG: [[STRING4]] = apply [[STRING_INIT:%[0-9]+]]([[LIT:%[0-9]+]],
-    // CHECK-DAG: [[STRING_INIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG: [[LIT]] = string_literal utf8 "Tau = %f"
+    // Match the format string first.
+    // CHECK: string_literal utf8 "Tau = %f"
 
     // Check if the size of the argument buffer is a constant.
 

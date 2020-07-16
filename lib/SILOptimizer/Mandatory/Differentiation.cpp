@@ -41,9 +41,9 @@
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
-#include "swift/SILOptimizer/Differentiation/JVPEmitter.h"
+#include "swift/SILOptimizer/Differentiation/JVPCloner.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
-#include "swift/SILOptimizer/Differentiation/VJPEmitter.h"
+#include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -923,8 +923,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
         return true;
       }
       // Emit JVP function.
-      JVPEmitter emitter(context, original, witness, jvp, invoker);
-      if (emitter.run())
+      JVPCloner cloner(context, original, witness, jvp, invoker);
+      if (cloner.run())
         return true;
     } else {
       // If JVP generation is disabled or a user-defined custom VJP function
@@ -951,8 +951,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     witness->setVJP(vjp);
     context.recordGeneratedFunction(vjp);
     // Emit VJP function.
-    VJPEmitter emitter(context, original, witness, vjp, invoker);
-    return emitter.run();
+    VJPCloner cloner(context, original, witness, vjp, invoker);
+    return cloner.run();
   }
   return false;
 }

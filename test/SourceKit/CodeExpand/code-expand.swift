@@ -11,23 +11,23 @@ foo(x: <#T##() -> Void#>, y: <#T##Int#>)
 // CHECK-NEXT: }, y: Int)
 
 anArr.indexOfObjectPassingTest(<#T##predicate: ((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?##((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?#>)
-// CHECK:      anArr.indexOfObjectPassingTest { (<#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#>) -> Bool in
+// CHECK:      anArr.indexOfObjectPassingTest { <#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#> in
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
 anArr.indexOfObjectPassingTest(<#T##predicate: ((_ obj: AnyObject!, _ idx: Int, _ stop: UnsafePointer<ObjCBool>) -> Bool)?##((_ obj: AnyObject!, _ idx: Int, _ stop: UnsafePointer<ObjCBool>) -> Bool)?#>)
-// CHECK:      anArr.indexOfObjectPassingTest { (obj, idx, stop) -> Bool in
+// CHECK:      anArr.indexOfObjectPassingTest { obj, idx, stop in
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
 anArr.indexOfObjectAtIndexes(<#T##s: NSIndexSet?##NSIndexSet?#>, options: <#T##NSEnumerationOptions#>, passingTest: <#T##((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?#>)
-// CHECK:      anArr.indexOfObjectAtIndexes(NSIndexSet?, options: NSEnumerationOptions) { (<#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#>) -> Bool in
+// CHECK:      anArr.indexOfObjectAtIndexes(NSIndexSet?, options: NSEnumerationOptions) { <#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#> in
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
 if anArr.indexOfObjectPassingTest(<#T##predicate: ((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?##((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?#>) {
 }
-// CHECK:      if anArr.indexOfObjectPassingTest({ (<#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#>) -> Bool in
+// CHECK:      if anArr.indexOfObjectPassingTest({ <#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#> in
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }) {
 // CHECK-NEXT: }
@@ -48,10 +48,10 @@ do {
 }
 
 foo(x: <#T##Self.SegueIdentifier -> Void#>)
-// CHECK:      foo { (<#Self.SegueIdentifier#>) in
+// CHECK:      foo { <#Self.SegueIdentifier#> in
 
 store.requestAccessToEntityType(<#T##entityType: EKEntityType##EKEntityType#>, completion: <#T##EKEventStoreRequestAccessCompletionHandler##EKEventStoreRequestAccessCompletionHandler##(Bool, NSError?) -> Void#>)
-// CHECK:      store.requestAccessToEntityType(EKEntityType) { (<#Bool#>, <#NSError?#>) in
+// CHECK:      store.requestAccessToEntityType(EKEntityType) { <#Bool#>, <#NSError?#> in
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 

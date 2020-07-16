@@ -2079,6 +2079,10 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
   }
 
+  // Incidental uses produce no values and have no effect on their operands.
+  if (isIncidentalUse(I))
+    return;
+
   // Instructions which return the address of non-writable memory cannot have
   // an effect on escaping.
   if (isNonWritableMemoryAddress(I))

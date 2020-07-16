@@ -1929,8 +1929,8 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     deprecatedAsUnavailableMessage = "";
     break;
 
-  case PlatformKind::OSX:
-  case PlatformKind::OSXApplicationExtension:
+  case PlatformKind::macOS:
+  case PlatformKind::macOSApplicationExtension:
     deprecatedAsUnavailableMessage =
         "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
     break;
@@ -1942,9 +1942,9 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
 
 bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
   switch (platformKind) {
-  case PlatformKind::OSX:
+  case PlatformKind::macOS:
     return name == "macos";
-  case PlatformKind::OSXApplicationExtension:
+  case PlatformKind::macOSApplicationExtension:
     return name == "macos" || name == "macos_app_extension";
 
   case PlatformKind::iOS:
@@ -1984,8 +1984,8 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::none:
     llvm_unreachable("version but no platform?");
 
-  case PlatformKind::OSX:
-  case PlatformKind::OSXApplicationExtension:
+  case PlatformKind::macOS:
+  case PlatformKind::macOSApplicationExtension:
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     return major < 10 ||
            (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
@@ -2930,11 +2930,12 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
 bool ClangImporter::Implementation::isVisibleClangEntry(
     const clang::NamedDecl *clangDecl) {
   // For a declaration, check whether the declaration is hidden.
-  if (!clangDecl->isHidden()) return true;
+  clang::Sema &clangSema = getClangSema();
+  if (clangSema.isVisible(clangDecl)) return true;
 
   // Is any redeclaration visible?
   for (auto redecl : clangDecl->redecls()) {
-    if (!cast<clang::NamedDecl>(redecl)->isHidden()) return true;
+    if (clangSema.isVisible(cast<clang::NamedDecl>(redecl))) return true;
   }
 
   return false;
@@ -3045,8 +3046,10 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     SmallVector<clang::NamedDecl *, 4> DelayedCategories;
 
     // Simply importing the categories adds them to the list of extensions.
-    for (const auto *Cat : objcClass->visible_categories()) {
-      Impl.importDeclReal(Cat, Impl.CurrentVersion);
+    for (const auto *Cat : objcClass->known_categories()) {
+      if (getClangSema().isVisible(Cat)) {
+        Impl.importDeclReal(Cat, Impl.CurrentVersion);
+      }
     }
   }
 

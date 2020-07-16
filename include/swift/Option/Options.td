@@ -167,7 +167,7 @@ HelpText<"Print a simple message comparing dependencies with source ranges (w/ f
 
 def driver_compare_incremental_schemes_path :
 Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
-HelpText<"Path to use for machine-readable comparision">,
+HelpText<"Path to use for machine-readable comparison">,
 MetaVarName<"<path>">;
 
 def driver_compare_incremental_schemes_path_EQ :
@@ -555,6 +555,14 @@ def disable_direct_intramodule_dependencies : Flag<["-"],
     "disable-direct-intramodule-dependencies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable experimental dependency tracking that never cascades">;
+
+def enable_experimental_cxx_interop :
+  Flag<["-"], "enable-experimental-cxx-interop">,
+  HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
+
+def experimental_cxx_stdlib :
+  Separate<["-"], "experimental-cxx-stdlib">,
+  HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
 
 // Diagnostic control options

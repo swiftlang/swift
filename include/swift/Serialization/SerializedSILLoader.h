@@ -76,10 +76,6 @@ public:
 
   bool invalidateFunction(SILFunction *F);
 
-  /// Deserialize all SILFunctions, VTables, and WitnessTables in all
-  /// SILModules.
-  void getAll();
-
   /// Deserialize all SILFunctions, VTables, and WitnessTables for
   /// a given Module.
   ///

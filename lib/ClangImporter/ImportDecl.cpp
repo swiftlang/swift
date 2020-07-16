@@ -502,9 +502,7 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
                                      /*implicit*/ true);
   assign->setType(TupleType::getEmpty(ctx));
 
-  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
-                                       /*Implicit=*/true);
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), nullptr, /*Implicit=*/true);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc(),
                                 /*implicit*/ true);
@@ -1366,11 +1364,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
     }
   }
 
-  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
-                                       /*Implicit=*/true);
-  result->setType(TupleType::getEmpty(ctx));
-
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), nullptr, /*Implicit=*/true);
   stmts.push_back(ret);
 
   // Create the function body.
@@ -1567,9 +1561,7 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
                                      /*Implicit=*/true);
   assign->setType(TupleType::getEmpty(ctx));
 
-  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
-                                       /*Implicit=*/true);
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), nullptr, /*Implicit=*/true);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
   return { body, /*isTypeChecked=*/true };
@@ -7111,9 +7103,12 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
           return;
 
         bool inNearbyCategory =
-            std::any_of(interfaceDecl->visible_categories_begin(),
-                        interfaceDecl->visible_categories_end(),
+            std::any_of(interfaceDecl->known_categories_begin(),
+                        interfaceDecl->known_categories_end(),
                         [=](const clang::ObjCCategoryDecl *category) -> bool {
+                          if (!Impl.getClangSema().isVisible(category)) {
+                            return false;
+                          }
                           if (category != decl) {
                             auto *categoryModule =
                                 Impl.getClangModuleForDecl(category);
@@ -7624,12 +7619,12 @@ void ClangImporter::Implementation::importAttributes(
       auto platformK =
         llvm::StringSwitch<Optional<PlatformKind>>(Platform)
           .Case("ios", PlatformKind::iOS)
-          .Case("macos", PlatformKind::OSX)
+          .Case("macos", PlatformKind::macOS)
           .Case("tvos", PlatformKind::tvOS)
           .Case("watchos", PlatformKind::watchOS)
           .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
           .Case("macos_app_extension",
-                PlatformKind::OSXApplicationExtension)
+                PlatformKind::macOSApplicationExtension)
           .Case("tvos_app_extension",
                 PlatformKind::tvOSApplicationExtension)
           .Case("watchos_app_extension",

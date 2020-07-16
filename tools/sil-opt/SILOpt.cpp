@@ -175,18 +175,9 @@ static llvm::cl::opt<unsigned>
 AssertConfId("assert-conf-id", llvm::cl::Hidden,
              llvm::cl::init(0));
 
-static llvm::cl::opt<bool>
-DisableSILLinking("disable-sil-linking",
-                  llvm::cl::desc("Disable SIL linking"));
-
 static llvm::cl::opt<int>
 SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
-
-static llvm::cl::opt<bool>
-SILExistentialSpecializer("enable-sil-existential-specializer", 
-                          llvm::cl::Hidden,
-                          llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
@@ -377,7 +368,6 @@ int main(int argc, char **argv) {
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
-  SILOpts.ExistentialSpecializer = SILExistentialSpecializer;
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
@@ -476,17 +466,6 @@ int main(int argc, char **argv) {
                                 CI.getSILOptions());
   }
   SILMod->setSerializeSILAction([]{});
-
-  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
-  // us.
-  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
-    auto SL = SerializedSILLoader::create(
-        CI.getASTContext(), SILMod.get(), nullptr);
-    if (DisableSILLinking)
-      SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
-    else
-      SL->getAll();
-  }
 
   if (!RemarksFilename.empty()) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
