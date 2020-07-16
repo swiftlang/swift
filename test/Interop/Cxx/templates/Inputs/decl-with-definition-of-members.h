@@ -21,7 +21,7 @@ inline int forceInstantiating() {
 }
 
 // Tpl<Arg> ClassTemplateSpecializationDecl has definition because function
-// above forced the instantiation. It's members are fully instantiated, so
+// above forced the instantiation. Its members are fully instantiated, so
 // nothing needs to be explicitly instantiated in swift.
 typedef Tpl<Arg> DefinedMembers;
 
