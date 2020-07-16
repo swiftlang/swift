@@ -431,12 +431,6 @@ public:
       return nullptr;
     }
 
-    // Try type checking the closure if it hasn't.
-    if (auto *closure = TheFunc->getAbstractClosureExpr()) {
-      if (!closure->getType() && !closure->hasSingleExpressionBody())
-        swift::typeCheckASTNodeAtLoc(closure->getParent(), closure->getLoc());
-    }
-
     Type ResultTy = TheFunc->getBodyResultType();
     if (!ResultTy || ResultTy->hasError())
       return nullptr;
