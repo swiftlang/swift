@@ -81,3 +81,13 @@ func testForwardMatchWithAutoclosure2(i: Int, s: String) {
     return i
   }
 }
+
+// Match a closure parameter to a variadic parameter.
+func acceptsVariadicClosureParameter(closures: ((Int, Int) -> Int)...) {
+}
+
+func testVariadicClosureParameter() {
+  acceptsVariadicClosureParameter { x, y in x % y }
+  acceptsVariadicClosureParameter() { x, y in x % y }
+  acceptsVariadicClosureParameter(closures: +, -, *, /) { x, y in x % y }
+}

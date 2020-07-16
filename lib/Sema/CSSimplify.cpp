@@ -200,6 +200,15 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
   return flags | ConstraintSystem::TMF_GenerateConstraints;
 }
 
+/// Whether the given parameter requires an argument.
+static bool parameterRequiresArgument(
+    ArrayRef<AnyFunctionType::Param> params,
+    const ParameterListInfo &paramInfo,
+    unsigned paramIdx) {
+  return !paramInfo.hasDefaultArgument(paramIdx)
+      && !params[paramIdx].isVariadic();
+}
+
 /// Determine whether any parameter from the given index up until the end
 /// requires an argument to be provided.
 ///
@@ -222,8 +231,7 @@ static bool anyParameterRequiresArgument(
       break;
 
     // If this parameter requires an argument, tell the caller.
-    if (!paramInfo.hasDefaultArgument(paramIdx)
-        && !params[paramIdx].isVariadic())
+    if (parameterRequiresArgument(params, paramInfo, paramIdx))
       return true;
   }
 
@@ -314,13 +322,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
-      return None;
-
-    // If we're claiming variadic arguments, do not claim an unlabeled trailing
-    // closure argument.
-    if (forVariadic &&
-        unlabeledTrailingClosureArgIndex &&
-        nextArgIdx == *unlabeledTrailingClosureArgIndex)
       return None;
 
     // Go hunting for an unclaimed argument whose name does match.
@@ -425,10 +426,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         return;
       }
 
-      // If this parameter has a default argument, consider applying a "fuzzy"
-      // match rule that skips this parameter if doing so is the only way to
-      // satisfy
-      if (paramInfo.hasDefaultArgument(paramIdx) &&
+      // If this parameter does not require an argument, consider applying a
+      // "fuzzy" match rule that skips this parameter if doing so is the only
+      // way to successfully match arguments to parameters.
+      if (!parameterRequiresArgument(params, paramInfo, paramIdx) &&
           param.getPlainType()->getASTContext().LangOpts
               .EnableFuzzyForwardScanTrailingClosureMatching &&
           anyParameterRequiresArgument(
@@ -469,10 +470,21 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       auto currentNextArgIdx = nextArgIdx;
       {
         nextArgIdx = *claimed;
+
         // Claim any additional unnamed arguments.
-        while (
-            (claimed = claimNextNamed(nextArgIdx, Identifier(), false, true))) {
-          parameterBindings[paramIdx].push_back(*claimed);
+        while (true) {
+          // If the next argument is the unlabeled trailing closure and the
+          // variadic parameter does not accept the unlabeled trailing closure
+          // argument, we're done.
+          if (unlabeledTrailingClosureArgIndex &&
+              skipClaimedArgs(nextArgIdx) == *unlabeledTrailingClosureArgIndex &&
+              !paramInfo.acceptsUnlabeledTrailingClosureArgument(paramIdx))
+            break;
+
+          if ((claimed = claimNextNamed(nextArgIdx, Identifier(), false, true)))
+            parameterBindings[paramIdx].push_back(*claimed);
+          else
+            break;
         }
       }
 
