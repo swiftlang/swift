@@ -2,15 +2,14 @@
 //
 // REQUIRES: executable_test
 
-import DeclWithDefinitionOfMembers
+import DeclWithPrimitiveArgument
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-TemplatesTestSuite.test("fully-instantiated") {
-  let a = Arg()
-  var t = DefinedMembers(t: a)
-  expectEqual(t.callMethod(), 53)
+TemplatesTestSuite.test("int-argument") {
+  var wrappedMagicInt = WrappedMagicInt(t: 42)
+  expectEqual(wrappedMagicInt.getInt(), 47)
 }
 
 runAllTests()

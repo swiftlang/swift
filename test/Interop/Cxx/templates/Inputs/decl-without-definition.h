@@ -2,22 +2,22 @@
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITHOUT_DEFINITION_H
 
 template<class T>
-struct Tpl {
+struct MagicWrapper {
 public:
   T t;
-  inline int callMethod() const {
-    return t.method() + 5;
+  inline int callGetInt() const {
+    return t.getInt() + 5;
   }
 };
 
-struct Arg {
+struct MagicNumber {
 public:
-  inline int method() const { return 12; }
+  inline int getInt() const { return 12; }
 };
 
-// Tpl<Arg> ClassTemplateSpecializationDecl doesn't have a definition in Clang
+// MagicWrapper<MagicNumber> ClassTemplateSpecializationDecl doesn't have a definition in Clang
 // because nothing in this header required the instantiation. Therefore we have
 // to construct the definition on the swift side.
-typedef Tpl<Arg> DoesNotHaveDefinition;
+typedef MagicWrapper<MagicNumber> WrappedMagicNumberWithoutDefinition;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITHOUT_DEFINITION_H

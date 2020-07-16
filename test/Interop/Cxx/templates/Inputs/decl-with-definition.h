@@ -2,26 +2,26 @@
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_H
 
 template<class T>
-struct Tpl {
+struct MagicWrapper {
 public:
   T t;
-  inline int callMethod() const {
-    return t.method() + 5;
+  inline int callGetInt() const {
+    return t.getInt() + 5;
   }
 };
 
-struct Arg {
+struct MagicNumber {
 public:
-  inline int method() const { return 24; }
+  inline int getInt() const { return 24; }
 };
 
-inline Tpl<Arg> forceInstantiating() {
-  return Tpl<Arg>();
+inline MagicWrapper<MagicNumber> forceInstantiating() {
+  return MagicWrapper<MagicNumber>();
 }
 
-// Tpl<Arg> ClassTemplateSpecializationDecl has definition because function
-// above forced the instantiation. Its members are not instantiated though, we
-// need to instantiate them in Swift.
-typedef Tpl<Arg> HasDefinition;
+// MagicWrapper<MagicNumber> ClassTemplateSpecializationDecl has definition
+// because function above forced the instantiation. Its members are not
+// instantiated though, we need to instantiate them in Swift.
+typedef MagicWrapper<MagicNumber> PartiallyDefinedWrappedMagicNumber;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_DECL_WITH_DEFINITION_H

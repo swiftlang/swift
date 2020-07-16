@@ -2,19 +2,19 @@
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_USING_DIRECTIVE_H
 
 template<class T>
-struct Tpl {
+struct MagicWrapper {
 public:
   T t;
-  inline int callMethod() const {
-    return t.method() + 5;
+  inline int callGetInt() const {
+    return t.getInt() + 5;
   }
 };
 
-struct Arg {
+struct MagicNumber {
 public:
-  inline int method() const { return 6; }
+  inline int getInt() const { return 6; }
 };
 
-using ComesFromUsingDirective = Tpl<Arg>;
+using UsingWrappedMagicNumber = MagicWrapper<MagicNumber>;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_USING_DIRECTIVE_H

@@ -1,22 +1,22 @@
 #ifndef TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_SPECIALIZATION_H
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_SPECIALIZATION_H
 
-struct Arg {
+struct MagicNumber {
 public:
-  inline int method() const { return 26; }
+  inline int getInt() const { return 26; }
 };
 
-template <class T> struct Tpl {
+template <class T> struct MagicWrapper {
 public:
   T t;
-  inline int callMethod() const { return t.method() + 5; }
+  inline int callGetInt() const { return t.getInt() + 5; }
 };
 
-template <> struct Tpl<Arg> {
-  Arg t;
-  int callMethod() const { return t.method() + 10; }
+template <> struct MagicWrapper<MagicNumber> {
+  MagicNumber t;
+  int callGetInt() const { return t.getInt() + 10; }
 };
 
-typedef Tpl<Arg> TplWithExplicitSpecialization;
+typedef MagicWrapper<MagicNumber> MagicWrappedNumberWithExplicitSpecialization;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_SPECIALIZATION_H

@@ -1,5 +1,5 @@
-module TemplateWithPrimitiveArgument {
-  header "template-with-primitive-argument.h"
+module DeclWithPrimitiveArgument {
+  header "decl-with-primitive-argument.h"
 }
 
 module DeclWithoutDefinition {
@@ -10,8 +10,8 @@ module DeclWithDefinition {
   header "decl-with-definition.h"
 }
 
-module DeclWithDefinitionOfMembers {
-  header "decl-with-definition-of-members.h"
+module DeclWithDefinitionIncludingMembers {
+  header "decl-with-definition-including-members.h"
 }
 
 module CanonicalTypes {

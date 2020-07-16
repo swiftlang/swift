@@ -7,10 +7,10 @@ import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-TemplatesTestSuite.test("has-definition") {
-  let a = Arg()
-  var t = DoesNotHaveDefinition(t: a)
-  expectEqual(t.callMethod(), 17)
+TemplatesTestSuite.test("without-definition") {
+  let magicNumber = MagicNumber()
+  var wrappedMagicNumber = WrappedMagicNumberWithoutDefinition(t: magicNumber)
+  expectEqual(wrappedMagicNumber.callGetInt(), 17)
 }
 
 runAllTests()

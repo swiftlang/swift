@@ -7,10 +7,10 @@ import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-TemplatesTestSuite.test("explicit-specialization-is-used") {
-  let arg = Arg()
-  var tpl = TplWithExplicitSpecialization(t: arg)
-  expectEqual(tpl.callMethod(), 36)
+TemplatesTestSuite.test("explicit-specialization") {
+  let magicNumber = MagicNumber()
+  var wrappedMagicNumber = MagicWrappedNumberWithExplicitSpecialization(t: magicNumber)
+  expectEqual(wrappedMagicNumber.callGetInt(), 36)
 }
 
 runAllTests()

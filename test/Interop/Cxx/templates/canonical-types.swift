@@ -10,12 +10,13 @@ var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 TemplatesTestSuite.test("canonical-types") {
   // multiple typedeffed types with the same canonical type are the same type
   // from the typechecking perspective.
-  let arg = Arg()
-  var tplA = TplA(t: arg)
-  expectEqual(tplA.callMethod(), 29)
+  let magicNumber = MagicNumber()
+  var wrappedMagicNumberA = WrappedMagicNumberA(t: magicNumber)
+  expectEqual(wrappedMagicNumberA.callGetInt(), 29)
 
-  var tplB: TplB = TplB(t: arg)
-  expectEqual(tplB.callMethod(), 29)
+  var wrappedMagicNumberB: WrappedMagicNumberB =
+    WrappedMagicNumberB(t: magicNumber)
+  expectEqual(wrappedMagicNumberB.callGetInt(), 29)
 }
 
 runAllTests()

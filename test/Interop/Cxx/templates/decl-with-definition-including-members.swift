@@ -2,15 +2,15 @@
 //
 // REQUIRES: executable_test
 
-import DeclWithDefinition
+import DeclWithDefinitionIncludingMembers
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
-TemplatesTestSuite.test("has-partial-definition") {
+TemplatesTestSuite.test("fully-defined") {
   let magicNumber = MagicNumber()
-  var wrappedMagicNumber = PartiallyDefinedWrappedMagicNumber(t: magicNumber)
-  expectEqual(wrappedMagicNumber.callGetInt(), 29)
+  var wrappedMagicNumber = FullyDefinedWrappedMagicNumber(t: magicNumber)
+  expectEqual(wrappedMagicNumber.callGetInt(), 53)
 }
 
 runAllTests()
