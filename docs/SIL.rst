@@ -2848,6 +2848,11 @@ by an ``end_borrow`` instruction. All ``load_borrow`` instructions must be
 paired with exactly one ``end_borrow`` instruction along any path through the
 program. Until ``end_borrow``, it is illegal to invalidate or store to ``%0``.
 
+begin_borrow
+````````````
+
+TODO
+
 end_borrow
 ``````````
 
