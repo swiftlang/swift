@@ -1673,7 +1673,7 @@ Owned
 Owned ownership models "move only" values. We require that each such value is
 consumed exactly once along all program paths. The IR verifier will flag values
 that are not consumed along a path as a leak and any double consumes as
-use-after-frees. We model move operations via "forwarding uses" such as casts
+use-after-frees. We model move operations via `forwarding uses`_ such as casts
 and transforming terminators (e.x.: `switch_enum`_, `checked_cast_br`_) that
 transform the input value, consuming it in the process, and producing a new
 transformed owned value as a result.
@@ -1728,7 +1728,7 @@ derived from the ARC object. As an example, consider the following Swift/SIL::
   }
 
 Notice how our individual copy (``%1``) threads its way through the IR using
-forwarding of ``@owned`` ownership. These forwarding operations partition the
+`forwarding uses`_ of ``@owned`` ownership. These `forwarding uses`_ partition the
 lifetime of the result of the copy_value into a set of disjoint individual owned
 lifetimes (``%2``, ``%3``, ``%5``).
 
@@ -1770,7 +1770,7 @@ optimizations that they can never shrink the lifetime of ``%0`` by moving
 `destroy_value`_ above ``%1``.
 
 Values with guaranteed ownership follow a dataflow rule that states that
-non-consuming "forwarding" uses of the guaranteed value are also guaranteed and
+non-consuming `forwarding uses`_ of the guaranteed value are also guaranteed and
 are recursively validated as being in the original values scope. This was a
 choice we made to reduce idempotent scopes in the IR::
 
@@ -1834,6 +1834,139 @@ This is a form of ownership that is used to model two different use cases:
   non-trivial value. As an example of this consider an unsafe bit cast of a
   trivial pointer to a class. In that case, since we have no reason to assume
   that the object will remain alive, we need to make a copy of the value.
+
+Forwarding Instructions
+~~~~~~~~~~~~~~~~~~~~~~~
+
+NOTE: In the following, we assumed that one read the section above, `Value Ownership Kind`_.
+
+In OSSA, certain SIL instructions derive the value ownership kinds of their
+results from the results type and the value ownership kind of a subset of said
+instruction's operands. This computation of the value ownership kind of the
+result from the set of operands is called "forwarding" and is performed by
+inferring the result's ownership when the instruction is constructed. As a
+result, we call these instructions "forwarding instructions". This results in
+two properties:
+
+* When manipulating forwarding instructions programatically, one must manually
+  update their forwarded ownership since most of the time the ownership is
+  stored in the instruction itself. Don't worry though because the SIL verifier
+  will catch this error for you if you forget to do so!
+
+* Textual SIL does not represent the ownership of forwarding instructions
+  explicitly. Instead, the instruction's ownership is inferred normally from the
+  parsed operand. Since the SILVerifier runs on Textual SIL after parsing, you
+  can feel confident that ownership constraints were inferred correctly.
+
+Forwarding has slightly different ownership semantics depending on the value
+ownership kind of the operand on construction and the result's type. We go
+through each below:
+
+* Given an ``@owned`` operand, the forwarding instruction is assumed to end the
+  lifetime of the operand and produce an ``@owned`` value if non-trivially typed
+  and ``@any`` if trivially typed. Example: This is used to represent the
+  semantics of casts::
+
+      sil @unsafelyCastToSubClass : $@convention(thin) (@owned Klass) -> @owned SubKlass {
+      bb0(%0 : @owned $Klass): // %0 is defined here.
+      
+        // %0 is consumed here and can no longer be used after this point.
+        // %1 is defined here and after this point must be used to access the object
+        // passed in via %0.
+        %1 = unchecked_ref_cast %0 : $Klass to $SubKlass
+      
+        // Then %1's lifetime ends here and we return the casted argument to our
+        // caller as an @owned result.
+        return %1 : $SubKlass
+      }
+
+* Given a ``@guaranteed`` operand, the forwarding instruction is assumed to
+  produce ``@guaranteed`` non-trivially typed values and ``@any`` trivially
+  typed values. Given the non-trivial case, the instruction is assumed to begin
+  a new implicit borrow scope for the incoming value. Since the borrow scope is
+  implicit, we validate the uses of the result as if they were uses of the
+  operand (recursively). This of course means that one should never see
+  end_borrows on any guaranteed forwarded results, the end_borrow is always on
+  the instruction that "introduces" the borrowed value. An example of a
+  guaranteed forwarding instruction is ``struct_extract``::
+
+     // In this function, I have a pair of Klasses and I want to grab some state
+     // and then call the hand off function for someone else to continue
+     // processing the pair.
+     sil @accessLHSStateAndHandOff : $@convention(thin) (@owned KlassPair) -> @owned State {
+     bb0(%0 : @owned $KlassPair): // %0 is defined here.
+
+       // Begin the borrow scope for %0. We want to access %1's subfield in a
+       // read only way that doesn't involve destructuring and extra copies. So
+       // we construct a guaranteed scope here so we can safely use a
+       // struct_extract.
+       %1 = begin_borrow %0 : $KlassPair
+
+       // Now we perform our struct_extract operation. This operation
+       // structurally grabs a value out of a struct without safety relying on
+       // the guaranteed ownership of its operand to know that %1 is live at all
+       // use points of %2, its result.
+       %2 = struct_extract %1 : $KlassPair, #KlassPair.lhs
+
+       // Then grab the state from our left hand side klass and copy it so we
+       // can pass off our klass pair to handOff for continued processing.
+       %3 = ref_element_addr %2 : $Klass, #Klass.state
+       %4 = load [copy] %3 : $*State
+
+       // Now that we have finished accessing %1, we end the borrow scope for %1.
+       end_borrow %1 : $KlassPair
+
+       %handOff = function_ref @handOff : $@convention(thin) (@owned KlassPair) -> ()
+       apply %handOff(%0) : $@convention(thin) (@owned KlassPair) -> ()
+
+       return %4 : $State
+     }
+
+* Given an ``@any`` operand, the result value must have ``@any`` ownership.
+
+* Given an ``@unowned`` operand, the result value will have ``@unowned``
+  ownership. It will be validated just like any other ``@unowned`` value, namely
+  that it must be copied before use.
+
+An additional wrinkle here is that even though the vast majority of forwarding
+instructions forward all types of ownership, this is not true in general. To see
+why this is necessary, lets compare/contrast `struct_extract`_ (which does not
+forward ``@owned`` ownership) and `unchecked_enum_data`_ (which can forward
+/all/ ownership kinds). The reason for this difference is that `struct_extract`_
+inherently can only extract out a single field of a larger object implying that
+the instruction could only represent consuming a sub-field of a value instead of
+the entire value at once. This violates our constraint that owned values can
+never be partially consumed: a value is either completely alive or completely
+dead. In contrast, enums always represent their payloads as elements in a single
+tuple value. This means that `unchecked_enum_data`_ when it extracts that
+payload from an enum, can consume the entire enum+payload.
+
+To handle cases where we want to use `struct_extract`_ in a consuming way, we
+instead are able to use the `destructure_struct`_ instruction that consumes the
+entire struct at once and gives one back the structs individual constituant
+parts::
+
+     struct KlassPair {
+       var fieldOne: Klass
+       var fieldTwo: Klass
+     }
+
+     sil @getFirstPairElt : $@convention(thin) (@owned KlassPair) -> @owned Klass {
+     bb0(%0 : @owned $KlassPair):
+       // If we were to just do this directly and consume KlassPair to access
+       // fieldOne... what would happen to fieldTwo? Would it be consumed?
+       //
+       // %1 = struct_extract %0 : $KlassPair, #KlassPair.fieldOne
+       //
+       // Instead we need to destructure to ensure we consume the entire owned value at once.
+       (%1, %2) = destructure_struct $KlassPair
+
+       // We only want to return %1, so we need to cleanup %2.
+       destroy_value %2 : $Klass
+
+       // Then return %1 to our caller
+       return %1 : $Klass
+     }
 
 Runtime Failure
 ---------------
