@@ -839,8 +839,9 @@ static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
   if (param->isInOut())
     return false;
 
-  Type paramType =
-      param->getInterfaceType()->getRValueType()->lookThroughAllOptionalTypes();
+  Type paramType = param->isVariadic() ? param->getVarargBaseTy()
+                                       : param->getInterfaceType();
+  paramType = paramType->getRValueType()->lookThroughAllOptionalTypes();
 
   // For autoclosure parameters, look through the autoclosure result type
   // to get the actual argument type.
