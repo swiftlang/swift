@@ -200,6 +200,37 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
   return flags | ConstraintSystem::TMF_GenerateConstraints;
 }
 
+/// Determine whether any parameter from the given index up until the end
+/// requires an argument to be provided.
+///
+/// \param params The parameters themselves.
+/// \param paramInfo Declaration-provided information about the parameters.
+/// \param firstParamIdx The first parameter to examine to determine whether any
+/// parameter in the range \c [paramIdx, params.size()) requires an argument.
+/// \param beforeLabel If non-empty, stop examining parameters when we reach
+/// a parameter with this label.
+static bool anyParameterRequiresArgument(
+    ArrayRef<AnyFunctionType::Param> params,
+    const ParameterListInfo &paramInfo,
+    unsigned firstParamIdx,
+    Optional<Identifier> beforeLabel) {
+  for (unsigned paramIdx : range(firstParamIdx, params.size())) {
+    // If have been asked to stop when we reach a parameter with a particular
+    // label, and we see a parameter with that label, we're done: no parameter
+    // requires an argument.
+    if (beforeLabel && *beforeLabel == params[paramIdx].getLabel())
+      break;
+
+    // If this parameter requires an argument, tell the caller.
+    if (!paramInfo.hasDefaultArgument(paramIdx)
+        && !params[paramIdx].isVariadic())
+      return true;
+  }
+
+  // No parameters required arguments.
+  return false;
+}
+
 // FIXME: This should return ConstraintSystem::TypeMatchResult instead
 //        to give more information to the solver about the failure.
 bool constraints::
@@ -394,17 +425,17 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         return;
       }
 
-      // If there is only one trailing closure argument, consider applying
-      // a "fuzzy" match rule that skips this parameter if it is defaulted but
-      // later parameters require an argument.
-      if (nextArgIdx + 1 == numArgs &&
-          paramInfo.hasDefaultArgument(paramIdx) &&
+      // If this parameter has a default argument, consider applying a "fuzzy"
+      // match rule that skips this parameter if doing so is the only way to
+      // satisfy
+      if (paramInfo.hasDefaultArgument(paramIdx) &&
           param.getPlainType()->getASTContext().LangOpts
               .EnableFuzzyForwardScanTrailingClosureMatching &&
-          llvm::any_of(range(paramIdx + 1, params.size()), [&](unsigned idx) {
-            return !paramInfo.hasDefaultArgument(idx)
-              && !params[idx].isVariadic();
-          })) {
+          anyParameterRequiresArgument(
+              params, paramInfo, paramIdx + 1,
+              nextArgIdx + 1 < numArgs
+                ? Optional<Identifier>(args[nextArgIdx + 1].getLabel())
+                : Optional<Identifier>(None))) {
         haveUnfulfilledParams = true;
         return;
       }
