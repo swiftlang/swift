@@ -74,6 +74,25 @@ public protocol RangeExpression {
 }
 
 extension RangeExpression {
+
+  /// Returns a Boolean value indicating whether a value is included in a
+  /// range.
+  ///
+  /// You can use the pattern-matching operator (`~=`) to test whether a value
+  /// is included in a range. The pattern-matching operator is used
+  /// internally in `case` statements for pattern matching. The following
+  /// example uses the `~=` operator to test whether an integer is included in
+  /// a range of single-digit numbers:
+  ///
+  ///     let chosenNumber = 3
+  ///     if 0..<10 ~= chosenNumber {
+  ///         print("\(chosenNumber) is a single digit.")
+  ///     }
+  ///     // Prints "3 is a single digit."
+  ///
+  /// - Parameters:
+  ///   - pattern: A range.
+  ///   - bound: A value to match against `pattern`.
   @inlinable
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
