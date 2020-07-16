@@ -342,12 +342,14 @@ void ConstraintSystem::PotentialBindings::finalize(
   // it's always better to infer concrete type and erase it if required
   // by the context.
   if (Bindings.size() > 1) {
-    auto anyType = llvm::find_if(Bindings, [](const PotentialBinding &binding) {
-      return binding.BindingType->isAny() && !binding.isDefaultableBinding();
-    });
+    auto AnyTypePos =
+        llvm::find_if(Bindings, [](const PotentialBinding &binding) {
+          return binding.BindingType->isAny() &&
+                 !binding.isDefaultableBinding();
+        });
 
-    if (anyType != Bindings.end()) {
-      std::rotate(Bindings.begin(), anyType + 1, Bindings.end());
+    if (AnyTypePos != Bindings.end()) {
+      std::rotate(AnyTypePos, AnyTypePos + 1, Bindings.end());
     }
   }
 
