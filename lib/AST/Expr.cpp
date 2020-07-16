@@ -2390,21 +2390,11 @@ TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
     assert(!Body->empty() &&
          Body->getFirstElement().isDecl(DeclKind::Var) &&
          "First element of Body should be a variable to init with the subExpr");
-    getVar()->setParentExpr(this);
   }
 }
 
 VarDecl * TapExpr::getVar() const {
   return dyn_cast<VarDecl>(Body->getFirstElement().dyn_cast<Decl *>());
-}
-
-SourceLoc TapExpr::getStartLoc() const {
-  // Include the body in the range, assuming the body follows the SubExpr.
-  if (auto *const se = getSubExpr())
-    return se->getStartLoc();
-  if (auto *const b = getBody())
-    return b->getStartLoc();
-  return SourceLoc();
 }
 
 SourceLoc TapExpr::getEndLoc() const {

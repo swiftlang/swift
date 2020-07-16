@@ -2242,20 +2242,12 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
-    Type interfaceType;
-    if (auto *parentE = VD->getParentExpr()) {
-      // Type check the ASTNode that contains the parent 'TapExpr' if it
-      // hasn't.
-      if (!parentE->getType())
-        swift::typeCheckASTNodeAtLoc(VD->getDeclContext(), parentE->getLoc());
-      interfaceType = parentE->getType();
-    } else if (auto *namingPattern = VD->getNamingPattern()) {
-      interfaceType = namingPattern->getType();
+    auto *namingPattern = VD->getNamingPattern();
+    if (!namingPattern) {
+      return ErrorType::get(Context);
     }
 
-    if (!interfaceType)
-      return ErrorType::get(Context);
-
+    Type interfaceType = namingPattern->getType();
     if (interfaceType->hasArchetype())
       interfaceType = interfaceType->mapTypeOutOfContext();
 
