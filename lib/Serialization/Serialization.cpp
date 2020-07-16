@@ -5154,7 +5154,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       for (auto config : entry.second) {
         std::string paramIndices = config.first.str().str();
         auto genSigID = addGenericSignatureRef(config.second);
-        derivativeConfigs[entry.first].push_back({paramIndices, genSigID});
+        derivativeConfigs[entry.first].push_back(
+          {std::string(paramIndices), genSigID});
       }
     }
     index_block::DerivativeFunctionConfigTableLayout DerivativeConfigTable(Out);
