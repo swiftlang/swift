@@ -434,9 +434,9 @@ where
   @inlinable
   @derivative(of: sum)
   func _jvpSum() -> (
-    value: Scalar, differential (TangentVector) -> Scalar.TangentVector
+    value: Scalar, differential: (TangentVector) -> Scalar.TangentVector
   ) {
-    return (sum(), { v in v.sum() }
+    return (sum(), { v in Scalar.TangentVector(v.sum()) })
   }
 }
 */
