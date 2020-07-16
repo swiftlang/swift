@@ -68,7 +68,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
     return;
   Symbols.addSymbol(kind, name, Targets);
   if (kind == SymbolKind::GlobalSymbol) {
-    StringSymbols.push_back(name);
+    StringSymbols.push_back(std::string(name));
 #ifndef NDEBUG
     if (!DuplicateSymbolChecker.insert(name).second) {
       llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
