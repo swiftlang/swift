@@ -25,40 +25,17 @@ using namespace swift;
 //                            MARK: General Helpers
 //===----------------------------------------------------------------------===//
 
-SILValue swift::stripAccessMarkers(SILValue v) {
-  while (auto *bai = dyn_cast<BeginAccessInst>(v)) {
-    v = bai->getOperand();
-  }
-  return v;
-}
-
-// The resulting projection must have an address-type operand at index zero
-// representing the projected address.
-SingleValueInstruction *swift::isAccessProjection(SILValue v) {
-  switch (v->getKind()) {
-  default:
-    return nullptr;
-
-  case ValueKind::StructElementAddrInst:
-  case ValueKind::TupleElementAddrInst:
-  case ValueKind::UncheckedTakeEnumDataAddrInst:
-  case ValueKind::TailAddrInst:
-  case ValueKind::IndexAddrInst:
-    return cast<SingleValueInstruction>(v);
-  };
-}
-
 // TODO: When the optimizer stops stripping begin_access markers, then we should
 // be able to assert that the result is a BeginAccessInst and the default case
 // is unreachable.
 SILValue swift::getAddressAccess(SILValue v) {
   while (true) {
     assert(v->getType().isAddress());
-    auto *projection = isAccessProjection(v);
+    auto projection = AccessProjection(v);
     if (!projection)
       return v;
 
-    v = projection->getOperand(0);
+    v = projection.baseAddress();
   }
 }
 
@@ -240,26 +217,26 @@ void AccessedStorage::print(raw_ostream &os) const {
 void AccessedStorage::dump() const { print(llvm::dbgs()); }
 
 namespace {
-struct FindAccessedStorageVisitor
-  : public AccessUseDefChainVisitor<FindAccessedStorageVisitor>
-{
+template <typename Impl>
+struct FindAccessedStorageVisitorBase : public AccessUseDefChainVisitor<Impl> {
+protected:
   SmallVector<SILValue, 8> addressWorklist;
   SmallPtrSet<SILPhiArgument *, 4> visitedPhis;
   Optional<AccessedStorage> storage;
 
 public:
-  FindAccessedStorageVisitor(SILValue firstSourceAddr)
-    : addressWorklist({firstSourceAddr})
-  {}
-  
-  AccessedStorage doIt() {
+  FindAccessedStorageVisitorBase(SILValue firstSourceAddr)
+      : addressWorklist({firstSourceAddr}) {}
+
+  // Main entry point.
+  AccessedStorage findStorage() {
     while (!addressWorklist.empty()) {
-      visit(addressWorklist.pop_back_val());
+      this->visit(addressWorklist.pop_back_val());
     }
     
     return storage.getValueOr(AccessedStorage());
   }
-  
+
   void setStorage(AccessedStorage foundStorage) {
     if (!storage) {
       storage = foundStorage;
@@ -292,20 +269,32 @@ public:
     addressWorklist.push_back(parentAddr);
   }
 };
+struct FindAccessedStorageVisitor
+    : public FindAccessedStorageVisitorBase<FindAccessedStorageVisitor> {
+
+  FindAccessedStorageVisitor(SILValue sourceAddr)
+      : FindAccessedStorageVisitorBase(sourceAddr) {}
+
+  void visitNestedAccess(BeginAccessInst *access) {
+    addressWorklist.push_back(access->getSource());
+  }
+};
+
+struct IdentifyAccessedStorageVisitor
+    : public FindAccessedStorageVisitorBase<IdentifyAccessedStorageVisitor> {
+
+  IdentifyAccessedStorageVisitor(SILValue sourceAddr)
+      : FindAccessedStorageVisitorBase(sourceAddr) {}
+};
+
 } // namespace
 
 AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
-  return FindAccessedStorageVisitor(sourceAddr).doIt();
+  return FindAccessedStorageVisitor(sourceAddr).findStorage();
 }
 
-AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
-  while (true) {
-    const AccessedStorage &storage = findAccessedStorage(sourceAddr);
-    if (!storage || storage.getKind() != AccessedStorage::Nested)
-      return storage;
-    
-    sourceAddr = cast<BeginAccessInst>(storage.getValue())->getSource();
-  }
+AccessedStorage swift::identifyAccessedStorageImpl(SILValue sourceAddr) {
+  return IdentifyAccessedStorageVisitor(sourceAddr).findStorage();
 }
 
 //===----------------------------------------------------------------------===//
@@ -485,10 +474,9 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
   case AccessedStorage::Nested: {
     // A begin_access is considered a separate base for the purpose of conflict
     // checking. However, for the purpose of inserting unenforced markers and
-    // performaing verification, it needs to be ignored.
+    // performing verification, it needs to be ignored.
     auto *BAI = cast<BeginAccessInst>(storage.getValue());
-    const AccessedStorage &nestedStorage =
-      findAccessedStorage(BAI->getSource());
+    const AccessedStorage &nestedStorage = identifyFormalAccess(BAI);
     if (!nestedStorage)
       return false;
 
