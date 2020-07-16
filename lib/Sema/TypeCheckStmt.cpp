@@ -1913,6 +1913,11 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
       if (SM.isBeforeInBuffer(endLoc, Loc))
         return {false, E};
 
+      // Don't walk into 'TapExpr'. They should be type checked with parent
+      // 'InterpolatedStringLiteralExpr'.
+      if (isa<TapExpr>(E))
+        return {false, E};
+
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         // NOTE: When a client wants to type check a closure signature, it
         // requests with closure's 'getLoc()' location.

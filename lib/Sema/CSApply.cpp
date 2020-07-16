@@ -7838,8 +7838,11 @@ namespace {
         return true;
 
       case SolutionApplicationToFunctionResult::Delay: {
-        auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
-        ClosuresToTypeCheck.push_back(closure);
+        if (!Rewriter.cs.Options
+                .contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked)) {
+          auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
+          ClosuresToTypeCheck.push_back(closure);
+        }
         return false;
       }
       }
@@ -8416,25 +8419,23 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   if (!resultTarget)
     return None;
 
-  if (!Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked)) {
-    bool hadError = false;
+  // Visit closures that have non-single expression bodies.
+  bool hadError = false;
 
-    // Visit closures that have non-single expression bodies.
-    for (auto *closure : walker.getClosuresToTypeCheck())
-      hadError |= TypeChecker::typeCheckClosureBody(closure);
+  for (auto *closure : walker.getClosuresToTypeCheck())
+    hadError |= TypeChecker::typeCheckClosureBody(closure);
 
-    // Tap expressions too; they should or should not be
-    // type-checked under the same conditions as closure bodies.
-    for (auto tuple : walker.getTapsToTypeCheck()) {
-      auto tap = std::get<0>(tuple);
-      auto tapDC = std::get<1>(tuple);
-      hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
-    }
-
-    // If any of them failed to type check, bail.
-    if (hadError)
-      return None;
+  // Tap expressions too; they should or should not be
+  // type-checked under the same conditions as closure bodies.
+  for (auto tuple : walker.getTapsToTypeCheck()) {
+    auto tap = std::get<0>(tuple);
+    auto tapDC = std::get<1>(tuple);
+    hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
   }
+
+  // If any of them failed to type check, bail.
+  if (hadError)
+    return None;
 
   rewriter.finalize();
 

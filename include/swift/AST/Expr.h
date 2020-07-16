@@ -950,9 +950,11 @@ public:
   BraceStmt * getBody() const { return Body; }
   void setBody(BraceStmt * b) { Body = b; }
 
-  SourceLoc getLoc() const { return getStartLoc(); }
+  SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
   
-  SourceLoc getStartLoc() const;
+  SourceLoc getStartLoc() const {
+    return SubExpr ? SubExpr->getStartLoc() : SourceLoc();
+  }
 
   SourceLoc getEndLoc() const;
 
