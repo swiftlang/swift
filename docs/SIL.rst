@@ -1035,7 +1035,10 @@ Basic Blocks
 
   sil-basic-block ::= sil-label sil-instruction-def* sil-terminator
   sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
-  sil-argument ::= sil-value-name ':' sil-type
+  sil-value-ownership-kind ::= @owned
+  sil-value-ownership-kind ::= @guaranteed
+  sil-value-ownership-kind ::= @unowned
+  sil-argument ::= sil-value-name ':' sil-value-ownership-kind? sil-type
 
   sil-instruction-result ::= sil-value-name
   sil-instruction-result ::= '(' (sil-value-name (',' sil-value-name)*)? ')'
@@ -1067,12 +1070,12 @@ block::
 Arguments to the entry point basic block, which has no predecessor,
 are bound by the function's caller::
 
-  sil @foo : $(Int) -> Int {
+  sil @foo : $@convention(thin) (Int) -> Int {
   bb0(%x : $Int):
     return %x : $Int
   }
 
-  sil @bar : $(Int, Int) -> () {
+  sil @bar : $@convention(thin) (Int, Int) -> () {
   bb0(%x : $Int, %y : $Int):
     %foo = function_ref @foo
     %1 = apply %foo(%x) : $(Int) -> Int
@@ -1081,6 +1084,17 @@ are bound by the function's caller::
     return %3 : $()
   }
 
+When a function is in Ownership SSA, arguments additionally have an explicit
+annotated convention that describe the ownership semantics of the argument
+value::
+
+  sil [ossa] @baz : $@convention(thin) (Int, @owned String, @guaranteed String, @unowned String) -> () {
+  bb0(%x : $Int, %y : @owned $String, %z : @guaranteed $String, %w : @unowned $String):
+    ...
+  }
+
+Note that the first argument (``%x``) has an implicit ownership kind of
+``@none`` since all trivial values have ``@none`` ownership.
 
 Debug Information
 ~~~~~~~~~~~~~~~~~
@@ -1578,6 +1592,248 @@ basic blocks, or ``unreachable`` instructions may be dominated by applications
 of functions returning uninhabited types. An ``unreachable`` instruction that
 survives guaranteed DCE and is not immediately preceded by a no-return
 application is a dataflow error.
+
+Ownership SSA
+-------------
+
+A SILFunction marked with the ``[ossa]`` function attribute is considered to be
+in Ownership SSA form. Ownership SSA is an augmented version of SSA that
+enforces ownership invariants by imbuing value-operand edges with semantic
+ownership information. All SIL values are statically assigned an ownership kind
+that defines the ownership semantics that the value models. All SIL operands
+that use a SIL value are required to be able to be semantically partitioned in
+between "normal uses" that just require the value to be live and "consuming
+uses" that end the lifetime of the value and after which the value can no longer
+be used. Since operands that are consuming uses end a value's lifetime,
+naturally we must have that the consuming use points jointly post-dominate all
+non-consuming use points and that a value must be consumed exactly once along
+all reachable program paths, preventing leaks and use-after-frees. As an
+example, consider the following SIL example with partitioned defs/uses annotated
+inline::
+
+  sil @stash_and_cast : $@convention(thin) (@owned Klass) -> @owned SuperKlass {
+  bb0(%kls1 : @owned $Klass): // Definition of %kls1
+
+    // "Normal Use" kls1.
+    // Definition of %kls2.
+    %kls2 = copy_value %kls1 : $Klass
+
+    // "Consuming Use" of %kls2 to store it into a global. Stores in ossa are
+    // consuming since memory is generally assumed to have "owned"
+    // semantics. After this instruction executes, we can no longer use %kls2
+    // without triggering an ownership violation.
+    store %kls2 to [init] %globalMem : $*Klass
+
+    // "Consuming Use" of %kls1.
+    // Definition of %kls1Casted.
+    %kls1Casted = upcast %kls1 : $Klass to $SuperKlass
+
+    // "Consuming Use" of %kls1Casted
+    return %kls1Casted : $SuperKlass
+  }
+
+Notice how every value in the SIL above has a partionable set of uses with
+normal uses always before consuming uses. Any such violations of ownership
+semantics would trigger a static SILVerifier error allowing us to know that we
+do not have any leaks or use-after-frees in the above code.
+
+The semantics in the previous example is of just one form of ownership semantics
+supported: "owned" semantics. In SIL, we support four different ownership kinds:
+
+* **None**. This is used to represent values that do not require memory
+  management and are outside of Ownership SSA invariants. Examples: trivial
+  values (e.x.: Int, Float), non-payloaded cases of non-trivial enums (e.x.:
+  Optional<T>.none), all address types.
+
+* **Owned**. A value that exists independently of any other value and is
+  consumed exactly once along all paths through a function by either a
+  destroy_value (actually destroying the value) or by a consuming instruction
+  that rebinds the value in some manner (e.x.: apply, casts, store).
+
+* **Guaranteed**. A value with a scoped lifetime whose liveness is dependent on
+  the lifetime of some other "base" owned or guaranteed value. Consumed by
+  end_borrow instructions. The "base" value is statically guaranteed to be live
+  at all of the value's paired end_borrow instructions.
+
+* **Unowned**. A value that is only guaranteed to be instantaneously valid and
+  must be copied before the value is used in an ``@owned`` or ``@guaranteed``
+  context. This is needed both to model argument values with the ObjC unsafe
+  unowned argument convention and also to model the ownership resulting from
+  bitcasting a trivial type to a non-trivial type. This value should never be
+  consumed.
+
+We describe each of these semantics in more detail below.
+
+Value Ownership Kind
+~~~~~~~~~~~~~~~~~~~~
+
+Owned
+`````
+
+Owned ownership models "move only" values. We require that each such value is
+consumed exactly once along all program paths. The IR verifier will flag values
+that are not consumed along a path as a leak and any double consumes as
+use-after-frees. We model move operations via "forwarding uses" such as casts
+and transforming terminators (e.x.: `switch_enum`_, `checked_cast_br`_) that
+transform the input value, consuming it in the process, and producing a new
+transformed owned value as a result.
+
+Putting this all together, one can view each owned SIL value as being
+effectively a "move only value" except when explicitly copied by a
+copy_value. This of course implies that ARC operations can be assumed to only
+semantically effect the specific value that they are applied to /and/ that each
+ARC constraint is able to be verified independently for each owned SILValue
+derived from the ARC object. As an example, consider the following Swift/SIL::
+
+  // testcase.swift.
+  func doSomething(x : Klass) -> OtherKlass? {
+    return x as? OtherKlass
+  }
+
+  // testcase.sil. A possible SILGen lowering
+  sil [ossa] @doSomething : $@convention(thin) (@guaranteed Klass) -> () {
+  bb0(%0 : @guaranteed Klass):
+    // Definition of '%1'
+    %1 = copy_value %0 : $Klass
+    
+    // Consume '%1'. This means '%1' can no longer be used after this point. We
+    // rebind '%1' in the destination blocks (bbYes, bbNo).
+    checked_cast_br %1 : $Klass to $OtherKlass, bbYes, bbNo
+
+  bbYes(%2 : @owned $OtherKlass): // On success, the checked_cast_br forwards
+                                  // '%1' into '%2' after casting to OtherKlass.
+
+    // Forward '%2' into '%3'. '%2' can not be used past this point in the
+    // function.
+    %3 = enum $Optional<OtherKlass>, case #Optional.some!enumelt, %2 : $OtherKlass
+
+    // Forward '%3' into the branch. '%3' can not be used past this point.
+    br bbEpilog(%3 : $Optional<OtherKlass>)
+
+  bbNo(%3 : @owned $Klass): // On failure, since we consumed '%1' already, we
+                            // return the original '%1' as a new value '%3'
+                            // so we can use it below.
+    // Actually destroy the underlying copy (``%1``) created by the copy_value
+    // in bb0.
+    destroy_value %3 : $Klass
+
+    // We want to return nil here. So we create a new non-payloaded enum and
+    // pass it off to bbEpilog.
+    %4 = enum $Optional<OtherKlass>, case #Optional.none!enumelt
+    br bbEpilog(%4 : $Optional<OtherKlass>)
+
+  bbEpilog(%5 : @owned $Optional<OtherKlass>):
+    // Consumes '%5' to return to caller.
+    return %5 : $Optional<OtherKlass>
+  }
+
+Notice how our individual copy (``%1``) threads its way through the IR using
+forwarding of ``@owned`` ownership. These forwarding operations partition the
+lifetime of the result of the copy_value into a set of disjoint individual owned
+lifetimes (``%2``, ``%3``, ``%5``).
+
+Guaranteed
+``````````
+
+Guaranteed ownership models values that have a scoped dependent lifetime on a
+"base value" with owned or guaranteed ownership. Due to this lifetime
+dependence, the base value is required to be statically live over the entire
+scope where the guaranteed value is valid.
+
+These explicit scopes are introduced into SIL by begin scope instructions (e.x.:
+`begin_borrow`_, `load_borrow`_) that are paired with sets of jointly
+post-dominating scope ending instructions (e.x.: `end_borrow`_)::
+
+  sil [ossa] @guaranteed_values : $@convention(thin) (@owned Klass) -> () {
+  bb0(%0 : @owned $Klass):
+    %1 = begin_borrow %0 : $Klass
+    cond_br ..., bb1, bb2
+
+  bb1:
+    ...
+    end_borrow %1 : $Klass
+    destroy_value %0 : $Klass
+    br bb3
+
+  bb2:
+    ...
+    end_borrow %1 : $Klass
+    destroy_value %0 : $Klass
+    br bb3
+
+  bb3:
+    ...
+  }
+
+Notice how the `end_borrow`_ allow for a SIL generator to communicate to
+optimizations that they can never shrink the lifetime of ``%0`` by moving
+`destroy_value`_ above ``%1``.
+
+Values with guaranteed ownership follow a dataflow rule that states that
+non-consuming "forwarding" uses of the guaranteed value are also guaranteed and
+are recursively validated as being in the original values scope. This was a
+choice we made to reduce idempotent scopes in the IR::
+
+  sil [ossa] @get_first_elt : $@convention(thin) (@guaranteed (String, String)) -> @owned String {
+  bb0(%0 : @guaranteed $(String, String)):
+    // %1 is validated as if it was apart of %0 and does not need its own begin_borrow/end_borrow.
+    %1 = tuple_extract %0 : $(String, String)
+    // So this copy_value is treated as a use of %0.
+    %2 = copy_value %1 : $String
+    return %2 : $String
+  }
+
+None
+````
+
+Values with None ownership are inert values that exist outside of the guarantees
+of Ownership SSA. Some examples of such values are:
+
+* Trivially typed values such as: Int, Float, Double
+* Non-payloaded non-trivial enums.
+* Address types.
+
+Since values with none ownership exist outside of ownership SSA, they can be
+used like normal SSA without violating ownership SSA invariants. This does not
+mean that code does not potentially violate other SIL rules (consider memory
+lifetime invariants)::
+
+    sil @none_values : $@convention(thin) (Int, @in Klass) -> Int {
+    bb0(%0 : $Int, %1 : $*Klass):
+
+      // %0, %1 are normal SSA values that can be used anywhere in the function
+      // without breaking Ownership SSA invariants. It could violate other
+      // invariants if for instance, we load from %1 after we destroy the object
+      // there.
+      destroy_addr %1 : $*Klass
+
+      // If uncommented, this would violate memory lifetime invariants due to
+      // the ``destroy_addr %1`` above. But this would not violate the rules of
+      // Ownership SSA since addresses exist outside of the guarantees of
+      // Ownership SSA.
+      //
+      // %2 = load [take] %1 : $*Klass
+
+      // I can return this object without worrying about needing to copy since
+      // none objects can be arbitrarily returned.
+      return %0 : $Int
+    }
+
+Unowned
+```````
+
+This is a form of ownership that is used to model two different use cases:
+
+* Arguments of functions with ObjC convention. This convention requires the
+  callee to copy the value before using it (preferably before any other code
+  runs). We do not model this flow sensitive property in SIL today, but we do
+  not allow for unowned values to be passed as owned or guaranteed values
+  without copying it first.
+
+* Values that are a conversion from a trivial value with None ownership to a
+  non-trivial value. As an example of this consider an unsafe bit cast of a
+  trivial pointer to a class. In that case, since we have no reason to assume
+  that the object will remain alive, we need to make a copy of the value.
 
 Runtime Failure
 ---------------
