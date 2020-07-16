@@ -359,6 +359,7 @@ func _convertMutableArrayToPointerArgument<
 }
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer: _Pointer
