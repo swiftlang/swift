@@ -921,7 +921,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
 
     // Emit the module contents.
-    irgen.emitGlobalTopLevel(desc.LinkerDirectives);
+    irgen.emitGlobalTopLevel(desc.getLinkerDirectives());
 
     for (auto *file : filesToEmit) {
       if (auto *nextSF = dyn_cast<SourceFile>(file)) {
@@ -1103,11 +1103,11 @@ struct LLVMCodeGenThreads {
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output files.
 /// All this is done in multiple threads.
-static void performParallelIRGeneration(
-    const IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
-    StringRef ModuleName,
-    ArrayRef<std::string> outputFilenames,
-    llvm::StringSet<> *linkerDirectives) {
+static void performParallelIRGeneration(IRGenDescriptor desc) {
+  const auto &Opts = desc.Opts;
+  auto outputFilenames = desc.parallelOutputFilenames;
+  auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
+  auto *M = desc.getParentModule();
 
   IRGenerator irgen(Opts, *SILMod);
 
@@ -1148,7 +1148,7 @@ static void performParallelIRGeneration(
     // Create the IR emitter.
     IRGenModule *IGM =
         new IRGenModule(irgen, std::move(targetMachine), nextSF,
-                        ModuleName, *OutputIter++, nextSF->getFilename(),
+                        desc.ModuleName, *OutputIter++, nextSF->getFilename(),
                         nextSF->getPrivateDiscriminator().str());
     IGMcreated = true;
 
@@ -1168,7 +1168,7 @@ static void performParallelIRGeneration(
   }
 
   // Emit the module contents.
-  irgen.emitGlobalTopLevel(linkerDirectives);
+  irgen.emitGlobalTopLevel(desc.getLinkerDirectives());
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
@@ -1296,36 +1296,35 @@ static void performParallelIRGeneration(
 }
 
 GeneratedModule swift::performIRGeneration(
-    const IRGenOptions &Opts, swift::ModuleDecl *M,
-    std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
-    const PrimarySpecificPaths &PSPs,
+    swift::ModuleDecl *M, const IRGenOptions &Opts,
+    const TBDGenOptions &TBDOpts, std::unique_ptr<SILModule> SILMod,
+    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
     ArrayRef<std::string> parallelOutputFilenames,
-    llvm::GlobalVariable **outModuleHash, llvm::StringSet<> *LinkerDirectives) {
+    llvm::GlobalVariable **outModuleHash) {
+  auto desc = IRGenDescriptor::forWholeModule(
+      M, Opts, TBDOpts, std::move(SILMod), ModuleName, PSPs,
+      parallelOutputFilenames, outModuleHash);
+
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty()) {
-    ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
-                                  parallelOutputFilenames, LinkerDirectives);
+    ::performParallelIRGeneration(desc);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return GeneratedModule::null();
   }
-
-  auto desc = IRGenDescriptor::forWholeModule(
-      Opts, M, std::move(SILMod), ModuleName, PSPs, parallelOutputFilenames,
-      outModuleHash, LinkerDirectives);
   return llvm::cantFail(M->getASTContext().evaluator(IRGenRequest{desc}));
 }
 
 GeneratedModule swift::
-performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
+performIRGeneration(SourceFile &SF, const IRGenOptions &Opts,
+                    const TBDGenOptions &TBDOpts,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                     StringRef PrivateDiscriminator,
-                    llvm::GlobalVariable **outModuleHash,
-                    llvm::StringSet<> *LinkerDirectives) {
-  auto desc = IRGenDescriptor::forFile(Opts, SF, std::move(SILMod), ModuleName,
-                                       PSPs, PrivateDiscriminator,
-                                       outModuleHash, LinkerDirectives);
+                    llvm::GlobalVariable **outModuleHash) {
+  auto desc = IRGenDescriptor::forFile(SF, Opts, TBDOpts, std::move(SILMod),
+                                       ModuleName, PSPs, PrivateDiscriminator,
+                                       outModuleHash);
   return llvm::cantFail(SF.getASTContext().evaluator(IRGenRequest{desc}));
 }
 

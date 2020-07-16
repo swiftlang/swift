@@ -17,6 +17,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 
@@ -73,6 +74,17 @@ ModuleDecl *IRGenDescriptor::getParentModule() const {
   if (auto *SF = Ctx.dyn_cast<SourceFile *>())
     return SF->getParentModule();
   return Ctx.get<ModuleDecl *>();
+}
+
+std::vector<std::string> IRGenDescriptor::getLinkerDirectives() const {
+  auto opts = TBDOpts;
+  opts.LinkerDirectivesOnly = true;
+  if (auto *SF = Ctx.dyn_cast<SourceFile *>()) {
+    return getPublicSymbols(TBDGenDescriptor::forFile(SF, opts));
+  } else {
+    auto *M = Ctx.get<ModuleDecl *>();
+    return getPublicSymbols(TBDGenDescriptor::forModule(M, opts));
+  }
 }
 
 evaluator::DependencySource IRGenRequest::readDependencySource(
