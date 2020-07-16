@@ -323,7 +323,7 @@ public:
   bool IsBraceStmtFromTopLevelDecl;
 
   /// Skip type checking any elements inside 'BraceStmt', also this is
-  /// propagated to DeclChecker and ConstraintSystem.
+  /// propagated to ConstraintSystem.
   bool LeaveBraceStmtBodyUnchecked = false;
 
   ASTContext &getASTContext() const { return Ctx; };
@@ -624,8 +624,7 @@ public:
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
-    TypeChecker::typeCheckDecl(
-        DS->getTempDecl(), /*LeaveBodyUnchecked=*/LeaveBraceStmtBodyUnchecked);
+    TypeChecker::typeCheckDecl(DS->getTempDecl());
 
     Expr *theCall = DS->getCallExpr();
     TypeChecker::typeCheckExpression(theCall, DC);
@@ -1594,8 +1593,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 
   // Type check the declaration.
   if (auto *D = node.dyn_cast<Decl *>()) {
-    TypeChecker::typeCheckDecl(
-        D, /*LeaveBodyUnchecked=*/LeaveBraceStmtBodyUnchecked);
+    TypeChecker::typeCheckDecl(D);
     return;
   }
 
