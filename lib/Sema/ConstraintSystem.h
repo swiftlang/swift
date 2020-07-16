@@ -3966,8 +3966,13 @@ public:
     auto resultTy = fnTy->getResult();
     if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
       resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
-    else
-      resultTy = resultTy->getWithoutSpecifierType()->getOptionalObjectType();
+    else {
+      auto objType =
+          resultTy->getWithoutSpecifierType()->getOptionalObjectType();
+      // Preserve l-value through force operation.
+      resultTy =
+          resultTy->is<LValueType>() ? LValueType::get(objType) : objType;
+    }
 
     assert(resultTy);
 

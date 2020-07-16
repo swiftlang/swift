@@ -137,7 +137,7 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         return str(out.decode())
     except subprocess.CalledProcessError as e:
         if allow_non_zero_exit:
-            return e.output
+            return str(e.output.decode())
         if optional:
             return None
         _fatal_error(
