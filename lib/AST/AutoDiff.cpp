@@ -372,6 +372,23 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
   return operationName.empty();
 }
 
+GenericSignature autodiff::getDifferentiabilityWitnessGenericSignature(
+    GenericSignature origGenSig, GenericSignature derivativeGenSig) {
+  // If there is no derivative generic signature, return the original generic
+  // signature.
+  if (!derivativeGenSig)
+    return origGenSig;
+  // If derivative generic signature has all concrete generic parameters and is
+  // equal to the original generic signature, return `nullptr`.
+  auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
+  auto origCanGenSig = origGenSig.getCanonicalSignature();
+  if (origCanGenSig == derivativeCanGenSig &&
+      derivativeCanGenSig->areAllParamsConcrete())
+    return GenericSignature();
+  // Otherwise, return the derivative generic signature.
+  return derivativeGenSig;
+}
+
 Type TangentSpace::getType() const {
   switch (kind) {
   case Kind::TangentVector:

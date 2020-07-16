@@ -57,3 +57,10 @@ func classRequirementSetters(_ x: inout Class, _ newValue: Float) {
   x.property = newValue
   x[] = newValue
 }
+
+// Test cross-file lookup of a derivative function with all-concrete derivative generic signature.
+@differentiable
+func allConcreteDerivativeGenericSignature(_ a: [S]) -> Float {
+  // No error expected.
+  return a.sum()
+}

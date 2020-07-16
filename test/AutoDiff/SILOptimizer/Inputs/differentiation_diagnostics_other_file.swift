@@ -41,3 +41,14 @@ class Class: Differentiable {
     set {}
   }
 }
+
+struct S: Differentiable {
+  var value: Float
+}
+
+extension Array where Element == S {
+  @differentiable
+  func sum() -> Float {
+    return 0
+  }
+}
