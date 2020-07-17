@@ -1453,7 +1453,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request = PreCheckFunctionBuilderRequest{func};
+  auto request = PreCheckFunctionBuilderRequest{func, func->getBody()};
   switch (evaluateOrDefault(
               ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1581,7 +1581,7 @@ ConstraintSystem::matchFunctionBuilder(
 
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
-  auto request = PreCheckFunctionBuilderRequest{fn};
+  auto request = PreCheckFunctionBuilderRequest{fn, fn.getBody()};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1744,8 +1744,14 @@ public:
 }
 
 FunctionBuilderBodyPreCheck
-PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
-                                         AnyFunctionRef fn) const {
+PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval, AnyFunctionRef fn,
+                                         BraceStmt *body) const {
+  // NOTE: 'body' is passed only for the request evaluater caching key.
+  // Since source tooling (e.g. code completion) might replace the body,
+  // the function alone is not sufficient for the key.
+  assert(fn.getBody() == body &&
+         "body must be the current body of the function");
+
   // We don't want to do the precheck if it will already have happened in
   // the enclosing expression.
   bool skipPrecheck = false;

@@ -1836,7 +1836,8 @@ enum class FunctionBuilderBodyPreCheck : uint8_t {
 
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderBodyPreCheck(AnyFunctionRef),
+                           FunctionBuilderBodyPreCheck(AnyFunctionRef,
+                                                       BraceStmt *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1845,8 +1846,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  FunctionBuilderBodyPreCheck
-  evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
+  FunctionBuilderBodyPreCheck evaluate(Evaluator &evaluator, AnyFunctionRef fn,
+                                       BraceStmt *body) const;
 
 public:
   // Separate caching.
