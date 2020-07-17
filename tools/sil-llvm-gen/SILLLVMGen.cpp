@@ -190,13 +190,13 @@ int main(int argc, char **argv) {
   auto *mod = CI.getMainModule();
   assert(mod->getFiles().size() == 1);
 
-  auto getDescriptor = [&]() -> IRGenDescriptor {
-    const auto &TBDOpts = Invocation.getTBDGenOptions();
-    const auto &SILOpts = Invocation.getSILOptions();
-    auto &SILTypes = CI.getSILTypes();
-    auto moduleName = CI.getMainModule()->getName().str();
-    const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
+  const auto &TBDOpts = Invocation.getTBDGenOptions();
+  const auto &SILOpts = Invocation.getSILOptions();
+  auto &SILTypes = CI.getSILTypes();
+  auto moduleName = CI.getMainModule()->getName().str();
+  const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
 
+  auto getDescriptor = [&]() -> IRGenDescriptor {
     if (PerformWMO) {
       return IRGenDescriptor::forWholeModule(
           mod, Opts, TBDOpts, SILOpts, SILTypes,
