@@ -2591,17 +2591,16 @@ namespace {
     
     Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
       switch (expr->getKind()) {
-      case MagicIdentifierLiteralExpr::File:
-      case MagicIdentifierLiteralExpr::FilePath:
-      case MagicIdentifierLiteralExpr::Function:
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case MagicIdentifierLiteralExpr::NAME: \
         return handleStringLiteralExpr(expr);
-
-      case MagicIdentifierLiteralExpr::Line:
-      case MagicIdentifierLiteralExpr::Column:
+#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case MagicIdentifierLiteralExpr::NAME: \
         return handleIntegerLiteralExpr(expr);
-
-      case MagicIdentifierLiteralExpr::DSOHandle:
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case MagicIdentifierLiteralExpr::NAME: \
         return expr;
+#include "swift/AST/MagicIdentifierKinds.def"
       }
 
 

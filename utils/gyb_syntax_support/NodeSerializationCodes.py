@@ -248,6 +248,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'CatchItemList': 244,
     'MultipleTrailingClosureElementList': 245,
     'MultipleTrailingClosureElement': 246,
+    'PoundFileIDExpr': 247,
 }
 
 

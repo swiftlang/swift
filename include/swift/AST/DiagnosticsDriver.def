@@ -104,13 +104,6 @@ WARNING(warn_arclite_not_found_when_link_objc_runtime,none,
         "unable to find Objective-C runtime support library 'arclite'; "
         "pass '-no-link-objc-runtime' to silence this warning", ())
 
-ERROR(error_two_files_same_name,none,
-      "filename \"%0\" used twice: '%1' and '%2'",
-      (StringRef, StringRef, StringRef))
-NOTE(note_explain_two_files_same_name,none,
-     "filenames are used to distinguish private declarations with the same "
-     "name", ())
-
 WARNING(warn_cannot_stat_input,none,
         "unable to determine when '%0' was last modified: %1",
         (StringRef, StringRef))

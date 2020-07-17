@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 556; // Serialization of -implicit-dynamic
+const uint16_t SWIFTMODULE_VERSION_MINOR = 557; // #fileID
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -459,8 +459,10 @@ using ValueOwnershipField = BCFixed<2>;
 enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
-  File,
+  FileID,
   FilePath,
+  FileIDSpelledAsFile,
+  FilePathSpelledAsFile,
   Line,
   Column,
   Function,

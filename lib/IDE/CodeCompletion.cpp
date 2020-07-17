@@ -2604,12 +2604,9 @@ public:
       case DefaultArgumentKind::EmptyDictionary:
         return !includeDefaultArgs;
 
-      case DefaultArgumentKind::File:
-      case DefaultArgumentKind::FilePath:
-      case DefaultArgumentKind::Line:
-      case DefaultArgumentKind::Column:
-      case DefaultArgumentKind::Function:
-      case DefaultArgumentKind::DSOHandle:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
         // Skip parameters that are defaulted to source location or other
         // caller context information.  Users typically don't want to specify
         // these parameters.
@@ -4042,35 +4039,53 @@ public:
 
   /// Add '#file', '#line', et at.
   void addPoundLiteralCompletions(bool needPound) {
-    auto addFromProto = [&](StringRef name, CodeCompletionKeywordKind kwKind,
-                            CodeCompletionLiteralKind literalKind) {
+    auto addFromProto = [&](MagicIdentifierLiteralExpr::Kind magicKind,
+                            Optional<CodeCompletionLiteralKind> literalKind) {
+      CodeCompletionKeywordKind kwKind;
+      switch (magicKind) {
+      case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
+        kwKind = CodeCompletionKeywordKind::pound_file;
+        break;
+      case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
+        // Already handled by above case.
+        return;
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
+      case MagicIdentifierLiteralExpr::NAME: \
+        kwKind = CodeCompletionKeywordKind::TOKEN; \
+        break;
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
+#include "swift/AST/MagicIdentifierKinds.def"
+      }
+
+      StringRef name = MagicIdentifierLiteralExpr::getKindString(magicKind);
       if (!needPound)
         name = name.substr(1);
+
+      if (!literalKind) {
+        // Pointer type
+        addKeyword(name, "UnsafeRawPointer", kwKind);
+        return;
+      }
 
       CodeCompletionResultBuilder builder(
           Sink, CodeCompletionResult::ResultKind::Keyword,
           SemanticContextKind::None, {});
-      builder.setLiteralKind(literalKind);
+      builder.setLiteralKind(literalKind.getValue());
       builder.setKeywordKind(kwKind);
       builder.addBaseName(name);
-      addTypeRelationFromProtocol(builder, literalKind);
+      addTypeRelationFromProtocol(builder, literalKind.getValue());
     };
 
-    addFromProto("#function", CodeCompletionKeywordKind::pound_function,
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    addFromProto(MagicIdentifierLiteralExpr::NAME, \
                  CodeCompletionLiteralKind::StringLiteral);
-    addFromProto("#file", CodeCompletionKeywordKind::pound_file,
-                 CodeCompletionLiteralKind::StringLiteral);
-    if (Ctx.LangOpts.EnableConcisePoundFile) {
-      addFromProto("#filePath", CodeCompletionKeywordKind::pound_file,
-                   CodeCompletionLiteralKind::StringLiteral);
-    }
-    addFromProto("#line", CodeCompletionKeywordKind::pound_line,
+#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    addFromProto(MagicIdentifierLiteralExpr::NAME, \
                  CodeCompletionLiteralKind::IntegerLiteral);
-    addFromProto("#column", CodeCompletionKeywordKind::pound_column,
-                 CodeCompletionLiteralKind::IntegerLiteral);
-
-    addKeyword(needPound ? "#dsohandle" : "dsohandle", "UnsafeRawPointer",
-               CodeCompletionKeywordKind::pound_dsohandle);
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    addFromProto(MagicIdentifierLiteralExpr::NAME, \
+                 None);
+#include "swift/AST/MagicIdentifierKinds.def"
   }
 
   void addValueLiteralCompletions() {

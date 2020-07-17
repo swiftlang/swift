@@ -294,23 +294,20 @@ public:
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
 
-  /// Creates a map from \c #filePath strings to corresponding \c #file
+  /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
   ///
-  /// A given \c #filePath string always maps to exactly one \c #file string,
+  /// A given \c #filePath string always maps to exactly one \c #fileID string,
   /// but it is possible for \c #sourceLocation directives to introduce
   /// duplicates in the opposite direction. If there are such conflicts, this
   /// method will diagnose the conflict and choose a "winner" among the paths
-  /// in a reproducible way. The \c bool paired with the \c #file string is
+  /// in a reproducible way. The \c bool paired with the \c #fileID string is
   /// \c true for paths which did not have a conflict or won a conflict, and
   /// \c false for paths which lost a conflict. Thus, if you want to generate a
-  /// reverse mapping, you should drop or special-case the \c #file strings that
-  /// are paired with \c false.
-  ///
-  /// Note that this returns an empty StringMap if concise \c #file strings are
-  /// disabled. Users should fall back to using the file path in this case.
+  /// reverse mapping, you should drop or special-case the \c #fileID strings
+  /// that are paired with \c false.
   llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
-  computeMagicFileStringMap(bool shouldDiagnose) const;
+  computeFileIDMap(bool shouldDiagnose) const;
 
   /// Add a file declaring a cross-import overlay.
   void addCrossImportOverlayFile(StringRef file);

@@ -1018,29 +1018,32 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
 /// Map magic literal tokens such as #file to their
 /// MagicIdentifierLiteralExpr kind.
 static MagicIdentifierLiteralExpr::Kind
-getMagicIdentifierLiteralKind(tok Kind) {
+getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
-  case tok::kw___COLUMN__:
-  case tok::pound_column:
-    return MagicIdentifierLiteralExpr::Kind::Column;
-  case tok::kw___FILE__:
   case tok::pound_file:
-    return MagicIdentifierLiteralExpr::Kind::File;
-  case tok::pound_filePath:
-    return MagicIdentifierLiteralExpr::Kind::FilePath;
-  case tok::kw___FUNCTION__:
-  case tok::pound_function:
-    return MagicIdentifierLiteralExpr::Kind::Function;
-  case tok::kw___LINE__:
-  case tok::pound_line:
-    return MagicIdentifierLiteralExpr::Kind::Line;
-  case tok::kw___DSO_HANDLE__:
-  case tok::pound_dsohandle:
-    return MagicIdentifierLiteralExpr::Kind::DSOHandle;
-
+    // TODO: Enable by default at the next source break.
+    return Opts.EnableConcisePoundFile
+         ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
+         : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) \
+  case tok::TOKEN: \
+    return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
   default:
     llvm_unreachable("not a magic literal");
   }
+}
+
+/// Map magic literal kinds such as #file to their SyntaxKind.
+static SyntaxKind
+getMagicIdentifierSyntaxKind(MagicIdentifierLiteralExpr::Kind LiteralKind) {
+  switch (LiteralKind) {
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case MagicIdentifierLiteralExpr::NAME: \
+    return SyntaxKind::SYNTAX_KIND;
+#include "swift/AST/MagicIdentifierKinds.def"
+  }
+  llvm_unreachable("not a magic literal kind");
 }
 
 ParserResult<Expr>
@@ -1450,20 +1453,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                 BooleanLiteralExpr(isTrue, consumeToken()));
   }
 
-  case tok::kw___FILE__:
-  case tok::kw___LINE__:
-  case tok::kw___COLUMN__:
-  case tok::kw___FUNCTION__:
-  case tok::kw___DSO_HANDLE__: {
-    StringRef replacement = "";
-    switch (Tok.getKind()) {
-    default: llvm_unreachable("can't get here");
-    case tok::kw___FILE__: replacement = "#file"; break;
-    case tok::kw___LINE__: replacement = "#line"; break;
-    case tok::kw___COLUMN__: replacement = "#column"; break;
-    case tok::kw___FUNCTION__:  replacement = "#function"; break;
-    case tok::kw___DSO_HANDLE__: replacement = "#dsohandle"; break;
-    }
+  // Cases for deprecated magic identifier tokens
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN) case tok::TOKEN:
+#include "swift/AST/MagicIdentifierKinds.def"
+  {
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
+    auto replacement = MagicIdentifierLiteralExpr::getKindString(Kind);
 
     diagnose(Tok.getLoc(), diag::snake_case_deprecated,
              Tok.getText(), replacement)
@@ -1471,26 +1466,18 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     LLVM_FALLTHROUGH;
   }
 
-  case tok::pound_column:
+  // Cases for non-deprecated magic identifier tokens
   case tok::pound_file:
-  case tok::pound_filePath:
-  case tok::pound_function:
-  case tok::pound_line:
-  case tok::pound_dsohandle: {
-    SyntaxKind SKind = SyntaxKind::UnknownExpr;
-    switch (Tok.getKind()) {
-    case tok::pound_column: SKind = SyntaxKind::PoundColumnExpr; break;
-    case tok::pound_file: SKind = SyntaxKind::PoundFileExpr; break;
-    case tok::pound_filePath: SKind = SyntaxKind::PoundFilePathExpr; break;
-    case tok::pound_function: SKind = SyntaxKind::PoundFunctionExpr; break;
-    // FIXME: #line was renamed to #sourceLocation
-    case tok::pound_line: SKind = SyntaxKind::PoundLineExpr; break;
-    case tok::pound_dsohandle: SKind = SyntaxKind::PoundDsohandleExpr; break;
-    default: break;
-    }
+#define MAGIC_IDENTIFIER_DEPRECATED_TOKEN(NAME, TOKEN)
+#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN) case tok::TOKEN:
+#include "swift/AST/MagicIdentifierKinds.def"
+  {
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind(), Context.LangOpts);
+    SyntaxKind SKind = getMagicIdentifierSyntaxKind(Kind);
+
     ExprContext.setCreateSyntax(SKind);
-    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
+
     return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
         Kind, Loc, /*implicit=*/false));
   }

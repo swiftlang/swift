@@ -211,32 +211,25 @@ getActualAccessorKind(uint8_t raw) {
 static Optional<swift::DefaultArgumentKind>
 getActualDefaultArgKind(uint8_t raw) {
   switch (static_cast<serialization::DefaultArgumentKind>(raw)) {
-  case serialization::DefaultArgumentKind::None:
-    return swift::DefaultArgumentKind::None;
-  case serialization::DefaultArgumentKind::Normal:
-    return swift::DefaultArgumentKind::Normal;
-  case serialization::DefaultArgumentKind::Inherited:
-    return swift::DefaultArgumentKind::Inherited;
-  case serialization::DefaultArgumentKind::Column:
-    return swift::DefaultArgumentKind::Column;
-  case serialization::DefaultArgumentKind::File:
-    return swift::DefaultArgumentKind::File;
-  case serialization::DefaultArgumentKind::FilePath:
-    return swift::DefaultArgumentKind::FilePath;
-  case serialization::DefaultArgumentKind::Line:
-    return swift::DefaultArgumentKind::Line;
-  case serialization::DefaultArgumentKind::Function:
-    return swift::DefaultArgumentKind::Function;
-  case serialization::DefaultArgumentKind::DSOHandle:
-    return swift::DefaultArgumentKind::DSOHandle;
-  case serialization::DefaultArgumentKind::NilLiteral:
-    return swift::DefaultArgumentKind::NilLiteral;
-  case serialization::DefaultArgumentKind::EmptyArray:
-    return swift::DefaultArgumentKind::EmptyArray;
-  case serialization::DefaultArgumentKind::EmptyDictionary:
-    return swift::DefaultArgumentKind::EmptyDictionary;
-  case serialization::DefaultArgumentKind::StoredProperty:
-    return swift::DefaultArgumentKind::StoredProperty;
+#define CASE(X) \
+  case serialization::DefaultArgumentKind::X: \
+    return swift::DefaultArgumentKind::X;
+  CASE(None)
+  CASE(Normal)
+  CASE(Inherited)
+  CASE(Column)
+  CASE(FileID)
+  CASE(FilePath)
+  CASE(FileIDSpelledAsFile)
+  CASE(FilePathSpelledAsFile)
+  CASE(Line)
+  CASE(Function)
+  CASE(DSOHandle)
+  CASE(NilLiteral)
+  CASE(EmptyArray)
+  CASE(EmptyDictionary)
+  CASE(StoredProperty)
+#undef CASE
   }
   return None;
 }

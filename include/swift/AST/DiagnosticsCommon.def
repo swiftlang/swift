@@ -114,13 +114,21 @@ ERROR(sdk_node_unrecognized_decl_kind,none,
 ERROR(sdk_node_unrecognized_accessor_kind,none,
       "unrecognized accessor kind '%0' in SDK node", (StringRef))
 
-// Emitted from ModuleDecl::computeMagicFileStringMap()
-WARNING(pound_source_location_creates_pound_file_conflicts,none,
-        "'#sourceLocation' directive produces '#file' string of '%0', which "
-        "conflicts with '#file' strings produced by other paths in the module",
-        (StringRef))
+// Emitted from ModuleDecl::computeFileIDMap()
+WARNING(source_location_creates_file_id_conflicts,none,
+        "'#sourceLocation' directive produces '#fileID' string of '%0', which "
+        "conflicts with '#fileID' strings produced by other paths in the "
+        "module", (StringRef))
 NOTE(fixit_correct_source_location_file,none,
      "change file in '#sourceLocation' to '%0'", (StringRef))
+
+// Usually, but not always, emitted from the driver
+ERROR(error_two_files_same_name,none,
+      "filename \"%0\" used twice: '%1' and '%2'",
+      (StringRef, StringRef, StringRef))
+NOTE(note_explain_two_files_same_name,none,
+     "filenames are used to distinguish private declarations with the same "
+     "name", ())
 
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics

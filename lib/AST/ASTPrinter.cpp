@@ -2741,12 +2741,9 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << " = ";
 
     switch (param->getDefaultArgumentKind()) {
-    case DefaultArgumentKind::File:
-    case DefaultArgumentKind::Line:
-    case DefaultArgumentKind::Column:
-    case DefaultArgumentKind::Function:
-    case DefaultArgumentKind::DSOHandle:
-    case DefaultArgumentKind::NilLiteral:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
       Printer.printKeyword(defaultArgStr, Options);
       break;
     default:
