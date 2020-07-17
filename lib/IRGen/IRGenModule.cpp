@@ -275,6 +275,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     MetadataKindTy          // MetadataKind Kind;
   });
   TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
+  TypeMetadataPtrPtrTy = TypeMetadataPtrTy->getPointerTo(DefaultAS);
 
   TypeMetadataResponseTy = createStructType(*this, "swift.metadata_response", {
     TypeMetadataPtrTy,
@@ -674,6 +675,16 @@ namespace RuntimeConstants {
     }
     return RuntimeAvailability::AlwaysAvailable;
   }
+
+  RuntimeAvailability
+  GetCanonicalSpecializedMetadataAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getIntermodulePrespecializedGenericMetadataAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -945,6 +956,7 @@ GeneratedModule IRGenModule::intoGeneratedModule() && {
   return GeneratedModule{
     std::move(LLVMContext),
     std::unique_ptr<llvm::Module>{ClangCodeGen->ReleaseModule()},
+    std::move(TargetMachine)
   };
 }
 

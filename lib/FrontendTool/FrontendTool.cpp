@@ -45,7 +45,6 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
@@ -1508,7 +1507,7 @@ generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            llvm::GlobalVariable *&HashGlobal,
            ArrayRef<std::string> parallelOutputFilenames) {
   if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return performIRGeneration(*SF, IRGenOpts, TBDOpts,
+    return performIRGeneration(SF, IRGenOpts, TBDOpts,
                                std::move(SM), OutputFilename, PSPs,
                                SF->getPrivateDiscriminator().str(),
                                &HashGlobal);
@@ -1648,16 +1647,14 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   const auto &opts = Instance.getInvocation().getIRGenOptions();
   std::unique_ptr<llvm::TargetMachine> TargetMachine =
       createTargetMachine(opts, Instance.getASTContext());
-  version::Version EffectiveLanguageVersion =
-      Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
-                     TargetMachine.get(), EffectiveLanguageVersion,
-                     OutputFilename, Instance.getStatsReporter());
+                     TargetMachine.get(), OutputFilename,
+                     Instance.getStatsReporter());
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
@@ -2233,9 +2230,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   PDC.setFormattingStyle(
       Invocation.getDiagnosticOptions().PrintedFormattingStyle);
-
-  if (Invocation.getFrontendOptions().DebugTimeCompilation)
-    SharedTimer::enableCompilationTimers();
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();

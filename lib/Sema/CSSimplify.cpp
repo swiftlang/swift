@@ -4232,6 +4232,12 @@ bool ConstraintSystem::repairFailures(
         if (hasFixFor(loc, FixKind::ContextualMismatch))
           return true;
 
+        if (contextualType->isVoid() &&
+            getContextualTypePurpose(anchor) == CTP_ReturnStmt) {
+          conversionsOrFixes.push_back(RemoveReturn::create(*this, lhs, loc));
+          break;
+        }
+
         conversionsOrFixes.push_back(
             ContextualMismatch::create(*this, lhs, rhs, loc));
         break;
