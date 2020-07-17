@@ -5293,7 +5293,8 @@ void swift::serializeToMemory(
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer, const SILModule *M) {
   if (moduleBuffer) {
-    SharedTimer timer("Serialization, swiftmodule, to memory");
+    auto name = "Serialization, swiftmodule, to memory";
+    llvm::NamedRegionTimer timer(name, name, "Swift", "Swift compilation");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     Serializer::writeToStream(stream, DC, M, options);
@@ -5302,7 +5303,8 @@ void swift::serializeToMemory(
   }
 
   if (moduleDocBuffer) {
-    SharedTimer timer("Serialization, swiftdoc, to memory");
+    auto name = "Serialization, swiftdoc, to memory";
+    llvm::NamedRegionTimer timer(name, name, "Swift", "Swift compilation");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     writeDocToStream(stream, DC, options.GroupInfoPath);
