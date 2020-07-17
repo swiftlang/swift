@@ -309,11 +309,25 @@ struct WrapperWithNonEscapingAutoclosure<V> {
 }
 
 struct UseWrapperWithNonEscapingAutoclosure {
-  @WrapperWithNonEscapingAutoclosure var foo: Int
+  @WrapperWithNonEscapingAutoclosure var p1: Int
+  @WrapperWithNonEscapingAutoclosure var p2: UInt = 10
 
-  // Memberwise init should take an Int arg, not a closure
-  // CHECK: // UseWrapperWithNonEscapingAutoclosure.init(foo:)
-  // CHECK: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3fooACSi_tcfC : $@convention(method) (Int, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
+  // property wrapper backing initializer of UseWrapperWithNonEscapingAutoclosure.p1
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p1SivpfP : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> WrapperWithNonEscapingAutoclosure<Int>
+
+  // property wrapper backing initializer of UseWrapperWithNonEscapingAutoclosure.p2
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p2SuvpfP : $@convention(thin) (@noescape @callee_guaranteed () -> UInt) -> WrapperWithNonEscapingAutoclosure<UInt>
+
+  // variable initialization expression of UseWrapperWithNonEscapingAutoclosure._p2
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3_p233_F728088E0028E14D18C6A10CF68512E8LLAA0defgH0VySuGvpfi : $@convention(thin) () -> @owned @callee_guaranteed () -> UInt
+  // CHECK: return %1 : $@callee_guaranteed () -> UInt
+
+  // default argument 1 of UseWrapperWithNonEscapingAutoclosure.init(p1:p2:)
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p12p2ACSiyXK_SuyXKtcfcfA0_ : $@convention(thin) () -> @owned @callee_guaranteed () -> UInt
+  // CHECK: return %1 : $@callee_guaranteed () -> UInt
+
+  // UseWrapperWithNonEscapingAutoclosure.init(p1:p2:)
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV2p12p2ACSiyXK_SuyXKtcfC : $@convention(method) (@noescape @callee_guaranteed () -> Int, @noescape @callee_guaranteed () -> UInt, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
 }
 
 struct UseStatic {
@@ -423,6 +437,21 @@ struct CompositionWithAutoclosure {
   // In the memberwise init, only p1 should be a closure - p2 and p3 should be just Int
   // CompositionWithAutoclosure.init(p1:p2:p3:)
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers26CompositionWithAutoclosureV2p12p22p3ACSiyXA_S2itcfC : $@convention(method) (@owned @callee_guaranteed () -> Int, Int, Int, @thin CompositionWithAutoclosure.Type) -> CompositionWithAutoclosure
+}
+
+@propertyWrapper
+struct WrapperWithAutoclosureAndExtraArgs<V> {
+  var wrappedValue: V
+  init(wrappedValue: @autoclosure @escaping () -> V, key: String) {
+    self.wrappedValue = wrappedValue()
+  }
+}
+
+struct UseAutoclosureWrapperWithExtraArgs {
+  @WrapperWithAutoclosureAndExtraArgs(key: "")
+  var value = 10
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers34UseAutoclosureWrapperWithExtraArgsV5valueSivpfP : $@convention(thin) (@owned @callee_guaranteed () -> Int) -> WrapperWithAutoclosureAndExtraArgs<Int>
 }
 
 // Observers with non-default mutatingness.
