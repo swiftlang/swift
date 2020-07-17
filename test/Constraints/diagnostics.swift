@@ -687,7 +687,9 @@ enum AssocTest {
   case one(Int)
 }
 
-if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{referencing operator function '==' on 'Equatable' requires that 'AssocTest' conform to 'Equatable'}}
+// FIXME(rdar://problem/65688291) - on iOS simulator this diagnostic is flaky,
+// either `referencing operator function '==' on 'Equatable'` or `operator function '==' requires`
+if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{requires that 'AssocTest' conform to 'Equatable'}}
 // expected-note @-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
 
 
