@@ -624,7 +624,7 @@ class ModuleInterfaceLoaderImpl {
 
     if (shouldLoadAdjacentModule) {
       if (fs.exists(modulePath)) {
-        result.first = modulePath;
+        result.first = modulePath.str();
       }
     }
 
@@ -641,7 +641,7 @@ class ModuleInterfaceLoaderImpl {
       }
       if (path) {
         if (fs.exists(*path)) {
-          result.second = *path;
+          result.second = path->str();
         }
       }
     }
