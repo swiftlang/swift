@@ -234,8 +234,6 @@ void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
 
 void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
   using namespace options;
-  Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
-
   if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
     Opts.StatsOutputDir = A->getValue();
     if (Args.getLastArg(OPT_trace_stats_events)) {
