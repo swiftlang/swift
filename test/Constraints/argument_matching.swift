@@ -1418,7 +1418,7 @@ struct RelabelAndTrailingClosure {
   func f2(aa: Int, bb: Int, _ cc: () -> Void = {}) {}
 
   func test() {
-    f1(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:cc:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
+    f1(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:_:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
     f2(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:_:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
 
     f1(aax: 1, bbx: 2) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
