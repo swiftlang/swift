@@ -181,7 +181,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
 
   @_alwaysEmitIntoClient
   public mutating func appendInterpolation(_ value: Any.Type) {
-	  _typeName(value, qualified: false).write(to: &self)
+    _typeName(value, qualified: false).write(to: &self)
   }
 
   /// Creates a string from this instance, consuming the instance in the
