@@ -30,10 +30,10 @@ class ModuleDecl;
 /// output.
 struct TBDGenOptions {
   /// Whether this compilation has multiple IRGen instances.
-  bool HasMultipleIGMs;
+  bool HasMultipleIGMs = false;
 
   /// Whether this compilation is producing a TBD for InstallAPI.
-  bool IsInstallAPI;
+  bool IsInstallAPI = false;
 
   /// Only collect linker directive symbols.
   bool LinkerDirectivesOnly = false;
