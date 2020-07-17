@@ -2380,20 +2380,9 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   return superclassSource;
 }
 
-/// Realize a potential archetype for this type parameter.
-PotentialArchetype *ResolvedType::realizePotentialArchetype(
-                                           GenericSignatureBuilder &builder) {
-  // Realize and cache the potential archetype.
-  return builder.realizePotentialArchetype(type);
-}
-
 Type ResolvedType::getDependentType(GenericSignatureBuilder &builder) const {
-  // Already-resolved potential archetype.
-  if (auto pa = type.dyn_cast<PotentialArchetype *>())
-    return pa->getDependentType(builder.getGenericParams());
-
-  Type result = type.get<Type>();
-  return result->isTypeParameter() ? result : Type();
+  return storage.get<PotentialArchetype *>()
+      ->getDependentType(builder.getGenericParams());
 }
 
 auto PotentialArchetype::getOrCreateEquivalenceClass(
@@ -3550,20 +3539,6 @@ static Type resolveDependentMemberTypes(
   });
 }
 
-PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
-                                                     UnresolvedType &type) {
-  if (auto pa = type.dyn_cast<PotentialArchetype *>())
-    return pa;
-
-  auto pa = maybeResolveEquivalenceClass(type.get<Type>(),
-                                         ArchetypeResolutionKind::WellFormed,
-                                         /*wantExactPotentialArchetype=*/true)
-    .getPotentialArchetypeIfKnown();
-  if (pa) type = pa;
-
-  return pa;
-}
-
 static Type getStructuralType(TypeDecl *typeDecl, bool keepSugar) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
     if (typealias->getUnderlyingTypeRepr() != nullptr) {
@@ -4549,8 +4524,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
       if (equivClass2) {
         equivClass = equivClass2;
       } else {
-        auto pa1 = type1.realizePotentialArchetype(*this);
-        equivClass = pa1->getOrCreateEquivalenceClass(*this);
+        equivClass = type1.getEquivalenceClass(*this);
       }
     }
 
@@ -4562,8 +4536,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
 
   // Both sides are type parameters; equate them.
   // FIXME: Realizes potential archetypes far too early.
-  auto OrigT1 = type1.realizePotentialArchetype(*this);
-  auto OrigT2 = type2.realizePotentialArchetype(*this);
+  auto OrigT1 = type1.getPotentialArchetypeIfKnown();
+  auto OrigT2 = type2.getPotentialArchetypeIfKnown();
 
   // Operate on the representatives
   auto T1 = OrigT1->getRepresentative();
