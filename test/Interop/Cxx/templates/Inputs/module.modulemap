@@ -25,3 +25,7 @@ module ExplicitSpecialization {
 module UsingDirective {
   header "using-directive.h"
 }
+
+module EagerInstantiationProblems {
+  header "eager-instantiation-problems.h"
+}
