@@ -60,11 +60,6 @@ bool MatchCallArgumentListener::relabelArguments(ArrayRef<Identifier> newNames){
   return true;
 }
 
-bool MatchCallArgumentListener::trailingClosureMismatch(
-    unsigned paramIdx, unsigned argIdx) {
-  return true;
-}
-
 /// Produce a score (smaller is better) comparing a parameter name and
 /// potentially-typo'd argument name.
 ///
@@ -947,37 +942,6 @@ public:
     auto impact = 1 + numOutOfOrder + numExtraneous * 2 + numRenames * 3 +
                   MissingArguments.size() * 2;
     return CS.recordFix(fix, impact);
-  }
-
-  bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
-    if (!CS.shouldAttemptFixes())
-      return true;
-
-    const auto &param = Parameters[paramIdx];
-
-    auto *argLoc = CS.getConstraintLocator(
-        Locator.withPathElement(LocatorPathElt::ApplyArgToParam(
-            argIdx, paramIdx, param.getParameterFlags())));
-
-    // TODO(diagnostics): This fix should be attempted later
-    // when the argument is matched to a parameter. Doing that
-    // would not require special handling of the closure type.
-    Type argType;
-    if (auto *closure =
-            dyn_cast<ClosureExpr>(simplifyLocatorToAnchor(argLoc))) {
-      argType = CS.getClosureType(closure);
-    } else {
-      argType = Arguments[argIdx].getPlainType();
-    }
-
-    argType.visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        CS.recordPotentialHole(typeVar);
-    });
-
-    auto *fix = AllowInvalidUseOfTrailingClosure::create(
-        CS, argType, param.getPlainType(), argLoc);
-    return CS.recordFix(fix, /*impact=*/3);
   }
 
   ArrayRef<std::pair<unsigned, AnyFunctionType::Param>>
@@ -3350,9 +3314,6 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ApplyArgToParam: {
     auto loc = getConstraintLocator(locator);
-
-    if (hasFixFor(loc, FixKind::AllowInvalidUseOfTrailingClosure))
-      return true;
 
     // Don't attempt to fix an argument being passed to a
     // _OptionalNilComparisonType parameter. Such an overload should only take
@@ -9601,7 +9562,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
-  case FixKind::AllowInvalidUseOfTrailingClosure:
   case FixKind::AllowNonClassTypeToConvertToAnyObject:
   case FixKind::SpecifyClosureParameterType:
   case FixKind::SpecifyClosureReturnType:
