@@ -1,8 +1,8 @@
 // RUN: not %swift -typecheck -target arm64-apple-ios7 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=TARGETCPU1 %s
-// TARGETCPU1: "-target-cpu" "cyclone"
+// TARGETCPU1: "-target-cpu" "apple-a7"
 
 // RUN: not %swift -typecheck -target arm64-apple-tvos9 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=APPLETVTARGETCPU1 %s
-// APPLETVTARGETCPU1: "-target-cpu" "cyclone"
+// APPLETVTARGETCPU1: "-target-cpu" "apple-a7"
 
 // RUN: not %swift -typecheck -target armv7s-apple-tvos9 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=APPLETVTARGETCPU2 %s
 // APPLETVTARGETCPU2: "-target-cpu" "swift"
@@ -14,7 +14,7 @@
 // WATCHTARGETCPU1: "-target-cpu" "cortex-a7"
 
 // RUN: not %swift -typecheck -target arm64-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHTARGETCPU2 %s
-// WATCHTARGETCPU2: "-target-cpu" "cyclone"
+// WATCHTARGETCPU2: "-target-cpu" "apple-a7"
 
 // RUN: not %swift -typecheck -target armv7s-apple-ios7 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=TARGETCPU2 %s
 // TARGETCPU2: "-target-cpu" "swift"
