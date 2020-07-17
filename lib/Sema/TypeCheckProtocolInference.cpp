@@ -807,7 +807,8 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
   // require a fixed type for this associated type.
   Type resultType;
   for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
-    if (!conformedProto->inheritsFrom(assocType->getProtocol()))
+    if (conformedProto != assocType->getProtocol() &&
+        !conformedProto->inheritsFrom(assocType->getProtocol()))
       continue;
 
     const auto genericSig = conformedProto->getGenericSignature();
