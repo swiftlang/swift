@@ -4512,12 +4512,13 @@ static void initializeResilientWitnessTable(
   }
 }
 
-/// Instantiate a brand new witness table for a resilient or generic
-/// protocol conformance.
-WitnessTable *
-WitnessTableCacheEntry::allocate(
-                               const ProtocolConformanceDescriptor *conformance,
-                               const void * const *instantiationArgs) {
+// Instantiate a generic or resilient witness table into a `buffer`
+// that has already been allocated of the appropriate size and zeroed out.
+static WitnessTable *
+instantiateWitnessTable(const Metadata *Type,
+                        const ProtocolConformanceDescriptor *conformance,
+                        const void * const *instantiationArgs,
+                        void **fullTable) {
   auto protocol = conformance->getProtocol();
   auto genericTable = conformance->getGenericWitnessTable();
 
@@ -4532,12 +4533,6 @@ WitnessTableCacheEntry::allocate(
 
   // Number of bytes for any private storage used by the conformance itself.
   size_t privateSizeInWords = genericTable->getWitnessTablePrivateSizeInWords();
-
-  // Find the allocation.
-  void **fullTable = reinterpret_cast<void**>(this + 1);
-
-  // Zero out the witness table.
-  memset(fullTable, 0, getWitnessTableSize(conformance));
 
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
@@ -4594,6 +4589,57 @@ WitnessTableCacheEntry::allocate(
 
   return castTable;
 }
+/// Instantiate a brand new witness table for a resilient or generic
+/// protocol conformance.
+WitnessTable *
+WitnessTableCacheEntry::allocate(
+                               const ProtocolConformanceDescriptor *conformance,
+                               const void * const *instantiationArgs) {
+  // Find the allocation.
+  void **fullTable = reinterpret_cast<void**>(this + 1);
+
+  // Zero out the witness table.
+  memset(fullTable, 0, getWitnessTableSize(conformance));
+
+  // Instantiate the table.
+  return instantiateWitnessTable(Type, Conformance, instantiationArgs, fullTable);
+}
+
+/// Instantiate the witness table for a nondependent conformance that only has
+/// one possible instantiation.
+static WitnessTable *
+getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                            const Metadata *type) {
+  // Check whether the table has already been instantiated.
+  auto tablePtr = reinterpret_cast<std::atomic<WitnessTable*> *>(
+                     conformance->getGenericWitnessTable()->PrivateData.get());
+  
+  auto existingTable = tablePtr->load(SWIFT_MEMORY_ORDER_CONSUME);
+  if (existingTable) {
+    return existingTable;
+  }
+
+  // Allocate space for the table.
+  auto tableSize = WitnessTableCacheEntry::getWitnessTableSize(conformance);
+  MetadataAllocator allocator;
+  auto buffer = (void **)allocator.Allocate(tableSize, alignof(void*));
+  memset(buffer, 0, tableSize);
+  
+  // Instantiate the table.
+  auto table = instantiateWitnessTable(type, conformance, nullptr, buffer);
+  
+  // See whether we can claim to be the one true table.
+  WitnessTable *orig = nullptr;
+  if (!tablePtr->compare_exchange_strong(orig, table, std::memory_order_release,
+                                         SWIFT_MEMORY_ORDER_CONSUME)) {
+    // Someone beat us to the punch. Throw away our table and return the
+    // existing one.
+    allocator.Deallocate(buffer);
+    return orig;
+  }
+  
+  return table;
+}
 
 const WitnessTable *
 swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
@@ -4615,10 +4661,23 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 
   // When there is no generic table, or it doesn't require instantiation,
   // use the pattern directly.
-  // accessor directly.
   auto genericTable = conformance->getGenericWitnessTable();
   if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
     return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
+  }
+  
+  // If the conformance is not dependent on generic arguments in the conforming
+  // type, then there is only one instantiation possible, so we can try to
+  // allocate only the table without the concurrent map structure.
+  //
+  // TODO: There is no metadata flag that directly encodes the "nondependent"
+  // as of the Swift 5.3 ABI. However, we can check whether the conforming
+  // type is generic; a nongeneric type's conformance can never be dependent (at
+  // least, not today). However, a generic type conformance may also be
+  // nondependent if it 
+  auto typeDescription = conformance->getTypeDescriptor();
+  if (typeDescription && !typeDescription->isGeneric()) {
+    return getNondependentWitnessTable(conformance, type);
   }
 
   auto &cache = getCache(genericTable);
