@@ -4156,16 +4156,20 @@ class PropertyWrapperValuePlaceholderExpr : public Expr {
   SourceRange Range;
   OpaqueValueExpr *Placeholder;
   Expr *WrappedValue;
+  bool IsAutoClosure = false;
 
   PropertyWrapperValuePlaceholderExpr(SourceRange Range, Type Ty,
                                       OpaqueValueExpr *placeholder,
-                                      Expr *wrappedValue)
+                                      Expr *wrappedValue,
+                                      bool isAutoClosure)
       : Expr(ExprKind::PropertyWrapperValuePlaceholder, /*Implicit=*/true, Ty),
-        Range(Range), Placeholder(placeholder), WrappedValue(wrappedValue) {}
+        Range(Range), Placeholder(placeholder), WrappedValue(wrappedValue),
+        IsAutoClosure(isAutoClosure) {}
 
 public:
   static PropertyWrapperValuePlaceholderExpr *
-  create(ASTContext &ctx, SourceRange range, Type ty, Expr *wrappedValue);
+  create(ASTContext &ctx, SourceRange range, Type ty, Expr *wrappedValue,
+         bool isAutoClosure = false);
 
   /// The original wrappedValue initialization expression provided via
   /// \c = on a proprety with attached property wrappers.
@@ -4186,6 +4190,8 @@ public:
   void setOpaqueValuePlaceholder(OpaqueValueExpr *placeholder) {
     Placeholder = placeholder;
   }
+
+  bool isAutoClosure() const { return IsAutoClosure; }
 
   SourceRange getSourceRange() const { return Range; }
 

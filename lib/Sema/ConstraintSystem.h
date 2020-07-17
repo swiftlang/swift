@@ -1382,13 +1382,19 @@ private:
       /// pattern.
       Pattern *pattern;
 
-      /// The variable to which property wrappers have been applied, if
-      /// this is an initialization involving a property wrapper.
-      VarDecl *wrappedVar;
+      struct {
+        /// The variable to which property wrappers have been applied, if
+        /// this is an initialization involving a property wrapper.
+        VarDecl *wrappedVar;
 
-      /// The innermost call to \c init(wrappedValue:), if this is an
-      /// initialization involving a property wrapper.
-      ApplyExpr *innermostWrappedValueInit;
+        /// The innermost call to \c init(wrappedValue:), if this is an
+        /// initialization involving a property wrapper.
+        ApplyExpr *innermostWrappedValueInit;
+
+        /// Whether this property wrapper has an initial wrapped value specified
+        /// via \c = .
+        bool hasInitialWrappedValue;
+      } propertyWrapper;
 
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
@@ -1618,11 +1624,18 @@ public:
         expression.contextualPurpose != CTP_Initialization)
       return false;
 
-    auto *wrappedVar = expression.wrappedVar;
+    auto *wrappedVar = expression.propertyWrapper.wrappedVar;
     if (!wrappedVar || wrappedVar->isStatic())
       return false;
 
-    return expression.innermostWrappedValueInit == apply;
+    return expression.propertyWrapper.innermostWrappedValueInit == apply;
+  }
+
+  /// Whether this target is for initialization of a property wrapper
+  /// with an initial wrapped value specified via \c = .
+  bool propertyWrapperHasInitialWrappedValue() const {
+    return (kind == Kind::expression &&
+            expression.propertyWrapper.hasInitialWrappedValue);
   }
 
   /// Retrieve the wrapped variable when initializing a pattern with a
@@ -1630,7 +1643,7 @@ public:
   VarDecl *getInitializationWrappedVar() const {
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
-    return expression.wrappedVar;
+    return expression.propertyWrapper.wrappedVar;
   }
 
   PatternBindingDecl *getInitializationPatternBindingDecl() const {
@@ -4086,7 +4099,8 @@ public:
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
-  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType);
+  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
+                             bool isDefaultWrappedValue = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.

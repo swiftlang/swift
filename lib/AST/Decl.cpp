@@ -6119,21 +6119,14 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
   return allAttachedPropertyWrappersHaveWrappedValueInit();
 }
 
-bool VarDecl::isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const {
-  auto customAttrs = getAttachedPropertyWrappers();
-  if (customAttrs.empty())
-    return false;
-
-  unsigned innermostWrapperIndex = customAttrs.size() - 1;
-  auto typeInfo = getAttachedPropertyWrapperTypeInfo(innermostWrapperIndex);
-  return typeInfo.isWrappedValueInitUsingEscapingAutoClosure;
-}
-
 Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
-  Type valueInterfaceTy = getValueInterfaceType();
+  auto wrapperInfo = getPropertyWrapperBackingPropertyInfo();
+  if (!wrapperInfo || !wrapperInfo.wrappedValuePlaceholder)
+    return Type();
 
-  if (isInnermostPropertyWrapperInitUsesEscapingAutoClosure())
-    return FunctionType::get({}, valueInterfaceTy);
+  Type valueInterfaceTy = wrapperInfo.wrappedValuePlaceholder->getType();
+  if (valueInterfaceTy->hasArchetype())
+    valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
 
   return valueInterfaceTy;
 }

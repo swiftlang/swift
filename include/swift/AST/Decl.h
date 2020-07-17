@@ -5244,10 +5244,6 @@ public:
   /// a suitable `init(wrappedValue:)`.
   bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
-  /// Whether the innermost property wrapper's initializer's 'wrappedValue' parameter
-  /// is marked with '@autoclosure' and '@escaping'.
-  bool isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const;
-
   /// Return the interface type of the value used for the 'wrappedValue:'
   /// parameter when initializing a property wrapper.
   ///
