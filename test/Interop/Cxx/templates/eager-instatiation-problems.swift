@@ -13,9 +13,20 @@ TemplatesTestSuite.test("eager-instantiation-of-members") {
   // error: type 'int' cannot be used prior to '::' because it has no members
   //   T::getIntDoesNotExist();
   //
-  // whereas in C++ this compiles.
+  // whereas in C++ this compiles. This is caused by ClangImporter eagerly
+  // instantiating typedeffed templates and also its members.
   // TODO(scentini): Fix this
-  // let _brokenMemberMagicWrapper = BrokenMemberMagicWrapper()
+  // let _brokenMagicWrapper = BrokenMagicWrapper()
+}
+
+TemplatesTestSuite.test("sfinae-example") {
+  // This will fail since we are currently not instantiating function templates.
+  // In C++ the first sfinaeGetInt should fail to instantiate, therefore get
+  // ignored, and only the second sfinaeGetInt is used.
+  // TODO(SR-12541): Fix this
+  // let magicNumber = MagicNumber()
+  // var brokenMagicWrapper = BrokenMagicWrapper()
+  // expectEqual(42, brokenMagicWrapper.sfinaeGetInt(magicNumber, 0))
 }
 
 runAllTests()
