@@ -5888,19 +5888,6 @@ bool ExtraneousCallFailure::diagnoseAsError() {
   return true;
 }
 
-bool InvalidUseOfTrailingClosure::diagnoseAsError() {
-  emitDiagnostic(diag::trailing_closure_bad_param, getToType())
-      .highlight(getSourceRange());
-
-  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
-    if (auto *decl = overload->choice.getDeclOrNull()) {
-      emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
-    }
-  }
-
-  return true;
-}
-
 void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   auto getPointerKind = [](Type ty) -> PointerTypeKind {
     PointerTypeKind pointerKind;
