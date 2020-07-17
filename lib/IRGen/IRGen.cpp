@@ -1466,3 +1466,18 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
                            irMod.getTargetMachine());
   return irMod;
 }
+
+GeneratedModuleRef
+OptimizedIRCachedRequest::evaluate(Evaluator &evaluator,
+                                   IRGenDescriptor desc) const {
+  auto mod = llvm::cantFail(evaluator(OptimizedIRRequest{desc}));
+
+  // FIXME: Once the evaluator supports cached move-only results, this will be
+  // unnecessary.
+  auto &ctx = desc.getParentModule()->getASTContext();
+  auto *memory = (GeneratedModule *)ctx.Allocate(sizeof(GeneratedModule),
+                                                 alignof(GeneratedModule));
+  new (memory) GeneratedModule(std::move(mod));
+  ctx.addCleanup([&]() { memory->~GeneratedModule(); });
+  return *memory;
+}

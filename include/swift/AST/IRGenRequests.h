@@ -97,6 +97,16 @@ public:
     return Module != nullptr && Context != nullptr;
   }
 
+  friend bool operator==(const GeneratedModule &lhs,
+                         const GeneratedModule &rhs) {
+    return lhs.Context == rhs.Context && lhs.Module == rhs.Module &&
+           lhs.Target == rhs.Target;
+  }
+  friend bool operator!=(const GeneratedModule &lhs,
+                         const GeneratedModule &rhs) {
+    return !(lhs == rhs);
+  }
+
 public:
   const llvm::Module *getModule() const { return Module.get(); }
   llvm::Module *getModule() { return Module.get(); }
@@ -122,6 +132,8 @@ public:
   /// ORC-compatible context.
   llvm::orc::ThreadSafeModule intoThreadSafeContext() &&;
 };
+
+void simple_display(llvm::raw_ostream &out, const GeneratedModule &mod);
 
 struct IRGenDescriptor {
   llvm::PointerUnion<FileUnit *, ModuleDecl *> Ctx;
@@ -250,6 +262,40 @@ private:
   // Evaluation.
   GeneratedModule evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
 };
+
+using GeneratedModuleRef = std::reference_wrapper<const GeneratedModule>;
+
+/// Cached version of OptimizedIRRequest. This is a separate request as it
+/// retains ownership of the GeneratedModule, rather than passing ownership to
+/// the caller. Passing ownership to the caller is useful as unfortunately the
+/// LLVM passes to emit object code can currently mutate the module they operate
+/// on, making them unsuitable for a cached module without first cloning it.
+class OptimizedIRCachedRequest
+    : public SimpleRequest<OptimizedIRCachedRequest,
+                           GeneratedModuleRef(IRGenDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  GeneratedModuleRef evaluate(Evaluator &evaluator, IRGenDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+// Allow AnyValue to compare two GeneratedModuleRefs.
+template <>
+inline bool
+AnyValue::Holder<GeneratedModuleRef>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return value.get() ==
+         static_cast<const Holder<GeneratedModuleRef> &>(other).value.get();
+}
 
 /// The zone number for IRGen.
 #define SWIFT_TYPEID_ZONE IRGen

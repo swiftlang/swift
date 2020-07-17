@@ -36,6 +36,14 @@ llvm::orc::ThreadSafeModule GeneratedModule::intoThreadSafeContext() && {
   return {std::move(Module), std::move(Context)};
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const GeneratedModule &mod) {
+  if (!mod) {
+    out << "(null)";
+    return;
+  }
+  out << "LLVM Module " << mod.getModule()->getName();
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            const IRGenDescriptor &desc) {
   auto *MD = desc.Ctx.dyn_cast<ModuleDecl *>();

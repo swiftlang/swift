@@ -32,6 +32,7 @@ class Decl;
 class EnumDecl;
 class FuncDecl;
 enum class FunctionBuilderBodyPreCheck : uint8_t;
+class GeneratedModule;
 class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;
