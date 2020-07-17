@@ -303,6 +303,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_module_interface_preserve_types_as_written);
   Opts.PrintFullConvention |=
     Args.hasArg(OPT_experimental_print_full_convention);
+  Opts.ExperimentalSPIImports |=
+    Args.hasArg(OPT_experimental_spi_imports);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
