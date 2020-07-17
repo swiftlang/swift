@@ -21,17 +21,16 @@ class GenericSignatureBuilder::ResolvedType {
   ResolvedType(EquivalenceClass *equivClass)
     : type(), equivClass(equivClass) { }
 
+  /// A concrete resolved type .
+  ResolvedType(Type type) : type(type), equivClass(nullptr) {
+    assert(!type->isTypeParameter());
+  }
+
 public:
   /// A specific resolved potential archetype.
   ResolvedType(PotentialArchetype *pa)
     : type(pa), equivClass(nullptr) { }
 
-  /// A resolved type within the given equivalence class.
-  ResolvedType(Type type, EquivalenceClass *equivClass)
-      : type(type), equivClass(equivClass) {
-    assert(type->isTypeParameter() == static_cast<bool>(equivClass) &&
-           "type parameters must have equivalence classes");
-  }
 
   /// Return an unresolved result, which could be resolved when we
   /// learn more information about the given equivalence class.
@@ -41,7 +40,7 @@ public:
 
   /// Return a result for a concrete type.
   static ResolvedType forConcrete(Type concreteType) {
-    return ResolvedType(concreteType, nullptr);
+    return ResolvedType(concreteType);
   }
 
   /// Determine whether this result was resolved.

@@ -3677,19 +3677,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       if (!nestedPA)
         return ResolvedType::forUnresolved(baseEquivClass);
 
-      // If base resolved to the anchor, then the nested potential archetype
-      // we found is the resolved potential archetype. Return it directly,
-      // so it doesn't need to be resolved again.
-      if (basePA == resolvedBase.getPotentialArchetypeIfKnown())
-        return ResolvedType(nestedPA);
-
-      // Compute the resolved dependent type to return.
-      Type resolvedBaseType = resolvedBase.getDependentType(*this);
-      Type resolvedMemberType =
-          DependentMemberType::get(resolvedBaseType, assocType);
-
-      return ResolvedType(resolvedMemberType,
-                          nestedPA->getOrCreateEquivalenceClass(*this));
+      return ResolvedType(nestedPA);
     } else {
       auto *concreteDecl =
           baseEquivClass->lookupNestedType(*this, depMemTy->getName());
