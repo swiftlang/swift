@@ -93,6 +93,16 @@ struct OwnershipModelEliminatorVisitor
   bool visitSwitchEnumInst(SwitchEnumInst *SWI);
   bool visitDestructureStructInst(DestructureStructInst *DSI);
   bool visitDestructureTupleInst(DestructureTupleInst *DTI);
+
+  // We lower this to unchecked_bitwise_cast losing our assumption of layout
+  // compatibility.
+  bool visitUncheckedValueCastInst(UncheckedValueCastInst *UVCI) {
+    auto *NewVal = B.createUncheckedBitwiseCast(
+        UVCI->getLoc(), UVCI->getOperand(), UVCI->getType());
+    UVCI->replaceAllUsesWith(NewVal);
+    UVCI->eraseFromParent();
+    return true;
+  }
 };
 
 } // end anonymous namespace

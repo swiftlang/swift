@@ -156,11 +156,6 @@ bool SerializedSILLoader::invalidateFunction(SILFunction *F) {
   return false;
 }
 
-void SerializedSILLoader::getAll() {
-  for (auto &Des : LoadedSILSections)
-    Des->getAll();
-}
-
 // FIXME: Not the best interface. We know exactly which FileUnits may have SIL
 // those in the main module.
 void SerializedSILLoader::getAllForModule(Identifier Mod,

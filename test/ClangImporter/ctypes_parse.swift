@@ -223,7 +223,7 @@ func testStructDefaultInit() {
 
 func testArrays() {
   nonnullArrayParameters([], [], [])
-  nonnullArrayParameters(nil, [], []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int8>'}}
+  nonnullArrayParameters(nil, [], []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<CChar>'}}
   nonnullArrayParameters([], nil, []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<UnsafeMutableRawPointer?>'}}
   nonnullArrayParameters([], [], nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int32>'}}
 
@@ -233,7 +233,7 @@ func testArrays() {
   // It would also be nice to warn here about the arrays being too short, but
   // that's probably beyond us for a while.
   staticBoundsArray([])
-  staticBoundsArray(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int8>'}}
+  staticBoundsArray(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<CChar>'}}
 }
 
 func testVaList() {

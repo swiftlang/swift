@@ -1620,6 +1620,9 @@ public:
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand());
+  }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }

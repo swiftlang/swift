@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,11 +10,34 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_silgen_name("swift_isClassType")
+internal func _isClassType(_: Any.Type) -> Bool
+
+@_silgen_name("swift_getMetadataKind")
+internal func _metadataKind(_: Any.Type) -> UInt
+
 @_silgen_name("swift_reflectionMirror_normalizedType")
 internal func _getNormalizedType<T>(_: T, type: Any.Type) -> Any.Type
 
 @_silgen_name("swift_reflectionMirror_count")
 internal func _getChildCount<T>(_: T, type: Any.Type) -> Int
+
+@_silgen_name("swift_reflectionMirror_recursiveCount")
+internal func _getRecursiveChildCount(_: Any.Type) -> Int
+
+@_silgen_name("swift_reflectionMirror_recursiveChildMetadata")
+internal func _getChildMetadata(
+  _: Any.Type,
+  index: Int,
+  outName: UnsafeMutablePointer<UnsafePointer<CChar>?>,
+  outFreeFunc: UnsafeMutablePointer<NameFreeFunc?>
+) -> Any.Type
+
+@_silgen_name("swift_reflectionMirror_recursiveChildOffset")
+internal func _getChildOffset(
+  _: Any.Type,
+  index: Int
+) -> Int
 
 internal typealias NameFreeFunc = @convention(c) (UnsafePointer<CChar>?) -> Void
 
@@ -167,4 +190,108 @@ extension Mirror {
     return nil
 #endif
   }
+}
+
+/// Options for calling `_forEachField(of:options:body:)`.
+@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@_spi(Reflection)
+public struct _EachFieldOptions: OptionSet {
+  public var rawValue: UInt32
+
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// Require the top-level type to be a class.
+  ///
+  /// If this is not set, the top-level type is required to be a struct or
+  /// tuple.
+  public static var classType = _EachFieldOptions(rawValue: 1 << 0)
+
+  /// Ignore fields that can't be introspected.
+  ///
+  /// If not set, the presence of things that can't be introspected causes
+  /// the function to immediately return `false`.
+  public static var ignoreUnknown = _EachFieldOptions(rawValue: 1 << 1)
+}
+
+/// The metadata "kind" for a type.
+@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@_spi(Reflection)
+public enum _MetadataKind: UInt {
+  // With "flags":
+  // runtimePrivate = 0x100
+  // nonHeap = 0x200
+  // nonType = 0x400
+  
+  case `class` = 0
+  case `struct` = 0x200     // 0 | nonHeap
+  case `enum` = 0x201       // 1 | nonHeap
+  case optional = 0x202     // 2 | nonHeap
+  case foreignClass = 0x203 // 3 | nonHeap
+  case opaque = 0x300       // 0 | runtimePrivate | nonHeap
+  case tuple = 0x301        // 1 | runtimePrivate | nonHeap
+  case function = 0x302     // 2 | runtimePrivate | nonHeap
+  case existential = 0x303  // 3 | runtimePrivate | nonHeap
+  case metatype = 0x304     // 4 | runtimePrivate | nonHeap
+  case objcClassWrapper = 0x305     // 5 | runtimePrivate | nonHeap
+  case existentialMetatype = 0x306  // 6 | runtimePrivate | nonHeap
+  case heapLocalVariable = 0x400    // 0 | nonType
+  case heapGenericLocalVariable = 0x500 // 0 | nonType | runtimePrivate
+  case errorObject = 0x501  // 1 | nonType | runtimePrivate
+  case unknown = 0xffff
+  
+  init(_ type: Any.Type) {
+    let v = _metadataKind(type)
+    if let result = _MetadataKind(rawValue: v) {
+      self = result
+    } else {
+      self = .unknown
+    }
+  }
+}
+
+/// Calls the given closure on every field of the specified type.
+///
+/// If `body` returns `false` for any field, no additional fields are visited.
+///
+/// - Parameters:
+///   - type: The type to inspect.
+///   - options: Options to use when reflecting over `type`.
+///   - body: A closure to call with information about each field in `type`.
+///     The parameters to `body` are a pointer to a C string holding the name
+///     of the field, the offset of the field in bytes, the type of the field,
+///     and the `_MetadataKind` of the field's type.
+/// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
+///   `false`.
+@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@discardableResult
+@_spi(Reflection)
+public func _forEachField(
+  of type: Any.Type,
+  options: _EachFieldOptions = [],
+  body: (UnsafePointer<CChar>, Int, Any.Type, _MetadataKind) -> Bool
+) -> Bool {
+  // Require class type iff `.classType` is included as an option
+  if _isClassType(type) != options.contains(.classType) {
+    return false
+  }
+
+  let childCount = _getRecursiveChildCount(type)
+  for i in 0..<childCount {
+    let offset = _getChildOffset(type, index: i)
+
+    var nameC: UnsafePointer<CChar>? = nil
+    var freeFunc: NameFreeFunc? = nil
+    let childType = _getChildMetadata(
+      type, index: i, outName: &nameC, outFreeFunc: &freeFunc)
+    defer { freeFunc?(nameC) }
+    let kind = _MetadataKind(childType)
+
+    if !body(nameC!, offset, childType, kind) {
+      return false
+    }
+  }
+
+  return true
 }

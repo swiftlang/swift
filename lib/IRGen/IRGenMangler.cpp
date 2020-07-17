@@ -143,6 +143,8 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   });
 }
 
+
+
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
   beginMangling();
@@ -154,6 +156,21 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
     appendProtocolName(protocol);
     appendOperator("MS");
   }
+  return finalize();
+}
+
+std::string IRGenMangler::mangleProtocolConformanceInstantiationCache(
+                                 const RootProtocolConformance *conformance) {
+  beginMangling();
+  if (isa<NormalProtocolConformance>(conformance)) {
+    appendProtocolConformance(conformance);
+    appendOperator("Mc");
+  } else {
+    auto protocol = cast<SelfProtocolConformance>(conformance)->getProtocol();
+    appendProtocolName(protocol);
+    appendOperator("MS");
+  }
+  appendOperator("MK");
   return finalize();
 }
 

@@ -686,7 +686,7 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformIOS; break;
       case PlatformKind::macCatalyst:
         PlatformUID = PlatformMacCatalyst; break;
-      case PlatformKind::OSX:
+      case PlatformKind::macOS:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
         PlatformUID = PlatformtvOS; break;
@@ -696,7 +696,7 @@ static void reportAttributes(ASTContext &Ctx,
         PlatformUID = PlatformIOSAppExt; break;
       case PlatformKind::macCatalystApplicationExtension:
         PlatformUID = PlatformMacCatalystAppExt; break;
-      case PlatformKind::OSXApplicationExtension:
+      case PlatformKind::macOSApplicationExtension:
         PlatformUID = PlatformOSXAppExt; break;
       case PlatformKind::tvOSApplicationExtension:
         PlatformUID = PlatformtvOSAppExt; break;

@@ -3238,6 +3238,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedValueCastInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::AddressToPointerInst:
   case SILInstructionKind::BridgeObjectToRefInst:
@@ -3306,6 +3307,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       break;
     case SILInstructionKind::UncheckedBitwiseCastInst:
       ResultVal = B.createUncheckedBitwiseCast(InstLoc, Val, Ty);
+      break;
+    case SILInstructionKind::UncheckedValueCastInst:
+      ResultVal = B.createUncheckedValueCast(InstLoc, Val, Ty);
       break;
     case SILInstructionKind::UpcastInst:
       ResultVal = B.createUpcast(InstLoc, Val, Ty);

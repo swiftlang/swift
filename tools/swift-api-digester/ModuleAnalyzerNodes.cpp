@@ -1331,7 +1331,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       SugaredGenericSig(Ctx.checkingABI()?
                         printGenericSignature(Ctx, D, /*Canonical*/false):
                         StringRef()),
-      IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::OSX)),
+      IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::macOS)),
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),

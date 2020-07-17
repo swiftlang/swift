@@ -195,14 +195,6 @@ int main(int argc, char **argv) {
                                 CI.getSILOptions());
   }
 
-  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
-  // us.
-  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
-    auto SL = SerializedSILLoader::create(
-        CI.getASTContext(), SILMod.get(), nullptr);
-    SL->getAll();
-  }
-
   const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
   auto Mod = performIRGeneration(CI.getMainModule(), Opts,
                                  CI.getInvocation().getTBDGenOptions(),

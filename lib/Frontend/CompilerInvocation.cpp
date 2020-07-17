@@ -63,12 +63,11 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
                           "diagnostics");
   DiagnosticOpts.DiagnosticDocumentationPath = std::string(DiagnosticDocsPath.str());
 
-  // Compute the path of the YAML diagnostic messages directory files
-  // in the toolchain.
+  // Compute the path to the diagnostic translations in the toolchain/build.
   llvm::SmallString<128> DiagnosticMessagesDir(Path);
   llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /swift
   llvm::sys::path::remove_filename(DiagnosticMessagesDir); // Remove /bin
-  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift");
+  llvm::sys::path::append(DiagnosticMessagesDir, "share", "swift", "diagnostics");
   DiagnosticOpts.LocalizationPath = std::string(DiagnosticMessagesDir.str());
 }
 
@@ -89,6 +88,21 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     platform = getPlatformNameForTriple(LangOpts.Target);
   }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
+
+  // If the SDK version is given, we should check if SDK-versioned prebuilt
+  // module cache is available and use it if so.
+  if (auto ver = LangOpts.SDKVersion) {
+    // "../macosx/prebuilt-modules"
+    SmallString<64> defaultPrebuiltPathWithSDKVer = defaultPrebuiltPath;
+    // "../macosx/prebuilt-modules/10.15"
+    llvm::sys::path::append(defaultPrebuiltPathWithSDKVer, ver->getAsString());
+    // If the versioned prebuilt module cache exists in the disk, use it.
+    if (llvm::sys::fs::exists(defaultPrebuiltPathWithSDKVer)) {
+      FrontendOpts.PrebuiltModuleCachePath =
+          std::string(defaultPrebuiltPathWithSDKVer.str());
+      return;
+    }
+  }
   FrontendOpts.PrebuiltModuleCachePath = std::string(defaultPrebuiltPath.str());
 }
 
@@ -377,7 +391,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (FrontendOpts.InputKind == InputFileKind::SIL)
     Opts.DisableAvailabilityChecking = true;
-  
+
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
     Opts.EnableAccessControl
@@ -411,7 +425,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTargetOSChecking
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
-  
+
   Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
   Opts.EnableASTScopeLookup =
       Args.hasFlag(options::OPT_enable_astscope_lookup,
@@ -487,7 +501,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTestableAttrRequiresTestableModule
       = A->getOption().matches(OPT_enable_testable_attr_requires_testable_module);
   }
-  
+
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
@@ -515,7 +529,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.MaxCircularityDepth = threshold;
     }
   }
-  
+
   for (const Arg *A : Args.filtered(OPT_D)) {
     Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
@@ -890,12 +904,12 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
-  // setRuntimeIncludePath() or setMainExecutablePath() and 
+  // setRuntimeIncludePath() or setMainExecutablePath() and
   // updated by calls to setTargetTriple() or parseArgs().
-  // Assumes exactly one of setMainExecutablePath() or setRuntimeIncludePath() 
+  // Assumes exactly one of setMainExecutablePath() or setRuntimeIncludePath()
   // is called before setTargetTriple() and parseArgs().
   // TODO: improve the handling of RuntimeIncludePath.
-  
+
   return false;
 }
 
@@ -1021,7 +1035,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          ClangImporterOptions &ClangOpts) {
   using namespace options;
 
-  
+
   if (const Arg *A = Args.getLastArg(OPT_sil_inline_threshold)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.InlineThreshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -1048,9 +1062,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // the SIL for the module.
   if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly)
     Opts.StopOptimizationAfterSerialization = true;
-
-  if (Args.hasArg(OPT_sil_merge_partial_modules))
-    Opts.MergePartialModules = true;
 
   // Propagate the typechecker's understanding of
   // -experimental-skip-non-inlinable-function-bodies to SIL.
@@ -1413,7 +1424,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
-  
+
   for (const Arg *A : Args.filtered(OPT_verify_type_layout)) {
     Opts.VerifyTypeLayoutNames.push_back(A->getValue());
   }
@@ -1474,6 +1485,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
+    auto LLVMLTOKind =
+        llvm::StringSwitch<Optional<IRGenLLVMLTOKind>>(A->getValue())
+            .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
+            .Case("llvm-full", IRGenLLVMLTOKind::Full)
+            .Default(llvm::None);
+    if (LLVMLTOKind)
+      Opts.LLVMLTOKind = LLVMLTOKind.getValue();
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
@@ -1522,7 +1545,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.DisableLegacyTypeInfo = true;
   }
 
-  if (Args.hasArg(OPT_prespecialize_generic_metadata) && 
+  if (Args.hasArg(OPT_prespecialize_generic_metadata) &&
       !Args.hasArg(OPT_disable_generic_metadata_prespecialization)) {
     Opts.PrespecializeGenericMetadata = true;
   }

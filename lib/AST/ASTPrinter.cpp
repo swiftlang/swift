@@ -998,7 +998,9 @@ void PrintAST::printAttributes(const Decl *D) {
     }
 
     // SPI groups
-    if (Options.PrintSPIs) {
+    if (Options.PrintSPIs &&
+        DeclAttribute::canAttributeAppearOnDeclKind(
+          DAK_SPIAccessControl, D->getKind())) {
       interleave(D->getSPIGroups(),
              [&](Identifier spiName) {
                Printer.printAttrName("_spi", true);

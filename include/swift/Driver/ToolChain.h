@@ -294,6 +294,9 @@ public:
   void getClangLibraryPath(const llvm::opt::ArgList &Args,
                            SmallString<128> &LibPath) const;
 
+  // Returns the Clang driver executable to use for linking.
+  const char *getClangLinkerDriver(const llvm::opt::ArgList &Args) const;
+
   /// Returns the name the clang library for a given sanitizer would have on
   /// the current toolchain.
   ///

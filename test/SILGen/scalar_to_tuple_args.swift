@@ -68,8 +68,6 @@ variadicFirst(x)
 // CHECK: [[X:%.*]] = load [trivial] [[READ]]
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
-// CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
-// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Int>([[ARRAY]])
 // CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @$s20scalar_to_tuple_args14variadicSecondyySi_SidtF
-// CHECK: apply [[VARIADIC_SECOND]]([[X]], [[FIN_ARR]])
+// CHECK: apply [[VARIADIC_SECOND]]([[X]], [[ARRAY]])
 variadicSecond(x)

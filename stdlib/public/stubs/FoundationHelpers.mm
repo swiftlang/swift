@@ -66,26 +66,26 @@ static inline void initializeBridgingFunctions() {
 }
 
 __swift_uint8_t
-swift::_swift_stdlib_isNSString(id obj) {
+_swift_stdlib_isNSString(id obj) {
   initializeBridgingFunctions();
   return _CFGetTypeID((CFTypeRef)obj) == _CFStringTypeID ? 1 : 0;
 }
 
 _swift_shims_CFHashCode
-swift::_swift_stdlib_CFStringHashNSString(id _Nonnull obj) {
+_swift_stdlib_CFStringHashNSString(id _Nonnull obj) {
   initializeBridgingFunctions();
   return _CFStringHashNSString(obj);
 }
 
 _swift_shims_CFHashCode
-swift::_swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
+_swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
                                   _swift_shims_CFIndex length) {
   initializeBridgingFunctions();
   return _CFStringHashCString(bytes, length);
 }
 
 const __swift_uint8_t *
-swift::_swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
+_swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
                                                   unsigned long encoding) {
   typedef __swift_uint8_t * _Nullable (*cStrImplPtr)(id, SEL, unsigned long);
   cStrImplPtr imp = (cStrImplPtr)class_getMethodImplementation([obj superclass],
@@ -94,7 +94,7 @@ swift::_swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
 }
 
 __swift_uint8_t
-swift::_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
+_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
                                          _swift_shims_UInt8 *buffer,
                                          _swift_shims_CFIndex maxLength,
                                          unsigned long encoding) {
@@ -111,7 +111,7 @@ swift::_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
 }
 
 __swift_uint8_t
-swift::_swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
+_swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
   initializeBridgingFunctions();
   if (!dyld_is_objc_constant) return false;
   return dyld_is_objc_constant(dyld_objc_string_kind, addr) ? 1 : 0;

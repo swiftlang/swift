@@ -150,6 +150,7 @@
                     "unchecked_ref_cast"
                     "unchecked_trivial_bit_cast"
                     "unchecked_bitwise_cast"
+                    "unchecked_value_cast"
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
                     "unowned_to_ref" "ref_to_unowned"
                     "convert_function" "convert_escape_to_noescape"

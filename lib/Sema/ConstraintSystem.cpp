@@ -698,7 +698,8 @@ Type ConstraintSystem::openUnboundGenericType(
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
   return TypeChecker::applyUnboundGenericArguments(
-      decl, parentTy, SourceLoc(), TypeResolution::forContextual(DC, None),
+      decl, parentTy, SourceLoc(),
+      TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr),
       arguments);
 }
 
@@ -1217,7 +1218,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // Resolve the reference to this type declaration in our current context.
     auto type = TypeChecker::resolveTypeInContext(
         typeDecl, nullptr,
-        TypeResolution::forContextual(useDC, TypeResolverContext::InExpression),
+        TypeResolution::forContextual(useDC, TypeResolverContext::InExpression,
+                                      /*unboundTyOpener*/ nullptr),
         /*isSpecialized=*/false);
 
     checkNestedTypeConstraints(*this, type, locator);
@@ -4237,11 +4239,17 @@ Optional<Identifier> constraints::getOperatorName(Expr *expr) {
   return None;
 }
 
-bool constraints::isPatternMatchingOperator(Expr *expr) {
+bool constraints::isPatternMatchingOperator(ASTNode node) {
+  auto *expr = getAsExpr(node);
+  if (!expr) return false;
+
   return isOperator(expr, "~=");
 }
 
-bool constraints::isStandardComparisonOperator(Expr *expr) {
+bool constraints::isStandardComparisonOperator(ASTNode node) {
+  auto *expr = getAsExpr(node);
+  if (!expr) return false;
+
   if (auto opName = getOperatorName(expr)) {
     return opName->is("==") || opName->is("!=") || opName->is("===") ||
            opName->is("!==") || opName->is("<") || opName->is(">") ||
@@ -4662,6 +4670,11 @@ SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
   return target;
 }
 
+SolutionApplicationTarget
+SolutionApplicationTarget::forUninitializedWrappedVar(VarDecl *wrappedVar) {
+  return SolutionApplicationTarget(wrappedVar);
+}
+
 ContextualPattern
 SolutionApplicationTarget::getContextualPattern() const {
   assert(kind == Kind::expression);
@@ -4729,6 +4742,8 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_AssignSource:
   case CTP_SubscriptAssignSource:
   case CTP_Condition:
+  case CTP_WrappedProperty:
+  case CTP_ComposedPropertyWrapper:
   case CTP_CannotFail:
     return false;
   }
@@ -4769,6 +4784,18 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     // diagnostic various cases that come up.
     DE.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
         .highlight(expr->getSourceRange());
+  } else if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
+    auto *wrapper = wrappedVar->getAttachedPropertyWrappers().back();
+    Type propertyType = wrappedVar->getInterfaceType();
+    Type wrapperType = wrapper->getType();
+
+    // Emit the property wrapper fallback diagnostic
+    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
+                         propertyType, wrapperType);
+    if (auto nominal = wrapperType->getAnyNominal()) {
+      nominal->diagnose(diag::property_wrapper_declared_here,
+                        nominal->getName());
+    }
   } else {
     // Emit a poor fallback message.
     DE.diagnose(target.getAsFunction()->getLoc(),

@@ -27,11 +27,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
@@ -225,7 +227,7 @@ namespace {
         return NAT->getSinglyDesugaredType();
       return T;
     }
-    
+
     ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
       switch (type->getKind()) {
       case clang::BuiltinType::Void:
@@ -235,7 +237,9 @@ namespace {
       case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
         return unwrapCType(Impl.getNamedSwiftType(Impl.getStdlibModule(), \
                                         #SWIFT_TYPE_NAME));
-          
+#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)       \
+      case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), #SWIFT_TYPE_NAME);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
       // Types that cannot be mapped into Swift, and probably won't ever be.
@@ -387,8 +391,8 @@ namespace {
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
       return Type();
     }
-    
-    ImportResult VisitPointerType(const clang::PointerType *type) {      
+
+    ImportResult VisitPointerType(const clang::PointerType *type) {
       auto pointeeQualType = type->getPointeeType();
       auto quals = pointeeQualType.getQualifiers();
 
@@ -481,7 +485,7 @@ namespace {
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
-      
+
       auto rep = FunctionType::Representation::Block;
       auto funcTy =
           FunctionType::get(fTy->getParams(), fTy->getResult(),
@@ -527,7 +531,7 @@ namespace {
       // context.
       return Type();
     }
-    
+
     ImportResult VisitConstantArrayType(const clang::ConstantArrayType *type) {
       // FIXME: Map to a real fixed-size Swift array type when we have those.
       // Importing as a tuple at least fills the right amount of space, and
@@ -542,10 +546,10 @@ namespace {
       auto size = type->getSize().getZExtValue();
       // An array of size N is imported as an N-element tuple which
       // takes very long to compile. We chose 4096 as the upper limit because
-      // we don't want to break arrays of size PATH_MAX. 
+      // we don't want to break arrays of size PATH_MAX.
       if (size > 4096)
         return Type();
-      
+
       SmallVector<TupleTypeElt, 8> elts{size, elementType};
       return TupleType::get(elts, elementType->getASTContext());
     }
@@ -984,7 +988,7 @@ namespace {
         } else {
           importedType = imported->getDeclaredType();
         }
- 
+
         if (!type->qual_empty()) {
           // As a special case, turn 'NSObject <NSCopying>' into
           // 'id <NSObject, NSCopying>', which can be imported more usefully.
@@ -1525,7 +1529,7 @@ ImportedType ClangImporter::Implementation::importType(
                 clangContext.getObjCSelRedefinitionType()))
       type = clangContext.getObjCSelType();
   }
-  
+
   // If nullability is provided as part of the type, that overrides
   // optionality provided externally.
   if (auto nullability = type->getNullability(clangContext)) {
@@ -1714,6 +1718,30 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   unsigned index = 0;
   SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
+  // C++ operators that are implemented as non-static member functions get
+  // imported into Swift as static methods that have an additional
+  // parameter for the left-hand side operand instead of the receiver object.
+  if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+    if (clangDecl->isOverloadedOperator()) {
+      auto param = new (SwiftContext)
+          ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                    SwiftContext.getIdentifier("lhs"), dc);
+
+      auto parent = CMD->getParent();
+      auto parentType = importType(
+          parent->getASTContext().getRecordType(parent),
+          ImportTypeKind::Parameter, allowNSUIntegerAsInt, Bridgeability::None);
+
+      param->setInterfaceType(parentType.getType());
+
+      // Workaround until proper const support is handled: Force everything to
+      // be mutating. This implicitly makes the parameter indirect.
+      param->setSpecifier(ParamSpecifier::InOut);
+
+      parameters.push_back(param);
+    }
+  }
+
   for (auto param : params) {
     auto paramTy = param->getType();
     if (paramTy->isVoidType()) {
@@ -1747,7 +1775,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         swiftParamTy = newParamTy;
       }
     }
-    
+
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
@@ -1920,7 +1948,7 @@ adjustResultTypeForThrowingFunction(ForeignErrorConvention::Info errorInfo,
 
   llvm_unreachable("Invalid ForeignErrorConvention.");
 }
-                                     
+
 /// Produce the foreign error convention from the imported error info,
 /// error parameter type, and original result type.
 static ForeignErrorConvention
@@ -2222,7 +2250,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
   // If we have a constructor with no parameters and a name with an
   // argument name, synthesize a Void parameter with that name.
-  if (kind == SpecialMethodKind::Constructor && params.empty() && 
+  if (kind == SpecialMethodKind::Constructor && params.empty() &&
       argNames.size() == 1) {
     addEmptyTupleParameter(argNames[0]);
   }
@@ -2248,7 +2276,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     return {Type(), false};
   }
 
-  
+
   // Form the parameter list.
   *bodyParams = ParameterList::create(SwiftContext, swiftParams);
 

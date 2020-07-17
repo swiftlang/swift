@@ -58,7 +58,7 @@ class SerializedModuleLoaderBase : public ModuleLoader {
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
 
-  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> OrphanedMemoryBuffers;
+  SmallVector<std::unique_ptr<ModuleFile>, 2> OrphanedModuleFiles;
 
 protected:
   ASTContext &Ctx;
