@@ -7,7 +7,7 @@ func forwardMatchWithGeneric<T>( // expected-note{{'forwardMatchWithGeneric(clos
 
 func testKnownSourceBreaks(i: Int) {
   forwardMatchWithGeneric { i } // expected-error{{missing argument for parameter 'closure1' in call}}
-  let _: (() -> ()).Type = type { } // expected-error{{missing argument label 'of:' in call}}
+  let _: (() -> ()).Type = type { }
 }
 
 func testUnlabeledParamMatching(i: Int, fn: ((Int) -> Int) -> Void) {
@@ -24,7 +24,7 @@ func forwardMatchFailure( // expected-note{{declared here}}
 ) { }
 
 func testForwardMatchFailure() {
-  forwardMatchFailure { x in // expected-error{{missing argument for parameter 'onCompletion' in call}}
+  forwardMatchFailure { x in
     print(x)
-  }
+  } // expected-error{{missing argument for parameter 'onCompletion' in call}}{{4-4= onCompletion: <#(Int) -> Void#>}}
 }
