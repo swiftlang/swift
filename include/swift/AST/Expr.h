@@ -1074,17 +1074,14 @@ public:
 class MagicIdentifierLiteralExpr : public LiteralExpr {
 public:
   enum Kind : unsigned {
-    File, FilePath, Line, Column, Function, DSOHandle
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) NAME,
+#include "swift/AST/MagicIdentifierKinds.def"
   };
 
   static StringRef getKindString(MagicIdentifierLiteralExpr::Kind value) {
     switch (value) {
-      case File: return "#file";
-      case FilePath: return "#filePath";
-      case Function: return "#function";
-      case Line: return "#line";
-      case Column: return "#column";
-      case DSOHandle: return "#dsohandle";
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) case NAME: return STRING;
+#include "swift/AST/MagicIdentifierKinds.def"
     }
 
     llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in getKindString.");
@@ -1107,21 +1104,15 @@ public:
     return static_cast<Kind>(Bits.MagicIdentifierLiteralExpr.Kind);
   }
 
-  bool isFile() const { return getKind() == File; }
-  bool isFunction() const { return getKind() == Function; }
-  bool isLine() const { return getKind() == Line; }
-  bool isColumn() const { return getKind() == Column; }
-  
   bool isString() const {
     switch (getKind()) {
-    case File:
-    case FilePath:
-    case Function:
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case NAME: \
       return true;
-    case Line:
-    case Column:
-    case DSOHandle:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case NAME: \
       return false;
+#include "swift/AST/MagicIdentifierKinds.def"
     }
     llvm_unreachable("bad Kind");
   }

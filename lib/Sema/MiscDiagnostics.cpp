@@ -436,10 +436,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       auto calleeDefaultArg = getMagicIdentifierDefaultArgKind(calleeParam);
       auto callerDefaultArg = getMagicIdentifierDefaultArgKind(callerParam);
 
-      // If one of the parameters doesn't have a default arg, or they both have
-      // the same one, everything's fine.
+      // If one of the parameters doesn't have a default arg, or they're both
+      // compatible, everything's fine.
       if (!calleeDefaultArg || !callerDefaultArg ||
-          *calleeDefaultArg == *callerDefaultArg)
+          areMagicIdentifiersCompatible(*calleeDefaultArg, *callerDefaultArg))
         return;
 
       StringRef calleeDefaultArgString =
@@ -474,18 +474,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     Optional<MagicIdentifierLiteralExpr::Kind>
     getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
       switch (param->getDefaultArgumentKind()) {
-      case DefaultArgumentKind::Column:
-        return MagicIdentifierLiteralExpr::Kind::Column;
-      case DefaultArgumentKind::DSOHandle:
-        return MagicIdentifierLiteralExpr::Kind::DSOHandle;
-      case DefaultArgumentKind::File:
-        return MagicIdentifierLiteralExpr::Kind::File;
-      case DefaultArgumentKind::FilePath:
-        return MagicIdentifierLiteralExpr::Kind::FilePath;
-      case DefaultArgumentKind::Function:
-        return MagicIdentifierLiteralExpr::Kind::Function;
-      case DefaultArgumentKind::Line:
-        return MagicIdentifierLiteralExpr::Kind::Line;
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case DefaultArgumentKind::NAME: \
+        return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
 
       case DefaultArgumentKind::None:
       case DefaultArgumentKind::Normal:
@@ -499,6 +491,52 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       llvm_unreachable("Unhandled DefaultArgumentKind in "
                        "getMagicIdentifierDefaultArgKind");
+    }
+
+    static bool
+    areMagicIdentifiersCompatible(MagicIdentifierLiteralExpr::Kind a,
+                                  MagicIdentifierLiteralExpr::Kind b) {
+      if (a == b)
+        return true;
+
+      // The rest of this handles special compatibility rules between the
+      // `*SpelledAsFile` cases and various other File-related cases.
+      //
+      // The way we're going to do this is a bit magical. We will arrange the
+      // cases in MagicIdentifierLiteralExpr::Kind so that that they sort in
+      // this order:
+      //
+      //     #fileID < Swift 6 #file < #filePath < Swift 5 #file < others
+      //
+      // Before we continue, let's verify that this holds.
+
+      using Kind = MagicIdentifierLiteralExpr::Kind;
+
+      static_assert(Kind::FileID < Kind::FileIDSpelledAsFile,
+                    "#fileID < Swift 6 #file");
+      static_assert(Kind::FileIDSpelledAsFile < Kind::FilePath,
+                    "Swift 6 #file < #filePath");
+      static_assert(Kind::FilePath < Kind::FilePathSpelledAsFile,
+                    "#filePath < Swift 5 #file");
+
+      static_assert(Kind::FilePathSpelledAsFile < Kind::Line,
+                    "Swift 5 #file < #line");
+      static_assert(Kind::FilePathSpelledAsFile < Kind::Column,
+                    "Swift 5 #file < #column");
+      static_assert(Kind::FilePathSpelledAsFile < Kind::Function,
+                    "Swift 5 #file < #function");
+      static_assert(Kind::FilePathSpelledAsFile < Kind::DSOHandle,
+                    "Swift 5 #file < #dsohandle");
+
+      // The rules are all commutative, so we will take the greater of the two
+      // kinds.
+      auto maxKind = std::max(a, b);
+
+      // Both Swift 6 #file and Swift 5 #file are greater than all of the cases
+      // they're compatible with. So if `maxCase` is one of those two, the other
+      // case must have been compatible with it!
+      return maxKind == Kind::FileIDSpelledAsFile ||
+             maxKind == Kind::FilePathSpelledAsFile;
     }
 
     void checkUseOfModule(DeclRefExpr *E) {
