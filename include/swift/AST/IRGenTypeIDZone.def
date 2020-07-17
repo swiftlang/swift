@@ -23,3 +23,6 @@ SWIFT_REQUEST(IRGen, OptimizedIRRequest,
 SWIFT_REQUEST(IRGen, OptimizedIRCachedRequest,
               GeneratedModuleRef(IRGenDescriptor),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(IRGen, SymbolObjectCodeRequest,
+              StringRef(SymbolsToEmit, IRGenDescriptor),
+              Cached, NoLocationInfo)

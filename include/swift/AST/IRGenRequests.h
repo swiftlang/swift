@@ -288,6 +288,28 @@ public:
   bool isCached() const { return true; }
 };
 
+using SymbolsToEmit = SmallVector<std::string, 1>;
+
+/// Return the object code for a specific set of symbols in a file or module.
+class SymbolObjectCodeRequest
+    : public SimpleRequest<SymbolObjectCodeRequest,
+                           StringRef(SymbolsToEmit, IRGenDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  StringRef evaluate(Evaluator &evaluator, SymbolsToEmit symbols,
+                     IRGenDescriptor desc) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two GeneratedModuleRefs.
 template <>
 inline bool

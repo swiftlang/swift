@@ -78,6 +78,7 @@
 #include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include <thread>
 
@@ -1480,4 +1481,47 @@ OptimizedIRCachedRequest::evaluate(Evaluator &evaluator,
   new (memory) GeneratedModule(std::move(mod));
   ctx.addCleanup([&]() { memory->~GeneratedModule(); });
   return *memory;
+}
+
+StringRef SymbolObjectCodeRequest::evaluate(Evaluator &evaluator,
+                                            SymbolsToEmit symbols,
+                                            IRGenDescriptor desc) const {
+  auto &ctx = desc.getParentModule()->getASTContext();
+  auto &mod = cantFail(evaluator(OptimizedIRCachedRequest{desc})).get();
+
+  ValueToValueMapTy vmap;
+  StringSet<> symbolsFound;
+  StringSet<> symbolsToExtract;
+  symbolsToExtract.insert(symbols.begin(), symbols.end());
+
+  // Extract out a new module containing only the definitions we want to emit.
+  auto newMod = CloneModule(*mod.getModule(), vmap, [&](const GlobalValue *GV) {
+    auto symbol = GV->getName();
+    if (GV->isDeclaration() || !symbolsToExtract.count(symbol))
+      return false;
+
+    symbolsFound.insert(symbol);
+    return true;
+  });
+
+  // Make sure we found all the symbols we wanted to emit.
+  assert(symbolsToExtract.size() == symbolsFound.size());
+
+  // Create a new target machine. Unfortunately we cannot re-use the one stored
+  // in the cached LLVM module as the passes to emit the object code may mutate
+  // it.
+  auto targetMachine = createTargetMachine(desc.Opts, ctx);
+
+  // Add the passes to emit the LLVM module as object code.
+  // TODO: Use compileAndWriteLLVM.
+  legacy::PassManager emitPasses;
+  emitPasses.add(createTargetTransformInfoWrapperPass(
+      targetMachine->getTargetIRAnalysis()));
+
+  SmallString<0> output;
+  raw_svector_ostream os(output);
+  targetMachine->addPassesToEmitFile(emitPasses, os, nullptr, CGFT_ObjectFile);
+  emitPasses.run(*newMod);
+  os << '\0';
+  return ctx.AllocateCopy(output.str());
 }
