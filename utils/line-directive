@@ -714,8 +714,8 @@ def run():
                 break
             output = input
 
-            def decode_match(p, l):
-                m = p.match(l)
+            def decode_match(p, line):
+                m = p.match(line)
                 if m is None:
                     return ()
                 file, line_num = map_line_to_source_file(
