@@ -376,8 +376,9 @@ SourceLoc extractNearestSourceLoc(Type ty);
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
-                                  bool functionsCount);
+  static bool hasReferenceSemanticsImpl(CanType type,
+                                        const GenericSignatureImpl *sig,
+                                        bool onlyInstanceTypes);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
@@ -415,9 +416,9 @@ public:
   ///
   /// This includes isAnyClassReferenceType(), as well as function types.
   bool hasReferenceSemantics() const {
-    return isReferenceTypeImpl(*this,
+    return hasReferenceSemanticsImpl(*this,
                                /*signature*/ nullptr,
-                               /*functions count*/ true);
+                               /*onlyInstanceTypes*/ false);
   }
 
   /// Are variables of this type permitted to have
@@ -430,8 +431,8 @@ public:
   /// But not:
   ///   - function types
   bool allowsOwnership(const GenericSignatureImpl *sig) const {
-    return isReferenceTypeImpl(*this, sig,
-                               /*functions count*/ false);
+    return hasReferenceSemanticsImpl(*this, sig,
+                                     /*onlyInstanceTypes*/ true);
   }
 
   /// Are values of this type essentially just class references,
@@ -445,9 +446,9 @@ public:
   ///   - a class-bounded existential type
   ///   - a dynamic Self type
   bool isAnyClassReferenceType() const {
-    return isReferenceTypeImpl(*this,
-                               /*signature*/ nullptr,
-                               /*functions count*/ false);
+    return hasReferenceSemanticsImpl(*this,
+                                     /*signature*/ nullptr,
+                                     /*onlyInstanceTypes*/ true);
   }
 
   /// Is this type existential?
