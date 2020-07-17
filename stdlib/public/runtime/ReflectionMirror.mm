@@ -56,6 +56,7 @@ int asprintf(char **strp, const char *fmt, ...) {
     return -1;
 
   length = _vsnprintf(*strp, length, fmt, argp1);
+  (*strp)[length] = '\0';
 
   va_end(argp0);
   va_end(argp1);

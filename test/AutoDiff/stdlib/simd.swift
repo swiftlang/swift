@@ -56,7 +56,7 @@ SIMDTests.test("Negate") {
   expectEqual(-g, pb1(g))
 }
 
-SIMDTests.test("subscript") {
+SIMDTests.test("Subscript") {
   let a = SIMD4<Float>(1, 2, 3, 4)
 
   func foo1(x: SIMD4<Float>) -> Float {
@@ -66,6 +66,35 @@ SIMDTests.test("subscript") {
   let (val1, pb1) = valueWithPullback(at: a, in: foo1)
   expectEqual(4, val1)
   expectEqual(SIMD4<Float>(0, 0, 0, 7), pb1(7))
+}
+
+SIMDTests.test("SubscriptSetter") {
+  let a = SIMD4<Float>(1, 2, 3, 4)
+  let ones = SIMD4<Float>(1, 1, 1, 1)
+
+  // A wrapper around `subscript(_: Int).set`.
+  func subscriptSet(
+    _ simd: SIMD4<Float>, index: Int, newScalar: Float
+  ) -> SIMD4<Float> {
+    var result = simd
+    result[index] = newScalar
+    return result
+  }
+
+  let (val1, pb1) = valueWithPullback(at: a, 5, in: { subscriptSet($0, index: 2, newScalar: $1) })
+  expectEqual(SIMD4<Float>(1, 2, 5, 4), val1)
+  expectEqual((SIMD4<Float>(1, 1, 0, 1), 1), pb1(ones))
+
+  func doubled(_ x: SIMD4<Float>) -> SIMD4<Float> {
+    var result = x
+    for i in withoutDerivative(at: x.indices) {
+      result[i] = x[i] * 2
+    }
+    return result
+  }
+  let (val2, pb2) = valueWithPullback(at: a, in: doubled)
+  expectEqual(SIMD4<Float>(2, 4, 6, 8), val2)
+  expectEqual(SIMD4<Float>(2, 2, 2, 2), pb2(ones))
 }
 
 SIMDTests.test("Addition") {

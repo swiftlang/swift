@@ -2053,7 +2053,15 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
     for (auto spi : attr->getSPIGroups())
       spiGroups.insert(spi);
 
-  auto &ctx = decl->getASTContext();
+  // Backing storage for a wrapped property gets the SPI groups from the
+  // original property.
+  if (auto varDecl = dyn_cast<VarDecl>(decl))
+    if (auto originalDecl = varDecl->getOriginalWrappedProperty()) {
+      auto originalSPIs = originalDecl->getSPIGroups();
+      spiGroups.insert(originalSPIs.begin(), originalSPIs.end());
+    }
+
+  // If there is no local SPI information, look at the context.
   if (spiGroups.empty()) {
 
     // Then in the extended nominal type.
@@ -2073,6 +2081,7 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
     }
   }
 
+  auto &ctx = decl->getASTContext();
   return ctx.AllocateCopy(spiGroups.getArrayRef());
 }
 

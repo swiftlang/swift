@@ -13,8 +13,7 @@ class ArrayBuilder<Element> {
 
 func foo<T>(@ArrayBuilder<T> fn: () -> [T]) {}
 
-// FIXME(SR-13132): This should compile.
-foo { // expected-error {{type of expression is ambiguous without more context}}
+foo {
   ""
 }
 
@@ -28,4 +27,21 @@ struct S<T> {
 func bar<T>(_ x: T, _ fn: (T, T.Type) -> [T]) {}
 bar("") { x, ty in
   (Builtin.one_way(S(ty).overloaded(x)))
+}
+
+protocol P {}
+extension String : P {}
+
+@_functionBuilder
+struct FooBuilder<T> {}
+
+extension FooBuilder where T : P {
+  static func buildBlock(_ x: Int, _ y: Int) -> String { "" }
+}
+
+func foo<T : P>(@FooBuilder<T> fn: () -> T) {}
+
+foo {
+  0
+  0
 }

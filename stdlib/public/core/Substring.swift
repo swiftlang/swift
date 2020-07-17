@@ -200,9 +200,8 @@ extension Substring: StringProtocol {
     return _slice.distance(from: start, to: end)
   }
 
-  @inlinable
   public subscript(i: Index) -> Character {
-    @inline(__always) get { return _slice[i] }
+    get { return _slice[i] }
   }
 
   public mutating func replaceSubrange<C>(
@@ -322,7 +321,6 @@ extension Substring: CustomDebugStringConvertible {
 }
 
 extension Substring: LosslessStringConvertible {
-  @inlinable
   public init(_ content: String) {
     self = content[...]
   }
@@ -800,7 +798,6 @@ extension Substring: ExpressibleByStringLiteral {
 
 // String/Substring Slicing
 extension String {
-  @inlinable
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
     _boundsCheck(r)
@@ -809,7 +806,6 @@ extension String {
 }
 
 extension Substring {
-  @inlinable
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
     return Substring(_slice[r])

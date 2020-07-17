@@ -3966,8 +3966,13 @@ public:
     auto resultTy = fnTy->getResult();
     if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
       resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
-    else
-      resultTy = resultTy->getWithoutSpecifierType()->getOptionalObjectType();
+    else {
+      auto objType =
+          resultTy->getWithoutSpecifierType()->getOptionalObjectType();
+      // Preserve l-value through force operation.
+      resultTy =
+          resultTy->is<LValueType>() ? LValueType::get(objType) : objType;
+    }
 
     assert(resultTy);
 
@@ -4420,6 +4425,12 @@ private:
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
+    /// The set of protocol requirements placed on this type variable.
+    llvm::TinyPtrVector<Constraint *> Protocols;
+
+    /// The set of constraints which would be used to infer default types.
+    llvm::TinyPtrVector<Constraint *> Defaults;
+
     /// Whether these bindings should be delayed until the rest of the
     /// constraint system is considered "fully bound".
     bool FullyBound = false;
@@ -4554,6 +4565,35 @@ private:
     /// if it has only concrete types or would resolve a closure.
     bool favoredOverDisjunction(Constraint *disjunction) const;
 
+    /// Detect `subtype` relationship between two type variables and
+    /// attempt to infer supertype bindings transitively e.g.
+    ///
+    /// Given A <: T1 <: T2 transitively A <: T2
+    ///
+    /// Which gives us a new (superclass A) binding for T2 as well as T1.
+    ///
+    /// \param cs The constraint system this type variable is associated with.
+    ///
+    /// \param inferredBindings The set of all bindings inferred for type
+    /// variables in the workset.
+    void inferTransitiveBindings(
+        ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+        const llvm::SmallDenseMap<TypeVariableType *,
+                                  ConstraintSystem::PotentialBindings>
+            &inferredBindings);
+
+    /// Infer bindings based on any protocol conformances that have default
+    /// types.
+    void inferDefaultTypes(ConstraintSystem &cs,
+                           llvm::SmallPtrSetImpl<CanType> &existingTypes);
+
+    /// Finalize binding computation for this type variable by
+    /// inferring bindings from context e.g. transitive bindings.
+    void finalize(ConstraintSystem &cs,
+                  const llvm::SmallDenseMap<TypeVariableType *,
+                                            ConstraintSystem::PotentialBindings>
+                      &inferredBindings);
+
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
@@ -4614,31 +4654,19 @@ private:
 
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
+
+  /// Infer bindings for the given type variable based on current
+  /// state of the constraint system.
+  PotentialBindings inferBindingsFor(TypeVariableType *typeVar);
+
+private:
   Optional<ConstraintSystem::PotentialBinding>
   getPotentialBindingForRelationalConstraint(
       PotentialBindings &result, Constraint *constraint,
       bool &hasDependentMemberRelationalConstraints,
-      bool &hasNonDependentMemberRelationalConstraints,
-      bool &addOptionalSupertypeBindings) const;
+      bool &hasNonDependentMemberRelationalConstraints) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
-  /// Detect `subtype` relationship between two type variables and
-  /// attempt to infer supertype bindings transitively e.g.
-  ///
-  /// Given A <: T1 <: T2 transitively A <: T2
-  ///
-  /// Which gives us a new (superclass A) binding for T2 as well as T1.
-  ///
-  /// \param inferredBindings The set of all bindings inferred for type
-  /// variables in the workset.
-  /// \param bindings The type variable we aim to infer new supertype
-  /// bindings for.
-  void inferTransitiveSupertypeBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-          &inferredBindings,
-      PotentialBindings &bindings);
-
-private:
   /// Add a constraint to the constraint system.
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
                                  ConstraintLocatorBuilder locator,

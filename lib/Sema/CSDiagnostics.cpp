@@ -6493,3 +6493,19 @@ void MissingRawValueFailure::fixIt(InFlightDiagnostic &diagnostic) const {
 
   diagnostic.fixItInsertAfter(range.End, fix);
 }
+
+bool MissingOptionalUnwrapKeyPathFailure::diagnoseAsError() {
+  emitDiagnostic(diag::optional_not_unwrapped, getFromType(),
+                 getFromType()->lookThroughSingleOptionalType());
+  
+  emitDiagnostic(diag::optional_keypath_application_base)
+      .fixItInsertAfter(getLoc(), "?");
+  emitDiagnostic(diag::unwrap_with_force_value)
+      .fixItInsertAfter(getLoc(), "!");
+  return true;
+}
+
+SourceLoc MissingOptionalUnwrapKeyPathFailure::getLoc() const {
+  auto *SE = castToExpr<SubscriptExpr>(getAnchor());
+  return SE->getBase()->getEndLoc();
+}
