@@ -52,7 +52,6 @@ From the settings application, go to `Update & Security`.  In the `For developer
 
 1. Clone `apple/llvm-project` into a directory for the toolchain
 2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-llbuild`, `apple/swift-package-manager` into the toolchain directory
-3. Clone `compnerd/swift-build` as a peer of the toolchain directory
 
 - Currently, other repositories in the Swift project have not been tested and may not be supported.
 
@@ -73,21 +72,12 @@ git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
 git clone https://github.com/apple/swift-llbuild llbuild
 git clone https://github.com/apple/swift-tools-support-core swift-tools-support-core
 git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager swiftpm
-git clone https://github.com/compnerd/swift-build swift-build
 ```
 
-## Acquire ICU, SQLite3, curl, libxml2 and zlib
+## Dependencies (ICU, SQLite3, curl, libxml2 and zlib)
 
-```
-C:\Python27\python.exe -m pip install --user msrest azure-devops tabulate
-C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id ICU --latest-artifacts --filter windows-x64 --download
-C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id XML2 --latest-artifacts --filter windows-x64 --download
-C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id CURL --latest-artifacts --filter windows-x64 --download
-C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id zlib --latest-artifacts --filter windows-x64 --download
-C:\Python27\python.exe swift-build\utilities\swift-build.py --build-id SQLite --latest-artifacts --filter windows-x64 --download
-```
-
-Extract the zip files, ignoring the top level directory, into `S:/Library`. The directory structure should resemble:
+The instructions assume that the dependencies are in `S:/Library`. The directory
+structure should resemble:
 
 ```
 /Library
@@ -102,6 +92,10 @@ Extract the zip files, ignoring the top level directory, into `S:/Library`. The 
   ┕ zlib-1.2.11
       ┕ usr/...
 ```
+
+Note that only ICU is required for building the toolchain, and SQLite is only
+needed for building llbuild and onwards.  The ICU project provides binaries,
+alternatively, see the ICU project for details on building ICU from source.
 
 ## One-time Setup (re-run on Visual Studio upgrades)
 
@@ -126,26 +120,17 @@ Warning: Creating the above links usually requires administrator privileges. The
 
 ```cmd
 cmake -B "S:\b\toolchain" ^
-  -C S:\swift-build\cmake\caches\windows-x86_64.cmake ^
-  -C S:\swift-build\cmake\caches\org.compnerd.dt.cmake ^
+  -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
   -D CMAKE_BUILD_TYPE=Release ^
-  -D LLVM_ENABLE_ASSERTIONS=YES ^
-  -D LLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lldb;lld" ^
-  -D LLVM_EXTERNAL_PROJECTS="cmark;swift" ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
   -D LLVM_ENABLE_PDB=YES ^
-  -D LLVM_ENABLE_LIBEDIT=NO ^
-  -D LLDB_ENABLE_PYTHON=YES ^
-  -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR="S:/swift" ^
-  -D LLVM_EXTERNAL_CMARK_SOURCE_DIR="S:/cmark" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-67/usr/include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-67/usr/lib/icuuc67.lib" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-67/usr/include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-67/usr/lib/icuin67.lib" ^
-  -D CMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" ^
-  -D PYTHON_EXECUTABLE=C:\Python27\python.exe ^
-  -D SWIFT_BUILD_DYNAMIC_STDLIB=YES ^
-  -D SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES ^
+  -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
+  -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
+  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=S:\Library\icu-67\usr\include ^
+  -D SWIFT_WINDOWS_x86_64_ICU_UC=S:\Library\icu-67\usr\lib\icuuc67.lib ^
+  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=S:\Library\icu-67\usr\include ^
+  -D SWIFT_WINDOWS_x86_64_ICU_I18N=S:\Library\icu-67\usr\lib\icuin67.lib ^
+  -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
   -G Ninja ^
   -S S:\llvm-project\llvm
 
