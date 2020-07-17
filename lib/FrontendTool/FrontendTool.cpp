@@ -2232,9 +2232,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   PDC.setFormattingStyle(
       Invocation.getDiagnosticOptions().PrintedFormattingStyle);
 
-  if (Invocation.getFrontendOptions().DebugTimeCompilation)
-    SharedTimer::enableCompilationTimers();
-
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();
   }
