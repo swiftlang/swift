@@ -1340,6 +1340,13 @@ class PoundAssertStmt : public Stmt {
   }
 };
 
+inline void simple_display(llvm::raw_ostream &out, Stmt *S) {
+  if (S)
+    out << Stmt::getKindName(S->getKind());
+  else
+    out << "(null)";
+};
+
 } // end namespace swift
 
 #endif // SWIFT_AST_STMT_H

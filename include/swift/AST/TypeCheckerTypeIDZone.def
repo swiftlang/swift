@@ -214,7 +214,7 @@ SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
               bool(StructDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
-              FunctionBuilderClosurePreCheck(AnyFunctionRef),
+              FunctionBuilderClosurePreCheck(AnyFunctionRef, BraceStmt *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
