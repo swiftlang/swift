@@ -8,6 +8,8 @@
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM
 
+// REQUIRES: rdar65712583
+
 import Builtin
 
 struct Pair<T> {
