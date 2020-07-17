@@ -3,16 +3,14 @@
 
 template<class T>
 struct MagicWrapper {
-public:
   T t;
-  inline int callGetInt() const {
+  int callGetInt() const {
     return t.getInt() + 5;
   }
 };
 
 struct MagicNumber {
-public:
-  inline int getInt() const { return 48; }
+  int getInt() const { return 48; }
 };
 
 inline int forceInstantiating() {

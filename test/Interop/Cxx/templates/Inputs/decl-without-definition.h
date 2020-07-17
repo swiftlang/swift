@@ -3,7 +3,6 @@
 
 template<class T>
 struct MagicWrapper {
-public:
   T t;
   int callGetInt() const {
     return t.getInt() + 5;

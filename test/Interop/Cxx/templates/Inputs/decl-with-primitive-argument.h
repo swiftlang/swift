@@ -3,9 +3,8 @@
 
 template<class T>
 struct MagicWrapper {
-public:
   T t;
-  inline int getInt() const {
+  int getInt() const {
     return t + 5;
   }
 };

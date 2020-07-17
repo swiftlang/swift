@@ -2,14 +2,12 @@
 #define TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_SPECIALIZATION_H
 
 struct MagicNumber {
-public:
-  inline int getInt() const { return 26; }
+  int getInt() const { return 26; }
 };
 
 template <class T> struct MagicWrapper {
-public:
   T t;
-  inline int callGetInt() const { return t.getInt() + 5; }
+  int callGetInt() const { return t.getInt() + 5; }
 };
 
 template <> struct MagicWrapper<MagicNumber> {
