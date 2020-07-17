@@ -574,6 +574,15 @@ public:
     return StringRef(scratch.data(), scratch.size());
   }
 
+  /// Whether the argument is a trailing closure.
+  bool isTrailingClosure() const {
+    if (auto trailingClosureArg =
+            ArgListExpr->getUnlabeledTrailingClosureIndexOfPackedArgument())
+      return ArgIdx >= *trailingClosureArg;
+
+    return false;
+  }
+
   /// \returns The interface type for the function being applied. Note that this
   /// may not a function type, for example it could be a generic parameter.
   Type getFnInterfaceType() const { return FnInterfaceType; }

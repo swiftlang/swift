@@ -420,7 +420,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
       // If the parameter we are looking at does not support the (unlabeled)
       // trailing closure argument, this parameter is unfulfilled.
-      if (!paramInfo.acceptsUnlabeledTrailingClosureArgument(paramIdx)) {
+      if (!paramInfo.acceptsUnlabeledTrailingClosureArgument(paramIdx) &&
+          !ignoreNameMismatch) {
         haveUnfulfilledParams = true;
         return;
       }
@@ -738,7 +739,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         // one argument requires label and another one doesn't, but caller
         // doesn't provide either, problem is going to be identified as
         // out-of-order argument instead of label mismatch.
-        const auto expectedLabel = params[paramIdx].getLabel();
+        const auto expectedLabel =
+          fromArgIdx == unlabeledTrailingClosureArgIndex
+            ? Identifier()
+            : params[paramIdx].getLabel();
         const auto argumentLabel = args[fromArgIdx].getLabel();
 
         if (argumentLabel != expectedLabel) {
