@@ -201,9 +201,10 @@ public:
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
 
-  virtual std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
-                                                      StringRef interfacePath) {
-    return std::string();
+  virtual std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) {
+    return std::vector<std::string>();
   }
 };
 

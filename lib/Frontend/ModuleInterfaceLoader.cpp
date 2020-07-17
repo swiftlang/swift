@@ -1015,9 +1015,9 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
-std::string
-ModuleInterfaceLoader::getUpToDateCompiledModuleForInterface(StringRef moduleName,
-                                                      StringRef interfacePath) {
+std::vector<std::string>
+ModuleInterfaceLoader::getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                                               StringRef interfacePath) {
   // Derive .swiftmodule path from the .swiftinterface path.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> modulePath = interfacePath;
@@ -1030,9 +1030,14 @@ ModuleInterfaceLoader::getUpToDateCompiledModuleForInterface(StringRef moduleNam
                 llvm::is_contained(PreferInterfaceForModules, moduleName) ?
                   ModuleLoadingMode::PreferInterface : LoadMode);
   SmallVector<FileDependency, 16> allDeps;
-  std::string usableModulePath;
-  Impl.discoverUpToDateCompiledModuleForInterface(allDeps, usableModulePath);
-  return usableModulePath;
+  std::vector<std::string> results;
+  auto pair = Impl.getCompiledModuleCandidates();
+  // Add compiled module candidates only when they are non-empty.
+  if (!pair.first.empty())
+    results.push_back(pair.first);
+  if (!pair.second.empty())
+    results.push_back(pair.second);
+  return results;
 }
 
 bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
