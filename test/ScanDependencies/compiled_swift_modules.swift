@@ -5,8 +5,10 @@
 
 import Foo
 
-// HAS_COMPILED:        "compiledModulePath": "{{.*}}Foo.swiftmodule{{.*}}.swiftmodule"
-// HAS_NO_COMPILED-NOT: "compiledModulePath": "{{.*}}Foo.swiftmodule{{.*}}.swiftmodule"
+// HAS_COMPILED: "compiledModuleCandidates": [
+// HAS_COMPILED-NEXT: "{{.*}}Foo.swiftmodule{{.*}}.swiftmodule"
+
+// HAS_NO_COMPILED-NOT: "{{.*}}Foo.swiftmodule{{.*}}.swiftmodule"
 
 // Step 1: build swift interface and swift module side by side
 // RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -emit-module-interface-path %t/Foo.swiftmodule/%target-swiftinterface-name
@@ -32,6 +34,6 @@ import Foo
 // Step 6: update the interface file from where the prebuilt module cache was built.
 // RUN: touch %t/Foo.swiftmodule/%target-swiftinterface-name
 
-// Step 4: scan dependency should give us the interface file.
-// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -emit-dependencies -emit-dependencies-path %t/deps.d
-// RUN: %FileCheck %s -check-prefix=HAS_NO_COMPILED < %t/deps.json
+// Step 7: scan dependency should give us the prebuilt module file even though it's out-of-date.
+// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules
+// RUN: %FileCheck %s -check-prefix=HAS_COMPILED < %t/deps.json
