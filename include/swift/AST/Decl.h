@@ -5960,9 +5960,10 @@ public:
                                   DeclContext *Parent);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
-                                  DeclName Name, SourceLoc NameLoc,
-                                  bool Async, bool Throws,
-                                  ParameterList *BodyParams, Type FnRetType,
+                                  DeclName Name, SourceLoc NameLoc, bool Async,
+                                  bool Throws, ParameterList *BodyParams,
+                                  Type FnRetType,
+                                  GenericParamList *GenericParams,
                                   DeclContext *Parent, ClangNode ClangN);
 
   bool isStatic() const;

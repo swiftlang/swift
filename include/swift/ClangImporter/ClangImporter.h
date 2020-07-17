@@ -472,6 +472,11 @@ public:
 
   bool isSerializable(const clang::Type *type,
                       bool checkCanonical) const override;
+
+  clang::FunctionDecl *
+  instantiateCXXFunctionTemplate(ASTContext &ctx,
+                                 clang::FunctionTemplateDecl *func,
+                                 SubstitutionMap subst) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

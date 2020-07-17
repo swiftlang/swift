@@ -16,17 +16,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CodeSynthesis.h"
 #include "CSDiagnostics.h"
+#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -34,6 +35,12 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
+#include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Mangle.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Sema/Sema.h"
+#include "clang/Sema/Template.h"
+#include "clang/Sema/TemplateDeduction.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -99,6 +106,45 @@ Solution::computeSubstitutions(GenericSignature sig,
                               lookupConformanceFn);
 }
 
+static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
+    ASTContext &ctx, FuncDecl *oldDecl, SubstitutionMap subst,
+    clang::FunctionDecl *specialized) {
+  // Create a new ParameterList with the substituted type.
+  auto oldFnType =
+      cast<GenericFunctionType>(oldDecl->getInterfaceType().getPointer());
+  auto newFnType = oldFnType->substGenericArgs(subst);
+  SmallVector<ParamDecl *, 4> newParams;
+  unsigned i = 0;
+  for (auto paramTy : newFnType->getParams()) {
+    auto *oldParamDecl = oldDecl->getParameters()->get(i);
+    auto *newParamDecl =
+        ParamDecl::cloneWithoutType(oldDecl->getASTContext(), oldParamDecl);
+    newParamDecl->setInterfaceType(paramTy.getParameterType());
+    newParams.push_back(newParamDecl);
+    (void)++i;
+  }
+  auto *newParamList =
+      ParameterList::create(ctx, SourceLoc(), newParams, SourceLoc());
+
+  // Generate a name for the specialized function.
+  std::string newNameStr;
+  llvm::raw_string_ostream buffer(newNameStr);
+  clang::MangleContext *mangler =
+      specialized->getASTContext().createMangleContext();
+  mangler->mangleName(specialized, buffer);
+  buffer.flush();
+  // Add all parameters as empty parameters.
+  auto newName = DeclName(
+      ctx, DeclName(ctx.getIdentifier(newNameStr)).getBaseName(), newParamList);
+
+  auto newFnDecl = FuncDecl::createImported(
+      ctx, oldDecl->getLoc(), newName, oldDecl->getNameLoc(),
+      /*Async*/ false, oldDecl->hasThrows(), newParamList,
+      newFnType->getResult(), /*GenericParams*/ nullptr,
+      oldDecl->getDeclContext(), specialized);
+  return ConcreteDeclRef(newFnDecl);
+}
+
 ConcreteDeclRef
 Solution::resolveConcreteDeclRef(ValueDecl *decl,
                                  ConstraintLocator *locator) const {
@@ -107,7 +153,25 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
 
   // Get the generic signatue of the decl and compute the substitutions.
   auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
-  return ConcreteDeclRef(decl, computeSubstitutions(sig, locator));
+  auto subst = computeSubstitutions(sig, locator);
+
+  // If this is a C++ function template, get it's specialization for the given
+  // substitution map and update the decl accordingly.
+  if (decl->getClangDecl() &&
+      isa<clang::FunctionTemplateDecl>(decl->getClangDecl())) {
+    auto *newFn =
+        decl->getASTContext()
+            .getClangModuleLoader()
+            ->instantiateCXXFunctionTemplate(
+                decl->getASTContext(),
+                const_cast<clang::FunctionTemplateDecl *>(
+                    cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
+                subst);
+    return generateDeclRefForSpecializedCXXFunctionTemplate(
+        decl->getASTContext(), cast<FuncDecl>(decl), subst, newFn);
+  }
+
+  return ConcreteDeclRef(decl, subst);
 }
 
 ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
@@ -634,7 +698,6 @@ namespace {
       if (!ref)
         ref = solution.resolveConcreteDeclRef(decl, loc);
 
-      assert(ref.getDecl() == decl);
       return ref;
     }
 

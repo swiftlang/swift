@@ -84,8 +84,18 @@ public:
   /// Swift declaration.
   Decl *getSwiftDeclForExportedClangDecl(const clang::Decl *decl) const;
 
+  /// Translate Swift generic arguments to template arguments.
+  ///
+  /// \returns nullptr if successful. If an error occors, returns a unique_ptr
+  /// to a `TemplateInstantiationError` with a list of the failed types.
+  std::unique_ptr<TemplateInstantiationError> getClangTemplateArguments(
+      const clang::TemplateParameterList *templateParams,
+      ArrayRef<Type> genericArgs,
+      SmallVectorImpl<clang::TemplateArgument> &templateArgs);
+
 private:
   clang::QualType convert(Type type);
+
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);
 

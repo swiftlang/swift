@@ -201,6 +201,7 @@ public:
       DC = nsDecl->getCanonicalDecl();
     } else {
       assert(isa<clang::TranslationUnitDecl>(dc) ||
+             isa<clang::LinkageSpecDecl>(dc) ||
              isa<clang::ObjCContainerDecl>(dc) &&
                  "No other kinds of effective Clang contexts");
       DC = dc;

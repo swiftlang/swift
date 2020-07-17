@@ -17,6 +17,7 @@
 #include "CFTypeInfo.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
@@ -51,7 +52,6 @@
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
-#include "swift/Basic/Statistic.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
@@ -161,27 +161,22 @@ createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
 static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                       Optional<AccessorInfo> accessorInfo,
                                       DeclName name, SourceLoc nameLoc,
-                                      ParameterList *bodyParams,
-                                      Type resultTy,
-                                      bool async,
-                                      bool throws,
-                                      DeclContext *dc,
+                                      GenericParamList *genericParams,
+                                      ParameterList *bodyParams, Type resultTy,
+                                      bool async, bool throws, DeclContext *dc,
                                       ClangNode clangNode) {
   if (accessorInfo) {
     return AccessorDecl::create(ctx, funcLoc,
                                 /*accessorKeywordLoc*/ SourceLoc(),
-                                accessorInfo->Kind,
-                                accessorInfo->Storage,
-                                /*StaticLoc*/SourceLoc(),
-                                StaticSpellingKind::None,
-                                throws,
-                                /*ThrowsLoc=*/SourceLoc(),
-                                /*GenericParams=*/nullptr,
-                                bodyParams,
-                                resultTy, dc, clangNode);
+                                accessorInfo->Kind, accessorInfo->Storage,
+                                /*StaticLoc*/ SourceLoc(),
+                                StaticSpellingKind::None, throws,
+                                /*ThrowsLoc=*/SourceLoc(), genericParams,
+                                bodyParams, resultTy, dc, clangNode);
   } else {
     return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, async, throws,
-                                    bodyParams, resultTy, dc, clangNode);
+                                    bodyParams, resultTy, genericParams, dc,
+                                    clangNode);
   }
 }
 
@@ -3736,9 +3731,9 @@ namespace {
           continue;
         nonSelfParams.push_back(decl->getParamDecl(i));
       }
-      return Impl.importFunctionParameterList(dc, decl, nonSelfParams,
-                                              decl->isVariadic(),
-                                              allowNSUIntegerAsInt, argNames);
+      return Impl.importFunctionParameterList(
+          dc, decl, nonSelfParams, decl->isVariadic(), allowNSUIntegerAsInt,
+          argNames, /*genericParams=*/{});
     }
 
     Decl *importGlobalAsInitializer(const clang::FunctionDecl *decl,
@@ -3783,10 +3778,11 @@ namespace {
       return importFunctionDecl(decl, importedName, correctSwiftName, None);
     }
 
-    Decl *importFunctionDecl(const clang::FunctionDecl *decl,
-                             ImportedName importedName,
-                             Optional<ImportedName> correctSwiftName,
-                             Optional<AccessorInfo> accessorInfo) {
+    Decl *importFunctionDecl(
+        const clang::FunctionDecl *decl, ImportedName importedName,
+        Optional<ImportedName> correctSwiftName,
+        Optional<AccessorInfo> accessorInfo,
+        const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
       if (decl->isDeleted())
         return nullptr;
 
@@ -3801,6 +3797,22 @@ namespace {
       ImportedType importedType;
       bool selfIsInOut = false;
       ParameterList *bodyParams = nullptr;
+      GenericParamList *genericParams = nullptr;
+      SmallVector<GenericTypeParamDecl *, 4> templateParams;
+      if (funcTemplate) {
+        unsigned i = 0;
+        for (auto param : *funcTemplate->getTemplateParameters()) {
+          auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
+              param, AccessLevel::Public, dc,
+              Impl.SwiftContext.getIdentifier(param->getName()), SourceLoc(), 0,
+              i);
+          templateParams.push_back(typeParam);
+          (void)++i;
+        }
+        genericParams = GenericParamList::create(Impl.SwiftContext, SourceLoc(),
+                                                 templateParams, SourceLoc());
+      }
+
       if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
         if (name.getBaseName() == DeclBaseName::createConstructor()) {
@@ -3868,7 +3880,8 @@ namespace {
         // names get into the resulting function type.
         importedType = Impl.importFunctionParamsAndReturnType(
             dc, decl, {decl->param_begin(), decl->param_size()},
-            decl->isVariadic(), isInSystemModule(dc), name, bodyParams);
+            decl->isVariadic(), isInSystemModule(dc), name, bodyParams,
+            templateParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
           if (mdecl->isStatic() ||
@@ -3901,6 +3914,10 @@ namespace {
 
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
+      ClangNode clangNode = decl;
+      if (funcTemplate)
+        clangNode = funcTemplate;
+
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
 
@@ -3914,17 +3931,17 @@ namespace {
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            decl, AccessLevel::Public, ctorName, loc, /*failable=*/false,
+            clangNode, AccessLevel::Public, ctorName, loc, /*failable=*/false,
             /*FailabilityLoc=*/SourceLoc(), /*Throws=*/false,
-            /*ThrowsLoc=*/SourceLoc(), bodyParams, /*GenericParams=*/nullptr,
-            dc);
+            /*ThrowsLoc=*/SourceLoc(), bodyParams, genericParams, dc);
       } else {
         auto resultTy = importedType.getType();
 
         FuncDecl *func =
             createFuncOrAccessor(Impl.SwiftContext, loc, accessorInfo, name,
-                                 nameLoc, bodyParams, resultTy,
-                                 /*async=*/false, /*throws=*/false, dc, decl);
+                                 nameLoc, genericParams, bodyParams, resultTy,
+                                 /*async=*/false, /*throws=*/false, dc,
+                                 clangNode);
         result = func;
 
         if (!dc->isModuleScopeContext()) {
@@ -4156,6 +4173,21 @@ namespace {
     Decl *VisitTemplateDecl(const clang::TemplateDecl *decl) {
       // Note: templates are not imported.
       return nullptr;
+    }
+
+    Decl *VisitFunctionTemplateDecl(const clang::FunctionTemplateDecl *decl) {
+      Optional<ImportedName> correctSwiftName;
+      auto importedName =
+          importFullName(decl->getAsFunction(), correctSwiftName);
+      if (!importedName)
+        return nullptr;
+      // All template parameters must be template type parameters.
+      if (!llvm::all_of(*decl->getTemplateParameters(), [](auto param) {
+            return isa<clang::TemplateTypeParmDecl>(param);
+          }))
+        return nullptr;
+      return importFunctionDecl(decl->getAsFunction(), importedName,
+                                correctSwiftName, None, decl);
     }
 
     Decl *VisitUsingDecl(const clang::UsingDecl *decl) {
@@ -4530,12 +4562,11 @@ namespace {
       }
 
       auto result = createFuncOrAccessor(Impl.SwiftContext,
-                                         /*funcLoc*/SourceLoc(),
-                                         accessorInfo,
+                                         /*funcLoc*/ SourceLoc(), accessorInfo,
                                          importedName.getDeclName(),
-                                         /*nameLoc*/SourceLoc(),
-                                         bodyParams, resultTy,
-                                         async, throws, dc, decl);
+                                         /*nameLoc*/ SourceLoc(),
+                                         /*genericParams=*/nullptr, bodyParams,
+                                         resultTy, async, throws, dc, decl);
 
       result->setAccess(getOverridableAccessLevel(dc));
 
@@ -6045,7 +6076,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   } else {
     parameterList = Impl.importFunctionParameterList(
         dc, decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
-        allowNSUIntegerAsInt, argNames);
+        allowNSUIntegerAsInt, argNames, /*genericParams=*/{});
   }
   if (!parameterList)
     return nullptr;

@@ -14,7 +14,9 @@
 #define SWIFT_AST_CLANG_MODULE_LOADER_H
 
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/TaggedUnion.h"
+#include "clang/AST/DeclTemplate.h"
 
 namespace clang {
 class ASTContext;
@@ -219,6 +221,18 @@ public:
   /// based on subtleties like the target module interface format.
   virtual bool isSerializable(const clang::Type *type,
                               bool checkCanonical) const = 0;
+
+  virtual clang::FunctionDecl *
+  instantiateCXXFunctionTemplate(ASTContext &ctx,
+                                 clang::FunctionTemplateDecl *func,
+                                 SubstitutionMap subst) = 0;
+};
+
+/// Used to describe a template instantiation error.
+struct TemplateInstantiationError {
+  /// Generic types that could not be converted to QualTypes using the
+  /// ClangTypeConverter.
+  SmallVector<Type, 4> failedTypes;
 };
 
 } // namespace swift
