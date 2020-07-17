@@ -187,7 +187,7 @@ for node in sorted(graph.keys()):
 
     label = node if len(requirements + generics) == 0 else (
         ('\n<TABLE BORDER="0">\n<TR><TD>\n%s\n</TD></TR><HR/>' +
-        '\n%s%s%s</TABLE>\n') % (
+            '\n%s%s%s</TABLE>\n') % (
             node,
             '\n'.join('<TR><TD>%s</TD></TR>' % r for r in requirements),
             divider,
