@@ -14,7 +14,7 @@ TemplatesTestSuite.test("canonical-types") {
   var wrappedMagicNumberA = WrappedMagicNumberA(t: magicNumber)
   expectEqual(wrappedMagicNumberA.callGetInt(), 29)
 
-  var wrappedMagicNumberB: WrappedMagicNumberB =
+  var wrappedMagicNumberB: WrappedMagicNumberA =
     WrappedMagicNumberB(t: magicNumber)
   expectEqual(wrappedMagicNumberB.callGetInt(), 29)
 }

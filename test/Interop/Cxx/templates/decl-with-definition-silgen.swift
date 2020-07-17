@@ -11,7 +11,7 @@ public func getWrappedMagicNumber() -> CInt {
   return wrappedMagicNumber.callGetInt()
 }
 
-// getWrappedMagicNumber()
+// CHECK: // getWrappedMagicNumber()
 // CHECK: sil @$s4main21getWrappedMagicNumbers5Int32VyF : $@convention(thin) () -> Int32 {
 // CHECK: [[MAGIC_NUMBER:%.*]] = struct $MagicNumber ()
 // CHECK: [[_:%.*]] = struct $__CxxTemplateInst12MagicWrapperI11MagicNumberE ([[MAGIC_NUMBER]] : $MagicNumber)
