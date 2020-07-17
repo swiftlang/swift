@@ -863,7 +863,6 @@ ParameterListInfo::ParameterListInfo(
     const ValueDecl *paramOwner,
     bool skipCurriedSelf) {
   defaultArguments.resize(params.size());
-  acceptsUnlabeledTrailingClosures.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -896,6 +895,10 @@ ParameterListInfo::ParameterListInfo(
   if (params.size() != paramList->size())
     return;
 
+  // Now we have enough information to determine which parameters accept
+  // unlabled trailing closures.
+  acceptsUnlabeledTrailingClosures.resize(params.size());
+
   // Note which parameters have default arguments and/or accept unlabeled
   // trailing closure arguments with the forward-scan rule.
   for (auto i : range(0, params.size())) {
@@ -917,7 +920,7 @@ bool ParameterListInfo::hasDefaultArgument(unsigned paramIdx) const {
 
 bool ParameterListInfo::acceptsUnlabeledTrailingClosureArgument(
     unsigned paramIdx) const {
-  return paramIdx < acceptsUnlabeledTrailingClosures.size() &&
+  return paramIdx >= acceptsUnlabeledTrailingClosures.size() ||
       acceptsUnlabeledTrailingClosures[paramIdx];
 }
 
