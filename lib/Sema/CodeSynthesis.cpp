@@ -355,7 +355,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   initName->setBuiltinInitializer(staticStringInit);
 
   auto *file = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::File, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::FileID, loc, /*Implicit=*/true);
   file->setType(staticStringType);
   file->setBuiltinInitializer(staticStringInit);
 

@@ -1277,15 +1277,11 @@ namespace {
 
     Type visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
       switch (expr->getKind()) {
-      case MagicIdentifierLiteralExpr::Column:
-      case MagicIdentifierLiteralExpr::File:
-      case MagicIdentifierLiteralExpr::FilePath:
-      case MagicIdentifierLiteralExpr::Function:
-      case MagicIdentifierLiteralExpr::Line:
-        return visitLiteralExpr(expr);
-
-      case MagicIdentifierLiteralExpr::DSOHandle: {
-        // #dsohandle has type UnsafeMutableRawPointer.
+      // Magic pointer identifiers are of type UnsafeMutableRawPointer.
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+      case MagicIdentifierLiteralExpr::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
+      {
         auto &ctx = CS.getASTContext();
         if (TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc()))
           return nullptr;
@@ -1293,6 +1289,10 @@ namespace {
         auto unsafeRawPointer = ctx.getUnsafeRawPointerDecl();
         return unsafeRawPointer->getDeclaredType();
       }
+
+      default:
+        // Others are actual literals and should be handled like any literal.
+        return visitLiteralExpr(expr);
       }
 
       llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
@@ -1472,6 +1472,13 @@ namespace {
         type = CS.getInstanceType(CS.cacheType(E));
         assert(type && "Implicit type expr must have type set!");
         type = CS.openUnboundGenericTypes(type, locator);
+      } else if (CS.hasType(E)) {
+        // If there's a type already set into the constraint system, honor it.
+        // FIXME: This supports the function builder transform, which sneakily
+        // stashes a type in the constraint system through a TypeExpr in order
+        // to pass it down to the rest of CSGen. This is a terribly
+        // unprincipled thing to do.
+        return CS.getType(E);
       } else {
         auto *repr = E->getTypeRepr();
         assert(repr && "Explicit node has no type repr!");
