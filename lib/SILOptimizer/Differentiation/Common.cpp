@@ -452,8 +452,11 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
          silParameterIndices->getNumIndices() <
              minimalConfig->parameterIndices->getNumIndices())) {
       minimalASTParameterIndices = config.parameterIndices;
-      minimalConfig = AutoDiffConfig(silParameterIndices, config.resultIndices,
-                                     config.derivativeGenericSignature);
+      minimalConfig =
+          AutoDiffConfig(silParameterIndices, config.resultIndices,
+                         autodiff::getDifferentiabilityWitnessGenericSignature(
+                             original->getGenericSignature(),
+                             config.derivativeGenericSignature));
     }
   }
   return minimalConfig;
