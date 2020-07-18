@@ -5757,6 +5757,12 @@ bool shouldTypeCheckInEnclosingExpression(ClosureExpr *expr);
 void forEachExprInConstraintSystem(
     Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
 
+/// Whether the given parameter requires an argument.
+bool parameterRequiresArgument(
+    ArrayRef<AnyFunctionType::Param> params,
+    const ParameterListInfo &paramInfo,
+    unsigned paramIdx);
+
 } // end namespace swift
 
 namespace llvm {
