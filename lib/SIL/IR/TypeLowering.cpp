@@ -390,7 +390,8 @@ namespace {
     } \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
                                    AbstractionPattern origType) { \
-      auto referentType = type->getReferentType(); \
+      auto referentType = \
+        type->getReferentType()->lookThroughSingleOptionalType(); \
       auto concreteType = getConcreteReferenceStorageReferent(referentType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
