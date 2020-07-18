@@ -88,6 +88,8 @@ public:
   /// Fetches the list of dependencies.
   ArrayRef<std::string> getDependencies() const;
 
+  bool hasClangCollector() const;
+
   /// Return the underlying clang::DependencyCollector that this
   /// class wraps.
   std::shared_ptr<clang::DependencyCollector> getClangCollector();

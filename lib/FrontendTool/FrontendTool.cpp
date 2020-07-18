@@ -744,16 +744,23 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   assert(!ctxt.hadError()
          && "We should've already exited earlier if there was an error.");
 
-  if (loadedModuleTracePath.empty())
-    return false;
-  std::error_code EC;
-  llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
-
-  if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        loadedModuleTracePath, EC.message());
-    out.clear_error();
+  if (depTracker == nullptr || !depTracker->hasClangCollector())
     return true;
+
+  SmallVector<char, 1024> traceStorage;
+  std::error_code EC;
+  std::unique_ptr<llvm::raw_ostream> os;
+  if (loadedModuleTracePath.empty()) {
+    os = std::make_unique<llvm::raw_svector_ostream>(traceStorage);
+  } else {
+    llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
+    if (out.has_error() || EC) {
+      ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                          loadedModuleTracePath, EC.message());
+      out.clear_error();
+      return true;
+    }
+    os = std::unique_ptr<llvm::raw_ostream>(&out);
   }
 
   SmallPtrSet<ModuleDecl *, 32> abiDependencies;
@@ -804,7 +811,9 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     json::jsonize(jsonOutput, trace, /*Required=*/true);
   }
   stringBuffer += "\n";
-  out << stringBuffer;
+  // Potentially just a "noop" to consume JSON output, since we cannot write
+  // to arbitrary files in CI.
+  *os.get() << stringBuffer;
 
   return true;
 }

@@ -55,6 +55,10 @@ DependencyTracker::getDependencies() const {
   return clangCollector->getDependencies();
 }
 
+bool DependencyTracker::hasClangCollector() const {
+  return clangCollector != nullptr;
+}
+
 std::shared_ptr<clang::DependencyCollector>
 DependencyTracker::getClangCollector() {
   return clangCollector;
