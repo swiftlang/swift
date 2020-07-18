@@ -195,7 +195,7 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 }
 
 /// Whether the given parameter requires an argument.
-static bool parameterRequiresArgument(
+bool swift::parameterRequiresArgument(
     ArrayRef<AnyFunctionType::Param> params,
     const ParameterListInfo &paramInfo,
     unsigned paramIdx) {

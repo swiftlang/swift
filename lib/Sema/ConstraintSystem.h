@@ -5439,6 +5439,12 @@ BraceStmt *applyFunctionBuilderTransform(
           constraints::SolutionApplicationTarget)>
             rewriteTarget);
 
+/// Whether the given parameter requires an argument.
+bool parameterRequiresArgument(
+    ArrayRef<AnyFunctionType::Param> params,
+    const ParameterListInfo &paramInfo,
+    unsigned paramIdx);
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
