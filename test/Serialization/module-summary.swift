@@ -10,30 +10,37 @@
 // Ensure that call graph edge has correct function guid
 // MAIN-CHECK:        <METADATA {{.+}} op0=7308225924950623125 op1=0/> blob data = '$s7module20A4FuncSiyF'
 // MAIN-CHECK:        <METADATA {{.+}} op0=-2624081020897602054 op1=0/> blob data = 'main'
-// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=1305169934332876051 op2=0/>
-// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-731742758654261144 op2=0/>
-// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-9123464239216498366 op2=0/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=1305169934332876051/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-731742758654261144/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-9123464239216498366/>
 // MAIN-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 
 // MAIN-CHECK:        <METADATA {{.+}} op0=-1760476766911317517 op1=0/> blob data = '$s4main9callTwiceyyF'
-// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-8492700279074763592 op2=0/>
-// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-432276440123806562 op2=0/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-8492700279074763592/>
+// MAIN-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=0 op1=-432276440123806562/>
 // MAIN-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 // RUN: llvm-bcanalyzer -dump %t/module2.swiftmodule.summary | %FileCheck %s --check-prefix TABLE-CHECK
-// TABLE-CHECK:        <METADATA {{.+}} op0=-9123464239216498366 op1=0/> blob data = '$s7module24usePyyx7module11PRzlF'
-// TABLE-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=1 op1=1692125368554804631 op2=8225888563470713412/>
+
+// TABLE-CHECK-DAG:    <METADATA abbrevid=4 op0=[[METHOD2_IMPL2:.*]] op1=0/> blob data = '$s7module29Concrete2V7module11PAadEP15defaultProvidedyyFTW'
+// TABLE-CHECK-DAG:    <METADATA abbrevid=4 op0=[[METHOD1_IMPL2:.*]] op1=0/> blob data = '$s7module29Concrete2V7module11PAadEP12memberMethodyyFTW'
+
+// TABLE-CHECK:        <METADATA {{.+}} op1=0/> blob data = '$s7module24usePyyx7module11PRzlF'
+// TABLE-CHECK-NEXT:   <CALL_GRAPH_EDGE {{.+}} op0=1 op1=[[METHOD1:.*]]/>
 // TABLE-CHECK-NEXT: </FUNCTION_SUMMARY>
 
-// TABLE-CHECK:        <METHOD_METADATA {{.+}} op0=0 op1=1692125368554804631 op2=8225888563470713412/>
-// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=-1159881846596281644/>
-// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=9188130023577763384/>
+// TABLE-CHECK-DAG:    <METADATA abbrevid=4 op0=[[METHOD2_IMPL1:.*]] op1=0/> blob data = '$s7module29Concrete1V7module11PAadEP15defaultProvidedyyFTW'
+// TABLE-CHECK-DAG:    <METADATA abbrevid=4 op0=[[METHOD1_IMPL1:.*]] op1=0/> blob data = '$s7module29Concrete1V7module11PAadEP12memberMethodyyFTW'
+
+// TABLE-CHECK:        <METHOD_METADATA {{.+}} op0=0 op1=[[METHOD1]]/>
+// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=[[METHOD1_IMPL1]]/>
+// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=[[METHOD1_IMPL2]]/>
 // TABLE-CHECK-NEXT: </VIRTUAL_METHOD_INFO>
 
-// TABLE-CHECK:        <METHOD_METADATA {{.+}} op0=0 op1=1757722448577808972 op2=8225888563470713412/>
-// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=-6034489220818382202/>
-// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=5892209788981434976/>
+// TABLE-CHECK:        <METHOD_METADATA {{.+}} op0=0 {{.+}}/>
+// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=[[METHOD2_IMPL1]]/>
+// TABLE-CHECK-NEXT:   <METHOD_IMPL {{.+}} op0=[[METHOD2_IMPL2]]/>
 // TABLE-CHECK-NEXT: </VIRTUAL_METHOD_INFO>
 
 
@@ -44,7 +51,7 @@
 // MERGED-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 // MERGED-CHECK:        <METADATA {{.+}} op0=7308225924950623125 op1=0/> blob data = '$s7module20A4FuncSiyF'
-// MERGED-CHECK-NEXT:   <CALL_GRAPH_EDGE abbrevid=5 op0=0 op1=1546188077662747336 op2=0/>
+// MERGED-CHECK-NEXT:   <CALL_GRAPH_EDGE abbrevid=5 op0=0 op1=1546188077662747336/>
 // MERGED-CHECK-NEXT: </FUNCTION_SUMMARY>
 
 // RUN: llvm-bcanalyzer -dump %t/merged-module.summary | %FileCheck %s --check-prefix LIVE-CHECK
@@ -84,6 +91,8 @@
 import module1
 import module2
 
+class S {}
+
 func foo() { bar(0) }
 func bar(_ i: Int) {
     if (i == 0) { return }
@@ -100,6 +109,7 @@ func callExternalFunc() {
 }
 
 public func publicFunc() {
+    S()
     foo()
 }
 

@@ -120,7 +120,7 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
       for (auto call : summary->calls()) {
         CallGraphEdgeLayout edgeLayout(Out);
         edgeLayout.emit(ScratchRecord, unsigned(call.getKind()),
-                        call.getCallee(), call.getTable());
+                        call.getCallee());
       }
     }
   }
@@ -136,8 +136,7 @@ void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
 
       MDLayout.emit(ScratchRecord,
                     unsigned(slot.Kind),
-                    slot.VirtualFuncID,
-                    slot.TableID);
+                    slot.VirtualFuncID);
       
       for (auto impl : impls) {
         MethodImplLayout ImplLayout(Out);
@@ -266,16 +265,16 @@ bool Deserializer::readFunctionSummary() {
     }
     case function_summary::CALL_GRAPH_EDGE: {
       unsigned edgeKindID;
-      GUID targetGUID, targetTable;
+      GUID targetGUID;
       function_summary::CallGraphEdgeLayout::readRecord(Scratch, edgeKindID,
-                                                        targetGUID, targetTable);
+                                                        targetGUID);
       auto edgeKind = getEdgeKind(edgeKindID);
       if (!edgeKind)
         llvm::report_fatal_error("Bad edge kind");
       if (!FS)
         llvm::report_fatal_error("Invalid state");
 
-      FS->addCall(targetGUID, targetTable, edgeKind.getValue());
+      FS->addCall(targetGUID, edgeKind.getValue());
       break;
     }
     }
@@ -318,14 +317,14 @@ bool Deserializer::readVirtualMethodInfo() {
     switch (maybeKind.get()) {
     case virtual_method_info::METHOD_METADATA: {
       unsigned methodKindID;
-      GUID virtualFuncGUID, tableGUID;
-      virtual_method_info::MethodMetadataLayout::readRecord(Scratch, methodKindID, virtualFuncGUID, tableGUID);
+      GUID virtualFuncGUID;
+      virtual_method_info::MethodMetadataLayout::readRecord(Scratch, methodKindID, virtualFuncGUID);
       
       auto Kind = getSlotKind(methodKindID);
       if (!Kind)
         llvm::report_fatal_error("Bad method kind");
 
-      slot = VirtualMethodSlot(Kind.getValue(), virtualFuncGUID, tableGUID);
+      slot = VirtualMethodSlot(Kind.getValue(), virtualFuncGUID);
       break;
     }
     case virtual_method_info::METHOD_IMPL: {

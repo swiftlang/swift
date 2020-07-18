@@ -65,26 +65,21 @@ buildFunctionSummaryIndex(SILFunction &F, BasicCalleeAnalysis &BCA) {
 }
 
 void indexWitnessTable(ModuleSummaryIndex &index, SILWitnessTable &WT) {
-  auto &Protocol = *WT.getProtocol();
   for (auto entry : WT.getEntries()) {
     if (entry.getKind() != SILWitnessTable::Method) break;
 
     auto methodWitness = entry.getMethodWitness();
-    auto VirtualFunc = methodWitness.Requirement.getFuncDecl();
     auto Witness = methodWitness.Witness;
-    llvm::dbgs() << "Emit table entry for " << Witness->getName() << "\n";
-    VirtualMethodSlot slot(*VirtualFunc, Protocol);
+    VirtualMethodSlot slot(methodWitness.Requirement, VirtualMethodSlot::KindTy::Witness);
     index.addImplementation(slot, getGUID(Witness->getName()));
   }
 }
 
 
 void indexVTable(ModuleSummaryIndex &index, SILVTable &VT) {
-  auto &Class = *VT.getClass();
   for (auto entry : VT.getEntries()) {
-    auto VirtualFunc = entry.getMethod().getFuncDecl();
     auto Impl = entry.getImplementation();
-    VirtualMethodSlot slot(*VirtualFunc, Class);
+    VirtualMethodSlot slot(entry.getMethod(), VirtualMethodSlot::KindTy::VTable);
     index.addImplementation(slot, getGUID(Impl->getName()));
   }
 }
@@ -97,6 +92,7 @@ ModuleSummaryIndex swift::buildModuleSummaryIndex(SILModule &M,
 
   for (auto &F : M) {
     auto FS = buildFunctionSummaryIndex(F, BCA);
+    FS->setLive(false);
     index.addFunctionSummary(F.getName(), std::move(FS));
   }
   

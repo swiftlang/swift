@@ -47,8 +47,7 @@ enum {
 using MethodMetadataLayout = BCRecordLayout<
   METHOD_METADATA,
   BCFixed<1>, // KindTy (WitnessTable or VTable)
-  BCVBR<16>,  // VirtualFunc GUID
-  BCVBR<16>   // Table GUID
+  BCVBR<16>   // VirtualFunc GUID
 >;
 
 using MethodImplLayout = BCRecordLayout<
@@ -71,8 +70,7 @@ using MetadataLayout = BCRecordLayout<METADATA,
 using CallGraphEdgeLayout =
     BCRecordLayout<CALL_GRAPH_EDGE,
                    BCFixed<32>, // FunctionSummary::Edge::Kind
-                   BCVBR<16>,   // Target Function GUID
-                   BCVBR<16>    // Table GUID
+                   BCVBR<16>    // Target Function GUID
                    >;
 } // namespace function_summary
 

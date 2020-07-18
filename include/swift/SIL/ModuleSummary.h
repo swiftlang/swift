@@ -3,6 +3,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/AST/ASTMangler.h"
 
 // FIXME: Move this into another module to avoid circular dependencies.
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -20,44 +21,17 @@ struct VirtualMethodSlot {
 
   KindTy Kind;
   GUID VirtualFuncID;
-  GUID TableID;
-  VirtualMethodSlot(KindTy kind, GUID virtualFuncID, GUID tableID)
-    : Kind(kind), VirtualFuncID(virtualFuncID), TableID(tableID) { }
-  VirtualMethodSlot(FuncDecl &VirtualFunc, TypeDecl &Context, KindTy kind) : Kind(kind) {
-    switch (Kind) {
-      case KindTy::Witness: {
-        assert(isa<ProtocolDecl>(Context));
-        break;
-      }
-      case KindTy::VTable: {
-        assert(isa<ClassDecl>(Context));
-        break;
-        
-      }
-      case KindTy::kindCount: {
-        llvm_unreachable("impossible");
-      }
-    }
-    VirtualFuncID = getGUID(VirtualFunc.getBaseIdentifier().str());
-    TableID = getGUID(Context.getNameStr());
+  VirtualMethodSlot(KindTy kind, GUID virtualFuncID)
+    : Kind(kind), VirtualFuncID(virtualFuncID) { }
+  VirtualMethodSlot(SILDeclRef VirtualFuncRef, KindTy kind) : Kind(kind) {
+    VirtualFuncID = getGUID(VirtualFuncRef.mangle());
   }
-  
-  VirtualMethodSlot(FuncDecl &VirtualFunc, ProtocolDecl &Context)
-  : VirtualMethodSlot(VirtualFunc, Context, KindTy::Witness) { }
-  
-  VirtualMethodSlot(FuncDecl &VirtualFunc, ClassDecl &Context)
-  : VirtualMethodSlot(VirtualFunc, Context, KindTy::VTable) { }
-  
+
   bool operator<(const VirtualMethodSlot &rhs)  const {
     if (Kind > rhs.Kind)
       return false;
     if (Kind < rhs.Kind)
       return true;
-    if (TableID > rhs.TableID)
-      return false;
-    if (TableID < rhs.TableID)
-      return true;
-
     return VirtualFuncID < rhs.VirtualFuncID;
   }
 };
@@ -66,7 +40,6 @@ class FunctionSummary {
 public:
   class EdgeTy {
     GUID CalleeFn;
-    GUID Table;
   public:
 
     enum class Kind {
@@ -78,17 +51,10 @@ public:
 
     Kind kind;
 
-    EdgeTy(FuncDecl &CalleeFn, TypeDecl &Context, Kind kind) : kind(kind) {
-      // FIXME: This is really fragile
-      this->CalleeFn = getGUID(CalleeFn.getBaseIdentifier().str());
-      this->Table = getGUID(Context.getNameStr());
+    EdgeTy(SILDeclRef &CalleeFn, Kind kind) : kind(kind) {
+      this->CalleeFn = getGUID(CalleeFn.mangle());
     }
 
-    GUID getTable() const {
-      // If kind is static, Table guid should be 0
-      assert(kind != Kind::Static || Table == 0);
-      return Table;
-    }
   public:
     Kind getKind() const { return kind; }
     GUID getCallee() const { return CalleeFn; }
@@ -111,33 +77,21 @@ public:
           llvm_unreachable("impossible");
         }
       }
-      return VirtualMethodSlot(slotKind, CalleeFn, Table);
+      return VirtualMethodSlot(slotKind, CalleeFn);
     }
 
-    EdgeTy(GUID callee, GUID table, Kind kind)
-      : CalleeFn(callee), Table(table), kind(kind) {}
-
     EdgeTy(GUID callee, Kind kind)
-      : CalleeFn(callee), Table(0), kind(kind) {}
+      : CalleeFn(callee), kind(kind) {}
 
     static EdgeTy staticCall(GUID Callee) {
       return EdgeTy(Callee, Kind::Static);
     }
-    static EdgeTy witnessCall(GUID Callee) {
+
+    static EdgeTy witnessCall(SILDeclRef Callee) {
       return EdgeTy(Callee, Kind::Witness);
     }
-    static EdgeTy vtableCall(GUID Callee) {
-      return EdgeTy(Callee, Kind::VTable);
-    }
-    static EdgeTy witnessCall(SILDeclRef Callee) {
-      auto &Fn = *Callee.getFuncDecl();
-      auto Context = dyn_cast<ProtocolDecl>(Fn.getDeclContext());
-      return EdgeTy(Fn, *Context, Kind::Witness);
-    }
     static EdgeTy vtableCall(SILDeclRef Callee) {
-      auto &Fn = *Callee.getFuncDecl();
-      auto Context = dyn_cast<ClassDecl>(Fn.getDeclContext());
-      return EdgeTy(Fn, *Context, Kind::VTable);
+      return EdgeTy(Callee, Kind::VTable);
     }
   };
 
@@ -157,10 +111,8 @@ public:
       : CallGraphEdgeList(std::move(CGEdges)) {}
   FunctionSummary() = default;
 
-  void addCall(GUID targetGUID, GUID tableGUID, EdgeTy::Kind kind) {
-    // If kind is static, Table guid should be 0
-    assert(kind != EdgeTy::Kind::Static || tableGUID == 0);
-    CallGraphEdgeList.emplace_back(targetGUID, tableGUID, kind);
+  void addCall(GUID targetGUID, EdgeTy::Kind kind) {
+    CallGraphEdgeList.emplace_back(targetGUID, kind);
   }
 
   ArrayRef<EdgeTy> calls() const { return CallGraphEdgeList; }
