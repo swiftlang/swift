@@ -281,7 +281,7 @@ def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
     locs = [tuple(random.uniform(*b) for b in bounds)
             for _ in range(ndim + 1)]
     SimplexPoint = namedtuple("SimplexPoint", ["loc", "val"])
-    simplex = [SimplexPoint(loc=L, val=f(L)) for L in locs]
+    simplex = [SimplexPoint(loc=loc, val=f(loc)) for loc in locs]
 
     # Algorithm parameters
     alpha = 1.0
