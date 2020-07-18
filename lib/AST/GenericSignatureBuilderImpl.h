@@ -24,7 +24,7 @@ class GenericSignatureBuilder::ResolvedType {
 public:
   /// A specific resolved potential archetype.
   ResolvedType(PotentialArchetype *pa)
-    : type(pa), equivClass(pa->getEquivalenceClassIfPresent()) { }
+    : type(pa), equivClass(nullptr) { }
 
   /// A resolved type within the given equivalence class.
   ResolvedType(Type type, EquivalenceClass *equivClass)
