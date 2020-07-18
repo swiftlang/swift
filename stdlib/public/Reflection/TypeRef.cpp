@@ -735,6 +735,7 @@ unsigned NominalTypeTrait::getDepth() const {
       return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
     default:
       break;
+    }
   }
   return 0;
 }
