@@ -3903,6 +3903,15 @@ Parser::parseDecl(ParseDeclOptions Flags,
       const bool IsProbablyTupleDecl =
           Tok.is(tok::l_paren) && peekToken().isIdentifierOrUnderscore();
 
+      const bool IsProbablyStatement =
+          Tok.isIdentifierOrUnderscore() &&
+          peekToken().isAny(tok::period);
+
+      if (IsProbablyStatement) {
+        diagnose(Tok.getLoc(), diag::found_unexpected_stmt);
+        break;
+      }
+
       if (IsProbablyVarDecl || IsProbablyTupleDecl) {
 
         DescriptiveDeclKind DescriptiveKind;

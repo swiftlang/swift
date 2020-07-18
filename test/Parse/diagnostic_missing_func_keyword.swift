@@ -38,7 +38,11 @@ struct Bar {
 
   (light, dark) = (100, 200)// expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
   
-  a, b: Int // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
+}
+
+struct Faz {
+  abc : Int = 10 // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
+  def.ber : Float = 1.0 // expected-note {{found an unexpected statement here}}
 }
 
 class Baz {
