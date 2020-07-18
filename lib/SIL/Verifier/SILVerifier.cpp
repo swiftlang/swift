@@ -312,6 +312,8 @@ void verifyKeyPathComponent(SILModule &M,
               loweredComponentTy.getASTType(),
           "getter result should match the maximal abstraction of the "
           "formal component type");
+      require(dyn_cast<DynamicSelfType>(componentTy) == nullptr,
+              "getter result should not be a dynamic Self type");
     }
     
     if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
@@ -4579,16 +4581,24 @@ public:
             "keypath result must be a key path type");
     
     auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
+    if (auto dynSelf = dyn_cast<DynamicSelfType>(baseTy)) {
+      baseTy = dynSelf.getSelfType();
+    }
     auto pattern = KPI->getPattern();
     SubstitutionMap patternSubs = KPI->getSubstitutions();
+    auto rootTy = pattern->getRootType().subst(patternSubs)->getCanonicalType();
     requireSameType(
-        baseTy, pattern->getRootType().subst(patternSubs)->getCanonicalType(),
+        baseTy, rootTy,
         "keypath root type should match root type of keypath pattern");
+    require(dyn_cast<DynamicSelfType>(rootTy) == nullptr,
+            "keypath root type must not be a dynamic Self type");
 
     auto leafTy = CanType(kpBGT->getGenericArgs()[1]);
     requireSameType(
         leafTy, pattern->getValueType().subst(patternSubs)->getCanonicalType(),
         "keypath value type should match value type of keypath pattern");
+    require(dyn_cast<DynamicSelfType>(leafTy) == nullptr,
+            "keypath value type must not be a dynamic Self type");
 
     {
       for (auto &component : pattern->getComponents()) {

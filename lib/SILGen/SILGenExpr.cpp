@@ -2700,7 +2700,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          ResilienceExpansion expansion,
                          ArrayRef<IndexTypePair> indexes,
                          CanType baseType,
-                         CanType propertyType) {
+                         CanType propertyType,
+                         CanType componentType) {
   // If the storage declaration is from a protocol, chase the override chain
   // back to the declaration whose getter introduced the witness table
   // entry.
@@ -2728,13 +2729,18 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
   // Build the signature of the thunk as expected by the keypath runtime.
   auto signature = [&]() {
-    CanType loweredBaseTy, loweredPropTy;
+    CanType loweredBaseTy, loweredCompTy;
     AbstractionPattern opaque = AbstractionPattern::getOpaque();
+    
+    // Note that componentType is the expected return type of this
+    // key path component, while propertyType is the declared type
+    // of the property we are accessing. The two may differ if
+    // the property returns a dynamic Self type.
 
     loweredBaseTy = SGM.Types.getLoweredRValueType(
         TypeExpansionContext::minimal(), opaque, baseType);
-    loweredPropTy = SGM.Types.getLoweredRValueType(
-        TypeExpansionContext::minimal(), opaque, propertyType);
+    loweredCompTy = SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), opaque, componentType);
     
     auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
@@ -2746,7 +2752,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                                                    ->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
-    SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
+    SILResultInfo result(loweredCompTy, ResultConvention::Indirect);
     
     return SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo::getThin(),
@@ -2776,6 +2782,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   if (genericEnv) {
     baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
     propertyType = genericEnv->mapTypeIntoContext(propertyType)
+      ->getCanonicalType();
+    componentType = genericEnv->mapTypeIntoContext(componentType)
       ->getCanonicalType();
     thunk->setGenericEnvironment(genericEnv);
   }
@@ -2820,9 +2828,13 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                                    propertyType, SGFContext())
     .getAsSingleValue(subSGF, loc);
   if (resultSubst.getType().getAddressType() != resultArg->getType())
-    resultSubst = subSGF.emitSubstToOrigValue(loc, resultSubst,
-                                         AbstractionPattern::getOpaque(),
-                                         propertyType);
+    resultSubst = subSGF.emitTransformedValue(loc, resultSubst,
+                        // input
+                        AbstractionPattern(propertyType), propertyType,
+                        // output
+                        AbstractionPattern::getOpaque(), componentType,
+                        subSGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                              componentType));
   
   resultSubst.forwardInto(subSGF, loc, resultArg);
   scope.pop();
@@ -3535,6 +3547,15 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     if (canStorageUseStoredKeyPathComponent(var, expansion)) {
       return KeyPathPatternComponent::forStoredProperty(var, componentTy);
     }
+    
+    // If the property returns a covariant Self type, the key path
+    // component type may be a subclass of the declared property type.
+    auto propertyTy = componentTy;
+    if (auto dynSelf = dyn_cast<DynamicSelfType>(componentTy)) {
+      assert(dynSelf.getSelfType()->isExactSuperclassOf(baseTy) &&
+             "dynamic Self should be a superclass of self");
+      componentTy = baseTy;
+    }
 
     // We need thunks to bring the getter and setter to the right signature
     // expected by the key path runtime.
@@ -3543,9 +3564,11 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     auto getter = getOrCreateKeyPathGetter(*this, loc,
              var, subs,
              needsGenericContext ? genericEnv : nullptr,
-             expansion, {}, baseTy, componentTy);
+             expansion, {}, baseTy, propertyTy, componentTy);
     
     if (isSettableInComponent()) {
+      assert(propertyTy == componentTy
+             && "settable properties cannot have dynamic Self type");
       auto setter = getOrCreateKeyPathSetter(*this, loc,
              var, subs,
              needsGenericContext ? genericEnv : nullptr,
@@ -3590,16 +3613,27 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                indexEquals, indexHash);
     }
     
+    // If the subscript returns a covariant Self type, the key path
+    // component type may be a subclass of the property type.
+    auto propertyTy = componentTy;
+    if (auto dynSelf = dyn_cast<DynamicSelfType>(componentTy)) {
+      assert(dynSelf.getSelfType()->isExactSuperclassOf(baseTy) &&
+             "dynamic Self should be a superclass of self");
+      componentTy = baseTy;
+    }
+    
     auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
     auto getter = getOrCreateKeyPathGetter(*this, loc,
              decl, subs,
              needsGenericContext ? genericEnv : nullptr,
              expansion,
              indexTypes,
-             baseTy, componentTy);
+             baseTy, propertyTy, componentTy);
   
     auto indexPatternsCopy = getASTContext().AllocateCopy(indexPatterns);
     if (isSettableInComponent()) {
+      assert(propertyTy == componentTy
+             && "settable subscripts cannot have dynamic Self type");
       auto setter = getOrCreateKeyPathSetter(*this, loc,
              decl, subs,
              needsGenericContext ? genericEnv : nullptr,
@@ -3646,6 +3680,11 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   if (rootTy->hasArchetype()) {
     needsGenericContext = true;
     rootTy = rootTy->mapTypeOutOfContext()->getCanonicalType();
+  }
+  
+  // Treat a dynamic Self as the statically-known type.
+  if (auto dynSelf = dyn_cast<DynamicSelfType>(rootTy)) {
+    rootTy = dynSelf->getSelfType()->getCanonicalType();
   }
   
   auto baseTy = rootTy;
