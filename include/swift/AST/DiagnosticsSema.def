@@ -1189,6 +1189,18 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
+WARNING(unlabeled_trailing_closure_changed_behavior,none,
+        "since Swift 5.3, unlabeled trailing closure argument matches parameter %0 rather than parameter %1",
+        (Identifier, Identifier))
+WARNING(unlabeled_trailing_closure_changed_behavior_same_param_name,none,
+        "since Swift 5.3, unlabeled trailing closure argument matches earlier parameter %0 rather than later parameter with the same name",
+        (Identifier))
+NOTE(trailing_closure_select_parameter,none,
+     "label the argument with %0 to %select{retain the pre-Swift 5.3 behavior|silence this warning for Swift 5.3 and newer}1",
+     (Identifier, unsigned))
+NOTE(decl_multiple_defaulted_closure_parameters,none,
+     "%0 contains defaulted closure parameters %1 and %2",
+     (DeclName, Identifier, Identifier))
 NOTE(candidate_with_extraneous_args,none,
       "candidate %0 requires %1 argument%s1, "
       "but %2 %select{were|was}3 %select{provided|used in closure body}4",
