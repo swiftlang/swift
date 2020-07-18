@@ -47,7 +47,7 @@ void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
   for (auto *constraint : conversions) {
     auto *tv =
         cs.simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
-    if (!tv)
+    if (!tv || tv == TypeVar)
       continue;
 
     auto relatedBindings = inferredBindings.find(tv);
