@@ -337,8 +337,15 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   }
 
   // Actually load the file and error out if necessary.
+  //
+  // Use the default arguments except for IsVolatile. Force avoiding the use of
+  // mmap to workaround issues on NFS when the swiftmodule file loaded changes
+  // on disk while it's in use.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
-      FS.getBufferForFile(ModulePath);
+      FS.getBufferForFile(ModulePath,
+                          /*FileSize=*/-1,
+                          /*RequiresNullTerminator=*/true,
+                          /*IsVolatile=*/true);
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
