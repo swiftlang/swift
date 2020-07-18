@@ -562,7 +562,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableFuzzyForwardScanTrailingClosureMatching =
       Args.hasFlag(OPT_enable_fuzzy_forward_scan_trailing_closure_matching,
                    OPT_disable_fuzzy_forward_scan_trailing_closure_matching,
-                   !Opts.EffectiveLanguageVersion.isVersionAtLeast(6));
+                   true);
 
   Opts.EnableCrossImportOverlays =
       Args.hasFlag(OPT_enable_cross_import_overlays,
