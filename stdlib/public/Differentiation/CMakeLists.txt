@@ -18,20 +18,6 @@
 # in this directory are directly built as part of swiftCore: see
 # stdlib/public/core/CMakeLists.txt. The `_Differentiation` module is created
 # empty to enable `#if canImport(_Differentiation)` guards in tests.
-#
-# Code from master branch is enclosed in `if(FALSE) ... endif()` to minimize
-# merge conflicts.
-if(FALSE)
-# SWIFT_ENABLE_TENSORFLOW END
-add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-  Differentiable.swift
-  DifferentialOperators.swift
-  DifferentiationUtilities.swift
-  AnyDifferentiable.swift
-  ArrayDifferentiation.swift
-  OptionalDifferentiation.swift
-# SWIFT_ENABLE_TENSORFLOW
-endif()
 # SWIFT_ENABLE_TENSORFLOW END
 
 add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
