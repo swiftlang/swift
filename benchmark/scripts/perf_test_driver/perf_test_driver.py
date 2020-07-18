@@ -130,8 +130,8 @@ class BenchmarkDriver(object):
         print("testing driver at path: %s" % binary)
         names = []
         output = subprocess.check_output([binary, "--list"], universal_newlines=True)
-        for l in output.split("\n")[1:]:
-            m = BENCHMARK_OUTPUT_RE.match(l)
+        for line in output.split("\n")[1:]:
+            m = BENCHMARK_OUTPUT_RE.match(line)
             if m is None:
                 continue
             names.append(m.group(1))

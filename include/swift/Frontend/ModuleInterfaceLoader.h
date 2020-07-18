@@ -237,8 +237,9 @@ public:
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     ModuleInterfaceLoaderOptions Opts);
 
-  std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
-                                                    StringRef interfacePath) override;
+  std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) override;
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
