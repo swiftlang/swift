@@ -12,54 +12,56 @@
 
 using namespace swift;
 
+namespace {
+class FunctionSummaryIndexer {
+  std::vector<FunctionSummary::EdgeTy> CallGraphEdgeList;
+public:
+  void indexInstruction(SILFunction &F, SILInstruction *I);
+  void indexFunction(SILFunction &F);
+  
+  std::unique_ptr<FunctionSummary> takeSummary() {
+    return std::make_unique<FunctionSummary>(std::move(CallGraphEdgeList));
+  }
+};
+
+void FunctionSummaryIndexer::indexInstruction(SILFunction &F, SILInstruction *I) {
+  // TODO: Handle dynamically replacable function ref inst
+  if (auto *FRI = dyn_cast<FunctionRefInst>(I)) {
+    SILFunction *callee = FRI->getReferencedFunctionOrNull();
+    assert(callee);
+    auto edge =
+        FunctionSummary::EdgeTy::staticCall(getGUID(callee->getName()));
+    CallGraphEdgeList.push_back(edge);
+    return;
+  }
+
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(I)) {
+    auto edge = FunctionSummary::EdgeTy::witnessCall(WMI->getMember());
+    CallGraphEdgeList.push_back(edge);
+    return;
+  }
+
+  if (auto *MI = dyn_cast<MethodInst>(I)) {
+    auto edge = FunctionSummary::EdgeTy::vtableCall(MI->getMember());
+    CallGraphEdgeList.push_back(edge);
+    return;
+  }
+}
+
+void FunctionSummaryIndexer::indexFunction(SILFunction &F) {
+  for (auto &BB : F) {
+     for (auto &I : BB) {
+       indexInstruction(F, &I);
+     }
+  }
+}
+};
+
 std::unique_ptr<FunctionSummary>
 buildFunctionSummaryIndex(SILFunction &F, BasicCalleeAnalysis &BCA) {
-  std::vector<FunctionSummary::EdgeTy> CallGraphEdgeList;
-
-  for (auto &BB : F) {
-    for (auto &I : BB) {
-      auto FAS = FullApplySite::isa(&I);
-      if (!FAS)
-        continue;
-      CalleeList Callees = BCA.getCalleeList(FAS);
-      if (Callees.isIncomplete()) {
-        auto Callee = FAS.getCalleeOrigin();
-        switch (Callee->getKind()) {
-        case ValueKind::WitnessMethodInst: {
-          auto WMI = cast<WitnessMethodInst>(Callee);
-          auto member = WMI->getMember();
-          auto CalleeFn = member.getFuncDecl();
-          auto Protocol = dyn_cast<ProtocolDecl>(CalleeFn->getDeclContext());
-          llvm::dbgs() << "Record " << CalleeFn->getNameStr()
-                       << " of " << Protocol->getNameStr() << " as reference to PWT\n";
-
-          auto edge = FunctionSummary::EdgeTy::witnessCall(WMI->getMember());
-          CallGraphEdgeList.push_back(edge);
-          break;
-        }
-        case ValueKind::ClassMethodInst: {
-          auto CMI = cast<ClassMethodInst>(Callee);
-          llvm::dbgs() << "Record " << CMI->getMember().getDecl()->getBaseName().getIdentifier().str() << " as reference to VTable\n";
-          auto edge = FunctionSummary::EdgeTy::vtableCall(CMI->getMember());
-          CallGraphEdgeList.push_back(edge);
-          break;
-        }
-        default:
-          llvm_unreachable("invalid kind");
-        }
-        continue;
-      }
-
-      // For static calls
-      std::vector<GUID> CalleeGUIDs;
-      for (auto Callee : Callees) {
-        auto edge =
-            FunctionSummary::EdgeTy::staticCall(getGUID(Callee->getName()));
-        CallGraphEdgeList.push_back(edge);
-      }
-    }
-  }
-  return std::make_unique<FunctionSummary>(CallGraphEdgeList);
+  FunctionSummaryIndexer indexer;
+  indexer.indexFunction(F);
+  return indexer.takeSummary();
 }
 
 void indexWitnessTable(ModuleSummaryIndex &index, SILWitnessTable &WT) {
