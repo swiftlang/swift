@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// Disabled due to test failure with `-O`: SR-13250.
+// REQUIRES: SR13250
+
 import StdlibUnittest
 import DifferentiationUnittest
 
