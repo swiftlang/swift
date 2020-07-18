@@ -5628,17 +5628,7 @@ static void maybeWarnAboutTrailingClosureBindingChange(
         decl->getName(), paramName, backwardParamName);
 
     // Dig out the parameter declarations so we can highlight them.
-    // FIXME: There should be a utility for this.
-    const ParameterList *paramList = nullptr;
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      paramList = func->getParameters();
-    } else if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
-      paramList = subscript->getIndices();
-    } else if (auto *enumElement = dyn_cast<EnumElementDecl>(decl)) {
-      paramList = enumElement->getParameterList();
-    }
-
-    if (paramList) {
+    if (const ParameterList *paramList = getParameterList(decl)) {
       diag.highlight(paramList->get(paramIdx)->getLoc());
       diag.highlight(paramList->get(*matchingBackwardParamIdx)->getLoc());
     }
