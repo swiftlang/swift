@@ -32,6 +32,13 @@ static const ProtocolDescriptor *getEquatableDescriptor() {
   return descriptor;
 }
 
+static const ProtocolDescriptor *getComparableDescriptor() {
+  auto descriptor = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const ProtocolDescriptor *>(
+                     dlsym(RTLD_DEFAULT, "$sSLMp")));
+  return descriptor;
+}
+
 static const WitnessTable *conformsToProtocol(const Metadata *type,
                                         const ProtocolDescriptor *protocol) {
   using Fn = const WitnessTable *(const Metadata *, const ProtocolDescriptor *);
@@ -45,9 +52,10 @@ static bool tupleConformsToProtocol(const Metadata *type,
                                     const ProtocolDescriptor *protocol) {
   auto tuple = cast<TupleTypeMetadata>(type);
 
-  // At the moment, tuples can only conform to Equatable, so reject all other
-  // protocols.
-  if (protocol != getEquatableDescriptor())
+  // At the moment, tuples can only conform to Equatable and Comparable, so
+  // reject all other protocols.
+  if (protocol != getEquatableDescriptor() &&
+      protocol != getComparableDescriptor())
     return false;
 
   for (size_t i = 0; i != tuple->NumElements; i += 1) {
@@ -60,12 +68,15 @@ static bool tupleConformsToProtocol(const Metadata *type,
 }
 
 extern const WitnessTable _swift_tupleEquatable_wt;
+extern const WitnessTable _swift_tupleComparable_wt;
 
 static const WitnessTable *getTupleConformanceWitnessTable(
                                            const ProtocolDescriptor *protocol) {
-  if (protocol == getEquatableDescriptor()) {
+  if (protocol == getEquatableDescriptor())
     return &_swift_tupleEquatable_wt;
-  }
+
+  if (protocol == getComparableDescriptor())
+    return &_swift_tupleComparable_wt;
 
   return nullptr;
 }
