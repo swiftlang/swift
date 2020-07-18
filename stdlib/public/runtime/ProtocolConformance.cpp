@@ -376,16 +376,18 @@ searchInConformanceCache(const Metadata *type,
   return {false, nullptr};
 }
 
-extern const ProtocolDescriptor EQUATABLE_PROTOCOL_DESCRIPTOR;
+extern const ProtocolDescriptor EQUATABLE_DESCRIPTOR;
+extern const ProtocolDescriptor COMPARABLE_DESCRIPTOR;
 
 static bool tupleConformsToProtocol(const Metadata *type,
                                     const ProtocolDescriptor *protocol) {
   auto tuple = cast<TupleTypeMetadata>(type);
 
-  // At the moment, tuples can only conform to Equatable, so reject all other
-  // protocols.
-  auto equatable = &EQUATABLE_PROTOCOL_DESCRIPTOR;
-  if (protocol != equatable)
+  // At the moment, tuples can only conform to Equatable and Comparable, so
+  // reject all other protocols.
+  auto equatable = &EQUATABLE_DESCRIPTOR;
+  auto comparable = &COMPARABLE_DESCRIPTOR;
+  if (protocol != equatable && protocol != comparable)
     return false;
 
   for (size_t i = 0; i != tuple->NumElements; i += 1) {
@@ -398,11 +400,16 @@ static bool tupleConformsToProtocol(const Metadata *type,
 }
 
 extern const ProtocolConformanceDescriptor _swift_tupleEquatable_conf;
+extern const ProtocolConformanceDescriptor _swift_tupleComparable_conf;
 
 static const ProtocolConformanceDescriptor *getTupleConformanceDescriptor(
                                            const ProtocolDescriptor *protocol) {
-  if (protocol == &EQUATABLE_PROTOCOL_DESCRIPTOR) {
+  if (protocol == &EQUATABLE_DESCRIPTOR) {
     return &_swift_tupleEquatable_conf;
+  }
+
+  if (protocol == &COMPARABLE_DESCRIPTOR) {
+    return &_swift_tupleComparable_conf;
   }
 
   return nullptr;

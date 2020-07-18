@@ -156,15 +156,21 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
 
     if (conformance->getType()->is<TupleType>()) {
       auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
+      auto comparable = ctx.getProtocol(KnownProtocolKind::Comparable);
 
       if (conformance->getProtocol() == equatable) {
         return "_swift_tupleEquatable_conf";
       }
 
-      llvm_unreachable("mangling unknown tuple witness table protocol");
+      if (conformance->getProtocol() == comparable) {
+        return "_swift_tupleComparable_conf";
+      }
+
+      llvm_unreachable("mangling conformance descriptor for unknown tuple \
+                        protocol");
     }
 
-    llvm_unreachable("mangling unknown builtin witness table type");
+    llvm_unreachable("mangling conformance descriptor for unknown builtin type");
   }
 
   beginMangling();
