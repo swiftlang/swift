@@ -68,12 +68,14 @@ func bar(_ s: S) {
   }
 }
 
-func multiple_trailing_with_defaults(
+func multiple_trailing_with_defaults( // expected-note{{contains defaulted closure parameters 'animations' and 'completion'}}
   duration: Int,
   animations: (() -> Void)? = nil,
   completion: (() -> Void)? = nil) {}
 
-multiple_trailing_with_defaults(duration: 42) {}
+multiple_trailing_with_defaults(duration: 42) {} // expected-warning{{unlabeled trailing closure argument matches}}
+// expected-note@-1{{'completion' to retain}}
+// expected-note@-2{{'animations' to silence this}}
 
 multiple_trailing_with_defaults(duration: 42) {} completion: {}
 

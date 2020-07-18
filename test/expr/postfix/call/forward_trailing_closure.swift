@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -disable-fuzzy-forward-scan-trailing-closure-matching
 
-func forwardMatch1(
+func forwardMatch1( // expected-note 5 {{contains defaulted}}
   a: Int = 0, b: Int = 17, closure1: (Int) -> Int = { $0 }, c: Int = 42,
   numbers: Int..., closure2: ((Double) -> Double)? = nil,
   closure3: (String) -> String = { $0 + "!" }
@@ -11,24 +11,29 @@ func testForwardMatch1(i: Int, d: Double, s: String) {
   forwardMatch1()
 
   // Matching closure1
-  forwardMatch1 { _ in i }
+  forwardMatch1 { _ in i } // expected-warning{{rather than}}
+  // expected-note@-1 2{{label the argument}}
   forwardMatch1 { _ in i } closure2: { d + $0 }
   forwardMatch1 { _ in i } closure2: { d + $0 } closure3: { $0 + ", " + s + "!" }
   forwardMatch1 { _ in i } closure3: { $0 + ", " + s + "!" }
 
-  forwardMatch1(a: 5) { $0 + i }
+  forwardMatch1(a: 5) { $0 + i } // expected-warning{{rather than}}
+  // expected-note@-1 2{{label the argument}}
   forwardMatch1(a: 5) { $0 + i } closure2: { d + $0 }
   forwardMatch1(a: 5) { $0 + i } closure2: { d + $0 } closure3: { $0 + ", " + s + "!" }
   forwardMatch1(a: 5) { $0 + i } closure3: { $0 + ", " + s + "!" }
 
-  forwardMatch1(b: 1) { $0 + i }
+  forwardMatch1(b: 1) { $0 + i } // expected-warning{{rather than}}
+  // expected-note@-1 2{{label the argument}}
   forwardMatch1(b: 1) { $0 + i } closure2: { d + $0 }
   forwardMatch1(b: 1) { $0 + i } closure2: { d + $0 } closure3: { $0 + ", " + s + "!" }
   forwardMatch1(b: 1) { $0 + i } closure3: { $0 + ", " + s + "!" }
 
   // Matching closure2
-  forwardMatch1(closure1: { $0 + i }) { d + $0 }
-  forwardMatch1(closure1: { $0 + i }, numbers: 1, 2, 3) { d + $0 }
+  forwardMatch1(closure1: { $0 + i }) { d + $0 } // expected-warning{{rather than}}
+  // expected-note@-1 2{{label the argument}}
+  forwardMatch1(closure1: { $0 + i }, numbers: 1, 2, 3) { d + $0 } // expected-warning{{rather than}}
+  // expected-note@-1 2{{label the argument}}
   forwardMatch1(closure1: { $0 + i }, numbers: 1, 2, 3) { d + $0 } closure3: { $0 + ", " + s + "!" }
 
   // Matching closure3

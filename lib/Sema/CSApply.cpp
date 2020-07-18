@@ -5723,7 +5723,7 @@ Expr *ExprRewriter::coerceCallArguments(
   // Warn if there was a recent change in trailing closure binding semantics
   // that might have lead to a silent change in behavior.
   maybeWarnAboutTrailingClosureBindingChange(
-      callee, apply->getFn(), arg, args, params, paramInfo,
+      callee, apply ? apply->getFn() : nullptr, arg, args, params, paramInfo,
       unlabeledTrailingClosureIndex, parameterBindings);
 
   SourceLoc lParenLoc, rParenLoc;

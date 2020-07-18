@@ -5,7 +5,7 @@ func takeFunc(_ f: (Int) -> Int) -> Int {}
 func takeValueAndFunc(_ value: Int, _ f: (Int) -> Int) {}
 func takeTwoFuncs(_ f: (Int) -> Int, _ g: (Int) -> Int) {}
 func takeFuncWithDefault(f : ((Int) -> Int)? = nil) {}
-func takeTwoFuncsWithDefaults(f1 : ((Int) -> Int)? = nil, f2 : ((String) -> String)? = nil) {}
+func takeTwoFuncsWithDefaults(f1 : ((Int) -> Int)? = nil, f2 : ((String) -> String)? = nil) {} // expected-note{{contains defaulted closure parameters 'f1' and 'f2'}}
 
 struct X {
   func takeFunc(_ f: (Int) -> Int) {}
@@ -94,8 +94,6 @@ var c3 = C().map // expected-note{{callee is here}}
 func multiTrailingClosure(_ a : () -> (), b : () -> ()) {  // expected-note {{'multiTrailingClosure(_:b:)' declared here}}
   multiTrailingClosure({}) {} // ok
   multiTrailingClosure {} {}   // expected-error {{missing argument for parameter 'b' in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{27-27=do }}
-  
-  
 }
 
 func labeledArgumentAndTrailingClosure() {
@@ -108,7 +106,8 @@ func labeledArgumentAndTrailingClosure() {
 
   // Trailing closure binds to first parameter.
  takeTwoFuncsWithDefaults { "Hello, " + $0 } // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
-  takeTwoFuncsWithDefaults { $0 + 1 }
+  takeTwoFuncsWithDefaults { $0 + 1 } // expected-warning{{rather than}}
+  // expected-note@-1 2{{label the argument}}
   takeTwoFuncsWithDefaults(f1: {$0 + 1 })
 }
 
