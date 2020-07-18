@@ -35,6 +35,7 @@ silopt_register_sources(
   Sink.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
+  TempLValueOpt.cpp
   TempRValueElimination.cpp
   UnsafeGuaranteedPeephole.cpp
 )
