@@ -42,7 +42,7 @@
 /*
  * Multiple Sanitizers At Once
  */
-// RUN: %swiftc_driver -sdk "" -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address,undefined,fuzzer -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=MULTIPLE_SAN_LINUX %s
+// RUN: %swiftc_driver -sdk "" -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address,fuzzer,undefined -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=MULTIPLE_SAN_LINUX %s
 
 /*
  * Bad Argument Tests
@@ -106,7 +106,7 @@
 
 // UBSAN: -rpath @executable_path
 
-// MULTIPLE_SAN_LINUX: -fsanitize=address,undefined,fuzzer
+// MULTIPLE_SAN_LINUX: -fsanitize=address,fuzzer,undefined
 
 // BADARG: unsupported argument 'unknown' to option '-sanitize='
 // INCOMPATIBLESANITIZERS: argument '-sanitize=address' is not allowed with '-sanitize=thread'

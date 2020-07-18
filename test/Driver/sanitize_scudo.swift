@@ -34,7 +34,7 @@
 
 // SCUDO_ASAN: argument '-sanitize=scudo' is not allowed with '-sanitize=address'
 // SCUDO_TSAN: argument '-sanitize=scudo' is not allowed with '-sanitize=thread'
-// SCUDO_UBSAN_LINUX: -fsanitize=undefined,scudo
+// SCUDO_UBSAN_LINUX: -fsanitize=scudo,undefined
 // SCUDO_LIBRARY_LINUX: bin{{/|\\\\}}clang
 // SCUDO_LIBRARY_LINUX-NOT: -fsanitize=scudo
 
