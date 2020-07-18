@@ -1464,7 +1464,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request = PreCheckFunctionBuilderRequest{func, func->getBody()};
+  auto request = PreCheckFunctionBuilderRequest{AnyFunctionRef(func)};
   switch (evaluateOrDefault(
               ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1592,7 +1592,7 @@ ConstraintSystem::matchFunctionBuilder(
 
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
-  auto request = PreCheckFunctionBuilderRequest{fn, fn.getBody()};
+  auto request = PreCheckFunctionBuilderRequest{fn};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1712,10 +1712,10 @@ public:
     if (HasError)
       return FunctionBuilderBodyPreCheck::Error;
 
+    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
+
     if (hasReturnStmt())
       return FunctionBuilderBodyPreCheck::HasReturnStmt;
-
-    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
 
     return FunctionBuilderBodyPreCheck::Okay;
   }
@@ -1754,23 +1754,16 @@ public:
 
 }
 
-FunctionBuilderBodyPreCheck
-PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval, AnyFunctionRef fn,
-                                         BraceStmt *body) const {
-  // NOTE: 'body' is passed only for the request evaluater caching key.
-  // Since source tooling (e.g. code completion) might replace the body,
-  // the function alone is not sufficient for the key.
-  assert(fn.getBody() == body &&
-         "body must be the current body of the function");
-
+FunctionBuilderBodyPreCheck PreCheckFunctionBuilderRequest::evaluate(
+    Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const {
   // We don't want to do the precheck if it will already have happened in
   // the enclosing expression.
   bool skipPrecheck = false;
   if (auto closure = dyn_cast_or_null<ClosureExpr>(
-          fn.getAbstractClosureExpr()))
+          owner.Fn.getAbstractClosureExpr()))
     skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
 
-  return PreCheckFunctionBuilderApplication(fn, false).run();
+  return PreCheckFunctionBuilderApplication(owner.Fn, false).run();
 }
 
 std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
