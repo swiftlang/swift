@@ -1101,8 +1101,9 @@ func rdar17170728() {
     // expected-error@-1 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
   }
 
-  let _ = [i, j, k].reduce(0 as Int?) { // expected-note{{found candidate with type '(__owned @escaping (Bool, Bool) -> Bool?, (inout @escaping (Bool, Bool) -> Bool?, Int?) throws -> ()) throws -> (Bool, Bool) -> Bool?'}}
-    // expected-error@-1{{no exact matches in call to instance method 'reduce'}}
+  let _ = [i, j, k].reduce(0 as Int?) {
+    // expected-error@-1{{missing argument label 'into:' in call}}
+    // expected-error@-2{{cannot convert value of type 'Int?' to expected argument type}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
     // expected-error@-1{{binary operator '+' cannot be applied to two 'Bool' operands}}
   }
