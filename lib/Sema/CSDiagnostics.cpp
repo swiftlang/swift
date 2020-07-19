@@ -5458,7 +5458,7 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
   SourceLoc startLoc; // Left invalid if we're inserting
 
   auto isSimpleTypelessPattern = [](Pattern *P) -> bool {
-    if (auto VP = dyn_cast_or_null<VarPattern>(P))
+    if (auto VP = dyn_cast_or_null<BindingPattern>(P))
       P = VP->getSubPattern();
     return P && isa<NamedPattern>(P);
   };

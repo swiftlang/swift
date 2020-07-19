@@ -1738,7 +1738,7 @@ Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   return nullptr;
 }
 
-Pattern *Traversal::visitVarPattern(VarPattern *P) {
+Pattern *Traversal::visitBindingPattern(BindingPattern *P) {
   if (Pattern *newSub = doIt(P->getSubPattern())) {
     P->setSubPattern(newSub);
     return P;

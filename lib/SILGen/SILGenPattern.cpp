@@ -99,7 +99,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     llvm_unreachable("not semantic");
   }
 }
@@ -129,7 +129,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return isDirectlyRefutablePattern(p->getSemanticsProvidingPattern());
   }  
   llvm_unreachable("bad pattern");
@@ -190,7 +190,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return getNumSpecializationsRecursive(p->getSemanticsProvidingPattern(), n);
   }  
   llvm_unreachable("bad pattern");
@@ -231,7 +231,7 @@ static bool isWildcardPattern(const Pattern *p) {
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
 
@@ -293,7 +293,7 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   }
     
   case PatternKind::Paren:
-  case PatternKind::Var:
+  case PatternKind::Binding:
   case PatternKind::Typed:
     llvm_unreachable("not semantic");
   }
@@ -1348,7 +1348,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     llvm_unreachable("non-semantic pattern kind!");
   
   case PatternKind::Tuple:
