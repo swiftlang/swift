@@ -83,7 +83,7 @@ bb4:
   return %10 : $()
 }
 
-// Verify that findAccessedStorage handles cyclic phis.
+// Verify that identifyFormalAccess handles cyclic phis.
 // <rdar://47059671> swiftc crashes
 class AClass {
   var aStoredProp: Builtin.Int32
