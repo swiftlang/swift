@@ -1193,12 +1193,12 @@ void PrintAST::printPattern(const Pattern *pattern) {
     // FIXME: Print expr.
     break;
 
-  case PatternKind::Var:
+  case PatternKind::Binding:
     if (!Options.SkipIntroducerKeywords)
-      Printer << (cast<VarPattern>(pattern)->isLet() ? tok::kw_let
-                                                     : tok::kw_var)
+      Printer << (cast<BindingPattern>(pattern)->isLet() ? tok::kw_let
+                                                         : tok::kw_var)
               << " ";
-    printPattern(cast<VarPattern>(pattern)->getSubPattern());
+    printPattern(cast<BindingPattern>(pattern)->getSubPattern());
   }
 }
 

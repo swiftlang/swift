@@ -2725,12 +2725,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case PatternKind::Expr:
       llvm_unreachable("Refutable patterns cannot be serialized");
 
-    case PatternKind::Var: {
-      auto var = cast<VarPattern>(pattern);
+    case PatternKind::Binding: {
+      auto var = cast<BindingPattern>(pattern);
 
-      unsigned abbrCode = S.DeclTypeAbbrCodes[VarPatternLayout::Code];
-      VarPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   var->isLet());
+      unsigned abbrCode = S.DeclTypeAbbrCodes[BindingPatternLayout::Code];
+      BindingPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       var->isLet());
       writePattern(var->getSubPattern());
       break;
     }
@@ -4492,7 +4492,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TuplePatternLayout>();
   registerDeclTypeAbbr<TuplePatternEltLayout>();
   registerDeclTypeAbbr<NamedPatternLayout>();
-  registerDeclTypeAbbr<VarPatternLayout>();
+  registerDeclTypeAbbr<BindingPatternLayout>();
   registerDeclTypeAbbr<AnyPatternLayout>();
   registerDeclTypeAbbr<TypedPatternLayout>();
   registerDeclTypeAbbr<InlinableBodyTextLayout>();

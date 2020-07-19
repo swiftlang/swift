@@ -5601,7 +5601,7 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (!Pat || Pat->isImplicit())
     return SourceRange();
 
-  if (auto *VP = dyn_cast<VarPattern>(Pat))
+  if (auto *VP = dyn_cast<BindingPattern>(Pat))
     Pat = VP->getSubPattern();
   if (auto *TP = dyn_cast<TypedPattern>(Pat))
     if (auto typeRepr = TP->getTypeRepr())

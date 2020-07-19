@@ -286,7 +286,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(Bool)
 #undef ALWAYS_RESOLVED_PATTERN
 
-  Pattern *visitVarPattern(VarPattern *P) {
+  Pattern *visitBindingPattern(BindingPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
     P->setSubPattern(visit(P->getSubPattern()));
@@ -643,11 +643,11 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   if (auto *TP = dyn_cast<TypedPattern>(P))
     InnerP = TP->getSubPattern();
 
-  // If the pattern was valid, check for an implicit VarPattern on the outer
+  // If the pattern was valid, check for an implicit BindingPattern on the outer
   // level.  If so, we have an "if let" condition and we want to enforce some
   // more structure on it.
-  if (isStmtCondition && isa<VarPattern>(InnerP) && InnerP->isImplicit()) {
-    auto *Body = cast<VarPattern>(InnerP)->getSubPattern();
+  if (isStmtCondition && isa<BindingPattern>(InnerP) && InnerP->isImplicit()) {
+    auto *Body = cast<BindingPattern>(InnerP)->getSubPattern();
 
     // If they wrote a "x?" pattern, they probably meant "if let x".
     // Check for this and recover nicely if they wrote that.
@@ -757,12 +757,12 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
   case PatternKind::Paren:
-  case PatternKind::Var: {
+  case PatternKind::Binding: {
     Pattern *SP;
     if (auto *PP = dyn_cast<ParenPattern>(P))
       SP = PP->getSubPattern();
     else
-      SP = cast<VarPattern>(P)->getSubPattern();
+      SP = cast<BindingPattern>(P)->getSubPattern();
     Type subType = TypeChecker::typeCheckPattern(
         pattern.forSubPattern(SP, /*retainTopLevel=*/true));
     if (subType->hasError())
@@ -1011,9 +1011,9 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     PP->setType(sub->getType());
     return P;
   }
-  case PatternKind::Var: {
-    auto VP = cast<VarPattern>(P);
-    
+  case PatternKind::Binding: {
+    auto VP = cast<BindingPattern>(P);
+
     Pattern *sub = VP->getSubPattern();
     sub = coercePatternToType(
         pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions);

@@ -2451,7 +2451,7 @@ void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
     return;
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return checkPattern(Pat->getSemanticsProvidingPattern(), Reason);
   case PatternKind::Named:
     return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);
