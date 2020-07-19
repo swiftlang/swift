@@ -508,10 +508,10 @@ infix operator ~>
 
 // Interval operators.
 
-infix operator <=~<=: RangeFormatiPrecedence, Comparable
-infix operator <=~~<: RangeFormatiPrecedence, Comparable
-infix operator <~~<=: RangeFormatiPrecedence, Comparable
-infix operator <~~~<: RangeFormatiPrecedence, Comparable
+infix operator <=~<=: RangeFormationPrecedence, Comparable
+infix operator <=~~<: RangeFormationPrecedence, Comparable
+infix operator <~~<=: RangeFormationPrecedence, Comparable
+infix operator <~~~<: RangeFormationPrecedence, Comparable
 
 prefix operator ~~~<=: Comparable
 prefix operator ~~~~<: Comparable
@@ -521,10 +521,10 @@ postfix operator <~~~~: Comparable
 
 // Inverse interval operators.
 
-infix operator >=~>=: RangeFormatiPrecedence, Comparable
-infix operator >~~>=: RangeFormatiPrecedence, Comparable
-infix operator >=~~>: RangeFormatiPrecedence, Comparable
-infix operator >~~~>: RangeFormatiPrecedence, Comparable
+infix operator >=~>=: RangeFormationPrecedence, Comparable
+infix operator >~~>=: RangeFormationPrecedence, Comparable
+infix operator >=~~>: RangeFormationPrecedence, Comparable
+infix operator >~~~>: RangeFormationPrecedence, Comparable
 
 postfix operator >=~~~: Comparable
 postfix operator >~~~~: Comparable
