@@ -206,6 +206,12 @@ public:
                                           StringRef interfacePath) {
     return std::vector<std::string>();
   }
+  virtual bool tryEmitForwardingModule(StringRef moduleName,
+                                       StringRef interfacePath,
+                                       ArrayRef<std::string> candidates,
+                                       StringRef outPath) {
+    return false;
+  }
 };
 
 /// Imports serialized Swift modules into an ASTContext.
