@@ -1948,20 +1948,20 @@ public:
     // also requires that Unidentified access fit a whitelist on known
     // non-internal globals or class properties.
     //
-    // First check that findAccessedStorage returns without asserting. For
+    // First check that identifyFormalAccess returns without asserting. For
     // Unsafe enforcement, that is sufficient. For any other enforcement
     // level also require that it returns a valid AccessedStorage object.
     // Unsafe enforcement is used for some unrecognizable access patterns,
     // like debugger variables. The compiler never cares about the source of
     // those accesses.
-    findAccessedStorage(BAI->getSource());
+    identifyFormalAccess(BAI);
     // FIXME: rdar://57291811 - the following check for valid storage will be
     // reenabled shortly. A fix is planned. In the meantime, the possiblity that
     // a real miscompilation could be caused by this failure is insignificant.
     // I will probably enable a much broader SILVerification of address-type
     // block arguments first to ensure we never hit this check again.
     /*
-    AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    AccessedStorage storage = identifyFormalAccess(BAI);
     if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
       require(storage, "Unknown formal access pattern");
     */
@@ -2000,8 +2000,8 @@ public:
       break;
     }
 
-    // First check that findAccessedStorage never asserts.
-    AccessedStorage storage = findAccessedStorage(BUAI->getSource());
+    // First check that identifyFormalAccess never asserts.
+    AccessedStorage storage = identifyFormalAccess(BUAI);
     // Only allow Unsafe and Builtin access to have invalid storage.
     if (BUAI->getEnforcement() != SILAccessEnforcement::Unsafe
         && !BUAI->isFromBuiltin()) {
