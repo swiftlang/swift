@@ -173,8 +173,13 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
         break;
 
       case DoesNotConform:
+        // for accurate diagnostic, we show TypeRepr if present
+        TypeLoc typeLoc = {
+            it->second->getTypeReprOrParentPatternTypeRepr(),
+            it->second->getType(),
+        };
         it->second->diagnose(diag::codable_non_conforming_property_here,
-                             derived.getProtocolType(), it->second->getType());
+                             derived.getProtocolType(), typeLoc);
         LLVM_FALLTHROUGH;
 
       case TypeNotValidated:
@@ -353,8 +358,21 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
       }
 
       case DoesNotConform:
+        // for accurate diagnostic, we show TypeRepr if present for IUO
+        TypeLoc typeLoc = TypeLoc();
+        if(varDecl->isImplicitlyUnwrappedOptional()){
+            typeLoc = {
+                varDecl->getTypeReprOrParentPatternTypeRepr(),
+                varDecl->getType(),
+            };
+        } else {
+            typeLoc = {
+                NULL,
+                varDecl->getType(),
+            };
+        }
         varDecl->diagnose(diag::codable_non_conforming_property_here,
-                          derived.getProtocolType(), varDecl->getType());
+                                derived.getProtocolType(),typeLoc);
         LLVM_FALLTHROUGH;
 
       case TypeNotValidated:
