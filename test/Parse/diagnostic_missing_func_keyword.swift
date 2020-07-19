@@ -27,9 +27,9 @@ infix operator %%
 struct Bar {
   fisr = 0x5F3759DF // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
 
-  %%<T: Brew> (lhs: T, rhs: T) -> T { // expected-error {{expected 'func' keyword in operator function declaration}} {{3-3=func }}
-                                      // expected-error @-1 {{operator '%%' declared in type 'Bar' must be 'static'}}
-                                      // expected-error @-2 {{member operator '%%' must have at least one argument of type 'Bar'}}
+  %%<T: Brew> (lhs: T, rhs: T) -> T { // expected-error {{expected declaration}}
+
+
     lhs + lhs + rhs + rhs
   }
 
@@ -38,12 +38,14 @@ struct Bar {
 
   (light, dark) = (100, 200)// expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
   
-  a, b: Int // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
+  a, b: Int // expected-error {{expected declaration}}
 }
 
 struct Faz {
   abc : Int = 10 // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
-  def.ber : Float = 1.0 // expected-note {{found an unexpected statement here}}
+  def.ber : Float = 1.0 // expected-error {{expected declaration}}
+
+  x + 3 // expected-error {{expected declaration}}
 }
 
 class Baz {
