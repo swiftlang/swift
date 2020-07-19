@@ -1039,9 +1039,9 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
     return buildDefaultInitializerString(
         dc, cast<TypedPattern>(pattern)->getSubPattern());
 
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return buildDefaultInitializerString(
-        dc, cast<VarPattern>(pattern)->getSubPattern());
+        dc, cast<BindingPattern>(pattern)->getSubPattern());
   }
 
   llvm_unreachable("Unhandled PatternKind in switch.");

@@ -2771,7 +2771,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         if (SC->getCond().size() == 1) {
           auto pattern = SC->getCond()[0].getPattern();
           if (auto OSP = dyn_cast<OptionalSomePattern>(pattern))
-            if (auto LP = dyn_cast<VarPattern>(OSP->getSubPattern()))
+            if (auto LP = dyn_cast<BindingPattern>(OSP->getSubPattern()))
               if (isa<NamedPattern>(LP->getSubPattern())) {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
@@ -2839,13 +2839,13 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         if (PBD->getSingleVar() == var)
           FixItLoc = PBD->getLoc();
       } else if (auto *pattern = var->getParentPattern()) {
-        VarPattern *foundVP = nullptr;
+        BindingPattern *foundVP = nullptr;
         pattern->forEachNode([&](Pattern *P) {
-          if (auto *VP = dyn_cast<VarPattern>(P))
+          if (auto *VP = dyn_cast<BindingPattern>(P))
             if (VP->getSingleVar() == var)
               foundVP = VP;
         });
-        
+
         if (foundVP && !foundVP->isLet())
           FixItLoc = foundVP->getLoc();
       }
@@ -3772,7 +3772,7 @@ static void diagDeprecatedObjCSelectors(const DeclContext *dc,
 static Pattern *skipNonTypeSyntacticPatterns(Pattern *pattern) {
   if (auto *pp = dyn_cast<ParenPattern>(pattern))
     return skipNonTypeSyntacticPatterns(pp->getSubPattern());
-  if (auto *vp = dyn_cast<VarPattern>(pattern))
+  if (auto *vp = dyn_cast<BindingPattern>(pattern))
     return skipNonTypeSyntacticPatterns(vp->getSubPattern());
   return pattern;
 }

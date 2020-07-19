@@ -5726,7 +5726,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       } else if (auto paren = dyn_cast<ParenPattern>(cur)) {
         primaryVarIsWellFormed = false;
         cur = paren->getSubPattern();
-      } else if (auto var = dyn_cast<VarPattern>(cur)) {
+      } else if (auto var = dyn_cast<BindingPattern>(cur)) {
         primaryVarIsWellFormed = false;
         cur = var->getSubPattern();
       } else {

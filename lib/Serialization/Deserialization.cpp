@@ -392,11 +392,12 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   }
   case decls_block::VAR_PATTERN: {
     bool isLet;
-    VarPatternLayout::readRecord(scratch, isLet);
+    BindingPatternLayout::readRecord(scratch, isLet);
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
-    auto result = VarPattern::createImplicit(getContext(), isLet, subPattern);
+    auto result =
+        BindingPattern::createImplicit(getContext(), isLet, subPattern);
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(interfaceType, owningDC);
     else
