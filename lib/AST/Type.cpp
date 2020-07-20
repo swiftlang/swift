@@ -3379,12 +3379,10 @@ AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
 #ifndef NDEBUG
   if (!(type->isFunctionPointerType() || type->isBlockPointerType() ||
         type->isFunctionReferenceType())) {
-    SmallString<256> buf;
-    llvm::raw_svector_ostream os(buf);
-    os << "Expected a Clang function type wrapped in a pointer type or "
-       << "a block pointer type but found:\n <TODO>";
-    // type->dump(os);
-    llvm_unreachable(os.str().data());
+    llvm::errs() << "Expected a Clang function type wrapped in a pointer type "
+                 << "or a block pointer type but found:\n";
+    type->dump();
+    llvm_unreachable("\nUnexpected Clang type when creating ExtInfo!");
   }
 #endif
   return;
