@@ -22,7 +22,7 @@ using namespace swift;
 using namespace constraints;
 
 void ConstraintSystem::PotentialBindings::inferTransitiveBindings(
-    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
@@ -119,7 +119,7 @@ isUnviableDefaultType(Type defaultType,
 }
 
 void ConstraintSystem::PotentialBindings::inferDefaultTypes(
-    ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
+    const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes) {
   auto isDirectRequirement = [&](Constraint *constraint) -> bool {
     if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
       auto *repr = cs.getRepresentative(typeVar);
@@ -275,7 +275,7 @@ void ConstraintSystem::PotentialBindings::inferDefaultTypes(
 }
 
 void ConstraintSystem::PotentialBindings::finalize(
-    ConstraintSystem &cs,
+    const ConstraintSystem &cs,
     const llvm::SmallDenseMap<TypeVariableType *,
                               ConstraintSystem::PotentialBindings>
         &inferredBindings) {
