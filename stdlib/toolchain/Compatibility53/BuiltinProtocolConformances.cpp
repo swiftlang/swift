@@ -37,6 +37,13 @@ static const ProtocolDescriptor *getComparableDescriptor() {
   return descriptor;
 }
 
+static const ProtocolDescriptor *getHashableDescriptor() {
+  auto descriptor = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const ProtocolDescriptor *>(
+                     dlsym(RTLD_DEFAULT, "$sSHMp")));
+  return descriptor;
+}
+
 static const WitnessTable *conformsToProtocol(const Metadata *type,
                                         const ProtocolDescriptor *protocol) {
   using Fn = const WitnessTable *(const Metadata *, const ProtocolDescriptor *);
@@ -448,4 +455,131 @@ bool swift::_swift_tupleComparable_greaterThan(OpaqueValue *tuple1,
   // Otherwise these tuples are completely equal, thus they are not greater than
   // each other.
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// Tuple Hashable Conformance
+//===----------------------------------------------------------------------===//
+
+#define TUPLE_HASHABLE_WT SYMBOL("_swift_tupleHashable_wt")
+
+// Define the conformance descriptor for tuple Hashable. We do this in
+// assembly to work around relative reference issues.
+__asm(
+  "  .section __DATA,__data\n"
+  "  .globl " TUPLE_HASHABLE_CONF "\n"
+  "  .p2align 2\n"
+  TUPLE_HASHABLE_CONF ":\n"
+  // This is an indirectable relative reference to the Hashable protocol
+  // descriptor. However, this is 0 here because the compatibility libraries
+  // can't have a dependency on libswiftCore (which is where Hashable lives).
+  "  .long 0\n"
+  // 769 is the MetadataKind::Tuple
+  "  .long 769\n"
+  // This is a direct relative reference to the witness table defined below.
+  "  .long ((" TUPLE_HASHABLE_WT ") - (" TUPLE_HASHABLE_CONF ")) - 8\n"
+  // 32 are the ConformanceFlags with the type reference bit set to MetadataKind.
+  "  .long 32\n"
+);
+
+extern const ProtocolConformanceDescriptor _swift_tupleHashable_conf;
+
+// Due to the fact that the compatibility libraries can't have a hard
+// dependency to libswiftCore (which is where the Hashable protocol desciptor
+// lives), we have to manually implant this before calling any user code.
+__attribute__((constructor))
+void _emplaceTupleHashableDescriptor() {
+  auto tupleHashableConf = const_cast<int32_t *>(
+    reinterpret_cast<const int32_t *>(&_swift_tupleHashable_conf));
+  auto hashable = getHashableDescriptor();
+
+  // This is an indirectable pointer.
+  *tupleHashableConf = intptr_t(hashable) - intptr_t(tupleHashableConf);
+}
+
+// The base Equatable protocol is itself a requirement, thus the requirement
+// count is 4 (Equatable + hashValue + hash(into:) + _rawHashValue) and the
+// witness is the tuple Equatable table.
+SWIFT_RUNTIME_EXPORT
+_WitnessTable<4> _swift_tupleHashable_wt = {
+  &_swift_tupleHashable_conf,
+  {
+    reinterpret_cast<const void *>(&_swift_tupleEquatable_wt),
+    reinterpret_cast<void *>(_swift_tupleHashable_hashValue),
+    reinterpret_cast<void *>(_swift_tupleHashable_hash),
+    nullptr
+  }
+};
+
+static void *get_rawHashValueDefaultImplFunc() {
+  auto impl = SWIFT_LAZY_CONSTANT(
+    dlsym(RTLD_DEFAULT, "$sSHsE13_rawHashValue4seedS2i_tF"));
+  return impl;
+}
+
+// Due to the fact that the compatibility libraries can't have a hard
+// dependency to libswiftCore (which is where the _rawHashValue default impl
+// lives), we have to manually implant this before calling any user code.
+__attribute__((constructor))
+void _emplaceTupleHashable_rawHashValueDefaultImpl() {
+  _swift_tupleHashable_wt.Witnesses[3] = get_rawHashValueDefaultImplFunc();
+}
+
+using HashValueFn = SWIFT_CC(swift) intptr_t(OpaqueValue *value, Metadata *Self,
+                                             void *witnessTable);
+using HasherCombineFn = SWIFT_CC(swift) void(OpaqueValue *value,
+                                             const Metadata *Self,
+                                             const WitnessTable *witnessTable,
+                                             SWIFT_CONTEXT OpaqueValue *hasher);
+
+static HashValueFn *get_hashValueFunc() {
+  auto descriptor = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<HashValueFn *>(
+                     dlsym(RTLD_DEFAULT, STR(SWIFT_HASHVALUE_FUNC))));
+  return descriptor;
+}
+
+static HasherCombineFn *getHashCombineFunc() {
+  auto descriptor = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<HasherCombineFn *>(
+                     dlsym(RTLD_DEFAULT, STR(SWIFT_HASHER_COMBINE_FUNC))));
+  return descriptor;
+}
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+intptr_t swift::_swift_tupleHashable_hashValue(SWIFT_CONTEXT OpaqueValue *tuple,
+                                          Metadata *Self, void *witnessTable) {
+  auto _hashValue = get_hashValueFunc();
+  return _hashValue(tuple, Self, witnessTable);
+}
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void swift::_swift_tupleHashable_hash(OpaqueValue *hasher,
+                                      SWIFT_CONTEXT OpaqueValue *tuple,
+                                      Metadata *Self, void *witnessTable) {
+  auto tupleTy = cast<TupleTypeMetadata>(Self);
+
+  // Loop through all elements and hash them into the Hasher.
+  for (size_t i = 0; i != tupleTy->NumElements; i += 1) {
+    auto elt = tupleTy->getElement(i);
+
+    // Ensure we actually have a conformance to Hashable for this element type.
+    auto hashable = getHashableDescriptor();
+    auto conformance = conformsToProtocol(elt.Type, hashable);
+
+    // If we don't have a conformance then something somewhere messed up in
+    // deciding that this tuple type was Hashable...??
+    if (!conformance)
+      swift_unreachable("Tuple hasing requires that all elements be Hashable.");
+
+    // Get the element value from the tuple.
+    auto value = reinterpret_cast<OpaqueValue *>(
+                  reinterpret_cast<char *>(tuple) + elt.Offset);
+
+    auto hasherCombine = getHashCombineFunc();
+
+    // Call the combine function on the hasher for this element value and we're
+    // done!
+    hasherCombine(value, elt.Type, conformance, hasher);
+  }
 }
