@@ -140,12 +140,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
       return false;
     };
 
-    if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
-      if (ReportParamList(AF->getParameters()))
-        return false;
-    }
-    if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
-      if (ReportParamList(SD->getIndices()))
+    if (isa<AbstractFunctionDecl>(VD) || isa<SubscriptDecl>(VD)) {
+      auto ParamList = getParameterList(VD);
+      if (ReportParamList(ParamList))
         return false;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
