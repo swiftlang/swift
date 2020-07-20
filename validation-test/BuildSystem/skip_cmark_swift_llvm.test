@@ -1,4 +1,4 @@
-# REQUIRES: standalone_test
+# REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
