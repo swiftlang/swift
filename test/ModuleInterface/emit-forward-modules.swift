@@ -2,7 +2,6 @@
 // RUN: %empty-directory(%t/Foo.swiftmodule)
 // RUN: %empty-directory(%t/ResourceDir/%target-sdk-name/prebuilt-modules/Foo.swiftmodule)
 // RUN: echo "public func foo() {}" > %t/Foo.swift
-// REQUIRES: rdar65827276
 
 import Foo
 
@@ -20,7 +19,7 @@ import Foo
 // RUN: %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/Foo-from-interface.swiftmodule
 
 // Step 4: given the stale adjacent binary module as a candidate, building a module from the interface should give us a binary module
-// RUN: touch %t/Foo.swiftmodule/%target-swiftinterface-name
+// RUN: echo "// some comments" >> %t/Foo.swiftmodule/%target-swiftinterface-name
 
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Foo.swiftmodule/%target-swiftinterface-name -o %t/Foo-from-interface.swiftmodule -module-name Foo -candidate-module-file %t/Foo.swiftmodule/%target-swiftmodule-name
 
