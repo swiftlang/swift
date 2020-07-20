@@ -2003,31 +2003,20 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   SolutionApplicationTarget target(
       expr, dc, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
-  bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(
-      target, unresolvedTypeExprs, options);
+  auto resultTarget = typeCheckExpression(target, options);
   if (!resultTarget) {
     expr = target.getAsExpr();
     return Type();
   }
 
   expr = resultTarget->getAsExpr();
-
-  // HACK for clients that want unresolved types.
-  if (unresolvedTypeExprs) {
-    return ErrorType::get(dc->getASTContext());
-  }
-
-
   return expr->getType();
 }
 
 Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(
     SolutionApplicationTarget &target,
-    bool &unresolvedTypeExprs,
     TypeCheckExprOptions options) {
-  unresolvedTypeExprs = false;
   Expr *expr = target.getAsExpr();
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
@@ -2081,14 +2070,12 @@ TypeChecker::typeCheckExpression(
   }
 
   // If the client allows the solution to have unresolved type expressions,
-  // check for them now.  We cannot apply the solution with unresolved TypeVars,
+  // check for them now. We cannot apply the solution with unresolved TypeVars,
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
        (viable->size() != 1 ||
         (target.getExprConversionType() &&
          target.getExprConversionType()->hasUnresolvedType()))) {
-    // FIXME: This hack should only be needed for CSDiag.
-    unresolvedTypeExprs = true;
     return target;
   }
 
@@ -2137,8 +2124,7 @@ bool TypeChecker::typeCheckBinding(
             /*bindPatternVarsOneWay=*/false);
 
   // Type-check the initializer.
-  bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs);
+  auto resultTarget = typeCheckExpression(target);
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();
@@ -2267,8 +2253,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
   auto target = SolutionApplicationTarget::forForEachStmt(
       stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
-  bool unresolvedTypeExprs = false;
-  return !typeCheckExpression(target, unresolvedTypeExprs);
+  return !typeCheckExpression(target);
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {

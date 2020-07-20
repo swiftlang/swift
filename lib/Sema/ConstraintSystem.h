@@ -2578,7 +2578,6 @@ private:
                                                         Type builderType);
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
-                                          bool &unresolvedTypeExprs,
                                           TypeCheckExprOptions options);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
