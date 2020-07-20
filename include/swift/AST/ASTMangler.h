@@ -57,6 +57,10 @@ protected:
   /// to fill these in.
   bool AllowSymbolicReferences = false;
 
+  /// If enabled, include the argument labels (if present) of the associated
+  /// values of an enum case.
+  bool IncludeEnumCasePayloadLabels = true;
+
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
                                               const OpaqueTypeDecl *>;

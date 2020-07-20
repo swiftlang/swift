@@ -4337,8 +4337,11 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
 }
 
 Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
-                                       ForDefinition_t forDefinition) {
-  LinkEntity entity = LinkEntity::forEnumCase(Case);
+                                       ForDefinition_t forDefinition,
+                                       bool forCaseCompatibility) {
+  LinkEntity entity = forCaseCompatibility
+                          ? LinkEntity::forEnumCaseCompatibility(Case)
+                          : LinkEntity::forEnumCase(Case);
   auto addr = getAddrOfSimpleVariable(*this, GlobalVars, entity, forDefinition);
 
   auto *global = cast<llvm::GlobalVariable>(addr.getAddress());

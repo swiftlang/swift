@@ -259,6 +259,22 @@ static void emitResilientTagIndex(IRGenModule &IGM,
   auto *global = cast<llvm::GlobalVariable>(
     IGM.getAddrOfEnumCase(Case, ForDefinition).getAddress());
   global->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
+
+  auto oldLinkEntity = LinkEntity::forEnumCaseCompatibility(Case);
+  auto newLinkEntity = LinkEntity::forEnumCase(Case);
+
+  // If the old and new manglings are the same, then we don't need to
+  // emit an alias.
+  if (oldLinkEntity.mangleAsString() == newLinkEntity.mangleAsString())
+    return;
+
+  // Emit an alias for compatibility reasons.
+  auto *globalCompat = cast<llvm::GlobalVariable>(
+      IGM.getAddrOfEnumCase(Case, ForDefinition, /*forCaseCompatibility*/ true)
+          .getAddress());
+  globalCompat->setInitializer(
+      llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
+  IGM.defineAlias(newLinkEntity, globalCompat);
 }
 
 void
@@ -6939,6 +6955,31 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   return ti;
 }
 
+static void emitOldEnumCaseSymbolForCompatibility(IRGenModule &IGM,
+                                                  EnumElementDecl *theCase) {
+  auto ProperlySizedIntTy =
+      SILType::getBuiltinIntegerType(8, IGM.getSwiftModule()->getASTContext());
+  auto storageType = IGM.getStorageType(ProperlySizedIntTy);
+
+  auto oldLinkEntity = LinkEntity::forEnumCaseCompatibility(theCase);
+  auto oldSymbolName = oldLinkEntity.mangleAsString();
+
+  if (IGM.Module.getNamedGlobal(oldSymbolName)) {
+    return;
+  }
+
+  auto info = LinkInfo::get(IGM, oldLinkEntity, ForDefinition);
+  auto oldSymbolVar = new llvm::GlobalVariable(
+      IGM.Module, storageType, /*constant*/ true, info.getLinkage(),
+      /*Init to zero*/ llvm::Constant::getNullValue(storageType),
+      oldSymbolName);
+  ApplyIRLinkage(
+      {info.getLinkage(), info.getVisibility(), info.getDLLStorage()})
+      .to(oldSymbolVar);
+  oldSymbolVar->setAlignment(llvm::MaybeAlign(8));
+  IGM.addUsedGlobal(oldSymbolVar);
+}
+
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
   if (!IRGen.hasLazyMetadata(theEnum)) {
     emitEnumMetadata(*this, theEnum);
@@ -6947,8 +6988,14 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
 
   emitNestedTypeDecls(theEnum->getMembers());
 
-  if (!isResilient(theEnum, ResilienceExpansion::Minimal))
+  if (!isResilient(theEnum, ResilienceExpansion::Minimal)) {
+    // We also need to emit the old symbol for the enum case
+    // for compatibility reasons.
+    for (auto enumCase : theEnum->getAllElements()) {
+      emitOldEnumCaseSymbolForCompatibility(*this, enumCase);
+    }
     return;
+  }
 
   // Emit resilient tag indices.
   auto &strategy = getEnumImplStrategy(

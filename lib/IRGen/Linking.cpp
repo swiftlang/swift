@@ -284,6 +284,9 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::EnumCase:
     return mangler.mangleEnumCase(getDecl());
 
+  case Kind::EnumCaseCompatibility:
+    return mangler.mangleEnumCase(getDecl(), /*forCaseCompatibility*/ true);
+
   case Kind::FieldOffset:
     return mangler.mangleFieldOffset(getDecl());
 
@@ -559,7 +562,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     llvm_unreachable("invalid metadata address");
   }
 
-  case Kind::EnumCase: {
+  case Kind::EnumCase:
+  case Kind::EnumCaseCompatibility: {
     auto *elementDecl = cast<EnumElementDecl>(getDecl());
     return getSILLinkage(getDeclLinkage(elementDecl), forDefinition);
   }
@@ -704,6 +708,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::MethodDescriptorAllocator:
   case Kind::MethodLookupFunction:
   case Kind::EnumCase:
+  case Kind::EnumCaseCompatibility:
   case Kind::FieldOffset:
   case Kind::ObjCClass:
   case Kind::ObjCClassRef:
@@ -831,6 +836,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::FieldOffset:
     return IGM.SizeTy;
   case Kind::EnumCase:
+  case Kind::EnumCaseCompatibility:
     return IGM.Int32Ty;
   case Kind::ProtocolWitnessTableLazyCacheVariable:
     return IGM.WitnessTablePtrTy;
@@ -880,6 +886,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::ReflectionAssociatedTypeDescriptor:
   case Kind::PropertyDescriptor:
   case Kind::EnumCase:
+  case Kind::EnumCaseCompatibility:
   case Kind::MethodDescriptor:
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:
@@ -959,6 +966,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::MethodDescriptorAllocator:
   case Kind::MethodLookupFunction:
   case Kind::EnumCase:
+  case Kind::EnumCaseCompatibility:
   case Kind::FieldOffset:
   case Kind::ObjCClass:
   case Kind::ObjCClassRef:
@@ -1029,6 +1037,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::MethodDescriptorAllocator:
   case Kind::MethodLookupFunction:
   case Kind::EnumCase:
+  case Kind::EnumCaseCompatibility:
   case Kind::FieldOffset:
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:

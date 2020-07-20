@@ -2299,8 +2299,18 @@ void ASTMangler::appendFunctionInputType(
   default:
     bool isFirstParam = true;
     for (auto &param : params) {
-      appendTypeListElement(Identifier(), param.getPlainType(),
-                            param.getParameterFlags(), forDecl);
+      // We need to include the argument label for the enum case in the
+      // mangling as well, to avoid collisions when we have enum cases
+      // that share the same base name, but have different labeled
+      // arguments.
+      if (forDecl && isa<EnumElementDecl>(forDecl) && param.hasLabel() &&
+          IncludeEnumCasePayloadLabels) {
+        appendTypeListElement(param.getLabel(), param.getPlainType(),
+                              param.getParameterFlags(), forDecl);
+      } else {
+        appendTypeListElement(Identifier(), param.getPlainType(),
+                              param.getParameterFlags(), forDecl);
+      }
       appendListSeparator(isFirstParam);
     }
     appendOperator("t");

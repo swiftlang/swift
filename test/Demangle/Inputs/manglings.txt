@@ -362,3 +362,5 @@ $sS5fIedtyyywddw_D ---> @escaping @differentiable @convention(thin) (@unowned Sw
 $syQo ---> $syQo
 $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee -> $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee
 $sx1td_t ---> (t: A...)
+$s4test3FooO3fooyACSi3bar_tcACmFfA_ ---> default argument 0 of test.Foo.foo(test.Foo.Type) -> (bar: Swift.Int) -> test.Foo
+$s4test3FooO3fooyACSi3bar_tcACmFWC ---> enum case for test.Foo.foo(test.Foo.Type) -> (bar: Swift.Int) -> test.Foo

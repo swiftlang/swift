@@ -333,7 +333,9 @@ public:
     return finalize();
   }
 
-  std::string mangleEnumCase(const ValueDecl *Decl) {
+  std::string mangleEnumCase(const ValueDecl *Decl,
+                             bool forCaseCompatibility = false) {
+    IncludeEnumCasePayloadLabels = !forCaseCompatibility;
     beginMangling();
     appendEntity(Decl);
     appendOperator("WC");

@@ -152,6 +152,11 @@ class LinkEntity {
     /// A resilient enum tag index. The pointer is a EnumElementDecl*.
     EnumCase,
 
+    /// A resilient enum tag index. The pointer is a EnumElementDecl*.
+    /// This one is for compatibility reasons, to emit the old label-less
+    /// symbol for enum cases.
+    EnumCaseCompatibility,
+
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
@@ -633,6 +638,12 @@ public:
   static LinkEntity forEnumCase(EnumElementDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::EnumCase, decl);
+    return entity;
+  }
+
+  static LinkEntity forEnumCaseCompatibility(EnumElementDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::EnumCaseCompatibility, decl);
     return entity;
   }
 
