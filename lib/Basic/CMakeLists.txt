@@ -12,7 +12,11 @@ else()
 endif()
 
 function(generate_revision_inc revision_inc_var name dir)
-  find_first_existing_vc_file("${dir}" ${name}_vc)
+  if(SWIFT_APPEND_VC_REV)
+    # generate_vcs_version_script generates header with only `undef`s
+    # inside when source directory doesn't exist.
+    find_first_existing_vc_file("${dir}" ${name}_vc)
+  endif()
 
   # Create custom target to generate the VC revision include.
   set(version_inc "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc")
