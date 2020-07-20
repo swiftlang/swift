@@ -608,3 +608,203 @@ bool swift::_swift_tupleComparable_greaterThan(OpaqueValue *tuple1,
   // each other.
   return false;
 }
+
+//===----------------------------------------------------------------------===//
+// Tuple Hashable Conformance
+//===----------------------------------------------------------------------===//
+
+#if defined(__ELF__)
+// Create a GOT equivalent for the Hashable reference.
+__asm(
+  "  .type got." HASHABLE_DESCRIPTOR_SYMBOL ", @object\n"
+  "  .section .data.rel.ro\n"
+  "  .p2align 3\n"
+  "got." HASHABLE_DESCRIPTOR_SYMBOL ":\n"
+  "  .quad (" HASHABLE_DESCRIPTOR_SYMBOL ")\n"
+  "  .size got." HASHABLE_DESCRIPTOR_SYMBOL ", 8\n"
+);
+
+// Create a GOT equivalent for the Hashable base conformance to Equatable.
+__asm(
+  "  .type got." HASHABLE_BASE_CONFORMANCE_DESCRIPTOR ", @object\n"
+  "  .p2align 3\n"
+  "got." HASHABLE_BASE_CONFORMANCE_DESCRIPTOR ":\n"
+  "  .quad (" HASHABLE_BASE_CONFORMANCE_DESCRIPTOR ")\n"
+  "  .size got." HASHABLE_BASE_CONFORMANCE_DESCRIPTOR ", 8\n"
+);
+
+// Create a GOT equivalent for the Hashable.hashValue method descriptor.
+__asm(
+  "  .type got." HASHABLE_HASHVALUE_METHOD_DESCRIPTOR ", @object\n"
+  "  .p2align 3\n"
+  "got." HASHABLE_HASHVALUE_METHOD_DESCRIPTOR ":\n"
+  "  .quad (" HASHABLE_HASHVALUE_METHOD_DESCRIPTOR ")\n"
+  "  .size got." HASHABLE_HASHVALUE_METHOD_DESCRIPTOR ", 8\n"
+);
+
+// Create a GOT equivalent for the Hashable.hash(into:) method descriptor.
+__asm(
+  "  .type got." HASHABLE_HASH_METHOD_DESCRIPTOR ", @object\n"
+  "  .p2align 3\n"
+  "got." HASHABLE_HASH_METHOD_DESCRIPTOR ":\n"
+  "  .quad (" HASHABLE_HASH_METHOD_DESCRIPTOR ")\n"
+  "  .size got." HASHABLE_HASH_METHOD_DESCRIPTOR ", 8\n"
+);
+
+// Create a GOT equivalent for the Hashable._rawHashValue method descriptor.
+__asm(
+  "  .type got." HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR ", @object\n"
+  "  .p2align 3\n"
+  "got." HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR ":\n"
+  "  .quad (" HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR ")\n"
+  "  .size got." HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR ", 8\n"
+);
+#endif
+
+// Define the conformance descriptor for tuple Hashable. We do this in
+// assembly to work around relative reference issues.
+__asm(
+  #if defined(__ELF__)
+  "  .type __swift_tupleHashable_private, @object\n"
+  "  .local __swift_tupleHashable_private\n"
+  "  .comm __swift_tupleHashable_private, 128, 16\n"
+  "  .protected " TUPLE_HASHABLE_CONF "\n"
+  "  .type " TUPLE_HASHABLE_CONF ", @object\n"
+  "  .section .rodata\n"
+  #elif defined(__MACH__)
+  "  .zerofill __DATA, __bss, __swift_tupleHashable_private, 128, 4\n"
+  "  .section __TEXT, __const\n"
+  #endif
+  "  .globl " TUPLE_HASHABLE_CONF "\n"
+  "  .p2align 2\n"
+  TUPLE_HASHABLE_CONF ":\n"
+  #if defined(__ELF__)
+  // This is an indirectable relative reference to the GOT equivalent for the
+  // Hashable protocol descriptor, hence why we add 1 to indicate indirect.
+  "  .long (got." HASHABLE_DESCRIPTOR_SYMBOL " - \
+              (" TUPLE_HASHABLE_CONF ")) + 1\n"
+  #elif defined(__MACH__)
+  "  .long " HASHABLE_DESCRIPTOR_SYMBOL "@GOTPCREL + 5\n"
+  #endif
+  // 769 is the MetadataKind::Tuple
+  "  .long 769\n"
+  // This indicates that we have no witness table pattern. We use a generic
+  // witness table for builtin conformances.
+  "  .long 0\n"
+  // 196640 are the ConformanceFlags with the type reference bit set to
+  // MetadataKind, the has resilient witness bit, and the generic witness table
+  // bit.
+  "  .long 196640\n"
+  // This 4 is the ResilientWitnessesHeader indicating we have 4 resilient
+  // witnesses.
+  "  .long 4\n"
+  #if defined(__ELF__)
+  // This is an indirectable relative reference to the GOT equivalent for the
+  // Hashable base conformance for Equatable, hence why we add 1 to indicate
+  // indirect.
+  "  .long ((got." HASHABLE_BASE_CONFORMANCE_DESCRIPTOR " - \
+              (" TUPLE_HASHABLE_CONF ")) - 20) + 1\n"
+  #elif defined(__MACH__)
+  "  .long " HASHABLE_BASE_CONFORMANCE_DESCRIPTOR "@GOTPCREL + 5\n"
+  #endif
+  // This is a direct relative reference to the associated conformance for
+  // Equatable defined above in assembly. NOTE: We intentionally use the
+  // Comparable implementation for this because the implementation is the same
+  // for both Hashable and Comparable. Both want to grab the Equatable table
+  // from its elements whose witness table is located in the same place for both
+  // protocols. NOTE: This is minus 23 because the associated conformance
+  // structure is 1 aligned.
+  "  .long ((\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") - \
+            (" TUPLE_HASHABLE_CONF ")) - 23\n"
+  #if defined(__ELF__)
+  // This is an indirectable relative reference to the GOT equivalent for the
+  // Hashable.hashValue method descriptor, hence why we add 1 to indicate
+  // indirect.
+  "  .long ((got." HASHABLE_HASHVALUE_METHOD_DESCRIPTOR " - \
+              (" TUPLE_HASHABLE_CONF ")) - 28) + 1\n"
+  #elif defined(__MACH__)
+  "  .long " HASHABLE_HASHVALUE_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
+  #endif
+  // This is a direct relative reference to the hashValue witness defined below.
+  "  .long ((" TUPLE_HASHABLE_HASHVALUE ") - (" TUPLE_HASHABLE_CONF ")) - 32\n"
+  #if defined(__ELF__)
+  // This is an indirectable relative reference to the GOT equivalent for the
+  // Hashable.hash(into:) method descriptor, hence why we add 1 to indicate
+  // indirect.
+  "  .long ((got." HASHABLE_HASH_METHOD_DESCRIPTOR " - \
+              (" TUPLE_HASHABLE_CONF ")) - 36) + 1\n"
+  #elif defined(__MACH__)
+  "  .long " HASHABLE_HASH_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
+  #endif
+  // This is a direct relative reference to the hash(into:) witness defined below.
+  "  .long ((" TUPLE_HASHABLE_HASH ") - (" TUPLE_HASHABLE_CONF ")) - 40\n"
+  #if defined(__ELF__)
+  // This is an indirectable relative reference to the GOT equivalent for the
+  // Hashable._rawHashValue method descriptor, hence why we add 1 to indicate
+  // indirect.
+  "  .long ((got." HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR " - \
+              (" TUPLE_HASHABLE_CONF ")) - 44) + 1\n"
+  #elif defined(__MACH__)
+  "  .long " HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR "@GOTPCREL + 5\n"
+  #endif
+  // This 0 indicates that we are requesting the default implementation for the
+  // _rawHashValue getter.
+  "  .long 0\n"
+  // The witness table size in words.
+  "  .short 0\n"
+  // The witness table private size in words & requires instantiation.
+  "  .short 1\n"
+  // The witness table instantiator function.
+  "  .long 0\n"
+  // This is a direct relative reference to the private data for the
+  // conformance.
+  "  .long (__swift_tupleHashable_private - (" TUPLE_HASHABLE_CONF ")) - 60\n"
+  #if defined(__ELF__)
+  "  .size " TUPLE_HASHABLE_CONF ", 64\n"
+  #endif
+);
+
+// These are all function values that we reinterpret later.
+extern void *SWIFT_HASHVALUE_FUNC;
+extern void *SWIFT_HASHER_COMBINE_FUNC;
+
+using HashValueFn = SWIFT_CC(swift) intptr_t(OpaqueValue *value, Metadata *Self,
+                                             void *witnessTable);
+using HasherCombineFn = SWIFT_CC(swift) void(OpaqueValue *value,
+                                             const Metadata *Self,
+                                             const WitnessTable *witnessTable,
+                                             SWIFT_CONTEXT OpaqueValue *hasher);
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+intptr_t _swift_tupleHashable_hashValue(SWIFT_CONTEXT OpaqueValue *tuple,
+                                        Metadata *Self, void *witnessTable) {
+  auto _hashValue = reinterpret_cast<HashValueFn *>(&SWIFT_HASHVALUE_FUNC);
+  return _hashValue(tuple, Self, witnessTable);
+}
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void _swift_tupleHashable_hash(OpaqueValue *hasher,
+                               SWIFT_CONTEXT OpaqueValue *tuple,
+                               Metadata *Self, void *witnessTable) {
+  auto tupleTy = cast<TupleTypeMetadata>(Self);
+  auto table = reinterpret_cast<void**>(witnessTable);
+
+  // Loop through all elements and hash them into the Hasher.
+  for (size_t i = 0; i != tupleTy->NumElements; i += 1) {
+    auto elt = tupleTy->getElement(i);
+
+    // Get the element conformance from the private data in the witness table.
+    auto conformance = reinterpret_cast<const WitnessTable *>(table[-1 - i]);
+
+    // Get the element value from the tuple.
+    auto value = reinterpret_cast<OpaqueValue *>(
+                  reinterpret_cast<char *>(tuple) + elt.Offset);
+
+    auto hasherCombine = 
+        reinterpret_cast<HasherCombineFn *>(&SWIFT_HASHER_COMBINE_FUNC);
+
+    // Call the combine function on the hasher for this element value and we're
+    // done!
+    hasherCombine(value, elt.Type, conformance, hasher);
+  }
+}

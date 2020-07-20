@@ -112,6 +112,45 @@ bool _swift_tupleComparable_greaterThan(OpaqueValue *tuple1, OpaqueValue *tuple2
                                         SWIFT_CONTEXT Metadata *swiftSelf,
                                         Metadata *Self, void *witnessTable);
 
+//===----------------------------------------------------------------------===//
+// Tuple Hashable Conformance
+//===----------------------------------------------------------------------===//
+
+// public protocol Hashable {}
+#define SWIFT_HASHABLE_MANGLING SH
+
+#define HASHABLE_DESCRIPTOR PROTOCOL_DESCRIPTOR_SYM(SWIFT_HASHABLE_MANGLING)
+
+#define HASHABLE_DESCRIPTOR_SYMBOL SYMBOL("$sSHMp")
+
+// Swift._hashValue<A where A: Swift.Hashable>(for: A) -> Swift.Int
+#define SWIFT_HASHVALUE_FUNC $ss10_hashValue3forSix_tSHRzlF
+// Swift.Hasher.combine<A where A: Swift.Hashable>(A) -> ()
+#define SWIFT_HASHER_COMBINE_FUNC $ss6HasherV7combineyyxSHRzlF
+
+#define HASHABLE_BASE_CONFORMANCE_DESCRIPTOR SYMBOL("$sSHSQTb")
+#define HASHABLE_HASHVALUE_METHOD_DESCRIPTOR SYMBOL("$sSH9hashValueSivgTq")
+#define HASHABLE_HASH_METHOD_DESCRIPTOR SYMBOL("$sSH4hash4intoys6HasherVz_tFTq")
+#define HASHABLE_RAWHASHVALUE_METHOD_DESCRIPTOR \
+          SYMBOL("$sSH13_rawHashValue4seedS2i_tFTq")
+
+#define TUPLE_HASHABLE_CONF SYMBOL("_swift_tupleHashable_conf")
+#define TUPLE_HASHABLE_HASHVALUE SYMBOL("_swift_tupleHashable_hashValue")
+#define TUPLE_HASHABLE_HASH SYMBOL("_swift_tupleHashable_hash")
+
+/// The protocol witness for Swift.Hashable.hashValue.getter: Swift.Int in
+/// conformance (A...): Swift.Hashable in Swift.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+intptr_t _swift_tupleHashable_hashValue(SWIFT_CONTEXT OpaqueValue *tuple,
+                                        Metadata *Self, void *witnessTable);
+
+/// The protocol witness for Swift.Hashable.hash(into:) in conformance
+/// (A...): Swift.Hashable in Swift.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+void _swift_tupleHashable_hash(OpaqueValue *hasher,
+                               SWIFT_CONTEXT OpaqueValue *tuple,
+                               Metadata *Self, void *witnessTable);
+
 } // end namespace swift
 
 #endif

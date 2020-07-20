@@ -1014,12 +1014,13 @@ LookupConformanceInModuleRequest::evaluate(
     return ProtocolConformanceRef(protocol);
 
   // Tuples have builtin conformances implemented within the runtime.
-  // These conformances so far consist of Equatable and Comparable.
+  // These conformances so far consist of Equatable, Comparable, and Hashable.
   if (auto tuple = type->getAs<TupleType>()) {
     auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
     auto comparable = ctx.getProtocol(KnownProtocolKind::Comparable);
+    auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
 
-    if (protocol != equatable && protocol != comparable)
+    if (protocol != equatable && protocol != comparable && protocol != hashable)
       return ProtocolConformanceRef::forInvalid();
 
     SmallVector<ProtocolConformanceRef, 4> elementConformances;

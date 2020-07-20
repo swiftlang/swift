@@ -2,6 +2,7 @@
 
 // CHECK-LABEL: @_swift_tupleEquatable_conf = external global %swift.protocol_conformance_descriptor
 // CHECK-LABEL: @_swift_tupleComparable_conf = external global %swift.protocol_conformance_descriptor
+// CHECK-LABEL: @_swift_tupleHashable_conf = external global %swift.protocol_conformance_descriptor
 
 struct Wrapper<T> {
   let value: T
@@ -59,4 +60,29 @@ public func testTupleComparable() {
 
   // CHECK: {{%.*}} = call swiftcc i1 {{.*}}({{%.*}}.1* noalias nocapture undef, {{%.*}}.1* noalias nocapture undef, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8** [[TEST_TUPLE_COMPARABLE_WT1]])
   let _ = Wrapper(value: ()) < Wrapper(value: ())
+}
+
+//===----------------------------------------------------------------------===//
+// Tuple Hashable conformance
+//===----------------------------------------------------------------------===//
+
+extension Wrapper: Hashable where T: Hashable {}
+
+public func hashValue<T: Hashable>(for instance: T) -> Int {
+  instance.hashValue
+}
+
+public func useHashable<T: Hashable>(_ thing: T) -> Int {
+  // CHECK: [[USE_HASHABLE_WT:%.*]] = call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* @_swift_tupleHashable_conf, %swift.type* {{%.*}}, i8*** {{%.*}})
+  // CHECK-NEXT: {{%.*}} = call swiftcc i64 {{.*}}(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[USE_HASHABLE_WT]])
+  hashValue(for: (thing, thing))
+}
+
+public func testTupleHashable() {
+  // CHECK: [[TEST_TUPLE_HASHABLE_WT1:%.*]] = call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* @_swift_tupleHashable_conf, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8*** undef)
+  // CHECK: {{%.*}} = call swiftcc i64 {{.*}}(%swift.opaque* noalias nocapture undef, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8** [[TEST_TUPLE_HASHABLE_WT1]])
+  let _ = hashValue(for: ())
+
+  // CHECK: {{%.*}} = call swiftcc i64 {{.*}}(%swift.type* {{%.*}}, i8** [[TEST_TUPLE_HASHABLE_WT1]], {{%.*}} noalias nocapture swiftself undef)
+  let _ = Wrapper(value: ()).hashValue
 }

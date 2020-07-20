@@ -157,6 +157,7 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
     if (conformance->getType()->is<TupleType>()) {
       auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
       auto comparable = ctx.getProtocol(KnownProtocolKind::Comparable);
+      auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
 
       if (conformance->getProtocol() == equatable) {
         return "_swift_tupleEquatable_conf";
@@ -164,6 +165,10 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
 
       if (conformance->getProtocol() == comparable) {
         return "_swift_tupleComparable_conf";
+      }
+
+      if (conformance->getProtocol() == hashable) {
+        return "_swift_tupleHashable_conf";
       }
 
       llvm_unreachable("mangling conformance descriptor for unknown tuple \

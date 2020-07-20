@@ -6,6 +6,7 @@ struct Wrapper<T> {
 }
 
 extension Wrapper: Equatable where T: Equatable {}
+extension Wrapper: Hashable where T: Hashable {}
 
 extension Wrapper: Comparable where T: Comparable {
   static func <(lhs: Wrapper, rhs: Wrapper) -> Bool {
@@ -30,6 +31,12 @@ extension Foo: Equatable {
 extension Foo: Comparable {
   static func <(lhs: Foo, rhs: Foo) -> Bool {
     lhs.age < rhs.age
+  }
+}
+
+extension Foo: Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(age)
   }
 }
 
@@ -125,7 +132,6 @@ print(compareGTE((1, 2), (1, 2)))
 // false
 print(compareGT((1, 2), (1, 2)))
 
-
 // true
 print(compareLT((1, 2), (2, 1)))
 // true
@@ -135,7 +141,6 @@ print(compareGTE((1, 2), (2, 1)))
 // false
 print(compareGT((1, 2), (2, 1)))
 
-
 // false
 print(compareLT(((1, 2), 3), ((1, 2), 3)))
 // true
@@ -144,7 +149,6 @@ print(compareLTE(((1, 2), 3), ((1, 2), 3)))
 print(compareGTE(((1, 2), 3), ((1, 2), 3)))
 // false
 print(compareGT(((1, 2), 3), ((1, 2), 3)))
-
 
 // true
 print(compareLT(((1, 2), 3), ((1, 2), 4)))
@@ -218,3 +222,88 @@ print(compareLTE((Foo(age: 128), 0), (Foo(age: 734), 0)))
 print(compareGTE((Foo(age: 128), 0), (Foo(age: 734), 0)))
 // CHECK: false
 print(compareGT((Foo(age: 128), 0), (Foo(age: 734), 0)))
+
+//===----------------------------------------------------------------------===//
+// Tuple Hashable Conformance
+//===----------------------------------------------------------------------===//
+
+var grid = [(x: Int, y: Int): Int]()
+
+grid[(x: 0, y: 0)] = 0
+// CHECK: 0
+print(grid[(x: 0, y: 0)]!)
+// CHECK: 0
+print(grid[(0, 0)]!)
+
+grid[(x: 1, y: 1)] = 1
+// CHECK: 1
+print(grid[(x: 1, y: 1)]!)
+// CHECK: 1
+print(grid[(1, 1)]!)
+
+let tupleSet: Set = [(x: 0, y: 1), (x: 128, y: 32), (x: 10, y: 0)]
+
+// CHECK: true
+print(tupleSet.contains((x: 0, y: 1)))
+
+// CHECK: true
+print(tupleSet.contains((0, 1)))
+
+func compareHashes<T: Hashable>(_ lhs: T, _ rhs: T) -> Bool {
+  lhs.hashValue == rhs.hashValue
+}
+
+// CHECK: true
+print(compareHashes((), ()))
+
+// CHECK: true
+print(compareHashes((1, 2), (1, 2)))
+
+// CHECK: false
+print(compareHashes((1, 2), (1, 3)))
+
+// CHECK: false
+print(compareHashes((1, 2), (2, 1)))
+
+// CHECK: true
+print(compareHashes(((1, 2), 3), ((1, 2), 3)))
+
+// CHECK: false
+print(compareHashes(((1, 2), 3), ((1, 2), 4)))
+
+// CHECK: false
+print(compareHashes(((1, 2), 3), ((3, 2), 1)))
+
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
+func opaqueTupleHashableValue() -> some Hashable {
+  (1, 2, 3, 4, 5)
+}
+
+if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
+  _ = opaqueTupleHashableValue().hashValue == opaqueTupleHashableValue().hashValue
+}
+
+// CHECK: true
+print(compareHashes(Wrapper(value: ()), Wrapper(value: ())))
+
+// CHECK: true
+print(compareHashes(Wrapper(value: (1, 2)), Wrapper(value: (1, 2))))
+
+// CHECK: false
+print(compareHashes(Wrapper(value: (1, 2)), Wrapper(value: (1, 3))))
+
+// CHECK: false
+print(compareHashes(Wrapper(value: (1, 2)), Wrapper(value: (2, 1))))
+
+func useHashable<T: Hashable>(_ thing: T) -> Bool {
+  compareHashes((thing, thing), (thing, thing))
+}
+
+// CHECK: true
+print(useHashable(128))
+
+// CHECK: true
+print(compareHashes((Foo(age: 128), 1), (Foo(age: 128), 1)))
+
+// CHECK: false
+print(compareHashes((Foo(age: 128), 1), (Foo(age: 0), 1)))
