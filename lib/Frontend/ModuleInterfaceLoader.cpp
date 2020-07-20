@@ -1654,6 +1654,31 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
                        moduleInfo.modulePath);
     return moduleBuf.getError();
   }
+
+  assert(moduleBuf);
+  const bool isForwardingModule = !serialization::isSerializedAST(moduleBuf
+    .get()->getBuffer());
+  // If the module is a forwarding module, read the actual content from the path
+  // encoded in the forwarding module as the actual module content.
+  if (isForwardingModule) {
+    auto forwardingModule = ForwardingModule::load(*moduleBuf.get());
+    if (forwardingModule) {
+      moduleBuf = fs.getBufferForFile(forwardingModule->underlyingModulePath);
+      if (!moduleBuf) {
+        // We cannot read the module content, diagnose.
+        Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+                           moduleInfo.modulePath);
+        return moduleBuf.getError();
+      }
+    } else {
+      // We cannot read the module content, diagnose.
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+                         moduleInfo.modulePath);
+      return forwardingModule.getError();
+    }
+  }
+  assert(moduleBuf);
+  // Move the opened module buffer to the caller.
   *ModuleBuffer = std::move(moduleBuf.get());
 
   // Open .swiftdoc file
