@@ -735,23 +735,12 @@ static bool getUnnamedParamIndex(const ParameterList *ParamList,
 }
 
 static unsigned getUnnamedParamIndex(const ParamDecl *D) {
-  if (auto SD = dyn_cast<SubscriptDecl>(D->getDeclContext())) {
-    unsigned UnnamedIndex = 0;
-    auto *ParamList = SD->getIndices();
-    if (getUnnamedParamIndex(ParamList, D, UnnamedIndex))
-      return UnnamedIndex;
-    llvm_unreachable("param not found");
-  }
-
   ParameterList *ParamList;
-
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
-    ParamList = AFD->getParameters();
-  } else if (auto EED = dyn_cast<EnumElementDecl>(D->getDeclContext())) {
-    ParamList = EED->getParameterList();
+  auto *DC = D->getDeclContext();
+  if (isa<AbstractClosureExpr>(DC)) {
+    ParamList = cast<AbstractClosureExpr>(DC)->getParameters();
   } else {
-    auto ACE = cast<AbstractClosureExpr>(D->getDeclContext());
-    ParamList = ACE->getParameters();
+    ParamList = getParameterList(cast<ValueDecl>(DC->getAsDecl()));
   }
 
   unsigned UnnamedIndex = 0;

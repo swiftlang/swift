@@ -501,18 +501,14 @@ private:
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (!handleBraces(VD->getBracesRange(), VD->getNameLoc()))
         return Stop;
-    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (auto *PL = AFD->getParameters()) {
-        if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
+    } else if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
+      if (isa<SubscriptDecl>(D)) {
+        if (!handleBraces(cast<SubscriptDecl>(D)->getBracesRange(), ContextLoc))
           return Stop;
       }
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-      if (!handleBraces(SD->getBracesRange(), ContextLoc))
+      auto *PL = getParameterList(cast<ValueDecl>(D));
+      if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
         return Stop;
-      if (auto *PL = SD->getIndices()) {
-        if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
-          return Stop;
-      }
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
