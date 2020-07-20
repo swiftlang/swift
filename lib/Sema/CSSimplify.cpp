@@ -7274,8 +7274,17 @@ ConstraintSystem::simplifyOneWayConstraint(
       secondSimplified, first, ConstraintKind::BindParam, flags, locator);
 }
 
-static Type getFunctionBuilderTypeFor(ConstraintSystem &cs, unsigned paramIdx,
-                                      ConstraintLocator *calleeLocator) {
+static Type getOpenedFunctionBuilderTypeFor(ConstraintSystem &cs,
+                                            ConstraintLocatorBuilder locator) {
+  auto lastElt = locator.last();
+  if (!lastElt)
+    return Type();
+
+  auto argToParamElt = lastElt->getAs<LocatorPathElt::ApplyArgToParam>();
+  if (!argToParamElt)
+    return Type();
+
+  auto *calleeLocator = cs.getCalleeLocator(cs.getConstraintLocator(locator));
   auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
   if (!(selectedOverload &&
         selectedOverload->choice.getKind() == OverloadChoiceKind::Decl))
@@ -7290,8 +7299,27 @@ static Type getFunctionBuilderTypeFor(ConstraintSystem &cs, unsigned paramIdx,
   if (!choice->hasParameterList())
     return Type();
 
-  auto *PD = getParameterAt(choice, paramIdx);
-  return PD->getFunctionBuilderType();
+  auto *PD = getParameterAt(choice, argToParamElt->getParamIdx());
+  auto builderType = PD->getFunctionBuilderType();
+  if (!builderType)
+    return Type();
+
+  // If the builder type has a type parameter, substitute in the type
+  // variables.
+  if (builderType->hasTypeParameter()) {
+    // Find the opened type for this callee and substitute in the type
+    // parametes.
+    // FIXME: We should consider changing OpenedTypes to a MapVector.
+    for (const auto &opened : cs.getOpenedTypes()) {
+      if (opened.first == calleeLocator) {
+        OpenedTypeMap replacements(opened.second.begin(), opened.second.end());
+        builderType = cs.openType(builderType, replacements);
+        break;
+      }
+    }
+    assert(!builderType->hasTypeParameter());
+  }
+  return builderType;
 }
 
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
@@ -7310,15 +7338,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *inferredClosureType = getClosureType(closure);
 
   // Determine whether a function builder will be applied.
-  Type functionBuilderType;
-  ConstraintLocator *calleeLocator = nullptr;
-  if (auto last = locator.last()) {
-    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
-      calleeLocator = getCalleeLocator(getConstraintLocator(locator));
-      functionBuilderType = getFunctionBuilderTypeFor(
-          *this, argToParam->getParamIdx(), calleeLocator);
-    }
-  }
+  auto functionBuilderType = getOpenedFunctionBuilderTypeFor(*this, locator);
 
   // Determine whether to introduce one-way constraints between the parameter's
   // type as seen in the body of the closure and the external parameter
@@ -7392,6 +7412,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // If there is a function builder to apply, do so now.
   if (functionBuilderType) {
+    auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
     if (auto result = matchFunctionBuilder(
             closure, functionBuilderType, closureType->getResult(),
             ConstraintKind::Conversion, calleeLocator, locator)) {
