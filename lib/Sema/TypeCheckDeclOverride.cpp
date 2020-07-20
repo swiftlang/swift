@@ -214,6 +214,19 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   return canDeclTy == canParentDeclTy;
 }
 
+static bool isUnavailableInAllVersions(ValueDecl *decl) {
+  ASTContext &ctx = decl->getASTContext();
+  auto *attr = decl->getAttrs().getUnavailable(ctx);
+
+  if (!attr)
+    return false;
+  if (attr->isUnconditionallyUnavailable())
+    return true;
+
+  return attr->getVersionAvailability(ctx)
+             == AvailableVersionComparison::Unavailable;
+}
+
 /// Perform basic checking to determine whether a declaration can override a
 /// declaration in a superclass.
 static bool areOverrideCompatibleSimple(ValueDecl *decl,
@@ -245,6 +258,15 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   // The declarations must be of the same kind.
   if (decl->getKind() != parentDecl->getKind())
     return false;
+
+  // If the parent decl is unavailable, the subclass decl can shadow it, but it
+  // can't override it. To avoid complex version logic, we don't apply this to
+  // `obsoleted` members, only `unavailable` ones.
+  // FIXME: Refactor to allow that when the minimum version is always satisfied.
+  if (isUnavailableInAllVersions(parentDecl))
+    // If the subclass decl is trying to override, we'll diagnose it later.
+    if (!decl->getAttrs().hasAttribute<OverrideAttr>())
+      return false;
 
   // Ignore invalid parent declarations.
   // FIXME: Do we really need this?
@@ -1867,6 +1889,15 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // FIXME: Possibly should extend to more availability checking.
   if (auto *attr = base->getAttrs().getUnavailable(ctx)) {
     diagnoseUnavailableOverride(override, base, attr);
+
+    if (isUnavailableInAllVersions(base)) {
+      auto modifier = override->getAttrs().getAttribute<OverrideAttr>();
+      if (modifier && modifier->isValid()) {
+        diags.diagnose(override, diag::suggest_removing_override,
+                       override->getBaseName())
+          .fixItRemove(modifier->getRange());
+      }
+    }
   }
 
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
