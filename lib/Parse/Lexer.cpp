@@ -921,15 +921,15 @@ void Lexer::lexDollarIdent() {
     return formToken(tok::sil_dollar, tokStart);
 
   bool isAllDigits = true;
-  for (;; ++CurPtr) {
+  while (true) {
     if (isDigit(*CurPtr)) {
-      // continue
-    } else if (clang::isIdentifierHead(*CurPtr, /*dollar*/true)) {
+      ++CurPtr;
+      continue;
+    } else if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
       isAllDigits = false;
-      // continue
-    } else {
-      break;
+      continue;
     }
+    break;
   }
 
   if (CurPtr == tokStart + 1) {

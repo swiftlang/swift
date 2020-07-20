@@ -315,8 +315,10 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
-                                   const RootProtocolConformance *conformance);
-  
+                                    const RootProtocolConformance *conformance);
+  std::string mangleProtocolConformanceInstantiationCache(
+                                    const RootProtocolConformance *conformance);
+
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
     beginMangling();
     appendEntity(storage);

@@ -253,8 +253,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         // type.
         if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
           varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-          isAutoClosure =
-            var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure();
+
+          auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+          isAutoClosure = wrapperInfo.wrappedValuePlaceholder->isAutoClosure();
         } else {
           varInterfaceType = backingPropertyType;
         }
@@ -355,7 +356,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   initName->setBuiltinInitializer(staticStringInit);
 
   auto *file = new (ctx) MagicIdentifierLiteralExpr(
-    MagicIdentifierLiteralExpr::File, loc, /*Implicit=*/true);
+    MagicIdentifierLiteralExpr::FileID, loc, /*Implicit=*/true);
   file->setType(staticStringType);
   file->setBuiltinInitializer(staticStringInit);
 

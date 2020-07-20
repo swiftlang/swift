@@ -44,16 +44,6 @@ public:
                                    /*IgnoreSwiftSourceInfoFile=*/true),
         moduleName(moduleName), astDelegate(astDelegate) { }
 
-  std::string getCompiledModulePath(const SerializedModuleBaseName &BaseName) {
-    if (LoadMode == ModuleLoadingMode::OnlySerialized) {
-      return BaseName.getName(file_types::TY_SwiftModuleFile);
-    }
-    return static_cast<SerializedModuleLoaderBase*>(Ctx
-      .getModuleInterfaceLoader())->getUpToDateCompiledModuleForInterface(
-         moduleName.str(),
-         BaseName.getName(file_types::TY_SwiftModuleInterfaceFile));
-  }
-
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID,
       const SerializedModuleBaseName &BaseName,
@@ -65,26 +55,23 @@ public:
 
     auto &fs = *Ctx.SourceMgr.getFileSystem();
 
-    // Compute the full path of the module we're looking for.
-    auto ModPath = getCompiledModulePath(BaseName);
-
-    if (fs.exists(ModPath)) {
-      // The module file will be loaded directly.
-      auto dependencies = scanModuleFile(ModPath);
-      if (dependencies) {
-        this->dependencies = std::move(dependencies.get());
-        return std::error_code();
-      }
-
-      return dependencies.getError();
-    }
-
-    // Check whether the .swiftinterface exists.
+    auto ModPath = BaseName.getName(file_types::TY_SwiftModuleFile);
     auto InPath = BaseName.getName(file_types::TY_SwiftModuleInterfaceFile);
 
-    if (!fs.exists(InPath))
-      return std::make_error_code(std::errc::no_such_file_or_directory);
-
+    if (LoadMode == ModuleLoadingMode::OnlySerialized || !fs.exists(InPath)) {
+      if (fs.exists(ModPath)) {
+        // The module file will be loaded directly.
+        auto dependencies = scanModuleFile(ModPath);
+        if (dependencies) {
+          this->dependencies = std::move(dependencies.get());
+          return std::error_code();
+        }
+        return dependencies.getError();
+      } else {
+        return std::make_error_code(std::errc::no_such_file_or_directory);
+      }
+    }
+    assert(fs.exists(InPath));
     auto dependencies = scanInterfaceFile(InPath);
     if (dependencies) {
       this->dependencies = std::move(dependencies.get());
@@ -99,6 +86,14 @@ public:
     llvm_unreachable("Not used");
   }
 };
+}
+
+static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
+                                                      StringRef moduleName,
+                                                      StringRef interfacePath) {
+  return static_cast<SerializedModuleLoaderBase*>(ctx
+    .getModuleInterfaceLoader())->getCompiledModuleCandidatesForInterface(
+      moduleName.str(), interfacePath);
 }
 
 ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
@@ -117,7 +112,11 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
                                               SourceLoc(),
                 [&](ASTContext &Ctx, ArrayRef<StringRef> Args,
                     ArrayRef<StringRef> PCMArgs, StringRef Hash) {
-    Result = ModuleDependencies::forSwiftInterface(moduleInterfacePath.str(),
+    std::string InPath = moduleInterfacePath.str();
+    auto compiledCandidates = getCompiledCandidates(Ctx, moduleName.str(),
+                                                    InPath);
+    Result = ModuleDependencies::forSwiftInterface(InPath,
+                                                   compiledCandidates,
                                                    Args,
                                                    PCMArgs,
                                                    Hash);

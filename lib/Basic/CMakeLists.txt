@@ -62,7 +62,6 @@ add_swift_host_library(swiftBasic STATIC
   StringExtras.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
-  Timer.cpp
   Unicode.cpp
   UUID.cpp
   Version.cpp

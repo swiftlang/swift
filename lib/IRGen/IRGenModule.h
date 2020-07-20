@@ -375,7 +375,7 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  void emitGlobalTopLevel(llvm::StringSet<> *LinkerDirectives);
+  void emitGlobalTopLevel(const std::vector<std::string> &LinkerDirectives);
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.
@@ -635,6 +635,7 @@ public:
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
+  llvm::PointerType *TypeMetadataPtrPtrTy; /// %swift.type**
   union {
     llvm::StructType *TypeMetadataResponseTy;   /// { %swift.type*, iSize }
     llvm::StructType *TypeMetadataDependencyTy; /// { %swift.type*, iSize }

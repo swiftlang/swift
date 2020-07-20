@@ -17,3 +17,6 @@
 SWIFT_REQUEST(IRGen, IRGenRequest,
               GeneratedModule(IRGenDescriptor),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(IRGen, OptimizedIRRequest,
+              GeneratedModule(IRGenDescriptor),
+              Uncached, NoLocationInfo)

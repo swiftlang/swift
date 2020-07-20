@@ -10,26 +10,51 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// These utilities model formal memory access locations as marked by
-/// begin_access and end_access instructions. The formal memory locations
-/// identified here must be consistent with language rules for exclusity
-/// enforcement. This is not meant to be a utility to reason about other general
-/// properties of SIL memory operations such as reference count identity,
-/// ownership, or aliasing. Code that queries the properties of arbitrary memory
-/// operations independent of begin_access instructions should use a different
-/// interface.
+/// These utilities model the storage locations of memory access.
 ///
-/// SIL memory addresses used for formal access need to meet special
-/// requirements. In particular, it must be possible to identifiy the storage by
-/// following the pointer's provenance. This is *not* true for SIL memory
-/// operations in general. The utilities cannot simply bailout on unrecognized
-/// patterns. Doing so would lead to undefined program behavior, which isn't
-/// something that can be directly tested (i.e. if this breaks, we won't see
-/// test failures).
+/// All memory operations that are part of a formal access, as defined by
+/// exclusivity rules, are marked by begin_access and end_access instructions.
 ///
-/// These utilities are mainly meant to be used by AccessEnforcement passes,
-/// which optimize exclusivity enforcement. They live in SIL so they can be used
-/// by SIL verification.
+///     Currently, access markers are stripped early in the pipeline. An active
+///     goal is to require access markers in OSSA form, and to enable access
+///     marker verification.
+///
+/// To verify access markers, SIL checks that all memory operations either have
+/// an address that originates in begin_access, or originates from a pattern
+/// that is recognized as a non-formal-access. This implies that every SIL
+/// memory operation has a recognizable address source.
+///
+/// If the memory operation is part of a formal access, then getAddressAccess()
+/// returns the begin_access marker.
+///
+/// AccessedStorage identifies the storage location of a memory access.
+///
+/// identifyFormalAccess() returns the formally accessed storage of a
+/// begin_access instruction. This must return a valid AccessedStorage value
+/// unless the access has "Unsafe" enforcement. The formal access location may
+/// be nested within an outer begin_access. For the purpose of exclusivity,
+/// nested accesses are considered distinct formal accesses so they return
+/// distinct AccessedStorage values even though they may access the same
+/// memory.
+///
+/// findAccessedStorage() returns the outermost AccessedStorage for any memory
+/// address. It can be called on the address of a memory operation, the address
+/// of a begin_access, or any other address value. If the address is from an
+/// enforced begin_access or from any memory operation that is part of a formal
+/// access, then it returns a valid AccessedStorage value. If the memory
+/// operation is not part of a formal access, then it still identifies the
+/// accessed location as a best effort, but the result may be invalid storage.
+///
+///    An active goal is to require findAccessedStorage() to always return a
+///    valid AccessedStorage value even for operations that aren't part of a
+///    formal access.
+///
+/// The AccessEnforcementWMO pass is an example of an optimistic optimization
+/// that relies on the above requirements for correctness. If
+/// findAccessedStorage() simply bailed out on an unrecognized memory address by
+/// returning an invalid AccessedStorage, then the optimization could make
+/// incorrect assumptions about the absence of access to globals or class
+/// properties.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -52,33 +77,52 @@ namespace swift {
 
 /// Get the base address of a formal access by stripping access markers.
 ///
-/// If \p v is an address, then the returned value is also an address
-/// (pointer-to-address is not stripped).
-SILValue stripAccessMarkers(SILValue v);
+/// Postcondition: If \p v is an address, then the returned value is also an
+/// address (pointer-to-address is not stripped).
+inline SILValue stripAccessMarkers(SILValue v) {
+  while (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    v = bai->getOperand();
+  }
+  return v;
+}
 
-/// Return a non-null address-type SingleValueInstruction if \p v is the result
-/// of an address projection that may be inside of a formal access, such as
+/// An address projection that may be inside of a formal access, such as
 /// (begin_borrow, struct_element_addr, tuple_element_addr).
-///
-/// The resulting projection must have an address-type operand at index zero
-/// representing the projected address.
-SingleValueInstruction *isAccessProjection(SILValue v);
+struct AccessProjection {
+  SingleValueInstruction *projectionInst = nullptr;
 
-/// Attempt to return the address corresponding to a variable's formal access
-/// by stripping indexing and address projections.
+  /// If \p v is not a recognized access projection the result is invalid.
+  AccessProjection(SILValue v) {
+    switch (v->getKind()) {
+    default:
+      break;
+
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
+    case ValueKind::TailAddrInst:
+    case ValueKind::IndexAddrInst:
+      projectionInst = cast<SingleValueInstruction>(v);
+    };
+  }
+
+  operator bool() const { return projectionInst != nullptr; }
+
+  SILValue baseAddress() const { return projectionInst->getOperand(0); }
+};
+
+/// Return the base address after stripping access projections. If \p v is an
+/// access projection, return the enclosing begin_access. Otherwise, return a
+/// "best effort" base address.
 ///
-/// \p v must be an address.
-///
-/// Returns an address. If the a formal access was successfully identified, and
-/// access markers have not yet been removed, then the returned address is
-/// produced by a begin_access marker.
+/// Precondition: \p v must be an address.
 ///
 /// To get the base address of the formal access behind the access marker,
 /// either call stripAccessMarkers() on the returned value, or call
 /// getAccessedAddress() on \p v.
 ///
-/// To identify the underlying storage object of the access, use
-/// findAccessedStorage() on either \p v or the returned address.
+/// To identify the underlying storage object of the access, call
+/// findAccessedStorage() either on \p v or on the returned address.
 SILValue getAddressAccess(SILValue v);
 
 /// Convenience for stripAccessMarkers(getAddressAccess(v)).
@@ -92,16 +136,18 @@ SILValue getAccessedAddress(SILValue v);
 /// let-variables are only written during let-variable initialization, which is
 /// assumed to store directly to the same, unaliased accessedAddress.
 ///
-/// The address of a let-variable must be the base of a formal access . A 'let'
-/// member of a struct is *not* a let-variable, because it's memory may be
-/// written when formally modifying the outer struct. A let-variable is either
-/// an entire local variable, global variable, or class property (this is the
-/// definition of the base address of a formal access).
+/// The address of a let-variable must be the base of a formal access, not an
+/// access projection. A 'let' member of a struct is *not* a let-variable,
+/// because it's memory may be written when formally modifying the outer
+/// struct. A let-variable is either an entire local variable, global variable,
+/// or class property (these are all formal access base addresses).
 ///
 /// The caller should derive the accessed address using
 /// stripAccessMarkers(getAccessedAddress(ptr)).
 bool isLetAddress(SILValue accessedAddress);
 
+/// Return true if two accesses to the same storage may conflict given the kind
+/// of each access.
 inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
@@ -116,53 +162,54 @@ namespace swift {
 
 /// Represents the identity of a storage object being accessed.
 ///
-/// AccessedStorage is carefully designed to solve three problems:
+/// Requirements:
 ///
-/// 1. Full specification and verification of SIL's model for exclusive
-///    formal memory access, as enforced by "access markers". It is not a
-///    model to encompass all SIL memory operations.
+///     A bitwise comparable encoding and hash key to identify each location
+///     being formally accessed. Any two accesses of "uniquely identified"
+///     storage must have the same key if they access the same storage and
+///     distinct keys if they access distinct storage. For more efficient
+///     analysis, accesses to non-uniquely identified storage should have the
+///     same key if they may point to the same storage.
 ///
-/// 2. A bitwise comparable encoding and hash key to identify each location
-///    being formally accessed. Any two accesses of uniquely identified storage
-///    must have the same key if they access the same storage and distinct keys
-///    if they access distinct storage. Accesses to non-uniquely identified
-///    storage should ideally have the same key if they may point to the same
-///    storage.
+///     Complete identification of all class or global accesses. Failing to
+///     identify a class or global access will introduce undefined program
+///     behavior which can't be tested.
 ///
-/// 3. Complete identification of all class or global accesses. Failing to
-///    identify a class or global access will introduce undefined program
-///    behavior which can't be tested.
+/// Memory operations on "uniquely identified" storage cannot overlap with any
+/// other memory operation on distinct "uniquely identified" storage.
 ///
 /// AccessedStorage may be one of several kinds of "identified" storage
-/// objects, or may be valid, but Unidentified storage. An identified object
-/// is known to identify the base of the accessed storage, whether that is a
-/// SILValue that produces the base address, or a variable
-/// declaration. "Uniquely identified" storage refers to identified storage that
-/// cannot be aliased. For example, local allocations are uniquely identified,
-/// while global variables and class properties are not. Unidentified storage is
-/// associated with a SILValue that produces the accessed address but has not
-/// been determined to be the base of a storage object. It may, for example,
-/// be a SILPhiArgument.
+/// objects. Storage is "identified" when the base of the formal access is
+/// recognized and the kind of storage precisely identified. The base is usually
+/// represented by the SILValue that the memory address is derived from. For
+/// global variable access, the base is the global's declaration instead.
 ///
-/// An invalid AccessedStorage object is marked Unidentified and contains an
-/// invalid value. This signals that analysis has failed to recognize an
-/// expected address producer pattern. Over time, more aggressive
-/// SILVerification could allow the optimizer to aggressively assert that
-/// AccessedStorage is always valid.
+/// Unidentified *valid* storage is also associated with a SILValue that
+/// produces the accessed address but that value has not been determined to be
+/// the base of a formal access. It may be from a ref_tail_addr, undef, or some
+/// recognized memory initialization pattern. Unidentified valid storage cannot
+/// represent any arbitrary base address--it must at least been proven not to
+/// correspond to any class or global variable access.
+///
+/// An *invalid* AccessedStorage object is Unidentified and associated with an
+/// invalid SILValue. This signals that analysis has failed to recognize an
+/// expected address producer pattern.
+///
+///     An active goal is to enforce that every memory operation's
+///     AccessedStorage is either valid or explicitly guarded by an "unsafe"
+///     begin_access.
 ///
 /// Note that the SILValue that represents a storage object is not
-/// necessarilly an address type. It may instead be a SILBoxType.
+/// necessarilly an address type. It may instead be a SILBoxType. So, even
+/// though address phis are not allowed, finding the base of an access may
+/// require traversing phis.
 ///
-/// AccessedStorage hashing and comparison (via DenseMapInfo) is used to
-/// determine when two 'begin_access' instructions access the same or disjoint
-/// underlying objects.
-///
-/// `DenseMapInfo::isEqual()` guarantees that two AccessStorage values refer to
-/// the same memory if both values are valid.
-///
-/// `!DenseMapInfo::isEqual()` does not guarantee that two identified
-/// AccessStorage values are distinct. Inequality does, however, guarantee that
-/// two *uniquely* identified AccessStorage values are distinct.
+/// Support for integer IDs and bitsets. An AccessedStorage value has enough
+/// extra bits to store a unique index for each identified access in a
+/// function. An AccessedStorage (without an ID) can be cheaply formed
+/// on-the-fly for any memory operation then used as a hash key to lookup its
+/// unique integer index which is stored directly in the hashed value but not
+/// used as part of the hash key.
 class AccessedStorage {
 public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
@@ -296,9 +343,9 @@ public:
     return getElementIndex();
   }
 
-  SILArgument *getArgument() const {
+  SILFunctionArgument *getArgument() const {
     assert(getKind() == Argument);
-    return cast<SILArgument>(value);
+    return cast<SILFunctionArgument>(value);
   }
 
   SILGlobalVariable *getGlobal() const {
@@ -358,8 +405,14 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
+  /// Return true if the given access is on a 'let' lvalue.
   bool isLetAccess(SILFunction *F) const;
-  
+
+  /// If this is a uniquely identified formal access, then it cannot
+  /// alias with any other uniquely identified access to different storage.
+  ///
+  /// This determines whether access markers may conflict, so it cannot assume
+  /// that exclusivity is enforced.
   bool isUniquelyIdentified() const {
     switch (getKind()) {
     case Box:
@@ -376,12 +429,31 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  bool isUniquelyIdentifiedOrClass() const {
+  /// Return true if this a uniquely identified formal access location assuming
+  /// exclusivity enforcement. Do not use this to optimize access markers.
+  bool isUniquelyIdentifiedAfterEnforcement() const {
     if (isUniquelyIdentified())
       return true;
-    return (getKind() == Class);
+
+    return getKind() == Argument
+           && getArgument()
+                  ->getArgumentConvention()
+                  .isExclusiveIndirectParameter();
   }
 
+  /// Return true if this identifies the base of a formal access location.
+  ///
+  /// Most formal access bases are uniquely identified, but class access
+  /// may alias other references to the same object.
+  bool isFormalAccessBase() const {
+    if (isUniquelyIdentified())
+      return true;
+
+    return getKind() == Class;
+  }
+
+  // Return true if this storage is guaranteed not to overlap with \p other's
+  // storage.
   bool isDistinctFrom(const AccessedStorage &other) const {
     if (isUniquelyIdentified() && other.isUniquelyIdentified()) {
       return !hasIdenticalBase(other);
@@ -423,6 +495,16 @@ private:
 namespace llvm {
 /// Enable using AccessedStorage as a key in DenseMap.
 /// Do *not* include any extra pass data in key equality.
+///
+/// AccessedStorage hashing and comparison is used to determine when two
+/// 'begin_access' instructions access the same or disjoint underlying objects.
+///
+/// `DenseMapInfo::isEqual()` guarantees that two AccessStorage values refer to
+/// the same memory if both values are valid.
+///
+/// `!DenseMapInfo::isEqual()` does not guarantee that two identified
+/// AccessStorage values are distinct. Inequality does, however, guarantee that
+/// two *uniquely* identified AccessStorage values are distinct.
 template <> struct DenseMapInfo<swift::AccessedStorage> {
   static swift::AccessedStorage getEmptyKey() {
     return swift::AccessedStorage(swift::SILValue::getFromOpaqueValue(
@@ -464,37 +546,50 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
 
 namespace swift {
 
-/// Given an address accessed by an instruction that reads or modifies
-/// memory, return an AccessedStorage object that identifies the formal access.
+/// Given an address used by an instruction that reads or writes memory, return
+/// the AccessedStorage value that identifies the formally accessed memory,
+/// looking through any nested formal accesses to find the underlying storage.
 ///
-/// The returned AccessedStorage represents the best attempt to find the base of
-/// the storage object being accessed at `sourceAddr`. This may be a fully
-/// identified storage base of known kind, or a valid but Unidentified storage
-/// object, such as a SILPhiArgument.
-///
-/// This may return an invalid storage object if the address producer is not
-/// recognized by a whitelist of recognizable access patterns. The result must
-/// always be valid when `sourceAddr` is used for formal memory access, i.e. as
-/// the operand of begin_access.
-///
-/// If `sourceAddr` is produced by a begin_access, this returns a Nested
-/// AccessedStorage kind. This is useful for exclusivity checking to distinguish
-/// between a nested access vs. a conflict.
+/// This may return invalid storage for a memory operation that is not part of
+/// a formal access or when the outermost formal access has Unsafe enforcement.
 AccessedStorage findAccessedStorage(SILValue sourceAddr);
 
-/// Given an address accessed by an instruction that reads or modifies
-/// memory, return an AccessedStorage that identifies the formal access, looking
-/// through any Nested access to find the original storage.
+// Helper for identifyFormalAccess.
+AccessedStorage identifyAccessedStorageImpl(SILValue sourceAddr);
+
+/// Return an AccessedStorage object that identifies the formal access
+/// represented by \p beginAccess.
 ///
-/// This is identical to findAccessedStorage(), but never returns Nested
-/// storage and may return invalid storage for nested access when the outer
-/// access has Unsafe enforcement.
-AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
+/// If the given access is nested within an outer access, return a Nested
+/// AccessedStorage kind. This is useful for exclusivity checking to distinguish
+/// between nested access vs. conflicting access on the same storage.
+///
+/// May return an invalid storage for either:
+/// - A \p beginAccess with Unsafe enforcement
+/// - Non-OSSA form in which address-type block args are allowed
+inline AccessedStorage identifyFormalAccess(BeginAccessInst *beginAccess) {
+  return identifyAccessedStorageImpl(beginAccess->getSource());
+}
+
+inline AccessedStorage
+identifyFormalAccess(BeginUnpairedAccessInst *beginAccess) {
+  return identifyAccessedStorageImpl(beginAccess->getSource());
+}
+
+/// Return a valid AccessedStorage object for an address captured by a no-escape
+/// closure. A no-escape closure may capture a regular storage address without
+/// guarding it with an access marker. If the captured address does come from an
+/// access marker, then this returns a Nested AccessedStorage kind.
+inline AccessedStorage identifyCapturedStorage(SILValue capturedAddress) {
+  auto storage = identifyAccessedStorageImpl(capturedAddress);
+  assert(storage && "captured access has invalid storage");
+  return storage;
+}
 
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//
-//                               MARK: Helper API
+//             MARK: Helper API for specific formal access patterns
 //===----------------------------------------------------------------------===//
 
 namespace swift {
@@ -540,7 +635,7 @@ void checkSwitchEnumBlockArg(SILPhiArgument *arg);
 ///
 /// If this returns false, then the address can be safely accessed without
 /// a begin_access marker. To determine whether to emit begin_access:
-///   storage = findAccessedStorage(address)
+///   storage = identifyFormalAccess(address)
 ///   needsAccessMarker = storage && isPossibleFormalAccessBase(storage)
 ///
 /// Warning: This is only valid for SIL with well-formed accesses. For example,

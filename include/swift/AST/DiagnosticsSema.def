@@ -1077,7 +1077,9 @@ NOTE(optional_base_chain,none,
      "base values", (DeclNameRef))
 NOTE(optional_base_remove_optional_for_keypath_root, none,
      "use unwrapped type %0 as key path root", (Type))
-
+NOTE(optional_keypath_application_base, none,
+     "use '?' to access key path subscript only for non-'nil' base values", ())
+    
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
@@ -2833,9 +2835,12 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "protocol %2, preventing synthesized conformance "
      "of %3 to %2",
      (unsigned, Type, Type, Type))
-NOTE(classes_automatic_protocol_synthesis,none,
-    "automatic synthesis of '%0' is not supported for classes",
-    (StringRef))
+NOTE(automatic_protocol_synthesis_unsupported,none,
+    "automatic synthesis of '%0' is not supported for %select{classes|structs}1",
+    (StringRef, unsigned))
+NOTE(comparable_synthesis_raw_value_not_allowed, none,
+     "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
+     (Type, Type, Type))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,

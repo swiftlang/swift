@@ -15,8 +15,10 @@
 from __future__ import print_function
 
 import functools
+import glob
 import multiprocessing
 import os
+import platform
 import re
 import subprocess
 
@@ -80,6 +82,22 @@ def _unwrap_self(args):
     return type(args[0]).process_input(*args)
 
 
+def get_benchmark_executable(binary_dir, opt_level):
+    suffix = opt_level + "-" + platform.machine() + "*"
+    pattern = os.path.join(binary_dir, "Benchmark_" + suffix)
+    executables = glob.glob(pattern)
+    if len(executables) == 0:
+        raise ValueError(
+            "No benchmark executable for file name pattern " +
+            pattern + " found")
+    if len(executables) > 1:
+        raise ValueError(
+            "Multiple benchmark executables for file name pattern " +
+            pattern + " found\n" +
+            str(executables))
+    return executables[0]
+
+
 BenchmarkDriver_OptLevels = ["Onone", "O", "Osize"]
 
 
@@ -92,7 +110,7 @@ class BenchmarkDriver(object):
         opt_levels=BenchmarkDriver_OptLevels,
     ):
         self.targets = [
-            (os.path.join(binary_dir, "Benchmark_%s" % o), o) for o in opt_levels
+            (get_benchmark_executable(binary_dir, o), o) for o in opt_levels
         ]
         self.xfail_list = xfail_list
         self.enable_parallel = enable_parallel
@@ -112,8 +130,8 @@ class BenchmarkDriver(object):
         print("testing driver at path: %s" % binary)
         names = []
         output = subprocess.check_output([binary, "--list"], universal_newlines=True)
-        for l in output.split("\n")[1:]:
-            m = BENCHMARK_OUTPUT_RE.match(l)
+        for line in output.split("\n")[1:]:
+            m = BENCHMARK_OUTPUT_RE.match(line)
             if m is None:
                 continue
             names.append(m.group(1))

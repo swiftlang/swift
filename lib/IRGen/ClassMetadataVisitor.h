@@ -171,7 +171,7 @@ private:
   friend SILVTableVisitor<Impl>;
   void addMethod(SILDeclRef declRef) {
     // Does this method require a reified runtime vtable entry?
-    if (methodRequiresReifiedVTableEntry(IGM, VTable, declRef)) {
+    if (!VTable || methodRequiresReifiedVTableEntry(IGM, VTable, declRef)) {
       asImpl().addReifiedVTableEntry(declRef);
     }
   }

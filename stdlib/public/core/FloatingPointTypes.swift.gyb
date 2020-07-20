@@ -40,7 +40,7 @@ RawSignificand = 'UInt' + str(SignificandSize)
 
 def Availability(bits):
     if bits == 16:
-        return '@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)'
+        return '@available(iOS 14.0, watchOS 7.0, tvOS 14.0, *)\n@available(macOS, unavailable)\n@available(macCatalyst, unavailable)'
     return ''
 
 if Self == 'Float16':

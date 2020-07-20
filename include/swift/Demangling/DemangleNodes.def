@@ -291,5 +291,8 @@ CONTEXT_NODE(OpaqueReturnTypeOf)
 NODE(CanonicalSpecializedGenericMetaclass)
 NODE(CanonicalSpecializedGenericTypeMetadataAccessFunction)
 
+// Added in Swift 5.4
+NODE(MetadataInstantiationCache)
+
 #undef CONTEXT_NODE
 #undef NODE
