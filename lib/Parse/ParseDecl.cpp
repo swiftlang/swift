@@ -3890,6 +3890,16 @@ Parser::parseDecl(ParseDeclOptions Flags,
     if (Flags.contains(PD_HasContainerType) &&
         IsAtStartOfLineOrPreviousHadSemi) {
 
+      // Fail fast if we have something that starts with an identifier
+      // but cannot be a var or func declaration.
+      const bool NotAVarOrFuncDecl = Tok.isIdentifierOrUnderscore() &&
+        peekToken().isAny(tok::period);
+
+      if (NotAVarOrFuncDecl) {
+          diagnose(Tok, diag::expected_decl);
+          break;
+      }
+
       // Emit diagnostics if we meet an identifier/operator where a declaration
       // is expected, perhaps the user forgot the 'func' or 'var' keyword.
       //
@@ -3927,8 +3937,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
 
       const bool IsProbablyFuncDecl =
-          (Tok.isIdentifierOrUnderscore() && peekToken().isAny(tok::l_paren, tok::l_angle)) || 
-          (Tok.isAnyOperator() && peekToken().isAny(tok::l_paren, tok::l_angle));
+          Tok.isIdentifierOrUnderscore() || Tok.isAnyOperator();
 
       if (IsProbablyFuncDecl) {
 
