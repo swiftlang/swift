@@ -163,6 +163,16 @@ static void validateProfilingArgs(DiagnosticEngine &diags,
   }
 }
 
+static void validateDependencyScanningArgs(DiagnosticEngine &diags,
+                                           const ArgList &args) {
+  const Arg *ExternalDependencyMap = args.getLastArg(options::OPT_external_dependency_module_map);
+  const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
+  if (ExternalDependencyMap && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-external-dependency-module-map-file", "-scan-dependencies");
+  }
+}
+
 static void validateDebugInfoArgs(DiagnosticEngine &diags,
                                   const ArgList &args) {
   // Check for missing debug option when verifying debug info.
@@ -261,6 +271,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateBridgingHeaderArgs(diags, args);
   validateWarningControlArgs(diags, args);
   validateProfilingArgs(diags, args);
+  validateDependencyScanningArgs(diags, args);
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
