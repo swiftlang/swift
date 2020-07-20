@@ -9905,9 +9905,11 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+    return matchTypes(first, second, kind, subflags, locator);
+
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
-    return matchTypes(first, second, kind, subflags, locator);
+    return addArgumentConversionConstraintImpl(kind, first, second, locator);
 
   case ConstraintKind::OpaqueUnderlyingType:
     return simplifyOpaqueUnderlyingTypeConstraint(first, second,
@@ -9975,6 +9977,36 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::addArgumentConversionConstraintImpl(
+    ConstraintKind kind, Type first, Type second,
+    ConstraintLocatorBuilder locator) {
+  assert(kind == ConstraintKind::ArgumentConversion ||
+         kind == ConstraintKind::OperatorArgumentConversion);
+
+  // If we have an unresolved closure argument, form an unsolved argument
+  // conversion constraint, making sure to reference the type variables for
+  // a function builder if applicable. This ensures we properly connect the
+  // closure type variable with any type variables in the function builder, as
+  // such type variables will be accessible within the body of the closure when
+  // we open it.
+  first = getFixedTypeRecursive(first, /*rvalue*/ false);
+  if (auto *argTypeVar = first->getAs<TypeVariableType>()) {
+    if (argTypeVar->getImpl().isClosureType()) {
+      // Extract any type variables present in the parameter's function builder.
+      SmallVector<TypeVariableType *, 4> typeVars;
+      if (auto builderTy = getOpenedFunctionBuilderTypeFor(*this, locator))
+        builderTy->getTypeVariables(typeVars);
+
+      auto *loc = getConstraintLocator(locator);
+      addUnsolvedConstraint(
+          Constraint::create(*this, kind, first, second, loc, typeVars));
+      return SolutionKind::Solved;
+    }
+  }
+  return matchTypes(first, second, kind, TMF_GenerateConstraints, locator);
 }
 
 void
