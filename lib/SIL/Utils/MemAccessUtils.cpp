@@ -119,6 +119,12 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     auto *REA = cast<RefElementAddrInst>(base);
     value = stripBorrow(REA->getOperand());
     setElementIndex(REA->getFieldNo());
+    break;
+  }
+  case Tail: {
+    auto *RTA = cast<RefTailAddrInst>(base);
+    value = stripBorrow(RTA->getOperand());
+    break;
   }
   }
 }
@@ -152,6 +158,9 @@ const ValueDecl *AccessedStorage::getDecl() const {
     auto *decl = getObject()->getType().getNominalOrBoundGenericNominal();
     return decl->getStoredProperties()[getPropertyIndex()];
   }
+  case Tail:
+    return nullptr;
+
   case Argument:
     return getArgument()->getDecl();
 
@@ -185,6 +194,8 @@ const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
     return "Global";
   case Class:
     return "Class";
+  case Tail:
+    return "Tail";
   }
   llvm_unreachable("unhandled kind");
 }
@@ -215,6 +226,9 @@ void AccessedStorage::print(raw_ostream &os) const {
     getDecl()->print(os);
     os << " Index: " << getPropertyIndex() << "\n";
     break;
+  case Tail:
+    os << getObject();
+    os << "  Tail\n";
   }
 }
 
@@ -578,6 +592,9 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     break;
   case AccessedStorage::Class:
     break;
+  case AccessedStorage::Tail:
+    return false;
+
   case AccessedStorage::Yield:
     // Yields are accessed by the caller.
     return false;

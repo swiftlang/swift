@@ -123,9 +123,9 @@ struct MyArray<T> {
 
 // CHECK-LABEL: @arrayValue
 // CHECK:   load [trivial] %{{.*}} : $*Builtin.Int64
-// CHECK: Unidentified  %{{.*}} = ref_tail_addr [immutable] [[REF:%[0-9]+]] : $__ContiguousArrayStorageBase, $Int64
+// CHECK: Tail  %{{.*}} = unchecked_ref_cast [[REF:%[0-9]+]] : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
 // CHECK:   load [trivial] %{{.*}} : $*Builtin.Int64
-// CHECK: Unidentified  %{{.*}} = ref_tail_addr [immutable] [[REF]] : $__ContiguousArrayStorageBase, $Int64
+// CHECK: Tail  %{{.*}} = unchecked_ref_cast [[REF:%[0-9]+]] : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
 sil [ossa] @arrayValue : $@convention(thin) (@guaranteed MyArray<Int64>) -> Int64 {
 bb0(%0 : @guaranteed $MyArray<Int64>):
   %1 = integer_literal $Builtin.Word, 3
