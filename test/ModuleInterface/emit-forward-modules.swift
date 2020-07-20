@@ -2,6 +2,7 @@
 // RUN: %empty-directory(%t/Foo.swiftmodule)
 // RUN: %empty-directory(%t/ResourceDir/%target-sdk-name/prebuilt-modules/Foo.swiftmodule)
 // RUN: echo "public func foo() {}" > %t/Foo.swift
+// REQUIRES: rdar65827276
 
 import Foo
 
