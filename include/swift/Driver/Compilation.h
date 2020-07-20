@@ -56,7 +56,7 @@ namespace driver {
 enum class OutputLevel {
   /// Indicates that normal output should be produced.
   Normal,
-  
+
   /// Indicates that only jobs should be printed and not run. (-###)
   PrintJobs,
 
@@ -83,7 +83,7 @@ public:
     const bool &EnableIncrementalBuild;
     const bool EnableSourceRangeDependencies;
 
-    /// If not empty, the path to use to log the comparision.
+    /// If not empty, the path to use to log the comparison.
     const StringRef CompareIncrementalSchemesPath;
 
     const unsigned SwiftInputCount;

@@ -4576,6 +4576,23 @@ class UncheckedBitwiseCastInst final
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
 
+/// Bitwise copy a value into another value of the same size.
+class UncheckedValueCastInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::UncheckedValueCastInst, UncheckedValueCastInst,
+          OwnershipForwardingConversionInst> {
+  friend SILBuilder;
+
+  UncheckedValueCastInst(SILDebugLocation DebugLoc, SILValue Operand,
+                         ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, Ty,
+            Operand.getOwnershipKind()) {}
+  static UncheckedValueCastInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+};
+
 /// Build a Builtin.BridgeObject from a heap object reference by bitwise-or-ing
 /// in bits from a word.
 class RefToBridgeObjectInst

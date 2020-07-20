@@ -1157,7 +1157,7 @@ namespace {
       ExprStack.pop_back();
 
       // Mark the direct callee as being a callee.
-      if (auto *call = dyn_cast<CallExpr>(expr))
+      if (auto *call = dyn_cast<ApplyExpr>(expr))
         markDirectCallee(call->getFn());
 
       // Fold sequence expressions.
@@ -1391,11 +1391,16 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     // Resolve the TypeRepr to get the base type for the lookup.
     // Disable availability diagnostics here, because the final
     // TypeRepr will be resolved again when generating constraints.
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::AllowUnavailable;
-    auto resolution = TypeResolution::forContextual(DC, options);
-    auto BaseTy = resolution.resolveType(InnerTypeRepr);
+    const auto options =
+        TypeResolutionOptions(TypeResolverContext::InExpression) |
+        TypeResolutionFlags::AllowUnavailable;
+    const auto resolution =
+        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          return unboundTy;
+        });
+    const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1919,11 +1924,15 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   } else {
     const auto options =
         TypeResolutionOptions(TypeResolverContext::InExpression) |
-        TypeResolutionFlags::AllowUnboundGenerics |
         TypeResolutionFlags::SilenceErrors;
 
-    auto result = TypeResolution::forContextual(DC, options)
-                      .resolveType(typeExpr->getTypeRepr());
+    const auto resolution =
+        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          return unboundTy;
+        });
+    const auto result = resolution.resolveType(typeExpr->getTypeRepr());
     if (result->hasError())
       return nullptr;
     castTy = result;
@@ -1994,31 +2003,20 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   SolutionApplicationTarget target(
       expr, dc, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
-  bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(
-      target, unresolvedTypeExprs, options);
+  auto resultTarget = typeCheckExpression(target, options);
   if (!resultTarget) {
     expr = target.getAsExpr();
     return Type();
   }
 
   expr = resultTarget->getAsExpr();
-
-  // HACK for clients that want unresolved types.
-  if (unresolvedTypeExprs) {
-    return ErrorType::get(dc->getASTContext());
-  }
-
-
   return expr->getType();
 }
 
 Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(
     SolutionApplicationTarget &target,
-    bool &unresolvedTypeExprs,
     TypeCheckExprOptions options) {
-  unresolvedTypeExprs = false;
   Expr *expr = target.getAsExpr();
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
@@ -2072,14 +2070,12 @@ TypeChecker::typeCheckExpression(
   }
 
   // If the client allows the solution to have unresolved type expressions,
-  // check for them now.  We cannot apply the solution with unresolved TypeVars,
+  // check for them now. We cannot apply the solution with unresolved TypeVars,
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
        (viable->size() != 1 ||
         (target.getExprConversionType() &&
          target.getExprConversionType()->hasUnresolvedType()))) {
-    // FIXME: This hack should only be needed for CSDiag.
-    unresolvedTypeExprs = true;
     return target;
   }
 
@@ -2128,8 +2124,7 @@ bool TypeChecker::typeCheckBinding(
             /*bindPatternVarsOneWay=*/false);
 
   // Type-check the initializer.
-  bool unresolvedTypeExprs = false;
-  auto resultTarget = typeCheckExpression(target, unresolvedTypeExprs);
+  auto resultTarget = typeCheckExpression(target);
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();
@@ -2258,8 +2253,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
   auto target = SolutionApplicationTarget::forForEachStmt(
       stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
-  bool unresolvedTypeExprs = false;
-  return !typeCheckExpression(target, unresolvedTypeExprs);
+  return !typeCheckExpression(target);
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
@@ -3037,7 +3031,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                                   Expr *fromExpr,
                                                   SourceRange diagToRange) {
   // Determine whether we should suppress diagnostics.
-  const bool suppressDiagnostics = contextKind == CheckedCastContextKind::None;
+  const bool suppressDiagnostics =
+      contextKind == CheckedCastContextKind::None ||
+      contextKind == CheckedCastContextKind::Coercion;
   assert((suppressDiagnostics || diagLoc.isValid()) &&
          "diagnostics require a valid source location");
 
@@ -3133,6 +3129,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
         switch (contextKind) {
         case CheckedCastContextKind::None:
+        case CheckedCastContextKind::Coercion:
           llvm_unreachable("suppressing diagnostics");
 
         case CheckedCastContextKind::ForcedCast: {
@@ -3264,7 +3261,15 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       return castKind;
 
     case CheckedCastKind::Unresolved:
-      return failed();
+      // Even though we know the elements cannot be downcast, we cannot return
+      // failed() here as it's possible for an empty Array, Set or Dictionary to
+      // be cast to any element type at runtime (SR-6192). The one exception to
+      // this is when we're checking whether we can treat a coercion as a checked
+      // cast because we don't want to tell the user to use as!, as it's probably
+      // the wrong suggestion.
+      if (contextKind == CheckedCastContextKind::Coercion)
+        return failed();
+      return castKind;
     }
     llvm_unreachable("invalid cast type");
   };
@@ -3295,15 +3300,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                          BridgingCoercion);
         break;
 
+      case CheckedCastKind::Unresolved:
+        // Handled the same as in checkElementCast; see comment there for
+        // rationale.
+        if (contextKind == CheckedCastContextKind::Coercion)
+          return failed();
+        LLVM_FALLTHROUGH;
+
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
         hasCast = true;
         break;
-
-      case CheckedCastKind::Unresolved:
-        return failed();
       }
 
       switch (typeCheckCheckedCast(fromKeyValue->second, toKeyValue->second,
@@ -3318,15 +3327,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                          BridgingCoercion);
         break;
 
+      case CheckedCastKind::Unresolved:
+        // Handled the same as in checkElementCast; see comment there for
+        // rationale.
+        if (contextKind == CheckedCastContextKind::Coercion)
+          return failed();
+        LLVM_FALLTHROUGH;
+
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::ValueCast:
         hasCast = true;
         break;
-
-      case CheckedCastKind::Unresolved:
-        return failed();
       }
 
       if (hasCast) return CheckedCastKind::DictionaryDowncast;
@@ -3357,7 +3370,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         const auto &fromElt = fromTuple->getElement(i);
         const auto &toElt = toTuple->getElement(i);
 
-        // We should only perform name validation if both element have a label,
+        // We should only perform name validation if both elements have a label,
         // because unlabeled tuple elements can be converted to labeled ones
         // e.g.
         // 
@@ -3423,6 +3436,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     case CheckedCastContextKind::EnumElementPattern:
     case CheckedCastContextKind::IsExpr:
     case CheckedCastContextKind::None:
+    case CheckedCastContextKind::Coercion:
       break;
     }
   }
@@ -3552,6 +3566,19 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (auto *protocolDecl =
           dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
       if (!couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
+        return failed();
+      }
+    } else if (auto protocolComposition =
+                   fromType->getAs<ProtocolCompositionType>()) {
+      if (llvm::any_of(protocolComposition->getMembers(),
+                       [&](Type protocolType) {
+                         if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
+                                 protocolType->getAnyNominal())) {
+                           return !couldDynamicallyConformToProtocol(
+                               toType, protocolDecl, dc);
+                         }
+                         return false;
+                       })) {
         return failed();
       }
     }

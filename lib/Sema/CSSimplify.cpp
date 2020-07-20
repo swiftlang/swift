@@ -3774,6 +3774,14 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::KeyPathRoot: {
+    // The root mismatch is from base U? to U or a subtype of U in keypath 
+    // application so let's suggest an unwrap the optional fix.
+    if (auto unwrapFix = UnwrapOptionalBaseKeyPathApplication::attempt(
+            *this, lhs, rhs, getConstraintLocator(locator))) {
+      conversionsOrFixes.push_back(unwrapFix);
+      break;
+    }
+
     conversionsOrFixes.push_back(AllowKeyPathRootTypeMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
 
@@ -4223,6 +4231,12 @@ bool ConstraintSystem::repairFailures(
             getConstraintLocator(anchor, LocatorPathElt::ContextualType());
         if (hasFixFor(loc, FixKind::ContextualMismatch))
           return true;
+
+        if (contextualType->isVoid() &&
+            getContextualTypePurpose(anchor) == CTP_ReturnStmt) {
+          conversionsOrFixes.push_back(RemoveReturn::create(*this, lhs, loc));
+          break;
+        }
 
         conversionsOrFixes.push_back(
             ContextualMismatch::create(*this, lhs, rhs, loc));
@@ -6268,7 +6282,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
           // If this is an attempt to access read-only member via
           // writable key path, let's fail this choice early.
           auto &ctx = getASTContext();
-          if (isReadOnlyKeyPathComponent(storage) &&
+          if (isReadOnlyKeyPathComponent(storage, SourceLoc()) &&
               (keyPath == ctx.getWritableKeyPathDecl() ||
                keyPath == ctx.getReferenceWritableKeyPathDecl())) {
             result.addUnviable(
@@ -8020,7 +8034,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       if (!storage)
         return SolutionKind::Error;
 
-      if (isReadOnlyKeyPathComponent(storage)) {
+      if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
         capability = ReadOnly;
         continue;
       }
@@ -9742,6 +9756,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
   case FixKind::AllowKeyPathRootTypeMismatch:
+  case FixKind::UnwrapOptionalBaseKeyPathApplication:
   case FixKind::AllowCoercionToForceCast:
   case FixKind::SpecifyKeyPathRootType: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
@@ -10156,6 +10171,8 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_CoerceOperand:
   case CTP_SubscriptAssignSource:
   case CTP_ForEachStmt:
+  case CTP_WrappedProperty:
+  case CTP_ComposedPropertyWrapper:
     break;
   }
 

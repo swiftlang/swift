@@ -127,9 +127,10 @@ SILValue swift::stripCastsWithoutMarkDependence(SILValue V) {
     V = stripSinglePredecessorArgs(V);
 
     auto K = V->getKind();
-    if (isRCIdentityPreservingCast(K) ||
-        K == ValueKind::UncheckedTrivialBitCastInst ||
-        K == ValueKind::EndCOWMutationInst) {
+    if (isRCIdentityPreservingCast(K)
+        || K == ValueKind::UncheckedTrivialBitCastInst
+        || K == ValueKind::BeginAccessInst
+        || K == ValueKind::EndCOWMutationInst) {
       V = cast<SingleValueInstruction>(V)->getOperand(0);
       continue;
     }
@@ -145,7 +146,8 @@ SILValue swift::stripCasts(SILValue v) {
     auto k = v->getKind();
     if (isRCIdentityPreservingCast(k)
         || k == ValueKind::UncheckedTrivialBitCastInst
-        || k == ValueKind::MarkDependenceInst) {
+        || k == ValueKind::MarkDependenceInst
+        || k == ValueKind::BeginAccessInst) {
       v = cast<SingleValueInstruction>(v)->getOperand(0);
       continue;
     }
@@ -321,6 +323,21 @@ bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
   Identifier Name = BI->getName();
   if (Name == BI->getModule().getASTContext().getIdentifier("tsanInoutAccess"))
     return true;
+
+  return false;
+}
+
+// Instrumentation instructions should not affect the correctness of the
+// program. That is, they should not affect the observable program state.
+// The constant evaluator relies on this property to skip instructions.
+bool swift::isInstrumentation(SILInstruction *Instruction) {
+  if (isSanitizerInstrumentation(Instruction))
+    return true;
+
+  if (BuiltinInst *bi = dyn_cast<BuiltinInst>(Instruction)) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::IntInstrprofIncrement)
+      return true;
+  }
 
   return false;
 }

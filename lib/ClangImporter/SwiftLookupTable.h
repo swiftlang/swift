@@ -528,6 +528,10 @@ public:
   SmallVector<clang::NamedDecl *, 4>
   lookupObjCMembers(SerializedSwiftName baseName);
 
+  /// Lookup member operators with the given base name, regardless of context.
+  SmallVector<clang::NamedDecl *, 4>
+  lookupMemberOperators(SerializedSwiftName baseName);
+
   /// Retrieve the set of Objective-C categories and extensions.
   ArrayRef<clang::ObjCCategoryDecl *> categories();
 

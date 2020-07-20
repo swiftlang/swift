@@ -26,7 +26,7 @@ func someFunction() {
   if #available(OSX 10.50, *) { // expected-note {{enclosing scope here}}
     // Still warn if the check is useless because an enclosing #available rules
     // it out.
-    if #available(OSX 10.50, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+    if #available(OSX 10.50, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
     }
   }
 }
@@ -35,7 +35,7 @@ func someFunction() {
 func availableOn10_50() { // expected-note {{enclosing scope here}}
   // Still warn if the check is useless because an enclosing @available rules
   // it out.
-  if #available(OSX 10.50, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+  if #available(OSX 10.50, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
   }
 }
 

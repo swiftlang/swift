@@ -29,27 +29,7 @@
 #endif
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
-#endif
-
-// This declaration might not be universally correct.
-// We verify its correctness for the current platform in the runtime code.
-#if defined(__linux__)
-# if defined(__ANDROID__) && !(defined(__aarch64__) || defined(__x86_64__))
-typedef __swift_uint16_t __swift_mode_t;
-# else
-typedef __swift_uint32_t __swift_mode_t;
-# endif
-#elif defined(__APPLE__)
-typedef __swift_uint16_t __swift_mode_t;
-#elif defined(_WIN32)
-typedef __swift_int32_t __swift_mode_t;
-#elif defined(__wasi__)
-typedef __swift_uint32_t __swift_mode_t;
-#elif defined(__OpenBSD__)
-typedef __swift_uint32_t __swift_mode_t;
-#else  // just guessing
-typedef __swift_uint16_t __swift_mode_t;
+extern "C" {
 #endif
 
 
@@ -184,7 +164,7 @@ long double lgammal_r(long double x, int *psigngam);
 #endif // defined(__APPLE__)
 
 #ifdef __cplusplus
-}} // extern "C", namespace swift
+} // extern "C"
 #endif
 
 #if __has_feature(nullability)

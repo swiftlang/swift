@@ -141,6 +141,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
+  bool canImportModule(Located<Identifier> mID) override;
+
   bool isCached(StringRef DepPath) override { return false; };
 
   struct Implementation;
@@ -235,8 +237,17 @@ public:
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     ModuleInterfaceLoaderOptions Opts);
 
-  std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
-                                                    StringRef interfacePath) override;
+  std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) override;
+
+  /// Given a list of potential ready-to-use compiled modules for \p interfacePath,
+  /// check if any one of them is up-to-date. If so, emit a forwarding module
+  /// to the candidate binary module to \p outPath.
+  bool tryEmitForwardingModule(StringRef moduleName,
+                               StringRef interfacePath,
+                               ArrayRef<std::string> candidates,
+                               StringRef outPath) override;
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {

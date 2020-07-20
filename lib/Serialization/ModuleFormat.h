@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 562; // base_addr_for_offset instruction
+const uint16_t SWIFTMODULE_VERSION_MINOR = 565; // #fileID
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -481,8 +481,10 @@ using ValueOwnershipField = BCFixed<2>;
 enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
-  File,
+  FileID,
+  FileIDSpelledAsFile,
   FilePath,
+  FilePathSpelledAsFile,
   Line,
   Column,
   Function,
@@ -1510,7 +1512,7 @@ namespace decls_block {
     // The sub-pattern trails the record.
   >;
 
-  using VarPatternLayout = BCRecordLayout<
+  using BindingPatternLayout = BCRecordLayout<
     VAR_PATTERN,
     BCFixed<1>  // isLet?
     // The sub-pattern trails the record.
@@ -1848,6 +1850,8 @@ namespace decls_block {
     Derivative_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
     IdentifierIDField, // Original name.
+    BCFixed<1>, // Has original accessor kind?
+    AccessorKindField, // Original accessor kind.
     DeclIDField, // Original function declaration.
     AutoDiffDerivativeFunctionKindField, // Derivative function kind.
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.

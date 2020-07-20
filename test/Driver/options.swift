@@ -1,3 +1,5 @@
+// REQUIRES: swift_interpreter
+
 // RUN: not %swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | %FileCheck -check-prefix=STDLIB_MODULE %s
 // RUN: %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
 // STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}

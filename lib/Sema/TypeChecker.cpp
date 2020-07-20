@@ -38,7 +38,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -121,21 +120,23 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
-    case MagicIdentifierLiteralExpr::File:
-    case MagicIdentifierLiteralExpr::FilePath:
-    case MagicIdentifierLiteralExpr::Function:
-      return TypeChecker::getProtocol(
-          Context, expr->getLoc(),
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
+      return TypeChecker::getProtocol( \
+          Context, expr->getLoc(), \
           KnownProtocolKind::ExpressibleByStringLiteral);
 
-    case MagicIdentifierLiteralExpr::Line:
-    case MagicIdentifierLiteralExpr::Column:
-      return TypeChecker::getProtocol(
-          Context, expr->getLoc(),
+#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
+      return TypeChecker::getProtocol( \
+          Context, expr->getLoc(), \
           KnownProtocolKind::ExpressibleByIntegerLiteral);
 
-    case MagicIdentifierLiteralExpr::DSOHandle:
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+    case MagicIdentifierLiteralExpr::NAME: \
       return nullptr;
+
+#include "swift/AST/MagicIdentifierKinds.def"
     }
   }
 
@@ -375,16 +376,20 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
-
-  // Fine to have unbound generic types.
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
   if (isSILMode) {
     options |= TypeResolutionFlags::SILMode;
   }
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
-  auto resolution = TypeResolution::forContextual(DC, GenericEnv, options);
+  const auto resolution =
+      TypeResolution::forContextual(DC, GenericEnv, options,
+                                    [](auto unboundTy) {
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        return unboundTy;
+      });
+
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);

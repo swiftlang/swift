@@ -4,6 +4,13 @@
 
 # REQUIRES: standalone_build
 
+# Build and install the SwiftPM dependencies first.
+#
+# CHECK: --- Installing cmark ---
+# CHECK: --- Installing llvm ---
+# CHECK: --- Installing swift ---
+# CHECK: --- Installing llbuild ---
+
 # Just make sure we compute the build graph/emit output.
 #
 # CHECK: -- Build Graph Inference --
@@ -16,11 +23,7 @@
 # CHECK:     llvm
 # CHECK:     swift
 
-# Then make sure we are installing/building at the appropriate times.
+# Then make sure we are installing/building SwiftPM last.
 #
-# CHECK: --- Installing cmark ---
-# CHECK: --- Installing llvm ---
-# CHECK: --- Installing swift ---
-# CHECK: --- Installing llbuild ---
 # CHECK: --- Building swiftpm ---
 # CHECK: --- Installing swiftpm ---

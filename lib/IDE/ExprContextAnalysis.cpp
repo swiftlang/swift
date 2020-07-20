@@ -213,16 +213,30 @@ public:
     } else if (auto tuple = dyn_cast<TupleExpr>(E->getArg())) {
       lParenLoc = tuple->getLParenLoc();
       rParenLoc = tuple->getRParenLoc();
+
+      assert((!E->getUnlabeledTrailingClosureIndex().hasValue() ||
+              (tuple->getNumElements() == E->getArgumentLabels().size() &&
+               tuple->getNumElements() == E->getArgumentLabelLocs().size())) &&
+             "CallExpr with trailing closure must have the same number of "
+             "argument labels");
+      assert(tuple->getNumElements() == E->getArgumentLabels().size());
+      assert(tuple->getNumElements() == E->getArgumentLabelLocs().size() ||
+             E->getArgumentLabelLocs().size() == 0);
+
+      bool hasArgumentLabelLocs = E->getArgumentLabelLocs().size() > 0;
+
       for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i) {
         if (isa<CodeCompletionExpr>(tuple->getElement(i))) {
           removing = true;
           continue;
         }
 
-        if (i < E->getUnlabeledTrailingClosureIndex()) {
+        if (!E->getUnlabeledTrailingClosureIndex().hasValue() ||
+            i < *E->getUnlabeledTrailingClosureIndex()) {
           // Normal arguments.
           argLabels.push_back(E->getArgumentLabels()[i]);
-          argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
+          if (hasArgumentLabelLocs)
+            argLabelLocs.push_back(E->getArgumentLabelLocs()[i]);
           args.push_back(tuple->getElement(i));
         } else {
           // Trailing closure arguments.
@@ -246,7 +260,20 @@ public:
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    return {true, visit(E)};
+    if (Removed)
+      return {false, nullptr};
+    E = visit(E);
+    return {!Removed, E};
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (Removed)
+      return {false, nullptr};
+    return {true, S};
+  }
+
+  bool walkToDeclPre(Decl *D) override {
+    return !Removed;
   }
 };
 }
@@ -388,6 +415,7 @@ static void collectPossibleCalleesByQualifiedLookup(
                           decls))
     return;
 
+  llvm::DenseMap<std::pair<char, CanType>, size_t> known;
   auto *baseNominal = baseInstanceTy->getAnyNominal();
   for (auto *VD : decls) {
     if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
@@ -420,27 +448,43 @@ static void collectPossibleCalleesByQualifiedLookup(
         DC.getParentModule(), VD,
         VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
     auto fnType = declaredMemberType.subst(subs);
-    if (!fnType)
+    if (!fnType || !fnType->is<AnyFunctionType>())
       continue;
 
-    if (fnType->is<AnyFunctionType>()) {
-      // If we are calling to typealias type,
-      if (isa<SugarType>(baseInstanceTy.getPointer())) {
-        auto canBaseTy = baseInstanceTy->getCanonicalType();
-        fnType = fnType.transform([&](Type t) -> Type {
-          if (t->getCanonicalType()->isEqual(canBaseTy))
-            return baseInstanceTy;
-          return t;
-        });
-      }
-      auto semanticContext = SemanticContextKind::CurrentNominal;
-      if (baseNominal &&
-          VD->getDeclContext()->getSelfNominalTypeDecl() != baseNominal)
-        semanticContext = SemanticContextKind::Super;
-
-      candidates.emplace_back(fnType->castTo<AnyFunctionType>(), VD,
-                              semanticContext);
+    // If we are calling on a type alias type, replace the canonicalized type
+    // in the function type with the type alias.
+    if (isa<SugarType>(baseInstanceTy.getPointer())) {
+      auto canBaseTy = baseInstanceTy->getCanonicalType();
+      fnType = fnType.transform([&](Type t) -> Type {
+        if (t->getCanonicalType()->isEqual(canBaseTy))
+          return baseInstanceTy;
+        return t;
+      });
     }
+
+    auto semanticContext = SemanticContextKind::CurrentNominal;
+    if (baseNominal &&
+        VD->getDeclContext()->getSelfNominalTypeDecl() != baseNominal)
+      semanticContext = SemanticContextKind::Super;
+
+    FunctionTypeAndDecl entry(fnType->castTo<AnyFunctionType>(), VD,
+                              semanticContext);
+    // Remember the index of the entry.
+    auto knownResult = known.insert(
+        {{VD->isStatic(), fnType->getCanonicalType()}, candidates.size()});
+    if (knownResult.second) {
+      candidates.push_back(entry);
+      continue;
+    }
+
+    auto idx = knownResult.first->second;
+    if (AvailableAttr::isUnavailable(candidates[idx].Decl) &&
+        !AvailableAttr::isUnavailable(VD)) {
+      // Replace the previously found "unavailable" with the "available" one.
+      candidates[idx] = entry;
+    }
+
+    // Otherwise, skip redundant results.
   }
 }
 
@@ -722,10 +766,7 @@ class ExprContextAnalyzer {
         auto Params = typeAndDecl.Type->getParams();
         ParameterList *paramList = nullptr;
         if (auto VD = typeAndDecl.Decl) {
-          if (auto FD = dyn_cast<AbstractFunctionDecl>(VD))
-            paramList = FD->getParameters();
-          else if (auto SD = dyn_cast<SubscriptDecl>(VD))
-            paramList = SD->getIndices();
+          paramList = getParameterList(VD);
           if (paramList && paramList->size() != Params.size())
             paramList = nullptr;
         }

@@ -105,7 +105,7 @@ macro(configure_build)
 endmacro()
 
 macro(configure_sdks_darwin)
-  set(macosx_arch "x86_64")
+  set(macosx_arch "x86_64" "arm64")
   set(iphoneos_arch "arm64" "arm64e" "armv7")
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k")
@@ -367,12 +367,17 @@ function (swift_benchmark_compile_archopts)
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-sdk" "${sdk}"
       "-no-link-objc-runtime")
+
+    # If we are not compiling at -Onone and are performing WMO, always emit
+    # optimization-records.
+    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
+      list(APPEND common_options "-save-optimization-record=bitstream")
+    endif()
   endif()
 
   set(opt_view_main_dir)
   if(SWIFT_BENCHMARK_GENERATE_OPT_VIEW AND LLVM_HAVE_OPT_VIEWER_MODULES)
     if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
-      list(APPEND common_options "-save-optimization-record")
       set(opt_view_main_dir "${objdir}/opt-view")
     endif()
   endif()
@@ -609,11 +614,7 @@ function (swift_benchmark_compile_archopts)
 
   if(is_darwin)
     # If host == target.
-    if("${BENCH_COMPILE_ARCHOPTS_PLATFORM}" STREQUAL "macosx")
-      set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")
-    else()
-      set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
-    endif()
+    set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   else()
     # If we are on Linux, we do not support cross compiling.
     set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}")

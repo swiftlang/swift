@@ -58,7 +58,25 @@ doit()
 // CHECK:   [[ARGUMENT_BUFFER:%[0-9]+]] = bitcast i8* [[ERASED_TABLE]] to i8**
 // CHECK:   [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR:%[0-9]+]] = load i8*, i8** [[ARGUMENT_BUFFER]], align 1
 // CHECK:   [[PROVIDED_PROTOCOL_DESCRIPTOR:%[0-9]+]] = bitcast i8* [[UNCAST_PROVIDED_PROTOCOL_DESCRIPTOR]] to %swift.protocol_conformance_descriptor*
-// CHECK:   [[EQUAL_DESCRIPTORS:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(%swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR]], %swift.protocol_conformance_descriptor* @"$sSi4main1PAAMc")
+// CHECK-arm64e:  [[ERASED_TABLE_INT:%[0-9]+]] = ptrtoint i8* [[ERASED_TABLE]] to i64
+// CHECK-arm64e:  [[TABLE_SIGNATURE:%[0-9]+]] = call i64 @llvm.ptrauth.blend.i64(i64 [[ERASED_TABLE_INT]], i64 50923)
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED:%[0-9]+]] = call i64 @llvm.ptrauth.auth.i64(i64 %13, i32 2, i64 [[TABLE_SIGNATURE]])
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR:%[0-9]+]] = inttoptr i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED]] to %swift.protocol_conformance_descriptor*
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_INT:%[0-9]+]] = ptrtoint %swift.protocol_conformance_descriptor* [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR]] to i64
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_INT:%[0-9]+]] = call i64 @llvm.ptrauth.sign.i64(i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_AUTHED_PTR_INT]], i32 2, i64 50923)
+// CHECK-arm64e:  [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED:%[0-9]+]] = inttoptr i64 [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED_INT]] to %swift.protocol_conformance_descriptor*
+// CHECK:   [[EQUAL_DESCRIPTORS:%[0-9]+]] = call swiftcc i1 @swift_compareProtocolConformanceDescriptors(
+// CHECK-SAME:     %swift.protocol_conformance_descriptor* 
+// CHECK-arm64e-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR_SIGNED]], 
+// CHECK-i386-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-x86_64-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7s-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-armv7k-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-arm64-SAME:     [[PROVIDED_PROTOCOL_DESCRIPTOR]], 
+// CHECK-SAME:     %swift.protocol_conformance_descriptor* 
+// CHECK-SAME:     $sSi4main1PAAMc
+// CHECK-SAME:   )
 // CHECK:   [[EQUAL_ARGUMENTS:%[0-9]+]] = and i1 [[EQUAL_TYPES]], [[EQUAL_DESCRIPTORS]]
 // CHECK:   br i1 [[EQUAL_ARGUMENTS]], label %[[EXIT_PRESPECIALIZED:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
 // CHECK: [[EXIT_PRESPECIALIZED]]:

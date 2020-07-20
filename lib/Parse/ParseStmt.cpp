@@ -1092,8 +1092,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                        P.CurDeclContext);
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
-    auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,
-                                                 namePattern);
+    auto varPattern =
+        new (P.Context) BindingPattern(loc, /*isLet*/ true, namePattern);
     varPattern->setImplicit();
     patternResult = makeParserResult(varPattern);
   }
@@ -1350,10 +1350,9 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
             auto *PlatformSpec =
                 cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
 
-            auto PlatformName = platformString(PlatformSpec->getPlatform());
             auto PlatformNameEndLoc =
-                PlatformSpec->getPlatformLoc().getAdvancedLoc(
-                    PlatformName.size());
+              Lexer::getLocForEndOfToken(SourceManager,
+                                         PlatformSpec->getPlatformLoc());
 
             diagnose(PlatformSpec->getPlatformLoc(),
                      diag::avail_query_meant_introduced)
@@ -1486,8 +1485,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
     
     if (ThePattern.isNonNull()) {
-      auto *P = new (Context) VarPattern(IntroducerLoc, wasLet,
-                                          ThePattern.get());
+      auto *P =
+          new (Context) BindingPattern(IntroducerLoc, wasLet, ThePattern.get());
       ThePattern = makeParserResult(Status, P);
     }
 

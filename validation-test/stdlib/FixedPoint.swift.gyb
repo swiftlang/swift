@@ -8,6 +8,7 @@ var FixedPoint = TestSuite("FixedPoint")
 
 %{
 
+from __future__ import division
 import gyb
 from SwiftIntTypes import all_integer_types
 
@@ -248,7 +249,7 @@ FixedPoint.test("${Self}.hash(into:)") {
 %     if self_ty.bits == 64:
     let expected = Hasher._hash(seed: 0, ${reference} as UInt64)
 %     else:
-    let expected = Hasher._hash(seed: 0, bytes: ${reference}, count: ${self_ty.bits / 8})
+    let expected = Hasher._hash(seed: 0, bytes: ${reference}, count: ${self_ty.bits // 8})
 %     end
     expectEqual(expected, output, "input: \(input)")
   }

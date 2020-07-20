@@ -392,7 +392,8 @@ namespace {
     } \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
                                    AbstractionPattern origType) { \
-      auto referentType = type->getReferentType(); \
+      auto referentType = \
+        type->getReferentType()->lookThroughSingleOptionalType(); \
       auto concreteType = getConcreteReferenceStorageReferent(referentType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
@@ -1453,6 +1454,7 @@ namespace {
 
       if (D->isCxxNotTriviallyCopyable()) {
         properties.setAddressOnly();
+        properties.setNonTrivial();
       }
 
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
@@ -1772,131 +1774,150 @@ CanType
 TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
                                         AbstractionPattern origType,
                                         CanType substType) {
-  // AST function types are turned into SIL function types:
-  //   - the type is uncurried as desired
-  //   - types are turned into their unbridged equivalents, depending
-  //     on the abstract CC
-  //   - ownership conventions are deduced
-  //   - a minimal substituted generic signature is extracted to represent
-  //     possible ABI-compatible substitutions
-  if (auto substFnType = dyn_cast<AnyFunctionType>(substType)) {
-    // If the formal type uses a C convention, it is not formally
-    // abstractable, and it may be subject to implicit bridging.
-    auto extInfo = substFnType->getExtInfo();
-    if (getSILFunctionLanguage(extInfo.getSILRepresentation())
-          == SILFunctionLanguage::C) {
-      // The importer only applies fully-reversible bridging to the
-      // component types of C function pointers.
-      auto bridging = Bridgeability::Full;
-      if (extInfo.getSILRepresentation()
-                        == SILFunctionTypeRepresentation::CFunctionPointer)
-        bridging = Bridgeability::None;
+  class LoweredRValueTypeVisitor
+      : public CanTypeVisitor<LoweredRValueTypeVisitor, CanType> {
+    TypeConverter &TC;
+    TypeExpansionContext forExpansion;
+    AbstractionPattern origType;
 
-      // Bridge the parameters and result of the function type.
-      auto bridgedFnType = getBridgedFunctionType(origType, substFnType,
-                                                  extInfo, bridging);
-      substFnType = bridgedFnType;
+  public:
+    LoweredRValueTypeVisitor(TypeConverter &TC,
+                             TypeExpansionContext forExpansion,
+                             AbstractionPattern origType)
+        : TC(TC), forExpansion(forExpansion), origType(origType) {}
 
-      // Also rewrite the type of the abstraction pattern.
-      auto signature = origType.getGenericSignatureOrNull();
-      if (origType.isTypeParameter()) {
-        origType = AbstractionPattern(signature, bridgedFnType);
-      } else {
-        origType.rewriteType(signature, bridgedFnType);
+    // AST function types are turned into SIL function types:
+    //   - the type is uncurried as desired
+    //   - types are turned into their unbridged equivalents, depending
+    //     on the abstract CC
+    //   - ownership conventions are deduced
+    //   - a minimal substituted generic signature is extracted to represent
+    //     possible ABI-compatible substitutions
+    CanType visitAnyFunctionType(CanAnyFunctionType substFnType) {
+      // If the formal type uses a C convention, it is not formally
+      // abstractable, and it may be subject to implicit bridging.
+      auto extInfo = substFnType->getExtInfo();
+      if (getSILFunctionLanguage(extInfo.getSILRepresentation()) ==
+          SILFunctionLanguage::C) {
+        // The importer only applies fully-reversible bridging to the
+        // component types of C function pointers.
+        auto bridging = Bridgeability::Full;
+        if (extInfo.getSILRepresentation() ==
+            SILFunctionTypeRepresentation::CFunctionPointer)
+          bridging = Bridgeability::None;
+
+        // Bridge the parameters and result of the function type.
+        auto bridgedFnType =
+            TC.getBridgedFunctionType(origType, substFnType, extInfo, bridging);
+        substFnType = bridgedFnType;
+
+        // Also rewrite the type of the abstraction pattern.
+        auto signature = origType.getGenericSignatureOrNull();
+        if (origType.isTypeParameter()) {
+          origType = AbstractionPattern(signature, bridgedFnType);
+        } else {
+          origType.rewriteType(signature, bridgedFnType);
+        }
       }
+
+      return ::getNativeSILFunctionType(TC, forExpansion, origType,
+                                        substFnType);
     }
 
-    return getNativeSILFunctionType(*this, forExpansion, origType, substFnType);
-  }
-
-  // Ignore dynamic self types.
-  if (auto selfType = dyn_cast<DynamicSelfType>(substType)) {
-    return getLoweredRValueType(forExpansion, origType, selfType.getSelfType());
-  }
-
-  // Static metatypes are unitary and can optimized to a "thin" empty
-  // representation if the type also appears as a static metatype in the
-  // original abstraction pattern.
-  if (auto substMeta = dyn_cast<MetatypeType>(substType)) {
-    // If the metatype has already been lowered, it will already carry its
-    // representation.
-    if (substMeta->hasRepresentation()) {
-      assert(substMeta->isLegalSILType());
-      return substOpaqueTypesWithUnderlyingTypes(substMeta, forExpansion);
+    // Ignore dynamic self types.
+    CanType visitDynamicSelfType(CanDynamicSelfType selfType) {
+      return TC.getLoweredRValueType(forExpansion, origType,
+                                     selfType.getSelfType());
     }
 
-    MetatypeRepresentation repr;
-    
-    auto origMeta = origType.getAs<MetatypeType>();
-    if (!origMeta) {
-      // If the metatype matches a dependent type, it must be thick.
-      assert(origType.isTypeParameterOrOpaqueArchetype());
-      repr = MetatypeRepresentation::Thick;
-    } else {
-      // Otherwise, we're thin if the metatype is thinnable both
-      // substituted and in the abstraction pattern.
-      if (hasSingletonMetatype(substMeta.getInstanceType())
-          && hasSingletonMetatype(origMeta.getInstanceType()))
-        repr = MetatypeRepresentation::Thin;
-      else
+    // Static metatypes are unitary and can optimized to a "thin" empty
+    // representation if the type also appears as a static metatype in the
+    // original abstraction pattern.
+    CanType visitMetatypeType(CanMetatypeType substMeta) {
+      // If the metatype has already been lowered, it will already carry its
+      // representation.
+      if (substMeta->hasRepresentation()) {
+        assert(substMeta->isLegalSILType());
+        return substOpaqueTypesWithUnderlyingTypes(substMeta, forExpansion);
+      }
+
+      MetatypeRepresentation repr;
+
+      auto origMeta = origType.getAs<MetatypeType>();
+      if (!origMeta) {
+        // If the metatype matches a dependent type, it must be thick.
+        assert(origType.isTypeParameterOrOpaqueArchetype());
         repr = MetatypeRepresentation::Thick;
+      } else {
+        // Otherwise, we're thin if the metatype is thinnable both
+        // substituted and in the abstraction pattern.
+        if (hasSingletonMetatype(substMeta.getInstanceType()) &&
+            hasSingletonMetatype(origMeta.getInstanceType()))
+          repr = MetatypeRepresentation::Thin;
+        else
+          repr = MetatypeRepresentation::Thick;
+      }
+
+      CanType instanceType = substOpaqueTypesWithUnderlyingTypes(
+          substMeta.getInstanceType(), forExpansion);
+
+      // Regardless of thinness, metatypes are always trivial.
+      return CanMetatypeType::get(instanceType, repr);
     }
 
-    CanType instanceType = substOpaqueTypesWithUnderlyingTypes(
-        substMeta.getInstanceType(), forExpansion);
+    // Give existential metatypes @thick representation by default.
+    CanType
+    visitExistentialMetatypeType(CanExistentialMetatypeType existMetatype) {
+      if (existMetatype->hasRepresentation()) {
+        assert(existMetatype->isLegalSILType());
+        return existMetatype;
+      }
 
-    // Regardless of thinness, metatypes are always trivial.
-    return CanMetatypeType::get(instanceType, repr);
-  }
-
-  // Give existential metatypes @thick representation by default.
-  if (auto existMetatype = dyn_cast<ExistentialMetatypeType>(substType)) {
-    if (existMetatype->hasRepresentation()) {
-      assert(existMetatype->isLegalSILType());
-      return existMetatype;
+      return CanExistentialMetatypeType::get(existMetatype.getInstanceType(),
+                                             MetatypeRepresentation::Thick);
     }
 
-    return CanExistentialMetatypeType::get(existMetatype.getInstanceType(),
-                                           MetatypeRepresentation::Thick);
-  }
+    // Lower tuple element types.
+    CanType visitTupleType(CanTupleType substTupleType) {
+      return computeLoweredTupleType(TC, forExpansion, origType,
+                                     substTupleType);
+    }
 
-  // Lower tuple element types.
-  if (auto substTupleType = dyn_cast<TupleType>(substType)) {
-    return computeLoweredTupleType(*this, forExpansion, origType,
-                                   substTupleType);
-  }
+    // Lower the referent type of reference storage types.
+    CanType visitReferenceStorageType(CanReferenceStorageType substRefType) {
+      return computeLoweredReferenceStorageType(TC, forExpansion, origType,
+                                                substRefType);
+    }
 
-  // Lower the referent type of reference storage types.
-  if (auto substRefType = dyn_cast<ReferenceStorageType>(substType)) {
-    return computeLoweredReferenceStorageType(*this, forExpansion, origType,
-                                              substRefType);
-  }
+    CanType visitSILFunctionType(CanSILFunctionType silFnTy) {
+      if (!silFnTy->hasOpaqueArchetype() ||
+          !forExpansion.shouldLookThroughOpaqueTypeArchetypes())
+        return silFnTy;
+      return silFnTy->substituteOpaqueArchetypes(TC, forExpansion);
+    }
 
-  // Lower the object type of optional types.
-  if (auto substObjectType = substType.getOptionalObjectType()) {
-    return computeLoweredOptionalType(*this, forExpansion, origType,
-                                      substType, substObjectType);
-  }
+    CanType visitType(CanType substType) {
+      // Lower the object type of optional types.
+      if (auto substObjectType = substType.getOptionalObjectType()) {
+        return computeLoweredOptionalType(TC, forExpansion, origType, substType,
+                                          substObjectType);
+      }
 
-  if (auto silFnTy = dyn_cast<SILFunctionType>(substType)) {
-    if (!substType->hasOpaqueArchetype() ||
-        !forExpansion.shouldLookThroughOpaqueTypeArchetypes())
-      return substType;
-    return silFnTy->substituteOpaqueArchetypes(*this, forExpansion);
-  }
+      // The Swift type directly corresponds to the lowered type.
+      auto underlyingTy =
+          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion,
+                                              /*allowLoweredTypes*/ true);
+      if (underlyingTy != substType) {
+        underlyingTy =
+            TC.computeLoweredRValueType(forExpansion, origType, underlyingTy);
+      }
 
-  // The Swift type directly corresponds to the lowered type.
-  auto underlyingTy =
-      substOpaqueTypesWithUnderlyingTypes(substType, forExpansion,
-                                          /*allowLoweredTypes*/ true);
-  if (underlyingTy != substType) {
-    underlyingTy = computeLoweredRValueType(
-        forExpansion,
-        origType,
-        underlyingTy);
-  }
+      return underlyingTy;
+    }
+  };
 
-  return underlyingTy;
+  LoweredRValueTypeVisitor visitor(*this, forExpansion, origType);
+  return visitor.visit(substType);
 }
 
 const TypeLowering &
@@ -2031,6 +2052,17 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   return CanFunctionType::get({}, C.TheRawPointerType);
 }
 
+/// Removes @noescape from the given type if it's a function type. Otherwise,
+/// returns the original type.
+static CanType removeNoEscape(CanType resultType) {
+  if (auto funTy = resultType->getAs<AnyFunctionType>()) {
+    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
+    return adjustFunctionType(cast<AnyFunctionType>(resultType), newExtInfo);
+  }
+
+  return resultType;
+}
+
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      SILDeclRef c) {
@@ -2047,11 +2079,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // Remove @noescape from function return types. A @noescape
   // function return type is a contradiction.
-  if (auto funTy = canResultTy->getAs<AnyFunctionType>()) {
-    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
-    canResultTy =
-        adjustFunctionType(cast<AnyFunctionType>(canResultTy), newExtInfo);
-  }
+  canResultTy = removeNoEscape(canResultTy);
 
   // Get the generic signature from the surrounding context.
   auto sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
@@ -2082,6 +2110,8 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
     if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
       resultTy = originalProperty->getPropertyWrapperInitValueInterfaceType()
                                      ->getCanonicalType();
+      // Stored property initializers can't return @noescape functions
+      resultTy = removeNoEscape(resultTy);
     }
   }
 

@@ -412,6 +412,7 @@ namespace {
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
           return this->getBoolValue() == other.getBoolValue();
 
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Constructor):
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::UnknownCase):
           return false;
 
@@ -1416,8 +1417,8 @@ namespace {
         llvm_unreachable("cannot appear in case patterns");
       case PatternKind::Expr:
         return Space();
-      case PatternKind::Var: {
-        auto *VP = cast<VarPattern>(item);
+      case PatternKind::Binding: {
+        auto *VP = cast<BindingPattern>(item);
         return projectPattern(VP->getSubPattern());
       }
       case PatternKind::Paren: {

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -target x86_64-apple-macosx10.50 -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -target %target-cpu-apple-macosx10.50 -verify
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -target x86_64-apple-macosx10.50 -dump-ast > %t.ast
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -target %target-cpu-apple-macosx10.50 -dump-ast > %t.ast
 // RUN: %FileCheck %s < %t.ast
 
 // REQUIRES: objc_interop

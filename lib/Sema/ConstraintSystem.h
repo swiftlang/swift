@@ -856,6 +856,7 @@ public:
     stmtCondElement,
     stmt,
     patternBindingEntry,
+    varDecl,
   };
 
 private:
@@ -870,6 +871,8 @@ private:
       const PatternBindingDecl *patternBinding;
       unsigned index;
     } patternBindingEntry;
+
+    const VarDecl *varDecl;
   } storage;
 
 public:
@@ -895,6 +898,11 @@ public:
     storage.patternBindingEntry.index = index;
   }
 
+  SolutionApplicationTargetsKey(const VarDecl *varDecl) {
+    kind = Kind::varDecl;
+    storage.varDecl = varDecl;
+  }
+
   friend bool operator==(
       SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
     if (lhs.kind != rhs.kind)
@@ -916,6 +924,9 @@ public:
                 == rhs.storage.patternBindingEntry.patternBinding) &&
           (lhs.storage.patternBindingEntry.index
              == rhs.storage.patternBindingEntry.index);
+
+    case Kind::varDecl:
+      return lhs.storage.varDecl == rhs.storage.varDecl;
     }
     llvm_unreachable("invalid SolutionApplicationTargetsKey kind");
   }
@@ -951,6 +962,11 @@ public:
               storage.patternBindingEntry.patternBinding),
           DenseMapInfo<unsigned>::getHashValue(
               storage.patternBindingEntry.index));
+
+    case Kind::varDecl:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.varDecl));
     }
     llvm_unreachable("invalid statement kind");
   }
@@ -1343,6 +1359,7 @@ public:
     stmtCondition,
     caseLabelItem,
     patternBinding,
+    uninitializedWrappedVar,
   } kind;
 
 private:
@@ -1365,13 +1382,19 @@ private:
       /// pattern.
       Pattern *pattern;
 
-      /// The variable to which property wrappers have been applied, if
-      /// this is an initialization involving a property wrapper.
-      VarDecl *wrappedVar;
+      struct {
+        /// The variable to which property wrappers have been applied, if
+        /// this is an initialization involving a property wrapper.
+        VarDecl *wrappedVar;
 
-      /// The innermost call to \c init(wrappedValue:), if this is an
-      /// initialization involving a property wrapper.
-      ApplyExpr *innermostWrappedValueInit;
+        /// The innermost call to \c init(wrappedValue:), if this is an
+        /// initialization involving a property wrapper.
+        ApplyExpr *innermostWrappedValueInit;
+
+        /// Whether this property wrapper has an initial wrapped value specified
+        /// via \c = .
+        bool hasInitialWrappedValue;
+      } propertyWrapper;
 
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
@@ -1409,6 +1432,8 @@ private:
     } caseLabelItem;
 
     PatternBindingDecl *patternBinding;
+
+    VarDecl *uninitializedWrappedVar;
   };
 
   // If the pattern contains a single variable that has an attached
@@ -1454,6 +1479,11 @@ public:
     this->patternBinding = patternBinding;
   }
 
+  SolutionApplicationTarget(VarDecl *wrappedVar) {
+    kind = Kind::uninitializedWrappedVar;
+    this->uninitializedWrappedVar= wrappedVar;
+  }
+
   /// Form a target for the initialization of a pattern from an expression.
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
@@ -1471,6 +1501,11 @@ public:
       ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
       bool bindPatternVarsOneWay);
 
+  /// Form a target for a property with an attached property wrapper that is
+  /// initialized out-of-line.
+  static SolutionApplicationTarget forUninitializedWrappedVar(
+      VarDecl *wrappedVar);
+
   Expr *getAsExpr() const {
     switch (kind) {
     case Kind::expression:
@@ -1480,6 +1515,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::uninitializedWrappedVar:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -1501,6 +1537,9 @@ public:
 
     case Kind::patternBinding:
       return patternBinding->getDeclContext();
+
+    case Kind::uninitializedWrappedVar:
+      return uninitializedWrappedVar->getDeclContext();
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -1585,11 +1624,18 @@ public:
         expression.contextualPurpose != CTP_Initialization)
       return false;
 
-    auto *wrappedVar = expression.wrappedVar;
+    auto *wrappedVar = expression.propertyWrapper.wrappedVar;
     if (!wrappedVar || wrappedVar->isStatic())
       return false;
 
-    return expression.innermostWrappedValueInit == apply;
+    return expression.propertyWrapper.innermostWrappedValueInit == apply;
+  }
+
+  /// Whether this target is for initialization of a property wrapper
+  /// with an initial wrapped value specified via \c = .
+  bool propertyWrapperHasInitialWrappedValue() const {
+    return (kind == Kind::expression &&
+            expression.propertyWrapper.hasInitialWrappedValue);
   }
 
   /// Retrieve the wrapped variable when initializing a pattern with a
@@ -1597,7 +1643,7 @@ public:
   VarDecl *getInitializationWrappedVar() const {
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
-    return expression.wrappedVar;
+    return expression.propertyWrapper.wrappedVar;
   }
 
   PatternBindingDecl *getInitializationPatternBindingDecl() const {
@@ -1653,6 +1699,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::uninitializedWrappedVar:
       return None;
 
     case Kind::function:
@@ -1667,6 +1714,7 @@ public:
     case Kind::function:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
+    case Kind::uninitializedWrappedVar:
       return None;
 
     case Kind::stmtCondition:
@@ -1681,6 +1729,7 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::patternBinding:
+    case Kind::uninitializedWrappedVar:
       return None;
 
     case Kind::caseLabelItem:
@@ -1695,10 +1744,25 @@ public:
     case Kind::function:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
+    case Kind::uninitializedWrappedVar:
       return nullptr;
 
     case Kind::patternBinding:
       return patternBinding;
+    }
+  }
+
+  VarDecl *getAsUninitializedWrappedVar() const {
+    switch (kind) {
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+      return nullptr;
+
+    case Kind::uninitializedWrappedVar:
+      return uninitializedWrappedVar;
     }
   }
 
@@ -1730,6 +1794,9 @@ public:
 
     case Kind::patternBinding:
       return patternBinding->getSourceRange();
+
+    case Kind::uninitializedWrappedVar:
+      return uninitializedWrappedVar->getSourceRange();
     }
     llvm_unreachable("invalid target type");
   }
@@ -1751,6 +1818,9 @@ public:
 
     case Kind::patternBinding:
       return patternBinding->getLoc();
+
+    case Kind::uninitializedWrappedVar:
+      return uninitializedWrappedVar->getLoc();
     }
     llvm_unreachable("invalid target type");
   }
@@ -2508,7 +2578,6 @@ private:
                                                         Type builderType);
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
-                                          bool &unresolvedTypeExprs,
                                           TypeCheckExprOptions options);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
@@ -3909,8 +3978,13 @@ public:
     auto resultTy = fnTy->getResult();
     if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
       resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
-    else
-      resultTy = resultTy->getWithoutSpecifierType()->getOptionalObjectType();
+    else {
+      auto objType =
+          resultTy->getWithoutSpecifierType()->getOptionalObjectType();
+      // Preserve l-value through force operation.
+      resultTy =
+          resultTy->is<LValueType>() ? LValueType::get(objType) : objType;
+    }
 
     assert(resultTy);
 
@@ -4024,7 +4098,8 @@ public:
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
-  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType);
+  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
+                             bool isDefaultWrappedValue = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
@@ -4363,6 +4438,12 @@ private:
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
+    /// The set of protocol requirements placed on this type variable.
+    llvm::TinyPtrVector<Constraint *> Protocols;
+
+    /// The set of constraints which would be used to infer default types.
+    llvm::TinyPtrVector<Constraint *> Defaults;
+
     /// Whether these bindings should be delayed until the rest of the
     /// constraint system is considered "fully bound".
     bool FullyBound = false;
@@ -4497,6 +4578,35 @@ private:
     /// if it has only concrete types or would resolve a closure.
     bool favoredOverDisjunction(Constraint *disjunction) const;
 
+    /// Detect `subtype` relationship between two type variables and
+    /// attempt to infer supertype bindings transitively e.g.
+    ///
+    /// Given A <: T1 <: T2 transitively A <: T2
+    ///
+    /// Which gives us a new (superclass A) binding for T2 as well as T1.
+    ///
+    /// \param cs The constraint system this type variable is associated with.
+    ///
+    /// \param inferredBindings The set of all bindings inferred for type
+    /// variables in the workset.
+    void inferTransitiveBindings(
+        ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+        const llvm::SmallDenseMap<TypeVariableType *,
+                                  ConstraintSystem::PotentialBindings>
+            &inferredBindings);
+
+    /// Infer bindings based on any protocol conformances that have default
+    /// types.
+    void inferDefaultTypes(ConstraintSystem &cs,
+                           llvm::SmallPtrSetImpl<CanType> &existingTypes);
+
+    /// Finalize binding computation for this type variable by
+    /// inferring bindings from context e.g. transitive bindings.
+    void finalize(ConstraintSystem &cs,
+                  const llvm::SmallDenseMap<TypeVariableType *,
+                                            ConstraintSystem::PotentialBindings>
+                      &inferredBindings);
+
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
@@ -4557,31 +4667,19 @@ private:
 
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
+
+  /// Infer bindings for the given type variable based on current
+  /// state of the constraint system.
+  PotentialBindings inferBindingsFor(TypeVariableType *typeVar);
+
+private:
   Optional<ConstraintSystem::PotentialBinding>
   getPotentialBindingForRelationalConstraint(
       PotentialBindings &result, Constraint *constraint,
       bool &hasDependentMemberRelationalConstraints,
-      bool &hasNonDependentMemberRelationalConstraints,
-      bool &addOptionalSupertypeBindings) const;
+      bool &hasNonDependentMemberRelationalConstraints) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
-  /// Detect `subtype` relationship between two type variables and
-  /// attempt to infer supertype bindings transitively e.g.
-  ///
-  /// Given A <: T1 <: T2 transitively A <: T2
-  ///
-  /// Which gives us a new (superclass A) binding for T2 as well as T1.
-  ///
-  /// \param inferredBindings The set of all bindings inferred for type
-  /// variables in the workset.
-  /// \param bindings The type variable we aim to infer new supertype
-  /// bindings for.
-  void inferTransitiveSupertypeBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-          &inferredBindings,
-      PotentialBindings &bindings);
-
-private:
   /// Add a constraint to the constraint system.
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
                                  ConstraintLocatorBuilder locator,
@@ -4614,7 +4712,8 @@ private:
                                   bool restoreOnFail,
                                   llvm::function_ref<bool(Constraint *)> pred);
 
-  bool isReadOnlyKeyPathComponent(const AbstractStorageDecl *storage) {
+  bool isReadOnlyKeyPathComponent(const AbstractStorageDecl *storage,
+                                  SourceLoc referenceLoc) {
     // See whether key paths can store to this component. (Key paths don't
     // get any special power from being formed in certain contexts, such
     // as the ability to assign to `let`s in initialization contexts, so
@@ -4634,6 +4733,17 @@ private:
       // A non-settable component makes the key path read-only, unless
       // a reference-writable component shows up later.
       return true;
+    }
+    
+    // If the setter is unavailable, then the keypath ought to be read-only
+    // in this context.
+    if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
+      auto maybeUnavail = TypeChecker::checkDeclarationAvailability(setter,
+                                                                    referenceLoc,
+                                                                    DC);
+      if (maybeUnavail.hasValue()) {
+        return true;
+      }
     }
 
     return false;
@@ -4970,6 +5080,25 @@ public:
   void print(raw_ostream &out, Expr *) const;
 };
 
+/// A function object suitable for use as an \c OpenUnboundGenericTypeFn that
+/// "opens" the given unbound type by introducing fresh type variables for
+/// generic parameters and constructing a bound generic type from these
+/// type variables.
+class OpenUnboundGenericType {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+
+public:
+  explicit OpenUnboundGenericType(ConstraintSystem &cs,
+                                  const ConstraintLocatorBuilder &locator)
+      : cs(cs), locator(locator) {}
+
+  Type operator()(UnboundGenericType *unboundTy) const {
+    return cs.openUnboundGenericType(unboundTy->getDecl(),
+                                     unboundTy->getParent(), locator);
+  }
+};
+
 /// Compute the shuffle required to map from a given tuple type to
 /// another tuple type.
 ///
@@ -5164,13 +5293,13 @@ bool isArgumentOfPatternMatchingOperator(ConstraintLocator *locator);
 /// associated with `===` and `!==` operators.
 bool isArgumentOfReferenceEqualityOperator(ConstraintLocator *locator);
 
-/// Determine whether given expression is a reference to a
+/// Determine whether the given AST node is a reference to a
 /// pattern-matching operator `~=`
-bool isPatternMatchingOperator(Expr *expr);
+bool isPatternMatchingOperator(ASTNode node);
 
-/// Determine whether given expression is a reference to a
+/// Determine whether the given AST node is a reference to a
 /// "standard" comparison operator such as "==", "!=", ">" etc.
-bool isStandardComparisonOperator(Expr *expr);
+bool isStandardComparisonOperator(ASTNode node);
 
 /// If given expression references operator overlaod(s)
 /// extract and produce name of the operator.

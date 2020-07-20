@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -enable-implicit-dynamic -target x86_64-apple-macosx10.9 -Onone -emit-ir %s | %FileCheck --check-prefix=MAYBE-AVAILABLE %s
-// RUN: %target-swift-frontend -enable-implicit-dynamic -target x86_64-apple-macosx10.15 -Onone -emit-ir %s | %FileCheck --check-prefix=ALWAYS-AVAILABLE %s
+// RUN: %target-swift-frontend -enable-implicit-dynamic -target %target-cpu-apple-macosx10.15 -Onone -emit-ir %s | %FileCheck --check-prefix=ALWAYS-AVAILABLE %s
 // REQUIRES: OS=macosx
 
 protocol P {}

@@ -45,7 +45,6 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
@@ -427,6 +426,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
   filter |= ModuleDecl::ImportFilterKind::Private;
   filter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  filter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
   filter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   mainModule->getImportedModules(imports, filter);
@@ -1507,7 +1507,7 @@ generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            llvm::GlobalVariable *&HashGlobal,
            ArrayRef<std::string> parallelOutputFilenames) {
   if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return performIRGeneration(*SF, IRGenOpts, TBDOpts,
+    return performIRGeneration(SF, IRGenOpts, TBDOpts,
                                std::move(SM), OutputFilename, PSPs,
                                SF->getPrivateDiscriminator().str(),
                                &HashGlobal);
@@ -1647,16 +1647,14 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   const auto &opts = Instance.getInvocation().getIRGenOptions();
   std::unique_ptr<llvm::TargetMachine> TargetMachine =
       createTargetMachine(opts, Instance.getASTContext());
-  version::Version EffectiveLanguageVersion =
-      Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
-                     TargetMachine.get(), EffectiveLanguageVersion,
-                     OutputFilename, Instance.getStatsReporter());
+                     TargetMachine.get(), OutputFilename,
+                     Instance.getStatsReporter());
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
@@ -1929,8 +1927,36 @@ createJSONFixItDiagnosticConsumerIfNeeded(
   });
 }
 
+/// Print information about a
+static void printCompatibilityLibrary(
+    llvm::VersionTuple runtimeVersion, llvm::VersionTuple maxVersion,
+    StringRef filter, StringRef libraryName, bool &printedAny,
+    llvm::raw_ostream &out) {
+  if (runtimeVersion > maxVersion)
+    return;
+
+  if (printedAny) {
+    out << ",";
+  }
+
+  out << "\n";
+  out << "      {\n";
+
+  out << "        \"libraryName\": \"";
+  out.write_escaped(libraryName);
+  out << "\",\n";
+
+  out << "        \"filter\": \"";
+  out.write_escaped(filter);
+  out << "\"\n";
+  out << "      }";
+
+  printedAny = true;
+}
+
 /// Print information about the target triple in JSON.
 static void printTripleInfo(const llvm::Triple &triple,
+                            llvm::Optional<llvm::VersionTuple> runtimeVersion,
                             llvm::raw_ostream &out) {
   out << "{\n";
 
@@ -1946,11 +1972,26 @@ static void printTripleInfo(const llvm::Triple &triple,
   out.write_escaped(getTargetSpecificModuleTriple(triple).getTriple());
   out << "\",\n";
 
-  if (auto runtimeVersion = getSwiftRuntimeCompatibilityVersionForTarget(
-          triple)) {
+  if (runtimeVersion) {
     out << "    \"swiftRuntimeCompatibilityVersion\": \"";
     out.write_escaped(runtimeVersion->getAsString());
     out << "\",\n";
+
+    // Compatibility libraries that need to be linked.
+    out << "    \"compatibilityLibraries\": [";
+    bool printedAnyCompatibilityLibrary = false;
+    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName)           \
+      printCompatibilityLibrary(                                        \
+        *runtimeVersion, llvm::VersionTuple Version, #Filter, LibraryName, \
+        printedAnyCompatibilityLibrary, out);
+    #include "swift/Frontend/BackDeploymentLibs.def"
+
+    if (printedAnyCompatibilityLibrary) {
+      out << "\n   ";
+    }
+    out << " ],\n";
+  } else {
+    out << "    \"compatibilityLibraries\": [ ],\n";
   }
 
   out << "    \"librariesRequireRPath\": "
@@ -1966,15 +2007,23 @@ static void printTargetInfo(const CompilerInvocation &invocation,
                             llvm::raw_ostream &out) {
   out << "{\n";
 
+  // Compiler version, as produced by --version.
+  out << "  \"compilerVersion\": \"";
+  out.write_escaped(version::getSwiftFullVersion(
+                                                 version::Version::getCurrentLanguageVersion()));
+  out << "\",\n";
+
   // Target triple and target variant triple.
+  auto runtimeVersion =
+    invocation.getIRGenOptions().AutolinkRuntimeCompatibilityLibraryVersion;
   auto &langOpts = invocation.getLangOptions();
   out << "  \"target\": ";
-  printTripleInfo(langOpts.Target, out);
+  printTripleInfo(langOpts.Target, runtimeVersion, out);
   out << ",\n";
 
   if (auto &variant = langOpts.TargetVariant) {
     out << "  \"targetVariant\": ";
-    printTripleInfo(*variant, out);
+    printTripleInfo(*variant, runtimeVersion, out);
     out << ",\n";
   }
 
@@ -2181,9 +2230,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   PDC.setFormattingStyle(
       Invocation.getDiagnosticOptions().PrintedFormattingStyle);
-
-  if (Invocation.getFrontendOptions().DebugTimeCompilation)
-    SharedTimer::enableCompilationTimers();
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();

@@ -56,7 +56,7 @@ using namespace swift::serialization;
 using llvm::Expected;
 
 StringRef swift::getNameOfModule(const ModuleFile *MF) {
-  return MF->Name;
+  return MF->getName();
 }
 
 namespace {
@@ -166,13 +166,13 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 
 void ModuleFile::fatal(llvm::Error error) {
   if (FileContext) {
-    getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Name);
+    getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Core->Name);
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_misc_version,
-      Name, MiscVersion);
+      Core->Name, Core->MiscVersion);
 
-    if (!CompatibilityVersion.empty()) {
+    if (!Core->CompatibilityVersion.empty()) {
       if (getContext().LangOpts.EffectiveLanguageVersion
-            != CompatibilityVersion) {
+            != Core->CompatibilityVersion) {
         SmallString<16> effectiveVersionBuffer, compatVersionBuffer;
         {
           llvm::raw_svector_ostream out(effectiveVersionBuffer);
@@ -180,19 +180,16 @@ void ModuleFile::fatal(llvm::Error error) {
         }
         {
           llvm::raw_svector_ostream out(compatVersionBuffer);
-          out << CompatibilityVersion;
+          out << Core->CompatibilityVersion;
         }
         getContext().Diags.diagnose(
             SourceLoc(), diag::serialization_compatibility_version_mismatch,
-            effectiveVersionBuffer, Name, compatVersionBuffer);
+            effectiveVersionBuffer, Core->Name, compatVersionBuffer);
       }
     }
   }
 
-  logAllUnhandledErrors(std::move(error), llvm::errs(),
-                        "\n*** DESERIALIZATION FAILURE (please include this "
-                        "section in any bug report) ***\n");
-  abort();
+  ModuleFileSharedCore::fatal(std::move(error));
 }
 
 static Optional<swift::AccessorKind>
@@ -211,32 +208,25 @@ getActualAccessorKind(uint8_t raw) {
 static Optional<swift::DefaultArgumentKind>
 getActualDefaultArgKind(uint8_t raw) {
   switch (static_cast<serialization::DefaultArgumentKind>(raw)) {
-  case serialization::DefaultArgumentKind::None:
-    return swift::DefaultArgumentKind::None;
-  case serialization::DefaultArgumentKind::Normal:
-    return swift::DefaultArgumentKind::Normal;
-  case serialization::DefaultArgumentKind::Inherited:
-    return swift::DefaultArgumentKind::Inherited;
-  case serialization::DefaultArgumentKind::Column:
-    return swift::DefaultArgumentKind::Column;
-  case serialization::DefaultArgumentKind::File:
-    return swift::DefaultArgumentKind::File;
-  case serialization::DefaultArgumentKind::FilePath:
-    return swift::DefaultArgumentKind::FilePath;
-  case serialization::DefaultArgumentKind::Line:
-    return swift::DefaultArgumentKind::Line;
-  case serialization::DefaultArgumentKind::Function:
-    return swift::DefaultArgumentKind::Function;
-  case serialization::DefaultArgumentKind::DSOHandle:
-    return swift::DefaultArgumentKind::DSOHandle;
-  case serialization::DefaultArgumentKind::NilLiteral:
-    return swift::DefaultArgumentKind::NilLiteral;
-  case serialization::DefaultArgumentKind::EmptyArray:
-    return swift::DefaultArgumentKind::EmptyArray;
-  case serialization::DefaultArgumentKind::EmptyDictionary:
-    return swift::DefaultArgumentKind::EmptyDictionary;
-  case serialization::DefaultArgumentKind::StoredProperty:
-    return swift::DefaultArgumentKind::StoredProperty;
+#define CASE(X) \
+  case serialization::DefaultArgumentKind::X: \
+    return swift::DefaultArgumentKind::X;
+  CASE(None)
+  CASE(Normal)
+  CASE(Inherited)
+  CASE(Column)
+  CASE(FileID)
+  CASE(FileIDSpelledAsFile)
+  CASE(FilePath)
+  CASE(FilePathSpelledAsFile)
+  CASE(Line)
+  CASE(Function)
+  CASE(DSOHandle)
+  CASE(NilLiteral)
+  CASE(EmptyArray)
+  CASE(EmptyDictionary)
+  CASE(StoredProperty)
+#undef CASE
   }
   return None;
 }
@@ -402,11 +392,12 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   }
   case decls_block::VAR_PATTERN: {
     bool isLet;
-    VarPatternLayout::readRecord(scratch, isLet);
+    BindingPatternLayout::readRecord(scratch, isLet);
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
-    auto result = VarPattern::createImplicit(getContext(), isLet, subPattern);
+    auto result =
+        BindingPattern::createImplicit(getContext(), isLet, subPattern);
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(interfaceType, owningDC);
     else
@@ -1871,13 +1862,7 @@ StringRef ModuleFile::getIdentifierText(IdentifierID IID) {
   if (!identRecord.Ident.empty())
     return identRecord.Ident.str();
 
-  assert(!IdentifierData.empty() && "no identifier data in module");
-
-  StringRef rawStrPtr = IdentifierData.substr(identRecord.Offset);
-  size_t terminatorOffset = rawStrPtr.find('\0');
-  assert(terminatorOffset != StringRef::npos &&
-         "unterminated identifier string data");
-  return rawStrPtr.slice(0, terminatorOffset);
+  return Core->getIdentifierText(IID);
 }
 
 DeclContext *ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) {
@@ -2917,7 +2902,7 @@ public:
       }
 
       PropertyWrapperBackingPropertyInfo info(
-          backingVar, storageWrapperVar, nullptr, nullptr, nullptr);
+          backingVar, storageWrapperVar, nullptr, nullptr);
       ctx.evaluator.cacheOutput(
           PropertyWrapperBackingPropertyInfoRequest{var}, std::move(info));
       ctx.evaluator.cacheOutput(
@@ -4380,16 +4365,26 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
       case decls_block::Derivative_DECL_ATTR: {
         bool isImplicit;
         uint64_t origNameId;
+        bool hasAccessorKind;
+        uint64_t rawAccessorKind;
         DeclID origDeclId;
         uint64_t rawDerivativeKind;
         ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DerivativeDeclAttrLayout::readRecord(
-            scratch, isImplicit, origNameId, origDeclId, rawDerivativeKind,
-            parameters);
+            scratch, isImplicit, origNameId, hasAccessorKind, rawAccessorKind,
+            origDeclId, rawDerivativeKind, parameters);
+
+        Optional<AccessorKind> accessorKind = None;
+        if (hasAccessorKind) {
+          auto maybeAccessorKind = getActualAccessorKind(rawAccessorKind);
+          if (!maybeAccessorKind)
+            MF.fatal();
+          accessorKind = *maybeAccessorKind;
+        }
 
         DeclNameRefWithLoc origName{DeclNameRef(MF.getDeclBaseName(origNameId)),
-                                    DeclNameLoc(), None};
+                                    DeclNameLoc(), accessorKind};
         auto derivativeKind =
             getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
         if (!derivativeKind)

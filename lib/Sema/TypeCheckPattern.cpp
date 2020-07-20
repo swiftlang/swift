@@ -286,7 +286,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(Bool)
 #undef ALWAYS_RESOLVED_PATTERN
 
-  Pattern *visitVarPattern(VarPattern *P) {
+  Pattern *visitBindingPattern(BindingPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
     P->setSubPattern(visit(P->getSubPattern()));
@@ -467,14 +467,19 @@ public:
     if (!ExprToIdentTypeRepr(components, Context).visit(ude->getBase()))
       return nullptr;
 
-    TypeResolutionOptions options = None;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::SilenceErrors;
+    const auto options =
+        TypeResolutionOptions(None) | TypeResolutionFlags::SilenceErrors;
 
     auto *repr = IdentTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
-    auto ty = TypeResolution::forContextual(DC, options).resolveType(repr);
+    const auto resolution =
+        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          return unboundTy;
+        });
+    const auto ty = resolution.resolveType(repr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
       return nullptr;
@@ -564,17 +569,20 @@ public:
       baseTE = TypeExpr::createImplicit(enumDecl->getDeclaredTypeInContext(),
                                         Context);
     } else {
-      TypeResolutionOptions options = None;
-      options |= TypeResolutionFlags::AllowUnboundGenerics;
-      options |= TypeResolutionFlags::SilenceErrors;
+      const auto options =
+          TypeResolutionOptions(None) | TypeResolutionFlags::SilenceErrors;
 
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
       auto *prefixRepr = IdentTypeRepr::create(Context, components);
 
       // See first if the entire repr resolves to a type.
-      Type enumTy = TypeResolution::forContextual(DC, options)
-                        .resolveType(prefixRepr);
+      const Type enumTy =
+          TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+            // FIXME: Don't let unbound generic types escape type resolution.
+            // For now, just return the unbound generic type.
+            return unboundTy;
+          }).resolveType(prefixRepr);
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
         return nullptr;
@@ -635,11 +643,11 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   if (auto *TP = dyn_cast<TypedPattern>(P))
     InnerP = TP->getSubPattern();
 
-  // If the pattern was valid, check for an implicit VarPattern on the outer
+  // If the pattern was valid, check for an implicit BindingPattern on the outer
   // level.  If so, we have an "if let" condition and we want to enforce some
   // more structure on it.
-  if (isStmtCondition && isa<VarPattern>(InnerP) && InnerP->isImplicit()) {
-    auto *Body = cast<VarPattern>(InnerP)->getSubPattern();
+  if (isStmtCondition && isa<BindingPattern>(InnerP) && InnerP->isImplicit()) {
+    auto *Body = cast<BindingPattern>(InnerP)->getSubPattern();
 
     // If they wrote a "x?" pattern, they probably meant "if let x".
     // Check for this and recover nicely if they wrote that.
@@ -726,7 +734,6 @@ static TypeResolutionOptions applyContextualPatternOptions(
     TypeResolutionOptions options, ContextualPattern pattern) {
   if (pattern.allowsInference()) {
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
   return options;
@@ -750,12 +757,12 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
   case PatternKind::Paren:
-  case PatternKind::Var: {
+  case PatternKind::Binding: {
     Pattern *SP;
     if (auto *PP = dyn_cast<ParenPattern>(P))
       SP = PP->getSubPattern();
     else
-      SP = cast<VarPattern>(P)->getSubPattern();
+      SP = cast<BindingPattern>(P)->getSubPattern();
     Type subType = TypeChecker::typeCheckPattern(
         pattern.forSubPattern(SP, /*retainTopLevel=*/true));
     if (subType->hasError())
@@ -770,8 +777,17 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
   case PatternKind::Typed: {
-    auto resolution = TypeResolution::forContextual(dc, options);
-    return validateTypedPattern(cast<TypedPattern>(P), resolution);
+    OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+    if (pattern.allowsInference()) {
+      unboundTyOpener = [](auto unboundTy) {
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        return unboundTy;
+      };
+    }
+    return validateTypedPattern(
+        cast<TypedPattern>(P),
+        TypeResolution::forContextual(dc, options, unboundTyOpener));
   }
 
   // A wildcard or name pattern cannot appear by itself in a context
@@ -824,9 +840,17 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     // typed pattern, the resulting pattern must have optional type.
     auto somePat = cast<OptionalSomePattern>(P);
     if (somePat->isImplicit() && isa<TypedPattern>(somePat->getSubPattern())) {
-      auto resolution = TypeResolution::forContextual(dc, options);
+      OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+      if (pattern.allowsInference()) {
+        unboundTyOpener = [](auto unboundTy) {
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          return unboundTy;
+        };
+      }
       TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
-      auto type = validateTypedPattern(TP, resolution);
+      const auto type = validateTypedPattern(
+          TP, TypeResolution::forContextual(dc, options, unboundTyOpener));
       if (type && !type->hasError()) {
         return OptionalType::get(type);
       }
@@ -987,9 +1011,9 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     PP->setType(sub->getType());
     return P;
   }
-  case PatternKind::Var: {
-    auto VP = cast<VarPattern>(P);
-    
+  case PatternKind::Binding: {
+    auto VP = cast<BindingPattern>(P);
+
     Pattern *sub = VP->getSubPattern();
     sub = coercePatternToType(
         pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions);
@@ -1230,9 +1254,12 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     auto IP = cast<IsPattern>(P);
 
     // Type-check the type parameter.
-    TypeResolutionOptions paramOptions(TypeResolverContext::InExpression);
-    auto castType = TypeResolution::forContextual(dc, paramOptions)
-                        .resolveType(IP->getCastTypeRepr());
+    const auto castType =
+        TypeResolution::forContextual(dc, TypeResolverContext::InExpression,
+                                      // FIXME: Should we really unconditionally
+                                      // complain about unbound generics here?
+                                      /*unboundTyOpener*/ nullptr)
+            .resolveType(IP->getCastTypeRepr());
     if (castType->hasError())
       return nullptr;
     IP->setCastType(castType);
