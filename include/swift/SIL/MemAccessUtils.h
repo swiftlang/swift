@@ -631,7 +631,7 @@ void checkSwitchEnumBlockArg(SILPhiArgument *arg);
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).
 ///
-/// `storage` must be a valid AccessedStorage object.
+/// `storage` must be a valid, non-nested AccessedStorage object.
 ///
 /// If this returns false, then the address can be safely accessed without
 /// a begin_access marker. To determine whether to emit begin_access:
@@ -670,12 +670,6 @@ protected:
   Impl &asImpl() { return static_cast<Impl &>(*this); }
 
 public:
-  // Subclasses can provide a method for any identified access base:
-  // Result visitBase(SILValue base, AccessedStorage::Kind kind);
-
-  // Visitors for specific identified access kinds. These default to calling out
-  // to visitIdentified.
-
   Result visitClassAccess(RefElementAddrInst *field) {
     return asImpl().visitBase(field, AccessedStorage::Class);
   }
@@ -685,7 +679,7 @@ public:
   Result visitBoxAccess(AllocBoxInst *box) {
     return asImpl().visitBase(box, AccessedStorage::Box);
   }
-  /// The argument may be either a GlobalAddrInst or the ApplyInst for a global
+  /// \p global may be either a GlobalAddrInst or the ApplyInst for a global
   /// accessor function.
   Result visitGlobalAccess(SILValue global) {
     return asImpl().visitBase(global, AccessedStorage::Global);
@@ -699,192 +693,190 @@ public:
   Result visitNestedAccess(BeginAccessInst *access) {
     return asImpl().visitBase(access, AccessedStorage::Nested);
   }
-
-  // Visitors for unidentified base values.
-
   Result visitUnidentified(SILValue base) {
     return asImpl().visitBase(base, AccessedStorage::Unidentified);
   }
 
-  // Subclasses must provide implementations to visit non-access bases
-  // and phi arguments, and for incomplete projections from the access:
-  // void visitNonAccess(SILValue base);
-  // void visitPhi(SILPhiArgument *phi);
-  // void visitIncomplete(SILValue projectedAddr, SILValue parentAddr);
+  // Subclasses must provide implementations for:
+  //
+  // Result visitBase(SILValue base, AccessedStorage::Kind kind);
+  // Result visitNonAccess(SILValue base);
+  // Result visitPhi(SILPhiArgument *phi);
+  // Result visitCast(SingleValueInstruction *cast, Operand *parentAddr);
+  // Result visitPathComponent(SingleValueInstruction *projectedAddr,
+  //                           Operand *parentAddr);
 
   Result visit(SILValue sourceAddr);
 };
 
 template<typename Impl, typename Result>
 Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
-  // Handle immediately-identifiable instructions.
-  while (true) {
-    switch (sourceAddr->getKind()) {
-    // An AllocBox is a fully identified memory location.
-    case ValueKind::AllocBoxInst:
-      return asImpl().visitBoxAccess(cast<AllocBoxInst>(sourceAddr));
-    // An AllocStack is a fully identified memory location, which may occur
-    // after inlining code already subjected to stack promotion.
-    case ValueKind::AllocStackInst:
-      return asImpl().visitStackAccess(cast<AllocStackInst>(sourceAddr));
-    case ValueKind::GlobalAddrInst:
-      return asImpl().visitGlobalAccess(sourceAddr);
-    case ValueKind::ApplyInst: {
-      FullApplySite apply(cast<ApplyInst>(sourceAddr));
-      if (auto *funcRef = apply.getReferencedFunctionOrNull()) {
-        if (getVariableOfGlobalInit(funcRef)) {
-          return asImpl().visitGlobalAccess(sourceAddr);
-        }
+  switch (sourceAddr->getKind()) {
+  default:
+    if (isAddressForLocalInitOnly(sourceAddr))
+      return asImpl().visitUnidentified(sourceAddr);
+    return asImpl().visitNonAccess(sourceAddr);
+
+  // MARK: Handle immediately-identifiable instructions.
+
+  // An AllocBox is a fully identified memory location.
+  case ValueKind::AllocBoxInst:
+    return asImpl().visitBoxAccess(cast<AllocBoxInst>(sourceAddr));
+  // An AllocStack is a fully identified memory location, which may occur
+  // after inlining code already subjected to stack promotion.
+  case ValueKind::AllocStackInst:
+    return asImpl().visitStackAccess(cast<AllocStackInst>(sourceAddr));
+  case ValueKind::GlobalAddrInst:
+    return asImpl().visitGlobalAccess(sourceAddr);
+  case ValueKind::ApplyInst: {
+    FullApplySite apply(cast<ApplyInst>(sourceAddr));
+    if (auto *funcRef = apply.getReferencedFunctionOrNull()) {
+      if (getVariableOfGlobalInit(funcRef)) {
+        return asImpl().visitGlobalAccess(sourceAddr);
       }
-      // Try to classify further below.
-      break;
     }
-    case ValueKind::RefElementAddrInst:
-      return asImpl().visitClassAccess(cast<RefElementAddrInst>(sourceAddr));
-    // A yield is effectively a nested access, enforced independently in
-    // the caller and callee.
-    case ValueKind::BeginApplyResult:
-      return asImpl().visitYieldAccess(cast<BeginApplyResult>(sourceAddr));
-    // A function argument is effectively a nested access, enforced
-    // independently in the caller and callee.
-    case ValueKind::SILFunctionArgument:
-      return asImpl().visitArgumentAccess(cast<SILFunctionArgument>(sourceAddr));
-    // View the outer begin_access as a separate location because nested
-    // accesses do not conflict with each other.
-    case ValueKind::BeginAccessInst:
-      return asImpl().visitNestedAccess(cast<BeginAccessInst>(sourceAddr));
-    default:
-      // Try to classify further below.
-      break;
-    }
-        
-    // If the sourceAddr producer cannot immediately be classified, follow the
-    // use-def chain of sourceAddr, box, or RawPointer producers.
-    assert(sourceAddr->getType().isAddress()
-           || isa<SILBoxType>(sourceAddr->getType().getASTType())
-           || isa<BuiltinRawPointerType>(sourceAddr->getType().getASTType()));
-
-    // Handle other unidentified address sources.
-    switch (sourceAddr->getKind()) {
-    default:
-      if (isAddressForLocalInitOnly(sourceAddr))
-        return asImpl().visitUnidentified(sourceAddr);
-      return asImpl().visitNonAccess(sourceAddr);
-
-    case ValueKind::SILUndef:
+    if (isExternalGlobalAddressor(cast<ApplyInst>(sourceAddr)))
       return asImpl().visitUnidentified(sourceAddr);
 
-    case ValueKind::ApplyInst:
-      if (isExternalGlobalAddressor(cast<ApplyInst>(sourceAddr)))
-        return asImpl().visitUnidentified(sourceAddr);
+    // Don't currently allow any other calls to return an accessed address.
+    return asImpl().visitNonAccess(sourceAddr);
+  }
+  case ValueKind::RefElementAddrInst:
+    return asImpl().visitClassAccess(cast<RefElementAddrInst>(sourceAddr));
+  // A yield is effectively a nested access, enforced independently in
+  // the caller and callee.
+  case ValueKind::BeginApplyResult:
+    return asImpl().visitYieldAccess(cast<BeginApplyResult>(sourceAddr));
+  // A function argument is effectively a nested access, enforced
+  // independently in the caller and callee.
+  case ValueKind::SILFunctionArgument:
+    return asImpl().visitArgumentAccess(cast<SILFunctionArgument>(sourceAddr));
 
-      // Don't currently allow any other calls to return an accessed address.
-      return asImpl().visitNonAccess(sourceAddr);
+  // View the outer begin_access as a separate location because nested
+  // accesses do not conflict with each other.
+  case ValueKind::BeginAccessInst:
+    return asImpl().visitNestedAccess(cast<BeginAccessInst>(sourceAddr));
 
-    case ValueKind::StructExtractInst:
-      // Handle nested access to a KeyPath projection. The projection itself
-      // uses a Builtin. However, the returned UnsafeMutablePointer may be
-      // converted to an address and accessed via an inout argument.
-      if (isUnsafePointerExtraction(cast<StructExtractInst>(sourceAddr)))
-        return asImpl().visitUnidentified(sourceAddr);
-      return asImpl().visitNonAccess(sourceAddr);
+  case ValueKind::SILUndef:
+    return asImpl().visitUnidentified(sourceAddr);
 
-    case ValueKind::SILPhiArgument: {
-      auto *phiArg = cast<SILPhiArgument>(sourceAddr);
-      if (phiArg->isPhiArgument()) {
-        return asImpl().visitPhi(phiArg);
-      }
+    // MARK: The sourceAddr producer cannot immediately be classified,
+    // follow the use-def chain.
 
-      // A non-phi block argument may be a box value projected out of
-      // switch_enum. Address-type block arguments are not allowed.
-      if (sourceAddr->getType().isAddress())
-        return asImpl().visitNonAccess(sourceAddr);
-
-      checkSwitchEnumBlockArg(cast<SILPhiArgument>(sourceAddr));
+  case ValueKind::StructExtractInst:
+    // Handle nested access to a KeyPath projection. The projection itself
+    // uses a Builtin. However, the returned UnsafeMutablePointer may be
+    // converted to an address and accessed via an inout argument.
+    if (isUnsafePointerExtraction(cast<StructExtractInst>(sourceAddr)))
       return asImpl().visitUnidentified(sourceAddr);
+    return asImpl().visitNonAccess(sourceAddr);
+
+  case ValueKind::SILPhiArgument: {
+    auto *phiArg = cast<SILPhiArgument>(sourceAddr);
+    if (phiArg->isPhiArgument()) {
+      return asImpl().visitPhi(phiArg);
     }
-    // Load a box from an indirect payload of an opaque enum.
-    // We must have peeked past the project_box earlier in this loop.
-    // (the indirectness makes it a box, the load is for address-only).
-    //
-    // %payload_adr = unchecked_take_enum_data_addr %enum : $*Enum, #Enum.case
-    // %box = load [take] %payload_adr : $*{ var Enum }
-    //
-    // FIXME: this case should go away with opaque values.
-    //
-    // Otherwise return invalid AccessedStorage.
-    case ValueKind::LoadInst:
-      if (sourceAddr->getType().is<SILBoxType>()) {
-        SILValue operAddr = cast<LoadInst>(sourceAddr)->getOperand();
-        assert(isa<UncheckedTakeEnumDataAddrInst>(operAddr));
-        return asImpl().visitIncomplete(sourceAddr, operAddr);
-      }
+
+    // A non-phi block argument may be a box value projected out of
+    // switch_enum. Address-type block arguments are not allowed.
+    if (sourceAddr->getType().isAddress())
       return asImpl().visitNonAccess(sourceAddr);
 
-    // ref_tail_addr project an address from a reference.
-    // This is a valid address producer for nested @inout argument
-    // access, but it is never used for formal access of identified objects.
-    case ValueKind::RefTailAddrInst:
-      return asImpl().visitUnidentified(sourceAddr);
-
-    // Inductive single-operand cases:
-    // Look through address casts to find the source address.
-    case ValueKind::MarkUninitializedInst:
-    case ValueKind::OpenExistentialAddrInst:
-    case ValueKind::UncheckedAddrCastInst:
-    // Inductive cases that apply to any type.
-    case ValueKind::CopyValueInst:
-    case ValueKind::MarkDependenceInst:
-    // Look through a project_box to identify the underlying alloc_box as the
-    // accesed object. It must be possible to reach either the alloc_box or the
-    // containing enum in this loop, only looking through simple value
-    // propagation such as copy_value.
-    case ValueKind::ProjectBoxInst:
-    // Handle project_block_storage just like project_box.
-    case ValueKind::ProjectBlockStorageInst:
-    // Look through begin_borrow in case a local box is borrowed.
-    case ValueKind::BeginBorrowInst:
-      return asImpl().visitIncomplete(sourceAddr,
-        cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
-
-    // Access to a Builtin.RawPointer. Treat this like the inductive cases above
-    // because some RawPointers originate from identified locations. See the
-    // special case for global addressors, which return RawPointer,
-    // above. AddressToPointer is also handled because it results from inlining
-    // a global addressor without folding the
-    // AddressToPointer->PointerToAddress.
-    //
-    // If the inductive search does not find a valid addressor, it will
-    // eventually reach the default case that returns in invalid location. This
-    // is correct for RawPointer because, although accessing a RawPointer is
-    // legal SIL, there is no way to guarantee that it doesn't access class or
-    // global storage, so returning a valid unidentified storage object would be
-    // incorrect. It is the caller's responsibility to know that formal access
-    // to such a location can be safely ignored.
-    //
-    // For example:
-    //
-    // - KeyPath Builtins access RawPointer. However, the caller can check
-    // that the access `isFromBuilin` and ignore the storage.
-    //
-    // - lldb generates RawPointer access for debugger variables, but SILGen
-    // marks debug VarDecl access as 'Unsafe' and SIL passes don't need the
-    // AccessedStorage for 'Unsafe' access.
-    case ValueKind::PointerToAddressInst:
-    case ValueKind::AddressToPointerInst:
-      return asImpl().visitIncomplete(sourceAddr,
-        cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
-
-    // Address-to-address subobject projections.
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-    case ValueKind::TailAddrInst:
-    case ValueKind::IndexAddrInst:
-      return asImpl().visitIncomplete(sourceAddr,
-        cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
+    checkSwitchEnumBlockArg(cast<SILPhiArgument>(sourceAddr));
+    return asImpl().visitUnidentified(sourceAddr);
+  }
+  // Load a box from an indirect payload of an opaque enum.
+  // We must have peeked past the project_box earlier in this loop.
+  // (the indirectness makes it a box, the load is for address-only).
+  //
+  // %payload_adr = unchecked_take_enum_data_addr %enum : $*Enum, #Enum.case
+  // %box = load [take] %payload_adr : $*{ var Enum }
+  //
+  // FIXME: this case should go away with opaque values.
+  //
+  // Otherwise return invalid AccessedStorage.
+  case ValueKind::LoadInst:
+    if (sourceAddr->getType().is<SILBoxType>()) {
+      Operand *addrOper = &cast<LoadInst>(sourceAddr)->getOperandRef();
+      assert(isa<UncheckedTakeEnumDataAddrInst>(addrOper->get()));
+      return asImpl().visitCast(cast<SingleValueInstruction>(sourceAddr),
+                                addrOper);
     }
-  };
+    return asImpl().visitNonAccess(sourceAddr);
+
+  // ref_tail_addr project an address from a reference.
+  // This is a valid address producer for nested @inout argument
+  // access, but it is never used for formal access of identified objects.
+  case ValueKind::RefTailAddrInst:
+    return asImpl().visitUnidentified(sourceAddr);
+
+  // Inductive single-operand cases:
+  // Look through address casts to find the source address.
+  case ValueKind::MarkUninitializedInst:
+  case ValueKind::OpenExistentialAddrInst:
+  case ValueKind::UncheckedAddrCastInst:
+  // Inductive cases that apply to any type.
+  case ValueKind::CopyValueInst:
+  case ValueKind::MarkDependenceInst:
+  // Look through a project_box to identify the underlying alloc_box as the
+  // accesed object. It must be possible to reach either the alloc_box or the
+  // containing enum in this loop, only looking through simple value
+  // propagation such as copy_value.
+  case ValueKind::ProjectBoxInst:
+  // Handle project_block_storage just like project_box.
+  case ValueKind::ProjectBlockStorageInst:
+  // Look through begin_borrow in case a local box is borrowed.
+  case ValueKind::BeginBorrowInst:
+  // Casting to RawPointer does not affect the AccessPath. When converting
+  // between address types, they must be layout compatible (with truncation).
+  case ValueKind::AddressToPointerInst:
+  // A tail_addr is a projection that does not affect the access path because it
+  // must always originate from a ref_tail_addr. Any projection within the
+  // object's tail storage effectively has the same access path.
+  case ValueKind::TailAddrInst:
+    return asImpl().visitCast(
+        cast<SingleValueInstruction>(sourceAddr),
+        &cast<SingleValueInstruction>(sourceAddr)->getAllOperands()[0]);
+
+  // Access to a Builtin.RawPointer. It may be important to continue looking
+  // through this because some RawPointers originate from identified
+  // locations. See the special case for global addressors, which return
+  // RawPointer, above.
+  //
+  // If the inductive search does not find a valid addressor, it will
+  // eventually reach the default case that returns in invalid location. This
+  // is correct for RawPointer because, although accessing a RawPointer is
+  // legal SIL, there is no way to guarantee that it doesn't access class or
+  // global storage, so returning a valid unidentified storage object would be
+  // incorrect. It is the caller's responsibility to know that formal access
+  // to such a location can be safely ignored.
+  //
+  // For example:
+  //
+  // - KeyPath Builtins access RawPointer. However, the caller can check
+  // that the access `isFromBuilin` and ignore the storage.
+  //
+  // - lldb generates RawPointer access for debugger variables, but SILGen
+  // marks debug VarDecl access as 'Unsafe' and SIL passes don't need the
+  // AccessedStorage for 'Unsafe' access.
+  //
+  // This is always considered a path component because an IndexAddr may
+  // project from it.
+  case ValueKind::PointerToAddressInst:
+    return asImpl().visitPathComponent(
+        cast<SingleValueInstruction>(sourceAddr),
+        &cast<SingleValueInstruction>(sourceAddr)->getAllOperands()[0]);
+
+  // Address-to-address subobject projections. Projection::isAddressProjection
+  // returns true for these.
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+  case ValueKind::IndexAddrInst:
+    return asImpl().visitPathComponent(
+        cast<SingleValueInstruction>(sourceAddr),
+        &cast<SingleValueInstruction>(sourceAddr)->getAllOperands()[0]);
+  }
 }
 
 } // end namespace swift
