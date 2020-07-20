@@ -3551,8 +3551,16 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open:
+  case AccessLevel::Open: {
+    if (useDC && VD->isSPI()) {
+      auto useModuleScopeContext = useDC->getModuleScopeContext();
+      if (useModuleScopeContext == sourceDC->getModuleScopeContext()) return true;
+
+      auto *useSF = dyn_cast<SourceFile>(useModuleScopeContext);
+      return !useSF || useSF->isImportedAsSPI(VD);
+    }
     return true;
+  }
   }
   llvm_unreachable("bad access level");
 }
