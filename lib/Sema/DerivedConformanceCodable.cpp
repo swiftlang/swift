@@ -172,8 +172,12 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
         properties.erase(it);
         break;
 
-      case DoesNotConform:
-        // for accurate diagnostic, we show TypeRepr if present
+      case DoesNotConform: {
+        // We use a TypeLoc here so diagnostics can show the type
+        // as written by the user in source if possible. This is useful
+        // when the user has written an IUO type for example, since
+        // diagnostics would show the type as 'T?' instead of 'T!' if
+        // we use a Type instead.
         TypeLoc typeLoc = {
             it->second->getTypeReprOrParentPatternTypeRepr(),
             it->second->getType(),
@@ -181,6 +185,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
         it->second->diagnose(diag::codable_non_conforming_property_here,
                              derived.getProtocolType(), typeLoc);
         LLVM_FALLTHROUGH;
+      }
 
       case TypeNotValidated:
         // We don't produce a diagnostic for a type which failed to validate.
@@ -357,15 +362,20 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
         break;
       }
 
-      case DoesNotConform:
-        // for accurate diagnostic, we show TypeRepr if present
+      case DoesNotConform: {
+        // We use a TypeLoc here so diagnostics can show the type
+        // as written by the user in source if possible. This is useful
+        // when the user has written an IUO type for example, since
+        // diagnostics would show the type as 'T?' instead of 'T!' if
+        // we use a Type instead.
         TypeLoc typeLoc = {
-            it->second->getTypeReprOrParentPatternTypeRepr(),
-            it->second->getType(),
+            varDecl->getTypeReprOrParentPatternTypeRepr(),
+            varDecl->getType(),
         };
         varDecl->diagnose(diag::codable_non_conforming_property_here,
-                                derived.getProtocolType(),typeLoc);
+                          derived.getProtocolType(), typeLoc);
         LLVM_FALLTHROUGH;
+      }
 
       case TypeNotValidated:
         // We don't produce a diagnostic for a type which failed to validate.
