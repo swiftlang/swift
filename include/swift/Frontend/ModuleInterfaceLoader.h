@@ -162,6 +162,90 @@ public:
   ~ExplicitSwiftModuleLoader();
 };
 
+/// Information about explicitly specified Swift module files.
+struct ExplicitModuleInfo {
+  // Path of the .swiftmodule file.
+  StringRef modulePath;
+  // Path of the .swiftmoduledoc file.
+  StringRef moduleDocPath;
+  // Path of the .swiftsourceinfo file.
+  StringRef moduleSourceInfoPath;
+  // Opened buffer for the .swiftmodule file.
+  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+};
+
+/// Parser of explicit module maps passed into the compiler.
+//  [
+//    {
+//      "moduleName": "A",
+//      "modulePath": "A.swiftmodule",
+//      "docPath": "A.swiftdoc",
+//      "sourceInfoPath": "A.swiftsourceinfo"
+//    },
+//    {
+//      "moduleName": "B",
+//      "modulePath": "B.swiftmodule",
+//      "docPath": "B.swiftdoc",
+//      "sourceInfoPath": "B.swiftsourceinfo"
+//    }
+//  ]
+class ExplicitModuleMapParser {
+public:
+  ExplicitModuleMapParser(ASTContext &Ctx) : Ctx(Ctx), Saver(Allocator) {}
+
+  std::error_code
+  parseSwiftExplicitModuleMap(const StringRef fileName,
+                              llvm::StringMap<ExplicitModuleInfo> &moduleMap);
+
+private:
+  StringRef getScalaNodeText(llvm::yaml::Node *N);
+  bool parseSingleModuleEntry(llvm::yaml::Node &node,
+                              llvm::StringMap<ExplicitModuleInfo> &moduleMap);
+
+  ASTContext &Ctx;
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver Saver;
+};
+
+///// A ModuleLoader that loads external dependency module stubs specified in
+///// -external-dependency-module-map-file
+///// This loader is used only in dependency scanning to inform the scanner that a set of modules
+///// constitute external dependencies that are not visible to the scanner but will nevertheless be
+///// taken care of by the scanner's clients. This "loader" will not attempt to load any module files.
+//class ExternalSwiftModuleStubLoader: public SerializedModuleLoaderBase {
+//  explicit ExternalSwiftModuleStubLoader(ASTContext &ctx, DependencyTracker *tracker,
+//                                         ModuleLoadingMode loadMode,
+//                                         bool IgnoreSwiftSourceInfoFile);
+//  std::error_code findModuleFilesInDirectory(
+//    AccessPathElem ModuleID,
+//    const SerializedModuleBaseName &BaseName,
+//    SmallVectorImpl<char> *ModuleInterfacePath,
+//    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+//    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+//    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
+//
+//  bool canImportModule(Located<Identifier> mID) override;
+//
+//  bool isCached(StringRef DepPath) override { return false; };
+//
+//  struct Implementation;
+//  Implementation &Impl;
+//public:
+//  static std::unique_ptr<ExternalSwiftModuleStubLoader>
+//  create(ASTContext &ctx,
+//         DependencyTracker *tracker, ModuleLoadingMode loadMode,
+//         StringRef ExternalDependencyModuleMap,
+//         bool IgnoreSwiftSourceInfoFile);
+//
+//  /// Append visible module names to \p names. Note that names are possibly
+//  /// duplicated, and not guaranteed to be ordered in any way.
+//  void collectVisibleTopLevelModuleNames(
+//      SmallVectorImpl<Identifier> &names) const override;
+//
+//  /// Actual record of the decoded stub.
+//  Optional<ModuleDependencies> dependencies;
+//};
+
 struct ModuleInterfaceLoaderOptions {
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
