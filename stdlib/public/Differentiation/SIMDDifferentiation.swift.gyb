@@ -413,7 +413,7 @@ where
 }
 
 // FIXME(TF-1103): Derivative registration does not yet support
-// `@_alwaysEmitIntoClient` original functions.
+// `@_alwaysEmitIntoClient` original functions like `SIMD.sum()`.
 /*
 extension SIMD
 where
