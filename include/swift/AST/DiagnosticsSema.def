@@ -5056,6 +5056,10 @@ NOTE(function_builder_infer_add_return, none,
 NOTE(function_builder_infer_pick_specific, none,
      "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
      (Type, unsigned, DeclName))
+WARNING(function_builder_missing_limited_availability, none,
+        "function builder %0 does not implement `buildLimitedAvailability`; "
+        "this code may crash on earlier versions of the OS",
+        (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
