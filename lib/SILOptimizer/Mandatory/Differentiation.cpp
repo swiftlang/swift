@@ -771,8 +771,8 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
               witness->getConfig()))
           .str();
   CanGenericSignature vjpCanGenSig;
-  if (auto jvpGenSig = witness->getDerivativeGenericSignature())
-    vjpCanGenSig = jvpGenSig->getCanonicalSignature();
+  if (auto vjpGenSig = witness->getDerivativeGenericSignature())
+    vjpCanGenSig = vjpGenSig->getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
     vjpGenericEnv = vjpCanGenSig->getGenericEnvironment();
