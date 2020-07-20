@@ -291,9 +291,10 @@ __asm(
   "  .long " COMPARABLE_BASE_CONFORMANCE_DESCRIPTOR "@GOTPCREL + 5\n"
   #endif
   // This is a direct relative reference to the associated conformance for
-  // Equatable defined above in assembly.
+  // Equatable defined above in assembly. NOTE: This is minus 23 because the
+  // associated conformance structure is 1 aligned.
   "  .long ((\"" TUPLE_COMPARABLE_ASSOCIATEDCONFORMANCE "\") - \
-            (" TUPLE_COMPARABLE_CONF ")) - 24\n"
+            (" TUPLE_COMPARABLE_CONF ")) - 23\n"
   #if defined(__ELF__)
   // This is an indirectable relative reference to the GOT equivalent for the
   // Comparable.< method descriptor, hence why we add 1 to indicate indirect.
