@@ -1,12 +1,12 @@
 // RUN: %target-sil-opt -sil-opt-remark-generator -sil-remarks-missed=sil-opt-remark-gen %s -o /dev/null 2>&1 | %FileCheck %s
 
-// CHECK: {{.*}}opt-remark-generator.sil:18:3: remark: Unable to remove ARC operation
+// CHECK: {{.*}}opt-remark-generator.sil:18:3: remark: Unable to remove retain
 // CHECK-NEXT: strong_retain
-// CHECK: {{.*}}opt-remark-generator.sil:19:3: remark: Unable to remove ARC operation
+// CHECK: {{.*}}opt-remark-generator.sil:19:3: remark: Unable to remove retain
 // CHECK-NEXT: retain_value
-// CHECK: {{.*}}opt-remark-generator.sil:20:3: remark: Unable to remove ARC operation
+// CHECK: {{.*}}opt-remark-generator.sil:20:3: remark: Unable to remove release
 // CHECK-NEXT: strong_release
-// CHECK: {{.*}}opt-remark-generator.sil:21:3: remark: Unable to remove ARC operation
+// CHECK: {{.*}}opt-remark-generator.sil:21:3: remark: Unable to remove release
 // CHECK-NEXT: release_value
 
 sil_stage canonical
