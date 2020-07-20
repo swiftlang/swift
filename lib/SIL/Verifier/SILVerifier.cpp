@@ -909,7 +909,7 @@ public:
     return InstNumbers[a] < InstNumbers[b];
   }
 
-  // FIXME: For sanity, address-type block args should be prohibited at all SIL
+  // FIXME: For sanity, address-type phis should be prohibited at all SIL
   // stages. However, the optimizer currently breaks the invariant in three
   // places:
   // 1. Normal Simplify CFG during conditional branch simplification
@@ -917,17 +917,14 @@ public:
   // 2. Simplify CFG via Jump Threading.
   // 3. Loop Rotation.
   //
+  // BasicBlockCloner::canCloneInstruction and sinkAddressProjections is
+  // designed to avoid this issue, we just need to make sure all passes use it
+  // correctly.
   //
-  bool prohibitAddressBlockArgs() {
-    // If this function was deserialized from canonical SIL, this invariant may
-    // already have been violated regardless of this module's SIL stage or
-    // exclusivity enforcement level. Presumably, access markers were already
-    // removed prior to serialization.
-    if (F.wasDeserializedCanonical())
-      return false;
-
-    SILModule &M = F.getModule();
-    return M.getStage() == SILStage::Raw;
+  // Minimally, we must prevent address-type phis as long as access markers are
+  // preserved. A goal is to preserve access markers in OSSA.
+  bool prohibitAddressPhis() {
+    return F.hasOwnership();
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -943,9 +940,9 @@ public:
       }
     } else {
     }
-    if (arg->isPhiArgument() && prohibitAddressBlockArgs()) {
-      // As a property of well-formed SIL, we disallow address-type block
-      // arguments. Supporting them would prevent reliably reasoning about the
+    if (arg->isPhiArgument() && prohibitAddressPhis()) {
+      // As a property of well-formed SIL, we disallow address-type
+      // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
       // diagnosing violations of memory access rules and supporting future
       // optimizations such as bitfield packing. Address-type block arguments
