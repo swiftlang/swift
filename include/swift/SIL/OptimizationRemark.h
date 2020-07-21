@@ -21,6 +21,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -95,11 +96,12 @@ struct Argument {
   /// If set, the debug location corresponding to the value.
   SourceLoc loc;
 
-  explicit Argument(StringRef Str = "")
-      : key(ArgumentKeyKind::Default, "String"), val(Str) {}
-  Argument(StringRef key, StringRef val)
-      : key(ArgumentKeyKind::Default, key), val(val) {}
+  explicit Argument(StringRef str = "")
+      : Argument({ArgumentKeyKind::Default, "String"}, str) {}
 
+  Argument(StringRef key, StringRef val)
+      : Argument({ArgumentKeyKind::Default, key}, val) {}
+  Argument(ArgumentKey key, StringRef val) : key(key), val(val) {}
   Argument(StringRef key, int n);
   Argument(StringRef key, long n);
   Argument(StringRef key, long long n);
@@ -112,6 +114,24 @@ struct Argument {
   Argument(ArgumentKey key, SILFunction *f);
   Argument(StringRef key, SILType ty);
   Argument(StringRef key, CanType ty);
+
+  Argument(StringRef key, StringRef msg, const ValueDecl *decl)
+      : Argument(ArgumentKey(ArgumentKeyKind::Default, key), msg, decl) {}
+  Argument(ArgumentKey key, StringRef msg, const ValueDecl *decl)
+      : key(key), val(msg), loc(decl->getLoc()) {}
+
+  /// Given a value, call \p funcPassedInferredArgs for each associated
+  /// ValueDecl that is associated with \p value. All created Arguments are
+  /// passed the same StringRef. To stop iteration, return false in \p
+  /// funcPassedInferedArgs.
+  ///
+  /// NOTE: the function may be called multiple times if the optimizer joined
+  /// two live ranges and thus when iterating over value's users we see multiple
+  /// debug_value operations.
+  static bool
+  inferArgumentsForValue(ArgumentKeyKind keyKind, StringRef message,
+                         SILValue value,
+                         function_ref<bool(Argument)> funcPassedInferedArgs);
 };
 
 /// Shorthand to insert named-value pairs.

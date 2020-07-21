@@ -20,6 +20,9 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -70,6 +73,28 @@ Argument::Argument(StringRef key, CanType ty)
     : key(ArgumentKeyKind::Default, key) {
   llvm::raw_string_ostream stream(val);
   ty.print(stream);
+}
+
+bool Argument::inferArgumentsForValue(
+    ArgumentKeyKind keyKind, StringRef msg, SILValue value,
+    function_ref<bool(Argument)> funcPassedInferedArgs) {
+  // If we have an argument, just use that.
+  if (auto *arg = dyn_cast<SILArgument>(value))
+    if (auto *decl = arg->getDecl())
+      return funcPassedInferedArgs(
+          Argument({keyKind, "InferredValue"}, msg, decl));
+
+  // TODO: Look for loads from globals and addresses.
+
+  // Otherwise, look for debug_values.
+  for (auto *use : getDebugUses(value))
+    if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
+      if (auto *decl = dvi->getDecl())
+        if (!funcPassedInferedArgs(
+                Argument({keyKind, "InferredValue"}, msg, decl)))
+          return false;
+
+  return true;
 }
 
 template <typename DerivedT>
