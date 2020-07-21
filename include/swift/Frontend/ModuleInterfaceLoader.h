@@ -191,7 +191,7 @@ struct ExplicitModuleInfo {
 //  ]
 class ExplicitModuleMapParser {
 public:
-  ExplicitModuleMapParser(ASTContext &Ctx) : Ctx(Ctx), Saver(Allocator) {}
+  ExplicitModuleMapParser(llvm::BumpPtrAllocator &Allocator) : Saver(Allocator) {}
 
   std::error_code
   parseSwiftExplicitModuleMap(const StringRef fileName,
@@ -201,9 +201,6 @@ private:
   StringRef getScalaNodeText(llvm::yaml::Node *N);
   bool parseSingleModuleEntry(llvm::yaml::Node &node,
                               llvm::StringMap<ExplicitModuleInfo> &moduleMap);
-
-  ASTContext &Ctx;
-  llvm::BumpPtrAllocator Allocator;
   llvm::StringSaver Saver;
 };
 

@@ -1513,11 +1513,12 @@ bool InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleN
 
 struct ExplicitSwiftModuleLoader::Implementation {
   ASTContext &Ctx;
+  llvm::BumpPtrAllocator Allocator;
   llvm::StringMap<ExplicitModuleInfo> ExplicitModuleMap;
   Implementation(ASTContext &Ctx) : Ctx(Ctx) {}
 
   void parseSwiftExplicitModuleMap(StringRef fileName) {
-    ExplicitModuleMapParser parser(Ctx);
+    ExplicitModuleMapParser parser(Allocator);
     auto result =
         parser.parseSwiftExplicitModuleMap(fileName, ExplicitModuleMap);
     if (result == std::errc::invalid_argument)
@@ -1587,8 +1588,6 @@ std::error_code ExplicitModuleMapParser::parseSwiftExplicitModuleMap(
         }
       }
     } else {
-      Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
-                         fileName);
       return std::make_error_code(std::errc::invalid_argument);
     }
   }
