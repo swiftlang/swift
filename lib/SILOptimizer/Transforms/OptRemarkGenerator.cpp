@@ -101,8 +101,11 @@ class OptRemarkGenerator : public SILFunctionTransform {
   bool isOptRemarksEnabled() {
     // TODO: Put this on LangOpts as a helper.
     auto &langOpts = getFunction()->getASTContext().LangOpts;
+
+    // If we have a remark streamer, emit everything.
     return bool(langOpts.OptimizationRemarkMissedPattern) ||
-           bool(langOpts.OptimizationRemarkPassedPattern);
+           bool(langOpts.OptimizationRemarkPassedPattern) ||
+           getFunction()->getModule().getSILRemarkStreamer();
   }
 
   /// The entry point to the transformation.
