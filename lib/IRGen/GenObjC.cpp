@@ -925,6 +925,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
 static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref,
                                             SILFunction *&SILFn) {
   SILFn = IGM.getSILModule().lookUpFunction(ref);
+  llvm::dbgs() << "Looking for '" << ref.mangle() << "'\n";
   assert(SILFn && "no IR function for swift-as-objc thunk");
   auto fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
   ApplyIRLinkage(IRLinkage::Internal).to(fn);

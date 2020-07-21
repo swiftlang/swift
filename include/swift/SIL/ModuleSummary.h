@@ -40,6 +40,7 @@ class FunctionSummary {
 public:
   class EdgeTy {
     GUID CalleeFn;
+    std::string Name;
   public:
 
     enum class Kind {
@@ -52,12 +53,37 @@ public:
     Kind kind;
 
     EdgeTy(SILDeclRef &CalleeFn, Kind kind) : kind(kind) {
+      this->Name = CalleeFn.mangle();
       this->CalleeFn = getGUID(CalleeFn.mangle());
     }
 
   public:
     Kind getKind() const { return kind; }
     GUID getCallee() const { return CalleeFn; }
+    std::string getName() const { return Name; };
+    
+    void dump() const {
+      llvm::dbgs() << "FunctionSummary(kind: ";
+      switch (kind) {
+      case Kind::Witness: {
+        llvm::dbgs() << "Witness";
+        break;
+      }
+      case Kind::VTable: {
+        llvm::dbgs() << "VTable";
+        break;
+      }
+      case Kind::Static: {
+        llvm::dbgs() << "Static";
+        break;
+      }
+      case Kind::kindCount: {
+        llvm_unreachable("impossible");
+      }
+      }
+      llvm::dbgs() << ", name: " << getName() << " , callee: ";
+      llvm::dbgs() << getCallee() << ")\n";
+    }
     
     VirtualMethodSlot slot() const {
       VirtualMethodSlot::KindTy slotKind;
@@ -80,11 +106,12 @@ public:
       return VirtualMethodSlot(slotKind, CalleeFn);
     }
 
-    EdgeTy(GUID callee, Kind kind)
-      : CalleeFn(callee), kind(kind) {}
+    EdgeTy(GUID callee, std::string name, Kind kind)
+      : CalleeFn(callee), Name(name), kind(kind) {}
 
-    static EdgeTy staticCall(GUID Callee) {
-      return EdgeTy(Callee, Kind::Static);
+    static EdgeTy staticCall(SILFunction *CalleeFn) {
+      GUID guid = getGUID(CalleeFn->getName());
+      return EdgeTy(guid, CalleeFn->getName(), Kind::Static);
     }
 
     static EdgeTy witnessCall(SILDeclRef Callee) {
@@ -98,6 +125,7 @@ public:
   
   struct FlagsTy {
     unsigned Live : 1;
+    unsigned Preserved: 1;
   };
   
   using CallGraphEdgeListTy = std::vector<EdgeTy>;
@@ -111,14 +139,17 @@ public:
       : CallGraphEdgeList(std::move(CGEdges)) {}
   FunctionSummary() = default;
 
-  void addCall(GUID targetGUID, EdgeTy::Kind kind) {
-    CallGraphEdgeList.emplace_back(targetGUID, kind);
+  void addCall(GUID targetGUID, std::string name, EdgeTy::Kind kind) {
+    CallGraphEdgeList.emplace_back(targetGUID, name, kind);
   }
 
   ArrayRef<EdgeTy> calls() const { return CallGraphEdgeList; }
   
   bool isLive() const { return Flags.Live; }
   void setLive(bool Live) { Flags.Live = Live; }
+
+  bool isPreserved() const { return Flags.Preserved; }
+  void setPreserved(bool Preserved) { Flags.Preserved = Preserved; }
 };
 
 struct FunctionSummaryInfo {

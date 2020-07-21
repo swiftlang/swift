@@ -76,9 +76,15 @@ public:
   }
 };
 
-static llvm::DenseSet<GUID> computePreservedGUIDs() {
+static llvm::DenseSet<GUID> computePreservedGUIDs(ModuleSummaryIndex *summary) {
   llvm::DenseSet<GUID> Set(1);
   Set.insert(getGUID("main"));
+  for (auto &pair : *summary) {
+    auto &info = pair.second;
+    if (info.TheSummary->isPreserved()) {
+      Set.insert(pair.first);
+    }
+  }
   return Set;
 }
 
@@ -115,8 +121,9 @@ void markDeadSymbols(ModuleSummaryIndex &summary, llvm::DenseSet<GUID> &Preserve
       case FunctionSummary::EdgeTy::Kind::Witness:
       case FunctionSummary::EdgeTy::Kind::VTable: {
         auto Impls = summary.getImplementations(Call.slot());
-        if (!Impls)
-          llvm_unreachable("Impls not found for the slot");
+        if (!Impls) {
+          continue;
+        }
         for (auto Impl : Impls.getValue()) {
           Worklist.push_back(Impl);
         }
@@ -166,7 +173,7 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
 
   TheSummary->setModuleName("combined");
   
-  auto PreservedGUIDs = computePreservedGUIDs();
+  auto PreservedGUIDs = computePreservedGUIDs(TheSummary.get());
   markDeadSymbols(*TheSummary.get(), PreservedGUIDs);
 
   modulesummary::emitModuleSummaryIndex(*TheSummary, Instance.getDiags(),

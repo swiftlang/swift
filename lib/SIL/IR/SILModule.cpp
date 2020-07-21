@@ -112,22 +112,28 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
 
 SILModule::~SILModule() {
   // Decrement ref count for each SILGlobalVariable with static initializers.
+  llvm::dbgs() << "In SILModule::~SILModule()\n";
+  llvm::dbgs() << "Before dropping global variable reference\n";
   for (SILGlobalVariable &v : silGlobals)
     v.dropAllReferences();
+  llvm::dbgs() << "After dropping reference\n";
 
+  llvm::dbgs() << "Before destructing VTables\n";
   for (auto vt : vtables)
     vt->~SILVTable();
-
+  llvm::dbgs() << "After destructing VTables\n";
   // Drop everything functions in this module reference.
   //
   // This is necessary since the functions may reference each other.  We don't
   // need to worry about sil_witness_tables since witness tables reference each
   // other via protocol conformances and sil_vtables don't reference each other
   // at all.
+  llvm::dbgs() << "Before dropping function reference\n";
   for (SILFunction &F : *this) {
     F.dropAllReferences();
     F.dropDynamicallyReplacedFunction();
   }
+  llvm::dbgs() << "After dropping function reference\n";
 }
 
 std::unique_ptr<SILModule> SILModule::createEmptyModule(

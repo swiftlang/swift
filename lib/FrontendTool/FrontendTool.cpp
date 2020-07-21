@@ -2059,14 +2059,14 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
-  if (Action == FrontendOptions::ActionType::EmitSIB)
-    return serializeSIB(SM.get(), PSPs, Context, MSF);
-
   if (!opts.ModuleSummaryOutputPath.empty()) {
     if (emitModuleSummary(SM.get(), opts.ModuleSummaryOutputPath, Context)) {
       return true;
     }
   }
+
+  if (Action == FrontendOptions::ActionType::EmitSIB)
+    return serializeSIB(SM.get(), PSPs, Context, MSF);
 
   if (PSPs.haveModuleOrModuleDocOutputPaths()) {
     if (Action == FrontendOptions::ActionType::MergeModules ||

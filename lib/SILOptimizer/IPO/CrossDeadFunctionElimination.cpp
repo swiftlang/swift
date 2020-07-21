@@ -54,6 +54,18 @@ public:
         return !info->isLive();
       });
     }
+
+    for (auto &WT : M.getDefaultWitnessTables()) {
+      WT.clearMethods_if([&](SILFunction *MW) -> bool {
+        if (!MW)
+          return false;
+        auto &maybePair = TheSummary.getFunctionInfo(getGUID(MW->getName()));
+        if (!maybePair)
+          return false;
+        auto info = maybePair.getValue().first;
+        return !info->isLive();
+      });
+    }
   }
   
   void eliminateDeadFunctions(SILModule &M) {
@@ -76,6 +88,56 @@ public:
       llvm::dbgs() << "Eliminate " << info.Name << "\n";
     }
   }
+  
+  void ensureLive(SILFunction *F) {
+    ensureLive(getGUID(F->getName()));
+  }
+  
+  void ensureLive(GUID guid) {
+    auto maybePair = this->TheSummary.getFunctionInfo(guid);
+    if (maybePair) {
+      auto pair = maybePair.getValue();
+      pair.first->setLive(true);
+    }
+  }
+  
+  void ensureLive(VirtualMethodSlot slot) {
+    auto Impls = this->TheSummary.getImplementations(slot);
+    if (!Impls) return;
+    for (auto Impl : Impls.getValue()) {
+      ensureLive(Impl);
+    }
+  }
+
+  void
+  ensureKeyPathComponentIsAlive(const KeyPathPatternComponent &component) {
+    component.visitReferencedFunctionsAndMethods(
+      [this](SILFunction *F) {
+        this->ensureLive(F);
+      },
+      [this](SILDeclRef method) {
+        auto decl = cast<AbstractFunctionDecl>(method.getDecl());
+        if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+          VirtualMethodSlot slot(method, VirtualMethodSlot::KindTy::VTable);
+          this->ensureLive(slot);
+        } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
+          VirtualMethodSlot slot(method, VirtualMethodSlot::KindTy::Witness);
+          this->ensureLive(slot);
+        } else {
+          llvm_unreachable("key path keyed by a non-class, non-protocol method");
+        }
+      }
+    );
+  }
+  
+  void ensurePreserved(SILModule &M) {
+    // Check property descriptor implementations.
+    for (SILProperty &P : M.getPropertyList()) {
+      if (auto component = P.getComponent()) {
+        ensureKeyPathComponentIsAlive(*component);
+      }
+    }
+  }
 
   void run() override {
     LLVM_DEBUG(llvm::dbgs() << "Running CrossDeadFuncElimination\n");
@@ -95,9 +157,11 @@ public:
     }
 
     auto &M = *getModule();
+    this->ensurePreserved(M);
     this->eliminateDeadEntriesFromTables(M);
     this->eliminateDeadFunctions(M);
     this->invalidateFunctionTables();
+    M.print(llvm::dbgs());
   }
 };
 

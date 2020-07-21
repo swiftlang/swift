@@ -102,32 +102,30 @@ void Serializer::emitHeader() {
 void Serializer::emitModuleSummary(const ModuleSummaryIndex &index) {
   using namespace module_summary;
 
-  llvm::BCBlockRAII restoreBlock(Out, MODULE_SUMMARY_ID, 3);
+  llvm::BCBlockRAII restoreBlock(Out, MODULE_SUMMARY_ID, 4);
   module_summary::MetadataLayout MDLayout(Out);
   MDLayout.emit(ScratchRecord, index.getModuleName());
   {
     for (const auto &pair : index) {
-      llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 4);
+      llvm::BCBlockRAII restoreBlock(Out, FUNCTION_SUMMARY_ID, 32);
       auto &info = pair.second;
       auto &summary = info.TheSummary;
       using namespace function_summary;
       function_summary::MetadataLayout MDlayout(Out);
 
-      llvm::dbgs() << "Emitting " << info.Name << "\n";
-
-      MDlayout.emit(ScratchRecord, pair.first, summary->isLive(), info.Name);
+      MDlayout.emit(ScratchRecord, pair.first, summary->isLive(), summary->isPreserved(), info.Name);
 
       for (auto call : summary->calls()) {
         CallGraphEdgeLayout edgeLayout(Out);
         edgeLayout.emit(ScratchRecord, unsigned(call.getKind()),
-                        call.getCallee());
+                        call.getCallee(), call.getName());
       }
     }
   }
   
   {
     for (auto &method : index.virtualMethods()) {
-      llvm::BCBlockRAII restoreBlock(Out, VIRTUAL_METHOD_INFO_ID, 5);
+      llvm::BCBlockRAII restoreBlock(Out, VIRTUAL_METHOD_INFO_ID, 8);
       auto &slot = method.first;
       auto impls = method.second;
       using namespace virtual_method_info;
@@ -251,8 +249,8 @@ bool Deserializer::readFunctionSummary() {
 
     switch (maybeKind.get()) {
     case function_summary::METADATA: {
-      unsigned isLive;
-      function_summary::MetadataLayout::readRecord(Scratch, guid, isLive);
+      unsigned isLive, isPreserved;
+      function_summary::MetadataLayout::readRecord(Scratch, guid, isLive, isPreserved);
       Name = BlobData.str();
       if (auto info = moduleSummary.getFunctionInfo(guid)) {
         FS = info.getValue().first;
@@ -261,6 +259,7 @@ bool Deserializer::readFunctionSummary() {
         FS = NewFSOwner.get();
       }
       FS->setLive(isLive);
+      FS->setPreserved(isPreserved);
       break;
     }
     case function_summary::CALL_GRAPH_EDGE: {
@@ -274,7 +273,7 @@ bool Deserializer::readFunctionSummary() {
       if (!FS)
         llvm::report_fatal_error("Invalid state");
 
-      FS->addCall(targetGUID, edgeKind.getValue());
+      FS->addCall(targetGUID, BlobData.str(), edgeKind.getValue());
       break;
     }
     }
@@ -286,7 +285,6 @@ bool Deserializer::readFunctionSummary() {
     next = maybeNext.get();
   }
 
-  llvm::dbgs() << "Added " << Name << " in FS list\n";
   if (auto &FS = NewFSOwner) {
     moduleSummary.addFunctionSummary(Name, std::move(FS));
   }
