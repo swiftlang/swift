@@ -2229,7 +2229,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 
     SmallVector<unsigned, 4> mismatches;
     auto result = matchDeepTypeArguments(
-        *this, subflags, args1, args2, locator,
+        *this, subflags | TMF_ApplyingFix, args1, args2, locator,
         [&mismatches](unsigned position) { mismatches.push_back(position); });
 
     if (mismatches.empty())
@@ -4268,6 +4268,24 @@ bool ConstraintSystem::repairFailures(
     }
 
     break;
+  }
+
+  case ConstraintLocator::GenericArgument: {
+    // If any of the types is a hole, consider it fixed.
+    if (lhs->isHole() || rhs->isHole())
+      return true;
+
+    // Ignoring the generic argument because we may have a generic requirement
+    // failure e.g. `String bind T.Element`, so let's drop the generic argument
+    // path element and recurse in repairFailures to check and potentially
+    // record the requirement failure fix.
+    path.pop_back();
+
+    if (path.empty() || !path.back().is<LocatorPathElt::AnyRequirement>())
+      break;
+
+    return repairFailures(lhs, rhs, matchKind, conversionsOrFixes,
+                          getConstraintLocator(anchor, path));
   }
 
   default:
