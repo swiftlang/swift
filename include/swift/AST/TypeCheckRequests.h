@@ -1823,6 +1823,45 @@ public:
   void cacheResult(Witness value) const;
 };
 
+struct PreCheckFunctionBuilderDescriptor {
+  AnyFunctionRef Fn;
+
+private:
+  // NOTE: Since source tooling (e.g. code completion) might replace the body,
+  // we need to take the body into account to calculate 'hash_value' and '=='.
+  // Also, we cannot 'getBody()' inside 'hash_value' and '==' because it invokes
+  // another request (even if it's cached).
+  BraceStmt *Body;
+
+public:
+  PreCheckFunctionBuilderDescriptor(AnyFunctionRef Fn)
+      : Fn(Fn), Body(Fn.getBody()) {}
+
+  friend llvm::hash_code
+  hash_value(const PreCheckFunctionBuilderDescriptor &owner) {
+    return llvm::hash_combine(owner.Fn, owner.Body);
+  }
+
+  friend bool operator==(const PreCheckFunctionBuilderDescriptor &lhs,
+                         const PreCheckFunctionBuilderDescriptor &rhs) {
+    return lhs.Fn == rhs.Fn && lhs.Body == rhs.Body;
+  }
+
+  friend bool operator!=(const PreCheckFunctionBuilderDescriptor &lhs,
+                         const PreCheckFunctionBuilderDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend SourceLoc extractNearestSourceLoc(PreCheckFunctionBuilderDescriptor d) {
+    return extractNearestSourceLoc(d.Fn);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out,
+                             const PreCheckFunctionBuilderDescriptor &d) {
+    simple_display(out, d.Fn);
+  }
+};
+
 enum class FunctionBuilderBodyPreCheck : uint8_t {
   /// There were no problems pre-checking the closure.
   Okay,
@@ -1836,8 +1875,8 @@ enum class FunctionBuilderBodyPreCheck : uint8_t {
 
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderBodyPreCheck(AnyFunctionRef,
-                                                       BraceStmt *),
+                           FunctionBuilderBodyPreCheck(
+                               PreCheckFunctionBuilderDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1846,8 +1885,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  FunctionBuilderBodyPreCheck evaluate(Evaluator &evaluator, AnyFunctionRef fn,
-                                       BraceStmt *body) const;
+  FunctionBuilderBodyPreCheck
+  evaluate(Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const;
 
 public:
   // Separate caching.

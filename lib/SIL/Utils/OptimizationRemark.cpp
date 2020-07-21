@@ -22,6 +22,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -67,7 +68,8 @@ Argument::Argument(StringRef key, CanType ty) : key(key) {
   ty.print(stream);
 }
 
-template <typename DerivedT> std::string Remark<DerivedT>::getMsg() const {
+template <typename DerivedT>
+std::string Remark<DerivedT>::getMsg() const {
   std::string str;
   llvm::raw_string_ostream stream(str);
   for (const Argument &arg : args)
@@ -75,7 +77,8 @@ template <typename DerivedT> std::string Remark<DerivedT>::getMsg() const {
   return stream.str();
 }
 
-template <typename DerivedT> std::string Remark<DerivedT>::getDebugMsg() const {
+template <typename DerivedT>
+std::string Remark<DerivedT>::getDebugMsg() const {
   std::string str;
   llvm::raw_string_ostream stream(str);
 
@@ -99,6 +102,90 @@ Emitter::Emitter(StringRef passName, SILModule &m)
           m.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
           m.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
               passName)) {}
+
+/// The user has passed us an instruction that for some reason has a source loc
+/// that can not be used. Search down the current block for an instruction with
+/// a valid source loc and use that instead.
+static SourceLoc inferOptRemarkSearchForwards(SILInstruction &i) {
+  for (auto &inst :
+       llvm::make_range(std::next(i.getIterator()), i.getParent()->end())) {
+    auto newLoc = inst.getLoc().getSourceLoc();
+    if (newLoc.isValid())
+      return newLoc;
+  }
+
+  return SourceLoc();
+}
+
+/// The user has passed us an instruction that for some reason has a source loc
+/// that can not be used. Search up the current block for an instruction with
+/// a valid SILLocation and use the end SourceLoc of the SourceRange for the
+/// instruction.
+static SourceLoc inferOptRemarkSearchBackwards(SILInstruction &i) {
+  for (auto &inst : llvm::make_range(std::next(i.getReverseIterator()),
+                                     i.getParent()->rend())) {
+    auto loc = inst.getLoc();
+    if (!bool(loc))
+      continue;
+
+    auto range = loc.getSourceRange();
+    if (range.isValid())
+      return range.End;
+  }
+
+  return SourceLoc();
+}
+
+SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
+    SILInstruction &i, SourceLocInferenceBehavior inferBehavior) {
+  auto loc = i.getLoc().getSourceLoc();
+
+  // Do a quick check if we already have a valid loc. In such a case, just
+  // return. Otherwise, we try to infer using one of our heuristics below.
+  if (loc.isValid())
+    return loc;
+
+  // Otherwise, try to handle the individual behavior cases, returning loc at
+  // the end of each case (its invalid, so it will get ignored). If loc is not
+  // returned, we hit an assert at the end to make it easy to identify a case
+  // was missed.
+  switch (inferBehavior) {
+  case SourceLocInferenceBehavior::None:
+    return loc;
+  case SourceLocInferenceBehavior::ForwardScanOnly: {
+    SourceLoc newLoc = inferOptRemarkSearchForwards(i);
+    if (newLoc.isValid())
+      return newLoc;
+    return loc;
+  }
+  case SourceLocInferenceBehavior::BackwardScanOnly: {
+    SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
+    if (newLoc.isValid())
+      return newLoc;
+    return loc;
+  }
+  case SourceLocInferenceBehavior::ForwardThenBackward: {
+    SourceLoc newLoc = inferOptRemarkSearchForwards(i);
+    if (newLoc.isValid())
+      return newLoc;
+    newLoc = inferOptRemarkSearchBackwards(i);
+    if (newLoc.isValid())
+      return newLoc;
+    return loc;
+  }
+  case SourceLocInferenceBehavior::BackwardThenForward: {
+    SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
+    if (newLoc.isValid())
+      return newLoc;
+    newLoc = inferOptRemarkSearchForwards(i);
+    if (newLoc.isValid())
+      return newLoc;
+    return loc;
+  }
+  }
+
+  llvm_unreachable("Covered switch isn't covered?!");
+}
 
 template <typename RemarkT, typename... ArgTypes>
 static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,

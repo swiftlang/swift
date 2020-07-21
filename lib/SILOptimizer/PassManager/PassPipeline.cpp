@@ -660,6 +660,9 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
+
+  // Only has an effect if opt-remark is enabled.
+  P.addOptRemarkGenerator();
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {

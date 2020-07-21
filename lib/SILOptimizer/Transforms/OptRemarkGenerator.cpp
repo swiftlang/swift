@@ -49,8 +49,10 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
     StrongRetainInst *sri) {
   ORE.emit([&]() {
     using namespace OptRemark;
-    return RemarkMissed("memory-management", *sri)
-           << "Unable to remove ARC operation";
+    // Retains begin a lifetime scope so we infer scan forward.
+    return RemarkMissed("memory-management", *sri,
+                        SourceLocInferenceBehavior::ForwardScanOnly)
+           << "Unable to remove retain";
   });
 }
 
@@ -58,8 +60,10 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
     StrongReleaseInst *sri) {
   ORE.emit([&]() {
     using namespace OptRemark;
-    return RemarkMissed("memory-management", *sri)
-           << "Unable to remove ARC operation";
+    // Releases end a lifetime scope so we infer scan backward.
+    return RemarkMissed("memory-management", *sri,
+                        SourceLocInferenceBehavior::BackwardScanOnly)
+           << "Unable to remove release";
   });
 }
 
@@ -67,8 +71,10 @@ void OptRemarkGeneratorInstructionVisitor::visitRetainValueInst(
     RetainValueInst *rvi) {
   ORE.emit([&]() {
     using namespace OptRemark;
-    return RemarkMissed("memory-management", *rvi)
-           << "Unable to remove ARC operation";
+    // Retains begin a lifetime scope, so we infer scan forwards.
+    return RemarkMissed("memory-management", *rvi,
+                        SourceLocInferenceBehavior::ForwardScanOnly)
+           << "Unable to remove retain";
   });
 }
 
@@ -76,8 +82,10 @@ void OptRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
     ReleaseValueInst *rvi) {
   ORE.emit([&]() {
     using namespace OptRemark;
-    return RemarkMissed("memory-management", *rvi)
-           << "Unable to remove ARC operation";
+    // Releases end a lifetime scope so we infer scan backward.
+    return RemarkMissed("memory-management", *rvi,
+                        SourceLocInferenceBehavior::BackwardScanOnly)
+           << "Unable to remove release";
   });
 }
 
@@ -90,10 +98,25 @@ namespace {
 class OptRemarkGenerator : public SILFunctionTransform {
   ~OptRemarkGenerator() override {}
 
+  bool isOptRemarksEnabled() {
+    // TODO: Put this on LangOpts as a helper.
+    auto &langOpts = getFunction()->getASTContext().LangOpts;
+
+    // If we have a remark streamer, emit everything.
+    return bool(langOpts.OptimizationRemarkMissedPattern) ||
+           bool(langOpts.OptimizationRemarkPassedPattern) ||
+           getFunction()->getModule().getSILRemarkStreamer();
+  }
+
   /// The entry point to the transformation.
   void run() override {
-    OptRemarkGeneratorInstructionVisitor visitor(getFunction()->getModule());
-    for (auto &block : *getFunction()) {
+    if (!isOptRemarksEnabled())
+      return;
+
+    auto *fn = getFunction();
+    LLVM_DEBUG(llvm::dbgs() << "Visiting: " << fn->getName() << "\n");
+    OptRemarkGeneratorInstructionVisitor visitor(fn->getModule());
+    for (auto &block : *fn) {
       for (auto &inst : block) {
         visitor.visit(&inst);
       }
