@@ -116,7 +116,7 @@ public:
   }
 
   static bool classof(const ModuleDependenciesStorageBase *base) {
-    return base->isSwiftModule;
+    return base->isSwiftModule && !base->isExternalSwiftModuleStub;
   }
 };
 
@@ -244,8 +244,11 @@ public:
   bool isSwiftModule() const;
 
   ModuleDependenciesKind getKind() const {
-    return isSwiftModule() ? ModuleDependenciesKind::Swift
-                           : ModuleDependenciesKind::Clang;
+    if (isExternalSwiftModuleStub())
+      return ModuleDependenciesKind::SwiftExternal;
+    else
+      return isSwiftModule() ? ModuleDependenciesKind::Swift
+                            : ModuleDependenciesKind::Clang;
   }
   /// Retrieve the dependencies for a Swift module.
   const SwiftModuleDependenciesStorage *getAsSwiftModule() const;
