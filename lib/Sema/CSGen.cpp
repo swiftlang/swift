@@ -91,10 +91,6 @@ namespace {
 
     llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
 
-    // TODO: manage as a set of lists, to speed up addition of binding
-    // constraints.
-    llvm::SmallVector<DeclRefExpr *, 16> anonClosureParams;
-    
     LinkedTypeInfo() {
       haveIntLiteral = false;
       haveFloatLiteral = false;
@@ -249,10 +245,7 @@ namespace {
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
         if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
-          if (isa<ParamDecl>(varDecl) &&
-              cast<ParamDecl>(varDecl)->isAnonClosureParam()) {
-            LTI.anonClosureParams.push_back(DRE);
-          } else if (CS.hasType(DRE)) {
+          if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
           return { false, expr };
@@ -345,24 +338,6 @@ namespace {
     LinkedTypeInfo lti;
 
     expr->walk(LinkedExprAnalyzer(lti, CS));
-
-    // Link anonymous closure params of the same index.
-    // TODO: As stated above, we should bucket these whilst collecting the
-    // exprs to avoid quadratic behavior.
-    for (auto acp1 : lti.anonClosureParams) {
-      for (auto acp2 : lti.anonClosureParams) {
-        if (acp1 == acp2)
-          continue;
-
-        if (acp1->getDecl()->getBaseName() == acp2->getDecl()->getBaseName()) {
-
-          auto tyvar1 = CS.getType(acp1)->getAs<TypeVariableType>();
-          auto tyvar2 = CS.getType(acp2)->getAs<TypeVariableType>();
-
-          mergeRepresentativeEquivalenceClasses(CS, tyvar1, tyvar2);
-        }
-      }
-    }
 
     auto mergeTypeVariables = [&](ArrayRef<TypeVariableType *> typeVars) {
       if (typeVars.size() < 2)
