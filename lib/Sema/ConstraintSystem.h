@@ -4685,6 +4685,13 @@ private:
                                  ConstraintLocatorBuilder locator,
                                  bool isFavored);
 
+  /// Adds a constraint for the conversion of an argument to a parameter. Do not
+  /// call directly, use \c addConstraint instead.
+  SolutionKind
+  addArgumentConversionConstraintImpl(ConstraintKind kind, Type first,
+                                      Type second,
+                                      ConstraintLocatorBuilder locator);
+
   /// Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
