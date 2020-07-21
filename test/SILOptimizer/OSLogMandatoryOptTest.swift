@@ -635,3 +635,41 @@ extension TestProtocolSelfTypeCapture {
   }
 }
 
+// Test that SwiftUI's preview transformations work with the logging APIs.
+
+// A function similar to the one used by SwiftUI preview to wrap string
+// literals.
+@_semantics("constant_evaluable")
+@_transparent
+public func __designTimeStringStub(
+  _ key: String,
+  fallback: OSLogMessage
+) -> OSLogMessage {
+  fallback
+}
+
+// CHECK-LABEL: @${{.*}}testSwiftUIPreviewWrappingyy
+func testSwiftUIPreviewWrapping() {
+  _osLogTestHelper(__designTimeStringStub("key", fallback: "percent: %"))
+    // CHECK: string_literal utf8 "percent: %%"
+    // CHECK-NOT: OSLogMessage
+    // CHECK-NOT: OSLogInterpolation
+    // CHECK-LABEL: end sil function '${{.*}}testSwiftUIPreviewWrappingyy
+}
+
+
+func functionTakingClosure(_ x: () -> Void) { }
+
+func testWrappingWithinClosures(x: Int) {
+  functionTakingClosure {
+    _osLogTestHelper(
+      __designTimeStringStub(
+        "key",
+        fallback: "escaping of percent: %"))
+      // CHECK-LABEL: @${{.*}}testWrappingWithinClosures1xySi_tFyyXEfU_
+      // CHECK: string_literal utf8 "escaping of percent: %%"
+      // CHECK-NOT: OSLogMessage
+      // CHECK-NOT: OSLogInterpolation
+      // CHECK-LABEL: end sil function '${{.*}}testWrappingWithinClosures1xySi_tFyyXEfU_
+  }
+}

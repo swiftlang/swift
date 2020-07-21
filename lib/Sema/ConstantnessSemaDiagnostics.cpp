@@ -92,6 +92,13 @@ static bool hasConstantEvaluableAttr(ValueDecl *decl) {
   return hasSemanticsAttr(decl, semantics::CONSTANT_EVALUABLE);
 }
 
+/// Return true iff the \p decl is annotated with oslog.message.init semantics
+/// attribute.
+static bool isOSLogMessageInitializer(ValueDecl *decl) {
+  return hasSemanticsAttr(decl, semantics::OSLOG_MESSAGE_INIT_STRING_LITERAL) ||
+         hasSemanticsAttr(decl, semantics::OSLOG_MESSAGE_INIT_INTERPOLATION);
+}
+
 /// Check whether \p expr is a compile-time constant. It must either be a
 /// literal_expr, which does not include array and dictionary literal, or a
 /// closure expression, which is considered a compile-time constant of a
@@ -162,12 +169,6 @@ static Expr *checkConstantness(Expr *expr) {
     if (!isa<ApplyExpr>(expr))
       return expr;
 
-    if (NominalTypeDecl *nominal =
-        expr->getType()->getNominalOrBoundGenericNominal()) {
-      if (nominal->getName() == nominal->getASTContext().Id_OSLogMessage)
-        return expr;
-    }
-
     ApplyExpr *apply = cast<ApplyExpr>(expr);
     ValueDecl *calledValue = apply->getCalledValue();
     if (!calledValue)
@@ -179,10 +180,18 @@ static Expr *checkConstantness(Expr *expr) {
       continue;
     }
 
+    AbstractFunctionDecl *callee = dyn_cast<AbstractFunctionDecl>(calledValue);
+    if (!callee)
+      return expr;
+
+    // If this is an application of OSLogMessage initializer, fail the check
+    // as this type must be created from string interpolations.
+    if (isOSLogMessageInitializer(callee))
+      return expr;
+
     // If this is a constant_evaluable function, check whether the arguments are
     // constants.
-    AbstractFunctionDecl *callee = dyn_cast<AbstractFunctionDecl>(calledValue);
-    if (!callee || !hasConstantEvaluableAttr(callee))
+    if (!hasConstantEvaluableAttr(callee))
       return expr;
     expressionsToCheck.push_back(apply->getArg());
   }
