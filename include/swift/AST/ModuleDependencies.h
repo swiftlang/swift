@@ -35,6 +35,29 @@ class Identifier;
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependenciesKind : int8_t {
   Swift,
+    // Placeholder dependencies are a kind of dependencies used only by the
+  // dependency scanner. They are swift modules that the scanner will not be
+  // able to locate in its search paths and which are the responsibility of the
+  // scanner's client to ensure are provided.
+  //
+  // Placeholder dependencies will be specified in the scanner's output
+  // dependency graph where it is the responsibility of the scanner's client to
+  // ensure required post-processing takes place to "resolve" them. In order to
+  // do so, the client (swift driver, or any other client build system) is
+  // expected to have access to a full dependency graph of all placeholder
+  // dependencies and be able to replace placeholder nodes in the dependency
+  // graph with their full dependency trees, `uniquing` common dependency module
+  // nodes in the process.
+  //
+  // One example where placeholder dependencies are employed is when using
+  // SwiftPM in Explicit Module Build mode. SwiftPM constructs a build plan for
+  // all targets ahead-of-time. When planning a build for a target that depends
+  // on other targets, the dependency scanning action is not able to locate
+  // dependency target modules, because they have not yet been built. Instead,
+  // the build system treats them as placeholder dependencies and resolves them
+  // with `actual` dependencies in a post-processing step once dependency graphs
+  // of all targets, individually, have been computed.
+  SwiftPlaceholder,
   Clang,
 };
 
@@ -160,21 +183,21 @@ public:
   }
 };
 
-/// Describes an external Swift module dependency module stub.
+/// Describes an placeholder Swift module dependency module stub.
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencies.
-class ExternalSwiftModuleDependencyStorage : public ModuleDependenciesStorageBase {
+class PlaceholderSwiftModuleDependencyStorage : public ModuleDependenciesStorageBase {
 public:
-  ExternalSwiftModuleDependencyStorage(const std::string &compiledModulePath,
+  PlaceholderSwiftModuleDependencyStorage(const std::string &compiledModulePath,
                                        const std::string &moduleDocPath,
                                        const std::string &sourceInfoPath)
-      : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftExternal,
+      : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftPlaceholder,
                                       compiledModulePath),
         moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath) {}
 
   ModuleDependenciesStorageBase *clone() const override {
-    return new ExternalSwiftModuleDependencyStorage(*this);
+    return new PlaceholderSwiftModuleDependencyStorage(*this);
   }
 
   /// The path to the .swiftModuleDoc file.
@@ -184,7 +207,7 @@ public:
   const std::string sourceInfoPath;
 
   static bool classof(const ModuleDependenciesStorageBase *base) {
-    return base->dependencyKind == ModuleDependenciesKind::SwiftExternal;
+    return base->dependencyKind == ModuleDependenciesKind::SwiftPlaceholder;
   }
 };
 
@@ -259,13 +282,13 @@ public:
           fileDependencies));
   }
 
-  /// Describe an external dependency swift module.
-  static ModuleDependencies forExternalSwiftModuleStub(
+  /// Describe a placeholder dependency swift module.
+  static ModuleDependencies forPlaceholderSwiftModuleStub(
       const std::string &compiledModulePath,
       const std::string &moduleDocPath,
       const std::string &sourceInfoPath) {
     return ModuleDependencies(
-        std::make_unique<ExternalSwiftModuleDependencyStorage>(
+        std::make_unique<PlaceholderSwiftModuleDependencyStorage>(
           compiledModulePath, moduleDocPath, sourceInfoPath));
   }
 
@@ -282,6 +305,9 @@ public:
   /// Whether the dependencies are for a Swift module.
   bool isSwiftModule() const;
 
+  /// Whether this represents a placeholder module stub
+  bool isPlaceholderSwiftModule() const;
+
   ModuleDependenciesKind getKind() const {
     return storage->dependencyKind;
   }
@@ -290,6 +316,10 @@ public:
 
   /// Retrieve the dependencies for a Clang module.
   const ClangModuleDependenciesStorage *getAsClangModule() const;
+
+  /// Retrieve the dependencies for a placeholder dependency module stub.
+  const PlaceholderSwiftModuleDependencyStorage *
+  getAsPlaceholderDependencyModule() const;
 
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleDependency(StringRef module,

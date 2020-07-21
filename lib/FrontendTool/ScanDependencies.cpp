@@ -224,8 +224,8 @@ namespace {
     std::string moduleKind;
     if (module.second == ModuleDependenciesKind::Swift)
       moduleKind = "swift";
-    else if (module.second == ModuleDependenciesKind::SwiftExternal)
-      moduleKind = "swiftExternal";
+    else if (module.second == ModuleDependenciesKind::SwiftPlaceholder)
+      moduleKind = "swiftPlaceholder";
     else
       moduleKind = "clang";
 
@@ -324,7 +324,7 @@ static void writeJSON(llvm::raw_ostream &out,
     out.indent(2 * 2);
     out << "{\n";
 
-    auto externalSwiftDep = moduleDeps.getAsExternalDependencyModuleStub();
+    auto externalSwiftDep = moduleDeps.getAsPlaceholderDependencyModule();
     auto swiftDeps = moduleDeps.getAsSwiftModule();
     auto clangDeps = moduleDeps.getAsClangModule();
 
@@ -426,7 +426,7 @@ static void writeJSON(llvm::raw_ostream &out,
         out << "}\n";
       }
     } else if (externalSwiftDep) {
-      out << "\"swiftExternal\": {\n";
+      out << "\"swiftPlaceholder\": {\n";
 
       // Module doc file
       if (externalSwiftDep->moduleDocPath != "")

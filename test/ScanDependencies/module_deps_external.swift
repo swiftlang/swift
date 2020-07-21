@@ -9,7 +9,7 @@
 // RUN: echo "\"sourceInfoPath\": \"%/t/inputs/SomeExternalModule.swiftsourceinfo\"" >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json
 
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -external-dependency-module-map-file %t/inputs/map.json -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -disable-implicit-swift-modules -Xcc -Xclang -Xcc -fno-implicit-modules
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -placeholder-dependency-module-map-file %t/inputs/map.json -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -disable-implicit-swift-modules -Xcc -Xclang -Xcc -fno-implicit-modules
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
@@ -39,7 +39,7 @@ import SomeExternalModule
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "swiftExternal": "SomeExternalModule"
+// CHECK-NEXT: "swiftPlaceholder": "SomeExternalModule"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "Swift"
@@ -73,7 +73,7 @@ import SomeExternalModule
 /// --------Swift external module SomeExternalModule
 // CHECK-LABEL: "modulePath": "BUILD_DIR/test-macosx-x86_64/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftmodule",
 // CHECK-NEXT: "details": {
-// CHECK-NEXT: "swiftExternal": {
+// CHECK-NEXT: "swiftPlaceholder": {
 // CHECK-NEXT: "moduleDocPath": "BUILD_DIR/test-macosx-x86_64/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftdoc",
 // CHECK-NEXT: "moduleSourceInfoPath": "BUILD_DIR/test-macosx-x86_64/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftsourceinfo",
 

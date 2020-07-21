@@ -905,8 +905,8 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   for (auto A: Args.filtered(OPT_candidate_module_file)) {
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
   }
-  if (const Arg *A = Args.getLastArg(OPT_external_dependency_module_map))
-    Opts.ExternalDependencyModuleMap = A->getValue();
+  if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
+    Opts.PlaceholderDependencyModuleMap = A->getValue();
 
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
