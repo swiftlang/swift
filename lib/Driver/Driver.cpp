@@ -168,7 +168,7 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
   const Arg *ExternalDependencyMap = args.getLastArg(options::OPT_external_dependency_module_map);
   const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
   if (ExternalDependencyMap && !ScanDependencies) {
-    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-external-dependency-module-map-file", "-scan-dependencies");
   }
 }

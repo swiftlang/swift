@@ -126,6 +126,7 @@ bool ModuleDependenciesCache::hasDependencies(
     Optional<ModuleDependenciesKind> kind) const {
   if (!kind) {
     return hasDependencies(moduleName, ModuleDependenciesKind::Swift) ||
+        hasDependencies(moduleName, ModuleDependenciesKind::SwiftExternal) ||
         hasDependencies(moduleName, ModuleDependenciesKind::Clang);
   }
 
@@ -140,8 +141,11 @@ Optional<ModuleDependencies> ModuleDependenciesCache::findDependencies(
     if (auto swiftDep = findDependencies(
             moduleName, ModuleDependenciesKind::Swift))
       return swiftDep;
-
-    return findDependencies(moduleName, ModuleDependenciesKind::Clang);
+    else if (auto swiftExternalDep = findDependencies(
+            moduleName, ModuleDependenciesKind::SwiftExternal))
+      return swiftExternalDep;
+    else
+      return findDependencies(moduleName, ModuleDependenciesKind::Clang);
   }
 
   const auto &map = getDependenciesMap(*kind);

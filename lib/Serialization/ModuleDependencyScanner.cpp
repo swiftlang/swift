@@ -37,12 +37,17 @@ class ModuleDependencyScanner : public SerializedModuleLoaderBase {
 public:
   Optional<ModuleDependencies> dependencies;
 
-  ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                          Identifier moduleName,
-                          InterfaceSubContextDelegate &astDelegate)
+  /// Describes the kind of dependencies this scanner is able to identify
+  ModuleDependenciesKind dependencyKind;
+
+  ModuleDependencyScanner(
+      ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
+      InterfaceSubContextDelegate &astDelegate,
+      ModuleDependenciesKind dependencyKind = ModuleDependenciesKind::Swift)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
-        moduleName(moduleName), astDelegate(astDelegate) { }
+        moduleName(moduleName), astDelegate(astDelegate),
+        dependencyKind(dependencyKind) {}
 
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID,
@@ -86,6 +91,73 @@ public:
     llvm_unreachable("Not used");
   }
 };
+
+/// A ModuleLoader that loads external dependency module stubs specified in
+/// -external-dependency-module-map-file
+/// This loader is used only in dependency scanning to inform the scanner that a
+/// set of modules constitute external dependencies that are not visible to the
+/// scanner but will nevertheless be provided by the scanner's clients.
+/// This "loader" will not attempt to load any module files.
+class ExternalSwiftModuleStubLoader : public ModuleDependencyScanner {
+  /// Scan the given external module map
+  void parseExternalModuleMap(StringRef fileName);
+  llvm::StringMap<ExplicitModuleInfo> ExternalDependencyModuleMap;
+
+public:
+  ExternalSwiftModuleStubLoader(ASTContext &ctx, ModuleLoadingMode LoadMode,
+                                Identifier moduleName,
+                                StringRef ExternalDependencyModuleMap,
+                                InterfaceSubContextDelegate &astDelegate)
+      : ModuleDependencyScanner(ctx, LoadMode, moduleName, astDelegate,
+                                ModuleDependenciesKind::SwiftExternal) {
+
+    // FIXME: Find a better place for this map to live, to avoid
+    // doing the parsing on every module.
+    parseExternalModuleMap(ExternalDependencyModuleMap);
+  }
+
+  std::error_code findModuleFilesInDirectory(
+      AccessPathElem ModuleID, const SerializedModuleBaseName &BaseName,
+      SmallVectorImpl<char> *ModuleInterfacePath,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override {
+    StringRef moduleName = ModuleID.Item.str();
+    auto it = ExternalDependencyModuleMap.find(moduleName);
+    // If no external module stub path is given matches the name, return with an
+    // error code.
+    if (it == ExternalDependencyModuleMap.end()) {
+      return std::make_error_code(std::errc::not_supported);
+    }
+    auto &moduleInfo = it->getValue();
+    assert(!moduleInfo.moduleBuffer &&
+           "External dependency module stubs cannot have an associated buffer");
+
+    auto dependencies = ModuleDependencies::forExternalSwiftModuleStub(
+        moduleInfo.modulePath, moduleInfo.moduleDocPath,
+        moduleInfo.moduleSourceInfoPath);
+    this->dependencies = std::move(dependencies);
+    return std::error_code{};
+  }
+
+public:
+  static std::unique_ptr<ExternalSwiftModuleStubLoader>
+  create(ASTContext &ctx, DependencyTracker *tracker,
+         ModuleLoadingMode loadMode, StringRef ExternalDependencyModuleMap,
+         bool IgnoreSwiftSourceInfoFile);
+};
+} // namespace
+
+void ExternalSwiftModuleStubLoader::parseExternalModuleMap(StringRef fileName) {
+  ExplicitModuleMapParser parser(Ctx);
+  auto result =
+      parser.parseSwiftExplicitModuleMap(fileName, ExternalDependencyModuleMap);
+  if (result == std::errc::invalid_argument)
+    Ctx.Diags.diagnose(
+        SourceLoc(), diag::external_dependency_module_map_corrupted, fileName);
+  else if (result == std::errc::no_such_file_or_directory)
+    Ctx.Diags.diagnose(SourceLoc(),
+                       diag::external_dependency_module_map_missing, fileName);
 }
 
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
@@ -153,15 +225,19 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
   if (auto found = cache.findDependencies(
           moduleName, ModuleDependenciesKind::Swift))
     return found;
+  if (auto found =
+          cache.findDependencies(moduleName, ModuleDependenciesKind::SwiftExternal))
+    return found;
 
   // Check whether there is a module with this name that we can import.
-  auto moduleId = Ctx.getIdentifier(moduleName);
-  ModuleDependencyScanner scanner(Ctx, LoadMode, moduleId, delegate);
-  if (!scanner.canImportModule({moduleId, SourceLoc()}))
-    return None;
+  for (auto &scanner : scanners) {
+    if (scanner->canImportModule({moduleId, SourceLoc()})) {
+      // Record the dependencies.
+      cache.recordDependencies(moduleName, *(scanner->dependencies),
+                               scanner->dependencyKind);
+      return std::move(scanner->dependencies);
+    }
+  }
 
-  // Record the dependencies.
-  cache.recordDependencies(moduleName, *scanner.dependencies,
-                           ModuleDependenciesKind::Swift);
-  return std::move(scanner.dependencies);
+  return None;
 }
