@@ -271,7 +271,7 @@ SIMDTests.test("Generics") {
   expectEqual((3, SIMD3<Double>(-1, -1, -1)), pb3(g))
 
   // SIMDType * Scalar
-  func testMultipication<Scalar, SIMDType: SIMD>(lhs: SIMDType, rhs: Scalar)
+  func testMultiplication<Scalar, SIMDType: SIMD>(lhs: SIMDType, rhs: Scalar)
     -> SIMDType
     where SIMDType.Scalar == Scalar,
       SIMDType : Differentiable,
@@ -281,13 +281,14 @@ SIMDTests.test("Generics") {
     return lhs * rhs
   }
   func simd3Multiply(lhs: SIMD3<Double>, rhs: Double) -> SIMD3<Double> {
-    return testMultipication(lhs: lhs, rhs: rhs)
+    return testMultiplication(lhs: lhs, rhs: rhs)
   }
   let (val4, pb4) = valueWithPullback(at: a, 5, in: simd3Multiply)
   expectEqual(SIMD3<Double>(5, 10, 15), val4)
   expectEqual((SIMD3<Double>(5, 5, 5), 6), pb4(g))
 
   // FIXME(TF-1103): Derivative registration does not yet support
+  // `@_alwaysEmitIntoClient` original functions like `SIMD.sum()`.
   /*
   func testSum<Scalar, SIMDType: SIMD>(x: SIMDType) -> Scalar
     where SIMDType.Scalar == Scalar,

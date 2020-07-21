@@ -850,14 +850,8 @@ ParameterListInfo::ParameterListInfo(
     return;
 
   // Find the corresponding parameter list.
-  const ParameterList *paramList = nullptr;
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-    paramList = func->getParameters();
-  } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
-    paramList = subscript->getIndices();
-  } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
-    paramList = enumElement->getParameterList();
-  }
+  const ParameterList *paramList =
+      getParameterList(const_cast<ValueDecl *>(paramOwner));
 
   // No parameter list means no default arguments - hand back the zeroed
   // bitvector.

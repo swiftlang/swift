@@ -536,20 +536,17 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
 static bool parameterTypesMatch(const ValueDecl *derivedDecl,
                                 const ValueDecl *baseDecl,
                                 TypeMatchOptions matchMode) {
-  const ParameterList *derivedParams;
-  const ParameterList *baseParams;
-  if (auto *derived = dyn_cast<AbstractFunctionDecl>(derivedDecl)) {
-    auto *base = dyn_cast<AbstractFunctionDecl>(baseDecl);
-    if (!base)
-      return false;
-    baseParams = base->getParameters();
-    derivedParams = derived->getParameters();
-  } else {
-    auto *base = dyn_cast<SubscriptDecl>(baseDecl);
-    if (!base)
-      return false;
-    baseParams = base->getIndices();
-    derivedParams = cast<SubscriptDecl>(derivedDecl)->getIndices();
+  const ParameterList *derivedParams = nullptr;
+  const ParameterList *baseParams = nullptr;
+  if ((isa<AbstractFunctionDecl>(derivedDecl) &&
+       isa<AbstractFunctionDecl>(baseDecl)) ||
+      isa<SubscriptDecl>(baseDecl)) {
+    derivedParams = getParameterList(const_cast<ValueDecl *>(derivedDecl));
+    baseParams = getParameterList(const_cast<ValueDecl *>(baseDecl));
+  }
+
+  if (!derivedParams && !baseParams) {
+    return false;
   }
 
   if (baseParams->size() != derivedParams->size())

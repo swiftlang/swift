@@ -1,13 +1,4 @@
-// RUN: %target-sil-opt -sil-opt-remark-generator -sil-remarks-missed=sil-opt-remark-gen %s -o /dev/null 2>&1 | %FileCheck %s
-
-// CHECK: {{.*}}opt-remark-generator.sil:18:3: remark: Unable to remove ARC operation
-// CHECK-NEXT: strong_retain
-// CHECK: {{.*}}opt-remark-generator.sil:19:3: remark: Unable to remove ARC operation
-// CHECK-NEXT: retain_value
-// CHECK: {{.*}}opt-remark-generator.sil:20:3: remark: Unable to remove ARC operation
-// CHECK-NEXT: strong_release
-// CHECK: {{.*}}opt-remark-generator.sil:21:3: remark: Unable to remove ARC operation
-// CHECK-NEXT: release_value
+// RUN: %target-sil-opt -sil-opt-remark-generator -sil-remarks-missed=sil-opt-remark-gen -verify %s -o /dev/null
 
 sil_stage canonical
 
@@ -15,10 +6,14 @@ import Builtin
 
 sil @foo : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  strong_retain %0 : $Builtin.NativeObject
-  retain_value %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  release_value %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject // expected-remark {{Found retain:}}
+                                           // expected-note @-1 {{Unable to infer any values being retained.}}
+  retain_value %0 : $Builtin.NativeObject  // expected-remark {{Found retain:}}
+                                           // expected-note @-1 {{Unable to infer any values being retained.}}
+  strong_release %0 : $Builtin.NativeObject // expected-remark {{Found release:}}
+                                            // expected-note @-1 {{Unable to infer any values being released.}}
+  release_value %0 : $Builtin.NativeObject // expected-remark {{Found release:}}
+                                           // expected-note @-1 {{Unable to infer any values being released.}}
   %9999 = tuple()
   return %9999 : $()
 }

@@ -723,16 +723,13 @@ bool ParameterList::hasInternalParameter(StringRef Prefix) const {
 
 bool Decl::hasUnderscoredNaming() const {
   const Decl *D = this;
-  if (const auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // If it's a function with a parameter with leading underscore, it's a
-    // private function.
-    if (AFD->getParameters()->hasInternalParameter("_")) {
-      return true;
-    }
-  }
 
-  if (const auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
-    if (SubscriptD->getIndices()->hasInternalParameter("_")) {
+  // If it's a function or subscript with a parameter with leading
+  // underscore, it's a private function or subscript.
+  if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
+    const auto VD = cast<ValueDecl>(D);
+    if (getParameterList(const_cast<ValueDecl *>(VD))
+            ->hasInternalParameter("_")) {
       return true;
     }
   }
