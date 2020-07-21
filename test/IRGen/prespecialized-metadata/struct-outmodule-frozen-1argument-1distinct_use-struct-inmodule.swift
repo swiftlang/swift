@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -prespecialize-generic-metadata -target %module-target-future %S/Inputs/struct-public-nonfrozen-1argument.swift -emit-library -o %t/%target-library-name(Argument) -emit-module -module-name Argument -emit-module-path %t/Argument.swiftmodule
-// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s -L %t -I %t -lArgument | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment 
+// RUN: %target-build-swift -Xfrontend -prespecialize-generic-metadata -target %module-target-future %S/Inputs/struct-public-frozen-1argument.swift -emit-library -o %t/%target-library-name(Generic) -emit-module -module-name Generic -emit-module-path %t/Generic.swiftmodule -enable-library-evolution
+// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s -L %t -I %t -lGeneric | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment 
 
-// REQUIRES: VENDOR=apple || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-//      CHECK: @"$s8Argument03OneA0Vy4main03TheA0VGMN" = linkonce_odr hidden constant <{
+//      CHECK: @"$s7Generic11OneArgumentVy4main03TheC0VGMN" = linkonce_odr hidden constant <{
 // CHECK-SAME:   i8**,
 // CHECK-SAME:   [[INT]],
 // CHECK-SAME:   %swift.type_descriptor*,
@@ -18,12 +18,12 @@
 // CHECK-SAME: }> <{
 // CHECK-SAME:   i8** getelementptr inbounds (
 // CHECK-SAME:     %swift.vwtable,
-// CHECK-SAME:     %swift.vwtable* @"$s8Argument03OneA0Vy4main03TheA0VGWV",
+// CHECK-SAME:     %swift.vwtable* @"$s7Generic11OneArgumentVy4main03TheC0VGWV",
 // CHECK-SAME:     i32 0,
 // CHECK-SAME:     i32 0
 // CHECK-SAME:   ),
 // CHECK-SAME:   [[INT]] 512,
-// CHECK-SAME:   $s8Argument03OneA0VMn
+// CHECK-SAME:   $s7Generic11OneArgumentVMn
 // CHECK-SAME:   %swift.type* bitcast (
 // CHECK-SAME:     [[INT]]* getelementptr inbounds (
 // CHECK-SAME:       <{
@@ -81,7 +81,7 @@ func consume<T>(_ t: T) {
   }
 }
 
-import Argument
+import Generic
 
 struct TheArgument {
   let value: Int
@@ -101,12 +101,12 @@ struct TheArgument {
 // CHECK-SAME:           i32,
 // CHECK-SAME:           i32,
 // CHECK-SAME:           i64
-// CHECK-SAME:         }>* @"$s8Argument03OneA0Vy4main03TheA0VGMN" to %swift.full_type*
+// CHECK-SAME:         }>* @"$s7Generic11OneArgumentVy4main03TheC0VGMN" to %swift.full_type*
 // CHECK-SAME:       ),
 // CHECK-SAME:       i32 0,
 // CHECK-SAME:       i32 1
 // CHECK-SAME:     ),
-// CHECK-SAME:     %swift.type** @"$s8Argument03OneA0Vy4main03TheA0VGMJ"
+// CHECK-SAME:   %swift.type** @"$s7Generic11OneArgumentVy4main03TheC0VGMJ"
 // CHECK-SAME:   )
 // CHECK-NEXT:   [[CANONICALIZED_METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[CANONICALIZED_METADATA_RESPONSE]], 0
 // CHECK-NEXT:   call swiftcc void @"$s4main7consumeyyxlF"(
@@ -118,4 +118,8 @@ func doit() {
   consume( OneArgument(TheArgument(value: 13)) )
 }
 doit()
+
+
+
+
 

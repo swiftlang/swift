@@ -543,6 +543,11 @@ enum class MangledTypeRefRole {
   DefaultAssociatedTypeWitness,
 };
 
+enum class TypeMetadataCanonicality : bool {
+  Noncanonical,
+  Canonical,
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -1392,9 +1397,14 @@ public:
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
-  llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);
-  ConstantReference getAddrOfTypeMetadata(CanType concreteType,
-                                          SymbolReferenceKind kind);
+  llvm::Constant *
+  getAddrOfTypeMetadata(CanType concreteType,
+                        TypeMetadataCanonicality canonicality =
+                            TypeMetadataCanonicality::Canonical);
+  ConstantReference
+  getAddrOfTypeMetadata(CanType concreteType, SymbolReferenceKind kind,
+                        TypeMetadataCanonicality canonicality =
+                            TypeMetadataCanonicality::Canonical);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
                                                ConstantInit init,
@@ -1420,6 +1430,7 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
   llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
                                                        ConstantInit definition);
+  llvm::Constant *getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);
