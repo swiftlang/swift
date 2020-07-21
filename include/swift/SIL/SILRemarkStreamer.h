@@ -111,7 +111,7 @@ llvm::remarks::Remark SILRemarkStreamer::toLLVMRemark(
 
   for (const OptRemark::Argument &arg : optRemark.getArgs()) {
     llvmRemark.Args.emplace_back();
-    llvmRemark.Args.back().Key = arg.key;
+    llvmRemark.Args.back().Key = arg.key.data;
     llvmRemark.Args.back().Val = arg.val;
     llvmRemark.Args.back().Loc =
         toRemarkLocation(arg.loc, getASTContext().SourceMgr);

@@ -20,6 +20,9 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -28,23 +31,25 @@
 using namespace swift;
 using namespace OptRemark;
 
-Argument::Argument(StringRef key, int n) : key(key), val(llvm::itostr(n)) {}
+Argument::Argument(StringRef key, int n)
+    : key(ArgumentKeyKind::Default, key), val(llvm::itostr(n)) {}
 
-Argument::Argument(StringRef key, long n) : key(key), val(llvm::itostr(n)) {}
+Argument::Argument(StringRef key, long n)
+    : key(ArgumentKeyKind::Default, key), val(llvm::itostr(n)) {}
 
 Argument::Argument(StringRef key, long long n)
-    : key(key), val(llvm::itostr(n)) {}
+    : key(ArgumentKeyKind::Default, key), val(llvm::itostr(n)) {}
 
 Argument::Argument(StringRef key, unsigned n)
-    : key(key), val(llvm::utostr(n)) {}
+    : key(ArgumentKeyKind::Default, key), val(llvm::utostr(n)) {}
 
 Argument::Argument(StringRef key, unsigned long n)
-    : key(key), val(llvm::utostr(n)) {}
+    : key(ArgumentKeyKind::Default, key), val(llvm::utostr(n)) {}
 
 Argument::Argument(StringRef key, unsigned long long n)
-    : key(key), val(llvm::utostr(n)) {}
+    : key(ArgumentKeyKind::Default, key), val(llvm::utostr(n)) {}
 
-Argument::Argument(StringRef key, SILFunction *f) : key(key) {
+Argument::Argument(ArgumentKey key, SILFunction *f) : key(key) {
   auto options = Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
   // Enable module names so that we have a way of filtering out
   // stdlib-related remarks.
@@ -58,22 +63,53 @@ Argument::Argument(StringRef key, SILFunction *f) : key(key) {
     loc = f->getLocation().getSourceLoc();
 }
 
-Argument::Argument(StringRef key, SILType ty) : key(key) {
+Argument::Argument(StringRef key, SILType ty)
+    : key(ArgumentKeyKind::Default, key) {
   llvm::raw_string_ostream stream(val);
   ty.print(stream);
 }
 
-Argument::Argument(StringRef key, CanType ty) : key(key) {
+Argument::Argument(StringRef key, CanType ty)
+    : key(ArgumentKeyKind::Default, key) {
   llvm::raw_string_ostream stream(val);
   ty.print(stream);
+}
+
+bool Argument::inferArgumentsForValue(
+    ArgumentKeyKind keyKind, StringRef msg, SILValue value,
+    function_ref<bool(Argument)> funcPassedInferedArgs) {
+  // If we have an argument, just use that.
+  if (auto *arg = dyn_cast<SILArgument>(value))
+    if (auto *decl = arg->getDecl())
+      return funcPassedInferedArgs(
+          Argument({keyKind, "InferredValue"}, msg, decl));
+
+  // TODO: Look for loads from globals and addresses.
+
+  // Otherwise, look for debug_values.
+  for (auto *use : getDebugUses(value))
+    if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
+      if (auto *decl = dvi->getDecl())
+        if (!funcPassedInferedArgs(
+                Argument({keyKind, "InferredValue"}, msg, decl)))
+          return false;
+
+  return true;
 }
 
 template <typename DerivedT>
 std::string Remark<DerivedT>::getMsg() const {
   std::string str;
   llvm::raw_string_ostream stream(str);
-  for (const Argument &arg : args)
+  // Go through our args and if we are not emitting for diagnostics *OR* we are
+  // emitting for diagnostics and this argument is not intended to be emitted as
+  // a diagnostic separate from our main remark, emit the arg value here.
+  for (const Argument &arg : args) {
+    if (arg.key.kind.isSeparateDiagnostic())
+      continue;
     stream << arg.val;
+  }
+
   return stream.str();
 }
 
@@ -194,9 +230,30 @@ static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,
     return;
   if (auto *remarkStreamer = module.getSILRemarkStreamer())
     remarkStreamer->emit(remark);
-  if (diagEnabled)
-    module.getASTContext().Diags.diagnose(remark.getLocation(), id,
-                                          remark.getMsg());
+
+  // If diagnostics are enabled, first emit the main diagnostic and then loop
+  // through our arguments and allow the arguments to add additional diagnostics
+  // if they want.
+  if (!diagEnabled)
+    return;
+
+  auto &de = module.getASTContext().Diags;
+  de.diagnoseWithNotes(
+      de.diagnose(remark.getLocation(), id, remark.getMsg()), [&]() {
+        for (auto &arg : remark.getArgs()) {
+          switch (arg.key.kind) {
+          case ArgumentKeyKind::Default:
+            continue;
+          case ArgumentKeyKind::Note:
+            de.diagnose(arg.loc, diag::opt_remark_note, arg.val);
+            continue;
+          case ArgumentKeyKind::ParentLocNote:
+            de.diagnose(remark.getLocation(), diag::opt_remark_note, arg.val);
+            continue;
+          }
+          llvm_unreachable("Unhandled case?!");
+        }
+      });
 }
 
 void Emitter::emit(const RemarkPassed &remark) {
