@@ -2958,6 +2958,19 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   std::tie(fromObjectType, fromUnwraps) = getObjectTypeAndUnwraps(fromType);
   std::tie(toObjectType, toUnwraps) = getObjectTypeAndUnwraps(toType);
 
+  // Since equality is symmetric and it decays into a `Bind` eagerly
+  // unwrapping optionals from either side might be incorrect since
+  // there is not enough information about what is expected e.g.
+  // `Int?? equal T0?` just like `T0? equal Int??` allows `T0` to be
+  // bound to `Int?` and there is no need to unwrap. Solver has to wait
+  // until more information becomes available about what `T0` is expected
+  // to be before taking action.
+  if (matchKind == ConstraintKind::Equal &&
+      (fromObjectType->is<TypeVariableType>() ||
+       toObjectType->is<TypeVariableType>())) {
+    return false;
+  }
+
   // If `from` is not less optional than `to`, force unwrap is
   // not going to help here. In case of object type of `from`
   // is a type variable, let's assume that it might be optional.
