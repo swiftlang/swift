@@ -17,8 +17,10 @@
 | **OS** | **Architecture** | **Build** |
 |---|:---:|:---:|
 |**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/ppc64le_ubuntu_16_04.json)** | PPC64LE |[![Build Status](https://ci-external.swift.org/job/oss-swift-5.1-RA-linux-ubuntu-16.04-ppc64le/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-5.1-RA-linux-ubuntu-16.04-ppc64le)|
-|**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_16.04.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64)|
-|**[Ubuntu 18.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_18.04.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-18.04-aarch64)|
+|**[Ubuntu 18.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_18.04_docker.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-ubuntu-18.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-ubuntu-18.04-aarch64)|
+|**[Ubuntu 20.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_20.04_docker.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-ubuntu-20.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-ubuntu-20.04-aarch64)|
+|**[CentOS 8 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_centos_8_docker.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-centos8-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-centos8-aarch64)|
+|**[Amazon Linux 2](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_amazon_linux_2_docker.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-amazon-linux-2-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-amazon-linux-2-aarch64)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | ARMv7 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64)|
 |**[Windows 2019 (VS 2017)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_windows_2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64)|
@@ -241,7 +243,7 @@ various products. These incremental builds are a big timesaver when developing
 and debugging.
 
     cd ${SWIFT_BUILD_DIR}
-    ninja swift
+    ninja swift-frontend
 
 This will build the Swift compiler, but will not rebuild the standard library or
 any other target. Building the `swift-stdlib` target as an additional layer of
@@ -258,7 +260,7 @@ To open the Swift project in Xcode, open `${SWIFT_BUILD_DIR}/Swift.xcodeproj`.
 It will auto-create a *lot* of schemes for all of the available targets. A
 common debug flow would involve:
 
- - Select the 'swift' scheme.
+ - Select the 'swift-frontend' scheme.
  - Pull up the scheme editor (⌘⇧<).
  - Select the 'Arguments' tab and click the '+'.
  - Add the command line options.

@@ -1,5 +1,5 @@
 
-// RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target x86_64-apple-macosx10.99  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target x86_64-apple-macosx50.99  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
 // RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target x86_64-apple-ios99.0      -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
 // RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target x86_64-apple-tvos99.0     -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
 // RUN: %swift -prespecialize-generic-metadata -module-name generic_metatypes -target i386-apple-watchos9.99    -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32  %s

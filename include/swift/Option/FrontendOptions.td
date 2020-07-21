@@ -259,8 +259,6 @@ def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
   HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
-def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
-  HelpText<"Prints the time taken by each compilation phase">;
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
@@ -554,9 +552,6 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
   MetaVarName<"<250>">,
   HelpText<"Controls the aggressiveness of loop unrolling">;
 
-def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
-  HelpText<"Merge SIL from all partial swiftmodules into the final module">;
-
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
   
@@ -724,4 +719,8 @@ def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
 
 def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
   HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
+
+def candidate_module_file
+  : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module may be ready to use for an interface">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

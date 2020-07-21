@@ -21,7 +21,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Timer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -3238,6 +3237,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedValueCastInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::AddressToPointerInst:
   case SILInstructionKind::BridgeObjectToRefInst:
@@ -3306,6 +3306,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       break;
     case SILInstructionKind::UncheckedBitwiseCastInst:
       ResultVal = B.createUncheckedBitwiseCast(InstLoc, Val, Ty);
+      break;
+    case SILInstructionKind::UncheckedValueCastInst:
+      ResultVal = B.createUncheckedValueCast(InstLoc, Val, Ty);
       break;
     case SILInstructionKind::UpcastInst:
       ResultVal = B.createUpcast(InstLoc, Val, Ty);

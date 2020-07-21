@@ -1440,7 +1440,7 @@ namespace {
     }
 
     void addMethod(SILDeclRef fn) {
-      if (methodRequiresReifiedVTableEntry(IGM, VTable, fn)) {
+      if (!VTable || methodRequiresReifiedVTableEntry(IGM, VTable, fn)) {
         VTableEntries.push_back(fn);
       } else if (getType()->getEffectiveAccess() >= AccessLevel::Public) {
         // Emit a stub method descriptor and lookup function for nonoverridden

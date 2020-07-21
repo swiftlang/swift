@@ -21,9 +21,11 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 
@@ -500,6 +502,34 @@ public:
 
   bool hasIndirectSILResults() const {
     return getSubstCalleeConv().hasIndirectSILResults();
+  }
+
+  /// If our apply site has a single direct result SILValue, return that
+  /// SILValue. Return SILValue() otherwise.
+  ///
+  /// This means that:
+  ///
+  /// 1. If we have an ApplyInst, we just visit the apply.
+  /// 2. If we have a TryApplyInst, we visit the first argument of the normal
+  ///    block.
+  /// 3. If we have a BeginApplyInst, we return SILValue() since the begin_apply
+  ///    yields values instead of returning them. A returned value should only
+  ///    be valid after a full apply site has completely finished executing.
+  SILValue getSingleDirectResult() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      return SILValue(cast<ApplyInst>(getInstruction()));
+    case FullApplySiteKind::BeginApplyInst: {
+      return SILValue();
+    }
+    case FullApplySiteKind::TryApplyInst: {
+      auto *normalBlock = cast<TryApplyInst>(getInstruction())->getNormalBB();
+      assert(normalBlock->getNumArguments() == 1 &&
+             "Expected try apply to have a single result");
+      return normalBlock->getArgument(0);
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
   unsigned getNumIndirectSILResults() const {

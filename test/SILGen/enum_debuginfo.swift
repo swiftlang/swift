@@ -4,4 +4,4 @@ public func makeEnum() -> MyEnum {
   return .hasPayload(argument: 123)
 }
 
-// CHECK-NOT: enum_debuginfo_other.swift
+// CHECK-NOT: enum_debuginfo_other.swift":{{[0-9]}}

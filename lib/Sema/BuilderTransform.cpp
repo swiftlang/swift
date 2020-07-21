@@ -80,10 +80,21 @@ class BuilderClosureVisitor
     auto simplifiedTy = cs->simplifyType(builderType);
     if (!simplifiedTy->hasTypeVariable()) {
       typeExpr = TypeExpr::createImplicitHack(loc, simplifiedTy, ctx);
+    } else if (auto *decl = simplifiedTy->getAnyGeneric()) {
+      // HACK: If there's not enough information to completely resolve the
+      // builder type, but we have the base available to us, form an *explicit*
+      // TypeExpr pointing at it. We cannot form an implicit base without
+      // a fully-resolved concrete type. Really, whatever we put here has no
+      // bearing on the generated solution because we're going to use this node
+      // to stash the builder type and hand it back to the ambient
+      // constraint system.
+      typeExpr = TypeExpr::createForDecl(DeclNameLoc(loc), decl, dc);
     } else {
       // HACK: If there's not enough information in the constraint system,
       // create a garbage base type to force it to diagnose
       // this as an ambiguous expression.
+      // FIXME: We can also construct an UnresolvedMemberExpr here instead of
+      // an UnresolvedDotExpr and get a slightly better diagnostic.
       typeExpr = TypeExpr::createImplicitHack(loc, ErrorType::get(ctx), ctx);
     }
     cs->setType(typeExpr, MetatypeType::get(builderType));
@@ -1453,7 +1464,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request = PreCheckFunctionBuilderRequest{func};
+  auto request = PreCheckFunctionBuilderRequest{func, func->getBody()};
   switch (evaluateOrDefault(
               ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1581,7 +1592,7 @@ ConstraintSystem::matchFunctionBuilder(
 
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
-  auto request = PreCheckFunctionBuilderRequest{fn};
+  auto request = PreCheckFunctionBuilderRequest{fn, fn.getBody()};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1744,8 +1755,14 @@ public:
 }
 
 FunctionBuilderBodyPreCheck
-PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
-                                         AnyFunctionRef fn) const {
+PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval, AnyFunctionRef fn,
+                                         BraceStmt *body) const {
+  // NOTE: 'body' is passed only for the request evaluater caching key.
+  // Since source tooling (e.g. code completion) might replace the body,
+  // the function alone is not sufficient for the key.
+  assert(fn.getBody() == body &&
+         "body must be the current body of the function");
+
   // We don't want to do the precheck if it will already have happened in
   // the enclosing expression.
   bool skipPrecheck = false;

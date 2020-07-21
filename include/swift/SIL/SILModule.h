@@ -561,10 +561,6 @@ public:
   /// i.e. it can be linked by linkFunction.
   bool hasFunction(StringRef Name);
 
-  /// Link all definitions in all segments that are logically part of
-  /// the same AST module.
-  void linkAllFromCurrentModule();
-
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
   /// witnesses, if any.

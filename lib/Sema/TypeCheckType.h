@@ -35,40 +35,37 @@ enum class TypeResolutionFlags : uint16_t {
   /// Whether to allow unspecified types within a pattern.
   AllowUnspecifiedTypes = 1 << 0,
 
-  /// Whether to allow unbound generic types.
-  AllowUnboundGenerics = 1 << 1,
-
   /// Whether an unavailable protocol can be referenced.
-  AllowUnavailableProtocol = 1 << 2,
+  AllowUnavailableProtocol = 1 << 1,
 
   /// Whether we should allow references to unavailable types.
-  AllowUnavailable = 1 << 3,
+  AllowUnavailable = 1 << 2,
 
   /// Whether the given type can override the type of a typed pattern.
-  OverrideType = 1 << 4,
+  OverrideType = 1 << 3,
 
   /// Whether we are validating the type for SIL.
   // FIXME: Move this flag to TypeResolverContext.
-  SILType = 1 << 5,
+  SILType = 1 << 4,
 
   /// Whether we are parsing a SIL file.  Not the same as SILType,
   /// because the latter is not set if we're parsing an AST type.
-  SILMode = 1 << 6,
+  SILMode = 1 << 5,
 
   /// Whether this is a resolution based on a non-inferred type pattern.
-  FromNonInferredPattern = 1 << 7,
+  FromNonInferredPattern = 1 << 6,
 
   /// Whether this type resolution is guaranteed not to affect downstream files.
-  KnownNonCascadingDependency = 1 << 8,
+  KnownNonCascadingDependency = 1 << 7,
 
   /// Whether we are at the direct base of a type expression.
-  Direct = 1 << 9,
+  Direct = 1 << 8,
 
   /// Whether we should not produce diagnostics if the type is invalid.
-  SilenceErrors = 1 << 10,
+  SilenceErrors = 1 << 9,
 
   /// Whether to allow module declaration types.
-  AllowModule = 1 << 11
+  AllowModule = 1 << 10
 };
 
 /// Type resolution contexts that require special handling.
@@ -275,6 +272,13 @@ public:
   }
 };
 
+/// A function reference used to "open" the given unbound generic type
+/// by introducing generic arguments and constructing a \c BoundGenericType
+/// out of them.
+///
+/// \returns the \c null type on failure.
+using OpenUnboundGenericTypeFn = llvm::function_ref<Type(UnboundGenericType *)>;
+
 /// Handles the resolution of types within a given declaration context,
 /// which might involve resolving generic parameters to a particular
 /// stage.
@@ -282,7 +286,9 @@ class TypeResolution {
   DeclContext *dc;
   TypeResolutionStage stage;
   TypeResolutionOptions options;
+  OpenUnboundGenericTypeFn unboundTyOpener;
 
+private:
   union {
     /// The generic environment used to map to archetypes.
     GenericEnvironment *genericEnv;
@@ -299,41 +305,45 @@ class TypeResolution {
   };
 
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
-                 TypeResolutionOptions options)
-      : dc(dc), stage(stage), options(options) {}
+                 TypeResolutionOptions options,
+                 OpenUnboundGenericTypeFn unboundTyOpener)
+      : dc(dc), stage(stage), options(options),
+        unboundTyOpener(unboundTyOpener) {}
 
   GenericSignatureBuilder *getGenericSignatureBuilder() const;
+
+  /// Retrieves the generic signature for the context, or NULL if there is
+  /// no generic signature to resolve types.
+  GenericSignature getGenericSignature() const;
 
 public:
   /// Form a type resolution for the structure of a type, which does not
   /// attempt to resolve member types of type parameters to a particular
   /// associated type.
   static TypeResolution forStructural(DeclContext *dc,
-                                      TypeResolutionOptions opts);
+                                      TypeResolutionOptions opts,
+                                      OpenUnboundGenericTypeFn unboundTyOpener);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution forInterface(DeclContext *dc,
-                                     TypeResolutionOptions opts);
-
-  /// Form a type resolution for an interface type, which is a complete
-  /// description of the type using generic parameters.
-  static TypeResolution forInterface(DeclContext *dc,
-                                     GenericSignature genericSig,
-                                     TypeResolutionOptions opts);
+                                     TypeResolutionOptions opts,
+                                     OpenUnboundGenericTypeFn unboundTyOpener);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given declaration
   /// context.
   static TypeResolution forContextual(DeclContext *dc,
-                                      TypeResolutionOptions opts);
+                                      TypeResolutionOptions opts,
+                                      OpenUnboundGenericTypeFn unboundTyOpener);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
   /// environment.
   static TypeResolution forContextual(DeclContext *dc,
                                       GenericEnvironment *genericEnv,
-                                      TypeResolutionOptions opts);
+                                      TypeResolutionOptions opts,
+                                      OpenUnboundGenericTypeFn unboundTyOpener);
 
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
@@ -351,9 +361,9 @@ public:
 
   TypeResolutionOptions getOptions() const { return options; }
 
-  /// Retrieves the generic signature for the context, or NULL if there is
-  /// no generic signature to resolve types.
-  GenericSignature getGenericSignature() const;
+  OpenUnboundGenericTypeFn getUnboundTypeOpener() const {
+    return unboundTyOpener;
+  }
 
   /// Resolves a TypeRepr to a type.
   ///
@@ -363,7 +373,7 @@ public:
   /// \param TyR The type representation to check.
   ///
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR);
+  Type resolveType(TypeRepr *TyR) const;
 
   /// Whether this type resolution uses archetypes (vs. generic parameters).
   bool usesArchetypes() const;

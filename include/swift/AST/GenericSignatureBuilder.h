@@ -743,12 +743,6 @@ private:
                             TypeArrayView<GenericTypeParamType> genericParams,
                             EquivalenceClass *equivClass);
 
-  /// Realize a potential archetype for the given type.
-  ///
-  /// The resolved archetype will be written back into the unresolved type,
-  /// to make the next resolution more efficient.
-  PotentialArchetype *realizePotentialArchetype(UnresolvedType &type);
-
 public:
   /// Try to resolve the equivalence class of the given type.
   ///

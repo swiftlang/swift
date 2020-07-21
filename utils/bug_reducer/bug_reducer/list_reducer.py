@@ -12,8 +12,8 @@ TESTRESULTS = set([TESTRESULT_NOFAILURE, TESTRESULT_KEEPSUFFIX,
 class ListReducer(object):
     """Reduce lists of objects. Inspired by llvm bugpoint"""
 
-    def __init__(self, l):
-        self.target_list = l
+    def __init__(self, lst):
+        self.target_list = lst
         # Maximal number of allowed splitting iterations,
         # before the elements are randomly shuffled.
         self.max_iters_without_progress = 3

@@ -28,6 +28,7 @@
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
@@ -2065,8 +2066,8 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
   if (value.getType() == opaqueTL.getLoweredType())
     return RValue(SGF, E, value);
 
-  auto cast = SGF.B.createUncheckedBitCast(E, value.forward(SGF),
-                                           opaqueTL.getLoweredType());
+  auto cast = SGF.B.createUncheckedReinterpretCast(E, value.forward(SGF),
+                                                   opaqueTL.getLoweredType());
   value = SGF.emitManagedRValueWithCleanup(cast);
 
   return RValue(SGF, E, value);
@@ -2108,7 +2109,8 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
 }
 
 ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
-                                      VarargsInfo &&varargs) {
+                                      VarargsInfo &&varargs,
+                                      unsigned numElements) {
   // Kill the abort cleanup.
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
@@ -2117,6 +2119,14 @@ ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
   if (array.hasCleanup())
     SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Active);
 
+  // Array literals only need to be finalized, if the array is really allocated.
+  // In case of zero elements, no allocation is done, but the empty-array
+  // singleton is used. "Finalization" means to emit an end_cow_mutation
+  // instruction on the array. As the empty-array singleton is a read-only and
+  // shared object, it's not legal to do a end_cow_mutation on it.
+  if (numElements == 0)
+    return array;
+    
   return SGF.emitUninitializedArrayFinalization(loc, std::move(array));
 }
 
@@ -3761,12 +3771,12 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
 RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   switch (E->getKind()) {
-  case MagicIdentifierLiteralExpr::File:
-  case MagicIdentifierLiteralExpr::FilePath:
-  case MagicIdentifierLiteralExpr::Function:
-  case MagicIdentifierLiteralExpr::Line:
-  case MagicIdentifierLiteralExpr::Column:
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+  case MagicIdentifierLiteralExpr::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
     return SGF.emitLiteral(E, C);
+    
   case MagicIdentifierLiteralExpr::DSOHandle: {
     auto SILLoc = SILLocation(E);
     auto UnsafeRawPointer = SGF.getASTContext().getUnsafeRawPointerDecl();
@@ -3869,7 +3879,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
   RValue array(SGF, loc, arrayType,
-             emitEndVarargs(SGF, loc, std::move(varargsInfo)));
+        emitEndVarargs(SGF, loc, std::move(varargsInfo), E->getNumElements()));
 
   array = scope.popPreservingValue(std::move(array));
 

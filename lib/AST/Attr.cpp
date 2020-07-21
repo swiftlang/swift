@@ -1052,7 +1052,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@derivative");
     Printer << "(of: ";
     auto *attr = cast<DerivativeAttr>(this);
-    Printer << attr->getOriginalFunctionName().Name;
+    if (auto *baseType = attr->getBaseTypeRepr())
+      baseType->print(Printer, Options);
+    attr->getOriginalFunctionName().print(Printer);
     auto *derivative = cast<AbstractFunctionDecl>(D);
     auto diffParamsString = getDifferentiationParametersClauseString(
         derivative, attr->getParameterIndices(), attr->getParsedParameters(),
@@ -1067,7 +1069,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@transpose");
     Printer << "(of: ";
     auto *attr = cast<TransposeAttr>(this);
-    Printer << attr->getOriginalFunctionName().Name;
+    if (auto *baseType = attr->getBaseTypeRepr())
+      baseType->print(Printer, Options);
+    attr->getOriginalFunctionName().print(Printer);
     auto *transpose = cast<AbstractFunctionDecl>(D);
     auto transParamsString = getDifferentiationParametersClauseString(
         transpose, attr->getParameterIndices(), attr->getParsedParameters(),
@@ -1717,6 +1721,12 @@ GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
   if (auto derivativeGenSig = getDerivativeGenericSignature())
     return derivativeGenSig->getGenericEnvironment();
   return original->getGenericEnvironment();
+}
+
+void DeclNameRefWithLoc::print(ASTPrinter &Printer) const {
+  Printer << Name;
+  if (AccessorKind)
+    Printer << '.' << getAccessorLabel(*AccessorKind);
 }
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,

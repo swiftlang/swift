@@ -16,8 +16,8 @@ import swift_tools
 
 class ReduceMiscompilingPasses(list_reducer.ListReducer):
 
-    def __init__(self, l, invoker):
-        list_reducer.ListReducer.__init__(self, l)
+    def __init__(self, lst, invoker):
+        list_reducer.ListReducer.__init__(self, lst)
         self.invoker = invoker
 
     def run_test(self, prefix, suffix):

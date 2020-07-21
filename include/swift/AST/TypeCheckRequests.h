@@ -1836,7 +1836,8 @@ enum class FunctionBuilderBodyPreCheck : uint8_t {
 
 class PreCheckFunctionBuilderRequest
     : public SimpleRequest<PreCheckFunctionBuilderRequest,
-                           FunctionBuilderBodyPreCheck(AnyFunctionRef),
+                           FunctionBuilderBodyPreCheck(AnyFunctionRef,
+                                                       BraceStmt *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1845,8 +1846,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  FunctionBuilderBodyPreCheck
-  evaluate(Evaluator &evaluator, AnyFunctionRef fn) const;
+  FunctionBuilderBodyPreCheck evaluate(Evaluator &evaluator, AnyFunctionRef fn,
+                                       BraceStmt *body) const;
 
 public:
   // Separate caching.
@@ -2192,7 +2193,7 @@ public:
 /// property in a `Differentiable`-conforming type.
 class TangentStoredPropertyRequest
     : public SimpleRequest<TangentStoredPropertyRequest,
-                           TangentPropertyInfo(VarDecl *),
+                           TangentPropertyInfo(VarDecl *, CanType),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2201,8 +2202,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  TangentPropertyInfo evaluate(Evaluator &evaluator,
-                               VarDecl *originalField) const;
+  TangentPropertyInfo evaluate(Evaluator &evaluator, VarDecl *originalField,
+                               CanType parentType) const;
 
 public:
   // Caching.
@@ -2444,7 +2445,7 @@ public:
 
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
-                           Type(TypeResolution *, TypeRepr *),
+                           Type(const TypeResolution *, TypeRepr *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2457,7 +2458,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, TypeResolution *resolution,
+  Type evaluate(Evaluator &evaluator, const TypeResolution *resolution,
                 TypeRepr *repr) const;
 };
 
@@ -2562,6 +2563,23 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+};
+
+class SynthesizeMainFunctionRequest
+    : public SimpleRequest<SynthesizeMainFunctionRequest,
+                           FuncDecl *(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  FuncDecl *evaluate(Evaluator &evaluator, Decl *) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

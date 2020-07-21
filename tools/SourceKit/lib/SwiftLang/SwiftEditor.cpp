@@ -659,7 +659,7 @@ public:
   }
 
 private:
-  std::vector<SwiftSemanticToken> getSemanticTokens(
+  std::vector<SwiftSemanticToken> takeSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
 
   Optional<std::vector<DiagnosticEntryInfo>> getSemanticDiagnostics(
@@ -760,12 +760,12 @@ void SwiftDocumentSemanticInfo::readSemanticInfo(
 
   llvm::sys::ScopedLock L(Mtx);
 
-  Tokens = getSemanticTokens(NewSnapshot);
+  Tokens = takeSemanticTokens(NewSnapshot);
   Diags = getSemanticDiagnostics(NewSnapshot, ParserDiags);
 }
 
 std::vector<SwiftSemanticToken>
-SwiftDocumentSemanticInfo::getSemanticTokens(
+SwiftDocumentSemanticInfo::takeSemanticTokens(
     ImmutableTextSnapshotRef NewSnapshot) {
 
   llvm::sys::ScopedLock L(Mtx);
@@ -773,15 +773,13 @@ SwiftDocumentSemanticInfo::getSemanticTokens(
   if (SemaToks.empty())
     return {};
 
-  auto result = SemaToks;
-
   // Adjust the position of the tokens.
   TokSnapshot->foreachReplaceUntil(NewSnapshot,
     [&](ReplaceImmutableTextUpdateRef Upd) -> bool {
-      if (result.empty())
+      if (SemaToks.empty())
         return false;
 
-      auto ReplaceBegin = std::lower_bound(result.begin(), result.end(),
+      auto ReplaceBegin = std::lower_bound(SemaToks.begin(), SemaToks.end(),
           Upd->getByteOffset(),
           [&](const SwiftSemanticToken &Tok, unsigned StartOffset) -> bool {
             return Tok.ByteOffset+Tok.Length < StartOffset;
@@ -791,7 +789,7 @@ SwiftDocumentSemanticInfo::getSemanticTokens(
       if (Upd->getLength() == 0) {
         ReplaceEnd = ReplaceBegin;
       } else {
-        ReplaceEnd = std::upper_bound(ReplaceBegin, result.end(),
+        ReplaceEnd = std::upper_bound(ReplaceBegin, SemaToks.end(),
             Upd->getByteOffset() + Upd->getLength(),
             [&](unsigned EndOffset, const SwiftSemanticToken &Tok) -> bool {
               return EndOffset < Tok.ByteOffset;
@@ -802,14 +800,14 @@ SwiftDocumentSemanticInfo::getSemanticTokens(
       int Delta = InsertLen - Upd->getLength();
       if (Delta != 0) {
         for (std::vector<SwiftSemanticToken>::iterator
-               I = ReplaceEnd, E = result.end(); I != E; ++I)
+               I = ReplaceEnd, E = SemaToks.end(); I != E; ++I)
           I->ByteOffset += Delta;
       }
-      result.erase(ReplaceBegin, ReplaceEnd);
+      SemaToks.erase(ReplaceBegin, ReplaceEnd);
       return true;
     });
 
-  return result;
+  return std::move(SemaToks);
 }
 
 Optional<std::vector<DiagnosticEntryInfo>>
@@ -2129,23 +2127,10 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
 }
 
-bool isReturningVoid(const SourceManager &SM, CharSourceRange Range) {
-  if (Range.isInvalid())
-    return false;
-  StringRef Text = SM.extractText(Range);
-  return "()" == Text || "Void" == Text;
-}
-
 static void
 printClosureBody(const PlaceholderExpansionScanner::ClosureInfo &closure,
                  llvm::raw_ostream &OS, const SourceManager &SM) {
-  bool ReturningVoid = isReturningVoid(SM, closure.ReturnTypeRange);
-
-  bool HasSignature = !closure.Params.empty() ||
-                      (closure.ReturnTypeRange.isValid() && !ReturningVoid);
   bool FirstParam = true;
-  if (HasSignature)
-    OS << "(";
   for (auto &Param : closure.Params) {
     if (!FirstParam)
       OS << ", ";
@@ -2153,30 +2138,19 @@ printClosureBody(const PlaceholderExpansionScanner::ClosureInfo &closure,
     if (Param.NameRange.isValid()) {
       // If we have a parameter name, just output the name as is and skip
       // the type. For example:
-      // <#(arg1: Int, arg2: Int)#> turns into (arg1, arg2).
+      // <#(arg1: Int, arg2: Int)#> turns into '{ arg1, arg2 in'.
       OS << SM.extractText(Param.NameRange);
     } else {
       // If we only have the parameter type, output the type as a
       // placeholder. For example:
-      // <#(Int, Int)#> turns into (<#Int#>, <#Int#>).
+      // <#(Int, Int)#> turns into '{ <#Int#>, <#Int#> in'.
       OS << "<#";
       OS << SM.extractText(Param.TypeRange);
       OS << "#>";
     }
   }
-  if (HasSignature)
-    OS << ") ";
-  if (closure.ReturnTypeRange.isValid()) {
-    auto ReturnTypeText = SM.extractText(closure.ReturnTypeRange);
-
-    // We need return type if it is not Void.
-    if (!ReturningVoid) {
-      OS << "-> ";
-      OS << ReturnTypeText << " ";
-    }
-  }
-  if (HasSignature)
-    OS << "in";
+  if (!FirstParam)
+    OS << " in";
   OS << "\n" << getCodePlaceholder() << "\n";
 }
 

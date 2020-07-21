@@ -58,7 +58,7 @@ class SerializedModuleLoaderBase : public ModuleLoader {
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
 
-  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> OrphanedMemoryBuffers;
+  SmallVector<std::unique_ptr<ModuleFile>, 2> OrphanedModuleFiles;
 
 protected:
   ASTContext &Ctx;
@@ -201,9 +201,16 @@ public:
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
 
-  virtual std::string getUpToDateCompiledModuleForInterface(StringRef moduleName,
-                                                      StringRef interfacePath) {
-    return std::string();
+  virtual std::vector<std::string>
+  getCompiledModuleCandidatesForInterface(StringRef moduleName,
+                                          StringRef interfacePath) {
+    return std::vector<std::string>();
+  }
+  virtual bool tryEmitForwardingModule(StringRef moduleName,
+                                       StringRef interfacePath,
+                                       ArrayRef<std::string> candidates,
+                                       StringRef outPath) {
+    return false;
   }
 };
 

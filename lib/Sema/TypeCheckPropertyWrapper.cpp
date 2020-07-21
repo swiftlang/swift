@@ -292,42 +292,6 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
   return subscript;
 }
 
-/// Whether the argument with label 'argumentLabel' in the initializer 'init'
-/// is an escaping autoclosure argument.
-static bool isEscapingAutoclosureArgument(const ConstructorDecl *init,
-                                          Identifier argumentLabel) {
-  if (!init)
-    return false;
-
-  Optional<size_t> parameterIndex = None;
-  auto params = init->getParameters();
-  for (size_t i = 0; i < params->size(); ++i) {
-    if (params->get(i)->getArgumentName() == argumentLabel) {
-      parameterIndex = i;
-      break;
-    }
-  }
-
-  if (!parameterIndex.hasValue())
-    return false;
-
-  size_t paramIndex = parameterIndex.getValue();
-  if (!params->get(paramIndex)->isAutoClosure())
-    return false;
-
-  if (auto initTy = init->getInterfaceType()->getAs<AnyFunctionType>()) {
-    if (auto funcTy = initTy->getResult()->getAs<FunctionType>()) {
-      if (funcTy->getNumParams() > paramIndex) {
-        Type paramTy = funcTy->getParams()[paramIndex].getPlainType();
-        if (auto paramFuncTy = paramTy->getAs<FunctionType>())
-          return !paramFuncTy->isNoEscape();
-      }
-    }
-  }
-
-  return false;
-}
-
 PropertyWrapperTypeInfo
 PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
@@ -356,14 +320,10 @@ PropertyWrapperTypeInfoRequest::evaluate(
   if (auto init = findSuitableWrapperInit(ctx, nominal, valueVar,
                               PropertyWrapperInitKind::WrappedValue, decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasWrappedValueInit;
-    result.isWrappedValueInitUsingEscapingAutoClosure =
-      isEscapingAutoclosureArgument(init, ctx.Id_wrappedValue);
   } else if (auto init = findSuitableWrapperInit(
                ctx, nominal, valueVar, PropertyWrapperInitKind::InitialValue,
                decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasInitialValueInit;
-    result.isWrappedValueInitUsingEscapingAutoClosure =
-      isEscapingAutoclosureArgument(init, ctx.Id_initialValue);
 
     if (init->getLoc().isValid()) {
       auto diag = init->diagnose(diag::property_wrapper_init_initialValue);
@@ -577,9 +537,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!rawType || rawType->hasError())
     return Type();
 
-  if (!rawType->hasUnboundGenericType())
-    return rawType->mapTypeOutOfContext();
-
   auto binding = var->getParentPatternBinding();
   if (!binding)
     return Type();
@@ -592,72 +549,23 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))
       TypeChecker::typeCheckPatternBinding(binding, index);
+  } else {
+    using namespace constraints;
+    auto dc = var->getInnermostDeclContext();
+    ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
+    auto target = SolutionApplicationTarget::forUninitializedWrappedVar(var);
+    auto solutions = cs.solve(target, FreeTypeVariableBinding::Disallow);
 
-    ASTContext &ctx = var->getASTContext();
-    Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
-    assert(type || ctx.Diags.hadAnyError());
-    return type;
-  }
-
-  // Compute the type of the property to plug in to the wrapper type.
-  Type propertyType = var->getType();
-  if (propertyType->hasError())
-    return Type();
-
-  using namespace constraints;
-  auto dc = var->getInnermostDeclContext();
-  ConstraintSystem cs(dc, None);
-  auto emptyLocator = cs.getConstraintLocator({});
-  
-  auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  Type valueMemberType;
-  Type outermostOpenedWrapperType;
-  for (unsigned i : indices(wrapperAttrs)) {
-    Type rawWrapperType = var->getAttachedPropertyWrapperType(i);
-    if (!rawWrapperType)
+    if (!solutions || !cs.applySolution(solutions->front(), target)) {
+      var->setInvalid();
       return Type();
-    
-    // Open the type.
-    Type openedWrapperType =
-      cs.openUnboundGenericTypes(rawWrapperType, emptyLocator);
-    if (!outermostOpenedWrapperType)
-      outermostOpenedWrapperType = openedWrapperType;
-    
-    // If we already have a value member type, it must be equivalent to
-    // this opened wrapper type.
-    if (valueMemberType) {
-      cs.addConstraint(ConstraintKind::Equal, valueMemberType,
-                       openedWrapperType, emptyLocator);
     }
-    
-    // Retrieve the type of the wrapped value.
-    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-    if (!wrapperInfo)
-      return Type();
-
-    valueMemberType = openedWrapperType->getTypeOfMember(
-        dc->getParentModule(), wrapperInfo.valueVar);
-  }
-  
-  // The resulting value member type must be equivalent to the property
-  // type.
-  cs.addConstraint(ConstraintKind::Equal, valueMemberType,
-                   propertyType, emptyLocator);
-
-  SmallVector<Solution, 4> solutions;
-  if (cs.solve(solutions) || solutions.size() != 1) {
-    var->diagnose(diag::property_wrapper_incompatible_property,
-                  propertyType, rawType);
-    var->setInvalid();
-    if (auto nominalWrapper = rawType->getAnyNominal()) {
-      nominalWrapper->diagnose(diag::property_wrapper_declared_here,
-                               nominalWrapper->getName());
-    }
-    return Type();
   }
 
-  Type wrapperType = solutions.front().simplifyType(outermostOpenedWrapperType);
-  return wrapperType->mapTypeOutOfContext();
+  ASTContext &ctx = var->getASTContext();
+  Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
+  assert(type || ctx.Diags.hadAnyError());
+  return type;
 }
 
 Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
@@ -686,18 +594,6 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
   return wrappedValueType;
 }
 
-static bool isOpaquePlaceholderClosure(const Expr *value) {
-  auto *placeholder = dyn_cast<PropertyWrapperValuePlaceholderExpr>(value);
-  if (!placeholder)
-    return false;
-
-  if (auto valueFnTy = placeholder->getType()->getAs<FunctionType>()) {
-    return (valueFnTy->getNumParams() == 0);
-  }
-
-  return false;
-}
-
 Expr *swift::buildPropertyWrapperWrappedValueCall(
     VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
     llvm::function_ref<void(ApplyExpr *)> innermostInitCallback) {
@@ -706,13 +602,7 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
   ApplyExpr *innermostInit = nullptr;
-  if (var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure() &&
-      isOpaquePlaceholderClosure(value)) {
-    // We can't pass the opaque closure directly as an autoclosure arg.
-    // So we instead pass a CallExpr calling the opaque closure, which
-    // the type checker shall wrap in an AutoClosureExpr.
-    initializer = CallExpr::createImplicit(ctx, value, {}, {});
-  }
+
   for (unsigned i : llvm::reverse(indices(wrapperAttrs))) {
     Type wrapperType =
       backingStorageType ? computeWrappedValueType(var, backingStorageType, i)

@@ -37,9 +37,9 @@ def run_parallel(fn, pool_args, n_processes=0):
     parallel implementation.
     """
 
-    def init(l):
+    def init(lck):
         global lock
-        lock = l
+        lock = lck
 
     if n_processes == 0:
         n_processes = cpu_count() * 2

@@ -17,7 +17,7 @@
 
 /// Serialize and deserialize this module, then print.
 // RUN: %target-swift-frontend -emit-module %s -emit-module-path %t/merged-partial.swiftmodule -swift-version 5 -I %t -module-name merged -enable-library-evolution
-// RUN: %target-swift-frontend -merge-modules %t/merged-partial.swiftmodule -module-name merged -sil-merge-partial-modules -emit-module -emit-module-path %t/merged.swiftmodule -I %t -emit-module-interface-path %t/merged.swiftinterface -emit-private-module-interface-path %t/merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
+// RUN: %target-swift-frontend -merge-modules %t/merged-partial.swiftmodule -module-name merged -emit-module -emit-module-path %t/merged.swiftmodule -I %t -emit-module-interface-path %t/merged.swiftinterface -emit-private-module-interface-path %t/merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
 // RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/merged.swiftinterface
 // RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/merged.private.swiftinterface
 
@@ -86,6 +86,58 @@ private class PrivateClassLocal {}
   @_spi(LocalSPI) public func extensionSPIMethod() {}
   // CHECK-PRIVATE: @_spi(LocalSPI) public func extensionSPIMethod()
   // CHECK-PUBLIC-NOT: extensionSPIMethod
+}
+
+@propertyWrapper
+public struct Wrapper<T> {
+  public var value: T
+
+  public var wrappedValue: T {
+    get { value }
+    set { value = newValue }
+  }
+}
+
+@propertyWrapper
+public struct WrapperWithInitialValue<T> {
+  private var value: T
+
+  public var wrappedValue: T {
+    get { value }
+    set { value = newValue }
+  }
+
+  public var projectedValue: Wrapper<T> {
+    get { Wrapper(value: value) }
+    set { value = newValue.value }
+  }
+}
+
+public class SomeClass {
+}
+
+public struct PublicStruct {
+  @_spi(S) @Wrapper public var spiWrappedSimple: SomeClass
+  // CHECK-PRIVATE: @_spi(S) @{{.*}}.Wrapper public var spiWrappedSimple: {{.*}}.SomeClass
+  // CHECK-PUBLIC-NOT: spiWrappedSimple
+
+  @_spi(S) @WrapperWithInitialValue public var spiWrappedDefault: SomeClass
+  // CHECK-PRIVATE: @_spi(S) @{{.*}}.WrapperWithInitialValue @_projectedValueProperty($spiWrappedDefault) public var spiWrappedDefault: {{.*}}.SomeClass
+  // CHECK-PRIVATE: @_spi(S) public var $spiWrappedDefault: {{.*}}.Wrapper<{{.*}}.SomeClass>
+  // CHECK-PUBLIC-NOT: spiWrappedDefault
+}
+
+@_spi(LocalSPI) public protocol SPIProto3 {
+// CHECK-PRIVATE: @_spi(LocalSPI) public protocol SPIProto3
+// CHECK-PUBLIC-NOT: SPIProto3
+
+  associatedtype AssociatedType
+  // CHECK-PRIVATE: {{^}}  associatedtype AssociatedType
+  // CHECK-PUBLIC-NOT: AssociatedType
+
+  func implicitSPIMethod()
+  // CHECK-PRIVATE: @_spi(LocalSPI) func implicitSPIMethod()
+  // CHECK-PUBLIC-NOT: implicitSPIMethod
 }
 
 // Test the dummy conformance printed to replace private types used in

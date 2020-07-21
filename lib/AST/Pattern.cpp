@@ -48,7 +48,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "prefix 'is' pattern";
   case PatternKind::Expr:
     return OS << "expression pattern";
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return OS << "'var' binding pattern";
   case PatternKind::EnumElement:
     return OS << "enum case matching pattern";
@@ -214,7 +214,7 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
 
   case PatternKind::Paren:
   case PatternKind::Typed:
-  case PatternKind::Var:
+  case PatternKind::Binding:
     return getSemanticsProvidingPattern()->forEachVariable(fn);
 
   case PatternKind::Tuple:
@@ -262,8 +262,8 @@ void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
     return cast<ParenPattern>(this)->getSubPattern()->forEachNode(f);
   case PatternKind::Typed:
     return cast<TypedPattern>(this)->getSubPattern()->forEachNode(f);
-  case PatternKind::Var:
-    return cast<VarPattern>(this)->getSubPattern()->forEachNode(f);
+  case PatternKind::Binding:
+    return cast<BindingPattern>(this)->getSubPattern()->forEachNode(f);
 
   case PatternKind::Tuple:
     for (auto elt : cast<TuplePattern>(this)->getElements())

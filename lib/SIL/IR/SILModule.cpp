@@ -427,11 +427,6 @@ bool SILModule::hasFunction(StringRef Name) {
   return getSILLoader()->hasSILFunction(Name);
 }
 
-void SILModule::linkAllFromCurrentModule() {
-  getSILLoader()->getAllForModule(getSwiftModule()->getName(),
-                                  /*PrimaryFile=*/nullptr);
-}
-
 void SILModule::invalidateSILLoaderCaches() {
   getSILLoader()->invalidateCaches();
 }

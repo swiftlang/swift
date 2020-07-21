@@ -14,6 +14,7 @@
 // RUN: %lldb-moduleimport-test -verbose %t/ASTSection.dylib | %FileCheck %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 // CHECK: - Swift Version: {{.+}}.{{.+}}
 // CHECK: - Compatibility Version: 4

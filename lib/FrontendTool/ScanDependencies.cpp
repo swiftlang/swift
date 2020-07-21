@@ -339,6 +339,17 @@ static void writeJSON(llvm::raw_ostream &out,
         }
         out.indent(5 * 2);
         out << "],\n";
+        out.indent(5 * 2);
+        out << "\"compiledModuleCandidates\": [\n";
+        for (auto &candidate: swiftDeps->compiledModuleCandidates) {
+          out.indent(6 * 2);
+          out << "\"" << candidate << "\"";
+          if (&candidate != &swiftDeps->compiledModuleCandidates.back())
+            out << ",";
+          out << "\n";
+        }
+        out.indent(5 * 2);
+        out << "],\n";
       } else if (!swiftDeps->compiledModulePath.empty()) {
         writeJSONSingleField(
             out, "compiledModulePath",

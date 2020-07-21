@@ -1620,6 +1620,9 @@ public:
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand());
+  }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
@@ -2915,12 +2918,10 @@ printSILCoverageMaps(SILPrintContext &Ctx,
     M->print(Ctx);
 }
 
-using MagicFileStringMap =
-    llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
+using FileIDMap = llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>;
 
-static void
-printMagicFileStringMapEntry(SILPrintContext &Ctx,
-                             const MagicFileStringMap::MapEntryTy &entry) {
+static void printFileIDMapEntry(SILPrintContext &Ctx,
+                                const FileIDMap::MapEntryTy &entry) {
   auto &OS = Ctx.OS();
   OS << "//   '" << std::get<0>(entry.second)
      << "' => '" << entry.first() << "'";
@@ -2931,12 +2932,11 @@ printMagicFileStringMapEntry(SILPrintContext &Ctx,
   OS << "\n";
 }
 
-static void printMagicFileStringMap(SILPrintContext &Ctx,
-                                    const MagicFileStringMap map) {
+static void printFileIDMap(SILPrintContext &Ctx, const FileIDMap map) {
   if (map.empty())
     return;
 
-  Ctx.OS() << "\n\n// Mappings from '#file' to '#filePath':\n";
+  Ctx.OS() << "\n\n// Mappings from '#fileID' to '#filePath':\n";
 
   if (Ctx.sortSIL()) {
     llvm::SmallVector<llvm::StringRef, 16> keys;
@@ -2959,10 +2959,10 @@ static void printMagicFileStringMap(SILPrintContext &Ctx,
     });
 
     for (auto key : keys)
-      printMagicFileStringMapEntry(Ctx, *map.find(key));
+      printFileIDMapEntry(Ctx, *map.find(key));
   } else {
     for (const auto &entry : map)
-      printMagicFileStringMapEntry(Ctx, entry);
+      printFileIDMapEntry(Ctx, entry);
   }
 }
 
@@ -3081,8 +3081,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
 
   if (M)
-    printMagicFileStringMap(
-        PrintCtx, M->computeMagicFileStringMap(/*shouldDiagnose=*/false));
+    printFileIDMap(
+        PrintCtx, M->computeFileIDMap(/*shouldDiagnose=*/false));
 
   OS << "\n\n";
 }
