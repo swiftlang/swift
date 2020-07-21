@@ -209,23 +209,26 @@ static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,
   // If diagnostics are enabled, first emit the main diagnostic and then loop
   // through our arguments and allow the arguments to add additional diagnostics
   // if they want.
-  if (diagEnabled) {
-    auto &Diags = module.getASTContext().Diags;
-    Diags.diagnose(remark.getLocation(), id,
-                   remark.getMsg());
-    for (auto &arg : remark.getArgs()) {
-      switch (arg.key.kind) {
-      case ArgumentKeyKind::Default:
-        continue;
-      case ArgumentKeyKind::Note:
-        Diags.diagnose(arg.loc, diag::opt_remark_note,
-                       arg.key.data);
-        continue;
-      }
+  if (!diagEnabled)
+    return;
 
-      llvm_unreachable("Unhandled case?!");
-    }
-  }
+  auto &de = module.getASTContext().Diags;
+  de.diagnoseWithNotes(
+      de.diagnose(remark.getLocation(), id, remark.getMsg()), [&]() {
+        for (auto &arg : remark.getArgs()) {
+          switch (arg.key.kind) {
+          case ArgumentKeyKind::Default:
+            continue;
+          case ArgumentKeyKind::Note:
+            de.diagnose(arg.loc, diag::opt_remark_note, arg.val);
+            continue;
+          case ArgumentKeyKind::ParentLocNote:
+            de.diagnose(remark.getLocation(), diag::opt_remark_note, arg.val);
+            continue;
+          }
+          llvm_unreachable("Unhandled case?!");
+        }
+      });
 }
 
 void Emitter::emit(const RemarkPassed &remark) {

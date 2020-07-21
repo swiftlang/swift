@@ -41,6 +41,15 @@ struct ArgumentKeyKind {
     // diagnostic when emitting diagnostics. Do nothing special
     // along the backend path.
     Note,
+
+    // Assume that this is a note that should be emitted as a separate
+    // diagnostic but that doesn't have its own source loc: we should reuse the
+    // one for the original remark.
+    //
+    // This is intended to be used in situations where one needs to emit a
+    // "note" warning due to us not being able to infer a part of our
+    // opt-remark.
+    ParentLocNote,
   };
 
   InnerTy innerValue;
@@ -60,6 +69,7 @@ struct ArgumentKeyKind {
     case InnerTy::Default:
       return false;
     case InnerTy::Note:
+    case InnerTy::ParentLocNote:
       return true;
     }
 
