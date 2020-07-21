@@ -120,6 +120,9 @@ struct Argument {
   Argument(ArgumentKey key, StringRef msg, const ValueDecl *decl)
       : key(key), val(msg), loc(decl->getLoc()) {}
 
+  Argument(ArgumentKey key, llvm::Twine &&twine, const SILInstruction *i)
+      : key(key), val(twine.str()), loc(i->getLoc().getSourceLoc()) {}
+
   /// Given a value, call \p funcPassedInferredArgs for each associated
   /// ValueDecl that is associated with \p value. All created Arguments are
   /// passed the same StringRef. To stop iteration, return false in \p

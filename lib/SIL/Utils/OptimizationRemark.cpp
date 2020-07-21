@@ -88,26 +88,58 @@ bool Argument::inferArgumentsForValue(
         return funcPassedInferedArgs(
             Argument({keyKind, "InferredValue"}, msg, decl));
 
-    // Otherwise, look for debug_values.
-    for (auto *use : getDebugUses(value))
-      if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-        if (auto *decl = dvi->getDecl())
-          if (!funcPassedInferedArgs(
-                  Argument({keyKind, "InferredValue"}, msg, decl)))
-            return false;
-
-    // If we have a load, look through it and continue. We may have a global or
-    // a function argument.
-    if (auto *li = dyn_cast<LoadInst>(value)) {
-      value = stripAccessMarkers(li->getOperand());
-      continue;
-    }
-
+    // Then handle globals.
     if (auto *ga = dyn_cast<GlobalAddrInst>(value))
       if (auto *decl = ga->getReferencedGlobal()->getDecl())
         if (!funcPassedInferedArgs(
                 Argument({keyKind, "InferredValue"}, msg, decl)))
           return false;
+
+    // Then visit our users.
+    for (auto *use : value->getUses()) {
+      if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
+        if (auto *decl = dvi->getDecl())
+          if (!funcPassedInferedArgs(
+                  Argument({keyKind, "InferredValue"}, msg, decl)))
+            return false;
+        continue;
+      }
+
+      // See if this value is associated with a vararg parameter. If so, just
+      // emit that the value is a temporary var arg. We do not use the passed in
+      // msg since there isn't a decl that we can provide.
+      if (auto fas = FullApplySite::isa(use->getUser())) {
+        if (fas.isVariadic(*use)) {
+          std::string msg;
+          {
+            llvm::raw_string_ostream stream(msg);
+            stream << "on variadic argument array for argument ";
+            stream << fas.getAppliedArgIndex(*use) << ":";
+          }
+
+          if (!funcPassedInferedArgs(Argument(
+                  {ArgumentKeyKind::Note, "InferredValue"},
+                  llvm::Twine() + std::move(msg), fas.getInstruction())))
+            return false;
+        }
+        continue;
+      }
+    }
+
+    // Finally, if we have a load, look through it and continue. We may have a
+    // global or a function argument.
+    //
+    // NOTE: This needs to run /after/ we have performed all of our user checks
+    // since checking users is a CFG downwards action and stripping off a load
+    // is an upwards move in the CFG graph meaning we would never visit such
+    // users.
+    //
+    // TODO: We should be able to build up an access path to give a nicer error
+    // that has a base value and a projection path like DI does.
+    if (auto *li = dyn_cast<LoadInst>(value)) {
+      value = stripAccessMarkers(li->getOperand());
+      continue;
+    }
 
     return true;
   }
