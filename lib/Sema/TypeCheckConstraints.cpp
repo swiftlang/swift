@@ -1995,6 +1995,33 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
+void constraints::performSyntacticDiagnosticsForTarget(
+    const SolutionApplicationTarget &target, bool isExprStmt) {
+  auto *dc = target.getDeclContext();
+  switch (target.kind) {
+  case SolutionApplicationTarget::Kind::expression: {
+    // First emit diagnostics for the main expression.
+    performSyntacticExprDiagnostics(target.getAsExpr(), dc, isExprStmt);
+
+    // If this is a for-in statement, we also need to check the where clause if
+    // present.
+    if (target.isForEachStmt()) {
+      if (auto *whereExpr = target.getForEachStmtInfo().whereExpr)
+        performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
+    }
+    return;
+  }
+  case SolutionApplicationTarget::Kind::function:
+  case SolutionApplicationTarget::Kind::stmtCondition:
+  case SolutionApplicationTarget::Kind::caseLabelItem:
+  case SolutionApplicationTarget::Kind::patternBinding:
+  case SolutionApplicationTarget::Kind::uninitializedWrappedVar:
+    // Nothing to do for these.
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       Type convertType,
@@ -2096,7 +2123,7 @@ TypeChecker::typeCheckExpression(
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
-    performSyntacticExprDiagnostics(result, dc, isExprStmt);
+    performSyntacticDiagnosticsForTarget(*resultTarget, isExprStmt);
   }
 
   resultTarget->setExpr(result);

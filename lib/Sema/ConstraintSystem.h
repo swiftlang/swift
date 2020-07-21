@@ -5596,6 +5596,11 @@ bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 /// statements that could produce non-void result.
 bool hasExplicitResult(ClosureExpr *closure);
 
+/// Emit diagnostics for syntactic restrictions within a given solution
+/// application target.
+void performSyntacticDiagnosticsForTarget(
+    const SolutionApplicationTarget &target, bool isExprStmt);
+
 } // end namespace constraints
 
 template<typename ...Args>
