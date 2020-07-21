@@ -102,6 +102,7 @@ class ExternalSwiftModuleStubScanner : public ModuleDependencyScanner {
   /// Scan the given external module map
   void parseExternalModuleMap(StringRef fileName);
   llvm::StringMap<ExplicitModuleInfo> ExternalDependencyModuleMap;
+  llvm::BumpPtrAllocator Allocator;
 
 public:
   ExternalSwiftModuleStubScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
@@ -139,17 +140,11 @@ public:
     this->dependencies = std::move(dependencies);
     return std::error_code{};
   }
-
-public:
-  static std::unique_ptr<ExternalSwiftModuleStubScanner>
-  create(ASTContext &ctx, DependencyTracker *tracker,
-         ModuleLoadingMode loadMode, StringRef ExternalDependencyModuleMap,
-         bool IgnoreSwiftSourceInfoFile);
 };
 } // namespace
 
 void ExternalSwiftModuleStubScanner::parseExternalModuleMap(StringRef fileName) {
-  ExplicitModuleMapParser parser(Ctx);
+  ExplicitModuleMapParser parser(Allocator);
   auto result =
       parser.parseSwiftExplicitModuleMap(fileName, ExternalDependencyModuleMap);
   if (result == std::errc::invalid_argument)
