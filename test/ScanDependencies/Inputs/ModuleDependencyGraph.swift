@@ -13,13 +13,13 @@ import Foundation
 
 enum ModuleDependencyId: Hashable {
   case swift(String)
-  case swiftExternal(String)
+  case swiftPlaceholder(String)
   case clang(String)
 
   var moduleName: String {
     switch self {
     case .swift(let name): return name
-    case .swiftExternal(let name): return name
+    case .swiftPlaceholder(let name): return name
     case .clang(let name): return name
     }
   }
@@ -28,7 +28,7 @@ enum ModuleDependencyId: Hashable {
 extension ModuleDependencyId: Codable {
   enum CodingKeys: CodingKey {
     case swift
-    case swiftExternal
+    case swiftPlaceholder
     case clang
   }
 
@@ -39,8 +39,8 @@ extension ModuleDependencyId: Codable {
       self = .swift(moduleName)
     } catch {
       do {
-        let moduleName =  try container.decode(String.self, forKey: .swiftExternal)
-        self = .swiftExternal(moduleName)
+        let moduleName =  try container.decode(String.self, forKey: .swiftPlaceholder)
+        self = .swiftPlaceholder(moduleName)
       } catch {
         let moduleName =  try container.decode(String.self, forKey: .clang)
         self = .clang(moduleName)
@@ -53,7 +53,7 @@ extension ModuleDependencyId: Codable {
     switch self {
       case .swift(let moduleName):
         try container.encode(moduleName, forKey: .swift)
-      case .swiftExternal(let moduleName):
+      case .swiftPlaceholder(let moduleName):
         try container.encode(moduleName, forKey: .swift)
       case .clang(let moduleName):
         try container.encode(moduleName, forKey: .clang)
@@ -93,7 +93,7 @@ struct SwiftModuleDetails: Codable {
 }
 
 /// Details specific to Swift external modules.
-struct SwiftExternalModuleDetails: Codable {
+struct swiftPlaceholderModuleDetails: Codable {
   /// The path to the .swiftModuleDoc file.
   var moduleDocPath: String?
 
@@ -135,7 +135,7 @@ struct ModuleDependencies: Codable {
 
     /// Swift external modules carry additional details that specify their
     /// module doc path and source info paths.
-    case swiftExternal(SwiftExternalModuleDetails)
+    case swiftPlaceholder(swiftPlaceholderModuleDetails)
 
     /// Clang modules are built from a module map file.
     case clang(ClangModuleDetails)
@@ -145,7 +145,7 @@ struct ModuleDependencies: Codable {
 extension ModuleDependencies.Details: Codable {
   enum CodingKeys: CodingKey {
     case swift
-    case swiftExternal
+    case swiftPlaceholder
     case clang
   }
 
@@ -156,8 +156,8 @@ extension ModuleDependencies.Details: Codable {
       self = .swift(details)
     } catch {
       do {
-        let details = try container.decode(SwiftExternalModuleDetails.self, forKey: .swiftExternal)
-        self = .swiftExternal(details)
+        let details = try container.decode(swiftPlaceholderModuleDetails.self, forKey: .swiftPlaceholder)
+        self = .swiftPlaceholder(details)
       } catch {
         let details = try container.decode(ClangModuleDetails.self, forKey: .clang)
         self = .clang(details)
@@ -170,8 +170,8 @@ extension ModuleDependencies.Details: Codable {
     switch self {
       case .swift(let details):
         try container.encode(details, forKey: .swift)
-      case .swiftExternal(let details):
-        try container.encode(details, forKey: .swiftExternal)
+      case .swiftPlaceholder(let details):
+        try container.encode(details, forKey: .swiftPlaceholder)
       case .clang(let details):
         try container.encode(details, forKey: .clang)
     }
