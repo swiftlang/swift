@@ -213,7 +213,10 @@ public:
   
   bool isNull() const { return Ptr == 0; }
   
-  TypeBase *operator->() const { return Ptr; }
+  TypeBase *operator->() const {
+    assert(Ptr && "Cannot dereference a null Type!");
+    return Ptr;
+  }
   
   explicit operator bool() const { return Ptr != 0; }
 
@@ -530,7 +533,10 @@ public:                                                             \
   TYPE *getPointer() const {                                        \
     return static_cast<TYPE*>(Type::getPointer());                  \
   }                                                                 \
-  TYPE *operator->() const { return getPointer(); }                 \
+  TYPE *operator->() const {                                        \
+    assert(getPointer() && "Cannot dereference a null " #TYPE);     \
+    return getPointer();                                            \
+  }                                                                 \
   operator TYPE *() const { return getPointer(); }                  \
   explicit operator bool() const { return getPointer() != nullptr; }
 

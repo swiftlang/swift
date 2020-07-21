@@ -208,9 +208,6 @@ public:
                         DeclContext *dc, Type builderType,
                         Type bodyResultType)
       : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
-    assert((cs || !builderType->hasTypeVariable()) &&
-           "cannot handle builder type with type variables without "
-           "constraint system");
     builder = builderType->getAnyNominal();
     applied.builderType = builderType;
     applied.bodyResultType = bodyResultType;
@@ -1633,22 +1630,6 @@ ConstraintSystem::matchFunctionBuilder(
         return getTypeMatchFailure(locator);
       }
     }
-  }
-
-  // If the builder type has a type parameter, substitute in the type
-  // variables.
-  if (builderType->hasTypeParameter()) {
-    // Find the opened type for this callee and substitute in the type
-    // parametes.
-    for (const auto &opened : OpenedTypes) {
-      if (opened.first == calleeLocator) {
-        OpenedTypeMap replacements(opened.second.begin(),
-                                   opened.second.end());
-        builderType = openType(builderType, replacements);
-        break;
-      }
-    }
-    assert(!builderType->hasTypeParameter());
   }
 
   BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
