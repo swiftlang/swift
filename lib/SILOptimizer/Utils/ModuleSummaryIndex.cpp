@@ -94,6 +94,7 @@ void indexWitnessTable(ModuleSummaryIndex &index, SILWitnessTable &WT) {
 
     auto methodWitness = entry.getMethodWitness();
     auto Witness = methodWitness.Witness;
+    if (!Witness) continue;
     VirtualMethodSlot slot(methodWitness.Requirement, VirtualMethodSlot::KindTy::Witness);
     index.addImplementation(slot, getGUID(Witness->getName()));
   }

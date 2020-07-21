@@ -1066,6 +1066,9 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   }
 
   performSILInstCountIfNeeded(silModule);
+  if (runSILCrossModuleEliminatorPass(*silModule)) {
+    return true;
+  }
   return false;
 }
 

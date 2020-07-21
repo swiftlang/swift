@@ -1036,6 +1036,7 @@ void IRGenerator::emitGlobalTopLevel(
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
   for (auto &silFn : PrimaryIGM->getSILModule().getFunctions()) {
+    llvm::dbgs() << "[katei debug] SILFunction " << silFn.getName() << "\n";
     // Don't bother adding external declarations to the function order.
     if (!silFn.isDefinition()) continue;
     FunctionOrder.insert(std::make_pair(&silFn, nextOrderNumber++));
@@ -1223,6 +1224,7 @@ void IRGenerator::emitLazyDefinitions() {
     // Emit any lazy function definitions we require.
     while (!LazyFunctionDefinitions.empty()) {
       SILFunction *f = LazyFunctionDefinitions.pop_back_val();
+      llvm::dbgs() << "[katei debug] Emit lazy fn " << f->getName() << "\n";
       CurrentIGMPtr IGM = getGenModule(f);
       assert(!f->isPossiblyUsedExternally()
              && "function with externally-visible linkage emitted lazily?");

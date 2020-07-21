@@ -5535,7 +5535,6 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
            "Default witnesses must have witness_method representation.");
   }
 #endif
-    llvm::dbgs() << "End of SILDefaultWitnessTable::verify '" << getUniqueName() << "'\n";
 }
 
 /// Verify that a global variable follows invariants.

@@ -77,16 +77,19 @@
 
 // RUN: %target-swift-frontend -emit-sil %S/Inputs/module2.swift -parse-as-library -module-summary-path %t/merged-module.summary -I %t -O | %FileCheck %s --check-prefix DEADFUNC-MODULE2-CHECK
 
-// DEADFUNC-MODULE2-CHECK-DAG: @$s7module29Concrete1V12memberMethodyyF
-// DEADFUNC-MODULE2-CHECK-DAG: @$s7module29Concrete1V7module11PAadEP12memberMethodyyFTW
-// DEADFUNC-MODULE2-CHECK-DAG: @$s7module29Concrete2V12memberMethodyyF
-// DEADFUNC-MODULE2-CHECK-DAG: @$s7module29Concrete2V7module11PAadEP12memberMethodyyFTW
-// DEADFUNC-MODULE2-CHECK-DAG: @$s7module24usePyyx7module11PRzlF
+// DEADFUNC-MODULE2-CHECK-DAG: $s7module29Concrete1V12memberMethodyyF
+// DEADFUNC-MODULE2-CHECK-DAG: $s7module29Concrete1V7module11PAadEP12memberMethodyyFTW
+// DEADFUNC-MODULE2-CHECK-DAG: $s7module29Concrete2V12memberMethodyyF
+// DEADFUNC-MODULE2-CHECK-DAG: $s7module29Concrete2V7module11PAadEP12memberMethodyyFTW
+// DEADFUNC-MODULE2-CHECK-DAG: $s7module24usePyyx7module11PRzlF
 
-// DEADFUNC-MODULE2-CHECK-NOT: @$s7module29Concrete2V7module11PAadEP15defaultProvidedyyFTW
-// DEADFUNC-MODULE2-CHECK-NOT: @$s7module20A4FuncSiyF
-// DEADFUNC-MODULE2-CHECK-NOT: @$s7module29Concrete1V7module11PAadEP15defaultProvidedyyFTW
-// DEADFUNC-MODULE2-CHECK-NOT: @$s7module11PPAAE15defaultProvidedyyF
+// DEADFUNC-MODULE2-CHECK-NOT: $s7module29Concrete2V7module11PAadEP15defaultProvidedyyFTW
+// DEADFUNC-MODULE2-CHECK-NOT: $s7module20A4FuncSiyF
+// DEADFUNC-MODULE2-CHECK-NOT: $s7module29Concrete1V7module11PAadEP15defaultProvidedyyFTW
+// DEADFUNC-MODULE2-CHECK-NOT: $s7module11PPAAE15defaultProvidedyyF
+
+
+// RUN: %target-swift-frontend -emit-ir %S/Inputs/module2.swift -parse-as-library -module-summary-path %t/merged-module.summary -I %t -O | %FileCheck %s --check-prefix DEADFUNC-MODULE2-CHECK
 
 import module1
 import module2

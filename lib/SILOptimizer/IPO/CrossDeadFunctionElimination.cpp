@@ -42,10 +42,12 @@ public:
         return !info->isLive();
       });
     }
-    
-    
-    for (auto &WT : M.getWitnessTableList()) {
-      WT.clearMethods_if([&] (const SILWitnessTable::MethodWitness &MW) -> bool {
+  
+    auto &WitnessTables = M.getWitnessTableList();
+    for (auto WI = WitnessTables.begin(), EI = WitnessTables.end(); WI != EI;) {
+      SILWitnessTable *WT = &*WI;
+      ++WI;
+      WT->clearMethods_if([&] (const SILWitnessTable::MethodWitness &MW) -> bool {
         auto Impl = MW.Witness;
         auto &maybePair = TheSummary.getFunctionInfo(getGUID(Impl->getName()));
         if (!maybePair)
@@ -55,8 +57,13 @@ public:
       });
     }
 
-    for (auto &WT : M.getDefaultWitnessTables()) {
-      WT.clearMethods_if([&](SILFunction *MW) -> bool {
+    auto DefaultWitnessTables = M.getDefaultWitnessTables();
+    for (auto WI = DefaultWitnessTables.begin(),
+              EI = DefaultWitnessTables.end();
+         WI != EI;) {
+      SILDefaultWitnessTable *WT = &*WI;
+      ++WI;
+      WT->clearMethods_if([&](SILFunction *MW) -> bool {
         if (!MW)
           return false;
         auto &maybePair = TheSummary.getFunctionInfo(getGUID(MW->getName()));
@@ -68,7 +75,7 @@ public:
     }
   }
   
-  void eliminateDeadFunctions(SILModule &M) {
+  void eliminateDeadFunctions(SILModule &M, std::vector<SILFunction *> &DeadFunctions) {
     for (auto &pair : TheSummary) {
       auto &info = pair.second;
       if (info.TheSummary->isLive()) {
@@ -82,9 +89,7 @@ public:
         continue;
       }
       F->dropAllReferences();
-      notifyWillDeleteFunction(F);
-      M.eraseFunction(F);
-
+      DeadFunctions.push_back(F);
       llvm::dbgs() << "Eliminate " << info.Name << "\n";
     }
   }
@@ -159,9 +164,16 @@ public:
     auto &M = *getModule();
     this->ensurePreserved(M);
     this->eliminateDeadEntriesFromTables(M);
-    this->eliminateDeadFunctions(M);
+    std::vector<SILFunction *> DeadFunctions;
+    this->eliminateDeadFunctions(M, DeadFunctions);
+
+    while (!DeadFunctions.empty()) {
+      SILFunction *F = DeadFunctions.back();
+      DeadFunctions.pop_back();
+      notifyWillDeleteFunction(F);
+      M.eraseFunction(F);
+    }
     this->invalidateFunctionTables();
-    M.print(llvm::dbgs());
   }
 };
 
