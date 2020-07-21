@@ -19,6 +19,7 @@
 #include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
@@ -37,6 +38,24 @@ using namespace swift;
 using namespace constraints;
 
 namespace {
+
+/// Find the first #available condition within the statement condition,
+/// or return NULL if there isn't one.
+const StmtConditionElement *findAvailabilityCondition(StmtCondition stmtCond) {
+  for (const auto &cond : stmtCond) {
+    switch (cond.getKind()) {
+    case StmtConditionElement::CK_Boolean:
+    case StmtConditionElement::CK_PatternBinding:
+      continue;
+
+    case StmtConditionElement::CK_Availability:
+      return &cond;
+      break;
+    }
+  }
+
+  return nullptr;
+}
 
 /// Visitor to classify the contents of the given closure.
 class BuilderClosureVisitor
@@ -502,10 +521,20 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
+    // If there is a #available in the condition, the 'then' will need to
+    // be wrapped in a call to buildAvailabilityErasure(_:), if available.
+    Expr *thenVarRefExpr = buildVarRef(
+        thenVar, ifStmt->getThenStmt()->getEndLoc());
+    if (findAvailabilityCondition(ifStmt->getCond()) &&
+        builderSupports(ctx.Id_buildLimitedAvailability)) {
+      thenVarRefExpr = buildCallIfWanted(
+          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
+          { thenVarRefExpr }, { Identifier() });
+    }
+
     // Prepare the `then` operand by wrapping it to produce a chain result.
     Expr *thenExpr = buildWrappedChainPayload(
-        buildVarRef(thenVar, ifStmt->getThenStmt()->getEndLoc()),
-        payloadIndex, numPayloads, isOptional);
+        thenVarRefExpr, payloadIndex, numPayloads, isOptional);
 
     // Prepare the `else operand:
     Expr *elseExpr;
@@ -1053,6 +1082,35 @@ public:
           FunctionBuilderTarget::forAssign(
             capturedThen.first, {capturedThen.second.front()}));
     ifStmt->setThenStmt(newThen);
+
+    // Look for a #available condition. If there is one, we need to check
+    // that the resulting type of the "then" does refer to any types that
+    // are unavailable in the enclosing context.
+    //
+    // Note that this is for staging in support for
+    if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
+      SourceLoc loc = availabilityCond->getStartLoc();
+      Type thenBodyType = solution.simplifyType(
+          solution.getType(target.captured.second[0]));
+      thenBodyType.findIf([&](Type type) {
+        auto nominal = type->getAnyNominal();
+        if (!nominal)
+          return false;
+
+        if (auto reason = TypeChecker::checkDeclarationAvailability(
+                              nominal, loc, dc)) {
+          // Note that the problem is with the function builder, not the body.
+          // This is for staging only. We want to disable #available in
+          // function builders that don't support this operation.
+          ctx.Diags.diagnose(
+              loc, diag::function_builder_missing_limited_availability,
+              builderTransform.builderType);
+          return true;
+        }
+
+        return false;
+      });
+    }
 
     if (auto elseBraceStmt =
             dyn_cast_or_null<BraceStmt>(ifStmt->getElseStmt())) {
