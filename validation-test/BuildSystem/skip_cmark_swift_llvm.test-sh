@@ -15,7 +15,7 @@
 # SKIP-CMARK-CHECK: cmake --build {{.*}}swift-
 
 # SKIP-LLVM-CHECK: cmake --build {{.*}}cmark-
-# SKIP-LLVM-CHECK-NOT: cmake --build {{.*}}llvm-
+# SKIP-LLVM-CHECK: cmake --build {{.*}}llvm-tblgen
 # SKIP-LLVM-CHECK: cmake --build {{.*}}swift-
 
 # SKIP-SWIFT-CHECK: cmake --build {{.*}}cmark-
