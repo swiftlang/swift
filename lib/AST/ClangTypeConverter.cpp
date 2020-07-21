@@ -22,7 +22,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ClangTypeConverter.h"
+#include "swift/AST/ClangTypeConverter.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
