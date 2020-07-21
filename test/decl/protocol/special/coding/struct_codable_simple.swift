@@ -34,8 +34,8 @@ let _ = SimpleStruct.CodingKeys.self // expected-error {{'CodingKeys' is inacces
 struct SR_12248_1: Codable { // expected-error {{type 'SR_12248_1' does not conform to protocol 'Encodable'}}
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
-  // expected-note@-1 {{cannot automatically synthesize 'Encodable' because '<<error type>>' does not conform to 'Encodable'}}
-  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because '<<error type>>' does not conform to 'Encodable'}}
+  // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'Int' does not conform to 'Encodable'}}
+  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'Int' does not conform to 'Encodable'}}
 }
 
 struct SR_12248_2: Decodable { 

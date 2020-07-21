@@ -968,13 +968,14 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
     struct WitnessVisitor : public SILWitnessVisitor<WitnessVisitor> {
       TBDGenVisitor &TBD;
       ProtocolDecl *PD;
+      bool Resilient;
 
     public:
       WitnessVisitor(TBDGenVisitor &TBD, ProtocolDecl *PD)
-          : TBD(TBD), PD(PD) {}
+          : TBD(TBD), PD(PD), Resilient(PD->getParentModule()->isResilient()) {}
 
       void addMethod(SILDeclRef declRef) {
-        if (PD->isResilient()) {
+        if (Resilient) {
           TBD.addDispatchThunk(declRef);
           TBD.addMethodDescriptor(declRef);
         }

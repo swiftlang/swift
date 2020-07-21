@@ -612,7 +612,7 @@ namespace {
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
                                      SILDefaultWitnessTable *defaultWitnesses)
       : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
-        Resilient(IGM.isResilient(Proto, ResilienceExpansion::Minimal)) {}
+        Resilient(IGM.getSwiftModule()->isResilient()) {}
 
     void layout() {
       super::layout();
@@ -1977,8 +1977,9 @@ void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,
                                         *type.getClassOrBoundGenericClass());
     break;
   default:
-    llvm_unreachable("Cannot statically specialize types of kind other than "
-                     "struct and enum.");
+    llvm_unreachable(
+        "Cannot statically specialize metadata for generic types of"
+        "kind other than struct, enum, and class.");
   }
 }
 
@@ -3476,7 +3477,9 @@ namespace {
       MetadataTrailingFlags flags = super::getTrailingFlags();
 
       flags.setIsStaticSpecialization(true);
-      flags.setIsCanonicalStaticSpecialization(true);
+      flags.setIsCanonicalStaticSpecialization(
+          irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
+              IGM, type));
 
       return flags;
     }

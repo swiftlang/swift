@@ -182,6 +182,12 @@ std::string LinkEntity::mangleAsString() const {
     }
     llvm_unreachable("invalid metadata address");
 
+  case Kind::NoncanonicalSpecializedGenericTypeMetadata:
+    return mangler.mangleNoncanonicalTypeMetadata(getType());
+
+  case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
+    return mangler.mangleNoncanonicalSpecializedGenericTypeMetadataCache(getType());
+
   case Kind::TypeMetadataPattern:
     return mangler.mangleTypeMetadataPattern(
                                         cast<NominalTypeDecl>(getDecl()));
@@ -511,6 +517,12 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     llvm_unreachable("bad kind");
   }
 
+  case Kind::NoncanonicalSpecializedGenericTypeMetadata:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
+    // Prespecialization of the same non-canonical generic metadata may be
+    // requested multiple times, so it needs to be uniqued.
+    return SILLinkage::Shared;
+
   // ...but we don't actually expose individual value witnesses (right now).
   case Kind::ValueWitness: {
     auto *nominal = getType().getAnyNominal();
@@ -753,6 +765,8 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::DifferentiabilityWitness:
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadata:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -785,6 +799,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
     return IGM.ObjCClassStructTy;
   case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
     return IGM.TypeMetadataPtrTy;
   case Kind::TypeMetadataDemanglingCacheVariable:
     return llvm::StructType::get(IGM.Int32Ty, IGM.Int32Ty);
@@ -793,6 +808,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return llvm::StructType::get(IGM.getLLVMContext(),
                                  {IGM.TypeMetadataPtrTy, IGM.Int8PtrTy});
   case Kind::TypeMetadata:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadata:
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
       if (getType().getClassOrBoundGenericClass())
@@ -907,6 +923,8 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::ObjCResilientClassStub:
   case Kind::DifferentiabilityWitness:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadata:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
     return IGM.getPointerAlignment();
   case Kind::TypeMetadataDemanglingCacheVariable:
     return Alignment(8);
@@ -944,8 +962,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
 
   case Kind::TypeMetadata:
-  case Kind::TypeMetadataAccessFunction:
-  case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction: {
+  case Kind::TypeMetadataAccessFunction: {
     if (auto *nominalDecl = getType()->getAnyNominal())
       return nominalDecl->isWeakImported(module);
     return false;
@@ -988,6 +1005,11 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ProtocolConformanceDescriptor:
     return getProtocolConformance()->getRootConformance()
                                    ->isWeakImported(module);
+
+  case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadata:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
+    return false;
 
   // TODO: Revisit some of the below, for weak conformances.
   case Kind::ObjCMetadataUpdateFunction:
@@ -1104,6 +1126,8 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadata:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
     assert(isAlwaysSharedLinkage() && "kind should always be shared linkage");
     return nullptr;
 
@@ -1129,6 +1153,8 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadata:
+  case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
     return true;
 
   default:
