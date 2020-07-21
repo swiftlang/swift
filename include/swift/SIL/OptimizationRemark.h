@@ -32,16 +32,63 @@ class SILFunction;
 
 namespace OptRemark {
 
+struct ArgumentKeyKind {
+  enum InnerTy {
+    // Just assume this is a normal msg that we are emitting.
+    Default,
+
+    // Assume this is a note that should be emitted as a separate
+    // diagnostic when emitting diagnostics. Do nothing special
+    // along the backend path.
+    Note,
+  };
+
+  InnerTy innerValue;
+
+  ArgumentKeyKind(InnerTy value) : innerValue(value) {}
+  ArgumentKeyKind(const ArgumentKeyKind &kind) : innerValue(kind.innerValue) {}
+
+  operator InnerTy() const { return innerValue; }
+
+  /// Return true if this argument is meant to be a separate diagnostic when we
+  /// emit diagnostics but when we emit to the remark streamer (due to not
+  /// having support for this), we just emit the remark inline.
+  ///
+  /// TODO: Unfortunate that this needs to be done.
+  bool isSeparateDiagnostic() const {
+    switch (innerValue) {
+    case InnerTy::Default:
+      return false;
+    case InnerTy::Note:
+      return true;
+    }
+
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+};
+
+struct ArgumentKey {
+  ArgumentKeyKind kind;
+  std::string data;
+
+  ArgumentKey(ArgumentKeyKind kind, StringRef data) : kind(kind), data(data) {}
+  ArgumentKey(ArgumentKeyKind::InnerTy kind, StringRef data)
+      : kind(kind), data(data) {}
+  ArgumentKey(ArgumentKey kind, StringRef data) : kind(kind.kind), data(data) {}
+};
+
 /// Used in the streaming interface as the general argument type.  It
 /// internally converts everything into a key-value pair.
 struct Argument {
-  std::string key;
+  ArgumentKey key;
   std::string val;
   /// If set, the debug location corresponding to the value.
   SourceLoc loc;
 
-  explicit Argument(StringRef Str = "") : key("String"), val(Str) {}
-  Argument(StringRef key, StringRef val) : key(key), val(val) {}
+  explicit Argument(StringRef Str = "")
+      : key(ArgumentKeyKind::Default, "String"), val(Str) {}
+  Argument(StringRef key, StringRef val)
+      : key(ArgumentKeyKind::Default, key), val(val) {}
 
   Argument(StringRef key, int n);
   Argument(StringRef key, long n);
@@ -50,7 +97,9 @@ struct Argument {
   Argument(StringRef key, unsigned long n);
   Argument(StringRef key, unsigned long long n);
 
-  Argument(StringRef key, SILFunction *f);
+  Argument(StringRef key, SILFunction *f)
+      : Argument(ArgumentKey(ArgumentKeyKind::Default, key), f) {}
+  Argument(ArgumentKey key, SILFunction *f);
   Argument(StringRef key, SILType ty);
   Argument(StringRef key, CanType ty);
 };
