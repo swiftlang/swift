@@ -43,11 +43,11 @@ enum class ModuleDependenciesKind : int8_t {
 /// This class is mostly an implementation detail for \c ModuleDependencies.
 class ModuleDependenciesStorageBase {
 public:
-  const bool isSwiftModule;
+  const ModuleDependenciesKind dependencyKind;
 
-  ModuleDependenciesStorageBase(bool isSwiftModule,
+  ModuleDependenciesStorageBase(ModuleDependenciesKind dependencyKind,
                                 const std::string &compiledModulePath)
-      : isSwiftModule(isSwiftModule),
+      : dependencyKind(dependencyKind),
         compiledModulePath(compiledModulePath) { }
 
   virtual ModuleDependenciesStorageBase *clone() const = 0;
@@ -103,7 +103,8 @@ public:
       ArrayRef<StringRef> buildCommandLine,
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash
-  ) : ModuleDependenciesStorageBase(/*isSwiftModule=*/true, compiledModulePath),
+  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Swift,
+                                    compiledModulePath),
       swiftInterfaceFile(swiftInterfaceFile),
       compiledModuleCandidates(compiledModuleCandidates.begin(),
                                compiledModuleCandidates.end()),
@@ -116,7 +117,7 @@ public:
   }
 
   static bool classof(const ModuleDependenciesStorageBase *base) {
-    return base->isSwiftModule && !base->isExternalSwiftModuleStub;
+    return base->dependencyKind == ModuleDependenciesKind::Swift;
   }
 };
 
@@ -143,7 +144,7 @@ public:
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies
-  ) : ModuleDependenciesStorageBase(/*isSwiftModule=*/false,
+  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Clang,
                                     compiledModulePath),
       moduleMapFile(moduleMapFile),
       contextHash(contextHash),
@@ -155,7 +156,35 @@ public:
   }
 
   static bool classof(const ModuleDependenciesStorageBase *base) {
-    return !base->isSwiftModule;
+    return base->dependencyKind == ModuleDependenciesKind::Clang;
+  }
+};
+
+/// Describes an external Swift module dependency module stub.
+///
+/// This class is mostly an implementation detail for \c ModuleDependencies.
+class ExternalSwiftModuleDependencyStorage : public ModuleDependenciesStorageBase {
+public:
+  ExternalSwiftModuleDependencyStorage(const std::string &compiledModulePath,
+                                       const std::string &moduleDocPath,
+                                       const std::string &sourceInfoPath)
+      : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftExternal,
+                                      compiledModulePath),
+        moduleDocPath(moduleDocPath),
+        sourceInfoPath(sourceInfoPath) {}
+
+  ModuleDependenciesStorageBase *clone() const override {
+    return new ExternalSwiftModuleDependencyStorage(*this);
+  }
+
+  /// The path to the .swiftModuleDoc file.
+  const std::string moduleDocPath;
+
+  /// The path to the .swiftSourceInfo file.
+  const std::string sourceInfoPath;
+
+  static bool classof(const ModuleDependenciesStorageBase *base) {
+    return base->dependencyKind == ModuleDependenciesKind::SwiftExternal;
   }
 };
 
@@ -254,11 +283,7 @@ public:
   bool isSwiftModule() const;
 
   ModuleDependenciesKind getKind() const {
-    if (isExternalSwiftModuleStub())
-      return ModuleDependenciesKind::SwiftExternal;
-    else
-      return isSwiftModule() ? ModuleDependenciesKind::Swift
-                            : ModuleDependenciesKind::Clang;
+    return storage->dependencyKind;
   }
   /// Retrieve the dependencies for a Swift module.
   const SwiftModuleDependenciesStorage *getAsSwiftModule() const;
