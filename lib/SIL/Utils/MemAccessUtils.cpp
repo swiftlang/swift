@@ -25,40 +25,17 @@ using namespace swift;
 //                            MARK: General Helpers
 //===----------------------------------------------------------------------===//
 
-SILValue swift::stripAccessMarkers(SILValue v) {
-  while (auto *bai = dyn_cast<BeginAccessInst>(v)) {
-    v = bai->getOperand();
-  }
-  return v;
-}
-
-// The resulting projection must have an address-type operand at index zero
-// representing the projected address.
-SingleValueInstruction *swift::isAccessProjection(SILValue v) {
-  switch (v->getKind()) {
-  default:
-    return nullptr;
-
-  case ValueKind::StructElementAddrInst:
-  case ValueKind::TupleElementAddrInst:
-  case ValueKind::UncheckedTakeEnumDataAddrInst:
-  case ValueKind::TailAddrInst:
-  case ValueKind::IndexAddrInst:
-    return cast<SingleValueInstruction>(v);
-  };
-}
-
 // TODO: When the optimizer stops stripping begin_access markers, then we should
 // be able to assert that the result is a BeginAccessInst and the default case
 // is unreachable.
 SILValue swift::getAddressAccess(SILValue v) {
   while (true) {
     assert(v->getType().isAddress());
-    auto *projection = isAccessProjection(v);
+    auto projection = AccessProjection(v);
     if (!projection)
       return v;
 
-    v = projection->getOperand(0);
+    v = projection.baseAddress();
   }
 }
 
@@ -240,26 +217,117 @@ void AccessedStorage::print(raw_ostream &os) const {
 void AccessedStorage::dump() const { print(llvm::dbgs()); }
 
 namespace {
-struct FindAccessedStorageVisitor
-  : public AccessUseDefChainVisitor<FindAccessedStorageVisitor>
-{
-  SmallVector<SILValue, 8> addressWorklist;
-  SmallPtrSet<SILPhiArgument *, 4> visitedPhis;
-  Optional<AccessedStorage> storage;
+// Find common AccessedStorage that leads to all arguments of a given
+// pointer phi use. Return an invalid SILValue on failure.
+//
+// Also guarantees that all phi inputs follow the same access path. If any phi
+// inputs have different access path components, then the phi is considered an
+// invalid access. This is ok because path components always have an address
+// type, and we are phasing out all address-type phis. Pointer-phis will
+// continue to be allowed but they cannot affect the access path.
+template <typename StorageVisitor>
+class FindPhiStorageVisitor
+    : public AccessUseDefChainVisitor<FindPhiStorageVisitor<StorageVisitor>> {
+  StorageVisitor &storageVisitor;
+  Optional<SILValue> commonDefinition;
+  SmallVector<SILValue, 8> pointerWorklist;
+  SmallPtrSet<SILPhiArgument *, 4> nestedPhis;
 
 public:
-  FindAccessedStorageVisitor(SILValue firstSourceAddr)
-    : addressWorklist({firstSourceAddr})
-  {}
-  
-  AccessedStorage doIt() {
-    while (!addressWorklist.empty()) {
-      visit(addressWorklist.pop_back_val());
+  FindPhiStorageVisitor(StorageVisitor &storageVisitor)
+      : storageVisitor(storageVisitor) {}
+
+  // Main entry point.
+  void findPhiStorage(SILPhiArgument *phiArg) {
+    // Visiting a phi will call storageVisitor to set the storage result
+    // whenever it finds a base.
+    visitPhi(phiArg);
+    while (!pointerWorklist.empty()) {
+      this->visit(pointerWorklist.pop_back_val());
     }
-    
+    // If a common path component was found, recursively look for the storage.
+    if (commonDefinition && commonDefinition.getValue()) {
+      auto storage = storageVisitor.findStorage(commonDefinition.getValue());
+      (void)storage; // The same storageVisitor called us. It has already
+                     // recorded the storage that it found.
+    }
+  }
+
+  // Visitor helper.
+  void setDefinition(SILValue def) {
+    if (!commonDefinition) {
+      commonDefinition = def;
+      return;
+    }
+    if (commonDefinition.getValue() != def)
+      commonDefinition = SILValue();
+  }
+
+  // MARK: Visitor implementation.
+
+  void checkResult(SILValue result) {
+    assert(!result && "must override any visitor that returns a result");
+  }
+
+  // Recursively call the original storageVisitor for each base. We can't simply
+  // look for a common definition on all phi inputs, because the base may be
+  // cloned on each path. For example, two global_addr instructions may refer to
+  // the same global storage. Those global_addr instructions may each be
+  // converted to a RawPointer before being passed into the non-address phi.
+  void visitBase(SILValue base, AccessedStorage::Kind kind) {
+    checkResult(storageVisitor.visitBase(base, kind));
+  }
+
+  void visitNonAccess(SILValue value) {
+    checkResult(storageVisitor.visitNonAccess(value));
+  }
+
+  void visitNestedAccess(BeginAccessInst *access) {
+    checkResult(storageVisitor.visitNestedAccess(access));
+  }
+
+  void visitPhi(SILPhiArgument *phiArg) {
+    if (nestedPhis.insert(phiArg).second)
+      phiArg->getIncomingPhiValues(pointerWorklist);
+  }
+
+  void visitCast(SingleValueInstruction *projectedAddr, Operand *parentAddr) {
+    // Allow conversions to/from pointers and addresses on disjoint phi paths.
+    this->pointerWorklist.push_back(parentAddr->get());
+  }
+
+  void visitPathComponent(SingleValueInstruction *projectedAddr,
+                          Operand *parentAddr) {
+    // Path components are not expected to occur on disjoint phi paths. Stop
+    // searching at this projection.
+    setDefinition(projectedAddr);
+  }
+};
+} // namespace
+
+namespace {
+// Implementation of AccessUseDefChainVisitor that looks for a single common
+// AccessedStorage object for all projection paths.
+template <typename Impl>
+class FindAccessedStorageVisitorBase
+    : public AccessUseDefChainVisitor<Impl, SILValue> {
+protected:
+  Optional<AccessedStorage> storage;
+  SmallPtrSet<SILPhiArgument *, 4> visitedPhis;
+
+public:
+  // Main entry point. May be called reentrantly by the phi visitor.
+  AccessedStorage findStorage(SILValue sourceAddr) {
+    SILValue nextAddr = this->visit(sourceAddr);
+    while (nextAddr) {
+      assert(nextAddr->getType().isAddress()
+             || isa<SILBoxType>(nextAddr->getType().getASTType())
+             || isa<BuiltinRawPointerType>(nextAddr->getType().getASTType()));
+      nextAddr = this->visit(nextAddr);
+    }
     return storage.getValueOr(AccessedStorage());
   }
-  
+
   void setStorage(AccessedStorage foundStorage) {
     if (!storage) {
       storage = foundStorage;
@@ -267,45 +335,65 @@ public:
       // `storage` may still be invalid. If both `storage` and `foundStorage`
       // are invalid, this check passes, but we return an invalid storage
       // below.
-      if (!storage->hasIdenticalBase(foundStorage)) {
+      if (!storage->hasIdenticalBase(foundStorage))
         storage = AccessedStorage();
-        addressWorklist.clear();
-      }
     }
   }
-  
-  void visitBase(SILValue base, AccessedStorage::Kind kind) {
+
+  // MARK: visitor implementation.
+
+  SILValue visitBase(SILValue base, AccessedStorage::Kind kind) {
     setStorage(AccessedStorage(base, kind));
+    return SILValue();
   }
-  
-  void visitNonAccess(SILValue value)  {
+
+  SILValue visitNonAccess(SILValue value) {
     setStorage(AccessedStorage());
+    return SILValue();
   }
-  
-  void visitPhi(SILPhiArgument *phiArg) {
+
+  SILValue visitPhi(SILPhiArgument *phiArg) {
+    // Cycles involving phis are only handled within FindPhiStorageVisitor.
+    // Path components are not allowed in phi cycles.
     if (visitedPhis.insert(phiArg).second) {
-      phiArg->getIncomingPhiValues(addressWorklist);
+      FindPhiStorageVisitor<Impl>(this->asImpl()).findPhiStorage(phiArg);
+      return SILValue();
     }
+    // Cannot treat unresolved phis as "unidentified" because they may alias
+    // with global or class access.
+    return visitNonAccess(phiArg);
   }
-  
-  void visitIncomplete(SILValue projectedAddr, SILValue parentAddr) {
-    addressWorklist.push_back(parentAddr);
+
+  SILValue visitCast(SingleValueInstruction *projectedAddr,
+                     Operand *parentAddr) {
+    return parentAddr->get();
+  }
+
+  SILValue visitPathComponent(SingleValueInstruction *projectedAddr,
+                              Operand *parentAddr) {
+    return parentAddr->get();
   }
 };
+
+struct FindAccessedStorageVisitor
+    : public FindAccessedStorageVisitorBase<FindAccessedStorageVisitor> {
+
+  SILValue visitNestedAccess(BeginAccessInst *access) {
+    return access->getSource();
+  }
+};
+
+struct IdentifyAccessedStorageVisitor
+    : public FindAccessedStorageVisitorBase<IdentifyAccessedStorageVisitor> {};
+
 } // namespace
 
 AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
-  return FindAccessedStorageVisitor(sourceAddr).doIt();
+  return FindAccessedStorageVisitor().findStorage(sourceAddr);
 }
 
-AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
-  while (true) {
-    const AccessedStorage &storage = findAccessedStorage(sourceAddr);
-    if (!storage || storage.getKind() != AccessedStorage::Nested)
-      return storage;
-    
-    sourceAddr = cast<BeginAccessInst>(storage.getValue())->getSource();
-  }
+AccessedStorage swift::identifyAccessedStorageImpl(SILValue sourceAddr) {
+  return IdentifyAccessedStorageVisitor().findStorage(sourceAddr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -467,6 +555,10 @@ void swift::checkSwitchEnumBlockArg(SILPhiArgument *arg) {
 bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
                                        SILFunction *F) {
   switch (storage.getKind()) {
+  case AccessedStorage::Nested:
+    assert(false && "don't pass nested storage to this helper");
+    return false;
+
   case AccessedStorage::Box:
   case AccessedStorage::Stack:
     if (isScratchBuffer(storage.getValue()))
@@ -482,18 +574,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
   case AccessedStorage::Argument:
     // Function arguments are accessed by the caller.
     return false;
-  case AccessedStorage::Nested: {
-    // A begin_access is considered a separate base for the purpose of conflict
-    // checking. However, for the purpose of inserting unenforced markers and
-    // performaing verification, it needs to be ignored.
-    auto *BAI = cast<BeginAccessInst>(storage.getValue());
-    const AccessedStorage &nestedStorage =
-      findAccessedStorage(BAI->getSource());
-    if (!nestedStorage)
-      return false;
 
-    return isPossibleFormalAccessBase(nestedStorage, F);
-  }
   case AccessedStorage::Unidentified:
     if (isAddressForLocalInitOnly(storage.getValue()))
       return false;
@@ -512,6 +593,8 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
 
     if (isScratchBuffer(storage.getValue()))
       return false;
+
+    break;
   }
   // Additional checks that apply to anything that may fall through.
 

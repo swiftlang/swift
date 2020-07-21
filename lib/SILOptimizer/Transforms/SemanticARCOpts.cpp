@@ -2090,11 +2090,16 @@ public:
   void visitNonAccess(SILValue addr) {
     return answer(true);
   }
-  
-  void visitIncomplete(SILValue projectedAddr, SILValue parentAddr) {
-    return next(parentAddr);
+
+  void visitCast(SingleValueInstruction *cast, Operand *parentAddr) {
+    return next(parentAddr->get());
   }
-  
+
+  void visitPathComponent(SingleValueInstruction *projectedAddr,
+                          Operand *parentAddr) {
+    return next(parentAddr->get());
+  }
+
   void visitPhi(SILPhiArgument *phi) {
     // We shouldn't have address phis in OSSA SIL, so we don't need to recur
     // through the predecessors here.

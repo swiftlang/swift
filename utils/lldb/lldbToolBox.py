@@ -6,6 +6,7 @@ Load into LLDB with 'command script import /path/to/lldbToolBox.py'
 This will also import LLVM data formatters as well, assuming that llvm is next
 to the swift checkout.
 """
+from __future__ import print_function
 
 import argparse
 import os
@@ -108,7 +109,7 @@ def sequence(debugger, command, exec_ctx, result, internal_dict):
         ret = lldb.SBCommandReturnObject()
         interpreter.HandleCommand(subcommand, exec_ctx, ret)
         if ret.GetOutput():
-            print >>result, ret.GetOutput().strip()
+            print(ret.GetOutput().strip(), file=result)
 
         if not ret.Succeeded():
             result.SetError(ret.GetError())

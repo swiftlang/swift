@@ -719,4 +719,8 @@ def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
 
 def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
   HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
+
+def candidate_module_file
+  : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
+    HelpText<"Specify Swift module may be ready to use for an interface">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

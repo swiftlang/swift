@@ -1029,7 +1029,6 @@ ModuleInterfaceLoader::getCompiledModuleCandidatesForInterface(StringRef moduleN
                 dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules, moduleName) ?
                   ModuleLoadingMode::PreferInterface : LoadMode);
-  SmallVector<FileDependency, 16> allDeps;
   std::vector<std::string> results;
   auto pair = Impl.getCompiledModuleCandidates();
   // Add compiled module candidates only when they are non-empty.
@@ -1038,6 +1037,41 @@ ModuleInterfaceLoader::getCompiledModuleCandidatesForInterface(StringRef moduleN
   if (!pair.second.empty())
     results.push_back(pair.second);
   return results;
+}
+
+bool ModuleInterfaceLoader::tryEmitForwardingModule(StringRef moduleName,
+                                                    StringRef interfacePath,
+                                                    ArrayRef<std::string> candidates,
+                                                    StringRef outputPath) {
+  // Derive .swiftmodule path from the .swiftinterface path.
+  auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
+  llvm::SmallString<32> modulePath = interfacePath;
+  llvm::sys::path::replace_extension(modulePath, newExt);
+  ModuleInterfaceLoaderImpl Impl(
+                Ctx, modulePath, interfacePath, moduleName,
+                CacheDir, PrebuiltCacheDir, SourceLoc(),
+                Opts,
+                dependencyTracker,
+                llvm::is_contained(PreferInterfaceForModules, moduleName) ?
+                  ModuleLoadingMode::PreferInterface : LoadMode);
+  SmallVector<FileDependency, 16> deps;
+  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+  for (auto mod: candidates) {
+    // Check if the candidate compiled module is still up-to-date.
+    if (Impl.swiftModuleIsUpToDate(mod, deps, moduleBuffer)) {
+      // If so, emit a forwarding module to the candidate.
+      ForwardingModule FM(mod);
+      auto hadError = withOutputFile(Ctx.Diags, outputPath,
+        [&](llvm::raw_pwrite_stream &out) {
+          llvm::yaml::Output yamlWriter(out);
+          yamlWriter << FM;
+          return false;
+        });
+      if (!hadError)
+        return true;
+    }
+  }
+  return false;
 }
 
 bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
@@ -1069,7 +1103,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
-                                  /*ModuleBuffer*/nullptr);
+                                  /*ModuleBuffer*/nullptr, nullptr,
+                                  SearchPathOpts.CandidateCompiledModules);
 }
 
 void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
@@ -1630,6 +1665,31 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
                        moduleInfo.modulePath);
     return moduleBuf.getError();
   }
+
+  assert(moduleBuf);
+  const bool isForwardingModule = !serialization::isSerializedAST(moduleBuf
+    .get()->getBuffer());
+  // If the module is a forwarding module, read the actual content from the path
+  // encoded in the forwarding module as the actual module content.
+  if (isForwardingModule) {
+    auto forwardingModule = ForwardingModule::load(*moduleBuf.get());
+    if (forwardingModule) {
+      moduleBuf = fs.getBufferForFile(forwardingModule->underlyingModulePath);
+      if (!moduleBuf) {
+        // We cannot read the module content, diagnose.
+        Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+                           moduleInfo.modulePath);
+        return moduleBuf.getError();
+      }
+    } else {
+      // We cannot read the module content, diagnose.
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
+                         moduleInfo.modulePath);
+      return forwardingModule.getError();
+    }
+  }
+  assert(moduleBuf);
+  // Move the opened module buffer to the caller.
   *ModuleBuffer = std::move(moduleBuf.get());
 
   // Open .swiftdoc file

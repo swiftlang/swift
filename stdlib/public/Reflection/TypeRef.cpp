@@ -728,11 +728,15 @@ bool TypeRef::isConcreteAfterSubstitutions(
 
 unsigned NominalTypeTrait::getDepth() const {
   if (auto P = Parent) {
-    if (auto *Nominal = dyn_cast<NominalTypeRef>(P))
-      return 1 + Nominal->getDepth();
-    return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
+    switch (P->getKind()) {
+    case TypeRefKind::Nominal:
+      return 1 + cast<NominalTypeRef>(P)->getDepth();
+    case TypeRefKind::BoundGeneric:
+      return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
+    default:
+      break;
+    }
   }
-
   return 0;
 }
 
