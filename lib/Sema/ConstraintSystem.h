@@ -1206,6 +1206,7 @@ struct DynamicCallableMethods {
 /// Describes the target to which a constraint system's solution can be
 /// applied.
 class SolutionApplicationTarget {
+public:
   enum class Kind {
     expression,
     function,
@@ -1213,6 +1214,7 @@ class SolutionApplicationTarget {
     caseLabelItem,
   } kind;
 
+private:
   union {
     struct {
       /// The expression being type-checked.
@@ -5287,6 +5289,11 @@ bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 /// Determine whether givne closure has any explicit `return`
 /// statements that could produce non-void result.
 bool hasExplicitResult(ClosureExpr *closure);
+
+/// Emit diagnostics for syntactic restrictions within a given solution
+/// application target.
+void performSyntacticDiagnosticsForTarget(
+    const SolutionApplicationTarget &target, bool isExprStmt);
 
 } // end namespace constraints
 
