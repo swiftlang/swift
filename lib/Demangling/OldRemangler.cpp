@@ -2132,6 +2132,9 @@ void Remangler::mangleOpaqueTypeDescriptorAccessorVar(Node *node) {
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
 }
+void Remangler::mangleMetadataInstantiationCache(Node *node) {
+  unreachable("unsupported");
+}
 
 void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
   Buffer << "MM";

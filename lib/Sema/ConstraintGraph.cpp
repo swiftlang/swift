@@ -1116,7 +1116,7 @@ bool ConstraintGraph::contractEdges() {
     // us enough information to decided on l-valueness.
     if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
-      if (auto bindings = CS.getPotentialBindings(tyvar1)) {
+      if (auto bindings = CS.inferBindingsFor(tyvar1)) {
         // Holes can't be contracted.
         if (bindings.IsHole)
           continue;

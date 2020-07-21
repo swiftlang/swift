@@ -253,7 +253,7 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
     if (argVal) {
       // Remap the argument source value and inherit the old storage info.
-      auto calleeStorage = findAccessedStorageNonNested(argVal);
+      auto calleeStorage = findAccessedStorage(argVal);
       if (calleeStorage)
         return StorageAccessInfo(calleeStorage, storage);
     }
@@ -262,7 +262,7 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     //
     // This is an untested bailout. It is only reachable if the call graph
     // contains an edge that getCallerArg is unable to analyze OR if
-    // findAccessedStorageNonNested returns an invalid SILValue, which won't
+    // findAccessedStorage returns an invalid SILValue, which won't
     // pass SIL verification.
     //
     // FIXME: In case argVal is invalid, support Unidentified access for invalid
@@ -299,7 +299,7 @@ void AccessedStorageResult::visitBeginAccess(B *beginAccess) {
     return;
 
   const AccessedStorage &storage =
-      findAccessedStorageNonNested(beginAccess->getSource());
+      findAccessedStorage(beginAccess->getSource());
 
   if (storage.getKind() == AccessedStorage::Unidentified) {
     // This also catches invalid storage.

@@ -392,7 +392,8 @@ namespace {
     } \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
                                    AbstractionPattern origType) { \
-      auto referentType = type->getReferentType(); \
+      auto referentType = \
+        type->getReferentType()->lookThroughSingleOptionalType(); \
       auto concreteType = getConcreteReferenceStorageReferent(referentType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
@@ -2051,6 +2052,17 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   return CanFunctionType::get({}, C.TheRawPointerType);
 }
 
+/// Removes @noescape from the given type if it's a function type. Otherwise,
+/// returns the original type.
+static CanType removeNoEscape(CanType resultType) {
+  if (auto funTy = resultType->getAs<AnyFunctionType>()) {
+    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
+    return adjustFunctionType(cast<AnyFunctionType>(resultType), newExtInfo);
+  }
+
+  return resultType;
+}
+
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      SILDeclRef c) {
@@ -2067,11 +2079,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // Remove @noescape from function return types. A @noescape
   // function return type is a contradiction.
-  if (auto funTy = canResultTy->getAs<AnyFunctionType>()) {
-    auto newExtInfo = funTy->getExtInfo().withNoEscape(false);
-    canResultTy =
-        adjustFunctionType(cast<AnyFunctionType>(canResultTy), newExtInfo);
-  }
+  canResultTy = removeNoEscape(canResultTy);
 
   // Get the generic signature from the surrounding context.
   auto sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
@@ -2102,6 +2110,8 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
     if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
       resultTy = originalProperty->getPropertyWrapperInitValueInterfaceType()
                                      ->getCanonicalType();
+      // Stored property initializers can't return @noescape functions
+      resultTy = removeNoEscape(resultTy);
     }
   }
 

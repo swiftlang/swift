@@ -63,7 +63,7 @@ def _make_line_map(target_filename, stream=None):
     """
     >>> try:
     ...     from StringIO import StringIO # py2
-    ... except ModuleNotFoundError:
+    ... except ImportError:
     ...     from io import StringIO # py3
     >>> _make_line_map('box',
     ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
@@ -714,8 +714,8 @@ def run():
                 break
             output = input
 
-            def decode_match(p, l):
-                m = p.match(l)
+            def decode_match(p, line):
+                m = p.match(line)
                 if m is None:
                     return ()
                 file, line_num = map_line_to_source_file(

@@ -7,6 +7,8 @@
 #
 # Invoke by passing the various Swift build directories as parameters.
 
+from __future__ import print_function
+
 import itertools
 import os
 import subprocess
@@ -14,9 +16,9 @@ import sys
 
 args = sys.argv[1:]
 if len(args) == 0:
-    print >> sys.stderr, "Usage:", sys.argv[0], "swift-build-dirs..."
-    print >> sys.stderr, ("Note: pass paths to the swift-macosx-x86_64"
-                          " directories, or /usr to test the OS.")
+    print("Usage:", sys.argv[0], "swift-build-dirs...", file=sys.stderr)
+    print(("Note: pass paths to the swift-macosx-x86_64"
+           " directories, or /usr to test the OS."), file=sys.stderr)
     sys.exit(1)
 
 absoluteArgs = [os.path.abspath(arg) for arg in args]
@@ -56,15 +58,15 @@ for i, (swiftc, swiftlib) in enumerate(zip(swiftcs, swiftlibs)):
 for i in range(len(swiftcs) + 1):
     for localMirrorlibs in itertools.combinations(mirrorlibs, i):
         for i, arg in enumerate(absoluteArgs):
-            print 'Testing', arg, 'with mirror libs:'
-            for l in localMirrorlibs:
-                print '\t', l
+            print('Testing', arg, 'with mirror libs:')
+            for lib in localMirrorlibs:
+                print('\t', lib)
             callArgs = ['/tmp/test']
             dylibPath = os.path.join('/tmp', 'libtest' + str(i) + '.dylib')
             callArgs.append(dylibPath)
             callArgs += list(localMirrorlibs)
-            print ' '.join(callArgs)
+            print(' '.join(callArgs))
             subprocess.call(callArgs)
-            print 'DONE'
-            print ''
-        print localMirrorlibs
+            print('DONE')
+            print('')
+        print(localMirrorlibs)

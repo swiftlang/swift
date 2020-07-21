@@ -1157,10 +1157,14 @@ LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
 
+# We cannot currently apply the normal rules of skipping here for LLVM. Even if
+# we are skipping building LLVM, we still need to at least build a few tools
+# like tblgen that Swift relies on for building and testing. See the LLVM
+# configure rules.
+PRODUCTS=(llvm)
 [[ "${SKIP_BUILD_CMARK}" ]] || PRODUCTS+=(cmark)
 [[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
 [[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
-[[ "${SKIP_BUILD_LLVM}" ]] || PRODUCTS+=(llvm)
 [[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
 [[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
 [[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
@@ -1550,7 +1554,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${BUILD_LLVM}" == "0" ] ; then
                     build_targets=(clean)
                 fi
-                if [ "${SKIP_BUILD}" ] ; then
+                if [[ "${SKIP_BUILD}" || "${SKIP_BUILD_LLVM}" ]] ; then
                     # We can't skip the build completely because the standalone
                     # build of Swift depend on these for building and testing.
                     build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
@@ -1661,19 +1665,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             libcxx)
-                build_targets=(cxx-headers)
+                build_targets=()
                 cmake_options=(
                     "${cmake_options[@]}"
-                    -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
-                    -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
-                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
-                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
-                    -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
-                    -DLLVM_INCLUDE_DOCS:BOOL=TRUE
-                    -DLLVM_CONFIG_PATH="$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-config"
                     "${llvm_cmake_options[@]}"
                 )
-
                 ;;
 
             swift)
@@ -2301,6 +2297,10 @@ for host in "${ALL_HOSTS[@]}"; do
             fi
             with_pushd "${build_dir}" \
                 call env "${EXTRA_DISTCC_OPTIONS[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}"
+        fi
+
+        if [[ "${product}" == "libcxx" ]]; then
+            continue
         fi
 
         # When we are building LLVM create symlinks to the c++ headers. We need

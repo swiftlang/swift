@@ -51,7 +51,7 @@ def split_lines(s):
     If the lines are later concatenated, the result is s, possibly
     with a single appended newline.
     """
-    return [l + '\n' for l in s.split('\n')]
+    return [line + '\n' for line in s.split('\n')]
 
 
 # text on a line up to the first '$$', '${', or '%%'
@@ -748,7 +748,7 @@ class Code(ASTNode):
             s = indent + 'Code: {' + source_lines[0] + '}'
         else:
             s = indent + 'Code:\n' + indent + '{\n' + '\n'.join(
-                indent + 4 * ' ' + l for l in source_lines
+                indent + 4 * ' ' + line for line in source_lines
             ) + '\n' + indent + '}'
         return s + self.format_children(indent)
 
@@ -763,8 +763,8 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     >>> # manually handle closing and deleting this file to allow us to open
     >>> # the file by its name across all platforms.
     >>> f = NamedTemporaryFile(delete=False)
-    >>> f.write(
-    ... r'''---
+    >>> _ = f.write(
+    ... br'''---
     ... % for i in range(int(x)):
     ... a pox on ${i} for epoxy
     ... % end

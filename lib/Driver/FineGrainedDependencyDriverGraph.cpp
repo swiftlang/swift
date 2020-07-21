@@ -196,6 +196,8 @@ std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
 }
 
 // Add every (swiftdeps) use of the external dependency to foundJobs.
+// Can return duplicates, but it doesn't break anything, and they will be
+// canonicalized later.
 std::vector<const Job *> ModuleDepGraph::findExternallyDependentUntracedJobs(
     StringRef externalDependency) {
   FrontendStatsTracer tracer(

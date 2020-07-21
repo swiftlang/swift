@@ -11,12 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 // RUN: %empty-directory(%t)
-// RUN: not --crash %target-build-swift -swift-version 4 -o %t/a.out %s
+// RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
 
-// REQUIRES: rdar65251059
+// See rdar://problem/65251059
+// UNSUPPORTED: windows
 // rdar://problem/65015626
 // XFAIL: asserts
 

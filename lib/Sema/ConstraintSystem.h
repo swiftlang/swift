@@ -1382,13 +1382,19 @@ private:
       /// pattern.
       Pattern *pattern;
 
-      /// The variable to which property wrappers have been applied, if
-      /// this is an initialization involving a property wrapper.
-      VarDecl *wrappedVar;
+      struct {
+        /// The variable to which property wrappers have been applied, if
+        /// this is an initialization involving a property wrapper.
+        VarDecl *wrappedVar;
 
-      /// The innermost call to \c init(wrappedValue:), if this is an
-      /// initialization involving a property wrapper.
-      ApplyExpr *innermostWrappedValueInit;
+        /// The innermost call to \c init(wrappedValue:), if this is an
+        /// initialization involving a property wrapper.
+        ApplyExpr *innermostWrappedValueInit;
+
+        /// Whether this property wrapper has an initial wrapped value specified
+        /// via \c = .
+        bool hasInitialWrappedValue;
+      } propertyWrapper;
 
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
@@ -1618,11 +1624,18 @@ public:
         expression.contextualPurpose != CTP_Initialization)
       return false;
 
-    auto *wrappedVar = expression.wrappedVar;
+    auto *wrappedVar = expression.propertyWrapper.wrappedVar;
     if (!wrappedVar || wrappedVar->isStatic())
       return false;
 
-    return expression.innermostWrappedValueInit == apply;
+    return expression.propertyWrapper.innermostWrappedValueInit == apply;
+  }
+
+  /// Whether this target is for initialization of a property wrapper
+  /// with an initial wrapped value specified via \c = .
+  bool propertyWrapperHasInitialWrappedValue() const {
+    return (kind == Kind::expression &&
+            expression.propertyWrapper.hasInitialWrappedValue);
   }
 
   /// Retrieve the wrapped variable when initializing a pattern with a
@@ -1630,7 +1643,7 @@ public:
   VarDecl *getInitializationWrappedVar() const {
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
-    return expression.wrappedVar;
+    return expression.propertyWrapper.wrappedVar;
   }
 
   PatternBindingDecl *getInitializationPatternBindingDecl() const {
@@ -2565,7 +2578,6 @@ private:
                                                         Type builderType);
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
-                                          bool &unresolvedTypeExprs,
                                           TypeCheckExprOptions options);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
@@ -3966,8 +3978,13 @@ public:
     auto resultTy = fnTy->getResult();
     if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
       resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
-    else
-      resultTy = resultTy->getWithoutSpecifierType()->getOptionalObjectType();
+    else {
+      auto objType =
+          resultTy->getWithoutSpecifierType()->getOptionalObjectType();
+      // Preserve l-value through force operation.
+      resultTy =
+          resultTy->is<LValueType>() ? LValueType::get(objType) : objType;
+    }
 
     assert(resultTy);
 
@@ -4081,7 +4098,8 @@ public:
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
-  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType);
+  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
+                             bool isDefaultWrappedValue = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
@@ -4420,6 +4438,12 @@ private:
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
+    /// The set of protocol requirements placed on this type variable.
+    llvm::TinyPtrVector<Constraint *> Protocols;
+
+    /// The set of constraints which would be used to infer default types.
+    llvm::TinyPtrVector<Constraint *> Defaults;
+
     /// Whether these bindings should be delayed until the rest of the
     /// constraint system is considered "fully bound".
     bool FullyBound = false;
@@ -4554,6 +4578,35 @@ private:
     /// if it has only concrete types or would resolve a closure.
     bool favoredOverDisjunction(Constraint *disjunction) const;
 
+    /// Detect `subtype` relationship between two type variables and
+    /// attempt to infer supertype bindings transitively e.g.
+    ///
+    /// Given A <: T1 <: T2 transitively A <: T2
+    ///
+    /// Which gives us a new (superclass A) binding for T2 as well as T1.
+    ///
+    /// \param cs The constraint system this type variable is associated with.
+    ///
+    /// \param inferredBindings The set of all bindings inferred for type
+    /// variables in the workset.
+    void inferTransitiveBindings(
+        ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &existingTypes,
+        const llvm::SmallDenseMap<TypeVariableType *,
+                                  ConstraintSystem::PotentialBindings>
+            &inferredBindings);
+
+    /// Infer bindings based on any protocol conformances that have default
+    /// types.
+    void inferDefaultTypes(ConstraintSystem &cs,
+                           llvm::SmallPtrSetImpl<CanType> &existingTypes);
+
+    /// Finalize binding computation for this type variable by
+    /// inferring bindings from context e.g. transitive bindings.
+    void finalize(ConstraintSystem &cs,
+                  const llvm::SmallDenseMap<TypeVariableType *,
+                                            ConstraintSystem::PotentialBindings>
+                      &inferredBindings);
+
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
@@ -4614,35 +4667,30 @@ private:
 
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
+
+  /// Infer bindings for the given type variable based on current
+  /// state of the constraint system.
+  PotentialBindings inferBindingsFor(TypeVariableType *typeVar);
+
+private:
   Optional<ConstraintSystem::PotentialBinding>
   getPotentialBindingForRelationalConstraint(
       PotentialBindings &result, Constraint *constraint,
       bool &hasDependentMemberRelationalConstraints,
-      bool &hasNonDependentMemberRelationalConstraints,
-      bool &addOptionalSupertypeBindings) const;
+      bool &hasNonDependentMemberRelationalConstraints) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
-  /// Detect `subtype` relationship between two type variables and
-  /// attempt to infer supertype bindings transitively e.g.
-  ///
-  /// Given A <: T1 <: T2 transitively A <: T2
-  ///
-  /// Which gives us a new (superclass A) binding for T2 as well as T1.
-  ///
-  /// \param inferredBindings The set of all bindings inferred for type
-  /// variables in the workset.
-  /// \param bindings The type variable we aim to infer new supertype
-  /// bindings for.
-  void inferTransitiveSupertypeBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-          &inferredBindings,
-      PotentialBindings &bindings);
-
-private:
   /// Add a constraint to the constraint system.
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
                                  ConstraintLocatorBuilder locator,
                                  bool isFavored);
+
+  /// Adds a constraint for the conversion of an argument to a parameter. Do not
+  /// call directly, use \c addConstraint instead.
+  SolutionKind
+  addArgumentConversionConstraintImpl(ConstraintKind kind, Type first,
+                                      Type second,
+                                      ConstraintLocatorBuilder locator);
 
   /// Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);

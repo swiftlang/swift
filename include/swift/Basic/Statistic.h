@@ -15,8 +15,8 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Timer.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Timer.h"
 
 #include <thread>
 #include <tuple>
