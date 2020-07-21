@@ -1013,7 +1013,7 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
 }
 
-func testSyntaxErrors() { // expected-note{{}}
+func testSyntaxErrors() {
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;
   _ = \[a ;
@@ -1045,4 +1045,4 @@ func testSyntaxErrors() { // expected-note{{}}
   _ = \A[a];
   _ = \A.a?;
   _ = \A.a!;
-} // expected-error@+1{{}}
+}

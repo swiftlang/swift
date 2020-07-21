@@ -658,7 +658,8 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
     diagnose(Tok, ID);
 
     // Attempt to recover by looking for a left brace on the same line
-    if (!skipUntilTokenOrEndOfLine(tok::l_brace))
+    if (!skipUntilTokenOrEndOfLine(tok::l_brace, tok::r_brace) ||
+        !Tok.is(tok::l_brace))
       return nullptr;
   }
   SyntaxParsingContext LocalContext(SyntaxContext, SyntaxKind::CodeBlock);
@@ -1699,7 +1700,8 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       // got a problem. If the last bit is 'else ... {' on one line, let's
       // assume they've forgotten the 'if'.
       BacktrackingScope backtrack(*this);
-      implicitlyInsertIf = skipUntilTokenOrEndOfLine(tok::l_brace);
+      if (skipUntilTokenOrEndOfLine(tok::l_brace, tok::r_brace))
+        implicitlyInsertIf = Tok.is(tok::l_brace);
     }
 
     if (Tok.is(tok::kw_if) || implicitlyInsertIf) {
