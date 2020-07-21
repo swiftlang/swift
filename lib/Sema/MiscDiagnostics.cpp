@@ -2743,7 +2743,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    let x = foo()
       //  ->
       //    _ = foo()
-      if (auto *pbd = var->getParentPatternBinding())
+      if (auto *pbd = var->getParentPatternBinding()) {
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
             !isa<TypedPattern>(pbd->getPattern(0))) {
           unsigned varKind = var->isLet();
@@ -2755,7 +2755,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
             .fixItReplace(replaceRange, "_");
           continue;
         }
-      
+      }
+
       // If the variable is defined in a pattern in an if/while/guard statement,
       // see if we can produce a tuned fixit.  When we have something like:
       //
@@ -2806,6 +2807,30 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   continue;
                 }
               }
+        }
+      }
+
+      // If the variable is defined in a pattern that isn't one of the usual
+      // conditional statements, try to detect and rewrite "simple" binding
+      // patterns:
+      //    case .pattern(let x):
+      //  ->
+      //    case .pattern(_):
+      if (auto *pattern = var->getParentPattern()) {
+        BindingPattern *foundVP = nullptr;
+        pattern->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<BindingPattern>(P))
+            if (VP->getSingleVar() == var)
+              foundVP = VP;
+        });
+
+        if (foundVP) {
+          unsigned varKind = var->isLet();
+          Diags
+              .diagnose(var->getLoc(), diag::variable_never_used,
+                        var->getName(), varKind)
+              .fixItReplace(foundVP->getSourceRange(), "_");
+          continue;
         }
       }
       
