@@ -351,6 +351,16 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   // Use the default arguments except for IsVolatile. Force avoiding the use of
   // mmap to workaround issues on NFS when the swiftmodule file loaded changes
   // on disk while it's in use.
+  //
+  // In practice, a swiftmodule file can chane when a client uses a
+  // swiftmodule file from a framework while the framework is recompiled and
+  // installed over existing files. Or when many processes rebuild the same
+  // module interface.
+  //
+  // We have seen these scenarios leading to deserialization errors that on
+  // the surface look like memory corruption.
+  //
+  // rdar://63755989
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
       FS.getBufferForFile(ModulePath,
                           /*FileSize=*/-1,
