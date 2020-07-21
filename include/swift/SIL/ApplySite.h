@@ -21,8 +21,10 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -409,6 +411,14 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled case");
     }
+  }
+
+  bool isVariadic(Operand &op) {
+    unsigned calleeArgIdx =
+        getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(op);
+    auto isVarArg =
+        getSubstCalleeConv().getParamInfoForSILArg(calleeArgIdx).isVariadic();
+    return SILParameterIsVariadic::Yes == isVarArg;
   }
 
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }

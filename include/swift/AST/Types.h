@@ -3765,19 +3765,30 @@ enum class SILParameterDifferentiability : bool {
   NotDifferentiable,
 };
 
+/// Labels if a parameter was originally a variadic argument at the AST level.
+///
+/// For use with SIL diagnostics.
+enum class SILParameterIsVariadic : bool {
+  No,
+  Yes,
+};
+
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   CanType Type;
   ParameterConvention Convention;
-  SILParameterDifferentiability Differentiability;
+  SILParameterDifferentiability Differentiability : 1;
+  SILParameterIsVariadic IsVariadic : 1;
 
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
   SILParameterInfo(
       CanType type, ParameterConvention conv,
       SILParameterDifferentiability differentiability =
-          SILParameterDifferentiability::DifferentiableOrNotApplicable)
-      : Type(type), Convention(conv), Differentiability(differentiability) {
+          SILParameterDifferentiability::DifferentiableOrNotApplicable,
+      SILParameterIsVariadic isVariadic = SILParameterIsVariadic::No)
+      : Type(type), Convention(conv), Differentiability(differentiability),
+        IsVariadic(isVariadic) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
@@ -3794,7 +3805,7 @@ public:
   /// \c t must refer back to the function type this is a parameter for.
   CanType getArgumentType(SILModule &M, const SILFunctionType *t, TypeExpansionContext context) const;
   ParameterConvention getConvention() const {
-    return Convention;
+    return ParameterConvention(Convention);
   }
   // Does this parameter convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
@@ -3832,13 +3843,22 @@ public:
   }
 
   SILParameterDifferentiability getDifferentiability() const {
-    return Differentiability;
+    return SILParameterDifferentiability(Differentiability);
   }
 
   SILParameterInfo getWithDifferentiability(
       SILParameterDifferentiability differentiability) const {
     return SILParameterInfo(getInterfaceType(), getConvention(),
-                            differentiability);
+                            differentiability, isVariadic());
+  }
+
+  SILParameterInfo getAsVariadic(SILParameterIsVariadic isVariadic) const {
+    return SILParameterInfo(getInterfaceType(), getConvention(),
+                            getDifferentiability(), isVariadic);
+  }
+
+  SILParameterIsVariadic isVariadic() const {
+    return SILParameterIsVariadic(IsVariadic);
   }
 
   /// The SIL storage type determines the ABI for arguments based purely on the
@@ -3854,12 +3874,14 @@ public:
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithInterfaceType(CanType type) const {
-    return SILParameterInfo(type, getConvention(), getDifferentiability());
+    return SILParameterInfo(type, getConvention(), getDifferentiability(),
+                            isVariadic());
   }
 
   /// Return a version of this parameter info with the convention replaced.
   SILParameterInfo getWithConvention(ParameterConvention c) const {
-    return SILParameterInfo(getInterfaceType(), c, getDifferentiability());
+    return SILParameterInfo(getInterfaceType(), c, getDifferentiability(),
+                            isVariadic());
   }
 
   /// Transform this SILParameterInfo by applying the user-provided
@@ -3890,6 +3912,7 @@ public:
     id.AddPointer(getInterfaceType().getPointer());
     id.AddInteger((unsigned)getConvention());
     id.AddInteger((unsigned)getDifferentiability());
+    id.AddInteger((unsigned)isVariadic());
   }
 
   SWIFT_DEBUG_DUMP;
@@ -3905,7 +3928,8 @@ public:
   bool operator==(SILParameterInfo rhs) const {
     return getInterfaceType() == rhs.getInterfaceType() &&
            getConvention() == rhs.getConvention() &&
-           getDifferentiability() == rhs.getDifferentiability();
+           getDifferentiability() == rhs.getDifferentiability() &&
+           isVariadic() == rhs.isVariadic();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);

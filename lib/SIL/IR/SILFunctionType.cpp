@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
 #define DEBUG_TYPE "libsil"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
@@ -1550,7 +1551,7 @@ private:
       auto flags = params[i].getParameterFlags();
 
       visit(flags.getValueOwnership(), /*forSelf=*/false, eltPattern, ty,
-            silRepresentation, flags.isNoDerivative());
+            silRepresentation, flags.isNoDerivative(), flags.isVariadic());
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -1572,7 +1573,7 @@ private:
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
              SILFunctionTypeRepresentation rep,
-             bool isNonDifferentiable = false) {
+             bool isNonDifferentiable = false, bool isVarArg = false) {
     assert(!isa<InOutType>(substType));
 
     // Tuples get handled specially, in some cases:
@@ -1589,9 +1590,8 @@ private:
           auto ownership = elt.getParameterFlags().getValueOwnership();
           assert(ownership == ValueOwnership::Default);
           assert(!elt.isVararg());
-          visit(ownership, forSelf,
-                origType.getTupleElementType(i),
-                CanType(elt.getRawType()), rep);
+          visit(ownership, forSelf, origType.getTupleElementType(i),
+                CanType(elt.getRawType()), rep, false, false);
         }
         return;
       case ValueOwnership::InOut:
@@ -1628,6 +1628,8 @@ private:
     if (isNonDifferentiable)
       param = param.getWithDifferentiability(
           SILParameterDifferentiability::NotDifferentiable);
+    if (isVarArg)
+      param = param.getAsVariadic(SILParameterIsVariadic::Yes);
     Inputs.push_back(param);
 
     maybeAddForeignParameters();
