@@ -39,7 +39,7 @@ Sequences = [
 ]
 def lazy (NameExpr) : return (NameExpr[0] + 'Lazy', '(' + NameExpr[1] + ').lazy')
 
-Sequences = Sequences + map(lazy, Sequences)
+Sequences = Sequences + list(map(lazy, Sequences))
 }%
 
 public let Prefix = [
