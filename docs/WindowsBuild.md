@@ -51,7 +51,7 @@ From the settings application, go to `Update & Security`.  In the `For developer
 ## Clone the repositories
 
 1. Clone `apple/llvm-project` into a directory for the toolchain
-2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-llbuild`, `apple/swift-package-manager` into the toolchain directory
+2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-llbuild`, `jpsim/yams`, `apple/swift-driver`, `apple/swift-package-manager` into the toolchain directory
 
 - Currently, other repositories in the Swift project have not been tested and may not be supported.
 
@@ -71,6 +71,8 @@ git clone https://github.com/apple/swift-corelibs-foundation swift-corelibs-foun
 git clone https://github.com/apple/swift-corelibs-xctest swift-corelibs-xctest
 git clone https://github.com/apple/swift-llbuild llbuild
 git clone https://github.com/apple/swift-tools-support-core swift-tools-support-core
+git clone https://github.com/jpsim/yams
+git clone https://github.com/apple/swift-driver
 git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager swiftpm
 ```
 
@@ -176,7 +178,7 @@ path S:\b\foundation\Foundation;%PATH%
 ## Build swift-corelibs-xctest
 
 ```cmd
-cmake -B S:\b\xctest -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D dispatch_DIR=S:\b\dispatch\cmake\modules -D Foundation_DIR=S:\b\foundation\cmake\modules -D LIT_COMMAND=S:\toolchain\llvm\utils\lit\lit.py -D PYTHON_EXECUTABLE=C:\Python27\python.exe -G Ninja -S S:\swift-corelibs-xctest
+cmake -B S:\b\xctest -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D dispatch_DIR=S:\b\libdispatch\cmake\modules -D Foundation_DIR=S:\b\foundation\cmake\modules -D LIT_COMMAND=S:\toolchain\llvm\utils\lit\lit.py -D PYTHON_EXECUTABLE=C:\Python27\python.exe -G Ninja -S S:\swift-corelibs-xctest
 ninja -C S:\b\xctest
 ```
 
@@ -227,10 +229,24 @@ cmake -B S:\b\tsc -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=cl -D C
 ninja -C S:\b\tsc
 ```
 
+## Build yams
+
+```cmd
+cmake -B S:\b\yams -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D Foundation_DIR=S:/b/foundation/cmake/modules -D dispatch_DIR=S:/b/libdispatch/cmake/modules -DXCTest_DIR=S:/b/xctest/cmake/modules -G Ninja -S S:\yams
+ninja -C S:\b\yams
+```
+
+## Build swift-driver
+
+```cmd
+cmake -B S:\b\driver -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D Foundation_DIR=S:/b/foundation/cmake/modules -D dispatch_DIR=S:/b/libdispatch/cmake/modules -DXCTest_DIR=S:/b/xctest/cmake/modules -D TSC_DIR=S:/b/tsc/cmake/modules -D LLBuild_DIR=S:/b/llbuild/cmake/modules -D Yams_DIR=S:/b/yams/cmake/modules -G Ninja -S S:\swift-driver
+ninja -C S:\b\driver
+```
+
 ## Build swift-package-manager
 
 ```cmd
-cmake -B S:\b\spm -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D USE_VENDORED_TSC=YES -D Foundation_DIR=S:/b/foundation/cmake/modules -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D LLBuild_DIR=S:/b/llbuild/cmake/modules -G Ninja -S S:\swiftpm
+cmake -B S:\b\spm -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D USE_VENDORED_TSC=YES -D Foundation_DIR=S:/b/foundation/cmake/modules -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D LLBuild_DIR=S:/b/llbuild/cmake/modules -D TSC_DIR=S:/b/tsc/cmake/modules -D Yams_DIR=S:/b/yams/cmake/modules -D SwiftDriver_DIR=S:/b/driver/cmake/modules -G Ninja -S S:\swiftpm
 ninja -C S:\b\spm
 ```
 
