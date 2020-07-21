@@ -40,3 +40,7 @@ public protocol ProtocolWithAssocTypeDefaults {
 public protocol ResilientSelfDefault : ResilientBaseProtocol {
   associatedtype AssocType: ResilientBaseProtocol = Self
 }
+
+@_fixed_layout public protocol OtherFrozenProtocol {
+  func protocolMethod()
+}
