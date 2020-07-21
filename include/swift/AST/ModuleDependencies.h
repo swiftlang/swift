@@ -230,6 +230,16 @@ public:
           fileDependencies));
   }
 
+  /// Describe an external dependency swift module.
+  static ModuleDependencies forExternalSwiftModuleStub(
+      const std::string &compiledModulePath,
+      const std::string &moduleDocPath,
+      const std::string &sourceInfoPath) {
+    return ModuleDependencies(
+        std::make_unique<ExternalSwiftModuleDependencyStorage>(
+          compiledModulePath, moduleDocPath, sourceInfoPath));
+  }
+
   /// Retrieve the path to the compiled module.
   const std::string getCompiledModulePath() const {
     return storage->compiledModulePath;

@@ -98,13 +98,13 @@ public:
 /// set of modules constitute external dependencies that are not visible to the
 /// scanner but will nevertheless be provided by the scanner's clients.
 /// This "loader" will not attempt to load any module files.
-class ExternalSwiftModuleStubLoader : public ModuleDependencyScanner {
+class ExternalSwiftModuleStubScanner : public ModuleDependencyScanner {
   /// Scan the given external module map
   void parseExternalModuleMap(StringRef fileName);
   llvm::StringMap<ExplicitModuleInfo> ExternalDependencyModuleMap;
 
 public:
-  ExternalSwiftModuleStubLoader(ASTContext &ctx, ModuleLoadingMode LoadMode,
+  ExternalSwiftModuleStubScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
                                 Identifier moduleName,
                                 StringRef ExternalDependencyModuleMap,
                                 InterfaceSubContextDelegate &astDelegate)
@@ -141,14 +141,14 @@ public:
   }
 
 public:
-  static std::unique_ptr<ExternalSwiftModuleStubLoader>
+  static std::unique_ptr<ExternalSwiftModuleStubScanner>
   create(ASTContext &ctx, DependencyTracker *tracker,
          ModuleLoadingMode loadMode, StringRef ExternalDependencyModuleMap,
          bool IgnoreSwiftSourceInfoFile);
 };
 } // namespace
 
-void ExternalSwiftModuleStubLoader::parseExternalModuleMap(StringRef fileName) {
+void ExternalSwiftModuleStubScanner::parseExternalModuleMap(StringRef fileName) {
   ExplicitModuleMapParser parser(Ctx);
   auto result =
       parser.parseSwiftExplicitModuleMap(fileName, ExternalDependencyModuleMap);
@@ -228,6 +228,15 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
   if (auto found =
           cache.findDependencies(moduleName, ModuleDependenciesKind::SwiftExternal))
     return found;
+
+  auto moduleId = Ctx.getIdentifier(moduleName);
+  // Instantiate dependency scanning "loaders".
+  SmallVector<std::unique_ptr<ModuleDependencyScanner>, 2> scanners;
+  scanners.push_back(std::make_unique<ModuleDependencyScanner>(
+      Ctx, LoadMode, moduleId, delegate));
+  scanners.push_back(std::make_unique<ExternalSwiftModuleStubScanner>(
+      Ctx, LoadMode, moduleId, Ctx.SearchPathOpts.ExternalDependencyModuleMap,
+      delegate));
 
   // Check whether there is a module with this name that we can import.
   for (auto &scanner : scanners) {

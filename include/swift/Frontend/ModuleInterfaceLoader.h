@@ -207,45 +207,6 @@ private:
   llvm::StringSaver Saver;
 };
 
-///// A ModuleLoader that loads external dependency module stubs specified in
-///// -external-dependency-module-map-file
-///// This loader is used only in dependency scanning to inform the scanner that a set of modules
-///// constitute external dependencies that are not visible to the scanner but will nevertheless be
-///// taken care of by the scanner's clients. This "loader" will not attempt to load any module files.
-//class ExternalSwiftModuleStubLoader: public SerializedModuleLoaderBase {
-//  explicit ExternalSwiftModuleStubLoader(ASTContext &ctx, DependencyTracker *tracker,
-//                                         ModuleLoadingMode loadMode,
-//                                         bool IgnoreSwiftSourceInfoFile);
-//  std::error_code findModuleFilesInDirectory(
-//    AccessPathElem ModuleID,
-//    const SerializedModuleBaseName &BaseName,
-//    SmallVectorImpl<char> *ModuleInterfacePath,
-//    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-//    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-//    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
-//
-//  bool canImportModule(Located<Identifier> mID) override;
-//
-//  bool isCached(StringRef DepPath) override { return false; };
-//
-//  struct Implementation;
-//  Implementation &Impl;
-//public:
-//  static std::unique_ptr<ExternalSwiftModuleStubLoader>
-//  create(ASTContext &ctx,
-//         DependencyTracker *tracker, ModuleLoadingMode loadMode,
-//         StringRef ExternalDependencyModuleMap,
-//         bool IgnoreSwiftSourceInfoFile);
-//
-//  /// Append visible module names to \p names. Note that names are possibly
-//  /// duplicated, and not guaranteed to be ordered in any way.
-//  void collectVisibleTopLevelModuleNames(
-//      SmallVectorImpl<Identifier> &names) const override;
-//
-//  /// Actual record of the decoded stub.
-//  Optional<ModuleDependencies> dependencies;
-//};
-
 struct ModuleInterfaceLoaderOptions {
   bool remarkOnRebuildFromInterface = false;
   bool disableInterfaceLock = false;
