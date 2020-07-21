@@ -766,10 +766,7 @@ class ExprContextAnalyzer {
         auto Params = typeAndDecl.Type->getParams();
         ParameterList *paramList = nullptr;
         if (auto VD = typeAndDecl.Decl) {
-          if (auto FD = dyn_cast<AbstractFunctionDecl>(VD))
-            paramList = FD->getParameters();
-          else if (auto SD = dyn_cast<SubscriptDecl>(VD))
-            paramList = SD->getIndices();
+          paramList = getParameterList(VD);
           if (paramList && paramList->size() != Params.size())
             paramList = nullptr;
         }

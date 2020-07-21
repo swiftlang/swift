@@ -1157,10 +1157,14 @@ LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
 
+# We cannot currently apply the normal rules of skipping here for LLVM. Even if
+# we are skipping building LLVM, we still need to at least build a few tools
+# like tblgen that Swift relies on for building and testing. See the LLVM
+# configure rules.
+PRODUCTS=(llvm)
 [[ "${SKIP_BUILD_CMARK}" ]] || PRODUCTS+=(cmark)
 [[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
 [[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
-[[ "${SKIP_BUILD_LLVM}" ]] || PRODUCTS+=(llvm)
 [[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
 [[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
 [[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
@@ -1552,7 +1556,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${BUILD_LLVM}" == "0" ] ; then
                     build_targets=(clean)
                 fi
-                if [ "${SKIP_BUILD}" ] ; then
+                if [[ "${SKIP_BUILD}" || "${SKIP_BUILD_LLVM}" ]] ; then
                     # We can't skip the build completely because the standalone
                     # build of Swift depend on these for building and testing.
                     build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)

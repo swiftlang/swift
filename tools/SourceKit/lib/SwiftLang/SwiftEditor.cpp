@@ -786,8 +786,10 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
           });
 
       std::vector<SwiftSemanticToken>::iterator ReplaceEnd;
-      if (Upd->getLength() == 0) {
+      if (ReplaceBegin == SemaToks.end()) {
         ReplaceEnd = ReplaceBegin;
+      } else if (Upd->getLength() == 0) {
+        ReplaceEnd = ReplaceBegin + 1;
       } else {
         ReplaceEnd = std::upper_bound(ReplaceBegin, SemaToks.end(),
             Upd->getByteOffset() + Upd->getLength(),

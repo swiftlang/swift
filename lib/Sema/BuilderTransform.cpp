@@ -19,6 +19,7 @@
 #include "MiscDiagnostics.h"
 #include "SolutionResult.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
@@ -37,6 +38,24 @@ using namespace swift;
 using namespace constraints;
 
 namespace {
+
+/// Find the first #available condition within the statement condition,
+/// or return NULL if there isn't one.
+const StmtConditionElement *findAvailabilityCondition(StmtCondition stmtCond) {
+  for (const auto &cond : stmtCond) {
+    switch (cond.getKind()) {
+    case StmtConditionElement::CK_Boolean:
+    case StmtConditionElement::CK_PatternBinding:
+      continue;
+
+    case StmtConditionElement::CK_Availability:
+      return &cond;
+      break;
+    }
+  }
+
+  return nullptr;
+}
 
 /// Visitor to classify the contents of the given closure.
 class BuilderClosureVisitor
@@ -208,9 +227,6 @@ public:
                         DeclContext *dc, Type builderType,
                         Type bodyResultType)
       : cs(cs), dc(dc), ctx(ctx), builderType(builderType) {
-    assert((cs || !builderType->hasTypeVariable()) &&
-           "cannot handle builder type with type variables without "
-           "constraint system");
     builder = builderType->getAnyNominal();
     applied.builderType = builderType;
     applied.bodyResultType = bodyResultType;
@@ -498,10 +514,20 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
+    // If there is a #available in the condition, the 'then' will need to
+    // be wrapped in a call to buildAvailabilityErasure(_:), if available.
+    Expr *thenVarRefExpr = buildVarRef(
+        thenVar, ifStmt->getThenStmt()->getEndLoc());
+    if (findAvailabilityCondition(ifStmt->getCond()) &&
+        builderSupports(ctx.Id_buildLimitedAvailability)) {
+      thenVarRefExpr = buildCallIfWanted(
+          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
+          { thenVarRefExpr }, { Identifier() });
+    }
+
     // Prepare the `then` operand by wrapping it to produce a chain result.
     Expr *thenExpr = buildWrappedChainPayload(
-        buildVarRef(thenVar, ifStmt->getThenStmt()->getEndLoc()),
-        payloadIndex, numPayloads, isOptional);
+        thenVarRefExpr, payloadIndex, numPayloads, isOptional);
 
     // Prepare the `else operand:
     Expr *elseExpr;
@@ -1175,6 +1201,35 @@ public:
             capturedThen.first, {capturedThen.second.front()}));
     ifStmt->setThenStmt(newThen);
 
+    // Look for a #available condition. If there is one, we need to check
+    // that the resulting type of the "then" does refer to any types that
+    // are unavailable in the enclosing context.
+    //
+    // Note that this is for staging in support for
+    if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
+      SourceLoc loc = availabilityCond->getStartLoc();
+      Type thenBodyType = solution.simplifyType(
+          solution.getType(target.captured.second[0]));
+      thenBodyType.findIf([&](Type type) {
+        auto nominal = type->getAnyNominal();
+        if (!nominal)
+          return false;
+
+        if (auto reason = TypeChecker::checkDeclarationAvailability(
+                              nominal, loc, dc)) {
+          // Note that the problem is with the function builder, not the body.
+          // This is for staging only. We want to disable #available in
+          // function builders that don't support this operation.
+          ctx.Diags.diagnose(
+              loc, diag::function_builder_missing_limited_availability,
+              builderTransform.builderType);
+          return true;
+        }
+
+        return false;
+      });
+    }
+
     if (auto elseBraceStmt =
             dyn_cast_or_null<BraceStmt>(ifStmt->getElseStmt())) {
       // Translate the "else" branch when it's a stmt-brace.
@@ -1464,7 +1519,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // If we encountered an error or there was an explicit result type,
   // bail out and report that to the caller.
   auto &ctx = func->getASTContext();
-  auto request = PreCheckFunctionBuilderRequest{func, func->getBody()};
+  auto request = PreCheckFunctionBuilderRequest{AnyFunctionRef(func)};
   switch (evaluateOrDefault(
               ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1592,7 +1647,7 @@ ConstraintSystem::matchFunctionBuilder(
 
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
-  auto request = PreCheckFunctionBuilderRequest{fn, fn.getBody()};
+  auto request = PreCheckFunctionBuilderRequest{fn};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             FunctionBuilderBodyPreCheck::Error)) {
   case FunctionBuilderBodyPreCheck::Okay:
@@ -1633,22 +1688,6 @@ ConstraintSystem::matchFunctionBuilder(
         return getTypeMatchFailure(locator);
       }
     }
-  }
-
-  // If the builder type has a type parameter, substitute in the type
-  // variables.
-  if (builderType->hasTypeParameter()) {
-    // Find the opened type for this callee and substitute in the type
-    // parametes.
-    for (const auto &opened : OpenedTypes) {
-      if (opened.first == calleeLocator) {
-        OpenedTypeMap replacements(opened.second.begin(),
-                                   opened.second.end());
-        builderType = openType(builderType, replacements);
-        break;
-      }
-    }
-    assert(!builderType->hasTypeParameter());
   }
 
   BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
@@ -1712,10 +1751,10 @@ public:
     if (HasError)
       return FunctionBuilderBodyPreCheck::Error;
 
+    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
+
     if (hasReturnStmt())
       return FunctionBuilderBodyPreCheck::HasReturnStmt;
-
-    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
 
     return FunctionBuilderBodyPreCheck::Okay;
   }
@@ -1754,23 +1793,16 @@ public:
 
 }
 
-FunctionBuilderBodyPreCheck
-PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval, AnyFunctionRef fn,
-                                         BraceStmt *body) const {
-  // NOTE: 'body' is passed only for the request evaluater caching key.
-  // Since source tooling (e.g. code completion) might replace the body,
-  // the function alone is not sufficient for the key.
-  assert(fn.getBody() == body &&
-         "body must be the current body of the function");
-
+FunctionBuilderBodyPreCheck PreCheckFunctionBuilderRequest::evaluate(
+    Evaluator &evaluator, PreCheckFunctionBuilderDescriptor owner) const {
   // We don't want to do the precheck if it will already have happened in
   // the enclosing expression.
   bool skipPrecheck = false;
   if (auto closure = dyn_cast_or_null<ClosureExpr>(
-          fn.getAbstractClosureExpr()))
+          owner.Fn.getAbstractClosureExpr()))
     skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
 
-  return PreCheckFunctionBuilderApplication(fn, false).run();
+  return PreCheckFunctionBuilderApplication(owner.Fn, false).run();
 }
 
 std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {

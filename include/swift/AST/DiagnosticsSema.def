@@ -2812,7 +2812,7 @@ ERROR(broken_tensor_group_requirement,none,
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
 NOTE(codable_non_conforming_property_here,none,
-     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Type))
+     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, TypeLoc))
 NOTE(codable_non_decoded_property_here,none,
      "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
 NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
@@ -5186,6 +5186,10 @@ NOTE(function_builder_infer_add_return, none,
 NOTE(function_builder_infer_pick_specific, none,
      "apply function builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
      (Type, unsigned, DeclName))
+WARNING(function_builder_missing_limited_availability, none,
+        "function builder %0 does not implement `buildLimitedAvailability`; "
+        "this code may crash on earlier versions of the OS",
+        (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

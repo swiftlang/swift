@@ -118,6 +118,14 @@ public:
     return mangleTypeSymbol(type, "N");
   }
 
+  std::string mangleNoncanonicalTypeMetadata(Type type) {
+    return mangleTypeSymbol(type, "MN");
+  }
+
+  std::string mangleNoncanonicalSpecializedGenericTypeMetadataCache(Type type) {
+    return mangleTypeSymbol(type, "MJ");
+  }
+
   std::string mangleTypeMetadataPattern(const NominalTypeDecl *decl) {
     return mangleNominalTypeSymbol(decl, "MP");
   }

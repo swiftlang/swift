@@ -45,8 +45,8 @@ class ClassWithNonExcludedVarMembers : Codable { // expected-error {{type 'Class
     // AnyHashable does not conform to Codable.
     var p3: AnyHashable? // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable?' does not conform to 'Decodable'}}
     // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable?' does not conform to 'Encodable'}}
-    var p4: AnyHashable! // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable?' does not conform to 'Decodable'}}
-    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable?' does not conform to 'Encodable'}}
+    var p4: AnyHashable! // expected-note {{cannot automatically synthesize 'Decodable' because 'AnyHashable!' does not conform to 'Decodable'}}
+    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'AnyHashable!' does not conform to 'Encodable'}}
 }
 
 class ClassWithExcludedVarMembers : Codable {
