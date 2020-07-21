@@ -9,8 +9,8 @@ struct S1 : Codable {
   var a: String = ""
   var b: Int = 0
   var c: Nested = Nested()
-  // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'S1.Nested' does not conform to 'Decodable'}}
-  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'S1.Nested' does not conform to 'Encodable'}}
+  // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'Nested' does not conform to 'Decodable'}}
+  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'Nested' does not conform to 'Encodable'}}
 }
 
 // Codable struct with non-enum CodingKeys.
