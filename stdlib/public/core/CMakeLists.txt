@@ -215,7 +215,8 @@ if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     ../Differentiation/DifferentiationUtilities.swift
     ../Differentiation/DifferentiationSupport.swift
     ../Differentiation/AnyDifferentiable.swift
-    ../Differentiation/ArrayDifferentiation.swift)
+    ../Differentiation/ArrayDifferentiation.swift
+    ../Differentiation/OptionalDifferentiation.swift)
   list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES
     ../Differentiation/FloatingPointDifferentiation.swift.gyb
     ../Differentiation/SIMDDifferentiation.swift.gyb)
