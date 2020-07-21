@@ -128,5 +128,10 @@ ADContext::findDifferentialOperator(DifferentiableFunctionInst *inst) {
   return inst->getLoc().getAsASTNode<DifferentiableFunctionExpr>();
 }
 
+LinearFunctionExpr *
+ADContext::findDifferentialOperator(LinearFunctionInst *inst) {
+  return inst->getLoc().getAsASTNode<LinearFunctionExpr>();
+}
+
 } // end namespace autodiff
 } // end namespace swift
