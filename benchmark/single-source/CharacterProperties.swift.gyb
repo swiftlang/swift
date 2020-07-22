@@ -52,27 +52,27 @@ extension Character {
   var firstScalar: UnicodeScalar { return unicodeScalars.first! }
 }
 
-% Properties = { "Alphanumeric": "alphanumerics", \
-%              "Capitalized": "capitalizedLetters", \
-%              "Control": "controlCharacters", \
-%              "Decimal": "decimalDigits", \
-%              "Letter": "letters", \
-%              "Lowercase": "lowercaseLetters", \
-%              "Uppercase": "uppercaseLetters", \
-%              "Newline": "newlines", \
-%              "Whitespace": "whitespaces", \
-%              "Punctuation": "punctuationCharacters" \
-%              }
+% Properties = [ ( "Alphanumeric", "alphanumerics"),
+%                ( "Capitalized", "capitalizedLetters"),
+%                ( "Control", "controlCharacters"),
+%                ( "Decimal", "decimalDigits"),
+%                ( "Letter", "letters"),
+%                ( "Lowercase", "lowercaseLetters"),
+%                ( "Uppercase", "uppercaseLetters"),
+%                ( "Newline", "newlines"),
+%                ( "Whitespace", "whitespaces"),
+%                ( "Punctuation", "punctuationCharacters")
+%              ]
 
 // Fetch the CharacterSet for every call
-% for Property, Set in Properties.items():
+% for Property, Set in Properties:
 func is${Property}(_ c: Character) -> Bool {
   return CharacterSet.${Set}.contains(c.firstScalar)
 }
 % end
 
 // Stash the set
-% for Property, Set in Properties.items():
+% for Property, Set in Properties:
 let ${Set} = CharacterSet.${Set}
 func is${Property}Stashed(_ c: Character) -> Bool {
   return ${Set}.contains(c.firstScalar)
@@ -81,13 +81,13 @@ func is${Property}Stashed(_ c: Character) -> Bool {
 
 func setupStash() {
   blackHole(workload)
-% for Property, Set in Properties.items():
+% for Property, Set in Properties:
     blackHole(${Set})
 % end
 }
 
 // Memoize the stashed set
-% for Property, Set in Properties.items():
+% for Property, Set in Properties:
 var ${Set}Memo = Set<UInt32>()
 func is${Property}StashedMemo(_ c: Character) -> Bool {
   let scalar = c.firstScalar
@@ -102,7 +102,7 @@ func is${Property}StashedMemo(_ c: Character) -> Bool {
 
 func setupMemo() {
   blackHole(workload)
-% for Property, Set in Properties.items():
+% for Property, Set in Properties:
     blackHole(${Set}Memo)
 % end
 }
@@ -130,7 +130,7 @@ func precompute(_ charSet: CharacterSet, capacity: Int) -> Set<UInt32> {
     capitalizedLetters=31
   )
 }%
-% for Property, Set in Properties.items():
+% for Property, Set in Properties:
 var ${Set}Precomputed: Set<UInt32> =
   precompute(${Set}, capacity: ${precomputed_capacity[Set]})
 func is${Property}Precomputed(_ c: Character) -> Bool {
@@ -140,7 +140,7 @@ func is${Property}Precomputed(_ c: Character) -> Bool {
 
 func setupPrecomputed() {
   blackHole(workload)
-% for Property, Set in Properties.items():
+% for Property, Set in Properties:
     blackHole(${Set}Precomputed)
 %#//    print("${Set}: \(${Set}Precomputed.count)")
 % end
@@ -171,7 +171,7 @@ let workload = """
 public func run_CharacterPropertiesFetch(_ N: Int) {
   for _ in 1...N {
     for c in workload {
-    % for Property, Set in Properties.items():
+    % for Property, Set in Properties:
         blackHole(is${Property}(c))
     % end
     }
@@ -182,7 +182,7 @@ public func run_CharacterPropertiesFetch(_ N: Int) {
 public func run_CharacterPropertiesStashed(_ N: Int) {
   for _ in 1...N {
     for c in workload {
-    % for Property, Set in Properties.items():
+    % for Property, Set in Properties:
         blackHole(is${Property}Stashed(c))
     % end
     }
@@ -193,7 +193,7 @@ public func run_CharacterPropertiesStashed(_ N: Int) {
 public func run_CharacterPropertiesStashedMemo(_ N: Int) {
   for _ in 1...N {
     for c in workload {
-    % for Property, Set in Properties.items():
+    % for Property, Set in Properties:
         blackHole(is${Property}StashedMemo(c))
     % end
     }
@@ -204,7 +204,7 @@ public func run_CharacterPropertiesStashedMemo(_ N: Int) {
 public func run_CharacterPropertiesPrecomputed(_ N: Int) {
   for _ in 1...N {
     for c in workload {
-    % for Property, Set in Properties.items():
+    % for Property, Set in Properties:
         blackHole(is${Property}Precomputed(c))
     % end
     }
