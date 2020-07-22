@@ -839,13 +839,10 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
-    if (ResultType.hasCodeCompletion())
-      return ResultType;
     retType = ResultType.getPtrOrNull();
-    if (!retType) {
-      Status.setIsParseError();
+    Status |= ResultType;
+    if (Status.isError())
       return Status;
-    }
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
