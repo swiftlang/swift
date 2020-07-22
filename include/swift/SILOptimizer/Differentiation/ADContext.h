@@ -219,8 +219,7 @@ public:
   /// pointer value as a previously processed and deleted instruction.
   LinearFunctionInst *
   createLinearFunction(SILBuilder &builder, SILLocation loc,
-                       IndexSubset *parameterIndices,
-                       IndexSubset *resultIndices, SILValue original,
+                       IndexSubset *parameterIndices, SILValue original,
                        Optional<SILValue> transposeFunction = None);
 
   // Given a `differentiable_function` instruction, finds the corresponding

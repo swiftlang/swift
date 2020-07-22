@@ -755,19 +755,6 @@ emitDerivativeFunctionReference(
   return None;
 }
 
-/// Emits a reference to the transpose function of `originalFunction`,
-/// differentiated with respect to exactly `desiredIndices`. Returns the
-/// transpose function `SILValue`.
-///
-/// Returns `None` on failure, signifying that a diagnostic has been emitted
-/// using `invoker`.
-static Optional<SILValue> emitTransposeFunctionReference(
-    DifferentiationTransformer &transformer, SILBuilder &builder,
-    SILAutoDiffIndices desiredIndices, SILValue originalFunction,
-    DifferentiationInvoker invoker) {
-  // TODO: Fill in.
-}
-
 //===----------------------------------------------------------------------===//
 // `SILDifferentiabilityWitness` processing
 //===----------------------------------------------------------------------===//
@@ -1226,13 +1213,25 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
 }
 
 SILValue DifferentiationTransformer::promoteToLinearFunction(
-    LinearFunctionInst *inst, SILBuilder &builder, SILLocation loc,
+    LinearFunctionInst *lfi, SILBuilder &builder, SILLocation loc,
     DifferentiationInvoker invoker) {
   // TODO: Fill in. Copy code from above.
   // For now, create a new `linear_function` instruction with an undef
   // transpose.
   // Eventually, use `emitTransposeFunctionReference` to fill in legitimately.
-  return inst;
+  auto origFnOperand = lfi->getOriginalFunction();
+  auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
+  auto *parameterIndices = lfi->getParameterIndices();
+  auto originalType = origFnOperand->getType().castTo<SILFunctionType>();
+  auto transposeFnType = originalType->getAutoDiffTransposeFunctionType(
+      parameterIndices, context.getTypeConverter(),
+      LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+  auto transposeType = SILType::getPrimitiveObjectType(transposeFnType);
+  auto transposeFn = SILUndef::get(transposeType, builder.getFunction());
+  auto *newLinearFn = context.createLinearFunction(
+      builder, loc, parameterIndices, origFnCopy, SILValue(transposeFn));
+  context.getLinearFunctionInstWorklist().push_back(lfi);
+  return newLinearFn;
 }
 
 /// Fold `differentiable_function_extract` users of the given
@@ -1390,7 +1389,8 @@ void Differentiation::run() {
 
   // If nothing has triggered differentiation, there's nothing to do.
   if (context.getInvokers().empty() &&
-      context.getDifferentiableFunctionInstWorklist().empty())
+      context.getDifferentiableFunctionInstWorklist().empty() &&
+      context.getLinearFunctionInstWorklist().empty())
     return;
 
   // Differentiation relies on the stdlib (the Swift module).
