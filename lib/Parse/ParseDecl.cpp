@@ -3891,13 +3891,20 @@ Parser::parseDecl(ParseDeclOptions Flags,
         IsAtStartOfLineOrPreviousHadSemi) {
 
       // Fail fast if we have something that starts with an identifier
-      // but cannot be a var or func declaration.
-      const bool NotAVarOrFuncDecl = Tok.isIdentifierOrUnderscore() &&
+      // and a period, but cannot be a var or func declaration.
+      // we try to parse from here as an expression to pass over
+      // the tokens and reach a safe place to keep parsing.
+      const bool IdentifierPeriod = Tok.isIdentifierOrUnderscore() &&
         peekToken().isAny(tok::period);
 
-      if (NotAVarOrFuncDecl) {
-          diagnose(Tok, diag::expected_decl);
-          break;
+      if (IdentifierPeriod) {
+        ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr);
+        // parse the rest of the expression to get past the problem.
+        if (ResultExpr.isNonNull()) {
+          auto Result = ResultExpr.get();
+        }
+        diagnose(Tok, diag::expected_decl);
+        break;
       }
 
       // Emit diagnostics if we meet an identifier/operator where a declaration

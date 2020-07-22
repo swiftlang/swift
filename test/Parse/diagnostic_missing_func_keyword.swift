@@ -40,9 +40,11 @@ struct Bar {
   
   a, b: Int // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
 
-  a.qux = 345 // expected-error {{expected declaration}}
-  
-  fisr.qux = 345 // expected-error {{expected declaration}}
+  // ensure that the id.id pattern is not interpreted as a function
+  a.foo = 345 // expected-error {{expected declaration}}
+  // ensure that the id.id pattern generating an expected declaration
+  // diagnostic does not block further diagnostics.
+  fisr.bar = 345 // expected-error {{expected declaration}}
 
 }
 
