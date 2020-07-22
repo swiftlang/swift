@@ -515,7 +515,7 @@ protected:
       return nullptr;
 
     // If there is a #available in the condition, the 'then' will need to
-    // be wrapped in a call to buildAvailabilityErasure(_:), if available.
+    // be wrapped in a call to buildLimitedAvailability(_:), if available.
     Expr *thenVarRefExpr = buildVarRef(
         thenVar, ifStmt->getThenStmt()->getEndLoc());
     if (findAvailabilityCondition(ifStmt->getCond()) &&
@@ -1202,10 +1202,14 @@ public:
     ifStmt->setThenStmt(newThen);
 
     // Look for a #available condition. If there is one, we need to check
-    // that the resulting type of the "then" does refer to any types that
+    // that the resulting type of the "then" doesn't refer to any types that
     // are unavailable in the enclosing context.
     //
-    // Note that this is for staging in support for
+    // Note that this is for staging in support for buildLimitedAvailability();
+    // the diagnostic is currently a warning, so that existing code that
+    // compiles today will continue to compile. Once function builder types
+    // have had the change to adopt buildLimitedAvailability(), we'll upgrade
+    // this warning to an error.
     if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
       SourceLoc loc = availabilityCond->getStartLoc();
       Type thenBodyType = solution.simplifyType(
@@ -1217,9 +1221,6 @@ public:
 
         if (auto reason = TypeChecker::checkDeclarationAvailability(
                               nominal, loc, dc)) {
-          // Note that the problem is with the function builder, not the body.
-          // This is for staging only. We want to disable #available in
-          // function builders that don't support this operation.
           ctx.Diags.diagnose(
               loc, diag::function_builder_missing_limited_availability,
               builderTransform.builderType);

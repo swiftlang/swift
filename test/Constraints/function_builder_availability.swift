@@ -65,7 +65,7 @@ tuplify(true) { cond in
   if #available(OSX 10.51, *) {
     globalFuncAvailableOn10_51()
     tuplify(false) { cond2 in
-      if cond, #available(OSX 10.52, *) { // expected-warning{{function builder 'TupleBuilder' does not implement `buildLimitedAvailability`; this code may crash on earlier versions of the OS}}
+      if cond, #available(OSX 10.52, *) { // expected-warning{{function builder 'TupleBuilder' does not implement 'buildLimitedAvailability'; this code may crash on earlier versions of the OS}}
         cond2
         globalFuncAvailableOn10_52()
       } else {
