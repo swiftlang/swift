@@ -14,12 +14,14 @@
 // CHECK-SAME:   %swift.type*,
 // CHECK-SAME:   i64
 // CHECK-SAME: }> <{
-// CHECK-SAME:   i8** getelementptr inbounds (
-// CHECK-SAME:     %swift.enum_vwtable,
-// CHECK-SAME:     %swift.enum_vwtable* @"$s8Argument03OneA0Oy4main03TheA0VGWV",
-// CHECK-SAME:     i32 0,
-// CHECK-SAME:     i32 0
-// CHECK-SAME:   ),
+//           :   i8** getelementptr inbounds (
+//           :     %swift.enum_vwtable,
+//           :     %swift.enum_vwtable* @"
+// CHECK-SAME:       $s8Argument03OneA0Oy4main03TheA0VGWV
+//           :     ",
+//           :     i32 0,
+//           :     i32 0
+//           :   ),
 // CHECK-SAME:   [[INT]] 513,
 // CHECK-SAME:   $s8Argument03OneA0OMn
 // CHECK-SAME:   %swift.type* bitcast (
