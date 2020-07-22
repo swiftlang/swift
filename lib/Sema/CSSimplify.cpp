@@ -2958,7 +2958,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   std::tie(fromObjectType, fromUnwraps) = getObjectTypeAndUnwraps(fromType);
   std::tie(toObjectType, toUnwraps) = getObjectTypeAndUnwraps(toType);
 
-  // Since equality is symmetric and it decays into a `Bind` eagerly
+  // Since equality is symmetric and it decays into a `Bind`, eagerly
   // unwrapping optionals from either side might be incorrect since
   // there is not enough information about what is expected e.g.
   // `Int?? equal T0?` just like `T0? equal Int??` allows `T0` to be
