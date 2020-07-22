@@ -16,12 +16,14 @@
 // CHECK-SAME:   i32,
 // CHECK-SAME:   i64
 // CHECK-SAME: }> <{
-// CHECK-SAME:   i8** getelementptr inbounds (
-// CHECK-SAME:     %swift.vwtable,
-// CHECK-SAME:     %swift.vwtable* @"$s7Generic11OneArgumentVy4main03TheC0VGWV",
-// CHECK-SAME:     i32 0,
-// CHECK-SAME:     i32 0
-// CHECK-SAME:   ),
+//           :   i8** getelementptr inbounds (
+//           :     %swift.vwtable,
+//           :     %swift.vwtable* @"
+// CHECK-SAME:       $s7Generic11OneArgumentVy4main03TheC0VGWV
+//           :     ",
+//           :     i32 0,
+//           :     i32 0
+//           :   ),
 // CHECK-SAME:   [[INT]] 512,
 // CHECK-SAME:   $s7Generic11OneArgumentVMn
 // CHECK-SAME:   %swift.type* bitcast (
