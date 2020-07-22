@@ -339,22 +339,6 @@ namespace {
 
     expr->walk(LinkedExprAnalyzer(lti, CS));
 
-    auto mergeTypeVariables = [&](ArrayRef<TypeVariableType *> typeVars) {
-      if (typeVars.size() < 2)
-        return;
-
-      auto rep1 = CS.getRepresentative(typeVars.front());
-      for (unsigned i = 1, n = typeVars.size(); i != n; ++i) {
-        auto rep2 = CS.getRepresentative(typeVars[i]);
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    };
-
-    mergeTypeVariables(lti.intLiteralTyvars);
-    mergeTypeVariables(lti.floatLiteralTyvars);
-    mergeTypeVariables(lti.stringLiteralTyvars);
-
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
 
