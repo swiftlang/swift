@@ -1603,6 +1603,12 @@ public:
   /// For a pattern initialization target, retrieve the contextual pattern.
   ContextualPattern getContextualPattern() const;
 
+  /// Whether this target is for a for-in statement.
+  bool isForEachStmt() const {
+    return kind == Kind::expression &&
+           getExprContextualTypePurpose() == CTP_ForEachStmt;
+  }
+
   /// Whether this is an initialization for an Optional.Some pattern.
   bool isOptionalSomePatternInit() const {
     return kind == Kind::expression &&
@@ -1659,14 +1665,12 @@ public:
   }
 
   const ForEachStmtInfo &getForEachStmtInfo() const {
-    assert(kind == Kind::expression);
-    assert(expression.contextualPurpose == CTP_ForEachStmt);
+    assert(isForEachStmt());
     return expression.forEachStmt;
   }
 
   ForEachStmtInfo &getForEachStmtInfo() {
-    assert(kind == Kind::expression);
-    assert(expression.contextualPurpose == CTP_ForEachStmt);
+    assert(isForEachStmt());
     return expression.forEachStmt;
   }
 
@@ -5591,6 +5595,11 @@ bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 /// Determine whether givne closure has any explicit `return`
 /// statements that could produce non-void result.
 bool hasExplicitResult(ClosureExpr *closure);
+
+/// Emit diagnostics for syntactic restrictions within a given solution
+/// application target.
+void performSyntacticDiagnosticsForTarget(
+    const SolutionApplicationTarget &target, bool isExprStmt);
 
 } // end namespace constraints
 

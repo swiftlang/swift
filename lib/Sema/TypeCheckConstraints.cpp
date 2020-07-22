@@ -1995,6 +1995,85 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
   return false;
 }
 
+namespace {
+/// Produce any additional syntactic diagnostics for the body of a function
+/// that had a function builder applied.
+class FunctionSyntacticDiagnosticWalker : public ASTWalker {
+  SmallVector<DeclContext *, 4> dcStack;
+
+public:
+  FunctionSyntacticDiagnosticWalker(DeclContext *dc) { dcStack.push_back(dc); }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
+
+    if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+      if (closure->wasSeparatelyTypeChecked()) {
+        dcStack.push_back(closure);
+        return {true, expr};
+      }
+    }
+
+    return {false, expr};
+  }
+
+  Expr *walkToExprPost(Expr *expr) override {
+    if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+      if (closure->wasSeparatelyTypeChecked()) {
+        assert(dcStack.back() == closure);
+        dcStack.pop_back();
+      }
+    }
+
+    return expr;
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    performStmtDiagnostics(dcStack.back()->getASTContext(), stmt);
+    return {true, stmt};
+  }
+
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
+    return {false, pattern};
+  }
+
+  bool walkToTypeLocPre(TypeLoc &typeLoc) override { return false; }
+  bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
+  bool walkToParameterListPre(ParameterList *params) override { return false; }
+};
+} // end anonymous namespace
+
+void constraints::performSyntacticDiagnosticsForTarget(
+    const SolutionApplicationTarget &target, bool isExprStmt) {
+  auto *dc = target.getDeclContext();
+  switch (target.kind) {
+  case SolutionApplicationTarget::Kind::expression: {
+    // First emit diagnostics for the main expression.
+    performSyntacticExprDiagnostics(target.getAsExpr(), dc, isExprStmt);
+
+    // If this is a for-in statement, we also need to check the where clause if
+    // present.
+    if (target.isForEachStmt()) {
+      if (auto *whereExpr = target.getForEachStmtInfo().whereExpr)
+        performSyntacticExprDiagnostics(whereExpr, dc, /*isExprStmt*/ false);
+    }
+    return;
+  }
+  case SolutionApplicationTarget::Kind::function: {
+    FunctionSyntacticDiagnosticWalker walker(dc);
+    target.getFunctionBody()->walk(walker);
+    return;
+  }
+  case SolutionApplicationTarget::Kind::stmtCondition:
+  case SolutionApplicationTarget::Kind::caseLabelItem:
+  case SolutionApplicationTarget::Kind::patternBinding:
+  case SolutionApplicationTarget::Kind::uninitializedWrappedVar:
+    // Nothing to do for these.
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       Type convertType,
@@ -2096,7 +2175,7 @@ TypeChecker::typeCheckExpression(
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
-    performSyntacticExprDiagnostics(result, dc, isExprStmt);
+    performSyntacticDiagnosticsForTarget(*resultTarget, isExprStmt);
   }
 
   resultTarget->setExpr(result);
