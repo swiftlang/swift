@@ -169,7 +169,7 @@ func next(_ x: inout Int, upto mod: Int) {
   x = (x + 1) % (mod + 1)
 }
 
-% for (V, i) in [(v, int(filter(str.isdigit, v))) for v in Vals]:
+% for (V, i) in [(v, int(''.join(filter(str.isdigit, v)))) for v in Vals]:
 struct ${V} : Existential {${
   ''.join(['\n	var f{0}: Int = {1}'.format(vi, v)
               for (vi, v) in Vars[0:i]]) +
@@ -208,7 +208,7 @@ class Klazz { // body same as Val2
 	}
 }
 
-% for (V, i) in [(v, int(filter(str.isdigit, v))) for v in Refs]:
+% for (V, i) in [(v, int(''.join(filter(str.isdigit, v)))) for v in Refs]:
 struct ${V} : Existential {
 	${'\n	'.join([('var f{0}: Klazz = Klazz()'.format(vi) if vi < 3 else
                  'var f3: Int = 0') for (vi, _) in Vars[0:i]])}
