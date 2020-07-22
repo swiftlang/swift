@@ -3574,12 +3574,14 @@ namespace {
           castKind == CheckedCastKind::ArrayDowncast ||
           castKind == CheckedCastKind::DictionaryDowncast ||
           castKind == CheckedCastKind::SetDowncast) {
-        auto *const cast = ConditionalCheckedCastExpr::createImplicit(
-            ctx, sub, castTypeRepr, toType);
+        auto *const cast =
+            ConditionalCheckedCastExpr::createImplicit(ctx, sub, toType);
+        cast->setType(OptionalType::get(toType));
+        cast->setCastType(toType);
         cs.setType(cast, cast->getType());
 
         // Type-check this conditional case.
-        Expr *result = handleConditionalCheckedCastExpr(cast, true);
+        Expr *result = handleConditionalCheckedCastExpr(cast, castTypeRepr);
         if (!result)
           return nullptr;
 
@@ -3588,7 +3590,8 @@ namespace {
 
         // Match the optional value against its `Some` case.
         auto *someDecl = ctx.getOptionalSomeDecl();
-        auto isSomeExpr = new (ctx) EnumIsCaseExpr(result, someDecl);
+        auto isSomeExpr =
+            new (ctx) EnumIsCaseExpr(result, castTypeRepr, someDecl);
         auto boolDecl = ctx.getBoolDecl();
 
         if (!boolDecl) {
@@ -4010,10 +4013,16 @@ namespace {
     }
 
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+      // Simplify and update the type we're casting to.
+      auto *const castTypeRepr = expr->getCastTypeRepr();
+      const auto toType = simplifyType(cs.getType(castTypeRepr));
+      expr->setCastType(toType);
+      cs.setType(castTypeRepr, toType);
+
       // If we need to insert a force-unwrap for coercions of the form
       // 'as! T!', do so now.
       if (hasForcedOptionalResult(expr)) {
-        auto *coerced = handleConditionalCheckedCastExpr(expr);
+        auto *coerced = handleConditionalCheckedCastExpr(expr, castTypeRepr);
         if (!coerced)
           return nullptr;
 
@@ -4021,29 +4030,28 @@ namespace {
             coerced, cs.getType(coerced)->getOptionalObjectType());
       }
 
-      return handleConditionalCheckedCastExpr(expr);
+      return handleConditionalCheckedCastExpr(expr, castTypeRepr);
     }
 
     Expr *handleConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr,
-                                           bool isInsideIsExpr = false) {
+                                           TypeRepr *castTypeRepr) {
+      assert(castTypeRepr &&
+             "cast requires TypeRepr; implicit casts are superfluous");
+
       // The subexpression is always an rvalue.
       auto &ctx = cs.getASTContext();
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
       // Simplify and update the type we're casting to.
-      auto *const castTypeRepr = expr->getCastTypeRepr();
-
       const auto fromType = cs.getType(sub);
-      const auto toType = simplifyType(cs.getType(castTypeRepr));
-      expr->setCastType(toType);
-      cs.setType(castTypeRepr, toType);
+      const auto toType = expr->getCastType();
 
       bool isSubExprLiteral = isa<LiteralExpr>(sub);
       auto castContextKind =
-          (SuppressDiagnostics || isInsideIsExpr || isSubExprLiteral)
-            ? CheckedCastContextKind::None
-            : CheckedCastContextKind::ConditionalCast;
+          (SuppressDiagnostics || expr->isImplicit() || isSubExprLiteral)
+              ? CheckedCastContextKind::None
+              : CheckedCastContextKind::ConditionalCast;
 
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
