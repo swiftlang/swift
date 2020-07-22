@@ -54,6 +54,10 @@ include(CheckSymbolExists)
 # This is primarily to support building smaller or faster project files.
 #
 
+option(SWIFT_APPEND_VC_REV
+  "Embed the version control system revision in Swift"
+  TRUE)
+
 option(SWIFT_INCLUDE_TOOLS
     "Generate build targets for swift tools"
     TRUE)
