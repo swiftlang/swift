@@ -4607,6 +4607,12 @@ private:
                            llvm::SmallPtrSetImpl<CanType> &existingTypes);
 
 public:
+    bool infer(const ConstraintSystem &cs,
+               llvm::SmallPtrSetImpl<CanType> &exactTypes,
+               Constraint *constraint,
+               bool &hasNonDependentMemberRelationalConstraints,
+               bool &hasDependentMemberRelationalConstraints);
+
     /// Finalize binding computation for this type variable by
     /// inferring bindings from context e.g. transitive bindings.
     void finalize(const ConstraintSystem &cs,
@@ -4677,7 +4683,8 @@ public:
 
   /// Infer bindings for the given type variable based on current
   /// state of the constraint system.
-  PotentialBindings inferBindingsFor(TypeVariableType *typeVar);
+  PotentialBindings inferBindingsFor(TypeVariableType *typeVar,
+                                     bool finalize = true) const;
 
 private:
   Optional<ConstraintSystem::PotentialBinding>
