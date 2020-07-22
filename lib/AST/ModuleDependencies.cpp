@@ -113,7 +113,7 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
   case ModuleDependenciesKind::Swift:
     return SwiftModuleDependencies;
   case ModuleDependenciesKind::SwiftPlaceholder:
-    return ExternalSwiftModuleDependencies;
+    return PlaceholderSwiftModuleDependencies;
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
@@ -126,7 +126,7 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) const {
   case ModuleDependenciesKind::Swift:
     return SwiftModuleDependencies;
   case ModuleDependenciesKind::SwiftPlaceholder:
-    return ExternalSwiftModuleDependencies;
+    return PlaceholderSwiftModuleDependencies;
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
