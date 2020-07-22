@@ -16,6 +16,7 @@ from __future__ import print_function
 
 import argparse
 import functools
+import io
 import json
 import math
 import os
@@ -55,7 +56,7 @@ def has_debuginfo(swiftc):
 def write_input_file(args, ast, d, n):
     fname = "in%d.swift" % n
     pathname = os.path.join(d, fname)
-    with open(pathname, 'w+') as f:
+    with io.open(pathname, 'w+', encoding='utf-8', newline='\n') as f:
         f.write(gyb.execute_template(ast, '', N=n))
     return fname
 
@@ -217,7 +218,11 @@ def run_many(args):
             print("**************************************************")
             args.llvm_stat_reporter = True
 
-    ast = gyb.parse_template(args.file.name, args.file.read())
+    if args.file == '-':
+        ast = gyb.parse_template('stdin', sys.stdin.read())
+    else:
+        with io.open(args.file, 'r', encoding='utf-8') as f:
+            ast = gyb.parse_template(args.file, f.read())
     rng = range(args.begin, args.end, args.step)
     if args.step > (args.end - args.begin):
         print("Step value", args.step,
@@ -695,7 +700,7 @@ def report(args, rng, runs):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        'file', type=argparse.FileType(),
+        'file', type=str,
         help='Path to GYB template file (defaults to stdin)', nargs='?',
         default=sys.stdin)
     parser.add_argument(
