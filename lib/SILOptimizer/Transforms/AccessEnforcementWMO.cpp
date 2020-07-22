@@ -85,6 +85,7 @@ const VarDecl *getDisjointAccessLocation(const AccessedStorage &storage) {
   }
   case AccessedStorage::Box:
   case AccessedStorage::Stack:
+  case AccessedStorage::Tail:
   case AccessedStorage::Argument:
   case AccessedStorage::Yield:
   case AccessedStorage::Unidentified:

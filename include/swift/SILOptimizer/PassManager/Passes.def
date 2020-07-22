@@ -68,8 +68,10 @@ PASS(CrossModuleSerializationSetup, "cross-module-serialization-setup",
      "Setup serialization flags for cross-module optimization")
 PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
+PASS(AccessedStorageAnalysisDumper, "accessed-storage-analysis-dump",
+     "Dump Accessed Storage Analysis Summaries")
 PASS(AccessedStorageDumper, "accessed-storage-dump",
-     "Dump Accessed Storage Summary")
+     "Dump Accessed Storage Information")
 PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
