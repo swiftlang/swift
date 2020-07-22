@@ -753,14 +753,6 @@ bool ConstraintSystem::PotentialBindings::infer(
     const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
     Constraint *constraint, bool &hasNonDependentMemberRelationalConstraints,
     bool &hasDependentMemberRelationalConstraints) {
-  // Determines whether this type variable represents an object
-  // of the optional type extracted by force unwrap.
-  bool isOptionalObject = false;
-  if (auto *locator = TypeVar->getImpl().getLocator()) {
-    auto anchor = locator->getAnchor();
-    isOptionalObject = isExpr<ForceValueExpr>(anchor);
-  }
-
   SmallVector<PotentialBinding, 4> literalBindings;
 
   switch (constraint->getKind()) {
@@ -797,29 +789,29 @@ bool ConstraintSystem::PotentialBindings::infer(
     if (exactTypes.insert(type->getCanonicalType()).second) {
       addPotentialBinding(*binding);
 
-      // Result of force unwrap is always connected to its base
-      // optional type via `OptionalObject` constraint which
-      // preserves l-valueness, so in case where object type got
-      // inferred before optional type (because it got the
-      // type from context e.g. parameter type of a function call),
-      // we need to test type with and without l-value after
-      // delaying bindings for as long as possible.
-      if (isOptionalObject && !type->is<LValueType>()) {
-        addPotentialBinding(binding->withType(LValueType::get(type)));
-        FullyBound = true;
-      }
-
+      // Determines whether this type variable represents an object
+      // of the optional type extracted by force unwrap.
       if (auto *locator = TypeVar->getImpl().getLocator()) {
-        auto path = locator->getPath();
-        auto voidType = cs.getASTContext().TheEmptyTupleType;
+        auto anchor = locator->getAnchor();
+        // Result of force unwrap is always connected to its base
+        // optional type via `OptionalObject` constraint which
+        // preserves l-valueness, so in case where object type got
+        // inferred before optional type (because it got the
+        // type from context e.g. parameter type of a function call),
+        // we need to test type with and without l-value after
+        // delaying bindings for as long as possible.
+        if (isExpr<ForceValueExpr>(anchor) && !type->is<LValueType>()) {
+          addPotentialBinding(binding->withType(LValueType::get(type)));
+          FullyBound = true;
+        }
 
         // If this is a type variable representing closure result,
         // which is on the right-side of some relational constraint
         // let's have it try `Void` as well because there is an
         // implicit conversion `() -> T` to `() -> Void` and this
         // helps to avoid creating a thunk to support it.
-        if (!path.empty() &&
-            path.back().getKind() == ConstraintLocator::ClosureResult &&
+        auto voidType = cs.getASTContext().TheEmptyTupleType;
+        if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
             binding->Kind == AllowedBindingKind::Supertypes &&
             exactTypes.insert(voidType).second) {
           addPotentialBinding({voidType, binding->Kind, constraint},
