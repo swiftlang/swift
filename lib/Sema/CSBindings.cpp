@@ -753,8 +753,6 @@ bool ConstraintSystem::PotentialBindings::infer(
     const ConstraintSystem &cs, llvm::SmallPtrSetImpl<CanType> &exactTypes,
     Constraint *constraint, bool &hasNonDependentMemberRelationalConstraints,
     bool &hasDependentMemberRelationalConstraints) {
-  SmallVector<PotentialBinding, 4> literalBindings;
-
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
