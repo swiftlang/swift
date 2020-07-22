@@ -561,7 +561,7 @@ func testGetOptionalForceClass(_ s: SimpleClass) -> Int {
 // CHECK-LABEL: sil {{.*}}testGetComplex
 // opt
 // CHECK: [[E1:%[0-9]+]] = ref_element_addr
-// CHECK: [[B1:%[0-9]+]] = begin_access [read] [dynamic] [[E1]]
+// CHECK: [[B1:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E1]]
 // !
 // CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
 // CHECK: cond_fail [[F]]

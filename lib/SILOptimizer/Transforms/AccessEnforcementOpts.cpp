@@ -743,6 +743,7 @@ void AccessConflictAndMergeAnalysis::visitMayRelease(SILInstruction *instr,
   // accesses can be affected by a deinitializer.
   auto isHeapAccess = [](AccessedStorage::Kind accessKind) {
     return accessKind == AccessedStorage::Class
+           || accessKind == AccessedStorage::Class
            || accessKind == AccessedStorage::Global;
   };
   // Mark the in-scope accesses as having a nested conflict
