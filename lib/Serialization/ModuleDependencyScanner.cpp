@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 using namespace swift;
 using llvm::ErrorOr;
@@ -100,7 +102,22 @@ public:
 /// This "loader" will not attempt to load any module files.
 class PlaceholderSwiftModuleScanner : public ModuleDependencyScanner {
   /// Scan the given placeholder module map
-  void parsePlaceholderModuleMap(StringRef fileName);
+  void parsePlaceholderModuleMap(StringRef fileName) {
+    ExplicitModuleMapParser parser(Allocator);
+    auto result =
+      parser.parseSwiftExplicitModuleMap(fileName, PlaceholderDependencyModuleMap);
+    if (result == std::errc::invalid_argument) {
+      Ctx.Diags.diagnose(SourceLoc(),
+                         diag::placeholder_dependency_module_map_corrupted,
+                         fileName);
+    }
+    else if (result == std::errc::no_such_file_or_directory) {
+      Ctx.Diags.diagnose(SourceLoc(),
+                         diag::placeholder_dependency_module_map_missing,
+                         fileName);
+    }
+  }
+
   llvm::StringMap<ExplicitModuleInfo> PlaceholderDependencyModuleMap;
   llvm::BumpPtrAllocator Allocator;
 
@@ -142,18 +159,6 @@ public:
   }
 };
 } // namespace
-
-void PlaceholderSwiftModuleScanner::parsePlaceholderModuleMap(StringRef fileName) {
-  ExplicitModuleMapParser parser(Allocator);
-  auto result =
-      parser.parseSwiftExplicitModuleMap(fileName, PlaceholderDependencyModuleMap);
-  if (result == std::errc::invalid_argument)
-    Ctx.Diags.diagnose(
-        SourceLoc(), diag::placeholder_dependency_module_map_corrupted, fileName);
-  else if (result == std::errc::no_such_file_or_directory)
-    Ctx.Diags.diagnose(SourceLoc(),
-                       diag::placeholder_dependency_module_map_missing, fileName);
-}
 
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
                                                       StringRef moduleName,

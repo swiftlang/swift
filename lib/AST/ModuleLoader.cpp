@@ -181,7 +181,7 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
   } else if (auto *clangDep = dyn_cast<ClangModuleDependenciesStorage>(storage.get())){
     modulePath = clangDep->moduleMapFile;
     assert(modulePath.hasValue());
-  } else { // ExternalSwiftModuleDependency
+  } else { // PlaceholderSwiftModuleDependencies
     return result;
   }
   findOverlayFilesInternal(ctx, *modulePath, moduleName, SourceLoc(),

@@ -35,7 +35,7 @@ class Identifier;
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependenciesKind : int8_t {
   Swift,
-    // Placeholder dependencies are a kind of dependencies used only by the
+  // Placeholder dependencies are a kind of dependencies used only by the
   // dependency scanner. They are swift modules that the scanner will not be
   // able to locate in its search paths and which are the responsibility of the
   // scanner's client to ensure are provided.
@@ -360,6 +360,9 @@ class ModuleDependenciesCache {
 
   /// Dependencies for Swift modules that have already been computed.
   llvm::StringMap<ModuleDependencies> SwiftModuleDependencies;
+
+  /// Dependencies for Swift placeholder dependency modules.
+  llvm::StringMap<ModuleDependencies> PlaceholderSwiftModuleDependencies;
 
   /// Dependencies for Clang modules that have already been computed.
   llvm::StringMap<ModuleDependencies> ClangModuleDependencies;
