@@ -550,6 +550,8 @@ TEST_F(EditTest, AnnotationsRangeShiftingAfterEditInsertEnd) {
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
   close(DocName);
 }
+// rdar://65934938 Failing in CI with ASan
+#if defined(__has_feature) && !__has_feature(address_sanitizer)
 TEST_F(EditTest, AnnotationsRangeShiftingAfterEditReplaceEnd) {
   const char *DocName = "test.swift";
   TestConsumer Consumer;
@@ -568,6 +570,7 @@ TEST_F(EditTest, AnnotationsRangeShiftingAfterEditReplaceEnd) {
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
   close(DocName);
 }
+#endif
 TEST_F(EditTest, AnnotationsRangeShiftingAfterEditDeleteEnd) {
   const char *DocName = "test.swift";
   TestConsumer Consumer;

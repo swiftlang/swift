@@ -1,4 +1,4 @@
-//===--- AccessedStorageDumper.cpp - Dump accessed storage for functions ---===//
+//===--- AccessedStorageAnalysisDumper.cpp - accessed storage anlaysis ----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,51 +10,40 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-accessed-storage-dumper"
-#include "swift/SIL/MemAccessUtils.h"
+#define DEBUG_TYPE "sil-accessed-storage-analysys-dumper"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
 
-static void dumpAccessedStorage(SILInstruction *inst) {
-  visitAccessedAddress(
-    inst,
-    [&](Operand *operand) {
-      inst->print(llvm::outs());
-      findAccessedStorage(operand->get()).print(llvm::outs());
-    }
-  );
-}
-
 namespace {
 
-/// Dumps sorage information for each access.
-class AccessedStorageDumper : public SILModuleTransform {
+/// Dumps per-function information on dynamically enforced formal accesses.
+class AccessedStorageAnalysisDumper : public SILModuleTransform {
 
   void run() override {
+    auto *analysis = PM->getAnalysis<AccessedStorageAnalysis>();
+
     for (auto &fn : *getModule()) {
       llvm::outs() << "@" << fn.getName() << "\n";
       if (fn.empty()) {
         llvm::outs() << "<unknown>\n";
         continue;
       }
-      for (auto &bb : fn) {
-        for (auto &inst : bb) {
-          if (inst.mayReadOrWriteMemory())
-            dumpAccessedStorage(&inst);
-        }
-      }
+      const FunctionAccessedStorage &summary = analysis->getEffects(&fn);
+      summary.print(llvm::outs());
     }
   }
 };
 
 } // end anonymous namespace
 
-SILTransform *swift::createAccessedStorageDumper() {
-  return new AccessedStorageDumper();
+SILTransform *swift::createAccessedStorageAnalysisDumper() {
+  return new AccessedStorageAnalysisDumper();
 }

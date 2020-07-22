@@ -189,7 +189,9 @@ namespace swift {
 /// the base of a formal access. It may be from a ref_tail_addr, undef, or some
 /// recognized memory initialization pattern. Unidentified valid storage cannot
 /// represent any arbitrary base address--it must at least been proven not to
-/// correspond to any class or global variable access.
+/// correspond to any class or global variable access, unless it's nested within
+/// another access to the same object. So, Unidentified can overlap with
+/// Class/Global access, but it cannot be the only formal access to that memory.
 ///
 /// An *invalid* AccessedStorage object is Unidentified and associated with an
 /// invalid SILValue. This signals that analysis has failed to recognize an
@@ -219,6 +221,7 @@ public:
     Stack,
     Global,
     Class,
+    Tail,
     Argument,
     Yield,
     Nested,
@@ -228,10 +231,16 @@ public:
 
   static const char *getKindName(Kind k);
 
-  /// Directly create an AccessedStorage for class property access.
+  // Give object tail storage a fake property index for convenience.
+  static constexpr unsigned TailIndex = ~0U;
+
+  /// Directly create an AccessedStorage for class or tail property access.
   static AccessedStorage forClass(SILValue object, unsigned propertyIndex) {
     AccessedStorage storage;
-    storage.initKind(Class, propertyIndex);
+    if (propertyIndex == TailIndex)
+      storage.initKind(Tail);
+    else
+      storage.initKind(Class, propertyIndex);
     storage.value = object;
     return storage;
   }
@@ -301,7 +310,8 @@ private:
   union {
     // For non-class storage, 'value' is the access base. For class storage
     // 'value' is the object base, where the access base is the class' stored
-    // property.
+    // property. For tail storage 'value' is the object base and there is no
+    // value for the access base.
     SILValue value;
     SILGlobalVariable *global;
   };
@@ -334,7 +344,7 @@ public:
   }
 
   SILValue getValue() const {
-    assert(getKind() != Global && getKind() != Class);
+    assert(getKind() != Global && getKind() != Class && getKind() != Tail);
     return value;
   }
 
@@ -354,7 +364,7 @@ public:
   }
 
   SILValue getObject() const {
-    assert(getKind() == Class);
+    assert(getKind() == Class || getKind() == Tail);
     return value;
   }
   unsigned getPropertyIndex() const {
@@ -374,6 +384,7 @@ public:
     switch (getKind()) {
     case Box:
     case Stack:
+    case Tail:
     case Argument:
     case Yield:
     case Nested:
@@ -396,6 +407,7 @@ public:
       return true;
     case Global:
     case Class:
+    case Tail:
     case Argument:
     case Yield:
     case Nested:
@@ -403,6 +415,11 @@ public:
       return false;
     }
     llvm_unreachable("unhandled kind");
+  }
+
+  /// Return trye if the given access is guaranteed to be within a heap object.
+  bool isObjectAccess() const {
+    return getKind() == Class || getKind() == Tail;
   }
 
   /// Return true if the given access is on a 'let' lvalue.
@@ -420,6 +437,7 @@ public:
     case Global:
       return true;
     case Class:
+    case Tail:
     case Argument:
     case Yield:
     case Nested:
@@ -455,20 +473,47 @@ public:
   // Return true if this storage is guaranteed not to overlap with \p other's
   // storage.
   bool isDistinctFrom(const AccessedStorage &other) const {
-    if (isUniquelyIdentified() && other.isUniquelyIdentified()) {
-      return !hasIdenticalBase(other);
-    }
-    if (getKind() != Class || other.getKind() != Class)
-      // At least one side is an Argument or Yield, or is unidentified.
-      return false;
+    if (isUniquelyIdentified()) {
+      if (other.isUniquelyIdentified() && !hasIdenticalBase(other))
+        return true;
 
-    // Classes are not uniquely identified by their base. However, if the
-    // underling objects have identical types and distinct property indices then
-    // they are distinct storage locations.
-    if (getObject()->getType() == other.getObject()->getType()
-        && getPropertyIndex() != other.getPropertyIndex()) {
-      return true;
+      if (other.isObjectAccess())
+        return true;
+
+      // We currently assume that Unidentified storage may overlap with
+      // Box/Stack storage.
+      return false;
     }
+    if (other.isUniquelyIdentified())
+      return other.isDistinctFrom(*this);
+
+    // Neither storage is uniquely identified.
+    if (isObjectAccess()) {
+      if (other.isObjectAccess()) {
+        // Property access cannot overlap with Tail access.
+        if (getKind() != other.getKind())
+          return true;
+
+        // We could also check if the object types are distinct, but that only
+        // helps if we know the relationships between class types.
+        return getKind() == Class
+               && getPropertyIndex() != other.getPropertyIndex();
+      }
+      // Any type of nested/argument address may be within the same object.
+      //
+      // We also currently assume Unidentified access may be within an object
+      // purely to handle KeyPath accesses. The deriviation of the KeyPath
+      // address must separately appear to be a Class access so that all Class
+      // accesses are accounted for.
+      return false;
+    }
+    if (other.isObjectAccess())
+      return other.isDistinctFrom(*this);
+
+    // Neither storage is from a class or tail.
+    //
+    // Unidentified values may alias with each other or with any kind of
+    // nested/argument access.
     return false;
   }
 
@@ -530,10 +575,11 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
       return storage.getParamIndex();
     case swift::AccessedStorage::Global:
       return DenseMapInfo<void *>::getHashValue(storage.getGlobal());
-    case swift::AccessedStorage::Class: {
+    case swift::AccessedStorage::Class:
       return llvm::hash_combine(storage.getObject(),
                                 storage.getPropertyIndex());
-    }
+    case swift::AccessedStorage::Tail:
+      return DenseMapInfo<swift::SILValue>::getHashValue(storage.getObject());
     }
     llvm_unreachable("Unhandled AccessedStorageKind");
   }
@@ -673,6 +719,9 @@ public:
   Result visitClassAccess(RefElementAddrInst *field) {
     return asImpl().visitBase(field, AccessedStorage::Class);
   }
+  Result visitTailAccess(RefTailAddrInst *tail) {
+    return asImpl().visitBase(tail, AccessedStorage::Tail);
+  }
   Result visitArgumentAccess(SILFunctionArgument *arg) {
     return asImpl().visitBase(arg, AccessedStorage::Argument);
   }
@@ -808,7 +857,7 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
   // This is a valid address producer for nested @inout argument
   // access, but it is never used for formal access of identified objects.
   case ValueKind::RefTailAddrInst:
-    return asImpl().visitUnidentified(sourceAddr);
+    return asImpl().visitTailAccess(cast<RefTailAddrInst>(sourceAddr));
 
   // Inductive single-operand cases:
   // Look through address casts to find the source address.

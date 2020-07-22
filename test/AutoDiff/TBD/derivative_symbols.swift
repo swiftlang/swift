@@ -19,7 +19,7 @@ public func topLevelDerivative<T: Differentiable>(_ x: T) -> (
   fatalError()
 }
 
-struct Struct: Differentiable {
+public struct Struct: Differentiable {
   var stored: Float
 
   // Test property.
@@ -52,5 +52,12 @@ struct Struct: Differentiable {
     value: Float, pullback: (Float) -> (TangentVector, Float)
   ) {
     fatalError()
+  }
+}
+
+extension Array where Element == Struct {
+  @differentiable
+  public func sum() -> Float {
+    return 0
   }
 }

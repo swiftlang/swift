@@ -28,7 +28,7 @@ func parseError4(x: Int) {
 
 func parseError5(x: Int) {
   switch x {
-  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{12-13=_}}
+  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{8-13=_}}
   }
 }
 

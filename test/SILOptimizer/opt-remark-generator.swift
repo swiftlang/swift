@@ -7,29 +7,31 @@
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory-management
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator.swift', 
-// CHECK-NEXT:                    Line: 57, Column: 5 }
+// CHECK-NEXT:                    Line: 59, Column: 5 }
 // CHECK-NEXT: Function:        'getGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'Found retain:'
-// CHECK-NEXT:   - InferValueFailure: Unable to infer any values being retained.
+// CHECK-NEXT:   - InferredValue:   'on value:'
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt-remark-generator.swift',
+// CHECK-NEXT:                        Line: 55, Column: 12 }
 // CHECK-NEXT: ...
 // CHECK-NEXT: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory-management
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator.swift', 
-// CHECK-NEXT:                    Line: 65, Column: 5 }
+// CHECK-NEXT:                    Line: 67, Column: 5 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'Found retain:'
 // CHECK-NEXT:   - InferredValue:   'on value:'
 // CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt-remark-generator.swift',
-// CHECK-NEXT:                        Line: 62, Column: 9 }
+// CHECK-NEXT:                        Line: 64, Column: 9 }
 // CHECK-NEXT: ...
 // CHECK-NEXT: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory-management
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator.swift', 
-// CHECK-NEXT:                    Line: 65, Column: 12 }
+// CHECK-NEXT:                    Line: 67, Column: 12 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'Found release:'
@@ -39,13 +41,13 @@
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory-management
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator.swift', 
-// CHECK-NEXT:                    Line: 65, Column: 12 }
+// CHECK-NEXT:                    Line: 67, Column: 12 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'Found release:'
 // CHECK-NEXT:   - InferredValue:   'on value:'
 // CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt-remark-generator.swift',
-// CHECK-NEXT:                        Line: 62, Column: 9 }
+// CHECK-NEXT:                        Line: 64, Column: 9 }
 // CHECK-NEXT: ...
 
 public class Klass {}
@@ -55,7 +57,7 @@ public var global = Klass()
 @inline(never)
 public func getGlobal() -> Klass {
     return global // expected-remark @:5 {{Found retain:}}
-                  // expected-note @-1:5 {{Unable to infer any values being retained.}}
+                  // expected-note @-5:12 {{on value:}}
 }
 
 public func useGlobal() {
