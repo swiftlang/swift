@@ -269,7 +269,7 @@ macro(swift_common_cxx_warnings)
     check_cxx_compiler_flag("-Werror=switch" CXX_SUPPORTS_WERROR_SWITCH_FLAG)
     append_if(CXX_SUPPORTS_WERROR_SWITCH_FLAG "-Werror=switch" CMAKE_CXX_FLAGS)
 
-    if(MSVC)
+    IF (CMAKE_SYSTEM_NAME MATCHES "Windows")
       check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
       append_if(CXX_SUPPORTS_WE4062 "/we4062" CMAKE_CXX_FLAGS)
     endif()
