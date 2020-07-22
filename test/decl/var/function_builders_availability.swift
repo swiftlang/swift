@@ -84,3 +84,16 @@ tuplify(true) { x in
   Option.best // expected-error{{'best' is only available in macOS 10.15.4 or newer}}
   // expected-note@-1{{add 'if #available' version check}}
 }
+
+@available(*, unavailable)
+func unavailableFunc(_ x: Bool) -> Bool {} // expected-note {{'unavailableFunc' has been explicitly marked unavailable here}}
+
+// SR-13260: Availability checking not working in the where clause of a for
+// loop.
+tuplify(true) { b in
+  for x in [b] where unavailableFunc(x) { // expected-error {{'unavailableFunc' is unavailable}}
+    ""
+    Option.best // expected-error{{'best' is only available in macOS 10.15.4 or newer}}
+    // expected-note@-1{{add 'if #available' version check}}
+  }
+}
