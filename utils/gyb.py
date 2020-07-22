@@ -737,7 +737,7 @@ class Code(ASTNode):
             result_string = None
             if isinstance(result, Number) and not isinstance(result, Integral):
                 result_string = repr(result)
-            elif isinstance(result, Integral):
+            elif isinstance(result, Integral) or isinstance(result, list):
                 result_string = str(result)
             else:
                 result_string = StringIO(result).read()
