@@ -1808,17 +1808,6 @@ ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
   return expr;
 }
 
-ConditionalCheckedCastExpr *
-ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
-                                           TypeRepr *tyRepr, Type castTy) {
-  auto *const expr = new (ctx) ConditionalCheckedCastExpr(
-      sub, SourceLoc(), SourceLoc(), new (ctx) TypeExpr(tyRepr));
-  expr->setType(OptionalType::get(castTy));
-  expr->setImplicit();
-  expr->setCastType(castTy);
-  return expr;
-}
-
 IsExpr *IsExpr::create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr) {
   return new (ctx) IsExpr(nullptr, isLoc, new (ctx) TypeExpr(tyRepr));
 }
