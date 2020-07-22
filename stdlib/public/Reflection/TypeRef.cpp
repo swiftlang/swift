@@ -545,6 +545,9 @@ public:
         // Tuple element := variadic-marker label? type
         auto tupleElt = Dem.createNode(Node::Kind::TupleElement);
 
+        if (isVariadic)
+          tupleElt->addChild(Dem.createNode(Node::Kind::VariadicMarker), Dem);
+
         if (eltType->getKind() == Node::Kind::Type) {
           tupleElt->addChild(eltType, Dem);
         } else {
