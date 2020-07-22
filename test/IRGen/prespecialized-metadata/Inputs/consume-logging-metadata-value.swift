@@ -9,3 +9,9 @@ func consume<T>(_ value: T) {
   }
 }
 
+@inline(never)
+func consumeType<T>(_ type: T.Type, line: UInt = #line) {
+  withExtendedLifetime(type) {
+    print(unsafePointerToMetadata(of: T.self), "@", line)
+  }
+}
