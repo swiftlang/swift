@@ -84,11 +84,6 @@ namespace {
     unsigned haveStringLiteral : 1;
 
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
-
-    llvm::SmallVector<TypeVariableType *, 16> intLiteralTyvars;
-    llvm::SmallVector<TypeVariableType *, 16> floatLiteralTyvars;
-    llvm::SmallVector<TypeVariableType *, 16> stringLiteralTyvars;
-
     llvm::SmallVector<BinaryExpr *, 4> binaryExprs;
 
     LinkedTypeInfo() {
@@ -188,35 +183,16 @@ namespace {
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.intLiteralTyvars.push_back(tyvar);
-        }
-        
         return { false, expr };
       }
       
       if (isa<FloatLiteralExpr>(expr)) {
         LTI.haveFloatLiteral = true;
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.floatLiteralTyvars.push_back(tyvar);
-        }
-
         return { false, expr };
       }
       
       if (isa<StringLiteralExpr>(expr)) {
         LTI.haveStringLiteral = true;
-
-        auto tyvar = CS.getType(expr)->getAs<TypeVariableType>();
-
-        if (tyvar) {
-          LTI.stringLiteralTyvars.push_back(tyvar);
-        }
-
         return { false, expr };
       }
 
@@ -338,22 +314,6 @@ namespace {
     LinkedTypeInfo lti;
 
     expr->walk(LinkedExprAnalyzer(lti, CS));
-
-    auto mergeTypeVariables = [&](ArrayRef<TypeVariableType *> typeVars) {
-      if (typeVars.size() < 2)
-        return;
-
-      auto rep1 = CS.getRepresentative(typeVars.front());
-      for (unsigned i = 1, n = typeVars.size(); i != n; ++i) {
-        auto rep2 = CS.getRepresentative(typeVars[i]);
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    };
-
-    mergeTypeVariables(lti.intLiteralTyvars);
-    mergeTypeVariables(lti.floatLiteralTyvars);
-    mergeTypeVariables(lti.stringLiteralTyvars);
 
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
