@@ -1195,6 +1195,9 @@ WARNING(unlabeled_trailing_closure_changed_behavior_same_param_name,none,
 NOTE(trailing_closure_select_parameter,none,
      "label the argument with %0 to %select{retain the pre-Swift 5.3 behavior|silence this warning for Swift 5.3 and newer}1",
      (Identifier, unsigned))
+WARNING(unlabeled_trailing_closure_deprecated,none,
+        "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
+        (Identifier))
 NOTE(decl_multiple_defaulted_closure_parameters,none,
      "%0 contains defaulted closure parameters %1 and %2",
      (DeclName, Identifier, Identifier))
