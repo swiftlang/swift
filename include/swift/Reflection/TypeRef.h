@@ -302,37 +302,27 @@ public:
 
 class TupleTypeRef final : public TypeRef {
   std::vector<const TypeRef *> Elements;
-  bool Variadic;
 
-  static TypeRefID Profile(const std::vector<const TypeRef *> &Elements,
-                           bool Variadic) {
+  static TypeRefID Profile(const std::vector<const TypeRef *> &Elements) {
     TypeRefID ID;
     for (auto Element : Elements)
       ID.addPointer(Element);
-
-    ID.addInteger(static_cast<uint32_t>(Variadic));
     return ID;
   }
 
 public:
-  TupleTypeRef(std::vector<const TypeRef *> Elements, bool Variadic=false)
-    : TypeRef(TypeRefKind::Tuple), Elements(std::move(Elements)),
-      Variadic(Variadic) {}
+  TupleTypeRef(std::vector<const TypeRef *> Elements)
+      : TypeRef(TypeRefKind::Tuple), Elements(std::move(Elements)) {}
 
   template <typename Allocator>
   static const TupleTypeRef *create(Allocator &A,
-                                    std::vector<const TypeRef *> Elements,
-                                    bool Variadic = false) {
-    FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements, Variadic);
+                                    std::vector<const TypeRef *> Elements) {
+    FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements);
   }
 
   const std::vector<const TypeRef *> &getElements() const {
     return Elements;
   };
-
-  bool isVariadic() const {
-    return Variadic;
-  }
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Tuple;
