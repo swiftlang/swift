@@ -162,6 +162,11 @@ typedef struct swift_metadata_allocation {
   unsigned Size;
 } swift_metadata_allocation_t;
 
+typedef struct swift_metadata_cache_node {
+  swift_reflection_ptr_t Left;
+  swift_reflection_ptr_t Right;
+} swift_metadata_cache_node_t;
+
 /// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
