@@ -1326,14 +1326,28 @@ bool ExtensionDecl::isConstrainedExtension() const {
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
   auto decl = getExtendedNominal();
   bool extendDeclFromSameModule = false;
-  if (!decl->getAlternateModuleName().empty()) {
-    // if the extended type was defined in the same module with the extension,
-    // we should consider them as the same module to preserve ABI stability.
-    extendDeclFromSameModule = decl->getAlternateModuleName() ==
-      getParentModule()->getNameStr();
+  auto extensionAlterName = getAlternateModuleName();
+  auto typeAlterName = decl->getAlternateModuleName();
+
+  if (!extensionAlterName.empty()) {
+    if (!typeAlterName.empty()) {
+      // Case I: type and extension are both moved from somewhere else
+      extendDeclFromSameModule = typeAlterName == extensionAlterName;
+    } else {
+      // Case II: extension alone was moved from somewhere else
+      extendDeclFromSameModule = extensionAlterName ==
+        decl->getParentModule()->getNameStr();
+    }
   } else {
-    extendDeclFromSameModule = decl->getParentModule() == getParentModule();
+    if (!typeAlterName.empty()) {
+      // Case III: extended type alone was moved from somewhere else
+      extendDeclFromSameModule = typeAlterName == getParentModule()->getNameStr();
+    } else {
+      // Case IV: neither of type and extension was moved from somewhere else
+      extendDeclFromSameModule = getParentModule() == decl->getParentModule();
+    }
   }
+
   return extendDeclFromSameModule
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
