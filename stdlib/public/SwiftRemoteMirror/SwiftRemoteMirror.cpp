@@ -645,6 +645,25 @@ const char *swift_reflection_metadataAllocationTagName(
   return returnableCString(ContextRef, Result);
 }
 
+int swift_reflection_metadataAllocationCacheNode(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadata_allocation_t Allocation,
+    swift_metadata_cache_node_t *OutNode) {
+  auto Context = ContextRef->nativeContext;
+  MetadataAllocation<Runtime> ConvertedAllocation;
+  ConvertedAllocation.Tag = Allocation.Tag;
+  ConvertedAllocation.Ptr = Allocation.Ptr;
+  ConvertedAllocation.Size = Allocation.Size;
+
+  auto Result = Context->metadataAllocationCacheNode(ConvertedAllocation);
+  if (!Result)
+    return 0;
+
+  OutNode->Left = Result->Left;
+  OutNode->Right = Result->Right;
+  return 1;
+}
+
 const char *swift_reflection_iterateMetadataAllocationBacktraces(
     SwiftReflectionContextRef ContextRef,
     swift_metadataAllocationBacktraceIterator Call, void *ContextPtr) {

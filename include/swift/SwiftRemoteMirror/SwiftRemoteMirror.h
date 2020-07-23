@@ -339,6 +339,12 @@ const char *
 swift_reflection_metadataAllocationTagName(SwiftReflectionContextRef ContextRef,
                                            swift_metadata_allocation_tag_t Tag);
 
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_metadataAllocationCacheNode(
+    SwiftReflectionContextRef ContextRef,
+    swift_metadata_allocation_t Allocation,
+    swift_metadata_cache_node_t *OutNode);
+
 /// Backtrace iterator callback passed to
 /// swift_reflection_iterateMetadataAllocationBacktraces
 typedef void (*swift_metadataAllocationBacktraceIterator)(
