@@ -57,6 +57,11 @@ using llvm::SmallDenseSet;
 using llvm::SmallMapVector;
 using llvm::SmallSet;
 
+/// This flag enables experimental `@differentiable(linear)` function
+/// transposition.
+static llvm::cl::opt<bool> EnableExperimentalLinearMapTransposition(
+    "enable-experimental-linear-map-transposition", llvm::cl::init(false));
+
 /// This flag is used to disable `differentiable_function_extract` instruction
 /// folding for SIL testing purposes.
 static llvm::cl::opt<bool> SkipFoldingDifferentiableFunctionExtraction(
@@ -1381,6 +1386,17 @@ void Differentiation::run() {
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i)) {
           context.getDifferentiableFunctionInstWorklist().push_back(dfi);
         } else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
+          // If linear map transposition is not enable and an uncanonical
+          // `linear_function` instruction is encounter, emit a diagnostic.
+          // FIXME(SR-11850): Finish support for linear map transposition.
+          if (!EnableExperimentalLinearMapTransposition) {
+            if (!lfi->hasTransposeFunction()) {
+              astCtx.Diags.diagnose(
+                lfi->getLoc().getSourceLoc(),
+                diag::autodiff_conversion_to_linear_function_not_supported);
+              errorOccurred = true;
+            }
+          }
           context.getLinearFunctionInstWorklist().push_back(lfi);
         }
       }
