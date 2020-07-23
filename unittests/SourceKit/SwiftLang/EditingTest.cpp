@@ -195,11 +195,14 @@ public:
   void doubleOpenWithDelay(std::chrono::microseconds delay, bool close);
 
   void setupThreeAnnotations(const char *DocName, TestConsumer &Consumer) {
+    // The following is engineered so that the references to `mem` are at
+    // offsets 60, 70, and 80 for convenience. They're on the same line so
+    // that tests do not accidentally depend on line separation.
     const char *Contents =
     "struct S {\n"
     "  var mem: Int = 0\n"
     "  func test() {\n"
-    "    _ = (self.mem, self.mem, self.mem)\n"
+    "          _ = mem;  _ = mem;  _ = mem\n"
     "  }\n"
     "}\n";
     const char *Args[] = { "-parse-as-library" };
@@ -550,8 +553,6 @@ TEST_F(EditTest, AnnotationsRangeShiftingAfterEditInsertEnd) {
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
   close(DocName);
 }
-// rdar://65934938 Failing in CI with ASan
-#if defined(__has_feature) && !__has_feature(address_sanitizer)
 TEST_F(EditTest, AnnotationsRangeShiftingAfterEditReplaceEnd) {
   const char *DocName = "test.swift";
   TestConsumer Consumer;
@@ -570,7 +571,6 @@ TEST_F(EditTest, AnnotationsRangeShiftingAfterEditReplaceEnd) {
   ASSERT_FALSE(waitForDocUpdate()) << "timed out";
   close(DocName);
 }
-#endif
 TEST_F(EditTest, AnnotationsRangeShiftingAfterEditDeleteEnd) {
   const char *DocName = "test.swift";
   TestConsumer Consumer;
