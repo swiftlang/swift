@@ -40,8 +40,7 @@ func dumpRawMetadata(
 ) throws {
   let backtraces = backtraceStyle != nil ? context.allocationBacktraces : [:]
   for allocation in context.allocations {
-    let tagNameC = swift_reflection_metadataAllocationTagName(context, allocation.tag)
-    let tagName = tagNameC.map(String.init) ?? "<unknown>"
+    let tagName = context.metadataTagName(allocation.tag) ?? "<unknown>"
     print("Metadata allocation at: \(hex: allocation.ptr) " +
           "size: \(allocation.size) tag: \(allocation.tag) (\(tagName))")
     printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
@@ -71,6 +70,22 @@ func dumpGenericMetadata(
     if let allocation = metadata.allocation {
       printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
     }
+  }
+}
+
+func dumpMetadataCacheNodes(
+  context: SwiftReflectionContextRef,
+  inspector: Inspector
+) throws {
+  print("Address","Tag","Tag Name","Size","Left","Right", separator: "\t")
+  for allocation in context.allocations {
+    guard let node = context.metadataAllocationCacheNode(allocation.allocation_t) else {
+      continue
+    }
+
+    let tagName = context.metadataTagName(allocation.tag) ?? "<unknown>"
+    print("\(hex: allocation.ptr)\t\(allocation.tag)\t\(tagName)\t" +
+          "\(allocation.size)\t\(hex: node.Left)\t\(hex: node.Right)")
   }
 }
 
@@ -133,18 +148,38 @@ struct SwiftInspect: ParsableCommand {
       DumpConformanceCache.self,
       DumpRawMetadata.self,
       DumpGenericMetadata.self,
+      DumpCacheNodes.self,
     ])
+}
+
+struct UniversalOptions: ParsableArguments {
+  @Argument(help: "The pid or partial name of the target process")
+  var nameOrPid: String
+}
+
+struct BacktraceOptions: ParsableArguments {
+  @Flag(help: "Show the backtrace for each allocation")
+  var backtrace: Bool
+
+  @Flag(help: "Show a long-form backtrace for each allocation")
+  var backtraceLong: Bool
+
+  var style: Backtrace.Style? {
+    backtrace ? .oneLine :
+    backtraceLong ? .long :
+    nil
+  }
 }
 
 struct DumpConformanceCache: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Print the contents of the target's protocol conformance cache.")
 
-  @Argument(help: "The pid or partial name of the target process")
-  var nameOrPid: String
+  @OptionGroup()
+  var options: UniversalOptions
 
   func run() throws {
-    try withReflectionContext(nameOrPid: nameOrPid) { context, _ in
+    try withReflectionContext(nameOrPid: options.nameOrPid) { context, _ in
       try dumpConformanceCache(context: context)
     }
   }
@@ -153,22 +188,18 @@ struct DumpConformanceCache: ParsableCommand {
 struct DumpRawMetadata: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Print the target's metadata allocations.")
-  @Argument(help: "The pid or partial name of the target process")
 
-  var nameOrPid: String
+  @OptionGroup()
+  var universalOptions: UniversalOptions
 
-  @Flag(help: "Show the backtrace for each allocation")
-  var backtrace: Bool
-
-  @Flag(help: "Show a long-form backtrace for each allocation")
-  var backtraceLong: Bool
+  @OptionGroup()
+  var backtraceOptions: BacktraceOptions
 
   func run() throws {
-    let style = backtrace ? Backtrace.Style.oneLine :
-                backtraceLong ? Backtrace.Style.long :
-                nil
-    try withReflectionContext(nameOrPid: nameOrPid) {
-      try dumpRawMetadata(context: $0, inspector: $1, backtraceStyle: style)
+    try withReflectionContext(nameOrPid: universalOptions.nameOrPid) {
+      try dumpRawMetadata(context: $0,
+                          inspector: $1,
+                          backtraceStyle: backtraceOptions.style)
     }
   }
 }
@@ -177,23 +208,32 @@ struct DumpGenericMetadata: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Print the target's generic metadata allocations.")
 
-  @Argument(help: "The pid or partial name of the target process")
-  var nameOrPid: String
+  @OptionGroup()
+  var universalOptions: UniversalOptions
 
-  @Flag(help: "Show the backtrace for each allocation")
-  var backtrace: Bool
-
-  @Flag(help: "Show a long-form backtrace for each allocation")
-  var backtraceLong: Bool
+  @OptionGroup()
+  var backtraceOptions: BacktraceOptions
 
   func run() throws {
-    let style = backtrace ? Backtrace.Style.oneLine :
-                backtraceLong ? Backtrace.Style.long :
-                nil
-    try withReflectionContext(nameOrPid: nameOrPid) {
+    try withReflectionContext(nameOrPid: universalOptions.nameOrPid) {
       try dumpGenericMetadata(context: $0,
                               inspector: $1,
-                              backtraceStyle: style)
+                              backtraceStyle: backtraceOptions.style)
+    }
+  }
+}
+
+struct DumpCacheNodes: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print the target's metadata cache nodes.")
+
+  @OptionGroup()
+  var options: UniversalOptions
+
+  func run() throws {
+    try withReflectionContext(nameOrPid: options.nameOrPid) {
+      try dumpMetadataCacheNodes(context: $0,
+                                 inspector: $1)
     }
   }
 }
