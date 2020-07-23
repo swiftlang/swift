@@ -92,8 +92,7 @@ public:
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args,
                               Type parent);
 
-  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels,
-                       bool isVariadic);
+  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels);
 
   Type createFunctionType(ArrayRef<Demangle::FunctionParam<Type>> params,
                           Type output, FunctionTypeFlags flags);

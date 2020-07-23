@@ -4704,7 +4704,7 @@ public:
 
 /// Represents an explicit conditional checked cast, which converts
 /// from a type to some subtype and produces an Optional value, which will be
-/// .Some(x) if the cast succeeds, or .None if the cast fails.
+/// .some(x) if the cast succeeds, or .none if the cast fails.
 /// Spelled 'a as? T' and produces a value of type 'T?'.
 class ConditionalCheckedCastExpr final : public CheckedCastExpr {
   SourceLoc QuestionLoc;
@@ -4721,9 +4721,6 @@ public:
 
   static ConditionalCheckedCastExpr *createImplicit(ASTContext &ctx, Expr *sub,
                                                     Type castTy);
-
-  static ConditionalCheckedCastExpr *
-  createImplicit(ASTContext &ctx, Expr *sub, TypeRepr *tyRepr, Type castTy);
 
   /// Retrieve the location of the '?' that follows 'as'.
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
@@ -4911,20 +4908,21 @@ public:
 /// a particular case.
 class EnumIsCaseExpr : public Expr {
   Expr *SubExpr;
+  TypeRepr *CaseRepr;
   EnumElementDecl *Element;
   
 public:
-  EnumIsCaseExpr(Expr *SubExpr, EnumElementDecl *Element)
-    : Expr(ExprKind::EnumIsCase, /*implicit*/ true),
-      SubExpr(SubExpr), Element(Element)
-  {}
-  
+  EnumIsCaseExpr(Expr *SubExpr, TypeRepr *CaseRepr, EnumElementDecl *Element)
+      : Expr(ExprKind::EnumIsCase, /*implicit*/ true), SubExpr(SubExpr),
+        CaseRepr(CaseRepr), Element(Element) {}
+
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
-  
+
+  TypeRepr *getCaseTypeRepr() const { return CaseRepr; }
+
   EnumElementDecl *getEnumElement() const { return Element; }
-  void setEnumElement(EnumElementDecl *elt) { Element = elt; }
-  
+
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
   SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
   SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }

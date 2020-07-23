@@ -612,6 +612,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
+  Opts.EnableVolatileModules |= Args.hasArg(OPT_enable_volatile_modules);
+
   Opts.UseDarwinPreStableABIBit =
     (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
     (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||

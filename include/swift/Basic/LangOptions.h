@@ -372,6 +372,9 @@ namespace swift {
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
 
+    /// Load swiftmodule files in memory as volatile and avoid mmap.
+    bool EnableVolatileModules = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
