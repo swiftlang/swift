@@ -1,0 +1,3 @@
+struct IntWrapper {
+  int value;
+};
