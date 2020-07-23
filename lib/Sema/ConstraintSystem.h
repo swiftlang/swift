@@ -68,6 +68,15 @@ namespace swift {
 
 namespace constraints {
 
+/// Describes the algorithm to use for trailing closure matching.
+enum class TrailingClosureMatching {
+  /// Match a trailing closure to the first parameter that appears to work.
+  Forward,
+
+  /// Match a trailing closure to the last parameter.
+  Backward,
+};
+
 /// A handle that holds the saved state of a type variable, which
 /// can be restored.
 class SavedTypeVariableBinding {
@@ -672,6 +681,8 @@ enum ScoreKind {
   SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
+  /// A use of the "backward" scanning heuristic for trailing closures.
+  SK_BackwardTrailingClosure,
   /// A use of a disfavored overload.
   SK_DisfavoredOverload,
   /// An implicit force of an implicitly unwrapped optional value.
@@ -1027,6 +1038,11 @@ public:
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
+
+  /// For locators associated with call expressions, the trailing closure
+  /// matching rule that was applied.
+  llvm::SmallMapVector<ConstraintLocator*, TrailingClosureMatching, 4>
+    trailingClosureMatchingChoices;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -2010,6 +2026,11 @@ private:
   std::vector<std::pair<ConstraintLocator*, unsigned>>
       DisjunctionChoices;
 
+  /// For locators associated with call expressions, the trailing closure
+  /// matching rule that was applied.
+  std::vector<std::pair<ConstraintLocator*, TrailingClosureMatching>>
+      trailingClosureMatchingChoices;
+
   /// The worklist of "active" constraints that should be revisited
   /// due to a change.
   ConstraintList ActiveConstraints;
@@ -2493,6 +2514,9 @@ public:
 
     /// The length of \c DisjunctionChoices.
     unsigned numDisjunctionChoices;
+
+    /// The length of \c trailingClosureMatchingChoices;
+    unsigned numTrailingClosureMatchingChoices;
 
     /// The length of \c OpenedTypes.
     unsigned numOpenedTypes;
@@ -2983,6 +3007,12 @@ public:
 
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordPotentialHole(FunctionType *fnType);
+
+  void recordTrailingClosureMatch(
+      ConstraintLocator *locator,
+      TrailingClosureMatching trailingClosureMatch) {
+    trailingClosureMatchingChoices.push_back({locator, trailingClosureMatch});
+  }
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
@@ -4232,10 +4262,9 @@ private:
 
   /// Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
-                                      Type type1,
-                                      Type type2,
-                                      TypeMatchOptions flags,
-                                      ConstraintLocatorBuilder locator);
+      Type type1, Type type2,
+      Optional<TrailingClosureMatching> trailingClosureMatching,
+      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the DynamicCallableApplicableFunction constraint.
   SolutionKind simplifyDynamicCallableApplicableFnConstraint(
@@ -5193,13 +5222,28 @@ public:
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
-  virtual bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
+  virtual bool outOfOrderArgument(
+      unsigned argIdx, unsigned prevArgIdx, ArrayRef<ParamBinding> bindings);
 
   /// Indicates that the arguments need to be relabeled to match the parameters.
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
+};
+
+/// The result of calling matchCallArguments().
+struct MatchCallArgumentResult {
+  /// The direction of trailing closure matching that was performed.
+  TrailingClosureMatching trailingClosureMatching;
+
+  /// The parameter bindings determined by the match.
+  SmallVector<ParamBinding, 4> parameterBindings;
+
+  /// When present, the forward and backward scans each produced a result,
+  /// and the parameter bindings are different. The primary result will be
+  /// forwarding, and this represents the backward binding.
+  Optional<SmallVector<ParamBinding, 4>> backwardParameterBindings;
 };
 
 /// Match the call arguments (as described by the given argument type) to
@@ -5215,16 +5259,21 @@ public:
 /// \param listener Listener that will be notified when certain problems occur,
 /// e.g., to produce a diagnostic.
 ///
-/// \param parameterBindings Will be populated with the arguments that are
-/// bound to each of the parameters.
-/// \returns true if the call arguments could not be matched to the parameters.
-bool matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
-                        ArrayRef<AnyFunctionType::Param> params,
-                        const ParameterListInfo &paramInfo,
-                        Optional<unsigned> unlabeledTrailingClosureIndex,
-                        bool allowFixes,
-                        MatchCallArgumentListener &listener,
-                        SmallVectorImpl<ParamBinding> &parameterBindings);
+/// \param trailingClosureMatching If specified, the trailing closure matching
+/// direction to use. Otherwise, the matching direction will be determined
+/// based on language mode.
+///
+/// \returns the bindings produced by performing this matching, or \c None if
+/// the match failed.
+Optional<MatchCallArgumentResult>
+matchCallArguments(
+    SmallVectorImpl<AnyFunctionType::Param> &args,
+    ArrayRef<AnyFunctionType::Param> params,
+    const ParameterListInfo &paramInfo,
+    Optional<unsigned> unlabeledTrailingClosureIndex,
+    bool allowFixes,
+    MatchCallArgumentListener &listener,
+    Optional<TrailingClosureMatching> trailingClosureMatching);
 
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
@@ -5232,7 +5281,8 @@ matchCallArguments(ConstraintSystem &cs,
                    ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
                    ConstraintKind subKind,
-                   ConstraintLocatorBuilder locator);
+                   ConstraintLocatorBuilder locator,
+                   Optional<TrailingClosureMatching> trailingClosureMatching);
 
 /// Given an expression that is the target of argument labels (for a call,
 /// subscript, etc.), find the underlying target expression.
