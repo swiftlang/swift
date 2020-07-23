@@ -1,9 +1,9 @@
 // RUN: %target-typecheck-verify-swift
 
-func doSomething(onError: ((Error) -> Void)? = nil, onCompletion: (Int) -> Void) { }
+func doSomething(onError: ((Error) -> Void)? = nil, onCompletion: (Int) -> Void) { } // expected-note{{'doSomething(onError:onCompletion:)' declared here}}
 
 func testDoSomething() {
-  doSomething { x in
+  doSomething { x in // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'onCompletion' to suppress this warning}}
     print(x)
   }
 
@@ -31,13 +31,13 @@ func testTrailingClosures() {
 
 // Ensure that we can match either with the forward or the backward rule,
 // depending on additional type check information.
-func trailingClosureEitherDirection(
+func trailingClosureEitherDirection( // expected-note{{'trailingClosureEitherDirection(f:g:)' declared here}}
   f: (Int) -> Int = { $0 }, g: (Int, Int) -> Int = { $0 + $1 }
 ) { }
 
 func testTrailingClosureEitherDirection() {
   trailingClosureEitherDirection { -$0 }
-  trailingClosureEitherDirection { $0 * $1 }
+  trailingClosureEitherDirection { $0 * $1 } // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'g' to suppress this warning}}{{33-33=(g: }}{{45-45=)}}
 }
 
 // Check that we resolve ambiguities when both directions can be matched.
@@ -51,11 +51,11 @@ trailingClosureBothDirections { $0 * $1 } // expected-warning{{since Swift 5.3, 
 
 // Check an amusing quirk of the "backward" rule that allows the order of
 // arguments to be swapped.
-struct AccidentalReorder {
+struct AccidentalReorder { // expected-note{{'init(content:optionalInt:)' declared here}}
   let content: () -> Int
   var optionalInt: Int?
 }
 
 func testAccidentalReorder() {
-  _ = AccidentalReorder(optionalInt: 17) { 42 }
+  _ = AccidentalReorder(optionalInt: 17) { 42 } // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'content' to suppress this warning}}
 }
