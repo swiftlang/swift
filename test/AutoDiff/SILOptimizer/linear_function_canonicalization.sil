@@ -1,0 +1,28 @@
+// RUN: %target-sil-opt -differentiation -enable-experimental-linear-map-transposition %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+import _Differentiation
+
+sil hidden @foo : $@convention(thin) (Float, Float, Float) -> Float {
+bb0(%0 : $Float, %1 : $Float, %2 : $Float):
+  return %2 : $Float
+}
+
+sil @make_linear_func : $@convention(thin) () -> () {
+bb0:
+  %orig = function_ref @foo : $@convention(thin) (Float, Float, Float) -> Float
+  %linear_fn_0 = linear_function [parameters 0] %orig : $@convention(thin) (Float, Float, Float) -> Float
+  %linear_fn_1 = linear_function [parameters 0 2] %orig : $@convention(thin) (Float, Float, Float) -> Float
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @make_linear_func
+// CHECK: bb0:
+// CHECK:   [[ORIG_FN:%.*]] = function_ref @foo : $@convention(thin) (Float, Float, Float) -> Float
+// CHECK:   linear_function [parameters 0] %0 : $@convention(thin) (Float, Float, Float) -> Float with_transpose undef : $@convention(thin) (Float, Float, Float) -> Float
+// CHECK:   linear_function [parameters 0 2] %0 : $@convention(thin) (Float, Float, Float) -> Float with_transpose undef : $@convention(thin) (Float, Float) -> (Float, Float)
+// CHECK: }

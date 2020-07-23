@@ -123,9 +123,23 @@ DifferentiableFunctionInst *ADContext::createDifferentiableFunction(
   return dfi;
 }
 
+LinearFunctionInst *ADContext::createLinearFunction(
+    SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
+    SILValue original, Optional<SILValue> transposeFunction) {
+  auto *lfi = builder.createLinearFunction(loc, parameterIndices, original,
+                                           transposeFunction);
+  processedLinearFunctionInsts.erase(lfi);
+  return lfi;
+}
+
 DifferentiableFunctionExpr *
 ADContext::findDifferentialOperator(DifferentiableFunctionInst *inst) {
   return inst->getLoc().getAsASTNode<DifferentiableFunctionExpr>();
+}
+
+LinearFunctionExpr *
+ADContext::findDifferentialOperator(LinearFunctionInst *inst) {
+  return inst->getLoc().getAsASTNode<LinearFunctionExpr>();
 }
 
 } // end namespace autodiff
