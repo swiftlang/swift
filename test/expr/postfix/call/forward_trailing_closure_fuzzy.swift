@@ -1,9 +1,10 @@
 // RUN: %target-typecheck-verify-swift
 
-func doSomething(onError: ((Error) -> Void)? = nil, onCompletion: (Int) -> Void) { } // expected-note{{'doSomething(onError:onCompletion:)' declared here}}
+func doSomething(onError: ((Error) -> Void)? = nil, onCompletion: (Int) -> Void) { }
 
 func testDoSomething() {
-  doSomething { x in // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'onCompletion' to suppress this warning}}
+  // Okay because we skip the onError.
+  doSomething { x in
     print(x)
   }
 

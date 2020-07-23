@@ -88,7 +88,7 @@ func testNotAmbiguous2() {
 }
 
 // Not ambiguous because of a missing default argument.
-func notAmbiguous3( // expected-note{{'notAmbiguous3(x:a:y:b:_:c:)' declared here}}
+func notAmbiguous3(
   x: (Int) -> Int = { $0 },
   a: Int = 5,
   y: (Int) -> Int = { $0 },
@@ -98,5 +98,5 @@ func notAmbiguous3( // expected-note{{'notAmbiguous3(x:a:y:b:_:c:)' declared her
 ) { }
 
 func testNotAmbiguous3() {
-  notAmbiguous3 { $0 } // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with '_' to suppress this warning}}
+  notAmbiguous3 { $0 }
 }
