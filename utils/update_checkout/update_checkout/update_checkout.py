@@ -28,9 +28,11 @@ from swift_build_support.swift_build_support import shell
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
 
+
 def child_init(lck):
     global lock
     lock = lck
+
 
 def run_parallel(fn, pool_args, n_processes=0):
     """Function used to run a given closure in parallel.
