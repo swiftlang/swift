@@ -3898,13 +3898,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
         peekToken().isAny(tok::period);
 
       if (IdentifierPeriod) {
-        ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr);
-        // parse the rest of the expression to get past the problem.
-        if (ResultExpr.isNonNull()) {
-          auto Result = ResultExpr.get();
-        }
+        // diagnostic first before parseExpr moves the cursor
         diagnose(Tok, diag::expected_decl);
-        break;
+        // parse the rest of the expression to get past the problem.
+        parseExpr(diag::expected_expr);
+        // we did not parse a Decl here so we need to report an error 
+        return makeParserError();
       }
 
       // Emit diagnostics if we meet an identifier/operator where a declaration
