@@ -759,8 +759,8 @@ public:
           !Reader->readString(RemoteAddress(tupleMeta->Labels), labels))
         return BuiltType();
 
-      auto BuiltTuple = Builder.createTupleType(elementTypes, std::move(labels),
-                                                /*variadic*/ false);
+      auto BuiltTuple =
+          Builder.createTupleType(elementTypes, std::move(labels));
       TypeCache[MetadataAddress] = BuiltTuple;
       return BuiltTuple;
     }

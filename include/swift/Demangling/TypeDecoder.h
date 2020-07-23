@@ -711,7 +711,6 @@ class TypeDecoder {
     case NodeKind::Tuple: {
       llvm::SmallVector<BuiltType, 8> elements;
       std::string labels;
-      bool variadic = false;
       for (auto &element : *Node) {
         if (element->getKind() != NodeKind::TupleElement)
           return BuiltType();
@@ -744,7 +743,7 @@ class TypeDecoder {
 
         elements.push_back(elementType);
       }
-      return Builder.createTupleType(elements, std::move(labels), variadic);
+      return Builder.createTupleType(elements, std::move(labels));
     }
     case NodeKind::TupleElement:
       if (Node->getNumChildren() < 1)
