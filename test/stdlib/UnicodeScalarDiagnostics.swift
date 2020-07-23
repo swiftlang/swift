@@ -8,9 +8,9 @@ func isString(_ s: inout String) {}
 func test_UnicodeScalarDoesNotImplementArithmetic(_ us: UnicodeScalar, i: Int) {
   var a1 = "a" + "b" // OK
   isString(&a1)
-  let a2 = "a" - "b" // expected-error {{binary operator '-' cannot be applied to two 'String' operands}}
-  let a3 = "a" * "b" // expected-error {{binary operator '*' cannot be applied to two 'String' operands}}
-  let a4 = "a" / "b" // expected-error {{binary operator '/' cannot be applied to two 'String' operands}}
+  let a2 = "a" - "b" // expected-error {{binary operator '-' cannot be applied to two 'String' operands}} expected-note {{}}
+  let a3 = "a" * "b" // expected-error {{binary operator '*' cannot be applied to two 'String' operands}} expected-note {{}}
+  let a4 = "a" / "b" // expected-error {{binary operator '/' cannot be applied to two 'String' operands}} expected-note {{}}
 
   let b1 = us + us // expected-error {{binary operator '+' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
   let b2 = us - us // expected-error {{binary operator '-' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
