@@ -28,6 +28,9 @@ from swift_build_support.swift_build_support import shell
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
 
+def child_init(lck):
+    global lock
+    lock = lck
 
 def run_parallel(fn, pool_args, n_processes=0):
     """Function used to run a given closure in parallel.
@@ -37,17 +40,13 @@ def run_parallel(fn, pool_args, n_processes=0):
     parallel implementation.
     """
 
-    def init(lck):
-        global lock
-        lock = lck
-
     if n_processes == 0:
         n_processes = cpu_count() * 2
 
     lk = Lock()
     print("Running ``%s`` with up to %d processes." %
           (fn.__name__, n_processes))
-    pool = Pool(processes=n_processes, initializer=init, initargs=(lk,))
+    pool = Pool(processes=n_processes, initializer=child_init, initargs=(lk,))
     results = pool.map_async(func=fn, iterable=pool_args).get(999999)
     pool.close()
     pool.join()
