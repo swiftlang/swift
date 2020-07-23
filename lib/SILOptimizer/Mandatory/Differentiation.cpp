@@ -1334,7 +1334,7 @@ bool DifferentiationTransformer::processLinearFunctionInst(
     lfi->printInContext(s);
   });
 
-  // If `lfi` already has derivative functions, do not process.
+  // If `lfi` already has a transpose function, do not process.
   if (lfi->hasTransposeFunction())
     return false;
 
