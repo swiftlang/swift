@@ -1220,10 +1220,9 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
 SILValue DifferentiationTransformer::promoteToLinearFunction(
     LinearFunctionInst *lfi, SILBuilder &builder, SILLocation loc,
     DifferentiationInvoker invoker) {
-  // TODO: Fill in. Copy code from above.
-  // For now, create a new `linear_function` instruction with an undef
-  // transpose.
-  // Eventually, use `emitTransposeFunctionReference` to fill in legitimately.
+  // Note: for now, this function creates a new `linear_function` instruction
+  // with an undef transpose function operand. Eventually, a legitimate
+  // transpose function operand should be created and used.
   auto origFnOperand = lfi->getOriginalFunction();
   auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *parameterIndices = lfi->getParameterIndices();
