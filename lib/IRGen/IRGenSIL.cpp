@@ -37,6 +37,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/MapVector.h"
@@ -817,6 +818,17 @@ public:
                                     SILType SILTy, const SILDebugScope *DS,
                                     VarDecl *VarDecl, SILDebugVariable VarInfo,
                                     IndirectionKind Indirection = DirectValue) {
+    // TODO: fix demangling for C++ types (SR-13223).
+    if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
+      if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
+        ty = metaTy->getRootClass().getPointer();
+      if (ty->getStructOrBoundGenericStruct() &&
+          ty->getStructOrBoundGenericStruct()->getClangDecl() &&
+          isa<clang::CXXRecordDecl>(
+              ty->getStructOrBoundGenericStruct()->getClangDecl()))
+        return;
+    }
+
     assert(IGM.DebugInfo && "debug info not enabled");
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
