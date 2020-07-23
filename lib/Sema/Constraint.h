@@ -45,6 +45,7 @@ namespace constraints {
 
 class ConstraintLocator;
 class ConstraintSystem;
+enum class TrailingClosureMatching;
 
 /// Describes the kind of constraint placed on one or more types.
 enum class ConstraintKind : char {
@@ -316,6 +317,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of function reference, for member references.
   unsigned TheFunctionRefKind : 2;
 
+  /// The trailing closure matching for an applicable function constraint,
+  /// if any. 0 = None, 1 = Forward, 2 = Backward.
+  unsigned trailingClosureMatching : 2;
+
   union {
     struct {
       /// The first type.
@@ -481,6 +486,12 @@ public:
                                        ConstraintLocator *locator,
                                        RememberChoice_t shouldRememberChoice
                                          = ForgetChoice);
+
+  /// Create a new Applicable Function constraint.
+  static Constraint *createApplicableFunction(
+      ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+      Optional<TrailingClosureMatching> trailingClosureMatching,
+      ConstraintLocator *locator);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -699,6 +710,10 @@ public:
            Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
   }
+
+  /// For an applicable function constraint, retrieve the trailing closure
+  /// matching rule.
+  Optional<TrailingClosureMatching> getTrailingClosureMatching() const;
 
   /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }

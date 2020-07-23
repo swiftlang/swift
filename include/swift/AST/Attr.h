@@ -55,7 +55,6 @@ class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
 class PatternBindingInitializer;
-enum class TrailingClosureMatching: uint8_t;
 class TrailingWhereClause;
 class TypeExpr;
 

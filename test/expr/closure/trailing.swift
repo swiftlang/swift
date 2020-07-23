@@ -104,8 +104,8 @@ func labeledArgumentAndTrailingClosure() {
   takeFuncWithDefault({ $0 + 1 }) // expected-error {{missing argument label 'f:' in call}} {{23-23=f: }}
   takeFuncWithDefault(f: { $0 + 1 })
 
-  // Trailing closure binds to first parameter.
- takeTwoFuncsWithDefaults { "Hello, " + $0 } // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
+  // Trailing closure binds to first parameter... unless only the second matches.
+ takeTwoFuncsWithDefaults { "Hello, " + $0 }
   takeTwoFuncsWithDefaults { $0 + 1 } // expected-warning{{rather than}}
   // expected-note@-1 2{{label the argument}}
   takeTwoFuncsWithDefaults(f1: {$0 + 1 })

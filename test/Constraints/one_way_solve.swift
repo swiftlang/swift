@@ -38,9 +38,9 @@ func testTernaryOneWayOverload(b: Bool) {
 
   // CHECK: solving component #1
   // CHECK: Initial bindings: $T11 := Int8
-  // CHECK: found solution 0 0 0 0 0 0 0 2 0 0 0 0 0
+  // CHECK: found solution 0 0 0 0 0 0 0 0 2 0 0 0 0 0
 
-  // CHECK: composed solution 0 0 0 0 0 0 0 2 0 0 0 0 0
-  // CHECK-NOT: composed solution 0 0 0 0 0 0 0 2 0 0 0 0 0
+  // CHECK: composed solution 0 0 0 0 0 0 0 0 2 0 0 0 0 0
+  // CHECK-NOT: composed solution 0 0 0 0 0 0 0 0 2 0 0 0 0 0
   let _: Int8 = b ? Builtin.one_way(int8Or16(17)) : Builtin.one_way(int8Or16(42))
 }
