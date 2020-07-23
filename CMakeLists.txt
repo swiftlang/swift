@@ -1111,9 +1111,9 @@ if(SWIFT_INCLUDE_TOOLS)
   # Refer to the large comment above the add_subdirectory(stdlib) call.
   # https://bugs.swift.org/browse/SR-5975
   add_subdirectory(tools)
-endif()
 
-add_subdirectory(localization)
+  add_subdirectory(localization)
+endif()
 
 add_subdirectory(utils)
 
