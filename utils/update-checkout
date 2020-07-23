@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+
 import update_checkout
 
 if __name__ == '__main__':
