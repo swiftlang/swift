@@ -455,6 +455,9 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
 
+def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
+  HelpText<"Load Swift modules in memory">;
+
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
 def solver_disable_shrink :
