@@ -230,14 +230,17 @@ transformCalleeStorage(const StorageAccessInfo &storage,
   case AccessedStorage::Global:
     // Global accesses is universal.
     return storage;
-  case AccessedStorage::Class: {
+  case AccessedStorage::Class:
+  case AccessedStorage::Tail: {
     // If the object's value is an argument, translate it into a value on the
     // caller side.
     SILValue obj = storage.getObject();
     if (auto *arg = dyn_cast<SILFunctionArgument>(obj)) {
       SILValue argVal = getCallerArg(fullApply, arg->getIndex());
       if (argVal) {
-        unsigned idx = storage.getPropertyIndex();
+        unsigned idx = (storage.getKind() == AccessedStorage::Class)
+                           ? storage.getPropertyIndex()
+                           : AccessedStorage::TailIndex;
         // Remap this storage info. The argument source value is now the new
         // object. The old storage info is inherited.
         return StorageAccessInfo(AccessedStorage::forClass(argVal, idx),

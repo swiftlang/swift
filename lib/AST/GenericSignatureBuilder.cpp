@@ -2065,18 +2065,9 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
       return ErrorType::get(anchor);
 
     // Map the parent type into this context.
-    Type parentType = parentEquivClass->getTypeInContext(builder, genericEnv);
-
-    // If the parent is concrete, handle the
-    parentArchetype = parentType->getAs<ArchetypeType>();
-    if (!parentArchetype) {
-      // Resolve the member type.
-      Type memberType =
-        depMemTy->substBaseType(parentType, builder.getLookupConformanceFn());
-
-      return genericEnv->mapTypeIntoContext(memberType,
-                                            builder.getLookupConformanceFn());
-    }
+    parentArchetype =
+      parentEquivClass->getTypeInContext(builder, genericEnv)
+                      ->castTo<ArchetypeType>();
 
     // If we already have a nested type with this name, return it.
     assocType = depMemTy->getAssocType();

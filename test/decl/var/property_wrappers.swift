@@ -2021,3 +2021,13 @@ public struct NonVisibleImplicitInit {
     return false
   }
 }
+
+@propertyWrapper
+struct OptionalWrapper<T> {
+  init() {}
+  var wrappedValue: T? { nil }
+}
+
+struct UseOptionalWrapper {
+  @OptionalWrapper var p: Int?? // Okay
+}

@@ -951,7 +951,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
       E->setSubExpr(Sub);
     }
-    
+
+    if (auto *typerepr = E->getCaseTypeRepr())
+      if (doIt(typerepr))
+        return nullptr;
+
     return E;
   }
   

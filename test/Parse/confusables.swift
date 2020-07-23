@@ -22,3 +22,9 @@ if (5 ‒ 5) == 0 {} // expected-note {{unicode character '‒' looks similar to
 // expected-note @-1 {{operator function '=='}}
 
 // FIXME(rdar://61028087): The above note should read "required by referencing operator function '==' on 'BinaryInteger' where 'Self' = '(Int, Int)'".
+
+// GREEK QUESTION MARK (which looks like a semicolon) 
+print("A"); print("B")
+// expected-error@-1 2{{consecutive statements on a line must be separated by ';'}}
+// expected-error@-2 {{cannot find ';' in scope}}
+// expected-note@-3 {{identifier ';' contains possibly confused characters; did you mean to use ';'?}} {{11-13=;}}
