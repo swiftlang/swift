@@ -28,6 +28,9 @@ from swift_build_support.swift_build_support import shell
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
 
+def child_init(lck):
+    global lock
+    lock = lck
 
 def child_init(lck):
     global lock
