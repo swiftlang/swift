@@ -12,6 +12,7 @@
 
 #include "swift/LLVMPasses/Passes.h"
 #include "LLVMARCOpts.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/LegacyPassManager.h" 
 #include "llvm/IR/Module.h"
