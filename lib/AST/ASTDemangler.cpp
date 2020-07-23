@@ -323,12 +323,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   return aliasDecl->getDeclaredInterfaceType().subst(subMap);
 }
 
-Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,
-                                 StringRef labels,
-                                 bool isVariadic) {
-  // Just bail out on variadic tuples for now.
-  if (isVariadic) return Type();
-
+Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, StringRef labels) {
   SmallVector<TupleTypeElt, 4> elements;
   elements.reserve(eltTypes.size());
   for (auto eltType : eltTypes) {
