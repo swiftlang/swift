@@ -462,7 +462,12 @@ func fn_r28909024(n: Int) {
   // (since both arguments are literal they are ranked lower than contextual type).
   //
   // Good diagnostic for this is - `unexpected non-void return value in void function`
-  return (0..<10).r28909024 { // expected-error {{type of expression is ambiguous without more context}}
+  return (0..<10).r28909024 { // expected-error 2 {{cannot convert value of type 'Int' to expected argument type '()'}}
+    // expected-error@-1 {{type '()' cannot conform to 'Strideable'; only struct/enum/class types can conform to protocols}}
+    // expected-error@-2 {{type '()' cannot conform to 'Comparable'; only struct/enum/class types can conform to protocols}}
+    // expected-note@-3 {{required by referencing operator function '..<' on 'Comparable' where 'Self' = '()'}}
+    // expected-note@-4 {{requirement from conditional conformance of 'Range<()>' to 'Collection'}}
+    // expected-error@-5 {{referencing instance method 'r28909024' on 'Range' requires that '().Stride' conform to 'SignedInteger'}}
     _ in true
   }
 }
