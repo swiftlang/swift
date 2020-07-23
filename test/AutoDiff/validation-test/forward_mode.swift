@@ -1537,15 +1537,17 @@ ForwardModeTests.test("Subtraction") {
 
 ForwardModeTests.test("Multiplication") {
   let a = SIMD4<Float>(1, 2, 3, 4)
+  let a2 = SIMD4<Float>(4, 3, 2, 1)
   let g = SIMD4<Float>(1, 1, 1, 1)
+  let g2 = SIMD4<Float>(0, 2, 1, 3)
 
   // SIMD * SIMD
   func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x * y
   }
-  let (val1, df1) = valueWithDifferential(at: a, a, in: foo1)
-  expectEqual(a * a, val1)
-  expectEqual(a * g + g * a, df1(g, g))
+  let (val1, df1) = valueWithDifferential(at: a, a2, in: foo1)
+  expectEqual(a * a2, val1)
+  expectEqual(a * g2 + g * a2, df1(g, g2))
 
   // SIMD * Scalar
   func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
