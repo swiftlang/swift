@@ -218,6 +218,36 @@ static bool backwardScanAcceptsTrailingClosure(
       paramTy->isAny();
 }
 
+/// Determine whether any parameter from the given index up until the end
+/// requires an argument to be provided.
+///
+/// \param params The parameters themselves.
+/// \param paramInfo Declaration-provided information about the parameters.
+/// \param firstParamIdx The first parameter to examine to determine whether any
+/// parameter in the range \c [paramIdx, params.size()) requires an argument.
+/// \param beforeLabel If non-empty, stop examining parameters when we reach
+/// a parameter with this label.
+static bool anyParameterRequiresArgument(
+    ArrayRef<AnyFunctionType::Param> params,
+    const ParameterListInfo &paramInfo,
+    unsigned firstParamIdx,
+    Optional<Identifier> beforeLabel) {
+  for (unsigned paramIdx : range(firstParamIdx, params.size())) {
+    // If have been asked to stop when we reach a parameter with a particular
+    // label, and we see a parameter with that label, we're done: no parameter
+    // requires an argument.
+    if (beforeLabel && *beforeLabel == params[paramIdx].getLabel())
+      break;
+
+    // If this parameter requires an argument, tell the caller.
+    if (parameterRequiresArgument(params, paramInfo, paramIdx))
+      return true;
+  }
+
+  // No parameters required arguments.
+  return false;
+}
+
 static bool matchCallArgumentsImpl(
     SmallVectorImpl<AnyFunctionType::Param> &args,
     ArrayRef<AnyFunctionType::Param> params,
@@ -401,6 +431,21 @@ static bool matchCallArgumentsImpl(
       // trailing closure argument, this parameter is unfulfilled.
       if (!paramInfo.acceptsUnlabeledTrailingClosureArgument(paramIdx) &&
           !ignoreNameMismatch) {
+        haveUnfulfilledParams = true;
+        return;
+      }
+
+      // If this parameter does not require an argument, consider applying a
+      // "fuzzy" match rule that skips this parameter if doing so is the only
+      // way to successfully match arguments to parameters.
+      if (!parameterRequiresArgument(params, paramInfo, paramIdx) &&
+          param.getPlainType()->getASTContext().LangOpts
+              .EnableFuzzyForwardScanTrailingClosureMatching &&
+          anyParameterRequiresArgument(
+              params, paramInfo, paramIdx + 1,
+              nextArgIdx + 1 < numArgs
+                ? Optional<Identifier>(args[nextArgIdx + 1].getLabel())
+                : Optional<Identifier>(None))) {
         haveUnfulfilledParams = true;
         return;
       }
