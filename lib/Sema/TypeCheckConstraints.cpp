@@ -3011,6 +3011,22 @@ void Solution::dump(raw_ostream &out) const {
                   << " is " << getName(restriction.second) << "\n";
   }
 
+  out << "\n";
+  out << "Trailing closure matching:\n";
+  for (auto &trailingClosureMatching : trailingClosureMatchingChoices) {
+    out.indent(2);
+    trailingClosureMatching.first->dump(sm, out);
+    switch (trailingClosureMatching.second) {
+    case TrailingClosureMatching::Forward:
+      out << ": forward\n";
+      break;
+
+    case TrailingClosureMatching::Backward:
+      out << ": backward\n";
+      break;
+    }
+  }
+
   out << "\nDisjunction choices:\n";
   for (auto &choice : DisjunctionChoices) {
     out.indent(2);

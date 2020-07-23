@@ -49,6 +49,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       log << "use of an unavailable declaration";
       break;
 
+    case SK_BackwardTrailingClosure:
+      llvm::errs() << "backward scan when matching a trailing closure";
+      break;
+
     case SK_Fix:
       log << "attempting to fix the source";
       break;

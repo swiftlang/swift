@@ -74,6 +74,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::DynamicCallableApplicableFunction:
     assert(First->is<FunctionType>()
            && "The left-hand side type should be a function type");
+    trailingClosureMatching = 0;
     break;
 
   case ConstraintKind::ValueMember:
@@ -259,7 +260,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
@@ -270,6 +270,11 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
+
+  case ConstraintKind::ApplicableFunction:
+    return createApplicableFunction(
+        cs, getFirstType(), getSecondType(), getTrailingClosureMatching(),
+        getLocator());
 
   case ConstraintKind::BindOverload:
     return createBindOverload(cs, getFirstType(), getOverloadChoice(),
@@ -448,6 +453,20 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
   if (auto restriction = getRestriction()) {
     Out << ' ' << getName(*restriction);
+  }
+
+  if (getKind() == ConstraintKind::ApplicableFunction) {
+    if (auto trailingClosureMatching = getTrailingClosureMatching()) {
+      switch (*trailingClosureMatching) {
+      case TrailingClosureMatching::Forward:
+        Out << " [forward scan]";
+        break;
+
+      case TrailingClosureMatching::Backward:
+        Out << " [backward scan]";
+        break;
+      }
+    }
   }
 
   if (auto *fix = getFix()) {
@@ -855,6 +874,55 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
                               cs.allocateCopy(constraints), locator, typeVars);
   disjunction->RememberChoice = (bool) rememberChoice;
   return disjunction;
+}
+
+Constraint *Constraint::createApplicableFunction(
+    ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+    Optional<TrailingClosureMatching> trailingClosureMatching,
+    ConstraintLocator *locator) {
+  // Collect type variables.
+  SmallVector<TypeVariableType *, 4> typeVars;
+  if (argumentFnType->hasTypeVariable())
+    argumentFnType->getTypeVariables(typeVars);
+  if (calleeType->hasTypeVariable())
+    calleeType->getTypeVariables(typeVars);
+  uniqueTypeVariables(typeVars);
+
+  // Create the constraint.
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  auto constraint = new (mem) Constraint(
+      ConstraintKind::ApplicableFunction, argumentFnType, calleeType, locator,
+      typeVars);
+
+  // Encode the trailing closure matching.
+  if (trailingClosureMatching) {
+    switch (*trailingClosureMatching) {
+      case TrailingClosureMatching::Forward:
+        constraint->trailingClosureMatching = 1;
+        break;
+
+      case TrailingClosureMatching::Backward:
+        constraint->trailingClosureMatching = 2;
+        break;
+    }
+  } else {
+    constraint->trailingClosureMatching = 0;
+  }
+
+  return constraint;
+}
+
+Optional<TrailingClosureMatching>
+Constraint::getTrailingClosureMatching() const {
+  assert(Kind == ConstraintKind::ApplicableFunction);
+  switch (trailingClosureMatching) {
+  case 0: return None;
+  case 1: return TrailingClosureMatching::Forward;
+  case 2: return TrailingClosureMatching::Backward;
+  }
+
+  llvm_unreachable("Bad trailing closure matching value");
 }
 
 void *Constraint::operator new(size_t bytes, ConstraintSystem& cs,
