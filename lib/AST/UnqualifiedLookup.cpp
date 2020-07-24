@@ -363,12 +363,9 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
   // An optimization:
   if (selfBounds.empty())
     return;
-  const NLOptions options =
-      baseNLOptions | (isCascadingUse ? NL_KnownCascadingDependency
-                                      : NL_KnownNonCascadingDependency);
 
   SmallVector<ValueDecl *, 4> Lookup;
-  contextForLookup->lookupQualified(selfBounds, Name, options, Lookup);
+  contextForLookup->lookupQualified(selfBounds, Name, baseNLOptions, Lookup);
   for (auto Result : Lookup) {
     results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
 #ifndef NDEBUG

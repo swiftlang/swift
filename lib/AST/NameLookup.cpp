@@ -2796,8 +2796,6 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
     FLAG(NL_RemoveNonVisible)
     FLAG(NL_RemoveOverridden)
     FLAG(NL_IgnoreAccessControl)
-    FLAG(NL_KnownNonCascadingDependency)
-    FLAG(NL_KnownCascadingDependency)
     FLAG(NL_OnlyTypes)
     FLAG(NL_IncludeAttributeImplements)
 #undef FLAG

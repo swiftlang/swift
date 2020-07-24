@@ -376,13 +376,11 @@ evaluator::DependencySource ModuleQualifiedLookupRequest::readDependencySource(
   // FIXME(Evaluator Incremental Dependencies): This is an artifact of the
   // current scheme and should be removed. There are very few callers that are
   // accurately passing the right known dependencies mask.
-  const bool knownPrivate =
-      (options & NL_KnownDependencyMask) == NL_KnownNonCascadingDependency;
   const bool fromPrivateDC =
       DC->isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
 
   auto scope = evaluator::DependencyScope::Cascading;
-  if (knownPrivate || fromPrivateDC)
+  if (fromPrivateDC)
     scope = evaluator::DependencyScope::Private;
   return { DC->getParentSourceFile(), scope };
 }
@@ -461,10 +459,8 @@ evaluator::DependencySource QualifiedLookupRequest::readDependencySource(
   // accurately passing the right known dependencies mask.
   const bool cascades =
       dc->isCascadingContextForLookup(/*functionsAreNonCascading*/ false);
-  const bool knownPrivate =
-      (opts & NL_KnownDependencyMask) == NL_KnownNonCascadingDependency;
   auto scope = evaluator::DependencyScope::Cascading;
-  if (!cascades || knownPrivate)
+  if (!cascades)
     scope = evaluator::DependencyScope::Private;
   return {
     dyn_cast<SourceFile>(dc->getModuleScopeContext()),
