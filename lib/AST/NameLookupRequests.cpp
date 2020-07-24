@@ -233,10 +233,9 @@ Optional<GenericParamList *> GenericParamListRequest::getCachedResult() const {
 
 void GenericParamListRequest::cacheResult(GenericParamList *params) const {
   auto *context = std::get<0>(getStorage());
-  if (params) {
-    for (auto param : *params)
-      param->setDeclContext(context);
-  }
+  if (params)
+    params->setDeclContext(context);
+
   context->GenericParamsAndBit.setPointerAndInt(params, true);
 }
 
