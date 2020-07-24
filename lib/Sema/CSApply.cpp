@@ -5521,22 +5521,6 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
-/// Determine the arity of the given parameter of function type.
-static unsigned functionParameterArity(AnyFunctionType::Param param) {
-  Type paramType = param.getPlainType();
-  if (param.isVariadic())
-    paramType = ParamDecl::getVarargBaseTy(paramType);
-
-  paramType = paramType->lookThroughAllOptionalTypes();
-
-  if (param.isAutoClosure()) {
-    paramType = paramType->castTo<AnyFunctionType>()->getResult();
-    paramType = paramType->lookThroughAllOptionalTypes();
-  }
-
-  return paramType->castTo<AnyFunctionType>()->getNumParams();
-}
-
 /// Attach a Fix-It to the given diagnostic to give the trailing closure
 /// argument a label.
 static void labelTrailingClosureArgument(
@@ -5625,113 +5609,6 @@ static unsigned findParamBindingArgument(
   }
 
   llvm_unreachable("No parameter binds the argument?");
-}
-
-/// SE-0286 changed the direction in which the unlabeled trailing closure
-/// argument is matched to a parameter, from backward (the pre-Swift 5.3
-/// semantics) to forward (after SE-0286). Identify cases where this may
-/// have resulted in a silent change in behavior.
-static void maybeWarnAboutTrailingClosureBindingChange(
-    ConcreteDeclRef callee,
-    Expr *fn,
-    Expr *arg,
-    ArrayRef<AnyFunctionType::Param> args,
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    Optional<unsigned> unlabeledTrailingClosureIndex,
-    ArrayRef<ParamBinding> parameterBindings) {
-
-  if (!unlabeledTrailingClosureIndex)
-    return;
-
-  if (*unlabeledTrailingClosureIndex != args.size() - 1)
-    return;
-
-  // Find the parameter that bound the unlabeled trailing closure argument.
-  unsigned paramIdx = findParamBindingArgument(
-      parameterBindings, *unlabeledTrailingClosureIndex);
-
-  // If this parameter requires an argument, it would have been unfilled
-  // prior to SE-2086; there is nothing to diagnose.
-  if (parameterRequiresArgument(params, paramInfo, paramIdx))
-    return;
-
-  // Look for a later parameter that could match a trailing closure; the
-  // last one of these would have been picked prior to SE-0286.
-  Optional<unsigned> matchingBackwardParamIdx;
-  for (unsigned backwardParamIdx :
-           range(paramIdx + 1, parameterBindings.size())) {
-    if (!paramInfo.acceptsUnlabeledTrailingClosureArgument(backwardParamIdx))
-      continue;
-
-    matchingBackwardParamIdx = backwardParamIdx;
-  }
-
-  // If there is no other parameter that could match the unlabeled trailing
-  // closure, there is nothing to diagnose.
-  if (!matchingBackwardParamIdx)
-    return;
-
-  // Do a simple arity check; if the matched parameter and backward-matched
-  // parameter accept functions with different arity, this would not have
-  // type-checked with the backward scan, so there is nothing to report.
-  if (functionParameterArity(params[paramIdx]) !=
-        functionParameterArity(params[*matchingBackwardParamIdx]))
-    return;
-
-  // Dig out the trailing closure.
-  Expr *trailingClosure = findTrailingClosureArgument(arg);
-
-  // Determine the names of the parameters that would be matched by the
-  // forward and backward scans.
-  Identifier paramName = params[paramIdx].getLabel();
-  Identifier backwardParamName = params[*matchingBackwardParamIdx].getLabel();
-
-  // Produce a diagnostic referencing the callee.
-  ASTContext &ctx = params[paramIdx].getPlainType()->getASTContext();
-  auto noteCallee = [&] {
-    auto decl = callee.getDecl();
-    if (!decl)
-      return;
-
-    auto diag = ctx.Diags.diagnose(
-        decl, diag::decl_multiple_defaulted_closure_parameters,
-        decl->getName(), paramName, backwardParamName);
-
-    // Dig out the parameter declarations so we can highlight them.
-    if (const ParameterList *paramList = getParameterList(decl)) {
-      diag.highlight(paramList->get(paramIdx)->getLoc());
-      diag.highlight(paramList->get(*matchingBackwardParamIdx)->getLoc());
-    }
-  };
-
-  // If the parameters have the same name, provide a custom diagnostic and then
-  // bail out early; there are no useful notes we can provide here.
-  if (paramName == backwardParamName) {
-    ctx.Diags.diagnose(trailingClosure->getStartLoc(), diag::unlabeled_trailing_closure_changed_behavior_same_param_name,
-        paramName);
-    noteCallee();
-    return;
-  }
-
-  // Produce the diagnostic.
-  ctx.Diags.diagnose(trailingClosure->getStartLoc(), diag::unlabeled_trailing_closure_changed_behavior, paramName,
-      backwardParamName);
-
-  // Produce a note with a Fix-It describing how to resolve the ambiguity.
-  auto diagResolution = [&](Identifier paramName, unsigned which) {
-    // Emit the note.
-    auto diag = ctx.Diags.diagnose(
-        trailingClosure->getStartLoc(), diag::trailing_closure_select_parameter,
-        paramName, which);
-    labelTrailingClosureArgument(
-        ctx, fn, arg, paramName, trailingClosure, diag);
-  };
-
-  diagResolution(backwardParamName, 0);
-  diagResolution(paramName, 1);
-
-  noteCallee();
 }
 
 /// Warn about the use of the deprecated "backward" scan for matching the
@@ -5850,13 +5727,8 @@ Expr *ExprRewriter::coerceCallArguments(
   // FIXME: Eventually, we want to enforce that we have either argTuple or
   // argParen here.
 
-  // Warn if there was a recent change in trailing closure binding semantics
-  // that might have lead to a silent change in behavior.
-  if (trailingClosureMatching == TrailingClosureMatching::Forward) {
-    maybeWarnAboutTrailingClosureBindingChange(
-        callee, apply ? apply->getFn() : nullptr, arg, args, params, paramInfo,
-        unlabeledTrailingClosureIndex, parameterBindings);
-  } else {
+  // Warn about the backward scan being deprecated.
+  if (trailingClosureMatching == TrailingClosureMatching::Backward) {
     warnAboutTrailingClosureBackwardScan(
         callee, apply ? apply->getFn() : nullptr, arg, params,
         unlabeledTrailingClosureIndex, parameterBindings);
