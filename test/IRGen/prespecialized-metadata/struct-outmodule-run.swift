@@ -13,6 +13,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
+// UNSUPPORTED: remote_run
 
 import Module
 
@@ -50,27 +51,27 @@ func consumeType_OneArgumentAtFirstUsageDynamic_Dynamic(line: UInt = #line) {
 
 @inline(never)
 func doit() {
-  // CHECK: [[STATIC_METADATA_ADDRESS:[0-9a-f]+]] @ 54
+  // CHECK: [[STATIC_METADATA_ADDRESS:[0-9a-f]+]] @ 55
   consumeType_OneArgumentAtFirstUsageStatic_Static()
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 56
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 57
   consumeType_OneArgumentAtFirstUsageStatic_Dynamic()
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 58
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 59
   consumeType_OneArgumentAtFirstUsageStatic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 60
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 61
   consumeType_OneArgumentAtFirstUsageDynamic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 62
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS:[0-9a-f]+]] @ 63
   consumeType_OneArgumentAtFirstUsageDynamic_Dynamic()
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 64
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 65
   consumeType_OneArgumentAtFirstUsageDynamic_Static()
 
   let staticMetadata = ptr(to: OneArgument<FirstUsageStatic>.self)
-  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 68
+  // CHECK: [[STATIC_METADATA_ADDRESS]] @ 69
   print(staticMetadata, "@", #line)
   assert(isStaticallySpecializedGenericMetadata(staticMetadata))
   assert(!isCanonicalStaticallySpecializedGenericMetadata(staticMetadata))
 
   let dynamicMetadata = ptr(to: OneArgument<FirstUsageDynamic>.self)
-  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 74
+  // CHECK: [[DYNAMIC_METADATA_ADDRESS]] @ 75
   print(dynamicMetadata, "@", #line)
   assert(!isStaticallySpecializedGenericMetadata(dynamicMetadata))
   assert(!isCanonicalStaticallySpecializedGenericMetadata(dynamicMetadata))
