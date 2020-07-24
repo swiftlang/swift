@@ -7291,8 +7291,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
               DeclNameRef(param->getName()),
               paramDecl->getDeclContext()->getParentSourceFile(),
               SourceLoc(),
-              UnqualifiedLookupFlags::KnownPrivate |
-                  UnqualifiedLookupFlags::TypeLookup);
+              UnqualifiedLookupFlags::TypeLookup);
           auto lookup = evaluateOrDefault(
               Context.evaluator, UnqualifiedLookupRequest{descriptor}, {});
           for (auto &result : lookup) {

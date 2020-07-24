@@ -439,11 +439,7 @@ evaluator::DependencySource UnqualifiedLookupRequest::readDependencySource(
   // with the existing scheme, but the existing scheme is totally ad-hoc. We
   // should remove this flag and ensure that non-cascading qualified lookups
   // occur in the right contexts instead.
-  auto scope = evaluator::DependencyScope::Cascading;
-  if (desc.Options.contains(UnqualifiedLookupFlags::KnownPrivate)) {
-    scope = evaluator::DependencyScope::Private;
-  }
-  return {desc.DC->getParentSourceFile(), scope};
+  return {desc.DC->getParentSourceFile(), evaluator::DependencyScope::Cascading};
 }
 
 void UnqualifiedLookupRequest::writeDependencySink(

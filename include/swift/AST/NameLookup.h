@@ -215,18 +215,16 @@ public:
 };
 
 enum class UnqualifiedLookupFlags {
-  /// This lookup is known to not affect downstream files.
-  KnownPrivate = 0x01,
   /// This lookup should only return types.
-  TypeLookup = 0x02,
+  TypeLookup            = 1 << 0,
   /// This lookup should consider declarations within protocols to which the
   /// context type conforms.
-  AllowProtocolMembers = 0x04,
+  AllowProtocolMembers  = 1 << 2,
   /// Don't check access when doing lookup into a type.
-  IgnoreAccessControl = 0x08,
+  IgnoreAccessControl   = 1 << 3,
   /// This lookup should include results from outside the innermost scope with
   /// results.
-  IncludeOuterResults = 0x10,
+  IncludeOuterResults   = 1 << 4,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
