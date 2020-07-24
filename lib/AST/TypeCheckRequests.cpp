@@ -162,7 +162,7 @@ evaluator::DependencySource SuperclassTypeRequest::readDependencySource(
   const auto access = std::get<0>(getStorage())->getFormalAccess();
   return {
     e.getActiveDependencySourceOrNull(),
-    evaluator::getScopeForAccessLevel(access)
+    evaluator::DependencyScope::Private,
   };
 }
 
@@ -1289,7 +1289,7 @@ evaluator::DependencySource CheckRedeclarationRequest::readDependencySource(
   auto *currentDC = current->getDeclContext();
   return {
     currentDC->getParentSourceFile(),
-    evaluator::getScopeForAccessLevel(current->getFormalAccess())
+    evaluator::DependencyScope::Private,
   };
 }
 
@@ -1329,7 +1329,7 @@ LookupAllConformancesInContextRequest::readDependencySource(
   }
 
   return {collector.getActiveDependencySourceOrNull(),
-          evaluator::getScopeForAccessLevel(nominal->getFormalAccess())};
+          evaluator::DependencyScope::Private};
 }
 
 void LookupAllConformancesInContextRequest::writeDependencySink(

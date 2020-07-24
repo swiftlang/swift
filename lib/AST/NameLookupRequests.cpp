@@ -99,7 +99,7 @@ evaluator::DependencySource InheritedProtocolsRequest::readDependencySource(
     return { nullptr, e.getActiveSourceScope() };
   return {
     e.getActiveDependencySourceOrNull(),
-    evaluator::getScopeForAccessLevel(PD->getFormalAccess())
+    DependencyScope::Private,
   };
 }
 

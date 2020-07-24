@@ -66,38 +66,6 @@ enum class DependencyScope : bool {
   Cascading = true,
 };
 
-/// Returns a \c DependencyScope appropriate for the given (formal) access level.
-///
-/// :warning: This function exists to bridge the old manual reference
-/// dependencies code to the new evaluator-based reference dependencies code.
-/// The manual code often made private/cascading scope judgements based on the
-/// access level of a declaration. While this makes some sense intuitively, it
-/// does not necessarily capture an accurate picture of where real incremental
-/// dependencies lie. For example, references to formally private types can
-/// "escape" to contexts that have no reference to the private name if, say,
-/// the layout of that private type is taken into consideration by
-/// SILGen or IRGen in a separate file that references the declaration
-/// transitively. However, due to the density of the current dependency
-/// graph, redundancy in registered dependency edges, and the liberal use of
-/// cascading edges, we may be saved from the worst consequences of this
-/// modelling choice.
-///
-/// The use of access-levels for dependency decisions is an anti-pattern that
-/// should be revisited once finer-grained dependencies are explored more
-/// thoroughly.
-inline DependencyScope getScopeForAccessLevel(AccessLevel l) {
-  switch (l) {
-  case AccessLevel::Private:
-  case AccessLevel::FilePrivate:
-    return DependencyScope::Private;
-  case AccessLevel::Internal:
-  case AccessLevel::Public:
-  case AccessLevel::Open:
-    return DependencyScope::Cascading;
-  }
-  llvm_unreachable("invalid access level kind");
-}
-
 // A \c DependencySource is currently defined to be a parent source file and
 // an associated dependency scope.
 //
