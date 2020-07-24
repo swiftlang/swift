@@ -138,6 +138,35 @@ sil_vtable PublicFragileB {
 // CHECK-SAME:     @PublicFragileB_bar
 // CHECK-SAME:     @PublicFragileA_bas
 
+sil @PublicResilientSubclassOfFragile_bar : $@convention(method) (@guaranteed PublicResilientSubclassOfFragile) -> ()
+sil @PublicResilientSubclassOfFragile_init : $@convention(method) (@thick PublicResilientSubclassOfFragile.Type) -> @owned PublicResilientSubclassOfFragile
+sil @PublicResilientSubclassOfFragile_dealloc : $@convention(method) (@owned PublicResilientSubclassOfFragile) -> ()
+
+public class PublicResilientSubclassOfFragile: PublicFragileA {
+  override func bar()
+}
+
+sil_vtable PublicResilientSubclassOfFragile {
+  #PublicResilientSubclassOfFragile.deinit!deallocator : @PublicResilientSubclassOfFragile_dealloc
+  #PublicFragileA.init!allocator : @PublicResilientSubclassOfFragile_init [override]
+  #PublicFragileA.foo : @PublicFragileA_foo [inherited] [nonoverridden]
+  #PublicFragileA.bar : @PublicResilientSubclassOfFragile_bar [override]
+  #PublicFragileA.bas : @PublicFragileA_bas [inherited] [nonoverridden]
+}
+
+// -- all entries from fragile base class should be preserved in public method descriptor table
+// CHECK-LABEL: @"$s21vtable_non_overridden32PublicResilientSubclassOfFragileCMn" =
+// CHECK-SAME:     i32 2, %swift.method_override_descriptor
+// CHECK-SAME:     @PublicResilientSubclassOfFragile_bar
+// CHECK-SAME:     @PublicResilientSubclassOfFragile_init
+
+// -- all entries from fragile base class should be preserved in public vtable
+// CHECK-LABEL: @"$s21vtable_non_overridden32PublicResilientSubclassOfFragileCMf" = 
+// CHECK-SAME:     @PublicResilientSubclassOfFragile_init
+// CHECK-SAME:     @PublicFragileA_foo
+// CHECK-SAME:     @PublicResilientSubclassOfFragile_bar
+// CHECK-SAME:     @PublicFragileA_bas
+
 public class PublicA {
   init()
   public func foo()
