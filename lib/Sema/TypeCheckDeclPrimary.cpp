@@ -70,13 +70,13 @@ using namespace swift;
 /// given type or extension. It need only be called within the primary source
 /// file.
 static void checkInheritanceClause(
-                    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> declUnion) {
-  DeclContext *DC;
-  MutableArrayRef<TypeLoc> inheritedClause;
-  ExtensionDecl *ext = nullptr;
-  TypeDecl *typeDecl = nullptr;
-  Decl *decl;
-  if ((ext = declUnion.dyn_cast<ExtensionDecl *>())) {
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
+  const DeclContext *DC;
+  ArrayRef<TypeLoc> inheritedClause;
+  const ExtensionDecl *ext = nullptr;
+  const TypeDecl *typeDecl = nullptr;
+  const Decl *decl;
+  if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
     DC = ext;
 
@@ -93,7 +93,7 @@ static void checkInheritanceClause(
       }
     }
   } else {
-    typeDecl = declUnion.get<TypeDecl *>();
+    typeDecl = declUnion.get<const TypeDecl *>();
     decl = typeDecl;
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       DC = nominal;
