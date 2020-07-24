@@ -102,11 +102,11 @@ evaluator::DependencySource IRGenRequest::readDependencySource(
 
   // We don't track dependencies in whole-module mode.
   if (auto *mod = desc.Ctx.dyn_cast<ModuleDecl *>()) {
-    return {nullptr, e.getActiveSourceScope()};
+    return nullptr;
   }
 
   auto *primary = desc.Ctx.get<FileUnit *>();
-  return {dyn_cast<SourceFile>(primary), evaluator::DependencyScope::Cascading};
+  return dyn_cast<SourceFile>(primary);
 }
 
 // Define request evaluation functions for each of the IRGen requests.

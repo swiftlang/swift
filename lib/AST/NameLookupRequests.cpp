@@ -96,11 +96,8 @@ evaluator::DependencySource InheritedProtocolsRequest::readDependencySource(
   // type conforms to Hashable which itself looks up Equatable during
   // qualified lookup.
   if (!PD->getParentSourceFile())
-    return { nullptr, e.getActiveSourceScope() };
-  return {
-    e.getActiveDependencySourceOrNull(),
-    DependencyScope::Private,
-  };
+    return nullptr;
+  return e.getActiveDependencySourceOrNull();
 }
 
 void InheritedProtocolsRequest::writeDependencySink(
@@ -184,7 +181,7 @@ void ExtendedNominalRequest::writeDependencySink(
   auto *SF = std::get<0>(getStorage())->getParentSourceFile();
   if (!SF)
     return;
-  if (SF != tracker.getRecorder().getActiveDependencySourceOrNull())
+  if (SF != tracker.getRecorder().getActiveDependencySourceOrNull().getPtrOrNull())
     return;
   tracker.addPotentialMember(value);
 }
@@ -209,14 +206,7 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
 
 evaluator::DependencySource GetDestructorRequest::readDependencySource(
     const evaluator::DependencyRecorder &eval) const {
-  // Looking up the deinitializer currently always occurs in a private
-  // scope because it is impossible to reference 'deinit' in user code, and a
-  // valid 'deinit' declaration cannot occur outside of the
-  // definition of a type.
-  return {
-    eval.getActiveDependencySourceOrNull(),
-    evaluator::DependencyScope::Private
-  };
+  return eval.getActiveDependencySourceOrNull();
 }
 
 //----------------------------------------------------------------------------//
@@ -371,7 +361,7 @@ swift::extractNearestSourceLoc(const LookupConformanceDescriptor &desc) {
 evaluator::DependencySource ModuleQualifiedLookupRequest::readDependencySource(
     const evaluator::DependencyRecorder &eval) const {
   auto *DC = std::get<0>(getStorage());
-  return { DC->getParentSourceFile(), evaluator::DependencyScope::Private };
+  return DC->getParentSourceFile();
 }
 
 void ModuleQualifiedLookupRequest::writeDependencySink(
@@ -403,13 +393,13 @@ void LookupConformanceInModuleRequest::writeDependencySink(
   if (!Adoptee)
     return;
 
-  auto *source = reqTracker.getRecorder().getActiveDependencySourceOrNull();
-  if (!source)
+  auto source = reqTracker.getRecorder().getActiveDependencySourceOrNull();
+  if (source.isNull())
     return;
 
   // Decline to record conformances defined outside of the active module.
   auto *conformance = lookupResult.getConcrete();
-  if (source->getParentModule() !=
+  if (source.get()->getParentModule() !=
       conformance->getDeclContext()->getParentModule())
     return;
   reqTracker.addPotentialMember(Adoptee);
@@ -421,12 +411,7 @@ void LookupConformanceInModuleRequest::writeDependencySink(
 
 evaluator::DependencySource UnqualifiedLookupRequest::readDependencySource(
     const evaluator::DependencyRecorder &) const {
-  auto &desc = std::get<0>(getStorage());
-  // FIXME(Evaluator Incremental Dependencies): This maintains compatibility
-  // with the existing scheme, but the existing scheme is totally ad-hoc. We
-  // should remove this flag and ensure that non-cascading qualified lookups
-  // occur in the right contexts instead.
-  return {desc.DC->getParentSourceFile(), evaluator::DependencyScope::Cascading};
+  return std::get<0>(getStorage()).DC->getParentSourceFile();
 }
 
 void UnqualifiedLookupRequest::writeDependencySink(
@@ -441,11 +426,8 @@ void UnqualifiedLookupRequest::writeDependencySink(
 
 evaluator::DependencySource QualifiedLookupRequest::readDependencySource(
     const evaluator::DependencyRecorder &) const {
-  auto *dc = std::get<0>(getStorage());
-  return {
-    dyn_cast<SourceFile>(dc->getModuleScopeContext()),
-    evaluator::DependencyScope::Private
-  };
+  auto *DC = std::get<0>(getStorage())->getModuleScopeContext();
+  return dyn_cast<SourceFile>(DC);
 }
 
 // Define request evaluation functions for each of the name lookup requests.

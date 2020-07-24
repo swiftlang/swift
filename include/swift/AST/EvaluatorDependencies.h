@@ -21,6 +21,7 @@
 #include "swift/AST/AnyRequest.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
@@ -32,48 +33,13 @@ namespace detail {
 template <typename...> using void_t = void;
 } // namespace detail
 
-/// The "scope" of a dependency edge tracked by the evaluator.
-///
-/// Dependency scopes come in two flavors: cascading and private. A private
-/// edge captures dependencies discovered in contexts that are not visible to
-/// to other files. For example, a conformance to a private protocol, or the use
-/// of any names inside of a function body. A cascading edge, by contrast,
-/// captures dependencies discovered in the remaining visible contexts. These
-/// are types with at least \c internal visibility, names defined or used
-/// outside of function bodies with at least \c internal visibility, etc. A
-/// dependency that has cascading scope is so-named because upon traversing the
-/// edge, a reader such as the driver should continue transitively evaluating
-/// further dependency edges.
-///
-/// A cascading edge is always conservatively correct to produce, but it comes
-/// at the cost of increased resources spent (and possibly even wasted!) during
-/// incremental compilation. A private edge, by contrast, is more efficient for
-/// incremental compilation but it is harder to safely use.
-///
-/// To ensure that these edges are registered consistently with the correct
-/// scopes, requests that act as the source of dependency edges are required
-/// to specify a \c DependencyScope under which all evaluated sub-requests will
-/// register their dependency edges. In this way, \c DependencyScope values
-/// form a stack-like structure and are pushed and popped by the evaluator
-/// during the course of request evaluation.
-///
-/// When determining the kind of scope a request should use, always err on the
-/// side of a cascading scope unless there is absolute proof any discovered
-/// dependencies will be private. Inner requests may also defensively choose to
-/// flip the dependency scope from private to cascading in the name of safety.
-enum class DependencyScope : bool {
-  Private = false,
-  Cascading = true,
-};
-
-// A \c DependencySource is currently defined to be a parent source file and
-// an associated dependency scope.
+// A \c DependencySource is currently defined to be a parent source file.
 //
 // The \c SourceFile instance is an artifact of the current dependency system,
 // and should be scrapped if possible. It currently encodes the idea that
 // edges in the incremental dependency graph invalidate entire files instead
 // of individual contexts.
-using DependencySource = llvm::PointerIntPair<SourceFile *, 1, DependencyScope>;
+using DependencySource = swift::NullablePtr<SourceFile>;
 
 struct DependencyRecorder;
 
@@ -306,16 +272,6 @@ public:
                                  ReferenceEnumerator f) const ;
 
 public:
-  /// Returns the scope of the current active scope.
-  ///
-  /// If there is no active scope, the result always cascades.
-  evaluator::DependencyScope getActiveSourceScope() const {
-    if (dependencySources.empty()) {
-      return evaluator::DependencyScope::Cascading;
-    }
-    return dependencySources.back().getInt();
-  }
-
   /// Returns the active dependency's source file, or \c nullptr if no
   /// dependency source is active.
   ///
@@ -323,14 +279,14 @@ public:
   /// dependency sink is seeking to filter out names based on the files they
   /// come from. Existing callers are being migrated to more reasonable ways
   /// of judging the relevancy of a dependency.
-  SourceFile *getActiveDependencySourceOrNull() const {
+  evaluator::DependencySource getActiveDependencySourceOrNull() const {
     if (dependencySources.empty())
       return nullptr;
     switch (mode) {
     case Mode::LegacyCascadingDependencies:
-      return dependencySources.back().getPointer();
+      return dependencySources.back();
     case Mode::DirectDependencies:
-      return dependencySources.front().getPointer();
+      return dependencySources.front();
     }
   }
 
@@ -350,7 +306,7 @@ public:
       auto Source = Req.readDependencySource(coll);
       // If there is no source to introduce, bail. This can occur if
       // a request originates in the context of a module.
-      if (!Source.getPointer()) {
+      if (Source.isNull()) {
         return;
       }
       coll.dependencySources.emplace_back(Source);
@@ -370,7 +326,7 @@ private:
   bool isActiveSourceCascading() const {
     switch (mode) {
     case Mode::LegacyCascadingDependencies:
-      return getActiveSourceScope() == evaluator::DependencyScope::Cascading;
+      return false;
     case Mode::DirectDependencies:
       return false;
     }

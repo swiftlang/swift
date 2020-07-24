@@ -381,8 +381,7 @@ void Evaluator::dumpDependenciesGraphviz() const {
 
 void evaluator::DependencyRecorder::realize(
     const DependencyCollector::Reference &ref) {
-  auto *source = getActiveDependencySourceOrNull();
-  assert(source && "cannot realize dependency without associated file!");
+  auto *source = getActiveDependencySourceOrNull().get();
   if (!source->isPrimary()) {
     return;
   }
@@ -429,8 +428,8 @@ void evaluator::DependencyRecorder::record(
     const llvm::SetVector<swift::ActiveRequest> &stack,
     llvm::function_ref<void(DependencyCollector &)> rec) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
-  auto *source = getActiveDependencySourceOrNull();
-  if (!source || !source->isPrimary()) {
+  auto source = getActiveDependencySourceOrNull();
+  if (source.isNull() || !source.get()->isPrimary()) {
     return;
   }
 
@@ -450,12 +449,12 @@ void evaluator::DependencyRecorder::replay(
     const swift::ActiveRequest &req) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
 
-  auto *source = getActiveDependencySourceOrNull();
+  auto source = getActiveDependencySourceOrNull();
   if (mode == Mode::LegacyCascadingDependencies) {
     return;
   }
 
-  if (!source || !source->isPrimary()) {
+  if (source.isNull() || !source.get()->isPrimary()) {
     return;
   }
 

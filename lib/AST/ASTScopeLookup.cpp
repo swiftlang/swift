@@ -585,7 +585,7 @@ Optional<bool> PatternEntryInitializerScope::resolveIsCascadingUseForThisScope(
   // initializing stored property of a type
   auto *const patternDeclContext = decl->getDeclContext();
   if (patternDeclContext->isTypeContext())
-    return isCascadingUseAccordingTo(PBI->getParent());
+    return false;
 
   // initializing global or local
   if (PBI)
