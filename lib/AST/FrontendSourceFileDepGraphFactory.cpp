@@ -578,7 +578,6 @@ public:
 public:
   void enumerateAllUses() {
     auto &Ctx = SF->getASTContext();
-    std::unordered_set<std::string> holdersOfCascadingMembers;
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
       const auto cascades = false;
       std::string name = ref.name.userFacingName().str();
@@ -596,22 +595,18 @@ public:
       case Kind::PotentialMember: {
         std::string context = DependencyKey::computeContextForProvidedEntity<
             NodeKind::potentialMember>(nominal);
-        appendHolderOfCascadingMembers(holdersOfCascadingMembers, nominal,
-                                       cascades);
         return enumerateUse<NodeKind::potentialMember>(context, "", cascades);
       }
       case Kind::UsedMember: {
         std::string context =
             DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
                 nominal);
-        appendHolderOfCascadingMembers(holdersOfCascadingMembers, nominal,
-                                       cascades);
         return enumerateUse<NodeKind::member>(context, name, cascades);
       }
       }
     });
     enumerateExternalUses();
-    enumerateNominalUses(std::move(holdersOfCascadingMembers));
+    enumerateNominalUses();
   }
 
 private:
@@ -623,23 +618,7 @@ private:
         isCascadingUse ? sourceFileInterface : sourceFileImplementation);
   }
 
-  void appendHolderOfCascadingMembers(std::unordered_set<std::string> &holders,
-                                      const NominalTypeDecl *subject,
-                                      bool isCascading) {
-    bool isPrivate = subject->isPrivateToEnclosingFile();
-    if (isPrivate && !includeIntrafileDeps)
-      return;
-
-    std::string context =
-        DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
-            subject);
-    if (isCascading) {
-      holders.insert(context);
-    }
-  }
-
-  void enumerateNominalUses(
-      const std::unordered_set<std::string> &&holdersOfCascadingMembers) {
+  void enumerateNominalUses() {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
       const NominalTypeDecl *subject = ref.subject;
@@ -655,8 +634,7 @@ private:
       std::string context =
           DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
               subject);
-      const bool isCascadingUse = holdersOfCascadingMembers.count(context) != 0;
-      enumerateUse<NodeKind::nominal>(context, "", isCascadingUse);
+      enumerateUse<NodeKind::nominal>(context, "", /*isCascadingUse*/ false);
     });
   }
 
