@@ -61,20 +61,20 @@ struct InstallNameStore {
 };
 
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
-public:
-  llvm::MachO::InterfaceFile &Symbols;
-  llvm::MachO::TargetList Targets;
-  std::vector<std::string> StringSymbols;
-  const llvm::DataLayout &DataLayout;
-
 #ifndef NDEBUG
   /// Tracks the symbols emitted to ensure we don't emit any duplicates.
   llvm::StringSet<> DuplicateSymbolChecker;
 #endif
 
-  const UniversalLinkageInfo &UniversalLinkInfo;
+  const llvm::DataLayout &DataLayout;
+  UniversalLinkageInfo UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
+
+  using SymbolKind = llvm::MachO::SymbolKind;
+  using SymbolCallbackFn = llvm::function_ref<void(StringRef, SymbolKind)>;
+
+  SymbolCallbackFn SymbolCallback;
 
   /// A set of original function and derivative configuration pairs for which
   /// derivative symbols have been emitted.
@@ -84,7 +84,6 @@ public:
   llvm::DenseSet<std::pair<AbstractFunctionDecl *, AutoDiffConfig>>
       AddedDerivatives;
 
-private:
   std::vector<Decl*> DeclStack;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     previousInstallNameMap;
@@ -141,15 +140,18 @@ private:
                                   AutoDiffConfig config);
 
 public:
-  TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
-                llvm::MachO::TargetList targets,
-                const llvm::DataLayout &dataLayout,
-                const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, const TBDGenOptions &opts)
-      : Symbols(symbols), Targets(targets), DataLayout(dataLayout),
-        UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
-        Opts(opts),
-        previousInstallNameMap(parsePreviousModuleInstallNameMap())  {}
+  TBDGenVisitor(const llvm::Triple &target, const llvm::DataLayout &dataLayout,
+                ModuleDecl *swiftModule, const TBDGenOptions &opts,
+                SymbolCallbackFn symbolCallback)
+      : DataLayout(dataLayout),
+        UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false),
+        SwiftModule(swiftModule), Opts(opts), SymbolCallback(symbolCallback),
+        previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}
+
+  /// Create a new visitor using the target and layout information from a
+  /// TBDGenDescriptor.
+  TBDGenVisitor(TBDGenDescriptor desc, SymbolCallbackFn symbolCallback);
+
   ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
