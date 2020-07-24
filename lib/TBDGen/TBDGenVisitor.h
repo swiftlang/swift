@@ -40,6 +40,7 @@ class DataLayout;
 
 namespace swift {
 
+class TBDGenDescriptor;
 struct TBDGenOptions;
 
 namespace tbdgen {
@@ -195,6 +196,12 @@ public:
   void visitDecl(Decl *D) {}
 
   void visit(Decl *D);
+
+  /// Visit the symbols in a given file unit.
+  void visitFile(FileUnit *file);
+
+  /// Visit the files specified by a given TBDGenDescriptor.
+  void visit(const TBDGenDescriptor &desc);
 };
 } // end namespace tbdgen
 } // end namespace swift

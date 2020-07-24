@@ -1053,6 +1053,63 @@ void TBDGenVisitor::visit(Decl *D) {
   ASTVisitor::visit(D);
 }
 
+static bool hasLinkerDirective(Decl *D) {
+  return !getAllMovedPlatformVersions(D).empty();
+}
+
+void TBDGenVisitor::visitFile(FileUnit *file) {
+  if (file == SwiftModule->getFiles()[0])
+    addFirstFileSymbols();
+
+  SmallVector<Decl *, 16> decls;
+  file->getTopLevelDecls(decls);
+
+  addMainIfNecessary(file);
+
+  for (auto d : decls) {
+    if (Opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
+      continue;
+    visit(d);
+  }
+}
+
+void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
+  if (auto *singleFile = desc.getSingleFile()) {
+    assert(SwiftModule == singleFile->getParentModule() &&
+           "mismatched file and module");
+    visitFile(singleFile);
+
+    // Visit synthesized file, if it exists.
+    if (auto *SF = dyn_cast<SourceFile>(singleFile)) {
+      if (auto *synthesizedFile = SF->getSynthesizedFile())
+        visitFile(synthesizedFile);
+    }
+    return;
+  }
+
+  llvm::SmallVector<ModuleDecl*, 4> Modules;
+  Modules.push_back(SwiftModule);
+
+  auto &ctx = SwiftModule->getASTContext();
+  for (auto Name: Opts.embedSymbolsFromModules) {
+    if (auto *MD = ctx.getModuleByName(Name)) {
+      // If it is a clang module, the symbols should be collected by TAPI.
+      if (!MD->isNonSwiftModule()) {
+        Modules.push_back(MD);
+        continue;
+      }
+    }
+    // Diagnose module name that cannot be found
+    ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
+  }
+  // Collect symbols in each module.
+  llvm::for_each(Modules, [&](ModuleDecl *M) {
+    for (auto *file : M->getFiles()) {
+      visitFile(file);
+    }
+  });
+}
+
 /// The kind of version being parsed, used for diagnostics.
 /// Note: Must match the order in DiagnosticsFrontend.def
 enum DylibVersionKind_t: unsigned {
@@ -1100,10 +1157,6 @@ static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
          llvm::sys::Process::GetEnv("LD_APPLICATION_EXTENSION_SAFE");
 }
 
-static bool hasLinkerDirective(Decl *D) {
-  return !getAllMovedPlatformVersions(D).empty();
-}
-
 TBDFileAndSymbols
 GenerateTBDRequest::evaluate(Evaluator &evaluator,
                              TBDGenDescriptor desc) const {
@@ -1144,53 +1197,7 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   TBDGenVisitor visitor(file, {target}, clang->getTargetInfo().getDataLayout(),
                         linkInfo, M, opts);
-
-  auto visitFile = [&](FileUnit *file) {
-    if (file == M->getFiles()[0]) {
-      visitor.addFirstFileSymbols();
-    }
-
-    SmallVector<Decl *, 16> decls;
-    file->getTopLevelDecls(decls);
-
-    visitor.addMainIfNecessary(file);
-
-    for (auto d : decls) {
-      if (opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
-        continue;
-      visitor.visit(d);
-    }
-  };
-
-  if (auto *singleFile = desc.getSingleFile()) {
-    assert(M == singleFile->getParentModule() && "mismatched file and module");
-    visitFile(singleFile);
-    // Visit synthesized file, if it exists.
-    if (auto *SF = dyn_cast<SourceFile>(singleFile))
-      if (auto *synthesizedFile = SF->getSynthesizedFile())
-        visitFile(synthesizedFile);
-  } else {
-    llvm::SmallVector<ModuleDecl*, 4> Modules;
-    Modules.push_back(M);
-    for (auto Name: opts.embedSymbolsFromModules) {
-      if (auto *MD = ctx.getModuleByName(Name)) {
-        // If it is a clang module, the symbols should be collected by TAPI.
-        if (!MD->isNonSwiftModule()) {
-          Modules.push_back(MD);
-          continue;
-        }
-      }
-      // Diagnose module name that cannot be found
-      ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
-    }
-    // Collect symbols in each module.
-    llvm::for_each(Modules, [&](ModuleDecl *M) {
-      for (auto *file : M->getFiles()) {
-        visitFile(file);
-      }
-    });
-  }
-
+  visitor.visit(desc);
   return std::make_pair(std::move(file), std::move(visitor.StringSymbols));
 }
 
