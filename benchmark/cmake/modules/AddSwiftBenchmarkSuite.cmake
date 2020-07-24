@@ -753,7 +753,6 @@ function(swift_benchmark_compile)
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
                   "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--architecture" "${arch}"
                   "--compare-script"
                   "${SWIFT_SOURCE_DIR}/benchmark/scripts/compare_perf_tests.py")
     endif()
