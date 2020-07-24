@@ -33,7 +33,7 @@ namespace detail {
 template <typename...> using void_t = void;
 } // namespace detail
 
-// A \c DependencySource is currently defined to be a parent source file.
+// A \c DependencySource is currently defined to be a primary source file.
 //
 // The \c SourceFile instance is an artifact of the current dependency system,
 // and should be scrapped if possible. It currently encodes the idea that
@@ -281,7 +281,7 @@ public:
       auto Source = Req.readDependencySource(coll);
       // If there is no source to introduce, bail. This can occur if
       // a request originates in the context of a module.
-      if (Source.isNull()) {
+      if (Source.isNull() || !Source.get()->isPrimary()) {
         return;
       }
       coll.dependencySources.emplace_back(Source);
