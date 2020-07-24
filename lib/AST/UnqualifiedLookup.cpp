@@ -195,8 +195,7 @@ namespace {
                          const bool isOriginallyTypeLookup);
 
     Optional<bool> getInitialIsCascadingUse() const {
-      return options.contains(Flags::KnownPrivate) ? Optional<bool>(false)
-                                                   : None;
+      return Optional<bool>(false);
     }
 
     void findResultsAndSaveUnavailables(

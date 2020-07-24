@@ -1111,7 +1111,6 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
-    relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
     TypeChecker::lookupUnqualifiedType(dc, comp->getNameRef(),
@@ -1177,7 +1176,6 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Try ignoring access control.
   NameLookupOptions relookupOptions = lookupOptions;
-  relookupOptions |= NameLookupFlags::KnownPrivate;
   relookupOptions |= NameLookupFlags::IgnoreAccessControl;
   auto inaccessibleMembers =
     TypeChecker::lookupMemberType(dc, parentType, comp->getNameRef(),
@@ -1212,8 +1210,6 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     // identifier not found as a member type vs. not found at all.
     NameLookupOptions memberLookupOptions = lookupOptions;
     memberLookupOptions |= NameLookupFlags::IgnoreAccessControl;
-    memberLookupOptions |= NameLookupFlags::KnownPrivate;
-
     memberLookup = TypeChecker::lookupMember(dc, parentType,
                                              comp->getNameRef(),
                                              memberLookupOptions);
