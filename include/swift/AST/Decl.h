@@ -1309,6 +1309,8 @@ public:
   /// for more information.
   void setOuterParameters(GenericParamList *Outer) { OuterParameters = Outer; }
 
+  void setDeclContext(DeclContext *dc);
+
   SourceLoc getLAngleLoc() const { return Brackets.Start; }
   SourceLoc getRAngleLoc() const { return Brackets.End; }
 

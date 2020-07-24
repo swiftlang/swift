@@ -964,6 +964,11 @@ void GenericParamList::setDepth(unsigned depth) {
     param->setDepth(depth);
 }
 
+void GenericParamList::setDeclContext(DeclContext *dc) {
+  for (auto param : *this)
+    param->setDeclContext(dc);
+}
+
 TrailingWhereClause::TrailingWhereClause(
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements)
