@@ -509,6 +509,7 @@ public:
     if (!meta || meta->getKind() != MetadataKind::Class)
       return None;
 
+#if SWIFT_OBJC_INTEROP
     // The following algorithm only works on the non-fragile Apple runtime.
 
     // Grab the RO-data pointer.  This part is not ABI.
@@ -524,6 +525,23 @@ public:
       return None;
 
     return start;
+#else
+    // All swift class instances start with an isa pointer,
+    // followed by the retain counts (which are the size of a long long).
+    size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
+    size_t start = isaAndRetainCountSize;
+
+    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    while (classMeta->Superclass) {
+      classMeta = cast<TargetClassMetadata<Runtime>>(
+          readMetadata(classMeta->Superclass));
+
+      // Subtract the size contribution of the isa and retain counts from 
+      // the super class.
+      start += classMeta->InstanceSize - isaAndRetainCountSize;
+    }
+    return start;
+#endif
   }
 
   /// Given a pointer to the metadata, attempt to read the value
