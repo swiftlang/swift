@@ -345,7 +345,8 @@ Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
 /// \see applyGenericArguments
 Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
                                   SourceLoc loc, TypeResolution resolution,
-                                  ArrayRef<Type> genericArgs);
+                                  ArrayRef<Type> genericArgs,
+                                  bool skipRequirementsCheck=false);
 
 /// Substitute the given base type into the type of the given nested type,
 /// producing the effective type that the nested type will have.
