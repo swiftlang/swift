@@ -928,18 +928,14 @@ GenericParamList::clone(DeclContext *dc) const {
   SmallVector<GenericTypeParamDecl *, 2> params;
   for (auto param : getParams()) {
     auto *newParam = new (ctx) GenericTypeParamDecl(
-      dc, param->getName(), param->getNameLoc(),
+      dc, param->getName(), SourceLoc(),
       GenericTypeParamDecl::InvalidDepth,
       param->getIndex());
+    newParam->setImplicit(true);
     params.push_back(newParam);
   }
 
-  return GenericParamList::create(ctx,
-                                  getLAngleLoc(),
-                                  params,
-                                  getWhereLoc(),
-                                  /*requirements=*/{},
-                                  getRAngleLoc());
+  return GenericParamList::create(ctx, SourceLoc(), params, SourceLoc());
 }
 
 void GenericParamList::addTrailingWhereClause(
