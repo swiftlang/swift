@@ -785,6 +785,10 @@ namespace {
                              args...);
         return;
 
+      case clang::Type::ConstantMatrix:
+      case clang::Type::DependentSizedMatrix:
+        llvm_unreachable("matrix type in ABI lowering not supported");
+
       case clang::Type::Pointer:
       case clang::Type::BlockPointer:
       case clang::Type::ObjCObjectPointer:
