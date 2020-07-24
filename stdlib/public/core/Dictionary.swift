@@ -1582,7 +1582,7 @@ extension Dictionary: Equatable where Value: Equatable {
     case (true, false):
       return lhs._variant.asNative.isEqual(to: rhs._variant.asCocoa)
     case (false, true):
-      return rhs._variant.asNative.isEqual(to: lhs._variant.asCocoa)
+      return lhs._variant.asCocoa.isEqual(to: rhs._variant.asNative)
     }
 #else
     return lhs._variant.asNative.isEqual(to: rhs._variant.asNative)

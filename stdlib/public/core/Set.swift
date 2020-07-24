@@ -415,7 +415,7 @@ extension Set: Equatable {
     case (true, false):
       return lhs._variant.asNative.isEqual(to: rhs._variant.asCocoa)
     case (false, true):
-      return rhs._variant.asNative.isEqual(to: lhs._variant.asCocoa)
+      return lhs._variant.asCocoa.isEqual(to: rhs._variant.asNative)
     }
 #else
     return lhs._variant.asNative.isEqual(to: rhs._variant.asNative)
@@ -710,7 +710,7 @@ extension Set: SetAlgebra {
   public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
   where S.Element == Element {
     guard !isEmpty else { return true }
-    
+
     let other = Set(possibleSuperset)
     return isSubset(of: other)
   }
@@ -1125,7 +1125,7 @@ extension Set {
   public func isDisjoint(with other: Set<Element>) -> Bool {
     return _isDisjoint(with: other)
   }
-    
+
   @inlinable
   internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
