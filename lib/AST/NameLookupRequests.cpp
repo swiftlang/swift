@@ -225,10 +225,13 @@ evaluator::DependencySource GetDestructorRequest::readDependencySource(
 
 Optional<GenericParamList *> GenericParamListRequest::getCachedResult() const {
   auto *decl = std::get<0>(getStorage());
-  if (!decl->GenericParamsAndBit.getInt()) {
-    return None;
-  }
-  return decl->GenericParamsAndBit.getPointer();
+  if (auto *params = decl->GenericParamsAndBit.getPointer())
+    return params;
+
+  if (decl->GenericParamsAndBit.getInt())
+    return nullptr;
+
+  return None;
 }
 
 void GenericParamListRequest::cacheResult(GenericParamList *params) const {

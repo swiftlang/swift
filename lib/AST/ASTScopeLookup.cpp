@@ -292,7 +292,10 @@ NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
   // Sigh... These must be here so that from body, we search generics before
   // members. But they also must be on the Decl scope for lookups starting from
   // generic parameters, where clauses, etc.
-  return getGenericContext()->getGenericParams();
+  auto *context = getGenericContext();
+  if (isa<TypeAliasDecl>(context))
+    return context->getParsedGenericParams();
+  return context->getGenericParams();
 }
 NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
   return decl->getGenericParams();

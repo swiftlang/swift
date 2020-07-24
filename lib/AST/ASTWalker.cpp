@@ -129,7 +129,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitGenericParamListIfNeeded(GenericContext *GC) {
     // Must check this first in case extensions have not been bound yet
     if (Walker.shouldWalkIntoGenericParams()) {
-      if (auto *params = GC->getGenericParams()) {
+      if (auto *params = GC->getParsedGenericParams()) {
         visitGenericParamList(params);
       }
       return true;
@@ -142,11 +142,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       for (auto &Req: Where->getRequirements())
         if (doIt(Req))
           return true;
-    } else if (!isa<ExtensionDecl>(GC)) {
-      if (const auto GP = GC->getGenericParams())
-        for (auto Req: GP->getTrailingRequirements())
-          if (doIt(Req))
-            return true;
+    } else if (const auto GP = GC->getParsedGenericParams()) {
+      for (auto Req: GP->getTrailingRequirements())
+        if (doIt(Req))
+          return true;
     }
     return false;
   }

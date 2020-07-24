@@ -1415,6 +1415,11 @@ public:
   /// this context is not generic.
   GenericParamList *getGenericParams() const;
 
+  /// Retrieve the generic parameters as written in source. Unlike
+  /// getGenericParams() this will not synthesize generic parameters for
+  /// extensions, protocols and certain type aliases.
+  GenericParamList *getParsedGenericParams() const;
+
   /// Determine whether this context has generic parameters
   /// of its own.
   ///
