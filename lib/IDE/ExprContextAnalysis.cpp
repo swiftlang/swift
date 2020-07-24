@@ -285,40 +285,61 @@ bool swift::ide::removeCodeCompletionExpr(ASTContext &Ctx, Expr *&expr) {
 }
 
 //===----------------------------------------------------------------------===//
-// getReturnTypeFromContext(DeclContext)
+// collectPossibleReturnTypesFromContext(DeclContext, SmallVectorImpl<Type>)
 //===----------------------------------------------------------------------===//
 
-Type swift::ide::getReturnTypeFromContext(const DeclContext *DC) {
+void swift::ide::collectPossibleReturnTypesFromContext(
+    DeclContext *DC, SmallVectorImpl<Type> &candidates) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
     auto Ty = FD->getInterfaceType();
     if (FD->getDeclContext()->isTypeContext())
       Ty = FD->getMethodInterfaceType();
-    if (auto FT = Ty->getAs<AnyFunctionType>())
-      return DC->mapTypeIntoContext(FT->getResult());
-  } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
-    if (ACE->getType() && !ACE->getType()->hasError())
-      return ACE->getResultType();
-    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
-      if (CE->hasExplicitResultType()) {
-        if (auto ty = CE->getExplicitResultType()) {
-          return ty;
-        }
-
-        auto typeLoc = TypeLoc{CE->getExplicitResultTypeRepr()};
-        if (swift::performTypeLocChecking(DC->getASTContext(),
-                                          typeLoc,
-                                          /*isSILMode*/ false,
-                                          /*isSILType*/ false,
-                                          DC->getGenericEnvironmentOfContext(),
-                                          const_cast<DeclContext *>(DC),
-                                          /*diagnostics*/ false)) {
-          return Type();
-        }
-        return typeLoc.getType();
-      }
+    if (auto FT = Ty->getAs<AnyFunctionType>()) {
+      candidates.push_back(DC->mapTypeIntoContext(FT->getResult()));
     }
   }
-  return Type();
+
+  if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
+    // Use the type checked type if it has.
+    if (ACE->getType() && !ACE->getType()->hasError() &&
+        !ACE->getResultType()->hasUnresolvedType()) {
+      candidates.push_back(ACE->getResultType());
+      return;
+    }
+
+    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
+      if (CE->hasExplicitResultType()) {
+        // If the closure has a explicit return type, use it.
+        if (auto ty = CE->getExplicitResultType()) {
+          candidates.push_back(ty);
+          return;
+        } else {
+          auto typeLoc = TypeLoc{CE->getExplicitResultTypeRepr()};
+          if (!swift::performTypeLocChecking(
+                  DC->getASTContext(), typeLoc, /*isSILMode=*/false,
+                  /*isSILType=*/false, DC->getGenericEnvironmentOfContext(),
+                  const_cast<DeclContext *>(DC), /*diagnostics=*/false)) {
+            candidates.push_back(typeLoc.getType());
+            return;
+          }
+        }
+      } else {
+        // Otherwise, check the context type of the closure.
+        ExprContextInfo closureCtxInfo(CE->getParent(), CE);
+        for (auto closureTy : closureCtxInfo.getPossibleTypes()) {
+          if (auto funcTy = closureTy->getAs<AnyFunctionType>())
+            candidates.push_back(funcTy->getResult());
+        }
+        if (!candidates.empty())
+          return;
+      }
+    }
+
+    // Even if the type checked type has unresolved types, it's better than
+    // nothing.
+    if (ACE->getType() && !ACE->getType()->hasError())
+      candidates.push_back(ACE->getResultType());
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -929,7 +950,10 @@ class ExprContextAnalyzer {
       auto *CE = cast<ClosureExpr>(Parent);
       assert(isSingleExpressionBodyForCodeCompletion(CE->getBody()));
       singleExpressionBody = true;
-      recordPossibleType(getReturnTypeFromContext(CE));
+      SmallVector<Type, 2> candidates;
+      collectPossibleReturnTypesFromContext(CE, candidates);
+      for (auto ty : candidates)
+        recordPossibleType(ty);
       break;
     }
     default:
@@ -939,9 +963,13 @@ class ExprContextAnalyzer {
 
   void analyzeStmt(Stmt *Parent) {
     switch (Parent->getKind()) {
-    case StmtKind::Return:
-      recordPossibleType(getReturnTypeFromContext(DC));
+    case StmtKind::Return: {
+      SmallVector<Type, 2> candidates;
+      collectPossibleReturnTypesFromContext(DC, candidates);
+      for (auto ty : candidates)
+        recordPossibleType(ty);
       break;
+    }
     case StmtKind::ForEach:
       if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
         if (containsTarget(SEQ)) {
@@ -1004,7 +1032,10 @@ class ExprContextAnalyzer {
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
         assert(isSingleExpressionBodyForCodeCompletion(FD->getBody()));
         singleExpressionBody = true;
-        recordPossibleType(getReturnTypeFromContext(FD));
+        SmallVector<Type, 2> candidates;
+        collectPossibleReturnTypesFromContext(DC, candidates);
+        for (auto ty : candidates)
+          recordPossibleType(ty);
         break;
       }
       llvm_unreachable("Unhandled decl kind.");
