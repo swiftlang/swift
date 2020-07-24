@@ -48,8 +48,8 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       llvm::errs() << "use of an unavailable declaration";
       break;
 
-    case SK_BackwardTrailingClosure:
-      llvm::errs() << "backward scan when matching a trailing closure";
+    case SK_ForwardTrailingClosure:
+      llvm::errs() << "forward scan when matching a trailing closure";
       break;
 
     case SK_Fix:

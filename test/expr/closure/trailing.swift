@@ -5,7 +5,7 @@ func takeFunc(_ f: (Int) -> Int) -> Int {}
 func takeValueAndFunc(_ value: Int, _ f: (Int) -> Int) {}
 func takeTwoFuncs(_ f: (Int) -> Int, _ g: (Int) -> Int) {}
 func takeFuncWithDefault(f : ((Int) -> Int)? = nil) {}
-func takeTwoFuncsWithDefaults(f1 : ((Int) -> Int)? = nil, f2 : ((String) -> String)? = nil) {} // expected-note{{contains defaulted closure parameters 'f1' and 'f2'}}
+func takeTwoFuncsWithDefaults(f1 : ((Int) -> Int)? = nil, f2 : ((String) -> String)? = nil) {}
 // expected-note@-1{{'takeTwoFuncsWithDefaults(f1:f2:)' declared here}}
 
 struct X {
@@ -107,8 +107,7 @@ func labeledArgumentAndTrailingClosure() {
 
   // Trailing closure binds to first parameter... unless only the second matches.
  takeTwoFuncsWithDefaults { "Hello, " + $0 } // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'f2' to suppress this warning}}
- takeTwoFuncsWithDefaults { $0 + 1 } // expected-warning{{rather than}}
-  // expected-note@-1 2{{label the argument}}
+ takeTwoFuncsWithDefaults { $0 + 1 }
   takeTwoFuncsWithDefaults(f1: {$0 + 1 })
 }
 
