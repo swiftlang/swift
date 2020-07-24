@@ -742,15 +742,18 @@ function(swift_benchmark_compile)
       add_custom_target("check-${executable_target}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
+                  "--architecture" "${arch}"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
                   "--independent-samples" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
+                  "--architecture" "${arch}"
                   "--independent-samples" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
                   "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"
+                  "--architecture" "${arch}"
                   "--compare-script"
                   "${SWIFT_SOURCE_DIR}/benchmark/scripts/compare_perf_tests.py")
     endif()
