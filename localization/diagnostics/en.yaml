@@ -6081,6 +6081,10 @@
   msg: >-
     cannot override %0 which has been marked unavailable%select{|: %1}1
 
+- id: suggest_removing_override
+  msg: >-
+    remove 'override' modifier to declare a new %0
+
 - id: override_less_available
   msg: >-
     overriding %0 must be as available as declaration it overrides
