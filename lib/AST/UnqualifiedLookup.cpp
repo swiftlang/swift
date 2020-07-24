@@ -56,34 +56,35 @@ namespace {
       UnqualifiedLookupFactory *const factory;
       /// Nontypes are formally members of the base type, i.e. the dynamic type
       /// of the activation record.
-      DeclContext *const dynamicContext;
+      const DeclContext *const dynamicContext;
       /// Types are formally members of the metatype, i.e. the static type of the
       /// activation record.
-      DeclContext *const staticContext;
+      const DeclContext *const staticContext;
       using SelfBounds = SmallVector<NominalTypeDecl *, 2>;
       SelfBounds selfBounds;
       
     public:
       /// \p staticContext is also the context from which to derive the self types
       ResultFinderForTypeContext(UnqualifiedLookupFactory *factory,
-                                 DeclContext *dynamicContext,
-                                 DeclContext *staticContext);
-      
+                                 const DeclContext *dynamicContext,
+                                 const DeclContext *staticContext);
+
       SWIFT_DEBUG_DUMP;
       
     private:
-      SelfBounds findSelfBounds(DeclContext *dc);
-      
+      SelfBounds findSelfBounds(const DeclContext *dc);
+
       // Classify this declaration.
       // Types are formally members of the metatype.
-      DeclContext *whereValueIsMember(const ValueDecl *const member) const {
+      const DeclContext *
+      whereValueIsMember(const ValueDecl *const member) const {
         return isa<TypeDecl>(member) ? staticContext : dynamicContext;
       }
-      
+
     public:
       /// Do the lookups and add matches to results.
-      void findResults(const DeclNameRef &Name, bool isCascadingUse,
-                       NLOptions baseNLOptions, DeclContext *contextForLookup,
+      void findResults(const DeclNameRef &Name, NLOptions baseNLOptions,
+                       const DeclContext *contextForLookup,
                        SmallVectorImpl<LookupResultEntry> &results) const;
     };
     
@@ -159,7 +160,7 @@ namespace {
     void performUnqualifiedLookup();
     
   private:
-    void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
+    void lookUpTopLevelNamesInModuleScopeContext(const DeclContext *);
 
     void lookInASTScopes();
 
@@ -175,34 +176,30 @@ namespace {
 #pragma mark context-based lookup declarations
 
     bool isOutsideBodyOfFunction(const AbstractFunctionDecl *const AFD) const;
-    
+
     /// For diagnostic purposes, move aside the unavailables, and put
     /// them back as a last-ditch effort.
     /// Could be cleaner someday with a richer interface to UnqualifiedLookup.
     void setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
-    
-    void addImportedResults(DeclContext *const dc);
-    
-    void addNamesKnownToDebugClient(DeclContext *dc);
-    
+
+    void addImportedResults(const DeclContext *const dc);
+
+    void addNamesKnownToDebugClient(const DeclContext *dc);
+
     void addUnavailableInnerResults();
-    
-    void lookForAModuleWithTheGivenName(DeclContext *const dc);
-    
+
+    void lookForAModuleWithTheGivenName(const DeclContext *dc);
+
 #pragma mark common helper declarations
     static NLOptions
     computeBaseNLOptions(const UnqualifiedLookupOptions options,
                          const bool isOriginallyTypeLookup);
 
-    Optional<bool> getInitialIsCascadingUse() const {
-      return Optional<bool>(false);
-    }
-
     void findResultsAndSaveUnavailables(
-                                        DeclContext *lookupContextForThisContext,
-                                        ResultFinderForTypeContext &&resultFinderForTypeContext,
-                                        bool isCascadingUse, NLOptions baseNLOptions);
-    
+        const DeclContext *lookupContextForThisContext,
+        ResultFinderForTypeContext &&resultFinderForTypeContext,
+        NLOptions baseNLOptions);
+
   public:
     SWIFT_DEBUG_DUMP;
     SWIFT_DEBUG_DUMPER(dumpResults());
@@ -246,9 +243,9 @@ public:
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
-  /// returns true if finished and new value for isCascadingUse
-  bool lookInMembers(DeclContext *const scopeDC, NominalTypeDecl *const nominal,
-                     function_ref<bool(Optional<bool>)>) override;
+  /// returns true if finished
+  bool lookInMembers(DeclContext *const scopeDC,
+                     NominalTypeDecl *const nominal) override;
 
 #ifndef NDEBUG
   void startingNextLookupStep() override {
@@ -327,12 +324,14 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 }
 
 void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
-    DeclContext *DC) {
+    const DeclContext *DC) {
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName() && !Name.isSpecial() && DebugClient &&
-      DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
-                                   isOriginallyTypeLookup, Results))
+      DebugClient->lookupOverrides(Name.getBaseName(),
+                                   const_cast<DeclContext *>(DC), Loc,
+                                   isOriginallyTypeLookup, Results)) {
     return;
+  }
 
   addImportedResults(DC);
   addNamesKnownToDebugClient(DC);
@@ -357,8 +356,8 @@ bool UnqualifiedLookupFactory::isOutsideBodyOfFunction(
 }
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
-    const DeclNameRef &Name, bool isCascadingUse, NLOptions baseNLOptions,
-    DeclContext *contextForLookup,
+    const DeclNameRef &Name, NLOptions baseNLOptions,
+    const DeclContext *contextForLookup,
     SmallVectorImpl<LookupResultEntry> &results) const {
   // An optimization:
   if (selfBounds.empty())
@@ -367,7 +366,8 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
   SmallVector<ValueDecl *, 4> Lookup;
   contextForLookup->lookupQualified(selfBounds, Name, baseNLOptions, Lookup);
   for (auto Result : Lookup) {
-    results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
+    results.emplace_back(const_cast<DeclContext *>(whereValueIsMember(Result)),
+                         Result);
 #ifndef NDEBUG
     factory->addedResult(results.back());
 #endif
@@ -406,13 +406,13 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
   filterForDiscriminator(Results, DebugClient);
 }
 
-void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
+void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(dc, Name.getFullName(), CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, dc);
+  lookupInModule(dc, Name.getFullName(), CurModuleResults,
+                 NLKind::UnqualifiedLookup, resolutionKind, dc);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
@@ -429,9 +429,11 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   filterForDiscriminator(Results, DebugClient);
 }
 
-void UnqualifiedLookupFactory::addNamesKnownToDebugClient(DeclContext *dc) {
+void UnqualifiedLookupFactory::addNamesKnownToDebugClient(
+    const DeclContext *dc) {
   if (Name.isSimpleName() && DebugClient)
-    DebugClient->lookupAdditions(Name.getBaseName(), dc, Loc,
+    DebugClient->lookupAdditions(Name.getBaseName(),
+                                 const_cast<DeclContext *>(dc), Loc,
                                  isOriginallyTypeLookup, Results);
 }
 
@@ -440,7 +442,7 @@ void UnqualifiedLookupFactory::addUnavailableInnerResults() {
 }
 
 void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
-    DeclContext *const dc) {
+    const DeclContext *const dc) {
   using namespace namelookup;
   if (!Name.isSimpleName() || Name.isSpecial())
     return;
@@ -470,17 +472,15 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 
 #pragma mark common helper definitions
 
-
 void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
-       DeclContext *lookupContextForThisContext,
-       ResultFinderForTypeContext &&resultFinderForTypeContext,
-       bool isCascadingUse, NLOptions baseNLOptions) {
+    const DeclContext *lookupContextForThisContext,
+    ResultFinderForTypeContext &&resultFinderForTypeContext,
+    NLOptions baseNLOptions) {
   auto firstPossiblyUnavailableResult = Results.size();
-  resultFinderForTypeContext.findResults(Name, isCascadingUse, baseNLOptions,
+  resultFinderForTypeContext.findResults(Name, baseNLOptions,
                                          lookupContextForThisContext, Results);
   setAsideUnavailableResults(firstPossiblyUnavailableResult);
 }
-
 
 NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookupOptions options,
@@ -495,8 +495,7 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
   return baseNLOptions;
 }
 
-bool UnqualifiedLookupFactory::isFirstResultEnough()
-    const {
+bool UnqualifiedLookupFactory::isFirstResultEnough() const {
   return !Results.empty() && !options.contains(Flags::IncludeOuterResults);
 }
 
@@ -508,15 +507,14 @@ void UnqualifiedLookupFactory::recordCompletionOfAScope() {
 
 UnqualifiedLookupFactory::ResultFinderForTypeContext::
     ResultFinderForTypeContext(UnqualifiedLookupFactory *factory,
-                               DeclContext *dynamicContext,
-                               DeclContext *staticContext)
-    : factory(factory),
-      dynamicContext(dynamicContext), staticContext(staticContext),
-      selfBounds(findSelfBounds(staticContext)) {}
+                               const DeclContext *dynamicContext,
+                               const DeclContext *staticContext)
+    : factory(factory), dynamicContext(dynamicContext),
+      staticContext(staticContext), selfBounds(findSelfBounds(staticContext)) {}
 
 UnqualifiedLookupFactory::ResultFinderForTypeContext::SelfBounds
 UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
-    DeclContext *dc) {
+    const DeclContext *dc) {
   auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal)
     return {};
@@ -638,8 +636,7 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
 // TODO: in future, migrate this functionality into ASTScopes
 bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
     DeclContext *const scopeDC,
-    NominalTypeDecl *const nominal,
-    function_ref<bool(Optional<bool>)> calculateIsCascadingUse) {
+    NominalTypeDecl *const nominal) {
   if (candidateSelfDC) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(candidateSelfDC)) {
       assert(!factory.isOutsideBodyOfFunction(afd) && "Should be inside");
@@ -654,10 +651,8 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
   // convert the unqualified reference into a self member access.
   auto resultFinder = UnqualifiedLookupFactory::ResultFinderForTypeContext(
       &factory, candidateSelfDC ? candidateSelfDC : scopeDC, scopeDC);
-  const bool isCascadingUse =
-      calculateIsCascadingUse(factory.getInitialIsCascadingUse());
   factory.findResultsAndSaveUnavailables(scopeDC, std::move(resultFinder),
-                                         isCascadingUse, factory.baseNLOptions);
+                                         factory.baseNLOptions);
   factory.recordCompletionOfAScope();
 
   // We're done looking inside a nominal type declaration. It is possible
@@ -700,7 +695,9 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
 
 void UnqualifiedLookupFactory::dump() const { print(llvm::errs()); }
 void UnqualifiedLookupFactory::dumpScopes() const { printScopes(llvm::errs()); }
-void UnqualifiedLookupFactory::dumpResults() const { printResults(llvm::errs()); }
+void UnqualifiedLookupFactory::dumpResults() const {
+  printResults(llvm::errs());
+}
 
 void UnqualifiedLookupFactory::printScopes(raw_ostream &out) const {
   out << "\n\nScopes:\n";

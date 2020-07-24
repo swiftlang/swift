@@ -505,9 +505,6 @@ template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
 
-void recordLookupOfTopLevelName(DeclContext *topLevelContext, DeclName name,
-                                bool isCascading);
-
 } // end namespace namelookup
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -632,8 +629,7 @@ public:
   /// Eventually this functionality should move into ASTScopeLookup
   virtual bool
   lookInMembers(DeclContext *const scopeDC,
-                NominalTypeDecl *const nominal,
-                function_ref<bool(Optional<bool>)> calculateIsCascadingUse) = 0;
+                NominalTypeDecl *const nominal) = 0;
 
 #ifndef NDEBUG
   virtual void startingNextLookupStep() = 0;
@@ -655,8 +651,7 @@ public:
 
   /// Eventually this functionality should move into ASTScopeLookup
   bool lookInMembers(DeclContext *const,
-                     NominalTypeDecl *const,
-                     function_ref<bool(Optional<bool>)>) override {
+                     NominalTypeDecl *const) override {
     return false;
   }
 
@@ -690,10 +685,6 @@ public:
   static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
   unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
                     namelookup::AbstractASTScopeDeclConsumer &);
-
-  static Optional<bool>
-  computeIsCascadingUse(ArrayRef<const ast_scope::ASTScopeImpl *> history,
-                        Optional<bool> initialIsCascadingUse);
 
   /// Entry point to record the visible statement labels from the given
   /// point.

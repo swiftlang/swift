@@ -417,10 +417,6 @@ public:
   static llvm::SmallVector<LabeledStmt *, 4>
   lookupLabeledStmts(SourceFile *sourceFile, SourceLoc loc);
 
-  static Optional<bool>
-  computeIsCascadingUse(ArrayRef<const ASTScopeImpl *> history,
-                        Optional<bool> initialIsCascadingUse);
-
   static std::pair<CaseStmt *, CaseStmt *>
   lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
 
@@ -448,7 +444,6 @@ protected:
   /// The main (recursive) lookup function:
   /// Tell DeclConsumer about all names found in this scope and if not done,
   /// recurse for enclosing scopes. Stop lookup if about to look in limit.
-  /// Return final value for isCascadingUse
   ///
   /// If the lookup depends on implicit self, selfDC is its context.
   /// (Names in extensions never depend on self.)
@@ -508,9 +503,6 @@ protected:
 
 #pragma mark - - lookup- local bindings
 protected:
-  virtual Optional<bool>
-  resolveIsCascadingUseForThisScope(Optional<bool>) const;
-
   // A local binding is a basically a local variable defined in that very scope
   // It is not an instance variable or inherited type.
 
@@ -611,11 +603,11 @@ public:
   virtual ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
                                     ScopeCreator &) const = 0;
 
+  /// \Returns \c true if this lookup is done looking for results, else \c false.
   virtual SourceRange
   getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *scope,
                             bool omitAssertions) const = 0;
 
-  /// Returns isDone and isCascadingUse
   virtual bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
                                ArrayRef<const ASTScopeImpl *>,
                                ASTScopeImpl::DeclConsumer consumer) const;
@@ -779,10 +771,6 @@ public:
   virtual std::string declKindName() const = 0;
   virtual bool doesDeclHaveABody() const;
   const char *portionName() const { return portion->portionName; }
-
-protected:
-  Optional<bool> resolveIsCascadingUseForThisScope(
-      Optional<bool> isCascadingUse) const override;
 
 public:
   // Only for DeclScope, not BodyScope
@@ -969,8 +957,7 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-  Optional<bool>
-  resolveIsCascadingUseForThisScope(Optional<bool>) const override;
+  bool doesContextMatchStartingContext(const DeclContext *) const override;
 };
 
 /// Concrete class for a function/initializer/deinitializer
@@ -1014,9 +1001,6 @@ private:
 
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
-
-  Optional<bool>
-  resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
 
 /// The parameters for an abstract function (init/func/deinit)., subscript, and
@@ -1087,8 +1071,6 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-  Optional<bool>
-  resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 
 public:
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
@@ -1123,10 +1105,6 @@ public:
   virtual NullablePtr<DeclContext> getDeclContext() const override;
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
-
-protected:
-  Optional<bool>
-  resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
 
 /// Consider:
@@ -1274,9 +1252,6 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-
-  Optional<bool>
-  resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
 
 /// The scope introduced by a conditional clause in an if/guard/while
@@ -1392,6 +1367,42 @@ public:
   NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
   Expr *getExpr() const { return closureExpr; }
   NullablePtr<const void> getReferrent() const override;
+};
+
+/// For a closure with named parameters, this scope does the local bindings.
+/// Absent if no "in".
+class ClosureParametersScope final : public AbstractClosureScope {
+public:
+  ClosureParametersScope(ClosureExpr *closureExpr,
+                         NullablePtr<CaptureListExpr> captureList)
+      : AbstractClosureScope(closureExpr, captureList) {}
+  virtual ~ClosureParametersScope() {}
+
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  
+  /// Since explicit captures of \c self by closures enable the use of implicit
+  /// \c self, we need to make sure that the appropriate \c self is used as the
+  /// base decl for these uses (otherwise, the capture would be marked as
+  /// unused. \c ClosureParametersScope::capturedSelfDC() checks if we have such
+  ///  a capture of self.
+  NullablePtr<DeclContext> capturedSelfDC() const override;
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
+};
+
+// The body encompasses the code in the closure; the part after the "in" if
+// there is an "in"
+class ClosureBodyScope final : public AbstractClosureScope {
+public:
+  ClosureBodyScope(ClosureExpr *closureExpr,
+                   NullablePtr<CaptureListExpr> captureList)
+      : AbstractClosureScope(closureExpr, captureList) {}
+  virtual ~ClosureBodyScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
@@ -1402,8 +1413,10 @@ private:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-  Optional<bool> resolveIsCascadingUseForThisScope(
-      Optional<bool> isCascadingUse) const override;
+public:
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 };
 
 class TopLevelCodeScope final : public ASTScopeImpl {

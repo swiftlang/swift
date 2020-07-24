@@ -246,8 +246,6 @@ bool ASTScopeImpl::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
 bool GenericTypeOrExtensionScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *> history,
     ASTScopeImpl::DeclConsumer consumer) const {
-  // isCascadingUseArg must have already been resolved, for a real lookup
-  // but may be \c None for dumping.
   return portion->lookupMembersOf(this, history, consumer);
 }
 
@@ -264,12 +262,7 @@ bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
   auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
   if (!nt)
     return false;
-  return consumer.lookInMembers(scope->getDeclContext().get(), nt,
-                                [&](Optional<bool> initialIsCascadingUse) {
-                                  return ASTScopeImpl::computeIsCascadingUse(
-                                             history, initialIsCascadingUse)
-                                      .getValueOr(true);
-                                });
+  return consumer.lookInMembers(scope->getDeclContext().get(), nt);
 }
 
 bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
@@ -455,17 +448,6 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
   return isDone;
 }
 
-#pragma mark compute isCascadingUse
-
-Optional<bool> ASTScopeImpl::computeIsCascadingUse(
-    ArrayRef<const ASTScopeImpl *> history,
-    const Optional<bool> initialIsCascadingUse) {
-  Optional<bool> isCascadingUse = initialIsCascadingUse;
-  for (const auto *scope : history)
-    isCascadingUse = scope->resolveIsCascadingUseForThisScope(isCascadingUse);
-  return isCascadingUse;
-}
-
 #pragma mark getLookupLimit
 
 NullablePtr<const ASTScopeImpl> ASTScopeImpl::getLookupLimit() const {
@@ -521,77 +503,6 @@ NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(
     }
   }
   return nullptr;
-}
-
-#pragma mark ifUnknownIsCascadingUseAccordingTo
-
-static bool ifUnknownIsCascadingUseAccordingTo(Optional<bool> isCascadingUse,
-                                               const DeclContext *const dc) {
-  return isCascadingUse.getValueOr(false);
-}
-
-#pragma mark resolveIsCascadingUseForThisScope
-
-Optional<bool> ASTScopeImpl::resolveIsCascadingUseForThisScope(
-    Optional<bool> isCascadingUse) const {
-  return isCascadingUse;
-}
-
-Optional<bool> GenericParamScope::resolveIsCascadingUseForThisScope(
-    Optional<bool> isCascadingUse) const {
-  if (auto *dc = getDeclContext().getPtrOrNull())
-    return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, dc);
-  ASTScope_unreachable("generic what?");
-}
-
-Optional<bool> AbstractFunctionDeclScope::resolveIsCascadingUseForThisScope(
-    Optional<bool> isCascadingUse) const {
-  return false;
-}
-
-Optional<bool> AbstractFunctionBodyScope::resolveIsCascadingUseForThisScope(
-    Optional<bool> isCascadingUse) const {
-  return false;
-}
-
-Optional<bool> GenericTypeOrExtensionScope::resolveIsCascadingUseForThisScope(
-    Optional<bool> isCascadingUse) const {
-  // Could override for ExtensionScope and just return true
-  return ifUnknownIsCascadingUseAccordingTo(isCascadingUse,
-                                            getDeclContext().get());
-}
-
-Optional<bool>
-DefaultArgumentInitializerScope::resolveIsCascadingUseForThisScope(
-    Optional<bool>) const {
-  return false;
-}
-
-Optional<bool> ClosureParametersScope::resolveIsCascadingUseForThisScope(
-    Optional<bool> isCascadingUse) const {
-  return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, closureExpr);
-}
-
-Optional<bool> PatternEntryInitializerScope::resolveIsCascadingUseForThisScope(
-    Optional<bool> isCascadingUse) const {
-  auto *const initContext = getPatternEntry().getInitContext();
-  auto *PBI = dyn_cast_or_null<PatternBindingInitializer>(initContext);
-  auto *isd = PBI ? PBI->getImplicitSelfDecl() : nullptr;
-
-  // 'self' is available within the pattern initializer of a 'lazy' variable.
-  if (isd)
-    return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, PBI);
-
-  // initializing stored property of a type
-  auto *const patternDeclContext = decl->getDeclContext();
-  if (patternDeclContext->isTypeContext())
-    return false;
-
-  // initializing global or local
-  if (PBI)
-    return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, PBI);
-
-  return isCascadingUse;
 }
 
 #pragma mark isLabeledStmtLookupTerminator implementations
