@@ -95,9 +95,9 @@ extension ${Self}: CustomStringConvertible {
   ///
   /// For all finite values, the value of this property is a string that can be
   /// converted back to an instance of ${Self} without rounding errors.  That
-  /// is, if `x` in a `${Self}`, then `${Self}(x.description) == x` is always
-  /// true.  For any NaN value, the property's value is "nan", and for positive
-  /// and negative infinity its value is "inf" and "-inf".
+  /// is, if `x` is an instance of `${Self}`, then `${Self}(x.description) ==
+  /// x` is always true.  For any NaN value, the property's value is "nan", and
+  /// for positive and negative infinity its value is "inf" and "-inf".
   public var description: String {
     if isNaN {
       return "nan"
