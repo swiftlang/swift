@@ -371,18 +371,7 @@ swift::extractNearestSourceLoc(const LookupConformanceDescriptor &desc) {
 evaluator::DependencySource ModuleQualifiedLookupRequest::readDependencySource(
     const evaluator::DependencyRecorder &eval) const {
   auto *DC = std::get<0>(getStorage());
-  auto options = std::get<3>(getStorage());
-
-  // FIXME(Evaluator Incremental Dependencies): This is an artifact of the
-  // current scheme and should be removed. There are very few callers that are
-  // accurately passing the right known dependencies mask.
-  const bool fromPrivateDC =
-      DC->isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
-
-  auto scope = evaluator::DependencyScope::Cascading;
-  if (fromPrivateDC)
-    scope = evaluator::DependencyScope::Private;
-  return { DC->getParentSourceFile(), scope };
+  return { DC->getParentSourceFile(), evaluator::DependencyScope::Private };
 }
 
 void ModuleQualifiedLookupRequest::writeDependencySink(
@@ -453,18 +442,9 @@ void UnqualifiedLookupRequest::writeDependencySink(
 evaluator::DependencySource QualifiedLookupRequest::readDependencySource(
     const evaluator::DependencyRecorder &) const {
   auto *dc = std::get<0>(getStorage());
-  auto opts = std::get<3>(getStorage());
-  // FIXME(Evaluator Incremental Dependencies): This is an artifact of the
-  // current scheme and should be removed. There are very few callers that are
-  // accurately passing the right known dependencies mask.
-  const bool cascades =
-      dc->isCascadingContextForLookup(/*functionsAreNonCascading*/ false);
-  auto scope = evaluator::DependencyScope::Cascading;
-  if (!cascades)
-    scope = evaluator::DependencyScope::Private;
   return {
     dyn_cast<SourceFile>(dc->getModuleScopeContext()),
-    scope
+    evaluator::DependencyScope::Private
   };
 }
 

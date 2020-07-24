@@ -525,13 +525,9 @@ NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(
 
 #pragma mark ifUnknownIsCascadingUseAccordingTo
 
-static bool isCascadingUseAccordingTo(const DeclContext *const dc) {
-  return dc->isCascadingContextForLookup(false);
-}
-
 static bool ifUnknownIsCascadingUseAccordingTo(Optional<bool> isCascadingUse,
                                                const DeclContext *const dc) {
-  return isCascadingUse.getValueOr(isCascadingUseAccordingTo(dc));
+  return isCascadingUse.getValueOr(false);
 }
 
 #pragma mark resolveIsCascadingUseForThisScope
@@ -550,8 +546,7 @@ Optional<bool> GenericParamScope::resolveIsCascadingUseForThisScope(
 
 Optional<bool> AbstractFunctionDeclScope::resolveIsCascadingUseForThisScope(
     Optional<bool> isCascadingUse) const {
-  return decl->isCascadingContextForLookup(false) &&
-         isCascadingUse.getValueOr(true);
+  return false;
 }
 
 Optional<bool> AbstractFunctionBodyScope::resolveIsCascadingUseForThisScope(
