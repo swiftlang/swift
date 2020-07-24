@@ -5703,7 +5703,7 @@ Expr *ExprRewriter::coerceCallArguments(
     SmallVector<LocatorPathElt, 4> path;
     auto anchor = locator.getLocatorParts(path);
     if (!path.empty() && path.back().is<LocatorPathElt::ApplyArgument>() &&
-        (anchor.isExpr(ExprKind::Call) || anchor.isExpr(ExprKind::Subscript))) {
+        (isa<CallExpr>(anchor) || isa<SubscriptExpr>(anchor))) {
       auto locatorPtr = cs.getConstraintLocator(locator);
       assert(solution.trailingClosureMatchingChoices.count(locatorPtr) == 1);
       trailingClosureMatching = solution.trailingClosureMatchingChoices.find(

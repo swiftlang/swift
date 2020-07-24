@@ -1409,7 +1409,8 @@ namespace {
       auto funcType = constr->getMethodInterfaceType()->castTo<FunctionType>();
       ::matchCallArguments(
           CS, funcType, args, params, ConstraintKind::ArgumentConversion,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
+          TrailingClosureMatching::Forward);
 
       Type result = tv;
       if (constr->isFailable())
