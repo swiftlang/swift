@@ -1639,11 +1639,16 @@ bool PullbackCloner::Implementation::run() {
       // Diagnose active enum values. Differentiation of enum values requires
       // special adjoint value handling and is not yet supported. Diagnose
       // only the first active enum value to prevent too many diagnostics.
-      if (type.getEnumOrBoundGenericEnum()) {
-        getContext().emitNondifferentiabilityError(
-            v, getInvoker(), diag::autodiff_enums_unsupported);
-        errorOccurred = true;
-        return true;
+      //
+      // Do not diagnose `Optional`-typed values, which will have special-case
+      // differentiation support.
+      if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+        if (enumDecl != getContext().getASTContext().getOptionalDecl()) {
+          getContext().emitNondifferentiabilityError(
+              v, getInvoker(), diag::autodiff_enums_unsupported);
+          errorOccurred = true;
+          return true;
+        }
       }
       // Diagnose unsupported stored property projections.
       if (auto *inst = dyn_cast<FieldIndexCacheBase>(v)) {
@@ -2116,6 +2121,7 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
     auto concreteBBArgAdj = materializeAdjointDirect(bbArgAdj, pbLoc);
     auto concreteBBArgAdjCopy =
         builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj);
+#warning TODO: handle `switch_enum` with `Optional` operand. Pattern-match this case and manually construct `Optional.TangentVector`.
     for (auto pair : incomingValues) {
       auto *predBB = std::get<0>(pair);
       auto incomingValue = std::get<1>(pair);
