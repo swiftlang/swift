@@ -580,7 +580,7 @@ public:
     auto &Ctx = SF->getASTContext();
     std::unordered_set<std::string> holdersOfCascadingMembers;
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
-      const auto cascades = ref.cascades;
+      const auto cascades = false;
       std::string name = ref.name.userFacingName().str();
       const auto *nominal = ref.subject;
       using Kind = evaluator::DependencyCollector::Reference::Kind;

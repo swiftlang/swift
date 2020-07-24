@@ -391,37 +391,31 @@ void evaluator::DependencyRecorder::realize(
 void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
                                                    DeclBaseName name) {
   if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
-    scratch.insert(
-        Reference::usedMember(subject, name, parent.isActiveSourceCascading()));
+    scratch.insert(Reference::usedMember(subject, name));
   }
-  return parent.realize(
-      Reference::usedMember(subject, name, parent.isActiveSourceCascading()));
+  return parent.realize(Reference::usedMember(subject, name));
 }
 
 void evaluator::DependencyCollector::addPotentialMember(
     NominalTypeDecl *subject) {
   if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
-    scratch.insert(
-        Reference::potentialMember(subject, parent.isActiveSourceCascading()));
+    scratch.insert(Reference::potentialMember(subject));
   }
-  return parent.realize(
-      Reference::potentialMember(subject, parent.isActiveSourceCascading()));
+  return parent.realize(Reference::potentialMember(subject));
 }
 
 void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
   if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
-    scratch.insert(Reference::topLevel(name, parent.isActiveSourceCascading()));
+    scratch.insert(Reference::topLevel(name));
   }
-  return parent.realize(
-      Reference::topLevel(name, parent.isActiveSourceCascading()));
+  return parent.realize(Reference::topLevel(name));
 }
 
 void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
   if (parent.mode == DependencyRecorder::Mode::DirectDependencies) {
-    scratch.insert(Reference::dynamic(name, parent.isActiveSourceCascading()));
+    scratch.insert(Reference::dynamic(name));
   }
-  return parent.realize(
-      Reference::dynamic(name, parent.isActiveSourceCascading()));
+  return parent.realize(Reference::dynamic(name));
 }
 
 void evaluator::DependencyRecorder::record(

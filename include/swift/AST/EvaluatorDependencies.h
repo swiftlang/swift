@@ -67,41 +67,38 @@ struct DependencyCollector {
 
     NominalTypeDecl *subject;
     DeclBaseName name;
-    bool cascades;
 
   private:
-    Reference(Kind kind, NominalTypeDecl *subject, DeclBaseName name,
-              bool cascades)
-        : kind(kind), subject(subject), name(name), cascades(cascades) {}
+    Reference(Kind kind, NominalTypeDecl *subject, DeclBaseName name)
+        : kind(kind), subject(subject), name(name) {}
 
   public:
     static Reference empty() {
       return {Kind::Empty, llvm::DenseMapInfo<NominalTypeDecl *>::getEmptyKey(),
-              llvm::DenseMapInfo<DeclBaseName>::getEmptyKey(), false};
+              llvm::DenseMapInfo<DeclBaseName>::getEmptyKey()};
     }
 
     static Reference tombstone() {
       return {Kind::Tombstone,
               llvm::DenseMapInfo<NominalTypeDecl *>::getTombstoneKey(),
-              llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey(), false};
+              llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey()};
     }
 
   public:
-    static Reference usedMember(NominalTypeDecl *subject, DeclBaseName name,
-                                bool cascades) {
-      return {Kind::UsedMember, subject, name, cascades};
+    static Reference usedMember(NominalTypeDecl *subject, DeclBaseName name) {
+      return {Kind::UsedMember, subject, name};
     }
 
-    static Reference potentialMember(NominalTypeDecl *subject, bool cascades) {
-      return {Kind::PotentialMember, subject, DeclBaseName(), cascades};
+    static Reference potentialMember(NominalTypeDecl *subject) {
+      return {Kind::PotentialMember, subject, DeclBaseName()};
     }
 
-    static Reference topLevel(DeclBaseName name, bool cascades) {
-      return {Kind::TopLevel, nullptr, name, cascades};
+    static Reference topLevel(DeclBaseName name) {
+      return {Kind::TopLevel, nullptr, name};
     }
 
-    static Reference dynamic(DeclBaseName name, bool cascades) {
-      return {Kind::Dynamic, nullptr, name, cascades};
+    static Reference dynamic(DeclBaseName name) {
+      return {Kind::Dynamic, nullptr, name};
     }
 
   public:
@@ -318,20 +315,6 @@ public:
         Coll.get()->dependencySources.pop_back();
     }
   };
-
-private:
-  /// Returns \c true if the scope of the current active source cascades.
-  ///
-  /// If there is no active scope, the result always cascades.
-  bool isActiveSourceCascading() const {
-    switch (mode) {
-    case Mode::LegacyCascadingDependencies:
-      return false;
-    case Mode::DirectDependencies:
-      return false;
-    }
-    llvm_unreachable("invalid mode");
-  }
 };
 } // end namespace evaluator
 
