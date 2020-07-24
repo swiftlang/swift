@@ -1822,7 +1822,9 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
 Type
 UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                 TypeAliasDecl *typeAlias) const {
-  TypeResolutionOptions options((typeAlias->getGenericParams()
+  bool isGeneric = (typeAlias->getParsedGenericParams() ||
+                    typeAlias->getTrailingWhereClause());
+  TypeResolutionOptions options((isGeneric
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
 
@@ -1834,16 +1836,39 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(typeAlias->getASTContext());
   }
 
-  const auto result =
-      TypeResolution::forInterface(typeAlias, options,
-                                   /*unboundTyOpener*/ nullptr,
-                                   /*placeholderHandler*/ nullptr)
-          .resolveType(underlyingRepr);
+  auto resolution = TypeResolution::forInterface(typeAlias, options,
+                                                 /*unboundTyOpener*/ nullptr,
+                                                 /*placeholderHandler*/ nullptr);
+  Type result = resolution.resolveType(underlyingRepr);
 
   if (result->hasError()) {
     typeAlias->setInvalid();
     return ErrorType::get(typeAlias->getASTContext());
   }
+
+  // A non-generic typealias is allowed to reference the unbound form of a
+  // generic type as its underlying type. We desugar this form to a typealias
+  // that is generic and forwards the generic arguments verbatim.
+  //
+  // This should use the 'unboundTyOpener' callback, but the interface isn't
+  // quite right. We only want to open the generic arguments for the top-level
+  // unbound generic type; any other occurrence of an unbound generic type in
+  // the underlying type is invalid.
+  if (auto *unboundType = result->getAs<UnboundGenericType>()) {
+    assert(!isGeneric);
+
+    // GenericParamListRequest should have given the typealias a copy of the
+    // underlying declaration's generic parameter list.
+    SmallVector<Type, 2> args;
+    for (auto paramDecl : *typeAlias->getGenericParams())
+      args.push_back(paramDecl->getDeclaredInterfaceType());
+
+    result = resolution.applyUnboundGenericArguments(
+        unboundType->getDecl(), unboundType->getParent(),
+        typeAlias->getLoc(), args,
+        /*skipRequirementsCheck=*/true);
+  }
+
   return result;
 }
 
