@@ -6247,7 +6247,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::ReturnStmtExpr : {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.setExpectedTypes(getReturnTypeFromContext(CurDeclContext),
+    SmallVector<Type, 2> possibleReturnTypes;
+    collectPossibleReturnTypesFromContext(CurDeclContext, possibleReturnTypes);
+    Lookup.setExpectedTypes(possibleReturnTypes,
                             /*isSingleExpressionBody*/ false);
     Lookup.getValueCompletionsInDeclContext(Loc);
     break;
