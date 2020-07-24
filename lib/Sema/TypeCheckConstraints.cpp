@@ -525,6 +525,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     llvm::SmallString<64> expectedIdentifier;
     bool isConfused = false;
     uint32_t codepoint;
+    uint32_t firstConfusableCodepoint = 0;
+    int totalCodepoints = 0;
     int offset = 0;
     while ((codepoint = validateUTF8CharacterAndAdvance(buffer,
                                                         buffer +
@@ -533,11 +535,16 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       int length = (buffer - simpleName.get()) - offset;
       if (auto expectedCodepoint =
           confusable::tryConvertConfusableCharacterToASCII(codepoint)) {
+        if (firstConfusableCodepoint == 0) {
+          firstConfusableCodepoint = codepoint;
+        }
         isConfused = true;
         expectedIdentifier += expectedCodepoint;
       } else {
         expectedIdentifier += (char)codepoint;
       }
+
+      totalCodepoints++;
 
       offset += length;
     }
@@ -580,11 +587,21 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     } else {
       emitBasicError();
 
-      Context.Diags
-          .diagnose(Loc, diag::confusable_character,
-                    UDRE->getName().isOperator(), simpleName.str(),
-                    expectedIdentifier)
-          .fixItReplace(Loc, expectedIdentifier);
+      if (totalCodepoints == 1) {
+        auto charNames = confusable::getConfusableAndBaseCodepointNames(
+            firstConfusableCodepoint);
+        Context.Diags
+            .diagnose(Loc, diag::single_confusable_character,
+                      UDRE->getName().isOperator(), simpleName.str(),
+                      charNames.first, expectedIdentifier, charNames.second)
+            .fixItReplace(Loc, expectedIdentifier);
+      } else {
+        Context.Diags
+            .diagnose(Loc, diag::confusable_character,
+                      UDRE->getName().isOperator(), simpleName.str(),
+                      expectedIdentifier)
+            .fixItReplace(Loc, expectedIdentifier);
+      }
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
