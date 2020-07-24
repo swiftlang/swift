@@ -3037,6 +3037,9 @@ namespace {
         typeContext->getDeclaredInterfaceType());
       auto superclassTy = selfTy->getSuperclass();
 
+      if (!superclassTy)
+        return Type();
+
       if (selfDecl->getInterfaceType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
 
