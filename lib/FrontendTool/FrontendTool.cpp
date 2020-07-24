@@ -1711,7 +1711,8 @@ static bool performCompile(CompilerInstance &Instance,
       << Invocation.getLangOptions().Target.str() << '\n';
     return false;
   }
-  if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
+  if (Action == FrontendOptions::ActionType::CompileModuleFromInterface ||
+      Action == FrontendOptions::ActionType::TypecheckModuleFromInterface)
     return buildModuleFromInterface(Instance);
 
   if (Invocation.getInputKind() == InputFileKind::LLVM)

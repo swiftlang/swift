@@ -176,6 +176,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
       return false;
     }
     FrontendOptions &FEOpts = subInvocation.getFrontendOptions();
+    bool isTypeChecking =
+        (FEOpts.RequestedAction == FrontendOptions::ActionType::Typecheck);
     const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
     StringRef InPath = InputInfo.file();
     const auto &OutputInfo =
@@ -242,6 +244,9 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     if (ShouldSerializeDeps)
       SerializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
+      if (isTypeChecking)
+        return;
+
       // We don't want to serialize module docs in the cache -- they
       // will be serialized beside the interface file.
       serializeToBuffers(Mod, SerializationOpts, ModuleBuffer,

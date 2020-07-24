@@ -51,6 +51,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::EmitModuleOnly:
   case ActionType::MergeModules:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
     return true;
   case ActionType::Immediate:
   case ActionType::REPL:
@@ -118,6 +119,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::Parse:
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -192,6 +194,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::DumpPCM:
@@ -232,6 +235,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
@@ -280,6 +284,7 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
@@ -317,6 +322,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
@@ -360,6 +366,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::DumpTypeInfo:
   case ActionType::EmitSILGen:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
@@ -404,6 +411,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::EmitSILGen:
   case ActionType::EmitSIBGen:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitPCM:
@@ -450,6 +458,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::MergeModules:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::DumpTypeInfo:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
@@ -484,6 +493,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::Parse:
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -521,6 +531,7 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCH:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
@@ -557,6 +568,7 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
   case ActionType::Typecheck:
   case ActionType::ResolveImports:
   case ActionType::MergeModules:

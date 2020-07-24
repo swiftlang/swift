@@ -116,6 +116,8 @@ public:
 
     /// Build from a swiftinterface, as close to `import` as possible
     CompileModuleFromInterface,
+    /// Same as CompileModuleFromInterface, but stopping after typechecking
+    TypecheckModuleFromInterface,
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL

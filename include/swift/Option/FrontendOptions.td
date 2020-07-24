@@ -641,6 +641,11 @@ def build_module_from_parseable_interface :
   Alias<compile_module_from_interface>,
   ModeOpt;
 
+def typecheck_module_from_interface :
+  Flag<["-"], "typecheck-module-from-interface">,
+  HelpText<"Treat the (single) input as a swiftinterface and typecheck it">,
+  ModeOpt;
+
 def module_interface_preserve_types_as_written :
   Flag<["-"], "module-interface-preserve-types-as-written">,
   HelpText<"When emitting a module interface, preserve types as they were "

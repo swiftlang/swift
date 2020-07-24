@@ -147,7 +147,8 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.RequestedAction = determineRequestedAction(Args);
   }
 
-  if (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface) {
+  if (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface ||
+      Opts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface) {
     // The situations where we use this action, e.g. explicit module building and
     // generating prebuilt module cache, don't need synchronization. We should avoid
     // using lock files for them.
@@ -389,6 +390,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::Immediate;
   if (Opt.matches(OPT_compile_module_from_interface))
     return FrontendOptions::ActionType::CompileModuleFromInterface;
+  if (Opt.matches(OPT_typecheck_module_from_interface))
+    return FrontendOptions::ActionType::TypecheckModuleFromInterface;
 
   llvm_unreachable("Unhandled mode option");
 }
