@@ -93,11 +93,11 @@ ${Availability(bits)}
 extension ${Self}: CustomStringConvertible {
   /// A textual representation of the value.
   ///
-  /// For all  finite values, the value of this property is a string that can
-  /// be converted back to an instance of ${Self} without rounding errors.
-  /// That is, if `x` in a `${Self}`, then `${Self}(x.description) == x` is
-  /// always true.  For any NaN value, the property's value is "nan", and for
-  /// positive and negative infinity its value is "inf" and "-inf".
+  /// For all finite values, the value of this property is a string that can be
+  /// converted back to an instance of ${Self} without rounding errors.  That
+  /// is, if `x` in a `${Self}`, then `${Self}(x.description) == x` is always
+  /// true.  For any NaN value, the property's value is "nan", and for positive
+  /// and negative infinity its value is "inf" and "-inf".
   public var description: String {
     if isNaN {
       return "nan"
@@ -115,7 +115,7 @@ ${Availability(bits)}
 extension ${Self}: CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   ///
-  /// This property has the same value as the `description` propyrty, except
+  /// This property has the same value as the `description` property, except
   /// that NaN values are printed in an extended format.
   public var debugDescription: String {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
