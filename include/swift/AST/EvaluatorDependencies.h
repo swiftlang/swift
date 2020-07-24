@@ -179,15 +179,6 @@ public:
 struct DependencyRecorder {
   friend DependencyCollector;
 
-  enum class Mode {
-    // Enables the status quo of recording direct dependencies.
-    //
-    // This mode restricts the dependency collector to ignore changes of
-    // scope. This has practical effect of charging all unqualified lookups to
-    // the primary file being acted upon instead of to the destination file.
-    DirectDependencies,
-  };
-
 private:
   /// A stack of dependency sources in the order they were evaluated.
   llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
@@ -195,11 +186,10 @@ private:
       fileReferences;
   llvm::DenseMap<AnyRequest, DependencyCollector::ReferenceSet>
       requestReferences;
-  Mode mode;
   bool isRecording;
 
 public:
-  explicit DependencyRecorder(Mode mode) : mode{mode}, isRecording{false} {};
+  explicit DependencyRecorder() : isRecording{false} {};
 
 private:
   /// Records the given \c Reference as a dependency of the current dependency
@@ -272,10 +262,7 @@ public:
   evaluator::DependencySource getActiveDependencySourceOrNull() const {
     if (dependencySources.empty())
       return nullptr;
-    switch (mode) {
-    case Mode::DirectDependencies:
-      return dependencySources.front();
-    }
+    return dependencySources.front();
   }
 
 public:
