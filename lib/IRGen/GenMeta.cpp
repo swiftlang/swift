@@ -5138,7 +5138,8 @@ void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
 bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                                              const SILVTable *vtable,
                                              SILDeclRef method) {
-  auto entry = vtable->getEntry(IGM.getSILModule(), method);
+  Optional<SILVTable::Entry> entry
+    = vtable->getEntry(IGM.getSILModule(), method);
   LLVM_DEBUG(llvm::dbgs() << "looking at vtable:\n";
              vtable->print(llvm::dbgs()));
   if (!entry) {
@@ -5150,7 +5151,8 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
     return true;
   }
   LLVM_DEBUG(llvm::dbgs() << "entry: ";
-             entry->print(llvm::dbgs()));
+             entry->print(llvm::dbgs());
+             llvm::dbgs() << "\n");
   
   // We may be able to elide the vtable entry, ABI permitting, if it's not
   // overridden.
@@ -5163,21 +5165,25 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
     return true;
   }
   
-  // Does the ABI require a vtable entry to exist? If the class is public,
+  // Does the ABI require a vtable entry to exist? If the class the vtable
+  // entry originates from is public,
   // and it's either marked fragile or part of a non-resilient module, then
   // other modules will directly address vtable offsets and we can't remove
   // vtable entries.
-  if (vtable->getClass()->getEffectiveAccess() >= AccessLevel::Public) {
+  auto originatingClass =
+    cast<ClassDecl>(method.getOverriddenVTableEntry().getDecl()->getDeclContext());
+
+  if (originatingClass->getEffectiveAccess() >= AccessLevel::Public) {
     // If the class is public,
     // and it's either marked fragile or part of a non-resilient module, then
     // other modules will directly address vtable offsets and we can't remove
     // vtable entries.
-    if (!vtable->getClass()->isResilient()) {
+    if (!originatingClass->isResilient()) {
       LLVM_DEBUG(llvm::dbgs() << "vtable entry in "
                               << vtable->getClass()->getName()
                               << " for ";
                  method.print(llvm::dbgs());
-                 llvm::dbgs() << " is in a public fragile class\n");
+                 llvm::dbgs() << " originates from a public fragile class\n");
       return true;
     }
   }
