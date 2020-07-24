@@ -1452,7 +1452,9 @@ public:
       auto overridden = VD->getOverriddenDecl();
       if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!overridden) {
-          VD->diagnose(diag::property_does_not_override)
+          auto isClassContext =
+              VD->getDeclContext()->getSelfClassDecl() != nullptr;
+          VD->diagnose(diag::property_does_not_override, isClassContext)
               .highlight(OA->getLocation());
           OA->setInvalid();
         }
@@ -1659,7 +1661,9 @@ public:
       // anything, complain.
       if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!SD->getOverriddenDecl()) {
-          SD->diagnose(diag::subscript_does_not_override)
+          auto isClassContext =
+              SD->getDeclContext()->getSelfClassDecl() != nullptr;
+          SD->diagnose(diag::subscript_does_not_override, isClassContext)
               .highlight(OA->getLocation());
           OA->setInvalid();
         }
@@ -2236,7 +2240,8 @@ public:
       // override anything, complain.
       if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!FD->getOverriddenDecl()) {
-          FD->diagnose(diag::method_does_not_override)
+          auto isClassContext = FD->getSelfClassDecl() != nullptr;
+          FD->diagnose(diag::method_does_not_override, isClassContext)
               .highlight(OA->getLocation());
           OA->setInvalid();
         }
@@ -2482,13 +2487,14 @@ public:
     // Check whether this initializer overrides an initializer in its
     // superclass.
     if (!checkOverrides(CD)) {
+      auto isClassContext = CD->getSelfClassDecl() != nullptr;
       // If an initializer has an override attribute but does not override
       // anything or overrides something that doesn't need an 'override'
       // keyword (e.g., a convenience initializer), complain.
       // anything, or overrides something that complain.
       if (auto *attr = CD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!CD->getOverriddenDecl()) {
-          CD->diagnose(diag::initializer_does_not_override)
+          CD->diagnose(diag::initializer_does_not_override, isClassContext)
               .highlight(attr->getLocation());
           attr->setInvalid();
         } else if (attr->isImplicit()) {
@@ -2513,7 +2519,7 @@ public:
             reqInit->diagnose(diag::overridden_required_initializer_here);
           } else {
             // We tried to override a convenience initializer.
-            CD->diagnose(diag::initializer_does_not_override)
+            CD->diagnose(diag::initializer_does_not_override, isClassContext)
                 .highlight(attr->getLocation());
             CD->getOverriddenDecl()->diagnose(
                 diag::convenience_init_override_here);
