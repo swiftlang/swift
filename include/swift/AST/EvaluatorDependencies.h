@@ -186,13 +186,6 @@ struct DependencyRecorder {
     // scope. This has practical effect of charging all unqualified lookups to
     // the primary file being acted upon instead of to the destination file.
     DirectDependencies,
-    // Enables a legacy mode of dependency tracking that makes a distinction
-    // between private and cascading edges, and does not directly capture
-    // transitive dependencies.
-    //
-    // By default, the dependency collector moves to register dependencies in
-    // the referenced name trackers at the top of the active dependency stack.
-    LegacyCascadingDependencies,
   };
 
 private:
@@ -280,8 +273,6 @@ public:
     if (dependencySources.empty())
       return nullptr;
     switch (mode) {
-    case Mode::LegacyCascadingDependencies:
-      return dependencySources.back();
     case Mode::DirectDependencies:
       return dependencySources.front();
     }

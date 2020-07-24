@@ -62,21 +62,11 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-static evaluator::DependencyRecorder::Mode
-computeDependencyModeFromFlags(const LangOptions &opts) {
-  using Mode = evaluator::DependencyRecorder::Mode;
-  if (opts.DirectIntramoduleDependencies) {
-    return Mode::DirectDependencies;
-  }
-
-  return Mode::LegacyCascadingDependencies;
-}
-
 Evaluator::Evaluator(DiagnosticEngine &diags, const LangOptions &opts)
     : diags(diags),
       debugDumpCycles(opts.DebugDumpCycles),
       buildDependencyGraph(opts.BuildRequestDependencyGraph),
-      recorder{computeDependencyModeFromFlags(opts)} {}
+      recorder{evaluator::DependencyRecorder::Mode::DirectDependencies} {}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -444,10 +434,6 @@ void evaluator::DependencyRecorder::replay(
   assert(!isRecording && "Probably not a good idea to allow nested recording");
 
   auto source = getActiveDependencySourceOrNull();
-  if (mode == Mode::LegacyCascadingDependencies) {
-    return;
-  }
-
   if (source.isNull() || !source.get()->isPrimary()) {
     return;
   }
@@ -496,7 +482,6 @@ void evaluator::DependencyRecorder::replay(
 void evaluator::DependencyRecorder::unionNearestCachedRequest(
     ArrayRef<swift::ActiveRequest> stack,
     const DependencyCollector::ReferenceSet &scratch) {
-  assert(mode != Mode::LegacyCascadingDependencies);
   auto nearest = std::find_if(stack.rbegin(), stack.rend(),
                               [](const auto &req){ return req.isCached(); });
   if (nearest == stack.rend()) {
