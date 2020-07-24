@@ -992,9 +992,8 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
                                GenericParamList *Params)
     : _GenericContext(), DeclContext(Kind, Parent) {
   if (Params) {
-    Parent->getASTContext().evaluator.cacheOutput(
-          GenericParamListRequest{const_cast<GenericContext *>(this)},
-          std::move(Params));
+    Params->setDeclContext(this);
+    GenericParamsAndBit.setPointerAndInt(Params, false);
   }
 }
 
@@ -1018,6 +1017,12 @@ GenericParamList *GenericContext::getGenericParams() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            GenericParamListRequest{
                                const_cast<GenericContext *>(this)}, nullptr);
+}
+
+GenericParamList *GenericContext::getParsedGenericParams() const {
+  if (GenericParamsAndBit.getInt())
+    return nullptr;
+  return GenericParamsAndBit.getPointer();
 }
 
 bool GenericContext::hasComputedGenericSignature() const {
@@ -1049,8 +1054,8 @@ void GenericContext::setGenericSignature(GenericSignature genericSig) {
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
-  if (isGeneric())
-    return getGenericParams()->getTrailingWhereClauseSourceRange();
+  if (auto *params = getParsedGenericParams())
+    return params->getTrailingWhereClauseSourceRange();
   else if (const auto *where = getTrailingWhereClause())
     return where->getSourceRange();
 

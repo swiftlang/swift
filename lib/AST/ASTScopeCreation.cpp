@@ -1599,9 +1599,13 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
     return ip;
 
+  auto *context = scope->getGenericContext();
+  auto *genericParams = (isa<TypeAliasDecl>(context)
+                         ? context->getParsedGenericParams()
+                         : context->getGenericParams());
   auto *deepestScope = scopeCreator.addNestedGenericParamScopesToTree(
-      scope->getDecl(), scope->getGenericContext()->getGenericParams(), scope);
-  if (scope->getGenericContext()->getTrailingWhereClause())
+      scope->getDecl(), genericParams, scope);
+  if (context->getTrailingWhereClause())
     scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
   scope->createBodyScope(deepestScope, scopeCreator);
   return ip;
