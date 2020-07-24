@@ -1105,9 +1105,7 @@ func rdar17170728() {
     // expected-error@-1{{missing argument label 'into:' in call}}
     // expected-error@-2{{cannot convert value of type 'Int?' to expected argument type}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 2 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-    // expected-error@-2 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
-    // expected-error@-3 {{result values in '? :' expression have mismatching types 'Bool' and 'Int?'}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
   }
 }
 

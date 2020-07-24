@@ -681,8 +681,8 @@ enum ScoreKind {
   SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
-  /// A use of the "backward" scanning heuristic for trailing closures.
-  SK_BackwardTrailingClosure,
+  /// A use of the "forward" scan for trailing closures.
+  SK_ForwardTrailingClosure,
   /// A use of a disfavored overload.
   SK_DisfavoredOverload,
   /// An implicit force of an implicitly unwrapped optional value.

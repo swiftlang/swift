@@ -42,13 +42,11 @@ func testTrailingClosureEitherDirection() {
 }
 
 // Check that we resolve ambiguities when both directions can be matched.
-// expected-note@+1{{'trailingClosureBothDirections(f:g:)' contains defaulted closure parameters 'f' and 'g'}}
+// expected-note@+1{{declared here}}
 func trailingClosureBothDirections(
   f: (Int, Int) -> Int = { $0 + $1 }, g: (Int, Int) -> Int = { $0 - $1 }
 ) { }
-trailingClosureBothDirections { $0 * $1 } // expected-warning{{since Swift 5.3, unlabeled trailing closure argument matches parameter 'f' rather than parameter 'g'}}
-// expected-note@-1{{label the argument with 'g' to retain the pre-Swift 5.3 behavior}}
-// expected-note@-2{{label the argument with 'f' to silence this warning for Swift 5.3 and newer}}
+trailingClosureBothDirections { $0 * $1 } // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'g' to suppress this warning}}
 
 // Check an amusing quirk of the "backward" rule that allows the order of
 // arguments to be swapped.
