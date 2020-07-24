@@ -509,7 +509,7 @@ bool swift::isSingleInitAllocStack(AllocStackInst *asi,
       continue;
     }
 
-    // Otherwise, if we have found something not in our whitelist, return false.
+    // Otherwise, if we have found something not in our allowlist, return false.
     return false;
   }
 
