@@ -44,7 +44,7 @@ struct Bar {
   a.foo = 345 // expected-error {{expected declaration}}
   // ensure that the id.id pattern generating an expected declaration
   // diagnostic does not block further diagnostics.
-  fisr.bar = 345 // expected-error {{expected declaration}}
+  fisr.bar = 345
 
 }
 

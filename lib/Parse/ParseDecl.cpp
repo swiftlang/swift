@@ -3901,8 +3901,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
         // diagnostic first before parseExpr moves the cursor
         diagnose(Tok, diag::expected_decl);
         // parse the rest of the expression to get past the problem.
+        // return it so that parsing continues at the end of the expr.
         parseExpr(diag::expected_expr);
-        // we did not parse a Decl here so we need to report an error 
+        // note that makeParserError will cause the parser to
+        // skip to the next right brace. So anything after this will
+        // not be parsed at all. It does not seem to be possible to
+        // recover even if the code after the expr is valid.
         return makeParserError();
       }
 
