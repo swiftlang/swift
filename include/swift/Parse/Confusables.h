@@ -13,6 +13,7 @@
 #ifndef SWIFT_CONFUSABLES_H
 #define SWIFT_CONFUSABLES_H
 
+#include "llvm/ADT/StringRef.h"
 #include <stdint.h>
 
 namespace swift {
@@ -21,6 +22,12 @@ namespace confusable {
   /// specification table of confusable characters and maps to punctuation,
   /// and either returns either the expected ASCII character or 0.
   char tryConvertConfusableCharacterToASCII(uint32_t codepoint);
+
+  /// Given a UTF-8 codepoint which is previously determined to be confusable,
+  /// return the name of the confusable character and the name of the base
+  /// character.
+  std::pair<llvm::StringRef, llvm::StringRef>
+  getConfusableAndBaseCodepointNames(uint32_t codepoint);
 }
 }
 

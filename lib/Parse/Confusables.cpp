@@ -14,9 +14,22 @@
 
 char swift::confusable::tryConvertConfusableCharacterToASCII(uint32_t codepoint) {
   switch (codepoint) {
-#define CONFUSABLE(CONFUSABLE_POINT, BASEPOINT) \
-  case CONFUSABLE_POINT: return BASEPOINT;
+#define CONFUSABLE(CONFUSABLE_POINT, CONFUSABLE_NAME, BASE_POINT, BASE_NAME)   \
+  case CONFUSABLE_POINT:                                                       \
+    return BASE_POINT;
 #include "swift/Parse/Confusables.def"
   default: return 0;
+  }
+}
+
+std::pair<llvm::StringRef, llvm::StringRef>
+swift::confusable::getConfusableAndBaseCodepointNames(uint32_t codepoint) {
+  switch (codepoint) {
+#define CONFUSABLE(CONFUSABLE_POINT, CONFUSABLE_NAME, BASE_POINT, BASE_NAME)   \
+  case CONFUSABLE_POINT:                                                       \
+    return std::make_pair(CONFUSABLE_NAME, BASE_NAME);
+#include "swift/Parse/Confusables.def"
+  default:
+    return std::make_pair("", "");
   }
 }
