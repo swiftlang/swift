@@ -9824,9 +9824,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::AllowArgumentTypeMismatch: {
-    increaseScore(SK_Fix);
-    
-    auto impact = 1;
+    auto impact = 2;
     // If there are any other argument mismatches already detected for this
     // call, we increase the score even higher so more argument fixes means
     // less viable is the overload.
@@ -9836,7 +9834,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                      ? fixLocator->getAnchor() == locator.getAnchor()
                      : false;
         }))
-      impact = 2;
+      impact += 3;
 
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
