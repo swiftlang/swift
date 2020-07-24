@@ -1228,13 +1228,13 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         cs.getConstraintLocator(locator),
         callArgumentMatch->trailingClosureMatching);
 
-    // If we matched with the backward rule, increase the score for backward
-    // matches.
-    // FIXME: We shouldn't want this? Wait until later so we can diagnose
-    // appropriately.
-    if (callArgumentMatch->trailingClosureMatching
-            == TrailingClosureMatching::Backward)
-      cs.increaseScore(SK_BackwardTrailingClosure);
+    // If there was a disjunction because both forward and backward were
+    // possible, increase the score for forward matches to bias toward the
+    // (source-compatible) backward matches. The compiler will produce a
+    // warning for such code.
+    if (trailingClosureMatching &&
+        *trailingClosureMatching == TrailingClosureMatching::Forward)
+      cs.increaseScore(SK_ForwardTrailingClosure);
 
     // Take the parameter bindings we selected.
     parameterBindings = std::move(callArgumentMatch->parameterBindings);
