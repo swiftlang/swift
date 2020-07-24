@@ -2526,11 +2526,9 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     return FunctionPointer(fnPtr, authInfo, signature);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
-    auto fnPtr = IGF.Builder.CreateBitCast(methodInfo.getDirectImpl(),
+    auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
-
-    auto authInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, methodType);
-    return FunctionPointer(fnPtr, authInfo, signature);
+    return FunctionPointer::forDirect(fnPtr, signature);
   }
   }
   
