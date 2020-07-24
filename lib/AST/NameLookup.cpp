@@ -2286,30 +2286,6 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
   return true;
 }
 
-
-/// Clone the given generic parameters in the given list. We don't need any
-/// of the requirements, because they will be inferred.
-static GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                            ExtensionDecl *ext,
-                                            GenericParamList *fromParams) {
-  // Clone generic parameters.
-  SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
-  for (auto fromGP : *fromParams) {
-    // Create the new generic parameter.
-    auto toGP = new (ctx) GenericTypeParamDecl(ext, fromGP->getName(),
-                                               SourceLoc(),
-                                               fromGP->getDepth(),
-                                               fromGP->getIndex());
-    toGP->setImplicit(true);
-
-    // Record new generic parameter.
-    toGenericParams.push_back(toGP);
-  }
-
-  return GenericParamList::create(ctx, SourceLoc(), toGenericParams,
-                                  SourceLoc());
-}
-
 static GenericParamList *
 createExtensionGenericParams(ASTContext &ctx,
                              ExtensionDecl *ext,
@@ -2317,8 +2293,7 @@ createExtensionGenericParams(ASTContext &ctx,
   // Collect generic parameters from all outer contexts.
   SmallVector<GenericParamList *, 2> allGenericParams;
   nominal->forEachGenericContext([&](GenericParamList *gpList) {
-    allGenericParams.push_back(
-      cloneGenericParams(ctx, ext, gpList));
+    allGenericParams.push_back(gpList->clone(ext));
   });
 
   GenericParamList *toParams = nullptr;
