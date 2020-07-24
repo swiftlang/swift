@@ -885,7 +885,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 /// Apply generic arguments to the given type.
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
-    ArrayRef<Type> genericArgs) const {
+    ArrayRef<Type> genericArgs,
+    bool skipRequirementsCheck) const {
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
@@ -898,11 +899,6 @@ Type TypeResolution::applyUnboundGenericArguments(
   // type parameters that appear inside this type with the provided
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
-
-  // If types involved in requirements check have either type variables
-  // or unbound generics, let's skip the check here, and let the solver
-  // do it when missing types are deduced.
-  bool skipRequirementsCheck = false;
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -943,6 +939,9 @@ Type TypeResolution::applyUnboundGenericArguments(
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
       substTy;
 
+    // If types involved in requirements check have either type variables
+    // or unbound generics, let's skip the check here, and let the solver
+    // do it when missing types are deduced.
     skipRequirementsCheck |=
         substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
   }
