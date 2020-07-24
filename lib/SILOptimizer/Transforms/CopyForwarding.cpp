@@ -1508,10 +1508,6 @@ class CopyForwardingPass : public SILFunctionTransform
     if (!EnableCopyForwarding && !EnableDestroyHoisting)
       return;
 
-    // FIXME: We should be able to support [ossa].
-    if (getFunction()->hasOwnership())
-      return;
-
     LLVM_DEBUG(llvm::dbgs() << "Copy Forwarding in Func "
                             << getFunction()->getName() << "\n");
 
