@@ -95,8 +95,7 @@ public:
 class SuperclassTypeRequest
     : public SimpleRequest<
           SuperclassTypeRequest, Type(NominalTypeDecl *, TypeResolutionStage),
-          RequestFlags::SeparatelyCached | RequestFlags::DependencySink |
-              RequestFlags::DependencySource> {
+          RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -120,8 +119,6 @@ public:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &e) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            Type t) const;
 };
@@ -2369,8 +2366,7 @@ class LookupAllConformancesInContextRequest
                            ProtocolConformanceLookupResult(
                                const IterableDeclContext *),
                            RequestFlags::Cached |
-                               RequestFlags::DependencySink |
-                               RequestFlags::DependencySource> {
+                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2385,8 +2381,6 @@ public:
   bool isCached() const { return true; }
 
   // Incremental dependencies
-  evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyRecorder &eval) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceLookupResult r) const;
 };

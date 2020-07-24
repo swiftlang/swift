@@ -157,11 +157,6 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
     protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
-evaluator::DependencySource SuperclassTypeRequest::readDependencySource(
-    const evaluator::DependencyRecorder &e) const {
-  return e.getActiveDependencySourceOrNull();
-}
-
 void SuperclassTypeRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker, Type value) const {
   if (!value)
@@ -1308,12 +1303,6 @@ void CheckRedeclarationRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 // LookupAllConformancesInContextRequest computation.
 //----------------------------------------------------------------------------//
-
-evaluator::DependencySource
-LookupAllConformancesInContextRequest::readDependencySource(
-    const evaluator::DependencyRecorder &collector) const {
-  return collector.getActiveDependencySourceOrNull();
-}
 
 void LookupAllConformancesInContextRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker,

@@ -88,18 +88,6 @@ void InheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const 
   proto->setInheritedProtocolsValid();
 }
 
-evaluator::DependencySource InheritedProtocolsRequest::readDependencySource(
-    const evaluator::DependencyRecorder &e) const {
-  auto *PD = std::get<0>(getStorage());
-  // Ignore context changes for protocols outside our module. This
-  // prevents transitive cascading edges when e.g. our private
-  // type conforms to Hashable which itself looks up Equatable during
-  // qualified lookup.
-  if (!PD->getParentSourceFile())
-    return nullptr;
-  return e.getActiveDependencySourceOrNull();
-}
-
 void InheritedProtocolsRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker,
     ArrayRef<ProtocolDecl *> PDs) const {
@@ -202,11 +190,6 @@ Optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
 void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
   auto *classDecl = std::get<0>(getStorage());
   classDecl->addMember(value);
-}
-
-evaluator::DependencySource GetDestructorRequest::readDependencySource(
-    const evaluator::DependencyRecorder &eval) const {
-  return eval.getActiveDependencySourceOrNull();
 }
 
 //----------------------------------------------------------------------------//
@@ -355,14 +338,8 @@ swift::extractNearestSourceLoc(const LookupConformanceDescriptor &desc) {
 }
 
 //----------------------------------------------------------------------------//
-// LookupInModuleRequest computation.
+// ModuleQualifiedLookupRequest computation.
 //----------------------------------------------------------------------------//
-
-evaluator::DependencySource ModuleQualifiedLookupRequest::readDependencySource(
-    const evaluator::DependencyRecorder &eval) const {
-  auto *DC = std::get<0>(getStorage());
-  return DC->getParentSourceFile();
-}
 
 void ModuleQualifiedLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker, QualifiedLookupResult l) const {
@@ -409,25 +386,10 @@ void LookupConformanceInModuleRequest::writeDependencySink(
 // UnqualifiedLookupRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource UnqualifiedLookupRequest::readDependencySource(
-    const evaluator::DependencyRecorder &) const {
-  return std::get<0>(getStorage()).DC->getParentSourceFile();
-}
-
 void UnqualifiedLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &track, LookupResult res) const {
   auto &desc = std::get<0>(getStorage());
   track.addTopLevelName(desc.Name.getBaseName());
-}
-
-//----------------------------------------------------------------------------//
-// QualifiedLookupRequest computation.
-//----------------------------------------------------------------------------//
-
-evaluator::DependencySource QualifiedLookupRequest::readDependencySource(
-    const evaluator::DependencyRecorder &) const {
-  auto *DC = std::get<0>(getStorage())->getModuleScopeContext();
-  return dyn_cast<SourceFile>(DC);
 }
 
 // Define request evaluation functions for each of the name lookup requests.
