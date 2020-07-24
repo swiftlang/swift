@@ -28,6 +28,9 @@
 // declarations are shuffled. rdar://problem/46618883
 // UNSUPPORTED: swift_evolve
 
+Protocol _HasContiguousBytes is now with @_fixed_layout
+Protocol _HasCustomAnyHashableRepresentation is now with @_fixed_layout
+Protocol _ObjectiveCBridgeable is now with @_fixed_layout
 Func _prespecialize() is a new API without @available attribute
 Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
 
