@@ -605,6 +605,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
   bool allowConcreteGenericParams = false;
   const auto *genericParams = GC->getGenericParams();
+  const auto *where = GC->getTrailingWhereClause();
+
   if (genericParams) {
     // Setup the depth of the generic parameters.
     const_cast<GenericParamList *>(genericParams)
@@ -619,9 +621,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl())) {
       return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
     }
+  }
 
   // ...or we may only have a contextual where clause.
-  } else if (const auto *where = GC->getTrailingWhereClause()) {
+  if (where) {
     // If there is no generic context for the where clause to
     // rely on, diagnose that now and bail out.
     if (!GC->isGenericContext()) {
@@ -631,9 +634,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                              : diag::where_nongeneric_ctx);
       return nullptr;
     }
+  }
 
+  if (!genericParams && where)
     allowConcreteGenericParams = true;
-  } else {
+
+  if (!genericParams && !where) {
     // We can fast-path computing the generic signature of non-generic
     // declarations by re-using the parent context's signature.
     if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl()))

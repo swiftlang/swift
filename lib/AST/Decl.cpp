@@ -888,8 +888,7 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    SourceLoc RAngleLoc)
   : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
     WhereLoc(WhereLoc), Requirements(Requirements),
-    OuterParameters(nullptr),
-    FirstTrailingWhereArg(Requirements.size())
+    OuterParameters(nullptr)
 {
   std::uninitialized_copy(Params.begin(), Params.end(),
                           getTrailingObjects<GenericTypeParamDecl *>());
@@ -936,27 +935,6 @@ GenericParamList::clone(DeclContext *dc) const {
   }
 
   return GenericParamList::create(ctx, SourceLoc(), params, SourceLoc());
-}
-
-void GenericParamList::addTrailingWhereClause(
-       ASTContext &ctx,
-       SourceLoc trailingWhereLoc,
-       ArrayRef<RequirementRepr> trailingRequirements) {
-  assert(TrailingWhereLoc.isInvalid() &&
-         "Already have a trailing where clause?");
-  TrailingWhereLoc = trailingWhereLoc;
-  FirstTrailingWhereArg = Requirements.size();
-
-  // Create a unified set of requirements.
-  auto newRequirements = ctx.AllocateUninitialized<RequirementRepr>(
-                           Requirements.size() + trailingRequirements.size());
-  std::memcpy(newRequirements.data(), Requirements.data(),
-              Requirements.size() * sizeof(RequirementRepr));
-  std::memcpy(newRequirements.data() + Requirements.size(),
-              trailingRequirements.data(),
-              trailingRequirements.size() * sizeof(RequirementRepr));
-
-  Requirements = newRequirements;
 }
 
 void GenericParamList::setDepth(unsigned depth) {
@@ -1054,9 +1032,7 @@ void GenericContext::setGenericSignature(GenericSignature genericSig) {
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
-  if (auto *params = getParsedGenericParams())
-    return params->getTrailingWhereClauseSourceRange();
-  else if (const auto *where = getTrailingWhereClause())
+  if (const auto *where = getTrailingWhereClause())
     return where->getSourceRange();
 
   return SourceRange();

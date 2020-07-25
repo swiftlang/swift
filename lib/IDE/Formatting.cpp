@@ -1585,6 +1585,8 @@ private:
         return Ctx;
       if (auto Ctx = getIndentContextFrom(AFD->getParsedGenericParams(), ContextLoc, D))
         return Ctx;
+      if (auto Ctx = getIndentContextFrom(AFD->getTrailingWhereClause(), ContextLoc, D))
+        return Ctx;
 
       if (TrailingTarget)
         return None;
@@ -1657,6 +1659,8 @@ private:
       if (auto Ctx = getIndentContextFrom(SD->getIndices(), ContextLoc))
         return Ctx;
       if (auto Ctx = getIndentContextFrom(SD->getParsedGenericParams(), ContextLoc, D))
+        return Ctx;
+      if (auto Ctx = getIndentContextFrom(SD->getTrailingWhereClause(), ContextLoc, D))
         return Ctx;
 
       if (TrailingTarget)
@@ -1753,6 +1757,10 @@ private:
       SourceLoc ContextLoc = TAD->getStartLoc();
 
       if (auto Ctx = getIndentContextFrom(TAD->getParsedGenericParams(), ContextLoc,
+                                          D)) {
+        return Ctx;
+      }
+      if (auto Ctx = getIndentContextFrom(TAD->getTrailingWhereClause(), ContextLoc,
                                           D)) {
         return Ctx;
       }
@@ -1874,11 +1882,6 @@ private:
         return Ctx;
     }
 
-    SourceRange TrailingRange = GP->getTrailingWhereClauseSourceRange();
-    if (auto Ctx = getIndentContextFromWhereClause(GP->getRequirements(),
-                                                   TrailingRange, ContextLoc,
-                                                   WalkableParent))
-      return Ctx;
     return None;
   }
 

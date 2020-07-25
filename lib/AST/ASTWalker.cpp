@@ -142,10 +142,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       for (auto &Req: Where->getRequirements())
         if (doIt(Req))
           return true;
-    } else if (const auto GP = GC->getParsedGenericParams()) {
-      for (auto Req: GP->getTrailingRequirements())
-        if (doIt(Req))
-          return true;
     }
     return false;
   }
@@ -445,7 +441,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     // Visit param conformance
-    for (auto Req : GPL->getNonTrailingRequirements()) {
+    for (auto Req : GPL->getRequirements()) {
       if (doIt(Req))
         return true;
     }
