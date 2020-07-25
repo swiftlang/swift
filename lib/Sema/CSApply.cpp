@@ -7649,6 +7649,13 @@ namespace {
         TapsToTypeCheck.push_back(std::make_pair(tap, Rewriter.dc));
       }
 
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        // Rewrite captures.
+        for (const auto &capture : captureList->getCaptureList()) {
+          (void)rewriteTarget(SolutionApplicationTarget(capture.Init));
+        }
+      }
+
       Rewriter.walkToExprPre(expr);
       return { true, expr };
     }
