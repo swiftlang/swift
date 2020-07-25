@@ -1647,9 +1647,7 @@ public:
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
   ParserStatus
-  parseFreestandingGenericWhereClause(GenericContext *genCtx,
-                                      GenericParamList *&GPList,
-                                      ParseDeclOptions flags);
+  parseFreestandingGenericWhereClause(GenericContext *genCtx);
 
   ParserStatus parseGenericWhereClause(
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,

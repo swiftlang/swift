@@ -898,21 +898,24 @@ TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
     auto decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
     result.insert(result.end(), decls.begin(), decls.end());
   };
-  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint:
-      resolve(req.getSubjectRepr());
-      resolve(req.getConstraintRepr());
-      break;
 
-    case RequirementReprKind::SameType:
-      resolve(req.getFirstTypeRepr());
-      resolve(req.getSecondTypeRepr());
-      break;
+  if (auto *whereClause = ext->getTrailingWhereClause()) {
+    for (const auto &req : whereClause->getRequirements()) {
+      switch (req.getKind()) {
+      case RequirementReprKind::TypeConstraint:
+        resolve(req.getSubjectRepr());
+        resolve(req.getConstraintRepr());
+        break;
 
-    case RequirementReprKind::LayoutConstraint:
-      resolve(req.getSubjectRepr());
-      break;
+      case RequirementReprKind::SameType:
+        resolve(req.getFirstTypeRepr());
+        resolve(req.getSecondTypeRepr());
+        break;
+
+      case RequirementReprKind::LayoutConstraint:
+        resolve(req.getSubjectRepr());
+        break;
+      }
     }
   }
 
@@ -2333,23 +2336,6 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
          outerParams = outerParams->getOuterParameters())
       outerParams->setDepth(depth--);
 
-    // If we have a trailing where clause, deal with it now.
-    // For now, trailing where clauses are only permitted on protocol extensions.
-    if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
-      if (genericParams) {
-        // Merge the trailing where clause into the generic parameter list.
-        // FIXME: Long-term, we'd like clients to deal with the trailing where
-        // clause explicitly, but for now it's far more direct to represent
-        // the trailing where clause as part of the requirements.
-        genericParams->addTrailingWhereClause(
-          ext->getASTContext(),
-          trailingWhereClause->getWhereLoc(),
-          trailingWhereClause->getRequirements());
-      }
-
-      // If there's no generic parameter list, the where clause is diagnosed
-      // in typeCheckDecl().
-    }
     return genericParams;
   } else if (auto *proto = dyn_cast<ProtocolDecl>(value)) {
     // The generic parameter 'Self'.

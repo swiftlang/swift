@@ -561,8 +561,7 @@ namespace {
       };
 
       if (const auto GC = Owner.dyn_cast<const GenericContext *>()) {
-        if (GC->getParsedGenericParams() == nullptr)
-          printWhere(GC->getTrailingWhereClause());
+        printWhere(GC->getTrailingWhereClause());
       } else {
         const auto ATD = Owner.get<const AssociatedTypeDecl *>();
         printWhere(ATD->getTrailingWhereClause());

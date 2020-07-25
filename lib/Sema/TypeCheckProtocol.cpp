@@ -3177,22 +3177,22 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
   }
 
   // Got it! Now try to find the requirement-as-written.
-  GenericParamList *genericParams = nullptr;
+  TrailingWhereClause *where = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(witness))
-    genericParams = func->getGenericParams();
+    where = func->getTrailingWhereClause();
   else if (auto subscript = dyn_cast<SubscriptDecl>(witness))
-    genericParams = subscript->getGenericParams();
+    where = subscript->getTrailingWhereClause();
 
   // A null repr indicates we don't have a valid location to diagnose. But
   // at least we have a requirement we can signal is bogus.
   Optional<std::pair<RequirementRepr *, Requirement>> target
     = std::make_pair((RequirementRepr *)nullptr, Requirement(*it));
-  if (!genericParams) {
+  if (!where) {
     return target;
   }
 
   // Resolve and search for a written requirement to match our bogus one.
-  WhereClauseOwner(cast<GenericContext>(witness), genericParams)
+  WhereClauseOwner(cast<GenericContext>(witness), where)
     .visitRequirements(TypeResolutionStage::Structural,
                        [&](Requirement req, RequirementRepr *repr) {
       if (req.getKind() != RequirementKind::SameType) {
