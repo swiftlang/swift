@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-opt-remark-gen"
 
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -24,6 +25,82 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Given a value, call \p funcPassedInferredArgs for each associated
+/// ValueDecl that is associated with \p value. All created Arguments are
+/// passed the same StringRef. To stop iteration, return false in \p
+/// funcPassedInferedArgs.
+///
+/// NOTE: the function may be called multiple times if the optimizer joined
+/// two live ranges and thus when iterating over value's users we see multiple
+/// debug_value operations.
+struct ValueToDeclInferrer {
+  using Argument = OptRemark::Argument;
+  using ArgumentKeyKind = OptRemark::ArgumentKeyKind;
+
+  bool infer(ArgumentKeyKind keyKind, StringRef msg, SILValue value,
+             function_ref<bool(Argument)> funcPassedInferedArgs);
+};
+
+} // anonymous namespace
+
+bool ValueToDeclInferrer::infer(
+    ArgumentKeyKind keyKind, StringRef msg, SILValue value,
+    function_ref<bool(Argument)> funcPassedInferedArgs) {
+
+  // This is a linear IR traversal using a 'falling while loop'. That means
+  // every time through the loop we are trying to handle a case before we hit
+  // the bottom of the while loop where we always return true (since we did not
+  // hit a could not compute case). Reassign value and continue to go to the
+  // next step.
+  while (true) {
+    // First check for "identified values" like arguments and global_addr.
+    if (auto *arg = dyn_cast<SILArgument>(value))
+      if (auto *decl = arg->getDecl())
+        return funcPassedInferedArgs(
+            Argument({keyKind, "InferredValue"}, msg, decl));
+
+    if (auto *ga = dyn_cast<GlobalAddrInst>(value))
+      if (auto *decl = ga->getReferencedGlobal()->getDecl())
+        if (!funcPassedInferedArgs(
+                Argument({keyKind, "InferredValue"}, msg, decl)))
+          return false;
+
+    // Then visit our users and see if we can find a debug_value that provides
+    // us with a decl we can use to construct an argument.
+    for (auto *use : value->getUses()) {
+      // Skip type dependent uses.
+      if (use->isTypeDependent())
+        continue;
+
+      if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
+        if (auto *decl = dvi->getDecl())
+          if (!funcPassedInferedArgs(
+                  Argument({keyKind, "InferredValue"}, msg, decl)))
+            return false;
+      }
+    }
+
+    // At this point, we could not infer any argument. See if we can look
+    // through loads, geps to construct a ProjectionPath.
+
+    // Finally, see if we can look through a load...
+    if (auto *li = dyn_cast<LoadInst>(value)) {
+      value = stripAccessMarkers(li->getOperand());
+      continue;
+    }
+
+    // If we reached this point, we finished falling through the loop and return
+    // true.
+    return true;
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                        Opt Remark Generator Visitor
 //===----------------------------------------------------------------------===//
 
@@ -34,6 +111,10 @@ struct OptRemarkGeneratorInstructionVisitor
   SILModule &mod;
   RCIdentityFunctionInfo &rcfi;
   OptRemark::Emitter ORE;
+
+  /// A class that we use to infer the decl that is associated with a
+  /// miscellaneous SIL value. This is just a heuristic that is to taste.
+  ValueToDeclInferrer valueToDeclInferrer;
 
   OptRemarkGeneratorInstructionVisitor(SILFunction &fn,
                                        RCIdentityFunctionInfo &rcfi)
@@ -54,7 +135,7 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
     using namespace OptRemark;
     SILValue root = rcfi.getRCIdentityRoot(sri->getOperand());
     SmallVector<Argument, 8> inferredArgs;
-    bool foundArgs = Argument::inferArgumentsForValue(
+    bool foundArgs = valueToDeclInferrer.infer(
         ArgumentKeyKind::Note, "on value:", root, [&](Argument arg) {
           inferredArgs.push_back(arg);
           return true;
@@ -84,7 +165,7 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
     // Releases end a lifetime scope so we infer scan backward.
     SILValue root = rcfi.getRCIdentityRoot(sri->getOperand());
     SmallVector<Argument, 8> inferredArgs;
-    bool foundArgs = Argument::inferArgumentsForValue(
+    bool foundArgs = valueToDeclInferrer.infer(
         ArgumentKeyKind::Note, "on value:", root, [&](Argument arg) {
           inferredArgs.push_back(arg);
           return true;
@@ -111,7 +192,7 @@ void OptRemarkGeneratorInstructionVisitor::visitRetainValueInst(
     using namespace OptRemark;
     SILValue root = rcfi.getRCIdentityRoot(rvi->getOperand());
     SmallVector<Argument, 8> inferredArgs;
-    bool foundArgs = Argument::inferArgumentsForValue(
+    bool foundArgs = valueToDeclInferrer.infer(
         ArgumentKeyKind::Note, "on value:", root, [&](Argument arg) {
           inferredArgs.push_back(arg);
           return true;
@@ -140,7 +221,7 @@ void OptRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
     using namespace OptRemark;
     SILValue root = rcfi.getRCIdentityRoot(rvi->getOperand());
     SmallVector<Argument, 8> inferredArgs;
-    bool foundArgs = Argument::inferArgumentsForValue(
+    bool foundArgs = valueToDeclInferrer.infer(
         ArgumentKeyKind::Note, "on value:", root, [&](Argument arg) {
           inferredArgs.push_back(arg);
           return true;
