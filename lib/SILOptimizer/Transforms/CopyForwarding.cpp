@@ -200,7 +200,7 @@ public:
 
 /// Gather all instructions that use the given `address`
 ///
-/// "Normal" uses are a whitelisted set of uses that guarantees the address is
+/// "Normal" uses are a allowlisted set of uses that guarantees the address is
 /// only used as if it refers to a single value and all uses are accounted for
 /// (no address projections).
 ///
