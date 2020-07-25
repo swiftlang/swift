@@ -3,7 +3,7 @@
 
 // Unsupported on Windows because we are using #import in ObjC, which leads
 // to compiler errors on Windows.
-// UNSUPPORTED: OS=Windows
+// UNSUPPORTED: OS=windows-msvc
 
 // Dependency graph:
 
