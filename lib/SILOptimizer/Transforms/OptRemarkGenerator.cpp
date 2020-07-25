@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -42,14 +43,18 @@ struct ValueToDeclInferrer {
   using Argument = OptRemark::Argument;
   using ArgumentKeyKind = OptRemark::ArgumentKeyKind;
 
-  bool infer(ArgumentKeyKind keyKind, StringRef msg, SILValue value,
+  bool infer(ArgumentKeyKind keyKind, SILValue value,
              function_ref<bool(Argument)> funcPassedInferedArgs);
 };
 
 } // anonymous namespace
 
+static void printNote(llvm::raw_string_ostream &stream, const ValueDecl *decl) {
+  stream << "of '" << decl->getBaseName() << "'";
+}
+
 bool ValueToDeclInferrer::infer(
-    ArgumentKeyKind keyKind, StringRef msg, SILValue value,
+    ArgumentKeyKind keyKind, SILValue value,
     function_ref<bool(Argument)> funcPassedInferedArgs) {
 
   // This is a linear IR traversal using a 'falling while loop'. That means
@@ -60,15 +65,27 @@ bool ValueToDeclInferrer::infer(
   while (true) {
     // First check for "identified values" like arguments and global_addr.
     if (auto *arg = dyn_cast<SILArgument>(value))
-      if (auto *decl = arg->getDecl())
+      if (auto *decl = arg->getDecl()) {
+        std::string msg;
+        {
+          llvm::raw_string_ostream stream(msg);
+          printNote(stream, decl);
+        }
         return funcPassedInferedArgs(
-            Argument({keyKind, "InferredValue"}, msg, decl));
+            Argument({keyKind, "InferredValue"}, std::move(msg), decl));
+      }
 
     if (auto *ga = dyn_cast<GlobalAddrInst>(value))
-      if (auto *decl = ga->getReferencedGlobal()->getDecl())
+      if (auto *decl = ga->getReferencedGlobal()->getDecl()) {
+        std::string msg;
+        {
+          llvm::raw_string_ostream stream(msg);
+          printNote(stream, decl);
+        }
         if (!funcPassedInferedArgs(
-                Argument({keyKind, "InferredValue"}, msg, decl)))
+                Argument({keyKind, "InferredValue"}, std::move(msg), decl)))
           return false;
+      }
 
     // Then visit our users and see if we can find a debug_value that provides
     // us with a decl we can use to construct an argument.
@@ -78,15 +95,23 @@ bool ValueToDeclInferrer::infer(
         continue;
 
       if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
-        if (auto *decl = dvi->getDecl())
+        if (auto *decl = dvi->getDecl()) {
+          std::string msg;
+          {
+            llvm::raw_string_ostream stream(msg);
+            printNote(stream, decl);
+          }
           if (!funcPassedInferedArgs(
-                  Argument({keyKind, "InferredValue"}, msg, decl)))
+                  Argument({keyKind, "InferredValue"}, std::move(msg), decl)))
             return false;
+        }
       }
     }
 
     // At this point, we could not infer any argument. See if we can look
-    // through loads, geps to construct a ProjectionPath.
+    // through loads.
+    //
+    // TODO: Add GEPs to construct a ProjectionPath.
 
     // Finally, see if we can look through a load...
     if (auto *li = dyn_cast<LoadInst>(value)) {
@@ -135,24 +160,19 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
     using namespace OptRemark;
     SILValue root = rcfi.getRCIdentityRoot(sri->getOperand());
     SmallVector<Argument, 8> inferredArgs;
-    bool foundArgs = valueToDeclInferrer.infer(
-        ArgumentKeyKind::Note, "on value:", root, [&](Argument arg) {
-          inferredArgs.push_back(arg);
-          return true;
-        });
+    bool foundArgs = valueToDeclInferrer.infer(ArgumentKeyKind::Note, root,
+                                               [&](Argument arg) {
+                                                 inferredArgs.push_back(arg);
+                                                 return true;
+                                               });
     (void)foundArgs;
 
     // Retains begin a lifetime scope so we infer scan forward.
-    auto remark = RemarkMissed("memory-management", *sri,
+    auto remark = RemarkMissed("memory", *sri,
                                SourceLocInferenceBehavior::ForwardScanOnly)
-                  << "Found retain:";
-    if (inferredArgs.empty()) {
-      remark << Argument({ArgumentKeyKind::ParentLocNote, "InferValueFailure"},
-                         "Unable to infer any values being retained.");
-    } else {
-      for (auto arg : inferredArgs) {
-        remark << arg;
-      }
+                  << "retain";
+    for (auto arg : inferredArgs) {
+      remark << arg;
     }
     return remark;
   });
@@ -165,22 +185,18 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
     // Releases end a lifetime scope so we infer scan backward.
     SILValue root = rcfi.getRCIdentityRoot(sri->getOperand());
     SmallVector<Argument, 8> inferredArgs;
-    bool foundArgs = valueToDeclInferrer.infer(
-        ArgumentKeyKind::Note, "on value:", root, [&](Argument arg) {
-          inferredArgs.push_back(arg);
-          return true;
-        });
+    bool foundArgs = valueToDeclInferrer.infer(ArgumentKeyKind::Note, root,
+                                               [&](Argument arg) {
+                                                 inferredArgs.push_back(arg);
+                                                 return true;
+                                               });
     (void)foundArgs;
-    auto remark = RemarkMissed("memory-management", *sri,
+
+    auto remark = RemarkMissed("memory", *sri,
                                SourceLocInferenceBehavior::BackwardScanOnly)
-                  << "Found release:";
-    if (inferredArgs.empty()) {
-      remark << Argument({ArgumentKeyKind::ParentLocNote, "InferValueFailure"},
-                         "Unable to infer any values being released.");
-    } else {
-      for (auto arg : inferredArgs) {
-        remark << arg;
-      }
+                  << "release";
+    for (auto arg : inferredArgs) {
+      remark << arg;
     }
     return remark;
   });
@@ -192,24 +208,19 @@ void OptRemarkGeneratorInstructionVisitor::visitRetainValueInst(
     using namespace OptRemark;
     SILValue root = rcfi.getRCIdentityRoot(rvi->getOperand());
     SmallVector<Argument, 8> inferredArgs;
-    bool foundArgs = valueToDeclInferrer.infer(
-        ArgumentKeyKind::Note, "on value:", root, [&](Argument arg) {
-          inferredArgs.push_back(arg);
-          return true;
-        });
+    bool foundArgs = valueToDeclInferrer.infer(ArgumentKeyKind::Note, root,
+                                               [&](Argument arg) {
+                                                 inferredArgs.push_back(arg);
+                                                 return true;
+                                               });
     (void)foundArgs;
 
     // Retains begin a lifetime scope, so we infer scan forwards.
-    auto remark = RemarkMissed("memory-management", *rvi,
+    auto remark = RemarkMissed("memory", *rvi,
                                SourceLocInferenceBehavior::ForwardScanOnly)
-                  << "Found retain:";
-    if (inferredArgs.empty()) {
-      remark << Argument({ArgumentKeyKind::ParentLocNote, "InferValueFailure"},
-                         "Unable to infer any values being retained.");
-    } else {
-      for (auto arg : inferredArgs) {
-        remark << arg;
-      }
+                  << "retain";
+    for (auto arg : inferredArgs) {
+      remark << arg;
     }
     return remark;
   });
@@ -221,26 +232,20 @@ void OptRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
     using namespace OptRemark;
     SILValue root = rcfi.getRCIdentityRoot(rvi->getOperand());
     SmallVector<Argument, 8> inferredArgs;
-    bool foundArgs = valueToDeclInferrer.infer(
-        ArgumentKeyKind::Note, "on value:", root, [&](Argument arg) {
-          inferredArgs.push_back(arg);
-          return true;
-        });
+    bool foundArgs = valueToDeclInferrer.infer(ArgumentKeyKind::Note, root,
+                                               [&](Argument arg) {
+                                                 inferredArgs.push_back(arg);
+                                                 return true;
+                                               });
     (void)foundArgs;
 
     // Releases end a lifetime scope so we infer scan backward.
-    auto remark = RemarkMissed("memory-management", *rvi,
+    auto remark = RemarkMissed("memory", *rvi,
                                SourceLocInferenceBehavior::BackwardScanOnly)
-                  << "Found release:";
-    if (inferredArgs.empty()) {
-      remark << Argument({ArgumentKeyKind::ParentLocNote, "InferValueFailure"},
-                         "Unable to infer any values being released.");
-    } else {
-      for (auto arg : inferredArgs) {
-        remark << arg;
-      }
+                  << "release";
+    for (auto arg : inferredArgs) {
+      remark << arg;
     }
-
     return remark;
   });
 }
