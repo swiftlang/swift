@@ -41,12 +41,15 @@ struct ModuleInterfaceOptions {
   /// back .swiftinterface and reconstructing .swiftmodule.
   std::string Flags;
 
-  // Print SPI decls and attributes.
+  /// Print SPI decls and attributes.
   bool PrintSPIs = false;
 
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.
   bool ExperimentalSPIImports = false;
+
+  /// Intentionally print invalid syntax into the file.
+  bool DebugPrintInvalidSyntax = false;
 };
 
 extern version::Version InterfaceFormatVersion;

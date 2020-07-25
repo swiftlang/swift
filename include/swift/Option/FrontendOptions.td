@@ -256,6 +256,9 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
 
+def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-swiftinterface-syntax">,
+  HelpText<"Write an invalid declaration into swiftinterface files">;
+
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
 def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
