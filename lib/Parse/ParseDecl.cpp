@@ -2728,7 +2728,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   case DAK_RequiresSuper: {
     // There is no message with the attribute.
     if (Tok.isNot(tok::l_paren)) {
-      Attributes.add(new (Context) RequiresSuperAttr(None, AtLoc, AttrRange,
+      Attributes.add(new (Context) RequiresSuperAttr(None, AtLoc, {Loc, Loc},
                                                      /*Implicit*/ false));
       break;
     }
@@ -2752,8 +2752,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     consumeToken(tok::string_literal);
 
     if (Message.hasValue()) {
-      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-
       // The message cannot be empty!
       if (Message.getValue().empty()) {
         diagnose(Loc, diag::requires_super_attr_empty_message);
@@ -2767,6 +2765,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                DeclAttribute::isDeclModifier(DK));
       return false;
     }
+
+    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
 
     Attributes.add(new (Context) RequiresSuperAttr(Message, AtLoc, AttrRange,
                                                    /*Implicit*/ false));
