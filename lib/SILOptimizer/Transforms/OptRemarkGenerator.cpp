@@ -35,9 +35,9 @@ struct OptRemarkGeneratorInstructionVisitor
   RCIdentityFunctionInfo &rcfi;
   OptRemark::Emitter ORE;
 
-  OptRemarkGeneratorInstructionVisitor(SILModule &mod,
+  OptRemarkGeneratorInstructionVisitor(SILFunction &fn,
                                        RCIdentityFunctionInfo &rcfi)
-      : mod(mod), rcfi(rcfi), ORE(DEBUG_TYPE, mod) {}
+      : mod(fn.getModule()), rcfi(rcfi), ORE(DEBUG_TYPE, fn) {}
 
   void visitStrongRetainInst(StrongRetainInst *sri);
   void visitStrongReleaseInst(StrongReleaseInst *sri);
@@ -174,13 +174,13 @@ class OptRemarkGenerator : public SILFunctionTransform {
   ~OptRemarkGenerator() override {}
 
   bool isOptRemarksEnabled() {
+    auto *fn = getFunction();
     // TODO: Put this on LangOpts as a helper.
-    auto &langOpts = getFunction()->getASTContext().LangOpts;
+    auto &langOpts = fn->getASTContext().LangOpts;
 
-    // If we have a remark streamer, emit everything.
     return bool(langOpts.OptimizationRemarkMissedPattern) ||
            bool(langOpts.OptimizationRemarkPassedPattern) ||
-           getFunction()->getModule().getSILRemarkStreamer();
+           fn->getModule().getSILRemarkStreamer();
   }
 
   /// The entry point to the transformation.
@@ -191,7 +191,7 @@ class OptRemarkGenerator : public SILFunctionTransform {
     auto *fn = getFunction();
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << fn->getName() << "\n");
     auto &rcfi = *getAnalysis<RCIdentityAnalysis>()->get(fn);
-    OptRemarkGeneratorInstructionVisitor visitor(fn->getModule(), rcfi);
+    OptRemarkGeneratorInstructionVisitor visitor(*fn, rcfi);
     for (auto &block : *fn) {
       for (auto &inst : block) {
         visitor.visit(&inst);

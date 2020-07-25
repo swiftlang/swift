@@ -144,15 +144,15 @@ std::string Remark<DerivedT>::getDebugMsg() const {
   return stream.str();
 }
 
-Emitter::Emitter(StringRef passName, SILModule &m)
-    : module(m), passName(passName),
+Emitter::Emitter(StringRef passName, SILFunction &fn)
+    : fn(fn), passName(passName),
       passedEnabled(
-          m.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
-          m.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
+          fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
+          fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
               passName)),
       missedEnabled(
-          m.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
-          m.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
+          fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
+          fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
               passName)) {}
 
 /// The user has passed us an instruction that for some reason has a source loc
@@ -240,10 +240,12 @@ SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
 }
 
 template <typename RemarkT, typename... ArgTypes>
-static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,
+static void emitRemark(SILFunction &fn, const Remark<RemarkT> &remark,
                        Diag<ArgTypes...> id, bool diagEnabled) {
   if (remark.getLocation().isInvalid())
     return;
+
+  auto &module = fn.getModule();
   if (auto *remarkStreamer = module.getSILRemarkStreamer())
     remarkStreamer->emit(remark);
 
@@ -273,13 +275,11 @@ static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,
 }
 
 void Emitter::emit(const RemarkPassed &remark) {
-  emitRemark(module, remark, diag::opt_remark_passed,
-             isEnabled<RemarkPassed>());
+  emitRemark(fn, remark, diag::opt_remark_passed, isEnabled<RemarkPassed>());
 }
 
 void Emitter::emit(const RemarkMissed &remark) {
-  emitRemark(module, remark, diag::opt_remark_missed,
-             isEnabled<RemarkMissed>());
+  emitRemark(fn, remark, diag::opt_remark_missed, isEnabled<RemarkMissed>());
 }
 
 void Emitter::emitDebug(const RemarkPassed &remark) {
