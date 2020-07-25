@@ -1456,12 +1456,12 @@ namespace  {
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
-    UNINTERESTING_ATTR(IgnoresSuper)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Inlinable)
+    UNINTERESTING_ATTR(IgnoresSuper)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Final)
     UNINTERESTING_ATTR(FixedLayout)
@@ -1480,7 +1480,6 @@ namespace  {
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(Required)
-    UNINTERESTING_ATTR(RequiresSuper)
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(SetterAccess)
@@ -1610,6 +1609,17 @@ namespace  {
       Diags.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
         .fixItInsert(Base->getAttributeInsertionLoc(false),
                      "@objc ");
+    }
+
+    void visitRequiresSuperAttr(RequiresSuperAttr *attr) {
+      // Add the @requiresSuper attribute to the override, unless it's final.
+      auto &C = Override->getASTContext();
+      auto attrs = Override->getAttrs();
+      if (!attrs.hasAttribute<RequiresSuperAttr>() &&
+          !attrs.hasAttribute<IgnoresSuperAttr>() && !Override->isFinal()) {
+        Override->getAttrs().add(new (C)
+                                     RequiresSuperAttr(attr->Message, true));
+      }
     }
   };
 } // end anonymous namespace
