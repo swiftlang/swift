@@ -803,8 +803,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitCaptureListExpr(CaptureListExpr *expr) {
     for (auto c : expr->getCaptureList()) {
-      if (doIt(c.Var) || doIt(c.Init))
+      if (Walker.shouldWalkCaptureInitializerExpressions()) {
+        for (auto entryIdx : range(c.Init->getNumPatternEntries())) {
+          if (auto newInit = doIt(c.Init->getInit(entryIdx)))
+            c.Init->setInit(entryIdx, newInit);
+          else
+            return nullptr;
+        }
+      } else if (doIt(c.Var) || doIt(c.Init)) {
         return nullptr;
+      }
     }
 
     ClosureExpr *body = expr->getClosureBody();

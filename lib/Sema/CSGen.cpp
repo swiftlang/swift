@@ -2783,6 +2783,8 @@ namespace {
 
         CollectVarRefs(ConstraintSystem &cs) : cs(cs) { }
 
+        bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           // If there are any error expressions in this closure
           // it wouldn't be possible to infer its type.
@@ -3733,6 +3735,16 @@ namespace {
         if (keyPath->isObjC()) {
           auto &cs = CG.getConstraintSystem();
           (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
+        }
+      }
+
+      // Generate constraints for each of the entries in the capture list.
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        auto &CS = CG.getConstraintSystem();
+        for (const auto &capture : captureList->getCaptureList()) {
+          SolutionApplicationTarget target(capture.Init);
+          if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+            return {false, nullptr};
         }
       }
 
