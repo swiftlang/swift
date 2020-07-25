@@ -2295,38 +2295,28 @@ private:
   union {
     /// A direct reference to a nominal type descriptor.
     RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime>,
-                                 TypeReferenceKind>
+                                 TypeMetadataRecordKind>
       DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
     RelativeDirectPointerIntPair<TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>,
-                                 TypeReferenceKind>
+                                 TypeMetadataRecordKind>
       IndirectNominalTypeDescriptor;
-
-    // We only allow a subset of the TypeReferenceKinds here.
-    // Should we just acknowledge that this is a different enum?
   };
 
 public:
-  TypeReferenceKind getTypeKind() const {
+  TypeMetadataRecordKind getTypeKind() const {
     return DirectNominalTypeDescriptor.getInt();
   }
   
   const TargetContextDescriptor<Runtime> *
   getContextDescriptor() const {
     switch (getTypeKind()) {
-    case TypeReferenceKind::DirectTypeDescriptor:
+    case TypeMetadataRecordKind::DirectTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeReferenceKind::IndirectTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectTypeDescriptor:
       return *IndirectNominalTypeDescriptor.getPointer();
-
-    // These types (and any others we might add to TypeReferenceKind
-    // in the future) are just never used in these lists.
-    case TypeReferenceKind::DirectObjCClassName:
-    case TypeReferenceKind::IndirectObjCClass:
-    case TypeReferenceKind::MetadataKind:
-      return nullptr;
     }
     
     return nullptr;

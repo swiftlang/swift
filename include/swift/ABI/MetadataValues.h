@@ -361,7 +361,19 @@ enum : unsigned {
   NumGenericMetadataPrivateDataWords = 16,
 };
 
-/// Kinds of type metadata/protocol conformance records.
+/// Kinds of type metadata reocrds.
+enum class TypeMetadataRecordKind : unsigned {
+  /// A direct reference to a nominal type descriptor.
+  DirectTypeDescriptor = 0x00,
+
+  /// An indirect reference to a nominal type descriptor.
+  IndirectTypeDescriptor = 0x01,
+
+  First_Kind = DirectTypeDescriptor,
+  Last_Kind = IndirectTypeDescriptor,
+};
+
+/// Kinds of references to type metadata.
 enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
   /// getTypeDescriptor() points to the type context descriptor.
