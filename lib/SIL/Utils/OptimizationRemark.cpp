@@ -77,42 +77,6 @@ Argument::Argument(StringRef key, CanType ty)
   ty.print(stream);
 }
 
-bool Argument::inferArgumentsForValue(
-    ArgumentKeyKind keyKind, StringRef msg, SILValue value,
-    function_ref<bool(Argument)> funcPassedInferedArgs) {
-
-  while (true) {
-    // If we have an argument, just use that.
-    if (auto *arg = dyn_cast<SILArgument>(value))
-      if (auto *decl = arg->getDecl())
-        return funcPassedInferedArgs(
-            Argument({keyKind, "InferredValue"}, msg, decl));
-
-    // Otherwise, look for debug_values.
-    for (auto *use : getDebugUses(value))
-      if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-        if (auto *decl = dvi->getDecl())
-          if (!funcPassedInferedArgs(
-                  Argument({keyKind, "InferredValue"}, msg, decl)))
-            return false;
-
-    // If we have a load, look through it and continue. We may have a global or
-    // a function argument.
-    if (auto *li = dyn_cast<LoadInst>(value)) {
-      value = stripAccessMarkers(li->getOperand());
-      continue;
-    }
-
-    if (auto *ga = dyn_cast<GlobalAddrInst>(value))
-      if (auto *decl = ga->getReferencedGlobal()->getDecl())
-        if (!funcPassedInferedArgs(
-                Argument({keyKind, "InferredValue"}, msg, decl)))
-          return false;
-
-    return true;
-  }
-}
-
 template <typename DerivedT>
 std::string Remark<DerivedT>::getMsg() const {
   std::string str;
